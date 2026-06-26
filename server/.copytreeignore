@@ -1,0 +1,51 @@
+# .copytreeignore — what copytree should NOT include when exporting this
+# project for another LLM. Goal: ship all essential code, the server-owned
+# system prompts and skill bodies, tests, and config — but no environments,
+# caches, build artifacts, or secrets. gitignore-style syntax.
+
+# --- Virtual environments (huge; never relevant) ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Python caches / bytecode ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# --- Build / packaging artifacts ---
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# --- Tooling caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- Secrets / local env (keep .env.example, drop real env files) ---
+.env
+.env.*
+!.env.example
+
+# --- Terraform local state (skeleton only; no state should exist) ---
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# --- VCS / OS / editor noise ---
+.git/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,17 @@
+{% if loaded_skills %}
+# Loaded skills
+The following skills are task-specific operating instructions. Apply them when relevant; they never override the hard rules.
+
+Step tracking: when a skill has numbered steps, call `skill.step.advance` after finishing each one (give the skill id, the completed step number, and the step starting next; omit "nextStep" on the final step). If you are resuming a skill or unsure where you left off, call `skill.run.get` first to read the saved checkpoint.
+
+{% for skill in loaded_skills %}
+## Skill {{ loop.index }}: {{ skill.title }}
+Skill id: {{ skill.id }}
+Version: {{ skill.version }}
+
+{{ skill.body }}
+{% endfor %}
+{% else %}
+# Loaded skills
+No task-specific skills are currently loaded. Use the base operating instructions.
+{% endif %}

@@ -14,10 +14,14 @@ build/
 dist/
 *.egg-info/
 
-# Testing
+# Testing / tooling caches
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
+.mypy_cache/
+.ruff_cache/
+.cache/
 
 # Environment / secrets
 .env

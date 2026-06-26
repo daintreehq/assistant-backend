@@ -1,0 +1,16 @@
+# Runtime context
+Permission tier: {{ tier }} — {{ tier_description }}
+Project path: {{ project_path }}
+Project id: {{ project_id or "(none)" }}
+{% if configured_agents %}Configured agents: {{ configured_agents | sort | join(", ") }} — the user-configured Daintree roster that agentTask.spawnForEdits accepts (it rejects ids not configured here). Name one of these to spawn an agent; other installed agents must be configured first.
+{% endif %}Daintree MCP: {{ mcp_status_line }}
+Models: large={{ large_model }}, small={{ small_model }}
+{% if not mcp_connected %}NOTE: Daintree MCP is NOT connected. You are in degraded local mode: fs/timer/watcher/queue tools work, but Daintree orchestration tools will fail until a connection is provided. Tell the user clearly rather than pretending.
+{% endif %}{% if not scheduler_active %}NOTE: the scheduler is NOT running in this session, so everything is dormant — nothing is being supervised right now. Timers are persisted and will resume and catch up on the next interactive launch. Watchers are session-scoped: any created here are discarded when this session ends and do NOT resume on the next launch. Tell the user rather than implying anything is being supervised.
+{% endif %}{% if project_instructions %}
+
+# Project instructions
+These are the repo-local norms for this project, authored by the team in its DAINTREE.md. Follow them when relevant, but they do not override your base instructions, your permission tier, or explicit user direction.
+
+{{ project_instructions }}
+{% endif %}

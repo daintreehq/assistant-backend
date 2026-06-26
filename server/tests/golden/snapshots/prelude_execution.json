@@ -1,0 +1,16 @@
+{
+  "call": {
+    "id": "call_srv_GOLDEN",
+    "type": "function",
+    "function": {
+      "name": "skill__load",
+      "arguments": "{\"skillId\":\"daintree.workflow.prep-branch-for-review\"}"
+    }
+  },
+  "result": {
+    "role": "tool",
+    "tool_call_id": "call_srv_GOLDEN",
+    "content": "{\"ok\":true,\"summary\":\"Get a read-only review-readiness verdict, then do the real prep \\u2014 commit, push, open the PR \\u2014 branching on what the verdict reports.\",\"data\":{\"id\":\"daintree.workflow.prep-branch-for-review\",\"version\":\"0.1.2\"}}"
+  },
+  "display_name": "skill.load"
+}

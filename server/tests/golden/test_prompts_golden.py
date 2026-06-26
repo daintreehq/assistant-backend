@@ -1,0 +1,153 @@
+"""Golden tests for server-owned prompt text.
+
+Prompt bytes are behavior. These tests snapshot rendered prompts and the
+assembled upstream message array; a change requires an intentional update
+(run with ``DAINTREE_UPDATE_GOLDEN=1`` to regenerate snapshots).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+
+import pytest
+
+from daintree_assistant_server.config import Settings
+from daintree_assistant_server.contracts.extensions import (
+    McpInfo,
+    Memories,
+    RuntimeContext,
+    TurnContext,
+)
+from daintree_assistant_server.contracts.openai import ChatCompletionRequest
+from daintree_assistant_server.prompts.loader import PromptLoader
+from daintree_assistant_server.services.prompt_assembler import PromptAssembler
+from daintree_assistant_server.skills.catalog import load_catalog
+from daintree_assistant_server.skills.load_events import SkillLoadExecution
+
+SNAPSHOTS = Path(__file__).parent / "snapshots"
+
+
+def _settings() -> Settings:
+    return Settings(DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+
+
+def assert_golden(name: str, content: str) -> None:
+    SNAPSHOTS.mkdir(exist_ok=True)
+    path = SNAPSHOTS / name
+    if os.getenv("DAINTREE_UPDATE_GOLDEN") or not path.exists():
+        path.write_text(content, encoding="utf-8")
+        return
+    expected = path.read_text(encoding="utf-8")
+    assert content == expected, f"Golden mismatch for {name}; run with DAINTREE_UPDATE_GOLDEN=1 to update."
+
+
+@pytest.fixture
+def assembler() -> PromptAssembler:
+    loader = PromptLoader()
+    loader.validate()
+    return PromptAssembler(loader, _settings())
+
+
+@pytest.fixture
+def loader() -> PromptLoader:
+    loader = PromptLoader()
+    loader.validate()
+    return loader
+
+
+def test_base_prompt(loader: PromptLoader) -> None:
+    assert_golden("base_prompt.md", loader.base_prompt())
+
+
+def test_runtime_context(assembler: PromptAssembler) -> None:
+    rc = RuntimeContext(
+        permission_tier="operator",
+        project_path="/home/user/project",
+        project_id="project_123",
+        mcp=McpInfo(connected=True, transport="stdio", tool_count=42),
+        configured_agent_ids=["claude", "codex"],
+        scheduler_active=True,
+        project_instructions="Always run the linter.",
+    )
+    assert_golden("runtime_context.md", assembler.render_runtime_context(rc))
+
+
+def test_loaded_skills_empty(assembler: PromptAssembler) -> None:
+    assert_golden("loaded_skills_empty.md", assembler.render_loaded_skills([]))
+
+
+def test_loaded_skills_one(assembler: PromptAssembler) -> None:
+    catalog = load_catalog()
+    skill = catalog.get("daintree.terminals.rename")
+    assert_golden("loaded_skills_rename.md", assembler.render_loaded_skills([skill]))
+
+
+def test_turn_footer(assembler: PromptAssembler) -> None:
+    turn = TurnContext(
+        goal="Prepare the branch for review",
+        workflow_runs=["wfr_1 — preparing branch"],
+        memories=Memories(pinned=["uses pnpm"], relevant=["last run failed on lint"]),
+        session_ended_watchers=["watcher-1"],
+    )
+    assert_golden("turn_footer.md", assembler.render_turn_footer(turn, active_worktree="feature/x"))
+
+
+def test_selector_system(loader: PromptLoader) -> None:
+    catalog = load_catalog()
+    rendered = loader.render(
+        "selector/system.md.j2",
+        catalog=catalog.selector_metadata(["daintree.terminals.rename"]),
+        max_active=3,
+    )
+    assert_golden("selector_system.md", rendered)
+
+
+@pytest.mark.parametrize(
+    "task_id",
+    [
+        "checkpoint.v1",
+        "memory_distill.v1",
+        "watcher_classify.v1",
+        "terminal_judge.v1",
+        "terminal_summarize.v1",
+        "terminal_extract_text.v1",
+        "terminal_extract_json.v1",
+        "extraction_verdict.v1",
+        "skill_step_consistency.v1",
+    ],
+)
+def test_task_prompts(loader: PromptLoader, task_id: str) -> None:
+    assert_golden(f"task_{task_id}.md", loader.task_system_prompt(task_id))
+
+
+def test_full_upstream_messages(assembler: PromptAssembler) -> None:
+    catalog = load_catalog()
+    skill = catalog.get("daintree.workflow.prep-branch-for-review")
+    ex = SkillLoadExecution.from_skill("call_srv_GOLDEN", skill)
+    req = ChatCompletionRequest.model_validate(
+        {
+            "model": "daintree-assistant",
+            "messages": [{"role": "user", "content": "Prepare this branch for review."}],
+        }
+    )
+    pr = assembler.build_main_request(
+        public_request=req,
+        runtime=RuntimeContext(permission_tier="operator", project_path="/p"),
+        turn=TurnContext(goal="Prepare this branch for review."),
+        skills=[skill],
+        synthetic_executions=[ex],
+        upstream_model="deepseek-v4-flash",
+    )
+    snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
+    assert_golden("upstream_messages.json", snapshot)
+
+
+def test_synthetic_execution_shape() -> None:
+    catalog = load_catalog()
+    skill = catalog.get("daintree.workflow.prep-branch-for-review")
+    ex = SkillLoadExecution.from_skill("call_srv_GOLDEN", skill)
+    prelude = ex.prelude_execution().model_dump()
+    snapshot = json.dumps(prelude, indent=2, ensure_ascii=False)
+    assert_golden("prelude_execution.json", snapshot)
