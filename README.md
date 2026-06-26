@@ -59,6 +59,10 @@ mypy src/
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 ```
 
+CI (`.github/workflows/ci.yml`) runs ruff + `mypy --strict` + pytest on every
+push/PR. Runtime dependencies are pinned in `requirements.lock` (a constraints
+file the Docker build installs against for reproducibility).
+
 ### Required configuration
 
 Set these (see `.env.example` for the full list):
@@ -97,10 +101,15 @@ Skill/selection metadata is delivered in the response body's `skills` block
 ## Deployment
 
 A multi-stage `Dockerfile` produces a minimal non-root image listening on
-`$PORT`. The recommended production edge is a global external Application Load
-Balancer with a serverless NEG to Cloud Run, a Google-managed TLS certificate,
-and Cloud Armor. Secrets come from Secret Manager. See `infra/terraform/` for a
-skeleton; secret values are never committed to Terraform state.
+`$PORT`. `infra/terraform/` is **staging-first**: the defaults expose the direct
+Cloud Run URL (`INGRESS_TRAFFIC_ALL`, app bearer auth as the gate) for smoke
+testing, with the production external load balancer / managed cert / DNS / Cloud
+Armor edge documented as a deferred step. Secrets come from Secret Manager and
+are never committed to Terraform state. See `infra/terraform/README.md` for the
+staging and production paths and a curl smoke-test script.
+
+In production (`ENVIRONMENT=production`) the service fails readiness if a secret
+is weak or default (e.g. the default `STATE_SALT`, a short signing key).
 
 ## License
 

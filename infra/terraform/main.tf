@@ -36,7 +36,7 @@ resource "google_secret_manager_secret_iam_member" "secret_access" {
 resource "google_cloud_run_v2_service" "service" {
   name     = var.service_name
   location = var.region
-  ingress  = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  ingress  = var.ingress
 
   template {
     service_account = google_service_account.runtime.email
@@ -64,7 +64,7 @@ resource "google_cloud_run_v2_service" "service" {
 
       env {
         name  = "ENVIRONMENT"
-        value = "production"
+        value = var.environment
       }
 
       # Secret-backed environment variables.
@@ -103,7 +103,21 @@ resource "google_cloud_run_v2_service" "service" {
   }
 }
 
-# NOTE: The external Application Load Balancer (global IP, serverless NEG,
-# Google-managed certificate for var.domain, HTTPS redirect, optional Cloud
-# Armor) is intentionally omitted from this skeleton; add it when wiring the
-# production edge. Do not enable CDN caching on authenticated routes.
+# Staging: make the direct *.run.app URL reachable with just the app bearer key.
+# Set allow_unauthenticated = false once the service sits behind the load
+# balancer / IAP and Google IAM gates invocation.
+resource "google_cloud_run_v2_service_iam_member" "invoker" {
+  count    = var.allow_unauthenticated ? 1 : 0
+  name     = google_cloud_run_v2_service.service.name
+  location = google_cloud_run_v2_service.service.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# PRODUCTION EDGE (deferred): for assistant.daintree.org, set
+# ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER", allow_unauthenticated =
+# false, and add a global external Application Load Balancer — global IP, a
+# serverless NEG targeting this service, backend service, URL map, HTTPS proxy,
+# a Google-managed certificate for var.domain, a forwarding rule, a DNS A
+# record, and optionally Cloud Armor. Do NOT enable CDN caching on authenticated
+# routes. See infra/terraform/README.md.

@@ -35,6 +35,40 @@ def test_missing_secrets_empty_when_present() -> None:
     assert _settings().missing_secrets() == []
 
 
+def test_weak_secrets_allowed_in_development() -> None:
+    # Short test keys + default salt are fine in development.
+    assert _settings().weak_secrets() == []
+
+
+def test_weak_secrets_flagged_in_production() -> None:
+    s = _settings(ENVIRONMENT="production")  # short keys + default salt
+    problems = s.weak_secrets()
+    assert any("STATE_SALT" in p for p in problems)
+    assert any("DAINTREE_API_KEY" in p for p in problems)
+    assert any("STATE_SIGNING_KEY_CURRENT" in p for p in problems)
+
+
+def test_strong_production_secrets_pass() -> None:
+    s = _settings(
+        ENVIRONMENT="production",
+        DAINTREE_API_KEY="x" * 24,
+        STATE_SIGNING_KEY_CURRENT="y" * 48,
+        STATE_SALT="a-real-random-salt-value",
+    )
+    assert s.weak_secrets() == []
+
+
+def test_production_previous_key_must_pair_with_kid() -> None:
+    s = _settings(
+        ENVIRONMENT="production",
+        DAINTREE_API_KEY="x" * 24,
+        STATE_SIGNING_KEY_CURRENT="y" * 48,
+        STATE_SALT="a-real-random-salt-value",
+        STATE_SIGNING_KEY_PREVIOUS="z" * 48,  # no kid → inconsistent
+    )
+    assert any("PREVIOUS" in p for p in s.weak_secrets())
+
+
 def test_secret_not_in_repr() -> None:
     s = _settings()
     assert "secret" not in repr(s)

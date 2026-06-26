@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
+from ..config import PUBLIC_MODEL_ID
 from .deps import require_ready
 
 router = APIRouter()
@@ -24,7 +25,7 @@ async def capabilities(
         "protocol": {"min": PROTOCOL_MIN, "max": PROTOCOL_MAX},
         "respond": {
             "endpoint": "/v1/daintree/respond",
-            "model": settings.public_model_id,
+            "model": PUBLIC_MODEL_ID,
             "streaming": True,
             "stream_events": ["meta", "delta", "done", "error"],
             "multimodal_images": {

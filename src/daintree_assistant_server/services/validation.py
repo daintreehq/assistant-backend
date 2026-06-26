@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 
-from ..config import Settings
+from ..config import DEEPSEEK_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.openai import (
     ChatMessage,
@@ -221,6 +221,26 @@ def _validate_tools(
             )
 
 
+def _validate_message_sequence(messages: list[ChatMessage]) -> None:
+    """Bounded OpenAI-style sequencing checks for clearer client feedback."""
+    for i, msg in enumerate(messages):
+        if msg.role == "tool" and not (msg.tool_call_id or "").strip():
+            raise invalid_request(
+                "A tool message requires a tool_call_id.",
+                param=f"input.messages[{i}].tool_call_id",
+                code="missing_tool_call_id",
+            )
+        ids_in_msg: set[str] = set()
+        for j, call in enumerate(msg.tool_calls or []):
+            if call.id in ids_in_msg:
+                raise invalid_request(
+                    f"Duplicate tool_call id {call.id!r} within a single message.",
+                    param=f"input.messages[{i}].tool_calls[{j}].id",
+                    code="duplicate_tool_call_id",
+                )
+            ids_in_msg.add(call.id)
+
+
 def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
     for i, msg in enumerate(messages):
         if isinstance(msg.content, str):
@@ -250,8 +270,9 @@ def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
 
 
 def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
-    """Run all semantic validation. Returns the resolved upstream model name."""
+    """Run all semantic validation. Returns the (hardcoded) upstream model name."""
     _validate_roles(req.input.messages)
+    _validate_message_sequence(req.input.messages)
     _validate_tools(req.input.tools, req.input.tool_choice, settings)
     _validate_content(req.input.messages, settings)
-    return settings.deepseek_main_model
+    return DEEPSEEK_MODEL

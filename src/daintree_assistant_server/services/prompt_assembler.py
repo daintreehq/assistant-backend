@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..config import Settings
+from ..config import DEEPSEEK_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import RuntimeContext, TurnContext
 from ..contracts.openai import (
@@ -122,8 +122,8 @@ class PromptAssembler:
             ],
             mcp_status_line=mcp_status_line,
             mcp_connected=mcp_connected,
-            large_model=self.settings.deepseek_main_model,
-            small_model=self.settings.deepseek_utility_model,
+            large_model=DEEPSEEK_MODEL,
+            small_model=DEEPSEEK_MODEL,
             scheduler_active=rc.scheduler_active,
             project_instructions=project_instructions,
         )

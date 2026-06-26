@@ -69,7 +69,9 @@ def test_selector_metadata_active_flag_and_no_body() -> None:
     assert by_id["a.one"]["active"] is True
     assert by_id["b.two"]["active"] is False
     assert "body" not in by_id["a.one"]
-    assert "required_tools" not in by_id["a.one"]
+    # The selector now sees risk + required_tools (to avoid over-selecting risky skills).
+    assert "risk" in by_id["a.one"]
+    assert "required_tools" in by_id["a.one"]
 
 
 def test_public_list_includes_required_tools_no_body() -> None:

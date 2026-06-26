@@ -22,6 +22,9 @@ from .contracts.errors import (
     ErrorDetail,
     ErrorEnvelope,
 )
+from .observability import get_logger
+
+logger = get_logger("daintree.errors")
 
 
 class DaintreeError(Exception):
@@ -273,7 +276,15 @@ async def http_exception_handler(_request: Request, exc: StarletteHTTPException)
     return err.to_response()
 
 
-async def unhandled_exception_handler(_request: Request, _exc: Exception) -> JSONResponse:
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    # Log the failure (route + exception class + stack) without request content.
+    logger.error(
+        "unhandled_exception",
+        path=request.url.path,
+        method=request.method,
+        exc_type=type(exc).__name__,
+        exc_info=exc,
+    )
     return internal_error().to_response()
 
 

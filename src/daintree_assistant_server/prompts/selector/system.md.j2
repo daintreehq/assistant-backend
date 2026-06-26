@@ -18,4 +18,6 @@ Skill catalog:
   summary: {{ skill.summary }}
   whenToUse: {{ skill.when_to_use }}
   tags: {{ skill.tags | join(", ") }}
+  risk: {{ skill.risk }}{% if skill.required_tools %}
+  requiredTools: {{ skill.required_tools | join(", ") }}{% endif %}
 {% endfor %}

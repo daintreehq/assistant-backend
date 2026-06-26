@@ -195,9 +195,9 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     injected: ChatProvider | None = getattr(app.state, "injected_provider", None)
     try:
         if injected is None:
-            missing = settings.missing_secrets()
-            if missing:
-                raise RuntimeError(f"missing required secrets: {', '.join(missing)}")
+            problems = settings.missing_secrets() + settings.weak_secrets()
+            if problems:
+                raise RuntimeError(f"configuration problems: {', '.join(problems)}")
         container = build_container(settings, injected)
         app.state.container = container
         app.state.ready = True

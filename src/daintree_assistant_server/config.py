@@ -14,6 +14,16 @@ from functools import lru_cache
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Hardcoded models — a product decision, not deployment config. Every DeepSeek
+# query (main completion, skill selector, and utility tasks) uses DEEPSEEK_MODEL;
+# PUBLIC_MODEL_ID is the alias returned to clients. Only the DeepSeek API key
+# (and base URL) come from the environment.
+DEEPSEEK_MODEL = "deepseek-v4-flash"
+PUBLIC_MODEL_ID = "daintree-assistant"
+
+# The development default salt; rejected in production by weak_secrets().
+DEFAULT_STATE_SALT = "daintree-state-salt"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -29,20 +39,12 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     build_sha: str = Field(default="", alias="BUILD_SHA")
 
-    # ---- Public model alias --------------------------------------------
-    public_model_id: str = Field(default="daintree-assistant", alias="PUBLIC_MODEL_ID")
-
     # ---- Upstream provider ---------------------------------------------
+    # The model is hardcoded (see DEEPSEEK_MODEL above); only the key and base
+    # URL come from the environment.
     deepseek_base_url: str = Field(default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
     deepseek_api_key: SecretStr = Field(default=SecretStr(""), alias="DEEPSEEK_API_KEY")
-    deepseek_main_model: str = Field(default="deepseek-v4-flash", alias="DEEPSEEK_MAIN_MODEL")
-    deepseek_selector_model: str = Field(
-        default="deepseek-v4-flash", alias="DEEPSEEK_SELECTOR_MODEL"
-    )
-    deepseek_utility_model: str = Field(default="deepseek-v4-flash", alias="DEEPSEEK_UTILITY_MODEL")
 
-    # Undocumented migration alias the public model id may also resolve to.
-    deepseek_public_alias: str = Field(default="deepseek-v4-flash", alias="DEEPSEEK_PUBLIC_ALIAS")
     # Provider-specific wire fields are opt-in: a hosted endpoint that rejects an
     # unknown field would fail every request, so default them OFF and enable each
     # only after a live smoke test confirms the exact endpoint accepts it.
@@ -64,7 +66,7 @@ class Settings(BaseSettings):
     state_signing_kid: str = Field(default="state-dev", alias="STATE_SIGNING_KID")
     state_signing_kid_previous: str = Field(default="", alias="STATE_SIGNING_KID_PREVIOUS")
     state_token_ttl_seconds: int = Field(default=604800, alias="STATE_TOKEN_TTL_SECONDS")
-    state_salt: SecretStr = Field(default=SecretStr("daintree-state-salt"), alias="STATE_SALT")
+    state_salt: SecretStr = Field(default=SecretStr(DEFAULT_STATE_SALT), alias="STATE_SALT")
 
     # ---- Limits ---------------------------------------------------------
     max_request_bytes: int = Field(default=8 * 1024 * 1024, alias="MAX_REQUEST_BYTES")
@@ -79,6 +81,13 @@ class Settings(BaseSettings):
     max_tool_schema_string_bytes: int = Field(
         default=16 * 1024, alias="MAX_TOOL_SCHEMA_STRING_BYTES"
     )
+
+    # ---- Task result_schema bounds (terminal_extract_json.v1 only) ------
+    max_result_schema_bytes: int = Field(default=32 * 1024, alias="MAX_RESULT_SCHEMA_BYTES")
+    max_result_schema_depth: int = Field(default=12, alias="MAX_RESULT_SCHEMA_DEPTH")
+    max_result_schema_properties: int = Field(default=128, alias="MAX_RESULT_SCHEMA_PROPERTIES")
+    max_result_schema_enum: int = Field(default=128, alias="MAX_RESULT_SCHEMA_ENUM")
+    max_result_schema_string: int = Field(default=4096, alias="MAX_RESULT_SCHEMA_STRING")
     max_active_skills: int = Field(default=3, alias="MAX_ACTIVE_SKILLS")
     max_meta_header_bytes: int = Field(default=6 * 1024, alias="MAX_META_HEADER_BYTES")
 
@@ -135,6 +144,31 @@ class Settings(BaseSettings):
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
         return missing
+
+    def weak_secrets(self) -> list[str]:
+        """Production-only: secrets that are present but too weak/default.
+
+        These join ``missing_secrets()`` to gate readiness, so a deploy with a
+        default salt or a short signing key fails ``/readyz`` rather than running
+        with forgeable state tokens. In development they are allowed (tests use
+        short keys).
+        """
+        if self.environment != "production":
+            return []
+        problems: list[str] = []
+        if len(self.daintree_api_key.get_secret_value()) < 16:
+            problems.append("DAINTREE_API_KEY is too short (<16 chars)")
+        if len(self.state_signing_key_current.get_secret_value()) < 32:
+            problems.append("STATE_SIGNING_KEY_CURRENT is too short (<32 chars)")
+        if self.state_salt.get_secret_value() == DEFAULT_STATE_SALT:
+            problems.append("STATE_SALT is the default value")
+        has_prev_key = bool(self.state_signing_key_previous.get_secret_value())
+        has_prev_kid = bool(self.state_signing_kid_previous)
+        if has_prev_key != has_prev_kid:
+            problems.append(
+                "STATE_SIGNING_KEY_PREVIOUS and STATE_SIGNING_KID_PREVIOUS must be set together"
+            )
+        return problems
 
 
 @lru_cache(maxsize=1)

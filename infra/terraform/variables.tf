@@ -44,7 +44,34 @@ variable "concurrency" {
   default     = 8
 }
 
+# Ingress controls who can reach the service.
+#   - Staging smoke test: "INGRESS_TRAFFIC_ALL" makes the *.run.app URL directly
+#     reachable; app-level bearer auth is the gate.
+#   - Production: "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" once the external
+#     Application Load Balancer + managed cert for var.domain are in place.
+variable "ingress" {
+  description = "Cloud Run ingress setting."
+  type        = string
+  default     = "INGRESS_TRAFFIC_ALL"
+}
+
+# For a staging URL reachable with just the app bearer key, grant allUsers the
+# run.invoker role (the app's auth, not Google IAM, is the gate). Set false once
+# the service sits behind the load balancer / IAP.
+variable "allow_unauthenticated" {
+  description = "Grant allUsers roles/run.invoker (staging direct-URL access)."
+  type        = bool
+  default     = true
+}
+
+variable "environment" {
+  description = "ENVIRONMENT value passed to the app (gates production secret checks)."
+  type        = string
+  default     = "production"
+}
+
 # Secret Manager secret IDs (values are managed out-of-band, never in TF state).
+# STATE_SALT must be a real (non-default) value or production readiness fails.
 variable "secret_ids" {
   description = "Map of env var name -> Secret Manager secret id."
   type        = map(string)
@@ -52,5 +79,6 @@ variable "secret_ids" {
     DAINTREE_API_KEY          = "daintree-api-key"
     DEEPSEEK_API_KEY          = "deepseek-api-key"
     STATE_SIGNING_KEY_CURRENT = "state-signing-key-current"
+    STATE_SALT                = "state-salt"
   }
 }

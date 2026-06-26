@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from daintree_assistant_server.config import Settings
+from daintree_assistant_server.config import DEEPSEEK_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.validation import validate_respond_request
@@ -37,7 +37,7 @@ def _req(*, messages: list | None = None, tools: list | None = None, tool_choice
 
 
 def test_valid_request_returns_upstream_model(settings: Settings) -> None:
-    assert validate_respond_request(_req(), settings) == settings.deepseek_main_model
+    assert validate_respond_request(_req(), settings) == DEEPSEEK_MODEL
 
 
 @pytest.mark.parametrize("role", ["system", "developer"])
@@ -97,6 +97,25 @@ def test_tool_choice_must_be_offered(settings: Settings) -> None:
     with pytest.raises(DaintreeError) as exc:
         validate_respond_request(req, settings)
     assert exc.value.code == "tool_choice_not_offered"
+
+
+def test_tool_message_requires_tool_call_id(settings: Settings) -> None:
+    req = _req(messages=[{"role": "tool", "content": "x"}])
+    with pytest.raises(DaintreeError) as exc:
+        validate_respond_request(req, settings)
+    assert exc.value.code == "missing_tool_call_id"
+
+
+def test_duplicate_tool_call_id_in_message_rejected(settings: Settings) -> None:
+    req = _req(messages=[{
+        "role": "assistant", "content": None, "tool_calls": [
+            {"id": "c1", "type": "function", "function": {"name": "git__status", "arguments": "{}"}},
+            {"id": "c1", "type": "function", "function": {"name": "fs__read", "arguments": "{}"}},
+        ],
+    }])
+    with pytest.raises(DaintreeError) as exc:
+        validate_respond_request(req, settings)
+    assert exc.value.code == "duplicate_tool_call_id"
 
 
 def test_remote_image_rejected_by_default(settings: Settings) -> None:

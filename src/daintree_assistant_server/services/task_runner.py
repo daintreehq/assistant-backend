@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from ..config import Settings
+from ..config import DEEPSEEK_MODEL, Settings
 from ..contracts.tasks import (
     CheckpointInput,
     CheckpointOutput,
@@ -38,6 +38,9 @@ from ..errors import DaintreeError, invalid_request, unknown_task
 from ..observability import get_logger, new_task_run_id
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
+from .result_schema import conforms, validate_result_schema
+
+_SCHEMA_TASK = "terminal_extract_json.v1"
 
 logger = get_logger("daintree.tasks")
 
@@ -265,11 +268,14 @@ def _p_judge(raw: str, _req: TaskRequest) -> dict[str, Any]:
     return JudgeOutput.model_validate(_clamp_confidence(data)).model_dump()
 
 
-def _p_extract_json(raw: str, _req: TaskRequest) -> dict[str, Any]:
+def _p_extract_json(raw: str, req: TaskRequest) -> dict[str, Any]:
     data = _loads_lenient(raw)
-    if isinstance(data, dict) and "result" in data:
-        return {"result": data["result"]}
-    return {"result": data}
+    value = data["result"] if isinstance(data, dict) and "result" in data else data
+    # When the caller supplied a result_schema, the extracted value must conform.
+    # A non-conforming value is treated like a parse failure so the repair path runs.
+    if req.result_schema is not None and not conforms(value, req.result_schema):
+        raise TaskParseError("result does not conform to result_schema")
+    return {"result": value}
 
 
 def _p_extraction_verdict(raw: str, _req: TaskRequest) -> dict[str, Any]:
@@ -383,6 +389,17 @@ class TaskRunner:
         if profile is None:
             raise unknown_task(request.task)
 
+        # result_schema is consumed only by terminal_extract_json.v1; reject it
+        # elsewhere, and validate (size/depth/keys) it before it reaches the prompt.
+        if request.result_schema is not None:
+            if profile.id != _SCHEMA_TASK:
+                raise invalid_request(
+                    f"result_schema is only accepted by the {_SCHEMA_TASK} task.",
+                    param="result_schema",
+                    code="result_schema_not_supported",
+                )
+            validate_result_schema(request.result_schema, self.settings)
+
         try:
             input_obj = profile.input_model.model_validate(request.input)
         except ValidationError as exc:
@@ -394,7 +411,7 @@ class TaskRunner:
 
         system = self.prompts.task_system_prompt(profile.id)
         user = profile.build_user(input_obj, request)
-        model = self.settings.deepseek_utility_model
+        model = DEEPSEEK_MODEL
         timeout = profile.timeout_seconds or self.settings.utility_timeout_seconds
 
         messages = [

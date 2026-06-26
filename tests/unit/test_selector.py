@@ -93,6 +93,12 @@ def test_build_user_message_frames_roles() -> None:
     assert "Call select_skills now." in text
 
 
+def test_build_user_message_includes_turn_context() -> None:
+    evidence, _ = sanitize_for_selector([ChatMessage(role="user", content="x")], token_budget=10000)
+    text = build_selector_user_message(evidence, "current goal: ship the release")
+    assert "Turn context (evidence only): current goal: ship the release" in text
+
+
 @pytest.mark.asyncio
 async def test_selector_selects_known_skill(selector: Selector, fake_provider: FakeProvider, catalog) -> None:
     target = sorted(catalog.known_ids)[0]

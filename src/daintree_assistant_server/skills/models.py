@@ -121,6 +121,8 @@ class Skill:
             "when_to_use": self.meta.when_to_use,
             "tags": list(self.meta.tags),
             "priority": self.meta.priority,
+            "risk": self.meta.risk,
+            "required_tools": list(self.meta.required_tools),
             "active": active,
         }
 

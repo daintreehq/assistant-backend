@@ -17,7 +17,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..config import Settings
+from ..config import PUBLIC_MODEL_ID, Settings
 from ..contracts.daintree_api import (
     RespondMessage,
     RespondRequest,
@@ -43,6 +43,7 @@ from ..skills.catalog import Catalog
 from ..skills.load_events import SkillLoadExecution
 from ..skills.selector import SelectionDecision, Selector
 from ..state.codec import StateCodec
+from ..text_utils import sanitize_line
 from .prompt_assembler import PromptAssembler
 
 logger = get_logger("daintree.respond")
@@ -136,6 +137,24 @@ class ChatOrchestrator:
             return True
         return instruction_revision != state_instruction_revision
 
+    @staticmethod
+    def _selector_turn_context(request: RespondRequest) -> str | None:
+        """A short, bounded turn-context hint for the selector (evidence only).
+
+        For background wake-ups and terse queue events the conversation alone may
+        not carry enough task signal, so surface the goal and wake flag.
+        """
+        turn = request.turn
+        if turn is None:
+            return None
+        parts: list[str] = []
+        goal = sanitize_line(turn.goal, 512)
+        if goal:
+            parts.append(f"current goal: {goal}")
+        if turn.is_wake:
+            parts.append("triggered by a background wake (no new user message)")
+        return " | ".join(parts) or None
+
     # ---- main entry -----------------------------------------------------
 
     async def complete(
@@ -175,7 +194,11 @@ class ChatOrchestrator:
         )
 
         if run_selector:
-            decision = await self.selector.select(request.input.messages, prior_active_ids)
+            decision = await self.selector.select(
+                request.input.messages,
+                prior_active_ids,
+                turn_context=self._selector_turn_context(request),
+            )
         else:
             decision = SelectionDecision.reuse(prior_active_ids)
         warnings.extend(decision.warnings)
@@ -386,7 +409,7 @@ class ChatOrchestrator:
         message = result.message or {}
         response = RespondResponse(
             request_id=meta.request_id,
-            model=self.settings.public_model_id,
+            model=PUBLIC_MODEL_ID,
             message=RespondMessage(
                 role=message.get("role", "assistant"),
                 content=message.get("content"),
@@ -421,7 +444,7 @@ class ChatOrchestrator:
             "meta",
             StreamMeta(
                 request_id=meta.request_id,
-                model=self.settings.public_model_id,
+                model=PUBLIC_MODEL_ID,
                 skills=meta.skills,
                 state=meta.state,
                 catalog_revision=meta.catalog_revision,
