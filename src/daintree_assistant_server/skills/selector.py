@@ -26,18 +26,22 @@ from ..providers.base import (
 from ..text_utils import estimate_tokens, head_tail, message_text
 from .catalog import Catalog
 
-# Forced selector function schema (section 7.7).
-SELECT_SKILLS_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "required": ["skill_ids", "confidence", "task_type"],
-    "properties": {
-        "skill_ids": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "task_type": {"type": "string", "maxLength": 80},
-        "reason": {"type": "string", "maxLength": 300},
-    },
-}
+
+# Forced selector function schema (section 7.7). `skill_ids` is bounded by the SAME
+# settings.max_active_skills used by the prompt ("ZERO to {{max_active}}") + parse +
+# merge — never a hardcoded ceiling that could silently disagree with the configured cap.
+def build_select_skills_schema(max_active: int) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["skill_ids", "confidence", "task_type"],
+        "properties": {
+            "skill_ids": {"type": "array", "items": {"type": "string"}, "maxItems": max_active},
+            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+            "task_type": {"type": "string", "maxLength": 80},
+            "reason": {"type": "string", "maxLength": 300},
+        },
+    }
 
 _REPAIR_INSTRUCTION = (
     "Your previous response was not a valid select_skills function call. "
@@ -214,6 +218,7 @@ class Selector:
         self.prompt_loader = prompt_loader
         self.catalog = catalog
         self.settings = settings
+        self._select_schema = build_select_skills_schema(settings.max_active_skills)
 
     async def select(
         self,
@@ -295,7 +300,7 @@ class Selector:
                 return await self.provider.structured_tool_call(
                     request,
                     function_name="select_skills",
-                    function_schema=SELECT_SKILLS_SCHEMA,
+                    function_schema=self._select_schema,
                 )
             except DaintreeError as exc:
                 last = exc

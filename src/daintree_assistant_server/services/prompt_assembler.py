@@ -1,13 +1,17 @@
 """Assemble the upstream main-model request.
 
-Layer order (section 9.1):
+Layer order — MOST-STABLE-FIRST so DeepSeek's prefix cache covers the large, stable
+content across a turn's rounds. Layers 1-3 are the CACHED PREFIX; layers 6-7 are
+per-request dynamic context, appended LAST so they never poison that prefix (see
+build_main_request):
 
-1. permanent base system message
-2. runtime-context system message (server-rendered typed local facts)
-3. loaded-skills system message (active skill bodies, or a stable fallback)
+1. base system message
+2. integrations system message — client MCP servers + tool index (omitted when absent)
+3. loaded-skills system message — active skill bodies, or a stable fallback
 4. client conversation (user / assistant / tool only)
 5. synthetic skill-load assistant/tool exchange (newly loaded skills only)
-6. trailing turn-context system message
+6. runtime-context system message — server-rendered typed local facts (dynamic; NOT layer 2)
+7. trailing turn-context (turn-footer) system message (dynamic)
 
 All local context is treated as untrusted data: control characters are
 stripped and every field has an explicit byte cap.
