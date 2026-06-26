@@ -46,4 +46,5 @@ def parse_chunk(data: str) -> dict[str, Any] | None:
     """
     if data.strip() == DONE_MARKER:
         return None
-    return json.loads(data)
+    chunk: dict[str, Any] = json.loads(data)
+    return chunk
