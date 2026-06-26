@@ -122,8 +122,8 @@ class DeepSeekProvider:
         api_key: str,
         base_url: str = "https://api.deepseek.com",
         default_timeout: float = 60.0,
-        send_prompt_cache_key: bool = False,
-        send_thinking: bool = False,
+        send_prompt_cache_key: bool = True,
+        send_thinking: bool = True,
     ) -> None:
         self._client = client
         self._api_key = api_key

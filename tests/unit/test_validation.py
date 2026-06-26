@@ -106,6 +106,29 @@ def test_tool_message_requires_tool_call_id(settings: Settings) -> None:
     assert exc.value.code == "missing_tool_call_id"
 
 
+def test_dangling_tool_message_rejected(settings: Settings) -> None:
+    # A tool message with no preceding assistant tool_call of the same id.
+    req = _req(messages=[
+        {"role": "user", "content": "go"},
+        {"role": "assistant", "content": "ok"},
+        {"role": "tool", "content": "result", "tool_call_id": "c1"},
+    ])
+    with pytest.raises(DaintreeError) as exc:
+        validate_respond_request(req, settings)
+    assert exc.value.code == "dangling_tool_message"
+
+
+def test_valid_tool_call_sequence_accepted(settings: Settings) -> None:
+    req = _req(messages=[
+        {"role": "user", "content": "go"},
+        {"role": "assistant", "content": None, "tool_calls": [
+            {"id": "c1", "type": "function", "function": {"name": "git__status", "arguments": "{}"}}
+        ]},
+        {"role": "tool", "content": "clean", "tool_call_id": "c1"},
+    ])
+    validate_respond_request(req, settings)
+
+
 def test_duplicate_tool_call_id_in_message_rejected(settings: Settings) -> None:
     req = _req(messages=[{
         "role": "assistant", "content": None, "tool_calls": [

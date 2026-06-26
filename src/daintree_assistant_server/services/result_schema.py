@@ -61,6 +61,11 @@ def _walk(node: Any, *, settings: Settings, param: str, depth: int, counter: lis
                 code="invalid_result_schema",
             )
 
+    # Each allow-listed key must also carry a value of the expected type — so an
+    # arbitrary string can't ride into the prompt under a permitted key (e.g.
+    # additionalProperties: "<instructions>").
+    _validate_constraint_values(node, param)
+
     def child(sub: Any, sub_param: str) -> None:
         _walk(sub, settings=settings, param=sub_param, depth=depth + 1, counter=counter)
 
@@ -140,6 +145,33 @@ def _bound_string(value: Any, *, settings: Settings, param: str) -> None:
         raise request_too_large("A string in result_schema exceeds the size limit.", param=param)
 
 
+_NUMERIC_KEYS = ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum")
+_NONNEG_INT_KEYS = ("minLength", "maxLength", "minItems", "maxItems")
+
+
+def _bad(param: str, key: str, expected: str) -> None:
+    raise invalid_request(
+        f"result_schema {param}.{key} must be {expected}.",
+        param=f"{param}.{key}",
+        code="invalid_result_schema",
+    )
+
+
+def _validate_constraint_values(node: dict[str, Any], param: str) -> None:
+    for key in _NUMERIC_KEYS:
+        if key in node and (isinstance(node[key], bool) or not isinstance(node[key], (int, float))):
+            _bad(param, key, "a number")
+    for key in _NONNEG_INT_KEYS:
+        value = node.get(key)
+        if key in node and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+            _bad(param, key, "a non-negative integer")
+    if "uniqueItems" in node and not isinstance(node["uniqueItems"], bool):
+        _bad(param, "uniqueItems", "a boolean")
+    addl = node.get("additionalProperties")
+    if "additionalProperties" in node and not isinstance(addl, (bool, dict)):
+        _bad(param, "additionalProperties", "a boolean or an object")
+
+
 # --------------------------------------------------------------------------
 # Output conformance (the same subset, applied to a value).
 # --------------------------------------------------------------------------
@@ -184,6 +216,22 @@ def conforms(value: Any, schema: Any) -> bool:
         if not any(_type_ok(value, one) for one in types):
             return False
 
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and value < schema["minimum"]:
+            return False
+        if "maximum" in schema and value > schema["maximum"]:
+            return False
+        if "exclusiveMinimum" in schema and value <= schema["exclusiveMinimum"]:
+            return False
+        if "exclusiveMaximum" in schema and value >= schema["exclusiveMaximum"]:
+            return False
+
+    if isinstance(value, str):
+        if "minLength" in schema and len(value) < schema["minLength"]:
+            return False
+        if "maxLength" in schema and len(value) > schema["maxLength"]:
+            return False
+
     if isinstance(value, dict) and (schema.get("type") == "object" or "properties" in schema):
         props = schema.get("properties") or {}
         for req in schema.get("required") or []:
@@ -198,6 +246,16 @@ def conforms(value: Any, schema: Any) -> bool:
                 return False
 
     if isinstance(value, list) and (schema.get("type") == "array" or "items" in schema):
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            return False
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            return False
+        if schema.get("uniqueItems"):
+            seen: list[Any] = []
+            for v in value:
+                if v in seen:
+                    return False
+                seen.append(v)
         items = schema.get("items")
         if isinstance(items, dict):
             if not all(conforms(v, items) for v in value):

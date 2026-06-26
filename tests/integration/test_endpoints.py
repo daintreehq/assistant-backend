@@ -127,6 +127,40 @@ def test_oversized_body_413(client, auth) -> None:
     assert r.status_code == 413
 
 
+def test_dev_boots_and_serves_unauthenticated_without_api_key() -> None:
+    """Local dev with no DAINTREE_API_KEY: boots ready and serves unauthenticated."""
+    from fastapi.testclient import TestClient
+
+    from daintree_assistant_server.config import Settings
+    from daintree_assistant_server.main import create_app
+
+    settings = Settings(
+        ENVIRONMENT="development", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="d",
+        STATE_SIGNING_KEY_CURRENT="sk", STATE_SALT="x",
+    )
+    app = create_app(settings=settings)  # real lifespan (no injected provider)
+    with TestClient(app) as client:
+        assert app.state.ready is True
+        # No Authorization header → allowed in development.
+        assert client.get("/v1/daintree/capabilities").status_code == 200
+
+
+def test_prod_not_ready_without_api_key() -> None:
+    from fastapi.testclient import TestClient
+
+    from daintree_assistant_server.config import Settings
+    from daintree_assistant_server.main import create_app
+
+    settings = Settings(
+        ENVIRONMENT="production", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="d" * 32,
+        STATE_SIGNING_KEY_CURRENT="s" * 48, STATE_SALT="a-real-salt-value",
+    )
+    app = create_app(settings=settings)
+    with TestClient(app) as client:
+        assert app.state.ready is False
+        assert client.get("/readyz").status_code == 503
+
+
 def test_not_ready_returns_503(fake_provider) -> None:
     """A startup failure (here: empty signing key) leaves the app not-ready."""
     from fastapi.testclient import TestClient

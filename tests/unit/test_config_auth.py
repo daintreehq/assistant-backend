@@ -97,7 +97,22 @@ def test_authenticate_case_insensitive_scheme() -> None:
     assert authenticate("bearer secret", _settings()) is DEVELOPMENT_PRINCIPAL
 
 
-def test_authenticate_empty_expected_key_rejects() -> None:
-    s = Settings(DAINTREE_API_KEY="", DEEPSEEK_API_KEY="dk", STATE_SIGNING_KEY_CURRENT="sk")
-    with pytest.raises(DaintreeError):
-        authenticate("Bearer ", s)
+def test_authenticate_dev_no_key_allows_unauthenticated() -> None:
+    # No key configured in development → unauthenticated access (any/no header).
+    s = Settings(
+        ENVIRONMENT="development", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="dk",
+        STATE_SIGNING_KEY_CURRENT="sk",
+    )
+    assert authenticate(None, s) is DEVELOPMENT_PRINCIPAL
+    assert authenticate("Bearer anything", s) is DEVELOPMENT_PRINCIPAL
+
+
+def test_authenticate_prod_no_key_rejects() -> None:
+    # Production never allows unauthenticated access, even with no key configured.
+    s = Settings(
+        ENVIRONMENT="production", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="dk",
+        STATE_SIGNING_KEY_CURRENT="sk",
+    )
+    with pytest.raises(DaintreeError) as exc:
+        authenticate(None, s)
+    assert exc.value.code == "invalid_api_key"

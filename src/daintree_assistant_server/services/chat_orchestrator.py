@@ -413,7 +413,7 @@ class ChatOrchestrator:
             message=RespondMessage(
                 role=message.get("role", "assistant"),
                 content=message.get("content"),
-                tool_calls=message.get("tool_calls"),
+                tool_calls=self._normalize_tool_calls(message.get("tool_calls")),
             ),
             finish_reason=result.finish_reason,
             usage=self._usage(result.usage),
@@ -424,6 +424,24 @@ class ChatOrchestrator:
             warnings=meta.warnings,
         )
         return response.model_dump(exclude_none=True)
+
+    @staticmethod
+    def _normalize_tool_calls(raw: Any) -> list[dict[str, Any]] | None:
+        """Project upstream tool-call dicts onto the strict response shape,
+        dropping provider-specific fields (e.g. DeepSeek's ``index``)."""
+        if not raw:
+            return None
+        out: list[dict[str, Any]] = []
+        for call in raw:
+            fn = call.get("function") or {}
+            out.append(
+                {
+                    "id": call.get("id", ""),
+                    "type": call.get("type", "function"),
+                    "function": {"name": fn.get("name", ""), "arguments": fn.get("arguments", "")},
+                }
+            )
+        return out
 
     @staticmethod
     def _usage(usage: ProviderUsage) -> RespondUsage:

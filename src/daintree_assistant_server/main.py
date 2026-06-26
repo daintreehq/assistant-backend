@@ -196,6 +196,10 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     try:
         if injected is None:
             problems = settings.missing_secrets() + settings.weak_secrets()
+            if settings.environment != "production":
+                # Local dev: a missing inbound API key just enables unauthenticated
+                # access; it must not block the server from booting.
+                problems = [p for p in problems if p != "DAINTREE_API_KEY"]
             if problems:
                 raise RuntimeError(f"configuration problems: {', '.join(problems)}")
         container = build_container(settings, injected)

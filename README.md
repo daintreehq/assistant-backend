@@ -79,8 +79,16 @@ Missing required secrets do not crash the process — they fail **readiness**
 ### Run locally
 
 ```bash
-uvicorn daintree_assistant_server.main:app --reload --port 8080
+# Copy the env scaffold and add your DeepSeek key; it binds HOST/PORT from .env
+# (default 127.0.0.1:8473). In development, leaving DAINTREE_API_KEY unset means
+# unauthenticated access.
+cp .env.example .env   # then edit DEEPSEEK_API_KEY (+ PORT if you like)
+python -m daintree_assistant_server
 ```
+
+Point your CLI at `http://127.0.0.1:8473` (or whatever `PORT` you set). For
+auto-reload during development: `uvicorn daintree_assistant_server.main:app
+--reload --port 8473`.
 
 ## Endpoints
 

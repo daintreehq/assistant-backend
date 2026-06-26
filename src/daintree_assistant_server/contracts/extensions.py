@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ClientInfo(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, max_length=128)
     version: str | None = Field(default=None, max_length=64)
@@ -26,7 +26,7 @@ class ClientInfo(BaseModel):
 
 
 class McpInfo(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     connected: bool = False
     transport: str | None = Field(default=None, max_length=64)
@@ -37,13 +37,12 @@ class McpInfo(BaseModel):
 class McpServer(BaseModel):
     """One MCP server the CLI is connected to, as the CLI reports it.
 
-    Server-rendered into the main system prompt as inert data. The fields are
-    intentionally permissive (``extra="ignore"``) so the CLI can add detail
-    over time without a server change — only the shape the server understands is
-    rendered; anything else is dropped.
+    Server-rendered into the main system prompt as inert data. The request is
+    strict (``extra="forbid"``): new MCP fields require a contract/protocol bump,
+    not a silent drop.
     """
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(max_length=128)
     transport: str | None = Field(default=None, max_length=64)
@@ -55,7 +54,7 @@ class McpServer(BaseModel):
 
 
 class RuntimeContext(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     permission_tier: str | None = Field(default=None, max_length=64)
     project_path: str | None = Field(default=None, max_length=4096)
@@ -71,14 +70,14 @@ class RuntimeContext(BaseModel):
 
 
 class Memories(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     pinned: list[str] = Field(default_factory=list)
     relevant: list[str] = Field(default_factory=list)
 
 
 class TurnContext(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     goal: str | None = None
     is_wake: bool = False
@@ -88,7 +87,7 @@ class TurnContext(BaseModel):
 
 
 class Selection(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     policy: Literal["new_instruction", "always"] = "new_instruction"
     force: bool = False

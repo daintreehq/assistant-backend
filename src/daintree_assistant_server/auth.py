@@ -45,10 +45,20 @@ def _extract_bearer(authorization: str | None) -> str | None:
 
 
 def authenticate(authorization: str | None, settings: Settings) -> Principal:
-    """Validate the bearer header and return the principal, or raise 401."""
-    token = _extract_bearer(authorization)
+    """Validate the bearer header and return the principal, or raise 401.
+
+    Local-development convenience: when no ``DAINTREE_API_KEY`` is configured and
+    the environment is not production, access is unauthenticated (everything runs
+    on the developer's own machine). Production never allows this — a missing key
+    there also fails readiness — so the server can't accidentally ship open.
+    """
     expected = settings.daintree_api_key.get_secret_value()
-    if not token or not expected:
+    if not expected:
+        if settings.environment != "production":
+            return DEVELOPMENT_PRINCIPAL
+        raise invalid_api_key()  # never allow unauthenticated access in production
+    token = _extract_bearer(authorization)
+    if not token:
         raise invalid_api_key()
     # Constant-time comparison; encode to bytes to avoid unicode timing quirks.
     if not hmac.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):

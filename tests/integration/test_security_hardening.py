@@ -70,6 +70,29 @@ def test_unknown_top_level_field_rejected(client, auth) -> None:
     assert r.status_code == 400  # extra="forbid" rejects it at the schema layer
 
 
+def test_unknown_field_in_message_rejected(client, auth) -> None:
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hi", "smuggled": "x"}],
+    ))
+    assert r.status_code == 400
+
+
+def test_unknown_field_in_runtime_rejected(client, auth) -> None:
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hi"}],
+        runtime={"permission_tier": "operator", "smuggled": "x"},
+    ))
+    assert r.status_code == 400
+
+
+def test_unknown_field_in_tool_def_rejected(client, auth) -> None:
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hi"}],
+        tools=[{"type": "function", "function": {"name": "git__status", "smuggled": "x"}}],
+    ))
+    assert r.status_code == 400
+
+
 def test_reserved_tool_call_smuggling_rejected(client, auth) -> None:
     r = client.post(URL, headers=auth, json=respond_body([
         {"role": "user", "content": "go"},

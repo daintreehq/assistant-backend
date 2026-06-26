@@ -24,6 +24,7 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
+    HOST=0.0.0.0 \
     PORT=8080
 
 RUN useradd --create-home --uid 10001 daintree
@@ -35,6 +36,7 @@ WORKDIR /home/daintree
 
 EXPOSE 8080
 
-# Cloud Run injects $PORT. One ASGI process; Uvicorn handles graceful shutdown
-# on SIGTERM within Cloud Run's termination window.
-CMD ["sh", "-c", "exec uvicorn daintree_assistant_server.main:app --host 0.0.0.0 --port ${PORT:-8080} --timeout-graceful-shutdown 25"]
+# Cloud Run injects $PORT (and HOST=0.0.0.0 is set above). One ASGI process; the
+# entrypoint binds HOST/PORT and handles graceful shutdown within Cloud Run's
+# termination window.
+CMD ["python", "-m", "daintree_assistant_server"]

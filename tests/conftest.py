@@ -23,6 +23,16 @@ from daintree_assistant_server.state.codec import StateCodec
 API_KEY = "test-api-key"
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _isolate_from_dotenv() -> Iterator[None]:
+    """Tests must not read a developer's local ``.env``: it would override any
+    Settings field not explicitly passed and break test isolation."""
+    previous = Settings.model_config.get("env_file")
+    Settings.model_config["env_file"] = None
+    yield
+    Settings.model_config["env_file"] = previous
+
+
 @pytest.fixture
 def settings() -> Settings:
     return Settings(

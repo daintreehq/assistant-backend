@@ -39,19 +39,27 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     build_sha: str = Field(default="", alias="BUILD_SHA")
 
+    # ---- Bind address (honored by `python -m daintree_assistant_server`) -
+    # Cloud Run injects PORT=8080; local dev sets a fixed port in .env so the
+    # CLI can always target it.
+    host: str = Field(default="127.0.0.1", alias="HOST")
+    port: int = Field(default=8080, alias="PORT")
+
     # ---- Upstream provider ---------------------------------------------
     # The model is hardcoded (see DEEPSEEK_MODEL above); only the key and base
     # URL come from the environment.
     deepseek_base_url: str = Field(default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
     deepseek_api_key: SecretStr = Field(default=SecretStr(""), alias="DEEPSEEK_API_KEY")
 
-    # Provider-specific wire fields are opt-in: a hosted endpoint that rejects an
-    # unknown field would fail every request, so default them OFF and enable each
-    # only after a live smoke test confirms the exact endpoint accepts it.
+    # DeepSeek V4 Flash specifics, confirmed against the live endpoint:
+    #  - thinking must be DISABLED for the selector's forced tool_choice to work
+    #    ("Thinking mode does not support this tool_choice"); the field is accepted.
+    #  - prompt_cache_key is accepted and improves prefix-cache routing.
+    # Both default ON; flip off only for a provider/model that rejects them.
     deepseek_send_prompt_cache_key: bool = Field(
-        default=False, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
+        default=True, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
     )
-    deepseek_send_thinking: bool = Field(default=False, alias="DEEPSEEK_SEND_THINKING")
+    deepseek_send_thinking: bool = Field(default=True, alias="DEEPSEEK_SEND_THINKING")
 
     # ---- Authentication -------------------------------------------------
     daintree_api_key: SecretStr = Field(default=SecretStr(""), alias="DAINTREE_API_KEY")

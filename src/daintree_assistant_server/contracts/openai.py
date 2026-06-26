@@ -27,7 +27,7 @@ class TextContentPart(BaseModel):
 
 
 class ImageUrl(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     url: str = Field(min_length=1)
     detail: str | None = None
@@ -52,7 +52,7 @@ ContentPart = Annotated[
 
 
 class FunctionCall(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     # OpenAI/DeepSeek function names are limited to 64 characters; this applies
     # to tool calls echoed back in assistant message history too.
@@ -61,7 +61,7 @@ class FunctionCall(BaseModel):
 
 
 class ToolCall(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1, max_length=256)
     type: Literal["function"] = "function"
@@ -69,7 +69,7 @@ class ToolCall(BaseModel):
 
 
 class FunctionDef(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     # OpenAI/DeepSeek function names are limited to 64 characters.
     name: str = Field(min_length=1, max_length=64)
@@ -78,7 +78,7 @@ class FunctionDef(BaseModel):
 
 
 class ToolDef(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     type: Literal["function"] = "function"
     function: FunctionDef
@@ -90,7 +90,7 @@ class ToolDef(BaseModel):
 
 
 class ChatMessage(BaseModel):
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     role: str
     content: str | list[ContentPart] | None = None

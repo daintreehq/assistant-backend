@@ -65,7 +65,9 @@ def test_scenario3_same_turn_round_does_not_rerun(client, auth, fake_provider) -
     r2 = client.post(URL, headers=auth, json=respond_body(
         [
             {"role": "user", "content": "prep branch"},
-            {"role": "assistant", "content": "ok"},
+            {"role": "assistant", "content": None, "tool_calls": [
+                {"id": "c1", "type": "function", "function": {"name": "git__status", "arguments": "{}"}}
+            ]},
             {"role": "tool", "content": "done", "tool_call_id": "c1"},
         ],
         session_id="s3", turn_id="t1", round=1, state=state,

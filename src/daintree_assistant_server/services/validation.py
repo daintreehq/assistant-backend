@@ -222,14 +222,24 @@ def _validate_tools(
 
 
 def _validate_message_sequence(messages: list[ChatMessage]) -> None:
-    """Bounded OpenAI-style sequencing checks for clearer client feedback."""
+    """OpenAI-style sequencing checks, so a malformed transcript fails fast with a
+    clear 400 instead of a confusing upstream 502 (and a wasted upstream call)."""
+    opened: set[str] = set()  # tool_call ids introduced by earlier assistant messages
     for i, msg in enumerate(messages):
-        if msg.role == "tool" and not (msg.tool_call_id or "").strip():
-            raise invalid_request(
-                "A tool message requires a tool_call_id.",
-                param=f"input.messages[{i}].tool_call_id",
-                code="missing_tool_call_id",
-            )
+        if msg.role == "tool":
+            tool_call_id = (msg.tool_call_id or "").strip()
+            if not tool_call_id:
+                raise invalid_request(
+                    "A tool message requires a tool_call_id.",
+                    param=f"input.messages[{i}].tool_call_id",
+                    code="missing_tool_call_id",
+                )
+            if tool_call_id not in opened:
+                raise invalid_request(
+                    "A tool message must follow an assistant tool call with the same id.",
+                    param=f"input.messages[{i}].tool_call_id",
+                    code="dangling_tool_message",
+                )
         ids_in_msg: set[str] = set()
         for j, call in enumerate(msg.tool_calls or []):
             if call.id in ids_in_msg:
@@ -239,6 +249,7 @@ def _validate_message_sequence(messages: list[ChatMessage]) -> None:
                     code="duplicate_tool_call_id",
                 )
             ids_in_msg.add(call.id)
+            opened.add(call.id)
 
 
 def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
