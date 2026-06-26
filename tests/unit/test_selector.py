@@ -99,6 +99,15 @@ def test_build_user_message_includes_turn_context() -> None:
     assert "Turn context (evidence only): current goal: ship the release" in text
 
 
+def test_build_user_message_includes_available_tools() -> None:
+    evidence, _ = sanitize_for_selector(
+        [ChatMessage(role="user", content="close the agent terminals")], token_budget=10000
+    )
+    text = build_selector_user_message(evidence, None, ["terminal__close", "terminal__list"])
+    assert "Tools the assistant already has this turn" in text
+    assert "terminal__close, terminal__list" in text
+
+
 @pytest.mark.asyncio
 async def test_selector_selects_known_skill(selector: Selector, fake_provider: FakeProvider, catalog) -> None:
     target = sorted(catalog.known_ids)[0]

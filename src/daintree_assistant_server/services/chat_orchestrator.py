@@ -155,6 +155,13 @@ class ChatOrchestrator:
             parts.append("triggered by a background wake (no new user message)")
         return " | ".join(parts) or None
 
+    @staticmethod
+    def _available_tool_names(request: RespondRequest, cap: int = 100) -> list[str]:
+        """The assistant's tool names, so the selector won't load a skill for a
+        task the base function list already covers. Names are already validated."""
+        names = [tool.function.name for tool in (request.input.tools or [])]
+        return names[:cap]
+
     # ---- main entry -----------------------------------------------------
 
     async def complete(
@@ -198,6 +205,7 @@ class ChatOrchestrator:
                 request.input.messages,
                 prior_active_ids,
                 turn_context=self._selector_turn_context(request),
+                available_tools=self._available_tool_names(request),
             )
         else:
             decision = SelectionDecision.reuse(prior_active_ids)
