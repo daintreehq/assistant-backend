@@ -57,6 +57,10 @@ mypy src/
 
 # Regenerate prompt golden snapshots after an intentional change
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
+
+# Live provider-contract tests (skipped by default; make real DeepSeek calls).
+# Pins the things mocks can't see — e.g. the selector's forced tool_choice.
+RUN_LIVE_DEEPSEEK=1 DEEPSEEK_API_KEY=sk-... pytest tests/live -q
 ```
 
 CI (`.github/workflows/ci.yml`) runs ruff + `mypy --strict` + pytest on every
