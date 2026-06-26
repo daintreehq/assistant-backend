@@ -34,6 +34,26 @@ class McpInfo(BaseModel):
     status: str | None = Field(default=None, max_length=64)
 
 
+class McpServer(BaseModel):
+    """One MCP server the CLI is connected to, as the CLI reports it.
+
+    Server-rendered into the main system prompt as inert data. The fields are
+    intentionally permissive (``extra="ignore"``) so the CLI can add detail
+    over time without a server change — only the shape the server understands is
+    rendered; anything else is dropped.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = Field(max_length=128)
+    transport: str | None = Field(default=None, max_length=64)
+    status: str | None = Field(default=None, max_length=64)
+    tool_count: int | None = Field(default=None, ge=0)
+    description: str | None = Field(default=None, max_length=4096)
+    # Free-form operating notes for this server (e.g. quick paths, gotchas).
+    instructions: str | None = Field(default=None, max_length=16384)
+
+
 class RuntimeContext(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -41,6 +61,9 @@ class RuntimeContext(BaseModel):
     project_path: str | None = Field(default=None, max_length=4096)
     project_id: str | None = Field(default=None, max_length=256)
     mcp: McpInfo | None = None
+    # The CLI's actual integration surface, sent per request so the server need
+    # not hardcode (and drift from) the tool reference. Rendered as inert data.
+    mcp_servers: list[McpServer] = Field(default_factory=list)
     configured_agent_ids: list[str] = Field(default_factory=list)
     scheduler_active: bool = True
     active_worktree: str | None = Field(default=None, max_length=512)
@@ -71,23 +94,9 @@ class Selection(BaseModel):
     force: bool = False
 
 
-class DaintreeExtension(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    protocol_version: int | None = None
-    session_id: str | None = Field(default=None, max_length=256)
-    turn_id: str | None = Field(default=None, max_length=256)
-    instruction_revision: int = Field(default=0, ge=0)
-    round: int = Field(default=0, ge=0)
-    state: str | None = Field(default=None, max_length=16384)
-    client: ClientInfo | None = None
-    runtime_context: RuntimeContext | None = None
-    turn_context: TurnContext | None = None
-    selection: Selection = Field(default_factory=Selection)
-
-
 # --------------------------------------------------------------------------
-# Response metadata (section 6.6).
+# Shared response-metadata building blocks (reused by the native API's
+# first-class skills block in :mod:`.daintree_api`).
 # --------------------------------------------------------------------------
 
 
@@ -139,16 +148,3 @@ class SelectorMeta(BaseModel):
     usage: SelectorUsage | None = None
     # Free-text reason is omitted by default; only present under a debug flag.
     reason: str | None = None
-
-
-class ResponseMeta(BaseModel):
-    v: int = 1
-    request_id: str
-    state: str | None = None
-    catalog_revision: str
-    prompt_version: str
-    active_skills: list[SkillRef] = Field(default_factory=list)
-    newly_loaded_skills: list[SkillRef] = Field(default_factory=list)
-    prelude: Prelude = Field(default_factory=Prelude)
-    selector: SelectorMeta = Field(default_factory=SelectorMeta)
-    warnings: list[str] = Field(default_factory=list)

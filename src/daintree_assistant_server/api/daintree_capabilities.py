@@ -22,13 +22,18 @@ async def capabilities(
     return {
         "server_version": __version__,
         "protocol": {"min": PROTOCOL_MIN, "max": PROTOCOL_MAX},
-        "chat": {
-            "models": [settings.public_model_id],
+        "respond": {
+            "endpoint": "/v1/daintree/respond",
+            "model": settings.public_model_id,
             "streaming": True,
-            "multimodal_images": True,
+            "stream_events": ["meta", "delta", "done", "error"],
+            "multimodal_images": {
+                "data_urls": True,
+                "remote_urls": settings.allow_remote_image_urls,
+            },
             "system_messages_accepted": False,
             "max_active_skills": settings.max_active_skills,
-            "metadata_transport": "x-daintree-meta-base64url",
+            "metadata_transport": "body+stream_meta_event",
         },
         "skills": {
             "catalog_revision": container.catalog.revision,

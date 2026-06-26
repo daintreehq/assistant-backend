@@ -66,7 +66,7 @@ async def resolve_skills(
         raise invalid_request("A 'load' action requires skill_ids.", param="skill_ids")
 
     container = request.app.state.container
-    meta, headers = await container.orchestrator.resolve(
+    result = await container.orchestrator.resolve(
         action=body.action,
         session_id=body.session_id,
         state_token=body.state,
@@ -76,4 +76,4 @@ async def resolve_skills(
         skill_ids=body.skill_ids,
         request_id=request.headers.get("x-request-id"),
     )
-    return JSONResponse(content=meta.model_dump(exclude_none=True), headers=headers)
+    return JSONResponse(content=result)

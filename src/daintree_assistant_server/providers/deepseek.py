@@ -122,13 +122,15 @@ class DeepSeekProvider:
         api_key: str,
         base_url: str = "https://api.deepseek.com",
         default_timeout: float = 60.0,
-        send_prompt_cache_key: bool = True,
+        send_prompt_cache_key: bool = False,
+        send_thinking: bool = False,
     ) -> None:
         self._client = client
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._default_timeout = default_timeout
         self._send_prompt_cache_key = send_prompt_cache_key
+        self._send_thinking = send_thinking
 
     # ---- helpers --------------------------------------------------------
 
@@ -160,7 +162,7 @@ class DeepSeekProvider:
             body["response_format"] = request.response_format
         if request.stop:
             body["stop"] = request.stop
-        if request.thinking_disabled:
+        if self._send_thinking and request.thinking_disabled:
             body["thinking"] = {"type": "disabled"}
         # prompt cache key is only valid for plain chat/stream (not json mode).
         if (

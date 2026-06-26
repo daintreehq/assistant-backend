@@ -46,6 +46,36 @@ def _check_version(version: int) -> None:
         )
 
 
+def require_daintree_fields(raw: dict[str, object]) -> None:
+    """Enforce the minimum Daintree-aware contract on a present extension.
+
+    A generic OpenAI client omits ``daintree`` entirely and stays in stateless
+    compatibility mode (this is never called for it). But once a client *opts
+    in* by sending a ``daintree`` object, it must identify the session and turn
+    so a signed state token is never issued against an empty/unspecified
+    session and the selector cadence has a real turn id to key on.
+
+    ``instruction_revision`` and ``round`` remain optional (they default to 0),
+    so the CLI is not forced to send a round counter on every request.
+    """
+    if raw.get("protocol_version") is None:
+        raise invalid_request(
+            "daintree.protocol_version is required when the daintree extension is present.",
+            param="daintree.protocol_version",
+            code="protocol_version_required",
+        )
+    check_protocol_value(raw.get("protocol_version"))
+    for field in ("session_id", "turn_id"):
+        value = raw.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise invalid_request(
+                f"daintree.{field} is required and must be a non-empty string when the "
+                "daintree extension is present.",
+                param=f"daintree.{field}",
+                code=f"{field}_required",
+            )
+
+
 def require_ready(request: Request) -> None:
     if not getattr(request.app.state, "ready", False):
         raise DaintreeError(

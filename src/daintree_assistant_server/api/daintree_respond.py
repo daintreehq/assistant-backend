@@ -1,4 +1,9 @@
-"""The main OpenAI-compatible Chat Completions endpoint."""
+"""The native Daintree generation endpoint: ``POST /v1/daintree/respond``.
+
+This is the Daintree-owned protocol (not OpenAI-compatible). It returns a native
+JSON response, or — when ``generation.stream`` is true — a named-event SSE stream
+(``meta`` / ``delta`` / ``done`` / ``error``).
+"""
 
 from __future__ import annotations
 
@@ -6,16 +11,16 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..auth import Principal, require_auth
-from ..contracts.openai import ChatCompletionRequest
-from ..services.validation import reject_forbidden_prompt_keys, validate_chat_request
+from ..contracts.daintree_api import RespondRequest
+from ..services.validation import validate_respond_request
 from .deps import check_protocol_header, check_protocol_value, require_ready
 
 router = APIRouter()
 
 
-@router.post("/v1/chat/completions", response_model=None)
-async def chat_completions(
-    body: ChatCompletionRequest,
+@router.post("/v1/daintree/respond", response_model=None)
+async def respond(
+    body: RespondRequest,
     request: Request,
     _principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
@@ -24,11 +29,9 @@ async def chat_completions(
     container = request.app.state.container
 
     check_protocol_header(request)
-    if body.daintree:
-        check_protocol_value(body.daintree.get("protocol_version"))
-        reject_forbidden_prompt_keys(body.daintree, param="daintree")
+    check_protocol_value(body.protocol_version)
 
-    upstream_model = validate_chat_request(body, settings)
+    upstream_model = validate_respond_request(body, settings)
 
     outcome = await container.orchestrator.complete(
         body,

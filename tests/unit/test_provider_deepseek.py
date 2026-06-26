@@ -21,9 +21,19 @@ SSE_OK = (
 )
 
 
-def _provider(handler) -> DeepSeekProvider:
+def _provider(handler, **kwargs) -> DeepSeekProvider:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return DeepSeekProvider(client, api_key="key", base_url="https://api.deepseek.com")
+    return DeepSeekProvider(client, api_key="key", base_url="https://api.deepseek.com", **kwargs)
+
+
+def _capture_body(captured: dict):
+    import json as _json
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(_json.loads(request.content))
+        return httpx.Response(200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}})
+
+    return handler
 
 
 def _req(**kwargs: object) -> ProviderChatRequest:
@@ -56,18 +66,47 @@ async def test_complete_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_thinking_disabled_in_body() -> None:
+async def test_thinking_sent_only_when_enabled() -> None:
     captured: dict = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        import json as _json
-
-        captured.update(_json.loads(request.content))
-        return httpx.Response(200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}})
-
-    provider = _provider(handler)
+    provider = _provider(_capture_body(captured), send_thinking=True)
     await provider.complete(_req())
     assert captured["thinking"] == {"type": "disabled"}
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_thinking_not_sent_by_default() -> None:
+    captured: dict = {}
+    provider = _provider(_capture_body(captured))
+    await provider.complete(_req())
+    assert "thinking" not in captured
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_prompt_cache_key_not_sent_by_default() -> None:
+    captured: dict = {}
+    provider = _provider(_capture_body(captured))
+    await provider.complete(_req(prompt_cache_key="daintree-main"))
+    assert "prompt_cache_key" not in captured
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_prompt_cache_key_sent_when_enabled_and_not_json_mode() -> None:
+    captured: dict = {}
+    provider = _provider(_capture_body(captured), send_prompt_cache_key=True)
+    await provider.complete(_req(prompt_cache_key="daintree-main"))
+    assert captured["prompt_cache_key"] == "daintree-main"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_prompt_cache_key_suppressed_in_json_mode() -> None:
+    captured: dict = {}
+    provider = _provider(_capture_body(captured), send_prompt_cache_key=True)
+    await provider.complete(_req(prompt_cache_key="daintree-main", response_format={"type": "json_object"}))
+    assert "prompt_cache_key" not in captured
     await provider.aclose()
 
 

@@ -20,11 +20,10 @@ from fastapi import FastAPI, Request
 from . import __version__
 from .api import (
     daintree_capabilities,
+    daintree_respond,
     daintree_skills,
     daintree_tasks,
     health,
-    openai_chat,
-    openai_models,
 )
 from .config import Settings, get_settings
 from .errors import register_exception_handlers, request_too_large
@@ -46,6 +45,70 @@ from .skills.selector import Selector
 from .state.codec import StateCodec
 
 logger = get_logger("daintree.main")
+
+
+class BodySizeLimitMiddleware:
+    """Reject oversized request bodies by counting bytes as they arrive.
+
+    A ``Content-Length`` header is honored up front, but the limit is *also*
+    enforced by reading the body in the middleware and bailing the moment it
+    exceeds the cap — so a chunked request (or one that omits ``Content-Length``)
+    cannot push an unbounded body into the JSON parser. The buffered body is
+    then replayed to the application unchanged. The decision is made *before*
+    the app runs, so the framework cannot reinterpret the abort as a 400.
+    """
+
+    def __init__(self, app: Any, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+
+        for name, value in scope.get("headers") or []:
+            if name == b"content-length":
+                try:
+                    declared = int(value)
+                except ValueError:
+                    break
+                if declared > self.max_bytes:
+                    await self._reject(scope, send)
+                    return
+                break
+
+        body = bytearray()
+        more_body = True
+        while more_body:
+            message = await receive()
+            if message.get("type") == "http.disconnect":
+                return
+            if message.get("type") != "http.request":
+                continue
+            body += message.get("body", b"")
+            more_body = bool(message.get("more_body", False))
+            if len(body) > self.max_bytes:
+                await self._reject(scope, send)
+                return
+
+        replayed = False
+
+        async def replay_receive() -> Any:
+            nonlocal replayed
+            if not replayed:
+                replayed = True
+                return {"type": "http.request", "body": bytes(body), "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay_receive, send)
+
+    async def _reject(self, scope: Any, send: Any) -> None:
+        async def _eat() -> Any:  # pragma: no cover - response sends no body reads
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        response = request_too_large("Request body exceeds the configured limit.").to_response()
+        await response(scope, _eat, send)
 
 
 @dataclass
@@ -77,6 +140,7 @@ def _build_provider(settings: Settings) -> ChatProvider:
         base_url=settings.deepseek_base_url,
         default_timeout=settings.main_timeout_seconds,
         send_prompt_cache_key=settings.deepseek_send_prompt_cache_key,
+        send_thinking=settings.deepseek_send_thinking,
     )
 
 
@@ -184,25 +248,17 @@ def create_app(
         request_id = request.headers.get("x-request-id") or new_request_id()
         bind_request_context(request_id=request_id, path=request.url.path, method=request.method)
         try:
-            # Reject oversized bodies up front via Content-Length when available.
-            content_length = request.headers.get("content-length")
-            if content_length is not None:
-                try:
-                    if int(content_length) > settings.max_request_bytes:
-                        return request_too_large(
-                            "Request body exceeds the configured limit."
-                        ).to_response()
-                except ValueError:
-                    pass
             response = await call_next(request)
             response.headers.setdefault("X-Request-Id", request_id)
             return response
         finally:
             clear_request_context()
 
+    # Outermost: count body bytes (handles chunked / missing Content-Length).
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_bytes)
+
     app.include_router(health.router)
-    app.include_router(openai_models.router)
-    app.include_router(openai_chat.router)
+    app.include_router(daintree_respond.router)
     app.include_router(daintree_capabilities.router)
     app.include_router(daintree_skills.router)
     app.include_router(daintree_tasks.router)

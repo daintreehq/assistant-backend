@@ -18,12 +18,14 @@ SELECTOR_PROMPT_VERSION = "selector-2026-06-26.1"
 
 # Main-prompt template names.
 TEMPLATE_RUNTIME_CONTEXT = "main/runtime_context.md.j2"
+TEMPLATE_INTEGRATIONS = "main/integrations.md.j2"
 TEMPLATE_LOADED_SKILLS = "main/loaded_skills.md.j2"
 TEMPLATE_TURN_FOOTER = "main/turn_footer.md.j2"
 TEMPLATE_SELECTOR_SYSTEM = "selector/system.md.j2"
 
 _ALL_TEMPLATES = (
     TEMPLATE_RUNTIME_CONTEXT,
+    TEMPLATE_INTEGRATIONS,
     TEMPLATE_LOADED_SKILLS,
     TEMPLATE_TURN_FOOTER,
     TEMPLATE_SELECTOR_SYSTEM,

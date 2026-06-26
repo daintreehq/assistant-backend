@@ -6,10 +6,16 @@ Used by both the selector (building evidence) and the prompt assembler
 
 from __future__ import annotations
 
+import re
+
 from .contracts.openai import ContentPart, ImageContentPart, TextContentPart
 
 # Characters permitted in addition to printable text.
 _ALLOWED_CONTROL = {"\n", "\t"}
+
+# Any run of whitespace (incl. newlines/tabs) collapses to one space for
+# single-line fields, so an untrusted value cannot inject extra lines.
+_WHITESPACE_RUN = re.compile(r"\s+")
 
 
 def strip_control_chars(text: str) -> str:
@@ -34,11 +40,45 @@ def cap_bytes(text: str, max_bytes: int) -> tuple[str, bool]:
 
 
 def sanitize_field(text: str | None, max_bytes: int) -> tuple[str, bool]:
-    """Strip control chars and cap a single untrusted text field."""
+    """Strip control chars and cap a single untrusted text field.
+
+    Newlines and tabs are preserved; use :func:`sanitize_line` for values that
+    must render on a single line, and :func:`frame_data_block` for multiline
+    values that must not be able to break out of their section.
+    """
     if not text:
         return "", False
     cleaned = strip_control_chars(text)
     return cap_bytes(cleaned, max_bytes)
+
+
+def sanitize_line(text: str | None, max_bytes: int) -> str:
+    """Collapse an untrusted value to a single safe line, then cap its bytes.
+
+    All whitespace (including newlines and tabs) becomes a single space so the
+    value cannot inject extra lines or fake headings into a system message.
+    Returns ``""`` for empty input.
+    """
+    if not text:
+        return ""
+    cleaned = _WHITESPACE_RUN.sub(" ", strip_control_chars(text)).strip()
+    capped, _ = cap_bytes(cleaned, max_bytes)
+    return capped
+
+
+def frame_data_block(text: str | None, max_bytes: int, *, tag: str) -> str:
+    """Frame multiline untrusted text as an inert, delimited data block.
+
+    Newlines are preserved, but any attempt to close the block early is
+    neutralized by escaping the delimiter, so embedded ``</tag>`` cannot end the
+    framing and inject following text as a new instruction. Returns ``""`` for
+    empty/blank input.
+    """
+    cleaned, _ = sanitize_field(text, max_bytes)
+    if not cleaned.strip():
+        return ""
+    neutralized = cleaned.replace(f"</{tag}>", f"<\\/{tag}>").replace(f"<{tag}>", f"<\\{tag}>")
+    return f"<{tag}>\n{neutralized}\n</{tag}>"
 
 
 def message_text(content: str | list[ContentPart] | None) -> str:

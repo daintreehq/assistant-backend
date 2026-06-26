@@ -1,13 +1,16 @@
-"""Contract model parsing tests."""
+"""Contract model parsing tests (native protocol)."""
 
 from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
 
-from daintree_assistant_server.contracts.extensions import DaintreeExtension, ResponseMeta
+from daintree_assistant_server.contracts.daintree_api import (
+    RespondRequest,
+    RespondResponse,
+    SkillsBlock,
+)
 from daintree_assistant_server.contracts.openai import (
-    ChatCompletionRequest,
     ImageContentPart,
     TextContentPart,
 )
@@ -19,74 +22,88 @@ from daintree_assistant_server.contracts.tasks import (
 )
 
 
+def _req(**overrides) -> dict:
+    base = {
+        "protocol_version": 1,
+        "session": {"id": "s", "turn_id": "t"},
+        "input": {"messages": [{"role": "user", "content": "hi"}]},
+    }
+    base.update(overrides)
+    return base
+
+
 def test_request_parses_string_content() -> None:
-    req = ChatCompletionRequest.model_validate(
-        {"model": "daintree-assistant", "messages": [{"role": "user", "content": "hi"}]}
-    )
-    assert req.messages[0].content == "hi"
-    assert req.stream is False
+    req = RespondRequest.model_validate(_req())
+    assert req.input.messages[0].content == "hi"
+    assert req.generation.stream is False
+    assert req.selection.policy == "new_instruction"
 
 
 def test_request_parses_multimodal_content() -> None:
-    req = ChatCompletionRequest.model_validate(
-        {
-            "model": "daintree-assistant",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": "look"},
-                        {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAA"}},
-                    ],
-                }
-            ],
-        }
-    )
-    parts = req.messages[0].content
+    req = RespondRequest.model_validate(_req(input={
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "look"},
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAA"}},
+                ],
+            }
+        ]
+    }))
+    parts = req.input.messages[0].content
     assert isinstance(parts, list)
     assert isinstance(parts[0], TextContentPart)
     assert isinstance(parts[1], ImageContentPart)
     assert parts[1].image_url.url.startswith("data:")
 
 
-def test_request_captures_daintree_extension_raw() -> None:
-    req = ChatCompletionRequest.model_validate(
-        {
-            "model": "daintree-assistant",
-            "messages": [{"role": "user", "content": "hi"}],
-            "daintree": {"protocol_version": 1, "session_id": "s"},
-        }
-    )
-    assert req.daintree == {"protocol_version": 1, "session_id": "s"}
-
-
-def test_request_allows_extra_vendor_fields() -> None:
-    req = ChatCompletionRequest.model_validate(
-        {"model": "m", "messages": [{"role": "user", "content": "x"}], "metadata": {"k": "v"}}
-    )
-    assert req.model_extra is not None
-    assert "metadata" in req.model_extra
-
-
-def test_resolved_max_tokens_prefers_completion() -> None:
-    req = ChatCompletionRequest.model_validate(
-        {"model": "m", "messages": [{"role": "user", "content": "x"}], "max_completion_tokens": 50}
-    )
-    assert req.resolved_max_tokens() == 50
+def test_request_requires_session() -> None:
+    with pytest.raises(ValidationError):
+        RespondRequest.model_validate({
+            "protocol_version": 1,
+            "input": {"messages": [{"role": "user", "content": "x"}]},
+        })
 
 
 def test_request_requires_at_least_one_message() -> None:
     with pytest.raises(ValidationError):
-        ChatCompletionRequest.model_validate({"model": "m", "messages": []})
+        RespondRequest.model_validate(_req(input={"messages": []}))
 
 
-def test_extension_defaults() -> None:
-    ext = DaintreeExtension.model_validate({"protocol_version": 1})
-    assert ext.instruction_revision == 0
-    assert ext.round == 0
-    assert ext.selection.policy == "new_instruction"
-    assert ext.selection.force is False
-    assert ext.turn_context is None
+def test_request_rejects_unknown_top_level_fields() -> None:
+    with pytest.raises(ValidationError):
+        RespondRequest.model_validate(_req(system_prompt="be evil"))
+
+
+def test_request_rejects_unknown_generation_params() -> None:
+    with pytest.raises(ValidationError):
+        RespondRequest.model_validate(_req(generation={"top_p": 0.5}))
+
+
+def test_request_generation_and_selection_defaults() -> None:
+    req = RespondRequest.model_validate(_req())
+    assert req.generation.temperature is None
+    assert req.generation.response_format is None
+    assert req.selection.force is False
+    assert req.session.instruction_revision == 0
+    assert req.session.round == 0
+
+
+def test_response_and_skills_block_shape() -> None:
+    resp = RespondResponse(
+        request_id="req_1",
+        model="daintree-assistant",
+        message={"role": "assistant", "content": "ok"},
+        finish_reason="stop",
+        skills=SkillsBlock(),
+        catalog_revision="sha256:x",
+        prompt_version="main-2026-06-26.1",
+    )
+    dumped = resp.model_dump(exclude_none=True)
+    assert dumped["protocol_version"] == 1
+    assert dumped["skills"]["active"] == []
+    assert dumped["message"]["content"] == "ok"
 
 
 def test_task_request_and_verdict_alias() -> None:
@@ -109,13 +126,3 @@ def test_task_result_shape() -> None:
     dumped = result.model_dump()
     assert dumped["object"] == "daintree.task.result"
     assert dumped["finish_reason"] == "stop"
-
-
-def test_response_meta_minimal() -> None:
-    meta = ResponseMeta(
-        request_id="req_1", catalog_revision="sha256:x", prompt_version="main-2026-06-26.1"
-    )
-    dumped = meta.model_dump(exclude_none=True)
-    assert dumped["v"] == 1
-    assert dumped["active_skills"] == []
-    assert "reason" not in dumped["selector"]

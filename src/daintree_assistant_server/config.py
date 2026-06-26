@@ -43,10 +43,13 @@ class Settings(BaseSettings):
 
     # Undocumented migration alias the public model id may also resolve to.
     deepseek_public_alias: str = Field(default="deepseek-v4-flash", alias="DEEPSEEK_PUBLIC_ALIAS")
-    # DeepSeek supports a prompt-cache key; disable if a provider rejects the field.
+    # Provider-specific wire fields are opt-in: a hosted endpoint that rejects an
+    # unknown field would fail every request, so default them OFF and enable each
+    # only after a live smoke test confirms the exact endpoint accepts it.
     deepseek_send_prompt_cache_key: bool = Field(
-        default=True, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
+        default=False, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
     )
+    deepseek_send_thinking: bool = Field(default=False, alias="DEEPSEEK_SEND_THINKING")
 
     # ---- Authentication -------------------------------------------------
     daintree_api_key: SecretStr = Field(default=SecretStr(""), alias="DAINTREE_API_KEY")
@@ -66,6 +69,16 @@ class Settings(BaseSettings):
     # ---- Limits ---------------------------------------------------------
     max_request_bytes: int = Field(default=8 * 1024 * 1024, alias="MAX_REQUEST_BYTES")
     max_tools: int = Field(default=128, alias="MAX_TOOLS")
+
+    # ---- Tool-definition bounds (defense before prompt assembly) --------
+    max_tool_definition_bytes: int = Field(
+        default=2 * 1024 * 1024, alias="MAX_TOOL_DEFINITION_BYTES"
+    )
+    max_tool_schema_depth: int = Field(default=16, alias="MAX_TOOL_SCHEMA_DEPTH")
+    max_tool_schema_properties: int = Field(default=512, alias="MAX_TOOL_SCHEMA_PROPERTIES")
+    max_tool_schema_string_bytes: int = Field(
+        default=16 * 1024, alias="MAX_TOOL_SCHEMA_STRING_BYTES"
+    )
     max_active_skills: int = Field(default=3, alias="MAX_ACTIVE_SKILLS")
     max_meta_header_bytes: int = Field(default=6 * 1024, alias="MAX_META_HEADER_BYTES")
 
@@ -100,6 +113,12 @@ class Settings(BaseSettings):
     cap_watchers_bytes: int = Field(default=4 * 1024, alias="CAP_WATCHERS_BYTES")
     cap_client_metadata: int = Field(default=2 * 1024, alias="CAP_CLIENT_METADATA")
     cap_message_text_part: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT_PART")
+    cap_message_text: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT")
+
+    # ---- CLI-provided integrations (MCP servers + tool index) -----------
+    cap_mcp_servers: int = Field(default=32, alias="CAP_MCP_SERVERS")
+    cap_mcp_block_bytes: int = Field(default=64 * 1024, alias="CAP_MCP_BLOCK_BYTES")
+    cap_tool_index_desc: int = Field(default=256, alias="CAP_TOOL_INDEX_DESC")
 
     # ---- Tracing --------------------------------------------------------
     otel_exporter_otlp_endpoint: str = Field(default="", alias="OTEL_EXPORTER_OTLP_ENDPOINT")

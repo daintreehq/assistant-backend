@@ -18,17 +18,17 @@ from __future__ import annotations
 from typing import Any
 
 from ..config import Settings
+from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import RuntimeContext, TurnContext
 from ..contracts.openai import (
-    ChatCompletionRequest,
     ChatMessage,
     ImageContentPart,
-    NamedToolChoice,
     TextContentPart,
     ToolCall,
     ToolDef,
 )
 from ..prompts.loader import (
+    TEMPLATE_INTEGRATIONS,
     TEMPLATE_LOADED_SKILLS,
     TEMPLATE_RUNTIME_CONTEXT,
     TEMPLATE_TURN_FOOTER,
@@ -37,7 +37,12 @@ from ..prompts.loader import (
 from ..providers.base import ProviderChatRequest
 from ..skills.load_events import SkillLoadExecution, synthetic_transcript
 from ..skills.models import Skill
-from ..text_utils import cap_bytes, message_text, sanitize_field, strip_control_chars
+from ..text_utils import (
+    cap_bytes,
+    frame_data_block,
+    message_text,
+    sanitize_line,
+)
 
 PROMPT_CACHE_KEY = "daintree-main"
 
@@ -53,14 +58,19 @@ _TIER_FALLBACK = "mutating actions require confirmation according to this tier."
 def _cap_list_combined(
     items: list[str], max_bytes: int, max_count: int | None = None
 ) -> list[str]:
+    """Sanitize each item to a single safe line and bound the combined bytes.
+
+    Each value is collapsed to one line (no embedded newlines) so a list item
+    rendered into a heading or comma-separated run cannot inject extra lines.
+    """
     out: list[str] = []
     total = 0
     for raw in items:
         if max_count is not None and len(out) >= max_count:
             break
-        value = strip_control_chars(str(raw))
-        if len(value.encode("utf-8")) > max_bytes:
-            value, _ = cap_bytes(value, max_bytes)
+        value = sanitize_line(str(raw), max_bytes)
+        if not value:
+            continue
         size = len(value.encode("utf-8")) + 1
         if out and total + size > max_bytes:
             break
@@ -87,26 +97,29 @@ class PromptAssembler:
         mcp_connected = bool(mcp and mcp.connected)
         if mcp and mcp.connected:
             mcp_status_line = (
-                f"connected ({mcp.transport or 'unknown'} transport, "
+                f"connected ({sanitize_line(mcp.transport, 64) or 'unknown'} transport, "
                 f"{mcp.tool_count or 0} tools)"
             )
         elif mcp and mcp.status:
-            mcp_status_line = strip_control_chars(mcp.status)
+            mcp_status_line = sanitize_line(mcp.status, 64)
         else:
             mcp_status_line = "not connected"
 
-        project_instructions, _ = sanitize_field(
-            rc.project_instructions, self.settings.cap_project_instructions
+        project_instructions = frame_data_block(
+            rc.project_instructions,
+            self.settings.cap_project_instructions,
+            tag="project_instructions",
         )
-        project_path, _ = sanitize_field(rc.project_path, 4096)
 
         return self.prompts.render(
             TEMPLATE_RUNTIME_CONTEXT,
-            tier=tier,
+            tier=sanitize_line(tier, 64),
             tier_description=tier_description,
-            project_path=project_path or "(unknown)",
-            project_id=strip_control_chars(rc.project_id or ""),
-            configured_agents=[strip_control_chars(a) for a in rc.configured_agent_ids],
+            project_path=sanitize_line(rc.project_path, 4096) or "(unknown)",
+            project_id=sanitize_line(rc.project_id, 256),
+            configured_agents=[
+                a for a in (sanitize_line(x, 256) for x in rc.configured_agent_ids) if a
+            ],
             mcp_status_line=mcp_status_line,
             mcp_connected=mcp_connected,
             large_model=self.settings.deepseek_main_model,
@@ -114,6 +127,56 @@ class PromptAssembler:
             scheduler_active=rc.scheduler_active,
             project_instructions=project_instructions,
         )
+
+    def render_integrations(
+        self, runtime: RuntimeContext | None, tools: list[ToolDef] | None
+    ) -> str:
+        """Render the client-reported MCP servers + tool index as inert data.
+
+        Returns ``""`` when the client supplies neither, so a generic OpenAI
+        client (or a CLI that has not yet started sending its integration
+        surface) produces no integrations system message at all.
+        """
+        servers: list[dict[str, Any]] = []
+        if runtime:
+            for srv in runtime.mcp_servers[: self.settings.cap_mcp_servers]:
+                name = sanitize_line(srv.name, 128)
+                if not name:
+                    continue
+                servers.append(
+                    {
+                        "name": name,
+                        "transport": sanitize_line(srv.transport, 64),
+                        "status": sanitize_line(srv.status, 64),
+                        "tool_count": srv.tool_count,
+                        "description": sanitize_line(srv.description, 4096),
+                        "instructions": frame_data_block(
+                            srv.instructions, 16384, tag="mcp_instructions"
+                        ),
+                    }
+                )
+
+        tool_index: list[dict[str, str]] = []
+        for tool in tools or []:
+            fn = tool.function
+            name = sanitize_line(fn.name, 64)
+            if not name:
+                continue
+            tool_index.append(
+                {
+                    "name": name,
+                    "description": sanitize_line(fn.description, self.settings.cap_tool_index_desc),
+                }
+            )
+
+        if not servers and not tool_index:
+            return ""
+
+        rendered = self.prompts.render(
+            TEMPLATE_INTEGRATIONS, mcp_servers=servers, tools=tool_index
+        )
+        capped, _ = cap_bytes(rendered, self.settings.cap_mcp_block_bytes)
+        return capped
 
     def render_loaded_skills(self, skills: list[Skill]) -> str:
         return self.prompts.render(TEMPLATE_LOADED_SKILLS, loaded_skills=skills)
@@ -125,8 +188,8 @@ class PromptAssembler:
             return self.prompts.render(TEMPLATE_TURN_FOOTER, turn_context=None)
         turn = turn or TurnContext()
 
-        goal, _ = sanitize_field(turn.goal, self.settings.cap_goal)
-        worktree, _ = sanitize_field(active_worktree, self.settings.cap_active_worktree)
+        goal = sanitize_line(turn.goal, self.settings.cap_goal)
+        worktree = sanitize_line(active_worktree, self.settings.cap_active_worktree)
         workflow_runs = _cap_list_combined(turn.workflow_runs, self.settings.cap_workflow_runs)
         pinned = _cap_list_combined(turn.memories.pinned, self.settings.cap_pinned_memories)
         relevant = _cap_list_combined(turn.memories.relevant, self.settings.cap_relevant_memories)
@@ -211,8 +274,8 @@ class PromptAssembler:
     def _project_tool_choice(self, tool_choice: Any) -> Any:
         if tool_choice is None:
             return None
-        if isinstance(tool_choice, NamedToolChoice):
-            return {"type": "function", "function": {"name": tool_choice.function.name}}
+        if isinstance(tool_choice, RespondToolChoice):
+            return {"type": "function", "function": {"name": tool_choice.name}}
         return tool_choice
 
     # ---- assembly -------------------------------------------------------
@@ -220,42 +283,57 @@ class PromptAssembler:
     def build_main_request(
         self,
         *,
-        public_request: ChatCompletionRequest,
-        runtime: RuntimeContext | None,
-        turn: TurnContext | None,
+        request: RespondRequest,
         skills: list[Skill],
         synthetic_executions: list[SkillLoadExecution],
         upstream_model: str,
     ) -> ProviderChatRequest:
+        """Assemble the upstream request, ordered most-stable-first so DeepSeek's
+        prefix cache covers the large, stable content (base prompt, the client's
+        integration surface, and the active skill bodies) across a turn's rounds.
+        Per-request variable context (runtime + turn) is appended LAST so it never
+        poisons that cached prefix.
+        """
+        runtime = request.runtime
+        turn = request.turn
+        gen = request.generation
+
+        # 1. static base prompt → cacheable across all sessions.
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self.prompts.base_prompt()},
-            {"role": "system", "content": self.render_runtime_context(runtime)},
-            {"role": "system", "content": self.render_loaded_skills(skills)},
         ]
-        messages.extend(self._message_to_wire(m) for m in public_request.messages)
+        # 2. integration surface (MCP + tools): session-stable → cacheable.
+        integrations = self.render_integrations(runtime, request.input.tools)
+        if integrations.strip():
+            messages.append({"role": "system", "content": integrations})
+        # 3. active skill bodies: turn-stable → cacheable across rounds.
+        messages.append({"role": "system", "content": self.render_loaded_skills(skills)})
+        # 4. conversation, then the synthetic skill-load exchange.
+        messages.extend(self._message_to_wire(m) for m in request.input.messages)
         messages.extend(synthetic_transcript(synthetic_executions))
-
+        # 5. per-request variable context LAST (kept out of the cached prefix).
+        runtime_msg = self.render_runtime_context(runtime)
+        if runtime_msg.strip():
+            messages.append({"role": "system", "content": runtime_msg})
         footer = self.render_turn_footer(turn, runtime.active_worktree if runtime else None)
         if footer.strip():
             messages.append({"role": "system", "content": footer})
 
         response_format = None
-        if public_request.response_format is not None:
-            response_format = {"type": public_request.response_format.type}
+        if gen.response_format is not None:
+            response_format = {"type": gen.response_format}
 
         return ProviderChatRequest(
             model=upstream_model,
             messages=messages,
-            tools=self._project_tools(public_request.tools),
-            tool_choice=self._project_tool_choice(public_request.tool_choice),
-            temperature=public_request.temperature,
-            max_tokens=public_request.resolved_max_tokens(),
+            tools=self._project_tools(request.input.tools),
+            tool_choice=self._project_tool_choice(request.input.tool_choice),
+            temperature=gen.temperature,
+            max_tokens=gen.max_tokens,
             response_format=response_format,
-            stop=public_request.stop,
-            stream=public_request.stream,
-            include_usage=bool(
-                public_request.stream_options and public_request.stream_options.include_usage
-            ),
+            stop=gen.stop,
+            stream=gen.stream,
+            include_usage=gen.stream,
             thinking_disabled=True,
             prompt_cache_key=PROMPT_CACHE_KEY,
             timeout=self.settings.main_timeout_seconds,

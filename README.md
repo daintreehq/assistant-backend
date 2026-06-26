@@ -6,13 +6,13 @@ skill catalog and bodies, automatic skill selection, prompt assembly, the
 small-model utility prompts, and upstream credentials. The CLI keeps local
 state and local tool execution.
 
-It exposes a largely **OpenAI-compatible** Chat Completions API plus a
-negotiated **Daintree extension** (request fields + response metadata). A
-generic OpenAI client can talk to it and ignore the extension; a Daintree-aware
-client uses the extension for skill-state continuity and the skill-load prelude.
+It exposes a **Daintree-native** API (`POST /v1/daintree/respond`) — purpose-built,
+not OpenAI-compatible. The session/skill envelope is first-class, skills are surfaced
+as their own response block, and streaming uses named SSE events (`meta`/`delta`/`done`/
+`error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** DeepSeek V4 Flash (OpenAI-format API), behind a provider abstraction
+- **Upstream:** DeepSeek V4 Flash (OpenAI-format API spoken *internally*, behind a provider abstraction)
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Key invariants
@@ -82,9 +82,8 @@ uvicorn daintree_assistant_server.main:app --reload --port 8080
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| `POST` | `/v1/chat/completions` | yes | Main OpenAI-compatible completion (+ Daintree extension) |
-| `GET`  | `/v1/models` | yes | Advertised model alias |
-| `GET`  | `/v1/daintree/capabilities` | yes | Protocol, limits, task profiles, catalog revision |
+| `POST` | `/v1/daintree/respond` | yes | Native generation (+ first-class `skills` block; stream or JSON) |
+| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task profiles, catalog revision |
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual find / load / clear |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks |
@@ -92,9 +91,8 @@ uvicorn daintree_assistant_server.main:app --reload --port 8080
 | `GET`  | `/readyz` | no | Readiness (config, secrets, prompts, catalog, provider) |
 | `GET`  | `/version` | no | Build SHA, version, protocol range |
 
-Daintree response metadata is delivered in the `X-Daintree-Meta` header
-(base64url JSON, available before the first streamed token) and, for
-non-streaming responses, also in a top-level `daintree` field.
+Skill/selection metadata is delivered in the response body's `skills` block
+(non-streaming) or as the first SSE `meta` event (streaming), before any token.
 
 ## Deployment
 

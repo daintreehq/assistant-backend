@@ -14,13 +14,14 @@ from pathlib import Path
 import pytest
 
 from daintree_assistant_server.config import Settings
+from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.contracts.extensions import (
     McpInfo,
+    McpServer,
     Memories,
     RuntimeContext,
     TurnContext,
 )
-from daintree_assistant_server.contracts.openai import ChatCompletionRequest
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from daintree_assistant_server.skills.catalog import load_catalog
@@ -72,6 +73,40 @@ def test_runtime_context(assembler: PromptAssembler) -> None:
         project_instructions="Always run the linter.",
     )
     assert_golden("runtime_context.md", assembler.render_runtime_context(rc))
+
+
+def test_integrations(assembler: PromptAssembler) -> None:
+    rc = RuntimeContext(
+        mcp_servers=[
+            McpServer(
+                name="daintree",
+                transport="http",
+                status="connected",
+                tool_count=12,
+                description="Daintree orchestration surface.",
+                instructions="Use terminal.list before sendCommand.\nNever invent state.",
+            ),
+            McpServer(name="filesystem", status="connected", tool_count=5),
+        ],
+    )
+    tools = RespondRequest.model_validate(
+        {
+            "protocol_version": 1,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {
+                "messages": [{"role": "user", "content": "hi"}],
+                "tools": [
+                    {"type": "function", "function": {"name": "git__status", "description": "Show git status."}},
+                    {"type": "function", "function": {"name": "fs__read", "description": "Read a file."}},
+                ],
+            },
+        }
+    ).input.tools
+    assert_golden("integrations.md", assembler.render_integrations(rc, tools))
+
+
+def test_integrations_empty_when_nothing_supplied(assembler: PromptAssembler) -> None:
+    assert assembler.render_integrations(RuntimeContext(), None) == ""
 
 
 def test_loaded_skills_empty(assembler: PromptAssembler) -> None:
@@ -126,16 +161,17 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     catalog = load_catalog()
     skill = catalog.get("daintree.workflow.prep-branch-for-review")
     ex = SkillLoadExecution.from_skill("call_srv_GOLDEN", skill)
-    req = ChatCompletionRequest.model_validate(
+    req = RespondRequest.model_validate(
         {
-            "model": "daintree-assistant",
-            "messages": [{"role": "user", "content": "Prepare this branch for review."}],
+            "protocol_version": 1,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
+            "runtime": {"permission_tier": "operator", "project_path": "/p"},
+            "turn": {"goal": "Prepare this branch for review."},
         }
     )
     pr = assembler.build_main_request(
-        public_request=req,
-        runtime=RuntimeContext(permission_tier="operator", project_path="/p"),
-        turn=TurnContext(goal="Prepare this branch for review."),
+        request=req,
         skills=[skill],
         synthetic_executions=[ex],
         upstream_model="deepseek-v4-flash",

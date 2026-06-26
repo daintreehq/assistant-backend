@@ -1,33 +1,42 @@
-"""The chat orchestrator: selection cadence, prompt assembly, metadata, and the
-delayed streaming start.
+"""The respond orchestrator: selection cadence, prompt assembly, skill metadata,
+and the delayed streaming start.
 
 It coordinates state verification, the skill selector, the prompt assembler, and
-the provider, producing a standards-shaped OpenAI completion plus the Daintree
-metadata extension (header for streaming; header + body field for non-streaming).
+the provider, producing a native Daintree response (non-streaming body, or a
+named-event SSE stream) with skills as a first-class block. The protocol is
+Daintree-owned — not OpenAI-compatible — though DeepSeek is still spoken in the
+OpenAI wire shape *upstream*, behind the provider abstraction.
 """
 
 from __future__ import annotations
 
 import asyncio
-import base64
 import json
 import random
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ..config import Settings
+from ..contracts.daintree_api import (
+    RespondMessage,
+    RespondRequest,
+    RespondResponse,
+    RespondUsage,
+    SkillsBlock,
+    StreamDelta,
+    StreamDone,
+    StreamMeta,
+)
 from ..contracts.extensions import (
-    DaintreeExtension,
     Prelude,
-    ResponseMeta,
     SelectorMeta,
     SelectorUsage,
     SkillRef,
 )
-from ..contracts.openai import ChatCompletionRequest, ChatMessage
-from ..errors import DaintreeError, invalid_request, metadata_too_large
-from ..observability import get_logger, new_call_id, new_completion_id, new_request_id
+from ..contracts.openai import ChatMessage
+from ..errors import DaintreeError
+from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
 from ..skills.catalog import Catalog
@@ -36,19 +45,7 @@ from ..skills.selector import SelectionDecision, Selector
 from ..state.codec import StateCodec
 from .prompt_assembler import PromptAssembler
 
-logger = get_logger("daintree.chat")
-
-
-def _parse_extension(raw: dict[str, Any] | None) -> DaintreeExtension | None:
-    """Validate the raw Daintree extension, mapping bad shapes to HTTP 400."""
-    if raw is None:
-        return None
-    try:
-        return DaintreeExtension.model_validate(raw)
-    except Exception as exc:  # pydantic ValidationError
-        raise invalid_request(
-            "Invalid Daintree extension.", param="daintree", code="invalid_daintree_extension"
-        ) from exc
+logger = get_logger("daintree.respond")
 
 
 def merge_active_skills(
@@ -76,10 +73,21 @@ def merge_active_skills(
 
 
 @dataclass
-class ChatOutcome:
+class _RespondMeta:
+    """The computed skill/state outcome shared by streaming and non-streaming."""
+
+    request_id: str
+    state: str
+    catalog_revision: str
+    prompt_version: str
+    skills: SkillsBlock
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass
+class RespondOutcome:
     """What the API layer needs to produce the HTTP response."""
 
-    meta: ResponseMeta
     headers: dict[str, str]
     streaming: bool
     body: dict[str, Any] | None = None
@@ -108,42 +116,41 @@ class ChatOrchestrator:
 
     def _should_run_selector(
         self,
-        ext: DaintreeExtension | None,
+        *,
+        force: bool,
+        policy: str,
         state_valid: bool,
         state_catalog_revision: str | None,
         state_turn_id: str | None,
         state_instruction_revision: int | None,
+        turn_id: str,
+        instruction_revision: int,
     ) -> bool:
-        if ext is None:  # stateless compatibility mode
-            return True
-        if ext.selection.force or ext.selection.policy == "always":
+        if force or policy == "always":
             return True
         if not state_valid:
             return True
         if state_catalog_revision != self.catalog.revision:
             return True
-        if ext.turn_id != state_turn_id:
+        if turn_id != state_turn_id:
             return True
-        return ext.instruction_revision != state_instruction_revision
+        return instruction_revision != state_instruction_revision
 
     # ---- main entry -----------------------------------------------------
 
     async def complete(
         self,
-        public_request: ChatCompletionRequest,
+        request: RespondRequest,
         *,
         upstream_model: str,
         request_id: str | None = None,
-    ) -> ChatOutcome:
+    ) -> RespondOutcome:
         request_id = request_id or new_request_id()
-        ext = _parse_extension(public_request.daintree)
-        session_id = ext.session_id if ext else None
+        session_id = request.session.id
 
         warnings: list[str] = []
-        verification = self.state_codec.verify(
-            ext.state if ext else None, session_id=session_id
-        )
-        if ext is not None and ext.state and not verification.valid and verification.reason:
+        verification = self.state_codec.verify(request.state, session_id=session_id)
+        if request.state and not verification.valid and verification.reason:
             warnings.append(verification.reason)
 
         # Only a fully valid token carries prior active skills forward; an
@@ -153,15 +160,22 @@ class ChatOrchestrator:
             prior_active_ids = self.catalog.filter_known(verification.payload.active_ids())
 
         run_selector = self._should_run_selector(
-            ext,
-            verification.valid,
-            verification.payload.catalog_revision if verification.payload else None,
-            verification.payload.last_turn_id if verification.payload else None,
-            verification.payload.last_instruction_revision if verification.payload else None,
+            force=request.selection.force,
+            policy=request.selection.policy,
+            state_valid=verification.valid,
+            state_catalog_revision=(
+                verification.payload.catalog_revision if verification.payload else None
+            ),
+            state_turn_id=verification.payload.last_turn_id if verification.payload else None,
+            state_instruction_revision=(
+                verification.payload.last_instruction_revision if verification.payload else None
+            ),
+            turn_id=request.session.turn_id,
+            instruction_revision=request.session.instruction_revision,
         )
 
         if run_selector:
-            decision = await self.selector.select(public_request.messages, prior_active_ids)
+            decision = await self.selector.select(request.input.messages, prior_active_ids)
         else:
             decision = SelectionDecision.reuse(prior_active_ids)
         warnings.extend(decision.warnings)
@@ -179,14 +193,12 @@ class ChatOrchestrator:
             session_id=session_id,
             active_skills=[(s.id, s.version) for s in skills],
             catalog_revision=self.catalog.revision,
-            turn_id=ext.turn_id if ext else None,
-            instruction_revision=ext.instruction_revision if ext else 0,
+            turn_id=request.session.turn_id,
+            instruction_revision=request.session.instruction_revision,
         )
 
         provider_request = self.assembler.build_main_request(
-            public_request=public_request,
-            runtime=ext.runtime_context if ext else None,
-            turn=ext.turn_context if ext else None,
+            request=request,
             skills=skills,
             synthetic_executions=executions,
             upstream_model=upstream_model,
@@ -202,18 +214,15 @@ class ChatOrchestrator:
             run_selector=run_selector,
             warnings=warnings,
         )
-        encoded_meta = self._encode_meta(meta)
         headers = {
-            "X-Daintree-Meta": encoded_meta,
             "X-Daintree-Protocol": "1",
             "X-Request-Id": request_id,
-            "Access-Control-Expose-Headers": "X-Daintree-Meta, X-Daintree-Protocol, X-Request-Id",
         }
 
         logger.info(
-            "chat_completion",
+            "respond",
             request_id=request_id,
-            stream=public_request.stream,
+            stream=request.generation.stream,
             selector_ran=decision.ran,
             selector_degraded=decision.degraded,
             active_skills=active_ids,
@@ -221,14 +230,14 @@ class ChatOrchestrator:
             warnings=warnings,
         )
 
-        if public_request.stream:
+        if request.generation.stream:
             stream, first_event = await self._open_stream_with_retry(provider_request)
-            body_iter = self._stream_body(stream, first_event, upstream_alias=request_id)
-            return ChatOutcome(meta=meta, headers=headers, streaming=True, stream=body_iter)
+            body_iter = self._stream_body(stream, first_event, meta=meta)
+            return RespondOutcome(headers=headers, streaming=True, stream=body_iter)
 
         result = await self._complete_with_retry(provider_request)
         body = self._build_nonstream_body(result, meta)
-        return ChatOutcome(meta=meta, headers=headers, streaming=False, body=body)
+        return RespondOutcome(headers=headers, streaming=False, body=body)
 
     # ---- manual resolve (section 12.2) ---------------------------------
 
@@ -243,7 +252,7 @@ class ChatOrchestrator:
         query: str | None = None,
         skill_ids: list[str] | None = None,
         request_id: str | None = None,
-    ) -> tuple[ResponseMeta, dict[str, str]]:
+    ) -> dict[str, Any]:
         request_id = request_id or new_request_id()
         verification = self.state_codec.verify(state_token, session_id=session_id)
         warnings: list[str] = []
@@ -306,14 +315,14 @@ class ChatOrchestrator:
             run_selector=run_selector,
             warnings=warnings,
         )
-        encoded = self._encode_meta(meta)
-        headers = {
-            "X-Daintree-Meta": encoded,
-            "X-Daintree-Protocol": "1",
-            "X-Request-Id": request_id,
-            "Access-Control-Expose-Headers": "X-Daintree-Meta, X-Daintree-Protocol, X-Request-Id",
+        return {
+            "request_id": meta.request_id,
+            "state": meta.state,
+            "catalog_revision": meta.catalog_revision,
+            "prompt_version": meta.prompt_version,
+            "skills": meta.skills.model_dump(exclude_none=True),
+            "warnings": meta.warnings,
         }
-        return meta, headers
 
     # ---- metadata -------------------------------------------------------
 
@@ -328,7 +337,7 @@ class ChatOrchestrator:
         decision: SelectionDecision,
         run_selector: bool,
         warnings: list[str],
-    ) -> ResponseMeta:
+    ) -> _RespondMeta:
         def refs(ids: list[str]) -> list[SkillRef]:
             out: list[SkillRef] = []
             for sid in ids:
@@ -349,13 +358,9 @@ class ChatOrchestrator:
 
         reason = decision.reason if self.settings.expose_debug_selector_reason else None
 
-        return ResponseMeta(
-            request_id=request_id,
-            state=state,
-            catalog_revision=self.catalog.revision,
-            prompt_version=MAIN_PROMPT_VERSION,
-            active_skills=refs(active_ids),
-            newly_loaded_skills=refs(newly_loaded_ids),
+        skills = SkillsBlock(
+            active=refs(active_ids),
+            newly_loaded=refs(newly_loaded_ids),
             prelude=Prelude(tool_executions=[e.prelude_execution() for e in executions]),
             selector=SelectorMeta(
                 ran=decision.ran or run_selector,
@@ -365,84 +370,121 @@ class ChatOrchestrator:
                 usage=selector_usage,
                 reason=reason,
             ),
+        )
+        return _RespondMeta(
+            request_id=request_id,
+            state=state,
+            catalog_revision=self.catalog.revision,
+            prompt_version=MAIN_PROMPT_VERSION,
+            skills=skills,
             warnings=warnings,
         )
 
-    def _encode_meta(self, meta: ResponseMeta) -> str:
-        payload = meta.model_dump(exclude_none=True)
-        encoded = self._encode_payload(payload)
-        if len(encoded.encode("ascii")) <= self.settings.max_meta_header_bytes:
-            return encoded
-        # Drop the debug reason first, then fail rather than lose the token.
-        if meta.selector.reason is not None:
-            meta.selector.reason = None
-            payload = meta.model_dump(exclude_none=True)
-            encoded = self._encode_payload(payload)
-            if len(encoded.encode("ascii")) <= self.settings.max_meta_header_bytes:
-                return encoded
-        raise metadata_too_large()
-
-    @staticmethod
-    def _encode_payload(payload: dict[str, Any]) -> str:
-        raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
-
     # ---- response bodies ------------------------------------------------
 
-    def _build_nonstream_body(self, result: Any, meta: ResponseMeta) -> dict[str, Any]:
-        usage = self._usage_dict(result.usage)
-        return {
-            "id": result.id or new_completion_id(),
-            "object": "chat.completion",
-            "created": result.created or 0,
-            "model": self.settings.public_model_id,
-            "choices": result.choices,
-            "usage": usage,
-            "daintree": meta.model_dump(exclude_none=True),
-        }
+    def _build_nonstream_body(self, result: Any, meta: _RespondMeta) -> dict[str, Any]:
+        message = result.message or {}
+        response = RespondResponse(
+            request_id=meta.request_id,
+            model=self.settings.public_model_id,
+            message=RespondMessage(
+                role=message.get("role", "assistant"),
+                content=message.get("content"),
+                tool_calls=message.get("tool_calls"),
+            ),
+            finish_reason=result.finish_reason,
+            usage=self._usage(result.usage),
+            skills=meta.skills,
+            state=meta.state,
+            catalog_revision=meta.catalog_revision,
+            prompt_version=meta.prompt_version,
+            warnings=meta.warnings,
+        )
+        return response.model_dump(exclude_none=True)
 
     @staticmethod
-    def _usage_dict(usage: ProviderUsage) -> dict[str, Any]:
-        out: dict[str, Any] = {
-            "prompt_tokens": usage.prompt_tokens or 0,
-            "completion_tokens": usage.completion_tokens or 0,
-            "total_tokens": usage.total_tokens or 0,
-        }
-        if usage.cached_tokens is not None:
-            out["prompt_tokens_details"] = {"cached_tokens": usage.cached_tokens}
-        return out
+    def _usage(usage: ProviderUsage) -> RespondUsage:
+        return RespondUsage(
+            prompt_tokens=usage.prompt_tokens or 0,
+            completion_tokens=usage.completion_tokens or 0,
+            total_tokens=usage.total_tokens or 0,
+            cached_tokens=usage.cached_tokens or 0,
+        )
 
     async def _stream_body(
-        self, stream: ProviderStream, first_event: dict[str, Any] | None, *, upstream_alias: str
+        self, stream: ProviderStream, first_event: dict[str, Any] | None, *, meta: _RespondMeta
     ) -> AsyncIterator[str]:
-        public_model = self.settings.public_model_id
+        # The metadata event is always first, before any token: the client gets
+        # the skill prelude, active set, refreshed state, and selector outcome
+        # up front, then renders the load as if it happened before the reply.
+        yield self._sse(
+            "meta",
+            StreamMeta(
+                request_id=meta.request_id,
+                model=self.settings.public_model_id,
+                skills=meta.skills,
+                state=meta.state,
+                catalog_revision=meta.catalog_revision,
+                prompt_version=meta.prompt_version,
+                warnings=meta.warnings,
+            ).model_dump(exclude_none=True),
+        )
+
+        finish_reason: str | None = None
         try:
-            if first_event is not None:
-                yield self._sse(self._rewrite_model(first_event, public_model))
+            for chunk in [first_event] if first_event is not None else []:
+                finish_reason = self._chunk_finish_reason(chunk) or finish_reason
+                delta = self._chunk_to_delta(chunk)
+                if delta is not None:
+                    yield self._sse("delta", delta)
             async for chunk in stream:
-                yield self._sse(self._rewrite_model(chunk, public_model))
-            yield "data: [DONE]\n\n"
+                finish_reason = self._chunk_finish_reason(chunk) or finish_reason
+                delta = self._chunk_to_delta(chunk)
+                if delta is not None:
+                    yield self._sse("delta", delta)
+            usage = self._usage(stream.usage or ProviderUsage())
+            yield self._sse(
+                "done", StreamDone(finish_reason=finish_reason, usage=usage).model_dump()
+            )
         except DaintreeError as exc:
-            # Failure after public headers: terminate the stream, never fabricate
-            # a successful finish. The connection simply ends.
+            # Failure after the meta event: emit a terminal error event and stop.
+            # Never fabricate a successful ``done``.
             logger.warning(
                 "stream_error_after_start",
-                request_id=upstream_alias,
+                request_id=meta.request_id,
                 code=exc.code,
                 status=exc.status_code,
             )
+            error_body = exc.envelope().model_dump(exclude_none=True)["error"]
+            yield self._sse("error", {"error": error_body})
         finally:
             await stream.aclose()
 
     @staticmethod
-    def _rewrite_model(chunk: dict[str, Any], model: str) -> dict[str, Any]:
-        if isinstance(chunk, dict) and "model" in chunk:
-            chunk = {**chunk, "model": model}
-        return chunk
+    def _chunk_finish_reason(chunk: dict[str, Any]) -> str | None:
+        choices = chunk.get("choices") or []
+        if not choices:
+            return None
+        reason = choices[0].get("finish_reason")
+        return reason if isinstance(reason, str) else None
 
     @staticmethod
-    def _sse(chunk: dict[str, Any]) -> str:
-        return f"data: {json.dumps(chunk, separators=(',', ':'), ensure_ascii=False)}\n\n"
+    def _chunk_to_delta(chunk: dict[str, Any]) -> StreamDelta | None:
+        choices = chunk.get("choices") or []
+        if not choices:
+            return None
+        delta = choices[0].get("delta") or {}
+        content = delta.get("content")
+        tool_calls = delta.get("tool_calls")
+        if content is None and not tool_calls:
+            return None
+        return StreamDelta(content=content, tool_calls=tool_calls)
+
+    @staticmethod
+    def _sse(event: str, data: dict[str, Any] | StreamDelta) -> str:
+        payload = data.model_dump(exclude_none=True) if isinstance(data, StreamDelta) else data
+        body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+        return f"event: {event}\ndata: {body}\n\n"
 
     # ---- retries (only before any public bytes) -------------------------
 

@@ -30,24 +30,13 @@ def test_version(client) -> None:
     assert r.json()["protocol"] == {"min": 1, "max": 1}
 
 
-def test_models(client, auth) -> None:
-    r = client.get("/v1/models", headers=auth)
-    assert r.status_code == 200
-    data = r.json()
-    assert data["object"] == "list"
-    assert data["data"][0]["id"] == "daintree-assistant"
-    assert data["data"][0]["owned_by"] == "daintree"
-
-
-def test_models_requires_auth(client) -> None:
-    assert client.get("/v1/models").status_code == 401
-
-
 def test_capabilities(client, auth) -> None:
     r = client.get("/v1/daintree/capabilities", headers=auth)
     body = r.json()
-    assert body["chat"]["system_messages_accepted"] is False
-    assert body["chat"]["max_active_skills"] == 3
+    assert body["respond"]["system_messages_accepted"] is False
+    assert body["respond"]["max_active_skills"] == 3
+    assert body["respond"]["stream_events"] == ["meta", "delta", "done", "error"]
+    assert body["respond"]["multimodal_images"]["remote_urls"] is False
     assert len(body["tasks"]) == 9
     assert body["skills"]["manual_resolve"] is True
 
@@ -72,8 +61,8 @@ def test_skills_resolve_find(client, auth, fake_provider) -> None:
     })
     assert r.status_code == 200
     body = r.json()
-    assert [s["id"] for s in body["active_skills"]] == [SKILL_PREP]
-    assert len(body["prelude"]["tool_executions"]) == 1
+    assert [s["id"] for s in body["skills"]["active"]] == [SKILL_PREP]
+    assert len(body["skills"]["prelude"]["tool_executions"]) == 1
     assert body["state"].startswith("dst1.")
 
 
@@ -82,15 +71,15 @@ def test_skills_resolve_load_and_clear(client, auth, app) -> None:
         "protocol_version": 1, "session_id": "s", "action": "load", "skill_ids": [SKILL_PREP],
     })
     body = r.json()
-    assert [s["id"] for s in body["active_skills"]] == [SKILL_PREP]
+    assert [s["id"] for s in body["skills"]["active"]] == [SKILL_PREP]
     state = body["state"]
 
     r2 = client.post("/v1/daintree/skills/resolve", headers=auth, json={
         "protocol_version": 1, "session_id": "s", "action": "clear", "state": state,
     })
     body2 = r2.json()
-    assert body2["active_skills"] == []
-    assert body2["prelude"]["tool_executions"] == []
+    assert body2["skills"]["active"] == []
+    assert body2["skills"]["prelude"]["tool_executions"] == []
 
 
 def test_skills_resolve_find_requires_query(client, auth) -> None:
@@ -134,7 +123,7 @@ def test_tasks_invalid_input_400(client, auth) -> None:
 
 def test_oversized_body_413(client, auth) -> None:
     headers = {**auth, "Content-Length": str(20 * 1024 * 1024)}
-    r = client.post("/v1/chat/completions", headers=headers, content=b'{"model":"daintree-assistant","messages":[]}')
+    r = client.post("/v1/daintree/respond", headers=headers, content=b'{"protocol_version":1}')
     assert r.status_code == 413
 
 
