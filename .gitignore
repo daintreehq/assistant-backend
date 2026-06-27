@@ -14,6 +14,9 @@ build/
 dist/
 *.egg-info/
 
+# Temporary / scratch
+.tmp/
+
 # Testing / tooling caches
 .pytest_cache/
 .coverage
