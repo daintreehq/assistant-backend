@@ -43,6 +43,17 @@ def test_validate_rejects_unknown_type(settings: Settings) -> None:
     assert exc.value.code == "invalid_result_schema"
 
 
+def test_value_shape_rejection_is_self_correcting(settings: Settings) -> None:
+    # A caller passing an EXAMPLE value instead of a schema is the common mistake;
+    # the rejection must spell out the fix (wrap fields under "properties") so the
+    # model can recover on retry rather than blindly renaming the bad key.
+    with pytest.raises(DaintreeError) as exc:
+        validate_result_schema({"answers": [{"terminalId": "string"}]}, settings)
+    assert exc.value.code == "invalid_result_schema"
+    assert "'answers' is not allowed" in exc.value.message
+    assert "properties" in exc.value.message
+
+
 def test_validate_rejects_string_additional_properties(settings: Settings) -> None:
     # An allow-listed key with a string value would ride into the prompt.
     with pytest.raises(DaintreeError) as exc:

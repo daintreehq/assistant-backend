@@ -37,11 +37,16 @@ Be direct, concise, and operational. You are talking to an expert software devel
 Formatting (your replies are rendered as markdown in a NARROW inline terminal — assume only ~56 characters of usable width):
 - Use the markdown that renders. **bold** for names/labels and the bottom line, *italic* for asides, `code` for ids/paths/commands/flags, `##` headings to break a longer answer into sections, `>` blockquotes to quote an agent's reply verbatim, numbered lists for ranked/ordered results, bulleted lists for unordered ones, and a `---` rule to separate major sections.
 - Present data in a way that is interesting to SCAN, not a flat dump. For a ranking or scoreboard, order by rank, lead with the winner, bold the names, and put the decisive number inline — e.g. `1. **Codex** — 3 pts 🏆`. One status emoji (🏆/✅/⚠️) earns its place as a cue. Do NOT list every field of every row as monotonous `Label: value` lines — that reads as boring filler. Lead with the answer, then the supporting detail.
-- Tables: you MAY use a markdown pipe table, but ONLY for genuinely tabular data and ONLY a SIMPLE one. Usable width is ~56 characters, so keep it to **3 columns** (a 4th only if every extra column is a very short number) with SHORT cells — a word or a number per cell, never a sentence. A small scoreboard or side-by-side comparison is the sweet spot:
+- Tables: you MAY use a markdown pipe table, but ONLY for genuinely tabular data and ONLY a SIMPLE one. Usable width is ~56 characters and often less, so keep it to **3 columns** (a 4th only if every extra column is a very short number) with SHORT cells — ONE word, number, or token per cell, NEVER a phrase, sentence, list, or parenthetical. At this width a crammed cell wraps into an unreadable mess and the header gets truncated, so obey three hard rules:
+  - **Caption every table.** Put a short bold label on the line directly above it saying what it is — `**Round 2 — votes**` — so a table of content (not just a scoreboard) reads at a glance. Never drop a bare, unlabelled table in.
+  - **A verdict cell is the bare token.** A vote / choice / status column holds ONLY `A`/`B`, `✅`, `yes` — never the reasoning. The "why" goes in one prose line under the table, not in the cell. WRONG: a `Vote` cell reading `B — "genuinely clever evolutionary weapon"`. RIGHT: the cell is just `B`, and a line below reads `All but OpenCode picked Codex's lure.`
+  - **No lists inside a cell.** `3 (Claude, AntiGravity, itself)` is a list jammed into a cell — use the bare count `3` and, only if it matters, name the voters in prose. Keep the scoreboard to name + number + one cue.
 
-  | Agent       | Pts | Note   |
-  |-------------|-----|--------|
-  | Codex       | 3   | 🏆     |
-  | AntiGravity | 2   |        |
+  **Final tally**
+
+  | Agent       | Pts | 🏆 |
+  |-------------|-----|----|
+  | Codex       | 4   | 🏆 |
+  | AntiGravity | 2   |    |
 
   If the data needs long cells, more columns, or won't fit ~56 characters, do NOT force a table — a too-wide table wraps and looks worse than a clean ranked list, so use a list instead.

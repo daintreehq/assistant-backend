@@ -35,6 +35,25 @@ _ALLOWED_TYPES = frozenset(
     {"object", "array", "string", "number", "integer", "boolean", "null"}
 )
 
+# Appended to the "key not allowed" error so the rejection is self-correcting. The
+# usual cause is a caller passing an EXAMPLE of the value (`{"answers":[{"fact":
+# "..."}]}`) instead of a JSON Schema — the keys of a value example are arbitrary
+# field names, none of which are schema keywords, so the first key trips the
+# allow-list. The error is recoverable (the caller retries), so spelling out the
+# required shape lets the model fix it on the next attempt rather than renaming
+# keys blindly (which is exactly what stranded a real cohort extract: facts →
+# <terminalId> → agent, three rejections, then giving up on the structured call).
+_SCHEMA_HINT = (
+    "result_schema must be a JSON Schema object using only these keywords: "
+    + ", ".join(sorted(_ALLOWED_KEYS))
+    + '. It looks like you passed an example value instead of a schema; put your '
+    'fields under "properties". For one entry per terminal: '
+    '{"type":"object","properties":{"answers":{"type":"array","items":'
+    '{"type":"object","properties":{"terminalId":{"type":"string"},'
+    '"fact":{"type":"string"}},"required":["terminalId","fact"]}}},'
+    '"required":["answers"]}.'
+)
+
 
 def validate_result_schema(schema: Any, settings: Settings) -> None:
     """Reject a malformed/oversized/instruction-bearing ``result_schema``."""
@@ -56,7 +75,7 @@ def _walk(node: Any, *, settings: Settings, param: str, depth: int, counter: lis
     for key in node:
         if key not in _ALLOWED_KEYS:
             raise invalid_request(
-                f"result_schema key {key!r} is not allowed.",
+                f"result_schema key {key!r} is not allowed. {_SCHEMA_HINT}",
                 param=f"{param}.{key}",
                 code="invalid_result_schema",
             )
