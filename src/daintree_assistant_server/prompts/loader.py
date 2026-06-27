@@ -13,7 +13,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, TemplateError, select_autoescape
 
 # Immutable prompt-family versions (surfaced in metadata and logs).
-MAIN_PROMPT_VERSION = "main-2026-06-27.1"
+MAIN_PROMPT_VERSION = "main-2026-06-27.2"
 SELECTOR_PROMPT_VERSION = "selector-2026-06-26.1"
 
 # Main-prompt template names.
