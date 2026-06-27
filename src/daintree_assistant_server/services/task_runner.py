@@ -52,10 +52,25 @@ class TaskParseError(Exception):
     """Raised when a task's model output cannot be parsed into its schema."""
 
 
-def _task_output_invalid(task: str) -> DaintreeError:
+# Appended to the schema-task failure so a crashed/empty source terminal becomes
+# ACTIONABLE instead of an opaque 502: the model couldn't fit the source into the schema
+# (commonly because the agent crashed or produced nothing relevant), so steer it to read
+# the terminal a different way rather than retrying the same structured extract.
+_EXTRACT_EMPTY_HINT = (
+    "The terminal output likely does not contain the requested information — the agent "
+    "may have crashed or produced nothing relevant. Re-read it with a plain-text "
+    "terminal.extract (no jsonSchema) or terminal.summarize instead of retrying the "
+    "structured extract."
+)
+
+
+def _task_output_invalid(task: str, hint: str = "") -> DaintreeError:
+    message = f"Task {task!r} produced output that could not be parsed."
+    if hint:
+        message = f"{message} {hint}"
     return DaintreeError(
         status_code=502,
-        message=f"Task {task!r} produced output that could not be parsed.",
+        message=message,
         type="api_error",
         code="task_output_invalid",
     )
@@ -479,7 +494,8 @@ class TaskRunner:
             try:
                 output = profile.parse_output(repair.text, request)
             except (TaskParseError, ValidationError) as exc:
-                raise _task_output_invalid(profile.id) from exc
+                hint = _EXTRACT_EMPTY_HINT if profile.id == _SCHEMA_TASK else ""
+                raise _task_output_invalid(profile.id, hint) from exc
 
         logger.info("task_run", task=profile.id, finish_reason=finish)
 

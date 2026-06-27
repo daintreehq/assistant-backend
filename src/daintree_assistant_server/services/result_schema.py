@@ -35,6 +35,37 @@ _ALLOWED_TYPES = frozenset(
     {"object", "array", "string", "number", "integer", "boolean", "null"}
 )
 
+# Non-schema keys models routinely INVENT that carry no prompt-injectable content —
+# size / optionality / annotation HINTS whose values are bare scalars. We STRIP these
+# and proceed instead of hard-rejecting, but ONLY when the value is a non-string scalar
+# (number / bool / null): a string, object, or list still falls through to the allow-list
+# rejection, so nothing instruction-like can ride into the server-owned prompt under a
+# tolerated key (the security stance above is preserved). The two that stranded a real
+# cohort extract — three rejected calls before the model gave up — were ``maxTokens`` (a
+# size cap this task does not honor) and ``optional`` (a non-standard "not required"); the
+# rest are common siblings. Matched case- and underscore-insensitively so ``maxTokens`` /
+# ``max_tokens`` / ``MAXTOKENS`` all normalize to the same entry.
+_STRIPPABLE_NOISE_KEYS = frozenset(
+    {
+        "maxtokens", "mintokens", "maxoutputtokens",
+        "optional", "nullable", "readonly", "writeonly", "deprecated",
+    }
+)
+
+
+def _strip_noise_keys(node: dict[str, Any]) -> None:
+    """Drop tolerated non-schema SCALAR keys from ``node`` in place (see
+    :data:`_STRIPPABLE_NOISE_KEYS`). A string / object / list value is left untouched so
+    the allow-list still rejects anything that could carry instructions into the prompt —
+    only bare numbers / bools / nulls are silently removed."""
+    for key in list(node.keys()):
+        if key in _ALLOWED_KEYS:
+            continue
+        if key.lower().replace("_", "") in _STRIPPABLE_NOISE_KEYS and not isinstance(
+            node[key], (str, dict, list)
+        ):
+            del node[key]
+
 # Appended to the "key not allowed" error so the rejection is self-correcting. The
 # usual cause is a caller passing an EXAMPLE of the value (`{"answers":[{"fact":
 # "..."}]}`) instead of a JSON Schema — the keys of a value example are arbitrary
@@ -72,6 +103,10 @@ def _walk(node: Any, *, settings: Settings, param: str, depth: int, counter: lis
             param=param,
             code="invalid_result_schema",
         )
+    # Repair a near-correct schema before the allow-list runs: silently drop the common
+    # non-schema scalar hints (maxTokens, optional, …) models tack on, so they no longer
+    # cost a round-trip rejection. Anything instruction-bearing still trips the allow-list.
+    _strip_noise_keys(node)
     for key in node:
         if key not in _ALLOWED_KEYS:
             raise invalid_request(
