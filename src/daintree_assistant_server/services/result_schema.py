@@ -260,7 +260,9 @@ def conforms(value: Any, schema: Any) -> bool:
         if "maxLength" in schema and len(value) > schema["maxLength"]:
             return False
 
-    if isinstance(value, dict) and (schema.get("type") == "object" or "properties" in schema):
+    if isinstance(value, dict) and (
+        schema.get("type") == "object" or "properties" in schema or "required" in schema
+    ):
         props = schema.get("properties") or {}
         for req in schema.get("required") or []:
             if req not in value:

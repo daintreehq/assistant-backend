@@ -137,6 +137,16 @@ def test_conforms_object_structure_without_explicit_type() -> None:
     assert conforms({}, schema) is False  # missing required answers
 
 
+def test_conforms_required_only_schema_validates_keys() -> None:
+    # A schema with ONLY `required` (no `properties`, no top-level `type`) still
+    # intends an object: a non-dict is rejected, and a dict must carry the required
+    # key. Without validating `required` here a `{}` would slip through.
+    schema = {"required": ["answers"]}
+    assert conforms(["x"], schema) is False  # non-dict
+    assert conforms({}, schema) is False  # dict missing the required key
+    assert conforms({"answers": 1}, schema) is True  # dict with the required key
+
+
 def test_conforms_additional_properties_false() -> None:
     schema = {"type": "object", "properties": {"a": {"type": "string"}}, "additionalProperties": False}
     assert conforms({"a": "x"}, schema) is True
