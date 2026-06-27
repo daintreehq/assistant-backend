@@ -234,9 +234,12 @@ worktrees) is treated as untrusted data: single-line fields collapse whitespace;
 fields (project instructions, MCP instructions) are framed in delimited, escape-neutralized
 data blocks so they cannot inject new instructions.
 
-`prompt_cache_key` ("daintree-main") and the provider-specific `thinking:{disabled}` field
-are opt-in (`DEEPSEEK_SEND_PROMPT_CACHE_KEY`, `DEEPSEEK_SEND_THINKING`), off by default
-until a live smoke test confirms the exact endpoint accepts them.
+The main request is sent with `prompt_cache_key` ("daintree-main") by default
+(`DEEPSEEK_SEND_PROMPT_CACHE_KEY`; suppressed in JSON mode), and every server-issued call is
+sent with the provider-specific `thinking:{type:"disabled"}` field by default
+(`DEEPSEEK_SEND_THINKING`). Flip either off only for a provider/model that rejects it — the
+selector's forced `tool_choice` is incompatible with thinking mode, and the main and utility
+calls run non-thinking for cheaper, more deterministic output.
 
 ## Errors
 

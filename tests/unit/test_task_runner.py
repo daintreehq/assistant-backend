@@ -116,6 +116,9 @@ async def test_json_repair_path(task_runner: TaskRunner, fake_provider: FakeProv
     result = await task_runner.run(TaskRequest(task="terminal_judge.v1", input={"question": "q"}))
     assert result.output["matched"] is True
     assert len(fake_provider.requests) == 2  # repaired
+    # The repair retry carries the task-specific hint (not just the generic instruction).
+    repair_text = fake_provider.requests[1].messages[-1]["content"]
+    assert "matched" in repair_text and "confidence" in repair_text
 
 
 @pytest.mark.asyncio

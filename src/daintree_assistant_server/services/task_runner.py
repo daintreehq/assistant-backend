@@ -302,6 +302,10 @@ class TaskProfile:
     max_output_tokens: int = 500
     timeout_seconds: float | None = None
     sensitive_fields: frozenset[str] = field(default_factory=frozenset)
+    # Appended to the generic repair instruction so the retry re-anchors on this
+    # task's exact output shape (the selector does the same for select_skills).
+    # Only used on the rare second attempt — no happy-path cost.
+    repair_hint: str | None = None
 
 
 def build_profiles() -> dict[str, TaskProfile]:
@@ -311,19 +315,27 @@ def build_profiles() -> dict[str, TaskProfile]:
             TaskProfile(
                 "checkpoint.v1", CheckpointInput, "json", _u_checkpoint, _p_checkpoint,
                 max_output_tokens=1200, sensitive_fields=frozenset({"transcript"}),
+                repair_hint="Return a single JSON object with the checkpoint fields described "
+                "above (goal, decisions, next_actions, open_questions, preserved_ids, …).",
             ),
             TaskProfile(
                 "memory_distill.v1", MemoryDistillInput, "json", _u_memory_distill,
                 _p_memory_distill, max_output_tokens=1200,
                 sensitive_fields=frozenset({"transcript"}),
+                repair_hint="Return a JSON array of fact objects, each with a \"fact\" string "
+                "and a \"kind\" of \"semantic\" or \"episodic\".",
             ),
             TaskProfile(
                 "watcher_classify.v1", WatcherClassifyInput, "json", _u_watcher, _p_watcher,
                 max_output_tokens=400, sensitive_fields=frozenset({"tail"}),
+                repair_hint="Return a single JSON object with keys classification, confidence, "
+                "summary, evidence, recommendedAction.",
             ),
             TaskProfile(
                 "terminal_judge.v1", TerminalJudgeInput, "json", _u_judge, _p_judge,
                 max_output_tokens=300, sensitive_fields=frozenset({"tail"}),
+                repair_hint="Return a single JSON object with keys matched (boolean), "
+                "confidence (0-1), reason.",
             ),
             TaskProfile(
                 "terminal_summarize.v1", TerminalSummarizeInput, "text", _u_summarize, _p_text,
@@ -336,15 +348,20 @@ def build_profiles() -> dict[str, TaskProfile]:
             TaskProfile(
                 "terminal_extract_json.v1", TerminalExtractJsonInput, "json", _u_extract_json,
                 _p_extract_json, max_output_tokens=600, sensitive_fields=frozenset({"tail"}),
+                repair_hint="Return a single JSON object of the form {\"result\": <value>} where "
+                "<value> conforms to the requested schema.",
             ),
             TaskProfile(
                 "extraction_verdict.v1", ExtractionVerdictInput, "json", _u_extraction_verdict,
                 _p_extraction_verdict, max_output_tokens=300,
                 sensitive_fields=frozenset({"result"}),
+                repair_hint="Return a single JSON object with keys pass (boolean) and reason.",
             ),
             TaskProfile(
                 "skill_step_consistency.v1", SkillStepConsistencyInput, "json",
                 _u_skill_consistency, _p_judge, max_output_tokens=300,
+                repair_hint="Return a single JSON object with keys matched (boolean), "
+                "confidence (0-1), reason.",
             ),
         ]
     }
@@ -446,9 +463,10 @@ class TaskRunner:
         except (TaskParseError, ValidationError) as first_error:
             if profile.output_mode != "json":
                 raise _task_output_invalid(profile.id) from first_error
+            repair_text = f"{_REPAIR} {profile.repair_hint}" if profile.repair_hint else _REPAIR
             repair_request = ProviderChatRequest(
                 model=model,
-                messages=[*messages, {"role": "user", "content": _REPAIR}],
+                messages=[*messages, {"role": "user", "content": repair_text}],
                 temperature=profile.temperature,
                 max_tokens=profile.max_output_tokens,
                 response_format=response_format,
