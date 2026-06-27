@@ -124,6 +124,10 @@ class RespondUsage(BaseModel):
 class RespondMessage(BaseModel):
     role: str = "assistant"
     content: str | None = None
+    # DeepSeek thinking-mode chain-of-thought (present only when thinking is on).
+    # The client must store it on the assistant turn and replay it next request
+    # when the turn performed tool calls — see ChatMessage.reasoning_content.
+    reasoning_content: str | None = None
     tool_calls: list[ToolCall] | None = None
 
 
@@ -145,7 +149,7 @@ class RespondResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------
-# Streaming event payloads (named SSE events: meta / delta / done / error).
+# Streaming event payloads (named SSE events: meta / status / delta / done / error).
 # --------------------------------------------------------------------------
 
 
@@ -166,8 +170,21 @@ class StreamMeta(BaseModel):
 
 class StreamDelta(BaseModel):
     content: str | None = None
+    # Thinking-mode chain-of-thought fragments, streamed before content (present
+    # only when thinking is on). The client concatenates these into the assistant
+    # turn's reasoning_content for replay — see ChatMessage.reasoning_content.
+    reasoning_content: str | None = None
     # Standard streaming tool-call delta fragments, passed through verbatim.
     tool_calls: list[dict[str, Any]] | None = None
+
+
+class StreamStatus(BaseModel):
+    """A generation-phase marker streamed after ``meta``. Currently emitted once
+    with ``phase="thinking"`` the moment the model begins its thinking-mode
+    chain-of-thought — the ``reasoning_content`` deltas that follow are the CoT to
+    display. Absent entirely when thinking is off."""
+
+    phase: str
 
 
 class StreamDone(BaseModel):

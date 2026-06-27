@@ -25,6 +25,7 @@ from ..contracts.daintree_api import (
     StreamDelta,
     StreamDone,
     StreamMeta,
+    StreamStatus,
 )
 from ..contracts.extensions import (
     Prelude,
@@ -419,6 +420,7 @@ class ChatOrchestrator:
             message=RespondMessage(
                 role=message.get("role", "assistant"),
                 content=message.get("content"),
+                reasoning_content=message.get("reasoning_content"),
                 tool_calls=self._normalize_tool_calls(message.get("tool_calls")),
             ),
             finish_reason=result.finish_reason,
@@ -477,18 +479,26 @@ class ChatOrchestrator:
             ).model_dump(exclude_none=True),
         )
 
-        finish_reason: str | None = None
-        try:
-            for chunk in [first_event] if first_event is not None else []:
-                finish_reason = self._chunk_finish_reason(chunk) or finish_reason
-                delta = self._chunk_to_delta(chunk)
-                if delta is not None:
-                    yield self._sse("delta", delta)
+        async def _chunks() -> AsyncIterator[dict[str, Any]]:
+            if first_event is not None:
+                yield first_event
             async for chunk in stream:
+                yield chunk
+
+        finish_reason: str | None = None
+        thinking_signaled = False
+        try:
+            async for chunk in _chunks():
                 finish_reason = self._chunk_finish_reason(chunk) or finish_reason
                 delta = self._chunk_to_delta(chunk)
-                if delta is not None:
-                    yield self._sse("delta", delta)
+                if delta is None:
+                    continue
+                # Announce the thinking phase once, the instant the model's
+                # chain-of-thought starts streaming, so the CLI can show it.
+                if delta.reasoning_content and not thinking_signaled:
+                    thinking_signaled = True
+                    yield self._sse("status", StreamStatus(phase="thinking").model_dump())
+                yield self._sse("delta", delta)
             usage = self._usage(stream.usage or ProviderUsage())
             yield self._sse(
                 "done", StreamDone(finish_reason=finish_reason, usage=usage).model_dump()
@@ -522,10 +532,13 @@ class ChatOrchestrator:
             return None
         delta = choices[0].get("delta") or {}
         content = delta.get("content")
+        reasoning_content = delta.get("reasoning_content")
         tool_calls = delta.get("tool_calls")
-        if content is None and not tool_calls:
+        if content is None and reasoning_content is None and not tool_calls:
             return None
-        return StreamDelta(content=content, tool_calls=tool_calls)
+        return StreamDelta(
+            content=content, reasoning_content=reasoning_content, tool_calls=tool_calls
+        )
 
     @staticmethod
     def _sse(event: str, data: dict[str, Any] | StreamDelta) -> str:

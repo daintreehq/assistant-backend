@@ -167,8 +167,16 @@ class DeepSeekProvider:
             body["response_format"] = request.response_format
         if request.stop:
             body["stop"] = request.stop
-        if self._send_thinking and request.thinking_disabled:
-            body["thinking"] = {"type": "disabled"}
+        if self._send_thinking:
+            if request.thinking_disabled:
+                body["thinking"] = {"type": "disabled"}
+            else:
+                # Thinking mode: the model emits a chain-of-thought (returned via
+                # reasoning_content) before the answer. reasoning_effort tunes the
+                # depth; DeepSeek remaps low/medium -> high and xhigh -> max.
+                body["thinking"] = {"type": "enabled"}
+                if request.reasoning_effort:
+                    body["reasoning_effort"] = request.reasoning_effort
         # prompt cache key is only valid for plain chat/stream (not json mode).
         if (
             self._send_prompt_cache_key
@@ -251,6 +259,7 @@ class DeepSeekProvider:
             max_tokens=request.max_tokens,
             stream=False,
             thinking_disabled=request.thinking_disabled,
+            reasoning_effort=request.reasoning_effort,
             timeout=request.timeout,
         )
         result = await self.complete(sub)

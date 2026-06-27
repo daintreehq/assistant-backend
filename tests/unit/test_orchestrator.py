@@ -43,6 +43,32 @@ def test_merge_no_duplicate_load(catalog) -> None:
     assert newly == []
 
 
+def _delta_chunk(delta: dict) -> dict:
+    return {"choices": [{"index": 0, "delta": delta, "finish_reason": None}]}
+
+
+def test_chunk_to_delta_surfaces_reasoning_only() -> None:
+    # A thinking-phase chunk carries only reasoning_content; it must still emit a
+    # delta (the old guard dropped any chunk without content/tool_calls).
+    delta = ChatOrchestrator._chunk_to_delta(_delta_chunk({"reasoning_content": "cot"}))
+    assert delta is not None
+    assert delta.reasoning_content == "cot"
+    assert delta.content is None
+
+
+def test_chunk_to_delta_surfaces_content_and_reasoning() -> None:
+    delta = ChatOrchestrator._chunk_to_delta(
+        _delta_chunk({"content": "hi", "reasoning_content": "cot"})
+    )
+    assert delta is not None
+    assert delta.content == "hi"
+    assert delta.reasoning_content == "cot"
+
+
+def test_chunk_to_delta_empty_delta_is_none() -> None:
+    assert ChatOrchestrator._chunk_to_delta(_delta_chunk({})) is None
+
+
 def _cadence(
     orch: ChatOrchestrator,
     *,

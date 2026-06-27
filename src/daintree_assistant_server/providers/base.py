@@ -51,6 +51,10 @@ class ProviderChatRequest:
     stream: bool = False
     include_usage: bool = False
     thinking_disabled: bool = True
+    # DeepSeek reasoning effort, only meaningful when thinking is enabled
+    # (``thinking_disabled=False``). DeepSeek accepts "high"/"max" (low/medium map
+    # to high, xhigh to max). ``None`` lets the provider default apply.
+    reasoning_effort: str | None = None
     prompt_cache_key: str | None = None
     timeout: float | None = None
 

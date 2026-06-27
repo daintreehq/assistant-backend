@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from daintree_assistant_server.config import Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.contracts.extensions import (
     McpInfo,
@@ -10,13 +11,18 @@ from daintree_assistant_server.contracts.extensions import (
     RuntimeContext,
     TurnContext,
 )
+from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 
 
-def _req(*, messages=None, tools=None, runtime=None, turn=None, generation=None) -> RespondRequest:
+def _req(
+    *, messages=None, tools=None, tool_choice=None, runtime=None, turn=None, generation=None
+) -> RespondRequest:
     inp: dict = {"messages": messages or [{"role": "user", "content": "hi"}]}
     if tools is not None:
         inp["tools"] = tools
+    if tool_choice is not None:
+        inp["tool_choice"] = tool_choice
     body: dict = {"protocol_version": 1, "session": {"id": "s", "turn_id": "t"}, "input": inp}
     if runtime is not None:
         body["runtime"] = runtime
@@ -180,7 +186,79 @@ def test_main_request_params(assembler: PromptAssembler) -> None:
         request=req, skills=[], upstream_model="deepseek-v4-flash",
     )
     assert pr.thinking_disabled is True
+    assert pr.reasoning_effort is None
     assert pr.prompt_cache_key == "daintree-main"
     assert pr.stream is True
     assert pr.include_usage is True
     assert pr.temperature == 0.5
+
+
+def test_reasoning_content_replayed_verbatim_for_tool_turn(assembler: PromptAssembler) -> None:
+    # An assistant turn that performed tool calls must carry its reasoning_content
+    # back to DeepSeek (else a 400); the assembler passes it through untouched.
+    req = _req(messages=[
+        {"role": "user", "content": "weather?"},
+        {
+            "role": "assistant",
+            "content": None,
+            "reasoning_content": "Need today's date first.",
+            "tool_calls": [
+                {"id": "c1", "type": "function",
+                 "function": {"name": "git__status", "arguments": "{}"}},
+            ],
+        },
+        {"role": "tool", "content": "ok", "tool_call_id": "c1"},
+    ])
+    pr = assembler.build_main_request(
+        request=req, skills=[], upstream_model="deepseek-v4-flash",
+    )
+    assistant_wire = next(m for m in pr.messages if m["role"] == "assistant")
+    assert assistant_wire["reasoning_content"] == "Need today's date first."
+
+
+def test_reasoning_content_absent_when_not_supplied(assembler: PromptAssembler) -> None:
+    req = _req(messages=[
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "hello"},
+    ])
+    pr = assembler.build_main_request(
+        request=req, skills=[], upstream_model="deepseek-v4-flash",
+    )
+    assistant_wire = next(m for m in pr.messages if m["role"] == "assistant")
+    assert "reasoning_content" not in assistant_wire
+
+
+def test_thinking_enabled_via_settings(prompt_loader: PromptLoader) -> None:
+    settings = Settings(
+        DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
+        MAIN_THINKING_ENABLED=True, MAIN_REASONING_EFFORT="max",
+    )
+    pr = PromptAssembler(prompt_loader, settings).build_main_request(
+        request=_req(), skills=[], upstream_model="deepseek-v4-flash",
+    )
+    assert pr.thinking_disabled is False
+    assert pr.reasoning_effort == "max"
+
+
+def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> None:
+    # DeepSeek 400s on thinking + forced tool_choice; the assembler must degrade to
+    # non-thinking rather than fail the turn (the same constraint as the selector).
+    settings = Settings(
+        DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
+        MAIN_THINKING_ENABLED=True,
+    )
+    assembler = PromptAssembler(prompt_loader, settings)
+    tools = [{"type": "function", "function": {"name": "git__status", "description": "d"}}]
+    for choice in ("required", {"name": "git__status"}):
+        pr = assembler.build_main_request(
+            request=_req(tools=tools, tool_choice=choice),
+            skills=[], upstream_model="deepseek-v4-flash",
+        )
+        assert pr.thinking_disabled is True, f"thinking must be off for tool_choice={choice!r}"
+        assert pr.reasoning_effort is None
+    # A non-forced choice ("auto") leaves thinking on.
+    pr_auto = assembler.build_main_request(
+        request=_req(tools=tools, tool_choice="auto"),
+        skills=[], upstream_model="deepseek-v4-flash",
+    )
+    assert pr_auto.thinking_disabled is False

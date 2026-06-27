@@ -84,6 +84,50 @@ async def test_thinking_not_sent_when_disabled_flag_off() -> None:
 
 
 @pytest.mark.asyncio
+async def test_thinking_enabled_sends_effort() -> None:
+    captured: dict = {}
+    provider = _provider(_capture_body(captured))
+    await provider.complete(_req(thinking_disabled=False, reasoning_effort="high"))
+    assert captured["thinking"] == {"type": "enabled"}
+    assert captured["reasoning_effort"] == "high"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_thinking_enabled_omits_effort_when_unset() -> None:
+    captured: dict = {}
+    provider = _provider(_capture_body(captured))
+    await provider.complete(_req(thinking_disabled=False))
+    assert captured["thinking"] == {"type": "enabled"}
+    assert "reasoning_effort" not in captured
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_disabled_thinking_never_sends_effort() -> None:
+    # reasoning_effort is meaningless without thinking; it must not leak into a
+    # non-thinking request even if a caller set it.
+    captured: dict = {}
+    provider = _provider(_capture_body(captured))
+    await provider.complete(_req(thinking_disabled=True, reasoning_effort="high"))
+    assert captured["thinking"] == {"type": "disabled"}
+    assert "reasoning_effort" not in captured
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_thinking_params_omitted_when_flag_off() -> None:
+    # send_thinking=False means the provider/model doesn't understand the field:
+    # send neither the directive nor the effort, even if a request enables thinking.
+    captured: dict = {}
+    provider = _provider(_capture_body(captured), send_thinking=False)
+    await provider.complete(_req(thinking_disabled=False, reasoning_effort="max"))
+    assert "thinking" not in captured
+    assert "reasoning_effort" not in captured
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
 async def test_prompt_cache_key_sent_by_default_when_not_json_mode() -> None:
     captured: dict = {}
     provider = _provider(_capture_body(captured))

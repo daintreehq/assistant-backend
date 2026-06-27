@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 from conftest import meta_of, parse_sse, respond_body
-from fakes import FakeProvider, make_text_chunks, tool_call_for
+from fakes import FakeProvider, make_result, make_text_chunks, tool_call_for
 
 from daintree_assistant_server.errors import upstream_error
 
@@ -208,10 +208,62 @@ def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider) -> 
     assert kinds[0] == "meta"  # metadata before any token
     assert kinds[-1] == "done"
     assert "delta" in kinds
+    assert "status" not in kinds  # no thinking phase when thinking is off
     meta = meta_of(events[0][1])
     assert [sk["id"] for sk in meta["active_skills"]] == [SKILL_PREP]
     streamed = "".join(d.get("content", "") for e, d in events if e == "delta")
     assert "hello" in streamed
+
+
+def test_nonstream_surfaces_reasoning_content(client, auth, fake_provider) -> None:
+    # When the upstream returns a thinking-mode chain-of-thought, it is delivered
+    # to the client on the assistant message so it can be replayed next turn.
+    fake_provider.tool_call_result = tool_call_for([])
+    fake_provider.complete_result = make_result(content="done", reasoning_content="my cot")
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hi"}], session_id="rc1", turn_id="t1",
+    ))
+    assert r.status_code == 200
+    assert r.json()["message"]["reasoning_content"] == "my cot"
+
+
+def test_nonstream_omits_reasoning_content_when_absent(client, auth, fake_provider) -> None:
+    fake_provider.tool_call_result = tool_call_for([])
+    fake_provider.complete_result = make_result(content="done")
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hi"}], session_id="rc1b", turn_id="t1",
+    ))
+    assert "reasoning_content" not in r.json()["message"]
+
+
+def test_stream_surfaces_reasoning_content(client, auth, fake_provider) -> None:
+    fake_provider.tool_call_result = tool_call_for([])
+    fake_provider.stream_chunks = [
+        {"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"reasoning_content": "cot "}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"content": "answer"}, "finish_reason": None}]},
+        {
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+        },
+    ]
+    body = respond_body(
+        [{"role": "user", "content": "hi"}], session_id="rc2", turn_id="t1",
+        generation={"stream": True},
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    kinds = [e for e, _ in events]
+    # A status:thinking event fires once, before the first (reasoning) delta.
+    assert "status" in kinds
+    status_idx = kinds.index("status")
+    assert events[status_idx][1]["phase"] == "thinking"
+    assert status_idx < kinds.index("delta")
+    reasoning = "".join(d.get("reasoning_content", "") for e, d in events if e == "delta")
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert "cot" in reasoning
+    assert "answer" in content
 
 
 def test_missing_session_rejected_422(client, auth) -> None:

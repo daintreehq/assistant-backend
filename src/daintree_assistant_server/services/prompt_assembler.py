@@ -254,6 +254,11 @@ class PromptAssembler:
             wire["name"] = msg.name
         if msg.tool_calls:
             wire["tool_calls"] = [self._tool_call_to_wire(tc) for tc in msg.tool_calls]
+        # Replay the model's prior chain-of-thought verbatim. DeepSeek REQUIRES it
+        # on assistant turns that performed tool calls (else a 400) and ignores it
+        # otherwise; either way it is the model's own output, never transformed.
+        if msg.role == "assistant" and msg.reasoning_content is not None:
+            wire["reasoning_content"] = msg.reasoning_content
         return wire
 
     # ---- tool projection ------------------------------------------------
@@ -282,6 +287,15 @@ class PromptAssembler:
         if isinstance(tool_choice, RespondToolChoice):
             return {"type": "function", "function": {"name": tool_choice.name}}
         return tool_choice
+
+    @staticmethod
+    def _is_forced_tool_choice(tool_choice: Any) -> bool:
+        """A forced tool_choice ("required" or a named tool) is incompatible with
+        DeepSeek thinking mode — the same constraint that keeps the selector
+        non-thinking. "auto"/"none"/absent are fine."""
+        if isinstance(tool_choice, RespondToolChoice):
+            return True
+        return bool(tool_choice == "required")
 
     # ---- assembly -------------------------------------------------------
 
@@ -327,6 +341,13 @@ class PromptAssembler:
         if gen.response_format is not None:
             response_format = {"type": gen.response_format}
 
+        # Thinking is opt-in (default off) and only on the main call. Force it off
+        # when the request pins a tool_choice: DeepSeek 400s on thinking + forced
+        # tool_choice, so degrade to non-thinking rather than fail the turn.
+        thinking_enabled = self.settings.main_thinking_enabled and not self._is_forced_tool_choice(
+            request.input.tool_choice
+        )
+
         return ProviderChatRequest(
             model=upstream_model,
             messages=messages,
@@ -338,7 +359,12 @@ class PromptAssembler:
             stop=gen.stop,
             stream=gen.stream,
             include_usage=gen.stream,
-            thinking_disabled=True,
+            # The main call is the only server call that may use thinking (the
+            # selector's forced tool_choice forbids it). Default OFF; when enabled,
+            # reasoning_content round-trips through the wire contract so tool-call
+            # turns can replay it. Thinking mode ignores temperature/top_p.
+            thinking_disabled=not thinking_enabled,
+            reasoning_effort=self.settings.main_reasoning_effort if thinking_enabled else None,
             prompt_cache_key=PROMPT_CACHE_KEY,
             timeout=self.settings.main_timeout_seconds,
         )

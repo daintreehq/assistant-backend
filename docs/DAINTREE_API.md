@@ -16,10 +16,10 @@ behind a provider abstraction; that is invisible to clients.
   with the right runbook loaded is the source of the system's intelligence.
 - **The server owns all system text.** Clients cannot send `system`/`developer`
   messages or any free-form prompt; the request schema is strict (`extra="forbid"`).
-- **Cache-optimized prompt layout.** The upstream prompt is ordered most-stable-first
-  (base prompt → integration surface → skill bodies → conversation → variable runtime
-  context) so DeepSeek's prefix cache covers the large, stable content across a turn's
-  rounds. See [Prompt assembly](#prompt-assembly--caching).
+- **Cache-optimized prompt layout.** The upstream prompt keeps the large append-only
+  conversation in the cached prefix (base prompt → integration surface → conversation),
+  then appends the small per-request tail (skill bodies → runtime → turn footer) after it,
+  so a skill load/evict re-encodes only that tail. See [Prompt assembly](#prompt-assembly--caching).
 - **Honest streaming.** Metadata arrives as the first SSE event; the stream never
   fabricates a successful finish after an upstream failure.
 
@@ -66,6 +66,7 @@ The single generation endpoint. Returns a native JSON body, or — when
     "messages": [                              // required, ≥1; roles: user | assistant | tool
       { "role": "user", "content": "…" },
       { "role": "assistant", "content": null,
+        "reasoning_content": "…",                // thinking-mode CoT; replay verbatim (see Notes)
         "tool_calls": [ { "id": "call_1", "type": "function",
                           "function": { "name": "git__status", "arguments": "{}" } } ] },
       { "role": "tool", "tool_call_id": "call_1", "content": "…" }
@@ -114,6 +115,10 @@ Notes:
   `system`/`developer` roles are all rejected.
 - `tools`/`tool_calls` use the standard `{id, type, function:{name, arguments}}` shape.
   `tool_choice` is flattened to `{ "name": … }` for the named case.
+- `reasoning_content` (assistant turns only) carries DeepSeek thinking-mode chain-of-thought.
+  It appears in the response only when thinking is enabled; on a turn that performed tool calls it
+  MUST be echoed back verbatim on later requests or DeepSeek 400s (it is ignored otherwise). Omit
+  it entirely when thinking is off. See Prompt assembly & caching.
 - Tool definitions are bounded (total bytes, schema depth, property count, string sizes);
   `function.parameters` must be a JSON object whose root `type`, when present, is `object`.
 
@@ -127,6 +132,7 @@ Notes:
   "message": {
     "role": "assistant",
     "content": "…",
+    "reasoning_content": "…",                   // present only when thinking is enabled
     "tool_calls": [ { "id": "call_…", "type": "function",
                       "function": { "name": "git__status", "arguments": "{…}" } } ]
   },
@@ -165,8 +171,11 @@ data: { "protocol_version":1, "request_id":"req_…", "model":"daintree-assistan
         "skills": { …same skills block… }, "state":"dst1.…",
         "catalog_revision":"sha256:…", "prompt_version":"…", "warnings":[] }
 
+event: status
+data: { "phase": "thinking" }                    // once, when thinking-mode CoT begins (thinking on only)
+
 event: delta
-data: { "content": "Hel" }                      // repeated; may carry "tool_calls" delta fragments
+data: { "content": "Hel" }                      // repeated; may carry "reasoning_content" or "tool_calls" fragments
 
 event: done
 data: { "finish_reason": "stop",
@@ -178,7 +187,13 @@ data: { "error": { "type":"…","code":"…","message":"…","param":"…" } }
 
 Guarantees:
 - `meta` is always first, before any token — so the client renders the skill prelude and
-  active set up front, as if the skill load happened before the reply.
+  active set up front, as if the skill load happened before the reply. Its arrival also marks
+  the upstream as connected (the first token is already in hand): show a "connecting" state
+  until `meta`, then switch to generation.
+- `status` (optional) marks a generation phase. Today the only phase is `thinking`, emitted
+  once the instant the model's chain-of-thought begins; the `reasoning_content` deltas that
+  follow are the CoT to display. It never appears when thinking is off. Unknown future phases
+  should be ignored by clients.
 - The server **prefetches the first upstream token before committing the `200`**, so a
   pre-stream upstream failure is delivered as an ordinary JSON error (with retries),
   not a broken stream.
@@ -235,11 +250,17 @@ fields (project instructions, MCP instructions) are framed in delimited, escape-
 data blocks so they cannot inject new instructions.
 
 The main request is sent with `prompt_cache_key` ("daintree-main") by default
-(`DEEPSEEK_SEND_PROMPT_CACHE_KEY`; suppressed in JSON mode), and every server-issued call is
-sent with the provider-specific `thinking:{type:"disabled"}` field by default
-(`DEEPSEEK_SEND_THINKING`). Flip either off only for a provider/model that rejects it — the
-selector's forced `tool_choice` is incompatible with thinking mode, and the main and utility
-calls run non-thinking for cheaper, more deterministic output.
+(`DEEPSEEK_SEND_PROMPT_CACHE_KEY`; suppressed in JSON mode). DeepSeek's `thinking` field is sent on
+every server call by default (`DEEPSEEK_SEND_THINKING`); flip off only for a provider/model that
+rejects it.
+
+The selector and utility tasks **always** run non-thinking (`thinking:{type:"disabled"}`) — the
+selector's forced `tool_choice` is incompatible with thinking mode. The main `/respond` call is
+non-thinking by default too, but can be enabled with `MAIN_THINKING_ENABLED=true`
+(`MAIN_REASONING_EFFORT` = `high` | `max`, default `high` — DeepSeek's effort floor; `low`/`medium`
+remap to `high`). When enabled, the model returns its chain-of-thought as `reasoning_content`; the
+client stores it on the assistant turn and replays it verbatim on any turn that performed tool
+calls (a hard DeepSeek requirement). Thinking mode ignores `temperature`/`top_p`/penalties.
 
 ## Errors
 

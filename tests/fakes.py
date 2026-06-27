@@ -24,6 +24,7 @@ def make_result(
     *,
     content: str | None = None,
     tool_calls: list[dict[str, Any]] | None = None,
+    reasoning_content: str | None = None,
     finish_reason: str = "stop",
     model: str = "deepseek-v4-flash",
     usage: ProviderUsage | None = None,
@@ -31,6 +32,8 @@ def make_result(
     message: dict[str, Any] = {"role": "assistant"}
     if content is not None:
         message["content"] = content
+    if reasoning_content is not None:
+        message["reasoning_content"] = reasoning_content
     if tool_calls is not None:
         message["tool_calls"] = tool_calls
     return ProviderChatResult(

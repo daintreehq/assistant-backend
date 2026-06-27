@@ -10,6 +10,7 @@ process fails *readiness* — not import — when a secret is absent.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -59,7 +60,26 @@ class Settings(BaseSettings):
     deepseek_send_prompt_cache_key: bool = Field(
         default=True, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
     )
+    # When True (default) the server sends an explicit thinking directive on every
+    # call (enabled/disabled per request). Set False ONLY for a provider that does
+    # not understand the field at all — NOT for DeepSeek: DeepSeek defaults thinking
+    # to ENABLED when the field is absent, so omitting it would silently turn
+    # thinking on and 400 the selector's forced tool_choice.
     deepseek_send_thinking: bool = Field(default=True, alias="DEEPSEEK_SEND_THINKING")
+
+    # ---- Main-model thinking (DeepSeek) --------------------------------
+    # The selector and utility tasks always run NON-thinking — the selector's
+    # forced tool_choice is incompatible with thinking mode. The main /respond
+    # call is the only one that can use it. Default OFF: thinking adds latency and
+    # reasoning tokens, and DeepSeek's effort floor is "high" (low/medium remap to
+    # high), so there is no cheap middle ground. When enabled, the model's
+    # reasoning_content round-trips through the wire contract so tool-call turns
+    # replay it (a hard DeepSeek requirement; missing it 400s). Thinking mode also
+    # ignores temperature/top_p/penalties.
+    main_thinking_enabled: bool = Field(default=False, alias="MAIN_THINKING_ENABLED")
+    main_reasoning_effort: Literal["high", "max"] = Field(
+        default="high", alias="MAIN_REASONING_EFFORT"
+    )
 
     # ---- Authentication -------------------------------------------------
     daintree_api_key: SecretStr = Field(default=SecretStr(""), alias="DAINTREE_API_KEY")

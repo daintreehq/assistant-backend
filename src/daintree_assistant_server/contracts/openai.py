@@ -97,3 +97,8 @@ class ChatMessage(BaseModel):
     name: str | None = Field(default=None, max_length=256)
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = Field(default=None, max_length=256)
+    # DeepSeek thinking-mode chain-of-thought. The model returns it alongside
+    # content; on an assistant turn that performed tool calls it MUST be replayed
+    # verbatim in later requests or DeepSeek returns 400 (it is ignored on turns
+    # without tool calls). Carried through prompt assembly untouched.
+    reasoning_content: str | None = Field(default=None, max_length=1_048_576)
