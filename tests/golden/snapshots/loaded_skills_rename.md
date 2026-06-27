@@ -7,7 +7,6 @@ Step tracking: when a skill has numbered steps, call `skill.step.advance` after 
 
 ## Skill 1: Rename terminal tabs
 Skill id: daintree.terminals.rename
-Version: 0.1.0
 
 Use when: the user wants terminals/agents/tabs renamed or titled — e.g. "figure out what each of these is doing and give them a proper title", "rename these", "title the agents".
 

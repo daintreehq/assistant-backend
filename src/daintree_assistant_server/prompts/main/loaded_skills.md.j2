@@ -7,7 +7,6 @@ Step tracking: when a skill has numbered steps, call `skill.step.advance` after 
 {% for skill in loaded_skills %}
 ## Skill {{ loop.index }}: {{ skill.title }}
 Skill id: {{ skill.id }}
-Version: {{ skill.version }}
 
 {{ skill.body }}
 {% endfor %}

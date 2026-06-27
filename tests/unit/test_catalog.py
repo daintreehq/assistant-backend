@@ -10,7 +10,6 @@ from daintree_assistant_server.skills.loader import SkillLoadError, parse_skill
 SKILL_A = """---
 id: a.one
 title: One
-version: 1.0.0
 summary: first
 whenToUse: when one
 risk: read
@@ -21,7 +20,6 @@ body one
 SKILL_B = """---
 id: b.two
 title: Two
-version: 2.0.0
 summary: second
 whenToUse: when two
 risk: project
@@ -87,12 +85,12 @@ def test_duplicate_id_rejected() -> None:
         Catalog([skill, skill])
 
 
-def test_revision_changes_with_version() -> None:
+def test_revision_changes_with_content() -> None:
     base = _catalog().revision
-    bumped = Catalog(
+    changed = Catalog(
         [
-            parse_skill(SKILL_A.replace("version: 1.0.0", "version: 1.0.1"), expected_id="a.one"),
+            parse_skill(SKILL_A.replace("body one", "body one, edited"), expected_id="a.one"),
             parse_skill(SKILL_B, expected_id="b.two"),
         ]
     ).revision
-    assert base != bumped
+    assert base != changed

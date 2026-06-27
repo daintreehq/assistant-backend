@@ -98,7 +98,7 @@ def test_response_and_skills_block_shape() -> None:
         finish_reason="stop",
         skills=SkillsBlock(),
         catalog_revision="sha256:x",
-        prompt_version="main-2026-06-26.1",
+        prompt_version="main",
     )
     dumped = resp.model_dump(exclude_none=True)
     assert dumped["protocol_version"] == 1

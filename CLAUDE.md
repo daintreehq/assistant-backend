@@ -61,7 +61,6 @@ Skills are Markdown runbooks that become task-specific operating instructions fo
 |---|---|---|
 | `id` | yes | must match filename stem |
 | `title` | yes | |
-| `version` | yes | SemVer (`MAJOR.MINOR.PATCH`) |
 | `summary` | yes | selector signal |
 | `whenToUse` | yes | the *primary* selector signal (camelCase key → `when_to_use`) |
 | `tags` | no | lowercased, deduped |
@@ -88,7 +87,33 @@ All prompt text is **server-owned** and lives in `src/daintree_assistant_server/
 **Two things that are easy to get wrong:**
 
 - **Assembly order is load-bearing.** `PromptAssembler.build_main_request` keeps the large **append-only conversation** in DeepSeek's cached prefix (base prompt → integrations → conversation), then appends the small per-request tail — **active skill bodies → runtime → turn footer** — *after* it. The active skill set changes by wholesale replacement on a topic shift, so the bodies sit behind the conversation: a skill load/evict then re-encodes only that bounded tail, never the conversation (a mutable block in front of the conversation is the one layout prefix caching can't tolerate). It also lands the runbook near generation, which the small model follows better. Don't reorder casually. All client-provided local context is treated as untrusted: sanitized and byte-capped (`text_utils.py`, the `cap_*` settings in `config.py`).
-- **Prompt bytes are behavior.** Bump the version constants in `prompts/loader.py` (`MAIN_PROMPT_VERSION`, `SELECTOR_PROMPT_VERSION`) on a meaningful change, and regenerate golden snapshots (below).
+- **Prompt bytes are behavior.** On a meaningful prompt change, regenerate golden snapshots (below) — that diff is the reviewable record. Do **not** bump version strings: `MAIN_PROMPT_VERSION`/`SELECTOR_PROMPT_VERSION` are fixed family labels (`"main"`/`"selector"`), not per-edit versions (see "Versioning" below).
+
+## Versioning (pre-release)
+
+This service is **pre-release and running locally** — there is no deployed version to stay
+compatible with. Treat everything on disk as simply "the current version." **Do not add
+version numbers, SemVer, or date stamps to prompts, skills, or prompt-family labels, and do
+not bump them on a change.** Edit freely and let the golden-snapshot diff be the record.
+
+What this means concretely:
+
+- **Skills** have **no `version` field** — frontmatter carries `id`/`title`/`summary`/etc.
+  only. Change busting rides on the skill content hash (which feeds `catalog_revision`), not
+  a hand-bumped number.
+- **Prompt-family labels** (`MAIN_PROMPT_VERSION` / `SELECTOR_PROMPT_VERSION` in
+  `prompts/loader.py`) are fixed names — `"main"` and `"selector"` — surfaced as
+  `prompt_version`. They identify *which* prompt, not a revision; leave them alone.
+- The **only `v1` that stays** is the wire identifier: the API URL path (`/v1/daintree/...`)
+  and task identifiers (`<task>.v1`, e.g. `terminal_summarize.v1`, with their matching
+  `tasks/<task>.v1.md` prompt files). Those are part of the request contract — keep them.
+- Separately, **build/protocol versioning is not in scope here and stays as-is**: the
+  `/version` endpoint, `server_version`, `protocol_version` / `X-Daintree-Protocol`, and the
+  signed-state-token format version (`TOKEN_VERSION`) are real wire/build metadata, unrelated
+  to prompt churn.
+
+If real release versioning is ever wanted, that is a deliberate, separate decision — not
+something to reintroduce incidentally.
 
 ## Golden tests
 

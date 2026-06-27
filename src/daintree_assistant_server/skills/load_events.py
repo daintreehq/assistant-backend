@@ -32,7 +32,6 @@ class SkillLoadExecution:
 
     call_id: str
     skill_id: str
-    version: str
     title: str
     summary: str
 
@@ -41,7 +40,6 @@ class SkillLoadExecution:
         return cls(
             call_id=call_id,
             skill_id=skill.id,
-            version=skill.version,
             title=skill.title,
             summary=skill.summary,
         )
@@ -54,7 +52,7 @@ class SkillLoadExecution:
             {
                 "ok": True,
                 "summary": self.summary,
-                "data": {"id": self.skill_id, "version": self.version},
+                "data": {"id": self.skill_id},
             },
             separators=(",", ":"),
         )

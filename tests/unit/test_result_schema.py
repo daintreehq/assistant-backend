@@ -114,6 +114,29 @@ def test_conforms_types_and_required() -> None:
     assert conforms({"count": True}, schema) is False      # bool is not integer
 
 
+def test_conforms_object_structure_without_explicit_type() -> None:
+    # A model often declares properties/required but omits the top-level
+    # `type:"object"`. A bare array must NOT pass such a schema — otherwise the
+    # cohort extract surfaces a flat list of values with terminalId attribution
+    # lost (the real miss this guards against).
+    schema = {
+        "properties": {
+            "answers": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"terminalId": {"type": "string"}, "fact": {"type": "string"}},
+                    "required": ["terminalId", "fact"],
+                },
+            }
+        },
+        "required": ["answers"],
+    }
+    assert conforms(["f1", "f2", "f3", "f4"], schema) is False  # bare array, no attribution
+    assert conforms({"answers": [{"terminalId": "terminal-5284bfef", "fact": "x"}]}, schema) is True
+    assert conforms({}, schema) is False  # missing required answers
+
+
 def test_conforms_additional_properties_false() -> None:
     schema = {"type": "object", "properties": {"a": {"type": "string"}}, "additionalProperties": False}
     assert conforms({"a": "x"}, schema) is True

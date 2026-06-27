@@ -1,7 +1,6 @@
 ---
 id: daintree.edits.spawn-visible-agent
 title: Spawn a visible agent for edits or exploration
-version: 0.2.0
 summary: How to handle requests that need a visible agent — to change files or to explore read-only.
 whenToUse: Use whenever the user asks to implement, refactor, fix, add tests, update docs, or otherwise change project files — OR to spawn/launch a visible agent to explore, investigate, or survey a project read-only.
 priority: 200

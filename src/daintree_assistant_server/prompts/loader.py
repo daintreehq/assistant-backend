@@ -1,4 +1,4 @@
-"""Prompt template loading and versioning.
+"""Prompt template loading.
 
 All prompt text is server-owned and lives in this package as ``.md`` and
 ``.md.j2`` files. The loader renders templates and exposes raw prompt bodies.
@@ -12,9 +12,12 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, TemplateError, select_autoescape
 
-# Immutable prompt-family versions (surfaced in metadata and logs).
-MAIN_PROMPT_VERSION = "main-2026-06-27.2"
-SELECTOR_PROMPT_VERSION = "selector-2026-06-26.1"
+# Stable prompt-family labels (surfaced in metadata and logs). Pre-release: these
+# are fixed family names, NOT versions — do not date-stamp them or bump them on
+# prompt edits. Everything on disk is simply "the current prompt." If real
+# release versioning is ever needed, that is a deliberate, separate change.
+MAIN_PROMPT_VERSION = "main"
+SELECTOR_PROMPT_VERSION = "selector"
 
 # Main-prompt template names.
 TEMPLATE_RUNTIME_CONTEXT = "main/runtime_context.md.j2"

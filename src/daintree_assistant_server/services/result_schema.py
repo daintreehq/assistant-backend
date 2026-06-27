@@ -234,6 +234,15 @@ def conforms(value: Any, schema: Any) -> bool:
         types = declared if isinstance(declared, list) else [declared]
         if not any(_type_ok(value, one) for one in types):
             return False
+    elif ("properties" in schema or "required" in schema) and not isinstance(value, dict):
+        # A schema that declares object structure (properties/required) but omits
+        # an explicit `type` still INTENDS an object — models routinely drop the
+        # top-level `type:"object"`. Plain JSON-Schema treats required/properties
+        # as no-ops on a non-object, which would let a bare array slip past this
+        # gate with attribution lost (exactly the cohort-extract miss that surfaced
+        # 4 bare strings instead of one {terminalId,…} object per agent). Treat
+        # declared object structure as implying object type so the repair fires.
+        return False
 
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         if "minimum" in schema and value < schema["minimum"]:

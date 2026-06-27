@@ -17,7 +17,6 @@ RISK_VALUES: frozenset[str] = frozenset(
     {"read", "local", "ui", "terminal", "project", "external", "git", "system"}
 )
 
-SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
 PRIORITY_MIN = 0
@@ -31,20 +30,12 @@ class SkillMeta(BaseModel):
 
     id: str = Field(min_length=1, max_length=256)
     title: str = Field(min_length=1, max_length=256)
-    version: str = Field(min_length=1, max_length=64)
     summary: str = Field(min_length=1, max_length=2048)
     when_to_use: str = Field(min_length=1, max_length=4096, alias="whenToUse")
     tags: list[str] = Field(default_factory=list)
     priority: int = Field(default=0, ge=PRIORITY_MIN, le=PRIORITY_MAX)
     risk: str = "read"
     required_tools: list[str] = Field(default_factory=list, alias="requiredTools")
-
-    @field_validator("version")
-    @classmethod
-    def _check_version(cls, v: str) -> str:
-        if not SEMVER_RE.match(v):
-            raise ValueError(f"version {v!r} is not a valid SemVer-compatible string")
-        return v
 
     @field_validator("risk")
     @classmethod
@@ -97,10 +88,6 @@ class Skill:
         return self.meta.title
 
     @property
-    def version(self) -> str:
-        return self.meta.version
-
-    @property
     def summary(self) -> str:
         return self.meta.summary
 
@@ -131,7 +118,6 @@ class Skill:
         return {
             "id": self.meta.id,
             "title": self.meta.title,
-            "version": self.meta.version,
             "summary": self.meta.summary,
             "when_to_use": self.meta.when_to_use,
             "tags": list(self.meta.tags),
@@ -141,5 +127,5 @@ class Skill:
         }
 
     def ref(self) -> dict[str, str]:
-        """A minimal {id, version, title} reference."""
-        return {"id": self.meta.id, "version": self.meta.version, "title": self.meta.title}
+        """A minimal {id, title} reference."""
+        return {"id": self.meta.id, "title": self.meta.title}

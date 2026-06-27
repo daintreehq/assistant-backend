@@ -11,7 +11,6 @@ class ActiveSkillRef(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str
-    version: str = ""
 
 
 class StatePayload(BaseModel):

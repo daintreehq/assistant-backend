@@ -1,7 +1,6 @@
 ---
 id: daintree.recipe.run-or-create
 title: Run or create Daintree workspace recipes
-version: 0.1.2
 summary: Load, run, or create a Daintree workspace recipe (or a worktree with one), and supervise any LIVE agent the recipe spawns.
 whenToUse: Use when the user asks to load, run, create, inspect, or apply a Daintree workspace recipe, or to create a worktree with a startup recipe.
 priority: 180

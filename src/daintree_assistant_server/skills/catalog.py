@@ -34,7 +34,7 @@ class Catalog:
 
     @staticmethod
     def _compute_revision(skills: Sequence[Skill]) -> str:
-        entries = sorted(f"{s.id}@{s.version}:{s.content_hash}" for s in skills)
+        entries = sorted(f"{s.id}:{s.content_hash}" for s in skills)
         digest = hashlib.sha256("\n".join(entries).encode("utf-8")).hexdigest()
         return f"sha256:{digest}"
 

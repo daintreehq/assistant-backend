@@ -13,7 +13,6 @@ from daintree_assistant_server.skills.loader import (
 VALID = """---
 id: test.example
 title: Example
-version: 1.2.3
 summary: A test skill.
 whenToUse: Use when testing.
 tags:
@@ -36,7 +35,6 @@ def test_parse_valid_skill() -> None:
     skill = parse_skill(VALID, expected_id="test.example")
     assert skill.id == "test.example"
     assert skill.title == "Example"
-    assert skill.version == "1.2.3"
     assert skill.when_to_use == "Use when testing."
     assert skill.meta.tags == ["alpha", "beta"]
     assert skill.risk == "read"
@@ -60,15 +58,9 @@ def test_missing_closing_delimiter() -> None:
 
 
 def test_empty_body_rejected() -> None:
-    text = "---\nid: test.example\ntitle: T\nversion: 1.0.0\nsummary: s\nwhenToUse: w\n---\n"
+    text = "---\nid: test.example\ntitle: T\nsummary: s\nwhenToUse: w\n---\n"
     with pytest.raises(SkillLoadError, match="body is empty"):
         parse_skill(text)
-
-
-def test_invalid_version_rejected() -> None:
-    bad = VALID.replace("version: 1.2.3", "version: not-semver")
-    with pytest.raises(SkillLoadError, match="metadata"):
-        parse_skill(bad, expected_id="test.example")
 
 
 def test_invalid_risk_rejected() -> None:

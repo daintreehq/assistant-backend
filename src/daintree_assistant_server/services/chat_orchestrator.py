@@ -222,7 +222,7 @@ class ChatOrchestrator:
 
         new_state = self.state_codec.issue(
             session_id=session_id,
-            active_skills=[(s.id, s.version) for s in skills],
+            active_skills=[s.id for s in skills],
             catalog_revision=self.catalog.revision,
             turn_id=request.session.turn_id,
             instruction_revision=request.session.instruction_revision,
@@ -330,7 +330,7 @@ class ChatOrchestrator:
         ]
         new_state = self.state_codec.issue(
             session_id=session_id,
-            active_skills=[(s.id, s.version) for s in skills],
+            active_skills=[s.id for s in skills],
             catalog_revision=self.catalog.revision,
             turn_id=turn_id,
             instruction_revision=instruction_revision,

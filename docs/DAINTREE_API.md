@@ -140,8 +140,8 @@ Notes:
   "usage": { "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cached_tokens": 0 },
 
   "skills": {                                   // first-class skill outcome
-    "active":       [ { "id": "…", "version": "…", "title": "…" } ],
-    "newly_loaded": [ { "id": "…", "version": "…", "title": "…" } ],
+    "active":       [ { "id": "…", "title": "…" } ],
+    "newly_loaded": [ { "id": "…", "title": "…" } ],
     "prelude": {                                // render BEFORE the assistant reply
       "tool_executions": [
         { "call":   { "id": "call_…", "type": "function",
@@ -156,7 +156,7 @@ Notes:
 
   "state": "dst1.…",                            // refreshed token — send back on the next request
   "catalog_revision": "sha256:…",
-  "prompt_version": "main-2026-06-26.1",
+  "prompt_version": "main",
   "warnings": []
 }
 ```
@@ -298,6 +298,8 @@ Stable envelope (pre-stream as JSON, mid-stream as an `error` event):
 
 ## Versioning
 
-`protocol_version` is explicit per request; `prompt_version` and `catalog_revision` are
-returned on every response so the client can detect server-side prompt/catalog changes
-(and re-run selection when the catalog moves).
+`protocol_version` is explicit per request. `prompt_version` is a stable prompt-family
+label (`"main"`) — pre-release, it is not bumped on prompt edits; everything on disk is
+simply the current prompt. `catalog_revision` is the real change signal: it is a content
+hash that moves whenever any skill changes, so the client re-runs selection when the
+catalog moves. Both are returned on every response.

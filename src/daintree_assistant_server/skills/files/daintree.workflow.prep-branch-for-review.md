@@ -1,7 +1,6 @@
 ---
 id: daintree.workflow.prep-branch-for-review
 title: Prepare a branch for review
-version: 0.1.2
 summary: Get a read-only review-readiness verdict, then do the real prep — commit, push, open the PR — branching on what the verdict reports.
 whenToUse: Use when the user asks to prepare a branch for review, open/ready a PR, wrap up work on an issue for review, or check whether the current branch is ready to push.
 priority: 185

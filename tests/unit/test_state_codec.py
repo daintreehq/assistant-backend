@@ -29,7 +29,7 @@ def test_issue_and_verify_roundtrip() -> None:
     codec = _codec(clock)
     token = codec.issue(
         session_id="ses1",
-        active_skills=[("a", "1.0.0"), ("b", "2.0.0")],
+        active_skills=["a", "b"],
         catalog_revision="sha256:rev",
         turn_id="t1",
         instruction_revision=2,
@@ -104,7 +104,7 @@ def test_key_rotation_previous_key_verifies() -> None:
     old = StateCodec(current_key=b"old-key", current_kid="k0", salt=b"salt", ttl_seconds=100,
                      clock=lambda: 1000.0)
     old_token = old.issue(
-        session_id="s", active_skills=[("a", "1")], catalog_revision="r", turn_id="t",
+        session_id="s", active_skills=["a"], catalog_revision="r", turn_id="t",
         instruction_revision=0,
     )
     rotated = StateCodec(
@@ -139,7 +139,7 @@ def test_oversize_token_raises_413() -> None:
 def test_session_bound_token_replayed_without_session_is_mismatch() -> None:
     codec = _codec([1000.0])
     token = codec.issue(
-        session_id="ses1", active_skills=[("a", "1")], catalog_revision="r", turn_id="t",
+        session_id="ses1", active_skills=["a"], catalog_revision="r", turn_id="t",
         instruction_revision=0,
     )
     # A session-bound token verified with no session_id must NOT validate.

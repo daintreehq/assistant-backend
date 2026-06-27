@@ -101,7 +101,6 @@ class Selection(BaseModel):
 
 class SkillRef(BaseModel):
     id: str
-    version: str
     title: str
 
 

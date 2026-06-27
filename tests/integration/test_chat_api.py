@@ -165,7 +165,7 @@ def test_scenario8_selector_fails_retains_prior(client, auth, fake_provider) -> 
 def test_scenario9_catalog_revision_change_reruns(client, auth, fake_provider, app) -> None:
     codec = app.state.container.state_codec
     stale = codec.issue(
-        session_id="s9", active_skills=[(SKILL_PREP, "9.9.9")],
+        session_id="s9", active_skills=[SKILL_PREP],
         catalog_revision="sha256:stale", turn_id="t1", instruction_revision=0,
     )
     fake_provider.tool_call_result = tool_call_for([SKILL_RENAME])
