@@ -11,7 +11,6 @@ from daintree_assistant_server.contracts.extensions import (
     TurnContext,
 )
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
-from daintree_assistant_server.skills.load_events import SkillLoadExecution
 
 
 def _req(*, messages=None, tools=None, runtime=None, turn=None, generation=None) -> RespondRequest:
@@ -30,7 +29,6 @@ def _req(*, messages=None, tools=None, runtime=None, turn=None, generation=None)
 
 def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
     skill = catalog.skills[0]
-    ex = SkillLoadExecution.from_skill("call_srv_1", skill)
     req = _req(
         messages=[
             {"role": "user", "content": "go"},
@@ -43,33 +41,45 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
         turn={"goal": "g"},
     )
     pr = assembler.build_main_request(
-        request=req, skills=[skill], synthetic_executions=[ex], upstream_model="deepseek-v4-flash",
+        request=req, skills=[skill], upstream_model="deepseek-v4-flash",
     )
-    roles = [m["role"] for m in pr.messages]
-    # Cache-optimal: base(system), skills(system), conversation..., synthetic, runtime(system), footer(system).
-    assert roles[0] == "system"  # base prompt
-    assert roles[1] == "system"  # loaded skills
-    assert roles[2] == "user"    # conversation begins (runtime moved to the end)
-    assert roles[-1] == "system"  # turn footer last
-    # base + skills are the cacheable prefix; the variable runtime context is near the end.
-    assert "# Runtime context" in pr.messages[0]["content"] or any(
-        "# Runtime context" in m["content"] for m in pr.messages[-2:]
-    )
-    assert any(
+    msgs = pr.messages
+    # Cache layout: base(system), conversation..., then the per-request tail:
+    # skill bodies(system), runtime(system), footer(system).
+    assert msgs[0]["role"] == "system"  # base prompt
+    assert msgs[1]["role"] == "user"    # conversation begins right after base (skills moved to the tail)
+    assert msgs[-1]["role"] == "system"  # turn footer last
+    # The append-only conversation is the cached bulk; skill bodies + runtime now follow it.
+    skill_idx = next(i for i, m in enumerate(msgs) if "# Loaded skills" in (m.get("content") or ""))
+    last_convo_idx = max(i for i, m in enumerate(msgs) if m["role"] in ("user", "assistant", "tool"))
+    assert skill_idx > last_convo_idx
+    assert any("# Runtime context" in (m.get("content") or "") for m in msgs[-2:])
+    # Skills reach the model as plain context only — never a synthetic skill__load tool call.
+    assert not any(
         m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "skill__load"
-        for m in pr.messages
+        for m in msgs
     )
 
 
-def test_skill_bodies_precede_conversation(assembler: PromptAssembler, catalog) -> None:
+def test_skill_bodies_follow_conversation(assembler: PromptAssembler, catalog) -> None:
     skill = catalog.skills[0]
     pr = assembler.build_main_request(
         request=_req(messages=[{"role": "user", "content": "go"}]),
-        skills=[skill], synthetic_executions=[], upstream_model="deepseek-v4-flash",
+        skills=[skill], upstream_model="deepseek-v4-flash",
     )
-    # Skill body is in the cacheable prefix (message[1]), before the user turn.
-    assert skill.title in pr.messages[1]["content"]
-    assert pr.messages[2]["role"] == "user"
+    # The conversation is the cached bulk; the skill body now follows it (re-encoded tail).
+    assert pr.messages[1]["role"] == "user"
+    assert pr.messages[2]["role"] == "system"
+    assert skill.title in pr.messages[2]["content"]
+
+
+def test_no_skill_block_when_set_is_empty(assembler: PromptAssembler) -> None:
+    pr = assembler.build_main_request(
+        request=_req(messages=[{"role": "user", "content": "go"}]),
+        skills=[], upstream_model="deepseek-v4-flash",
+    )
+    # Empty active set emits no loaded-skills system message right before generation.
+    assert not any("# Loaded skills" in (m.get("content") or "") for m in pr.messages)
 
 
 def test_no_skills_fallback(assembler: PromptAssembler) -> None:
@@ -132,14 +142,14 @@ def test_integrations_neutralizes_instruction_injection(assembler: PromptAssembl
 def test_integrations_message_inserted_only_when_present(assembler: PromptAssembler) -> None:
     with_int = assembler.build_main_request(
         request=_req(runtime={"mcp_servers": [{"name": "daintree"}]}),
-        skills=[], synthetic_executions=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek-v4-flash",
     )
     assert any(
         m["role"] == "system" and "# Integrations" in m["content"] for m in with_int.messages
     )
     without = assembler.build_main_request(
         request=_req(),
-        skills=[], synthetic_executions=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek-v4-flash",
     )
     assert not any(
         m["role"] == "system" and "# Integrations" in m["content"] for m in without.messages
@@ -157,7 +167,7 @@ def test_footer_renders_memories_and_worktree(assembler: PromptAssembler) -> Non
 def test_tool_projection(assembler: PromptAssembler) -> None:
     req = _req(tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}])
     pr = assembler.build_main_request(
-        request=req, skills=[], synthetic_executions=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek-v4-flash",
     )
     assert pr.tools is not None
     assert pr.tools[0]["function"]["name"] == "git__status"
@@ -167,7 +177,7 @@ def test_tool_projection(assembler: PromptAssembler) -> None:
 def test_main_request_params(assembler: PromptAssembler) -> None:
     req = _req(generation={"stream": True, "temperature": 0.5})
     pr = assembler.build_main_request(
-        request=req, skills=[], synthetic_executions=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek-v4-flash",
     )
     assert pr.thinking_disabled is True
     assert pr.prompt_cache_key == "daintree-main"

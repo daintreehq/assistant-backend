@@ -1,17 +1,19 @@
 """Assemble the upstream main-model request.
 
-Layer order — MOST-STABLE-FIRST so DeepSeek's prefix cache covers the large, stable
-content across a turn's rounds. Layers 1-3 are the CACHED PREFIX; layers 6-7 are
-per-request dynamic context, appended LAST so they never poison that prefix (see
-build_main_request):
+Layer order — the large APPEND-ONLY conversation is kept in the cached prefix; the small
+per-request tail (skill bodies + runtime + footer) follows it. The active skill set changes
+by wholesale replacement on a topic shift, so placing the bodies AFTER the conversation means
+a load/evict re-encodes only that bounded tail, never the conversation (a mutable block in
+front of the append-only conversation is the one layout prefix caching cannot tolerate). It
+also lands the runbook near generation, which a small model follows better. See
+build_main_request:
 
-1. base system message
+1. base system message — static; cached across all sessions
 2. integrations system message — client MCP servers + tool index (omitted when absent)
-3. loaded-skills system message — active skill bodies, or a stable fallback
-4. client conversation (user / assistant / tool only)
-5. synthetic skill-load assistant/tool exchange (newly loaded skills only)
-6. runtime-context system message — server-rendered typed local facts (dynamic; NOT layer 2)
-7. trailing turn-context (turn-footer) system message (dynamic)
+3. client conversation (user / assistant / tool only) — append-only; the cached bulk
+4. loaded-skills system message — active skill bodies (omitted when the active set is empty)
+5. runtime-context system message — server-rendered typed local facts (per-request)
+6. trailing turn-context (turn-footer) system message (per-request)
 
 All local context is treated as untrusted data: control characters are
 stripped and every field has an explicit byte cap.
@@ -39,7 +41,6 @@ from ..prompts.loader import (
     PromptLoader,
 )
 from ..providers.base import ProviderChatRequest
-from ..skills.load_events import SkillLoadExecution, synthetic_transcript
 from ..skills.models import Skill
 from ..text_utils import (
     cap_bytes,
@@ -289,14 +290,12 @@ class PromptAssembler:
         *,
         request: RespondRequest,
         skills: list[Skill],
-        synthetic_executions: list[SkillLoadExecution],
         upstream_model: str,
     ) -> ProviderChatRequest:
-        """Assemble the upstream request, ordered most-stable-first so DeepSeek's
-        prefix cache covers the large, stable content (base prompt, the client's
-        integration surface, and the active skill bodies) across a turn's rounds.
-        Per-request variable context (runtime + turn) is appended LAST so it never
-        poisons that cached prefix.
+        """Assemble the upstream request so DeepSeek's prefix cache covers the base
+        prompt, the integration surface, and the append-only conversation. The active
+        skill bodies and the per-request runtime/turn context follow the conversation,
+        so a skill-set change re-encodes only that bounded tail — never the conversation.
         """
         runtime = request.runtime
         turn = request.turn
@@ -310,11 +309,12 @@ class PromptAssembler:
         integrations = self.render_integrations(runtime, request.input.tools)
         if integrations.strip():
             messages.append({"role": "system", "content": integrations})
-        # 3. active skill bodies: turn-stable → cacheable across rounds.
-        messages.append({"role": "system", "content": self.render_loaded_skills(skills)})
-        # 4. conversation, then the synthetic skill-load exchange.
+        # 3. client conversation: append-only and the largest segment → kept in the cached prefix.
         messages.extend(self._message_to_wire(m) for m in request.input.messages)
-        messages.extend(synthetic_transcript(synthetic_executions))
+        # 4. active skill bodies AFTER the conversation: a set change (load/evict) re-encodes only
+        #    this bounded block, never the conversation, and lands the runbook near generation.
+        if skills:
+            messages.append({"role": "system", "content": self.render_loaded_skills(skills)})
         # 5. per-request variable context LAST (kept out of the cached prefix).
         runtime_msg = self.render_runtime_context(runtime)
         if runtime_msg.strip():

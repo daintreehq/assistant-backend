@@ -56,10 +56,19 @@ class PromptLoader:
     # ---- raw bodies -----------------------------------------------------
 
     def base_prompt(self) -> str:
-        path = self.dir / "main" / "base.md"
-        if not path.is_file():
-            raise PromptError(f"missing base prompt: {path}")
-        return path.read_text(encoding="utf-8").replace("\r\n", "\n").rstrip("\n")
+        # The permanent base prompt is authored as ordered section partials
+        # (``main/base/NN-*.md``) and assembled here into one stable block;
+        # filename order is load-bearing, so partials are read sorted by name.
+        base_dir = self.dir / "main" / "base"
+        if not base_dir.is_dir():
+            raise PromptError(f"missing base prompt dir: {base_dir}")
+        parts = sorted(base_dir.glob("*.md"))
+        if not parts:
+            raise PromptError(f"no base prompt parts in {base_dir}")
+        sections = [
+            p.read_text(encoding="utf-8").replace("\r\n", "\n").strip("\n") for p in parts
+        ]
+        return "\n\n".join(sections)
 
     def task_system_prompt(self, task_id: str) -> str:
         path = self.dir / "tasks" / f"{task_id}.md"

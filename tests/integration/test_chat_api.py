@@ -19,8 +19,12 @@ def _main_request(provider: FakeProvider):
 
 
 def _loaded_skills_message(provider: FakeProvider) -> str:
-    # base[0], loaded_skills[1] (no integrations when no tools are supplied).
-    return _main_request(provider).messages[1]["content"]
+    # Skill bodies now follow the conversation (cache layout), so find by content, not position.
+    return next(
+        m["content"]
+        for m in _main_request(provider).messages
+        if "# Loaded skills" in (m.get("content") or "")
+    )
 
 
 def test_scenario1_new_session_skill_selected(client, auth, fake_provider, app) -> None:
@@ -36,7 +40,9 @@ def test_scenario1_new_session_skill_selected(client, auth, fake_provider, app) 
     assert len(meta["prelude"]["tool_executions"]) == 1
     assert meta["prelude"]["tool_executions"][0]["display_name"] == "skill.load"
     upstream = _main_request(fake_provider)
-    assert any(
+    # The CLI sees a skill.load prelude (above), but the model must NOT — skills
+    # reach it as plain context, with no synthetic skill__load call to imitate.
+    assert not any(
         m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "skill__load"
         for m in upstream.messages
     )

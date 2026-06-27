@@ -230,7 +230,6 @@ class ChatOrchestrator:
         provider_request = self.assembler.build_main_request(
             request=request,
             skills=skills,
-            synthetic_executions=executions,
             upstream_model=upstream_model,
         )
 

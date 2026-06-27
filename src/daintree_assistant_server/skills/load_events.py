@@ -1,10 +1,11 @@
-"""Synthetic skill-load events.
+"""Skill-load events surfaced to the CLI.
 
-A single immutable :class:`SkillLoadExecution` is the source of truth for both
-the upstream synthetic transcript (so the main model observes the load) and the
-``daintree.prelude.tool_executions`` metadata returned to the CLI. Deriving
-both from the same object prevents the visible prelude and the upstream prelude
-from drifting apart.
+A single immutable :class:`SkillLoadExecution` describes one skill that was just
+activated this turn. It feeds the ``daintree.prelude.tool_executions`` metadata
+the server returns to the CLI, which renders a visible "skill.load" prelude for
+the user. The main model is NOT shown this as a tool call — active skill bodies
+reach it as plain context in the "Loaded skills" system block — so there is no
+synthetic self-call for it to imitate or narrate.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ SKILL_LOAD_DISPLAY_NAME = "skill.load"
 
 @dataclass(frozen=True)
 class SkillLoadExecution:
-    """One synthetic skill-load tool call/result pair."""
+    """One skill-load event, surfaced to the CLI as a visible prelude."""
 
     call_id: str
     skill_id: str
@@ -58,20 +59,6 @@ class SkillLoadExecution:
             separators=(",", ":"),
         )
 
-    def wire_tool_call(self) -> dict[str, object]:
-        return {
-            "id": self.call_id,
-            "type": "function",
-            "function": {"name": SKILL_LOAD_WIRE_NAME, "arguments": self.arguments_json()},
-        }
-
-    def wire_tool_result(self) -> dict[str, object]:
-        return {
-            "role": "tool",
-            "tool_call_id": self.call_id,
-            "content": self.result_content(),
-        }
-
     def prelude_execution(self) -> PreludeExecution:
         return PreludeExecution(
             call=PreludeToolCall(
@@ -83,20 +70,3 @@ class SkillLoadExecution:
             result=PreludeToolResult(tool_call_id=self.call_id, content=self.result_content()),
             display_name=SKILL_LOAD_DISPLAY_NAME,
         )
-
-
-def synthetic_transcript(executions: list[SkillLoadExecution]) -> list[dict[str, object]]:
-    """Build the upstream messages for a set of newly loaded skills.
-
-    One assistant message carries all the tool calls, followed by one tool
-    message per call — mirroring the CLI's batched-tool presentation.
-    """
-    if not executions:
-        return []
-    assistant: dict[str, object] = {
-        "role": "assistant",
-        "tool_calls": [e.wire_tool_call() for e in executions],
-    }
-    messages: list[dict[str, object]] = [assistant]
-    messages.extend(e.wire_tool_result() for e in executions)
-    return messages

@@ -87,7 +87,7 @@ All prompt text is **server-owned** and lives in `src/daintree_assistant_server/
 
 **Two things that are easy to get wrong:**
 
-- **Assembly order is load-bearing.** `PromptAssembler.build_main_request` orders messages *most-stable-first* so DeepSeek's prefix cache covers the large stable content (base prompt → integrations → active skill bodies → conversation) across a turn's rounds; per-request dynamic context (runtime + turn footer) is appended **last** so it never poisons the cached prefix. Don't reorder casually. All client-provided local context is treated as untrusted: sanitized and byte-capped (`text_utils.py`, the `cap_*` settings in `config.py`).
+- **Assembly order is load-bearing.** `PromptAssembler.build_main_request` keeps the large **append-only conversation** in DeepSeek's cached prefix (base prompt → integrations → conversation), then appends the small per-request tail — **active skill bodies → runtime → turn footer** — *after* it. The active skill set changes by wholesale replacement on a topic shift, so the bodies sit behind the conversation: a skill load/evict then re-encodes only that bounded tail, never the conversation (a mutable block in front of the conversation is the one layout prefix caching can't tolerate). It also lands the runbook near generation, which the small model follows better. Don't reorder casually. All client-provided local context is treated as untrusted: sanitized and byte-capped (`text_utils.py`, the `cap_*` settings in `config.py`).
 - **Prompt bytes are behavior.** Bump the version constants in `prompts/loader.py` (`MAIN_PROMPT_VERSION`, `SELECTOR_PROMPT_VERSION`) on a meaningful change, and regenerate golden snapshots (below).
 
 ## Golden tests

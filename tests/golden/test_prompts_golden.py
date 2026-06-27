@@ -160,7 +160,6 @@ def test_task_prompts(loader: PromptLoader, task_id: str) -> None:
 def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     catalog = load_catalog()
     skill = catalog.get("daintree.workflow.prep-branch-for-review")
-    ex = SkillLoadExecution.from_skill("call_srv_GOLDEN", skill)
     req = RespondRequest.model_validate(
         {
             "protocol_version": 1,
@@ -173,7 +172,6 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     pr = assembler.build_main_request(
         request=req,
         skills=[skill],
-        synthetic_executions=[ex],
         upstream_model="deepseek-v4-flash",
     )
     snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)

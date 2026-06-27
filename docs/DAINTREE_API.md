@@ -200,9 +200,10 @@ Skill selection is removed from the main thread:
 2. **Active set.** Newly selected skills are merged additively (new-first) with the prior
    active set and capped (default 3).
 3. **Injection.** Only the active skill *bodies* are injected into the main prompt — never
-   the full catalog. Newly-loaded skills also produce a synthetic `skill__load` tool
-   exchange in the upstream transcript (so the model observes the load) and the
-   `skills.prelude` the client renders first.
+   the full catalog — and they reach the model as **plain context** (the "Loaded skills"
+   system block), not a tool call. The model is **not** shown a synthetic `skill__load`
+   self-call; a `skills.prelude` is still returned for the client to render a visible
+   "Skill loaded" card.
 4. **State token.** `state` is an opaque, signed (`HMAC-SHA256`, key-ring/`kid` rotation),
    session-bound, expiring token carrying the active skills + catalog revision + cadence
    keys. It is verified fail-closed; an invalid/expired/wrong-session token is ignored
@@ -213,16 +214,19 @@ reserved and rejected if a client offers them as tools or replays them in histor
 
 ## Prompt assembly & caching
 
-The upstream message array is ordered most-stable-first so DeepSeek's prefix cache covers
-the largest stable content:
+The upstream message array keeps the large **append-only conversation** in DeepSeek's cached
+prefix; the small per-request tail (skill bodies + runtime + footer) follows it. The active
+skill set changes by wholesale replacement on a topic shift, so the bodies sit *after* the
+conversation — a skill load/evict then re-encodes only that bounded tail, never the
+conversation, and the runbook lands near generation (better for the small model).
 
 | # | Message | Stability |
 |---|---------|-----------|
 | 1 | Base system prompt | static — cached across all sessions |
 | 2 | Integrations (MCP servers + tool index) | session-stable |
-| 3 | Active skill bodies | turn-stable — cached across a turn's rounds |
-| 4 | Conversation + synthetic skill-load | grows within a turn |
-| 5 | Runtime context | per-request (kept out of the cached prefix) |
+| 3 | Conversation | append-only — the cached bulk |
+| 4 | Active skill bodies | per-request tail (omitted when the active set is empty) |
+| 5 | Runtime context | per-request |
 | 6 | Turn footer | per-request |
 
 All client-provided context (ids, names, MCP details, project instructions, memories,
