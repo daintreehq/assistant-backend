@@ -23,6 +23,7 @@ from ..providers.base import (
     ProviderToolCallResult,
     ProviderUsage,
 )
+from ..providers.retry import retry_upstream
 from ..text_utils import estimate_tokens, head_tail, message_text
 from .catalog import Catalog
 
@@ -302,18 +303,16 @@ class Selector:
         )
 
     async def _call_once(self, request: ProviderChatRequest) -> ProviderToolCallResult:
-        """Call the provider, retrying once on a transient (retryable) error."""
-        last: DaintreeError | None = None
-        for attempt in range(2):
-            try:
-                return await self.provider.structured_tool_call(
-                    request,
-                    function_name="select_skills",
-                    function_schema=self._select_schema,
-                )
-            except DaintreeError as exc:
-                last = exc
-                if not exc.retryable or attempt == 1:
-                    raise
-        assert last is not None  # pragma: no cover
-        raise last
+        """Call the provider, retrying transient (retryable) errors.
+
+        Exhausted retries raise; ``_run`` then degrades the selector open.
+        """
+        return await retry_upstream(
+            lambda: self.provider.structured_tool_call(
+                request,
+                function_name="select_skills",
+                function_schema=self._select_schema,
+            ),
+            retries=self.settings.max_upstream_retries,
+            backoff_base_seconds=self.settings.retry_backoff_base_seconds,
+        )

@@ -112,8 +112,13 @@ class Settings(BaseSettings):
     selector_max_output_tokens: int = Field(default=500, alias="SELECTOR_MAX_OUTPUT_TOKENS")
 
     # ---- Retries --------------------------------------------------------
-    max_upstream_retries: int = Field(default=2, alias="MAX_UPSTREAM_RETRIES")
-    retry_backoff_base_seconds: float = Field(default=0.25, alias="RETRY_BACKOFF_BASE_SECONDS")
+    # Applies to every upstream DeepSeek call (main completion, stream open,
+    # selector, utility tasks): retries transient failures only, and only before
+    # any public bytes are emitted. 3 retries = up to 4 attempts.
+    max_upstream_retries: int = Field(default=3, ge=0, alias="MAX_UPSTREAM_RETRIES")
+    retry_backoff_base_seconds: float = Field(
+        default=0.25, ge=0.0, alias="RETRY_BACKOFF_BASE_SECONDS"
+    )
 
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")

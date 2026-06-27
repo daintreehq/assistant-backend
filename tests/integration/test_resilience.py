@@ -42,6 +42,8 @@ def test_nonstream_persistent_error_surfaces(client, auth, fake_provider) -> Non
     assert r.status_code == 429
     assert r.json()["error"]["code"] == "upstream_rate_limited"
     assert r.headers.get("retry-after") == "5"
+    # Default budget: 1 try + 3 retries = 4 attempts, all exhausted before surfacing.
+    assert len(fake_provider.requests) == 4
 
 
 def test_nonstream_non_retryable_error(client, auth, fake_provider) -> None:
@@ -84,6 +86,8 @@ def test_stream_open_persistent_error_is_json_not_stream(client, auth, fake_prov
     r = client.post(URL, headers=auth, json=_stream_body())
     assert r.status_code == 429
     assert r.json()["error"]["code"] == "upstream_rate_limited"
+    # Default budget: 1 try + 3 retries = 4 stream-open attempts before surfacing.
+    assert len(fake_provider.stream_requests) == 4
 
 
 def test_stream_breaks_after_first_token_no_fabricated_finish(client, auth, fake_provider) -> None:

@@ -148,3 +148,44 @@ async def test_selector_degrades_on_upstream_error(selector: Selector, fake_prov
     fake_provider.tool_call_error = upstream_error("boom")
     decision = await selector.select(_msgs("task"), [])
     assert decision.degraded is True
+
+
+@pytest.mark.asyncio
+async def test_selector_retries_transient_then_succeeds(
+    selector: Selector, fake_provider: FakeProvider, catalog
+) -> None:
+    from daintree_assistant_server.errors import upstream_timeout
+
+    target = sorted(catalog.known_ids)[0]
+    calls = [0]
+
+    def tool_call(_req: object) -> ProviderToolCallResult:
+        calls[0] += 1
+        if calls[0] < 2:
+            raise upstream_timeout()
+        return tool_call_for([target])
+
+    fake_provider.tool_call_result = tool_call
+    decision = await selector.select(_msgs("task"), [])
+    assert decision.degraded is False
+    assert decision.skill_ids == [target]
+    assert calls[0] == 2  # retried the transient failure
+
+
+@pytest.mark.asyncio
+async def test_selector_exhausts_retries_then_fails_open(
+    selector: Selector, fake_provider: FakeProvider
+) -> None:
+    from daintree_assistant_server.errors import upstream_timeout
+
+    calls = [0]
+
+    def tool_call(_req: object) -> ProviderToolCallResult:
+        calls[0] += 1
+        raise upstream_timeout()  # transient every time
+
+    fake_provider.tool_call_result = tool_call
+    decision = await selector.select(_msgs("task"), [])
+    assert decision.degraded is True
+    assert "skill_selector_failed_open" in decision.warnings
+    assert calls[0] == 4  # 1 try + 3 retries, then fail open

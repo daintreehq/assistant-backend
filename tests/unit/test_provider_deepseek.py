@@ -221,6 +221,29 @@ async def test_stream_eof_before_done_raises() -> None:
 
 
 @pytest.mark.asyncio
+async def test_stream_transport_interruption_is_retryable() -> None:
+    # A dropped connection while reading the stream maps to a *retryable*
+    # upstream_error, so a prefetch failure (before public bytes) can be retried.
+    from daintree_assistant_server.providers.deepseek import DeepSeekStream
+
+    class _Ctx:
+        async def __aexit__(self, *_a: object) -> bool:
+            return False
+
+    class _Resp:
+        async def aiter_lines(self):  # noqa: ANN202 - test stub
+            raise httpx.ReadError("connection dropped")
+            yield ""  # pragma: no cover - makes this an async generator
+
+    stream = DeepSeekStream(_Ctx(), _Resp(), "deepseek-v4-flash")
+    with pytest.raises(DaintreeError) as exc:
+        await stream.prefetch_first_event()
+    assert exc.value.code == "upstream_error"
+    assert exc.value.retryable is True
+    await stream.aclose()
+
+
+@pytest.mark.asyncio
 async def test_structured_tool_call() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         import json as _json

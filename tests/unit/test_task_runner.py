@@ -8,7 +8,7 @@ import pytest
 from fakes import FakeProvider, make_result
 
 from daintree_assistant_server.contracts.tasks import TaskRequest
-from daintree_assistant_server.errors import DaintreeError
+from daintree_assistant_server.errors import DaintreeError, upstream_error, upstream_timeout
 from daintree_assistant_server.services.task_runner import TaskRunner
 
 
@@ -124,6 +124,68 @@ async def test_json_repair_exhausted_raises(task_runner: TaskRunner, fake_provid
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(TaskRequest(task="terminal_judge.v1", input={"question": "q"}))
     assert exc.value.code == "task_output_invalid"
+
+
+# ---- transient-error retries --------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_task_retries_transient_error(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
+    calls = [0]
+
+    def complete(_req):
+        calls[0] += 1
+        if calls[0] < 3:
+            raise upstream_timeout()
+        return make_result(content="Tests are green.")
+
+    fake_provider.complete_result = complete
+    out = await _run(task_runner, "terminal_summarize.v1", {"purpose": "p", "tail": "x"})
+    assert out == {"text": "Tests are green."}
+    assert calls[0] == 3  # 2 failures + success
+
+
+@pytest.mark.asyncio
+async def test_task_persistent_transient_error_surfaces(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
+    fake_provider.complete_error = upstream_timeout()
+    with pytest.raises(DaintreeError) as exc:
+        await _run(task_runner, "terminal_summarize.v1", {"tail": "x"})
+    assert exc.value.code == "upstream_timeout"
+
+
+@pytest.mark.asyncio
+async def test_repair_call_retries_transient_error(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
+    # First output is unparseable (triggers JSON repair); the repair call hits a
+    # transient error, which must itself be retried before succeeding.
+    calls = [0]
+
+    def complete(_req):
+        calls[0] += 1
+        if calls[0] == 1:
+            return make_result(content="not json at all")  # -> repair
+        if calls[0] == 2:
+            raise upstream_timeout()  # transient during repair
+        return make_result(content=json.dumps({"reason": "r", "confidence": 0.5, "matched": True}))
+
+    fake_provider.complete_result = complete
+    out = await _run(task_runner, "terminal_judge.v1", {"question": "q", "tail": "t"})
+    assert out["matched"] is True
+    assert calls[0] == 3  # initial + repair(transient) + repair(retry success)
+
+
+@pytest.mark.asyncio
+async def test_task_non_retryable_error_not_retried(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
+    calls = [0]
+
+    def complete(_req):
+        calls[0] += 1
+        raise upstream_error("bad gateway")  # retryable=False
+
+    fake_provider.complete_result = complete
+    with pytest.raises(DaintreeError) as exc:
+        await _run(task_runner, "terminal_summarize.v1", {"tail": "x"})
+    assert exc.value.code == "upstream_error"
+    assert calls[0] == 1  # surfaced on the first attempt, no retry
 
 
 @pytest.mark.asyncio

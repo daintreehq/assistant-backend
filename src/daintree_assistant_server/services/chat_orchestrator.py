@@ -10,9 +10,7 @@ OpenAI wire shape *upstream*, behind the provider abstraction.
 
 from __future__ import annotations
 
-import asyncio
 import json
-import random
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -39,6 +37,7 @@ from ..errors import DaintreeError
 from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
+from ..providers.retry import retry_upstream
 from ..skills.catalog import Catalog
 from ..skills.load_events import SkillLoadExecution
 from ..skills.selector import SelectionDecision, Selector
@@ -537,51 +536,35 @@ class ChatOrchestrator:
 
     # ---- retries (only before any public bytes) -------------------------
 
-    async def _backoff(self, attempt: int) -> None:
-        base = self.settings.retry_backoff_base_seconds
-        if base <= 0:
-            return
-        delay = min(base * (2**attempt), 5.0)
-        delay += random.uniform(0, base)  # noqa: S311 - jitter, not security-sensitive
-        await asyncio.sleep(delay)
-
     async def _complete_with_retry(self, request: ProviderChatRequest) -> Any:
-        attempts = 1 + max(0, self.settings.max_upstream_retries)
-        last: DaintreeError | None = None
-        for i in range(attempts):
-            try:
-                return await self.provider.complete(request)
-            except DaintreeError as exc:
-                last = exc
-                if not exc.retryable or i == attempts - 1:
-                    raise
-                await self._backoff(i)
-        assert last is not None  # pragma: no cover
-        raise last
+        return await retry_upstream(
+            lambda: self.provider.complete(request),
+            retries=self.settings.max_upstream_retries,
+            backoff_base_seconds=self.settings.retry_backoff_base_seconds,
+        )
 
     async def _open_stream_with_retry(
         self, request: ProviderChatRequest
     ) -> tuple[ProviderStream, dict[str, Any] | None]:
-        attempts = 1 + max(0, self.settings.max_upstream_retries)
-        last: DaintreeError | None = None
-        for i in range(attempts):
-            try:
-                stream = await self.provider.open_stream(request)
-            except DaintreeError as exc:
-                last = exc
-                if not exc.retryable or i == attempts - 1:
-                    raise
-                await self._backoff(i)
-                continue
+        # Opening the stream and reading its first event are one retryable unit:
+        # a failure in either is transient and recoverable so long as no public
+        # bytes have left the building. A failed prefetch must close its
+        # half-open stream before the attempt unwinds — on ANY exception,
+        # including cancellation, so the httpx context never leaks. Only
+        # DaintreeError is retried (retry_upstream catches nothing else).
+        async def _open() -> tuple[ProviderStream, dict[str, Any] | None]:
+            stream = await self.provider.open_stream(request)
+            ok = False
             try:
                 first = await stream.prefetch_first_event()
-            except DaintreeError as exc:
-                await stream.aclose()
-                last = exc
-                if not exc.retryable or i == attempts - 1:
-                    raise
-                await self._backoff(i)
-                continue
-            return stream, first
-        assert last is not None  # pragma: no cover
-        raise last
+                ok = True
+                return stream, first
+            finally:
+                if not ok:
+                    await stream.aclose()
+
+        return await retry_upstream(
+            _open,
+            retries=self.settings.max_upstream_retries,
+            backoff_base_seconds=self.settings.retry_backoff_base_seconds,
+        )

@@ -38,6 +38,7 @@ from ..errors import DaintreeError, invalid_request, unknown_task
 from ..observability import get_logger, new_task_run_id
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
+from ..providers.retry import retry_upstream
 from .result_schema import conforms, validate_result_schema
 
 _SCHEMA_TASK = "terminal_extract_json.v1"
@@ -384,6 +385,13 @@ class TaskRunner:
     def task_ids(self) -> list[str]:
         return sorted(self.profiles)
 
+    async def _complete_with_retry(self, request: ProviderChatRequest) -> Any:
+        return await retry_upstream(
+            lambda: self.provider.complete(request),
+            retries=self.settings.max_upstream_retries,
+            backoff_base_seconds=self.settings.retry_backoff_base_seconds,
+        )
+
     async def run(self, request: TaskRequest) -> TaskResult:
         profile = self.profiles.get(request.task)
         if profile is None:
@@ -429,7 +437,7 @@ class TaskRunner:
             timeout=timeout,
         )
 
-        result = await self.provider.complete(provider_request)
+        result = await self._complete_with_retry(provider_request)
         usage = result.usage
         finish = result.finish_reason or "stop"
 
@@ -447,7 +455,7 @@ class TaskRunner:
                 thinking_disabled=True,
                 timeout=timeout,
             )
-            repair = await self.provider.complete(repair_request)
+            repair = await self._complete_with_retry(repair_request)
             usage = _sum_usage(usage, repair.usage)
             finish = repair.finish_reason or "stop"
             try:

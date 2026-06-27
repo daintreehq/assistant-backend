@@ -73,7 +73,12 @@ class DeepSeekStream(ProviderStream):
             raise upstream_timeout() from exc
         except httpx.TransportError as exc:
             self._done = True
-            raise upstream_error("The upstream model stream was interrupted.") from exc
+            # A dropped connection is transient. Retrying is only acted on before
+            # any public bytes are emitted (a failed prefetch); the mid-stream
+            # consumer ignores the flag and surfaces a terminal error instead.
+            raise upstream_error(
+                "The upstream model stream was interrupted.", retryable=True
+            ) from exc
 
         try:
             chunk = parse_chunk(data)
@@ -281,7 +286,10 @@ class DeepSeekProvider:
             raise upstream_error("Could not reach the upstream provider.", retryable=True) from exc
         if response.status_code >= 400:
             try:
-                await response.aread()
+                # Drain the error body best-effort: a transport failure mid-read
+                # must not mask the mapped status error (e.g. a retryable 5xx).
+                with contextlib.suppress(httpx.HTTPError):
+                    await response.aread()
             finally:
                 await ctx.__aexit__(None, None, None)
             raise self._map_http_error(response.status_code, response.headers)
