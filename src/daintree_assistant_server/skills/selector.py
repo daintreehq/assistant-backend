@@ -127,8 +127,8 @@ def build_selector_user_message(
         lines.append("")
     if available_tools:
         lines.append(
-            "Tools the assistant already has this turn (it can call these directly — do not "
-            f"load a skill for what these already cover): {', '.join(available_tools)}"
+            "Tools the assistant already has this turn (context — it can call these "
+            f"directly): {', '.join(available_tools)}"
         )
         lines.append("")
     lines.append(
