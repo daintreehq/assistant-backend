@@ -38,3 +38,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# uv (not used by this project; pip + requirements.lock is the source of truth)
+uv.lock
