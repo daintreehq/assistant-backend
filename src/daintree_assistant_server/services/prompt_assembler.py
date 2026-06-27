@@ -116,6 +116,24 @@ class PromptAssembler:
             tag="project_instructions",
         )
 
+        # Open-terminal inventory (issue #286): cap the row count, sanitize every
+        # client-supplied string to one inert line, and drop any row whose id sanitizes
+        # away. exit_code is passed through unsanitized (a validated int | None).
+        open_terminals = [
+            {
+                "id": tid,
+                "kind": sanitize_line(t.kind, 64),
+                "worktree_id": sanitize_line(t.worktree_id, 512),
+                "title": sanitize_line(t.title, 512),
+                "agent_id": sanitize_line(t.agent_id, 256),
+                "agent_state": sanitize_line(t.agent_state, 64),
+                "waiting_reason": sanitize_line(t.waiting_reason, 512),
+                "exit_code": t.exit_code,
+            }
+            for t in rc.open_terminals[: self.settings.cap_open_terminals]
+            if (tid := sanitize_line(t.id, 256))
+        ]
+
         return self.prompts.render(
             TEMPLATE_RUNTIME_CONTEXT,
             tier=sanitize_line(tier, 64),
@@ -131,6 +149,7 @@ class PromptAssembler:
             small_model=DEEPSEEK_MODEL,
             scheduler_active=rc.scheduler_active,
             project_instructions=project_instructions,
+            open_terminals=open_terminals,
         )
 
     def render_integrations(

@@ -53,6 +53,28 @@ class McpServer(BaseModel):
     instructions: str | None = Field(default=None, max_length=16384)
 
 
+class OpenTerminal(BaseModel):
+    """One live Daintree terminal in the per-request open-terminal inventory.
+
+    The CLI attaches a fresh, metadata-only snapshot (no terminal output) of the
+    open terminals to every request so the model always sees the live roster as
+    inert data instead of tool-calling ``terminal.list`` mid-turn to discover it.
+    Strict (``extra="forbid"``): a new terminal field is a contract change, not a
+    silent drop. ``exit_code`` is nullable because 0 is a meaningful clean exit.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(max_length=256)
+    kind: str | None = Field(default=None, max_length=64)
+    worktree_id: str | None = Field(default=None, max_length=4096)
+    title: str | None = Field(default=None, max_length=512)
+    agent_id: str | None = Field(default=None, max_length=256)
+    agent_state: str | None = Field(default=None, max_length=64)
+    waiting_reason: str | None = Field(default=None, max_length=512)
+    exit_code: int | None = None
+
+
 class RuntimeContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -67,6 +89,10 @@ class RuntimeContext(BaseModel):
     scheduler_active: bool = True
     active_worktree: str | None = Field(default=None, max_length=512)
     project_instructions: str | None = None
+    # Fresh per-request snapshot of the open terminals (issue #286): the live
+    # roster the CLI fetched this turn, rendered as inert data so the model can
+    # see what is open without a mid-turn terminal.list discovery call.
+    open_terminals: list[OpenTerminal] = Field(default_factory=list)
 
 
 class Memories(BaseModel):
