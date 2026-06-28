@@ -19,6 +19,7 @@ from daintree_assistant_server.contracts.extensions import (
     McpInfo,
     McpServer,
     Memories,
+    OpenTerminal,
     RuntimeContext,
     TurnContext,
 )
@@ -71,6 +72,21 @@ def test_runtime_context(assembler: PromptAssembler) -> None:
         configured_agent_ids=["claude", "codex"],
         scheduler_active=True,
         project_instructions="Always run the linter.",
+        open_terminals=[
+            OpenTerminal(
+                id="terminal-5284bfef-3d11-424c-90cb-136f24046295",
+                kind="agent",
+                worktree_id="wt-feature-login",
+                title="Implement login form",
+                agent_id="claude",
+                agent_state="working",
+            ),
+            OpenTerminal(
+                id="terminal-9a1c0b77-2f4e-4d8a-8c1b-7e0f5a2d3c64",
+                kind="shell",
+                exit_code=0,
+            ),
+        ],
     )
     assert_golden("runtime_context.md", assembler.render_runtime_context(rc))
 
