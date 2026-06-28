@@ -19,6 +19,7 @@ from daintree_assistant_server.contracts.extensions import (
     McpInfo,
     McpServer,
     Memories,
+    OpenTerminal,
     RuntimeContext,
     TurnContext,
 )
@@ -71,6 +72,21 @@ def test_runtime_context(assembler: PromptAssembler) -> None:
         configured_agent_ids=["claude", "codex"],
         scheduler_active=True,
         project_instructions="Always run the linter.",
+        open_terminals=[
+            OpenTerminal(
+                id="terminal-5284bfef-3d11-424c-90cb-136f24046295",
+                kind="agent",
+                worktree_id="wt-feature-login",
+                title="Implement login form",
+                agent_id="claude",
+                agent_state="working",
+            ),
+            OpenTerminal(
+                id="terminal-9a1c0b77-2f4e-4d8a-8c1b-7e0f5a2d3c64",
+                kind="shell",
+                exit_code=0,
+            ),
+        ],
     )
     assert_golden("runtime_context.md", assembler.render_runtime_context(rc))
 
@@ -176,6 +192,43 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     )
     snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
     assert_golden("upstream_messages.json", snapshot)
+
+
+def test_full_upstream_messages_with_open_terminals(assembler: PromptAssembler) -> None:
+    # The open-terminal inventory must reach the assembled upstream request in the
+    # volatile per-request tail (runtime context), not just render in isolation.
+    catalog = load_catalog()
+    skill = catalog.get("daintree.workflow.prep-branch-for-review")
+    req = RespondRequest.model_validate(
+        {
+            "protocol_version": 1,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
+            "runtime": {
+                "permission_tier": "operator",
+                "project_path": "/p",
+                "open_terminals": [
+                    {
+                        "id": "terminal-5284bfef-3d11-424c-90cb-136f24046295",
+                        "kind": "agent",
+                        "worktree_id": "wt-feature-login",
+                        "title": "Implement login form",
+                        "agent_id": "claude",
+                        "agent_state": "working",
+                    },
+                    {"id": "terminal-9a1c0b77-2f4e-4d8a-8c1b-7e0f5a2d3c64", "kind": "shell", "exit_code": 0},
+                ],
+            },
+            "turn": {"goal": "Prepare this branch for review."},
+        }
+    )
+    pr = assembler.build_main_request(
+        request=req,
+        skills=[skill],
+        upstream_model="deepseek-v4-flash",
+    )
+    snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
+    assert_golden("upstream_messages_with_terminals.json", snapshot)
 
 
 def test_synthetic_execution_shape() -> None:

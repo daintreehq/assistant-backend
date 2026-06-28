@@ -90,6 +90,34 @@ def test_request_generation_and_selection_defaults() -> None:
     assert req.session.round == 0
 
 
+def test_request_parses_open_terminals() -> None:
+    # exit_code must distinguish a clean 0 from "not exited" (None): 0 is a real
+    # value, not a falsy drop. Both must survive the wire-contract round-trip.
+    req = RespondRequest.model_validate(
+        _req(
+            runtime={
+                "open_terminals": [
+                    {"id": "terminal-1", "exit_code": 0},
+                    {"id": "terminal-2", "exit_code": None},
+                ]
+            }
+        )
+    )
+    terminals = req.runtime.open_terminals
+    assert [t.id for t in terminals] == ["terminal-1", "terminal-2"]
+    assert terminals[0].exit_code == 0
+    assert terminals[1].exit_code is None
+
+
+def test_open_terminal_rejects_nested_unknown_field() -> None:
+    # OpenTerminal is extra="forbid": an unknown field nested in the inventory is
+    # a contract change, not a silent drop.
+    with pytest.raises(ValidationError):
+        RespondRequest.model_validate(
+            _req(runtime={"open_terminals": [{"id": "terminal-1", "surprise": "x"}]})
+        )
+
+
 def test_response_and_skills_block_shape() -> None:
     resp = RespondResponse(
         request_id="req_1",
