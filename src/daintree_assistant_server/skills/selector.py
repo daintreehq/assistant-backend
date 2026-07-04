@@ -84,11 +84,18 @@ class SelectionDecision:
 
 
 def sanitize_for_selector(
-    messages: list[ChatMessage], token_budget: int
+    messages: list[ChatMessage],
+    token_budget: int,
+    *,
+    tool_char_cap: int = _TOOL_RESULT_CHAR_CAP,
+    message_char_cap: int = _MESSAGE_CHAR_CAP,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Build bounded, newest-biased conversation evidence for the selector.
 
     Returns ``(evidence, truncated)`` where evidence is in chronological order.
+    The per-message caps default to the selector's tight limits; the skill-learning
+    harness passes larger ones — its judgments need the actual tool output and
+    assistant responses, not classification-sized excerpts.
     """
     eligible = [m for m in messages if m.role in ("user", "assistant", "tool")]
     kept: list[dict[str, Any]] = []
@@ -97,9 +104,9 @@ def sanitize_for_selector(
     for msg in reversed(eligible):
         text = message_text(msg.content)
         if msg.role == "tool":
-            text = head_tail(text, _TOOL_RESULT_CHAR_CAP)
+            text = head_tail(text, tool_char_cap)
         else:
-            text = head_tail(text, _MESSAGE_CHAR_CAP)
+            text = head_tail(text, message_char_cap)
         tool_names = [tc.function.name for tc in (msg.tool_calls or [])]
         evidence = {
             "role": msg.role,

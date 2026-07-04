@@ -92,10 +92,10 @@ A backend-internal harness (`services/skill_learning.py`) that watches completed
 - **Fails open**: `SkillLearner.run` swallows every exception and returns a no-op. Learning must never break `/respond`.
 - The **skill loader is the authority for disk**: a proposal is rendered to markdown and run through `parse_skill(expected_id=...)`; it only lands on disk if that (plus an id-format guard, a path-containment check, and a conservative secret scan) passes.
 
-**Pipeline** (inline, on the selector cadence — a genuine new-instruction boundary, never a tool-continuation round):
-1. **Gate** (`prompts/skill_learning/gate.md`, small model, non-thinking JSON) reads the whole workflow transcript and returns none / improve / create. Strong triggers: the user signalling a problem ("what happened here?", "this shouldn't have happened") or the assistant visibly struggling; a cleanly completed repeatable workflow can justify a *create*. Only a `general_daintree_workflow` lesson above `SKILL_LEARNING_MIN_CONFIDENCE` writes.
-2. **Build/improve** (`build.md` / `improve.md`, GLM 5.2, thinking) returns a `SkillProposal`.
-3. **Validate → write → reload**: atomic write, `CatalogManager.reload()`, and (create only) fold into this turn's active set.
+**Pipeline** (inline, at a genuine new-instruction boundary — a new `turn_id` or a mid-turn interjection — never a tool-continuation round, even when the selector reruns for a catalog-revision change or `selection.force`):
+1. **Gate** (`prompts/skill_learning/gate.md`, small model, non-thinking JSON) reads the whole workflow transcript and returns none / improve / create. Strong triggers: the user signalling a problem ("what happened here?", "this shouldn't have happened") or the assistant visibly struggling; a cleanly completed repeatable workflow can justify a *create*. Only a `general_daintree_workflow` lesson above `SKILL_LEARNING_MIN_CONFIDENCE`, backed by concrete evidence, writes.
+2. **Build/improve** (`build.md` / `improve.md`, GLM 5.2, thinking) diagnoses what worked and what failed in the workflow, then returns a `SkillProposal`; the diagnosis plus a unified diff land in the audit record.
+3. **Validate → write → reload**: atomic write + reload as one cancellation-shielded unit (`CatalogManager.reload()`, rollback on failure), and (create only) fold into this turn's active set.
 
 **Modes** (`SKILL_LEARNING_MODE`): `off` | `propose` (run the pipeline, write only a proposal + audit JSON under `SKILL_LEARNING_AUDIT_DIR`, never touch skill files) | `apply` (write the skill file + reload).
 

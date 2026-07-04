@@ -40,6 +40,11 @@ class GateVerdict(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason: str = ""
     evidence: list[str] = Field(default_factory=list)
+    # Catalog ids the gate judged closest to this workflow's domain. The cheap
+    # small model picks them; the GLM builder/improver then sees those skills as
+    # its house-style/scope exemplars instead of arbitrary ones. Unknown ids are
+    # filtered against the catalog before use.
+    related_skill_ids: list[str] = Field(default_factory=list)
 
 
 class SkillProposal(BaseModel):
@@ -73,3 +78,12 @@ class SkillProposal(BaseModel):
     body: str = ""
     change_summary: list[str] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    # The builder/improver's diagnosis of the workflow: which parts of the (old)
+    # skill/procedure worked and which failed. Audit-trail only — never rendered
+    # into the skill file — so the dogfooding loop can see WHY each change landed.
+    what_worked: list[str] = Field(
+        default_factory=list, validation_alias=AliasChoices("what_worked", "whatWorked")
+    )
+    what_failed: list[str] = Field(
+        default_factory=list, validation_alias=AliasChoices("what_failed", "whatFailed")
+    )

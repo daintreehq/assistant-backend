@@ -21,9 +21,12 @@ untouched. Learning must never break a user's response.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import difflib
 import json
 import os
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -48,6 +51,14 @@ from ..skills.models import Skill
 from ..skills.selector import sanitize_for_selector
 
 logger = get_logger("daintree.skill_learning")
+
+# Per-message caps for the learning transcript — much looser than the selector's
+# classification-sized excerpts, because learning judgments hinge on what actually
+# happened inside tool results and assistant replies. The tool cap matches the CLI's
+# own per-tool-result serialization cap (8000 chars), so learning sees tool output at
+# full wire fidelity; oversized results already arrive as capped previews.
+_LEARNING_TOOL_CHAR_CAP = 8_000
+_LEARNING_MESSAGE_CHAR_CAP = 24_000
 
 # A skill id must be a safe single-path-segment filename stem.
 _SAFE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -143,6 +154,19 @@ def _contains_secret(text: str) -> bool:
     return any(pat.search(text) for pat in _SECRET_PATTERNS)
 
 
+def _unified_diff(old: str, new: str, skill_id: str) -> str:
+    """A reviewable old→new diff for the audit record (empty old = a create)."""
+    return "\n".join(
+        difflib.unified_diff(
+            old.splitlines(),
+            new.splitlines(),
+            fromfile=f"a/{skill_id}.md",
+            tofile=f"b/{skill_id}.md",
+            lineterm="",
+        )
+    )
+
+
 class SkillLearner:
     """Runs the inline skill-learning pipeline. Constructed only when enabled."""
 
@@ -217,7 +241,7 @@ class SkillLearner:
             proposal = await self._build_create(transcript, catalog, verdict, tools)
         else:
             assert old_skill is not None  # guarded by _verdict_actionable
-            proposal = await self._build_improve(old_skill, transcript, verdict, tools)
+            proposal = await self._build_improve(old_skill, transcript, verdict, tools, catalog)
 
         if proposal.action == "no_change":
             logger.info(
@@ -234,6 +258,18 @@ class SkillLearner:
         if validated is None:
             return LearningOutcome()
         markdown, skill, path = validated
+
+        # An improve that renders byte-identical to the current skill is a no-op.
+        # The completed workflow stays in the conversation history for many turns,
+        # so without this a repeat-proposed "improvement" would re-apply forever —
+        # empty-diff audits, and in overlay mode a redundant shadow file.
+        if (
+            not is_create
+            and old_skill is not None
+            and skill.content_hash == old_skill.content_hash
+        ):
+            logger.info("skill_learning_identical_skipped", skill_id=skill.id)
+            return LearningOutcome()
 
         return await self._apply(
             skill=skill,
@@ -253,6 +289,10 @@ class SkillLearner:
         if verdict.lesson_type != "general_daintree_workflow":
             return False
         if verdict.confidence < self.settings.skill_learning_min_confidence:
+            return False
+        # The gate prompt demands concrete evidence for a write; enforce it here too
+        # so an over-eager verdict with nothing to point at never spends a GLM call.
+        if not any(e.strip() for e in verdict.evidence):
             return False
         if verdict.action == "create_new_skill":
             return True
@@ -289,10 +329,12 @@ class SkillLearner:
     ) -> SkillProposal:
         system = self.prompts.skill_learning_prompt("build")
         user = (
-            "Existing catalog ids (do NOT reuse any of these for the new skill):\n"
-            f"{', '.join(s.id for s in catalog.skills)}\n\n"
-            "Example skills to match the house style:\n"
-            f"{self._examples(catalog)}\n\n"
+            "Existing catalog (do NOT reuse any of these ids, and do NOT duplicate "
+            "a workflow one of these already covers):\n"
+            f"{self._catalog_digest(catalog)}\n\n"
+            "Example skills to match the house style (complete files — frontmatter "
+            "and body; the first ones are from the same domain as this workflow):\n"
+            f"{self._examples(catalog, preferred_ids=verdict.related_skill_ids)}\n\n"
             f"Tools available in the workflow: {', '.join(tools) or '(none reported)'}\n\n"
             f"Gate reason: {verdict.reason}\n"
             f"Gate evidence:\n{self._bullets(verdict.evidence)}\n\n"
@@ -312,13 +354,37 @@ class SkillLearner:
         return SkillProposal.model_validate(_clamp_confidence(data))
 
     async def _build_improve(
-        self, target: Skill, transcript: str, verdict: GateVerdict, tools: list[str]
+        self,
+        target: Skill,
+        transcript: str,
+        verdict: GateVerdict,
+        tools: list[str],
+        catalog: Catalog,
     ) -> SkillProposal:
         system = self.prompts.skill_learning_prompt("improve")
         current = self._render_markdown(self._meta_dict(target), target.body)
+        # Gate-picked neighbors give the improver house-style reference and scope
+        # boundaries (what the OTHER skills already cover). No shortest-first
+        # top-up here: only genuinely related skills are useful context.
+        related = [
+            s
+            for sid in verdict.related_skill_ids
+            if (s := catalog.get(sid)) is not None and s.id != target.id
+        ][:2]
+        related_block = ""
+        if related:
+            rendered = "\n\n---\n\n".join(
+                self._render_markdown(self._meta_dict(s), s.body) for s in related
+            )
+            related_block = (
+                "Related skills, for style reference and scope boundaries (do NOT "
+                "fold their jobs into this skill):\n"
+                f'"""\n{rendered}\n"""\n\n'
+            )
         user = (
             f"Current skill to improve (id {target.id}):\n"
             f'"""\n{current}\n"""\n\n'
+            f"{related_block}"
             f"Tools available in the workflow: {', '.join(tools) or '(none reported)'}\n\n"
             f"Gate reason: {verdict.reason}\n"
             f"Gate evidence:\n{self._bullets(verdict.evidence)}\n\n"
@@ -428,14 +494,18 @@ class SkillLearner:
                 )
                 return None
 
+        # Mechanical normalization only (no semantic guessing): clamp priority into
+        # the schema's range and normalize the risk token's case, so a trivially
+        # out-of-bounds value doesn't discard an otherwise sound proposal. A WRONG
+        # risk value still fails the loader's enum check below, on purpose.
         markdown = self._render_markdown(
             {
                 "id": skill_id,
                 "title": proposal.title,
                 "summary": proposal.summary,
                 "whenToUse": proposal.when_to_use,
-                "priority": proposal.priority,
-                "risk": proposal.risk,
+                "priority": min(1000, max(0, proposal.priority)),
+                "risk": proposal.risk.strip().lower(),
                 "tags": list(proposal.tags),
                 "requiredTools": list(proposal.required_tools),
             },
@@ -477,6 +547,7 @@ class SkillLearner:
         is_create: bool,
         old_skill: Skill | None,
     ) -> LearningOutcome:
+        old_text = await asyncio.to_thread(self._current_text, path, old_skill)
         audit = {
             "action": "create_skill" if is_create else "update_skill",
             "skill_id": skill.id,
@@ -485,6 +556,12 @@ class SkillLearner:
             "mode": self.mode,
             "confidence": proposal.confidence,
             "change_summary": list(proposal.change_summary),
+            # The model's diagnosis of the workflow — why this change landed. Kept in
+            # the audit trail so the dogfooding loop can review the reasoning, never
+            # rendered into the skill file itself.
+            "what_worked": list(proposal.what_worked),
+            "what_failed": list(proposal.what_failed),
+            "diff": _unified_diff(old_text, markdown, skill.id),
             "gate": verdict.model_dump(),
         }
         short = skill.content_hash.split(":")[-1][:8]
@@ -515,16 +592,25 @@ class SkillLearner:
                 logger.info("skill_learning_stale_skipped", skill_id=skill.id)
                 return LearningOutcome()
 
-            prior = await asyncio.to_thread(self._write_skill_file, path, markdown, skill.id)
+            # Write + reload runs shielded from cancellation. The CLI cancels the
+            # in-flight HTTP request on Ctrl-C — likely during a slow learning turn —
+            # and that cancellation propagates into this task. Once the file write
+            # has started, disk and the in-memory catalog must not diverge: let the
+            # commit finish (it rolls itself back on reload failure), THEN propagate.
+            commit = asyncio.create_task(self._commit(path, markdown, skill.id))
             try:
-                new_catalog = await self.catalog_manager.reload()
-            except Exception as exc:  # noqa: BLE001 - roll the file back, then no-op
-                await asyncio.to_thread(self._restore_file, path, prior)
-                logger.warning("skill_learning_reload_failed", skill_id=skill.id, error=str(exc))
-                return LearningOutcome()
+                new_catalog = await asyncio.shield(commit)
+            except asyncio.CancelledError:
+                # Even REPEATED cancellation (double Ctrl-C, shutdown) must not
+                # interrupt the commit: keep waiting — shielded — until it settles,
+                # so the lock stays held and disk/catalog can never diverge. The
+                # commit handles its own rollback; its outcome is irrelevant here.
+                while not commit.done():
+                    with contextlib.suppress(BaseException):
+                        await asyncio.shield(commit)
+                raise
 
-        if new_catalog.get(skill.id) is None:
-            logger.warning("skill_learning_reload_missing", skill_id=skill.id)
+        if new_catalog is None:
             return LearningOutcome()
 
         # The change is committed and live; auditing is best-effort and must not turn
@@ -543,7 +629,42 @@ class SkillLearner:
         )
         return LearningOutcome(changed=True, created_id=skill.id if is_create else None)
 
+    async def _commit(self, path: Path, markdown: str, skill_id: str) -> Catalog | None:
+        """Write the skill file and reload the catalog as ONE unit.
+
+        Rolls the file back and returns ``None`` if the reload fails, so disk and
+        the in-memory catalog always agree. Runs shielded from cancellation — see
+        :meth:`_apply`.
+        """
+        prior = await asyncio.to_thread(self._write_skill_file, path, markdown, skill_id)
+        try:
+            new_catalog = await self.catalog_manager.reload()
+        except Exception as exc:  # noqa: BLE001 - roll the file back, then no-op
+            await asyncio.to_thread(self._restore_file, path, prior)
+            logger.warning("skill_learning_reload_failed", skill_id=skill_id, error=str(exc))
+            return None
+        if new_catalog.get(skill_id) is None:
+            # The write landed somewhere the catalog doesn't load from (a
+            # misconfigured write dir) — undo it rather than leave a dead file.
+            await asyncio.to_thread(self._restore_file, path, prior)
+            logger.warning("skill_learning_reload_missing", skill_id=skill_id)
+            return None
+        return new_catalog
+
     # ---- filesystem (blocking; run via asyncio.to_thread) ---------------
+
+    @staticmethod
+    def _current_text(path: Path, old_skill: Skill | None) -> str:
+        """The pre-change text for the audit diff: the target file's current bytes,
+        or (overlay improve, where the overlay file may not exist yet) the packaged
+        skill re-rendered; empty for a fresh create."""
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+        if old_skill is not None:
+            return SkillLearner._render_markdown(
+                SkillLearner._meta_dict(old_skill), old_skill.body
+            )
+        return ""
 
     @staticmethod
     def _write_skill_file(path: Path, markdown: str, skill_id: str) -> bytes | None:
@@ -589,11 +710,19 @@ class SkillLearner:
     # ---- prompt helpers -------------------------------------------------
 
     def _transcript(self, request: RespondRequest) -> str:
-        # Full detection over the whole (bounded, newest-biased) message history.
-        evidence, _ = sanitize_for_selector(
-            request.input.messages, self.settings.skill_learning_context_tokens
+        # Full detection over the whole (bounded, newest-biased) message history,
+        # with learning-sized per-message caps — see _LEARNING_*_CHAR_CAP above.
+        evidence, truncated = sanitize_for_selector(
+            request.input.messages,
+            self.settings.skill_learning_context_tokens,
+            tool_char_cap=_LEARNING_TOOL_CHAR_CAP,
+            message_char_cap=_LEARNING_MESSAGE_CHAR_CAP,
         )
         lines: list[str] = []
+        if truncated:
+            # Tell the gate the transcript starts mid-history, so an abrupt opening
+            # is not mistaken for the start of the workflow.
+            lines.append("[transcript truncated: oldest messages dropped]")
         for ev in evidence:
             role = ev["role"]
             text = ev["text"]
@@ -609,18 +738,40 @@ class SkillLearner:
         return "\n".join(lines)
 
     @staticmethod
-    def _catalog_digest(catalog: Catalog, active_ids: list[str]) -> str:
+    def _catalog_digest(catalog: Catalog, active_ids: Sequence[str] = ()) -> str:
+        # whenToUse is included because it is the trigger condition: the gate routes
+        # improve-vs-create by whether an existing skill SHOULD have covered the
+        # workflow, and summaries alone often don't carry the trigger.
         active = set(active_ids)
         return "\n".join(
-            f"- {s.id} — {s.summary}{' [active]' if s.id in active else ''}"
+            f"- {s.id} — {s.summary}{' [active]' if s.id in active else ''}\n"
+            f"  when: {s.when_to_use}"
             for s in catalog.skills
         )
 
-    def _examples(self, catalog: Catalog, count: int = 2) -> str:
-        chosen = sorted(catalog.skills, key=lambda s: len(s.body))[:count]
-        blocks = [
-            f"### {s.id}\nwhenToUse: {s.when_to_use}\n\n{s.body}" for s in chosen
-        ]
+    def _examples(
+        self, catalog: Catalog, preferred_ids: Sequence[str] = (), count: int = 3
+    ) -> str:
+        # Complete files (frontmatter + body), so the builder calibrates title/
+        # summary/tags/priority/risk against real values, not just body prose.
+        # The gate's related_skill_ids come first — same-domain skills are the
+        # best style AND scope anchors — topped up shortest-first (compact,
+        # representative) when the gate named fewer than ``count``.
+        chosen: list[Skill] = []
+        seen: set[str] = set()
+        for sid in preferred_ids:
+            skill = catalog.get(sid)
+            if skill is not None and skill.id not in seen:
+                seen.add(skill.id)
+                chosen.append(skill)
+                if len(chosen) >= count:
+                    break
+        if len(chosen) < count:
+            fill = sorted(
+                (s for s in catalog.skills if s.id not in seen), key=lambda s: len(s.body)
+            )
+            chosen.extend(fill[: count - len(chosen)])
+        blocks = [self._render_markdown(self._meta_dict(s), s.body) for s in chosen]
         return "\n\n---\n\n".join(blocks) if blocks else "(no examples available)"
 
     @staticmethod

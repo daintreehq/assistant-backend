@@ -113,7 +113,10 @@ CLI at the same server — nothing about the wire protocol changes.
    triggers are you signalling a problem ("what happened here?", "this shouldn't
    have happened") or the assistant visibly struggling; a cleanly completed,
    repeatable workflow can also justify a *new* skill.
-2. If warranted, **GLM 5.2** writes the new skill body or the improved one.
+2. If warranted, **GLM 5.2** first diagnoses the workflow — what the assistant (and
+   the current skill, if improving) did that worked and where it failed — then
+   writes the new skill or the improved one. The diagnosis is kept in the audit
+   record so you can review *why* each change landed.
 3. The backend validates it through the real skill loader (frontmatter, house
    style, tool-name rules, size caps, secret scan), writes the `.md` file, and
    reloads the catalog. A created skill is used **this same turn**.
@@ -133,7 +136,8 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
   + an audit JSON under `.daintree/skill-learning/proposals/` (gitignored) — a safe
   dry run that never touches real skill files or the catalog.
 - Every applied change also drops an audit record (old/new hash, gate verdict,
-  diff) under `.daintree/skill-learning/`. Watch the server logs for
+  a unified diff, and the model's what-worked / what-failed diagnosis) under
+  `.daintree/skill-learning/`. Watch the server logs for
   `skill_learning_applied` events. Changed skills change the catalog revision, so
   regenerate golden snapshots before committing (`DAINTREE_UPDATE_GOLDEN=1 pytest
   tests/golden/`).
