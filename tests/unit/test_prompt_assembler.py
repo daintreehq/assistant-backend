@@ -281,7 +281,7 @@ def test_reasoning_content_absent_when_not_supplied(assembler: PromptAssembler) 
 
 def test_thinking_enabled_via_settings(prompt_loader: PromptLoader) -> None:
     settings = Settings(
-        DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
+        DAINTREE_API_KEY="k", FIREWORKS_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
         MAIN_THINKING_ENABLED=True, MAIN_REASONING_EFFORT="max",
     )
     pr = PromptAssembler(prompt_loader, settings).build_main_request(
@@ -295,7 +295,7 @@ def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> No
     # DeepSeek 400s on thinking + forced tool_choice; the assembler must degrade to
     # non-thinking rather than fail the turn (the same constraint as the selector).
     settings = Settings(
-        DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
+        DAINTREE_API_KEY="k", FIREWORKS_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
         MAIN_THINKING_ENABLED=True,
     )
     assembler = PromptAssembler(prompt_loader, settings)

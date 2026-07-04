@@ -57,6 +57,7 @@ daintree_assistant_server = [
     "prompts/main/*.j2",
     "prompts/selector/*.j2",
     "prompts/tasks/*.md",
+    "prompts/skill_learning/*.md",
     "skills/files/*.md",
 ]
 

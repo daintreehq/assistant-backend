@@ -16,7 +16,11 @@ from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from daintree_assistant_server.services.task_runner import TaskRunner
-from daintree_assistant_server.skills.catalog import load_catalog
+from daintree_assistant_server.skills.catalog import (
+    CatalogManager,
+    default_skills_dir,
+    load_catalog,
+)
 from daintree_assistant_server.skills.selector import Selector
 from daintree_assistant_server.state.codec import StateCodec
 
@@ -37,7 +41,7 @@ def _isolate_from_dotenv() -> Iterator[None]:
 def settings() -> Settings:
     return Settings(
         DAINTREE_API_KEY=API_KEY,
-        DEEPSEEK_API_KEY="test-deepseek-key",
+        FIREWORKS_API_KEY="test-fireworks-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         STATE_SIGNING_KID="k1",
         STATE_SALT="test-salt",
@@ -68,6 +72,12 @@ def catalog() -> Any:
 
 
 @pytest.fixture
+def catalog_manager() -> CatalogManager:
+    primary = default_skills_dir()
+    return CatalogManager(load_catalog(primary), primary_dir=primary)
+
+
+@pytest.fixture
 def state_codec(settings: Settings) -> StateCodec:
     return StateCodec(
         current_key=settings.state_signing_key_current.get_secret_value().encode(),
@@ -78,8 +88,13 @@ def state_codec(settings: Settings) -> StateCodec:
 
 
 @pytest.fixture
-def selector(fake_provider: FakeProvider, prompt_loader: PromptLoader, catalog: Any, settings: Settings) -> Selector:
-    return Selector(fake_provider, prompt_loader, catalog, settings)
+def selector(
+    fake_provider: FakeProvider,
+    prompt_loader: PromptLoader,
+    catalog_manager: CatalogManager,
+    settings: Settings,
+) -> Selector:
+    return Selector(fake_provider, prompt_loader, catalog_manager, settings)
 
 
 @pytest.fixture
@@ -90,7 +105,7 @@ def assembler(prompt_loader: PromptLoader, settings: Settings) -> PromptAssemble
 @pytest.fixture
 def orchestrator(
     settings: Settings,
-    catalog: Any,
+    catalog_manager: CatalogManager,
     selector: Selector,
     state_codec: StateCodec,
     assembler: PromptAssembler,
@@ -98,7 +113,7 @@ def orchestrator(
 ) -> ChatOrchestrator:
     return ChatOrchestrator(
         settings=settings,
-        catalog=catalog,
+        catalog_manager=catalog_manager,
         selector=selector,
         state_codec=state_codec,
         assembler=assembler,

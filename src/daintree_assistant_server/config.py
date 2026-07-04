@@ -15,11 +15,15 @@ from typing import Literal
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Hardcoded models — a product decision, not deployment config. Every DeepSeek
-# query (main completion, skill selector, and utility tasks) uses DEEPSEEK_MODEL;
-# PUBLIC_MODEL_ID is the alias returned to clients. Only the DeepSeek API key
-# (and base URL) come from the environment.
-DEEPSEEK_MODEL = "deepseek-v4-flash"
+# Hardcoded model identities — a product decision, not deployment config. The
+# main completion, the skill selector, and the utility tasks all run on the small
+# model. The skill-learning gate also uses the small model; its builder/improver
+# use the stronger GLM model (a harder generation task). PUBLIC_MODEL_ID is the
+# alias returned to clients. Only the Fireworks API key (and base URL) come from
+# the environment. Fireworks speaks the OpenAI wire shape.
+FIREWORKS_SMALL_MODEL = "accounts/fireworks/models/deepseek-v4-flash"
+SKILL_BUILDER_MODEL = "accounts/fireworks/models/glm-5p2"
+SKILL_IMPROVER_MODEL = "accounts/fireworks/models/glm-5p2"
 PUBLIC_MODEL_ID = "daintree-assistant"
 
 # The development default salt; rejected in production by weak_secrets().
@@ -46,36 +50,31 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", alias="HOST")
     port: int = Field(default=8080, alias="PORT")
 
-    # ---- Upstream provider ---------------------------------------------
-    # The model is hardcoded (see DEEPSEEK_MODEL above); only the key and base
-    # URL come from the environment.
-    deepseek_base_url: str = Field(default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
-    deepseek_api_key: SecretStr = Field(default=SecretStr(""), alias="DEEPSEEK_API_KEY")
-
-    # DeepSeek V4 Flash specifics, confirmed against the live endpoint:
-    #  - thinking must be DISABLED for the selector's forced tool_choice to work
-    #    ("Thinking mode does not support this tool_choice"); the field is accepted.
-    #  - prompt_cache_key is accepted and improves prefix-cache routing.
-    # Both default ON; flip off only for a provider/model that rejects them.
-    deepseek_send_prompt_cache_key: bool = Field(
-        default=True, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
+    # ---- Upstream provider (Fireworks, OpenAI-compatible) --------------
+    # Models are hardcoded (see the constants above); only the key and base URL
+    # come from the environment.
+    fireworks_base_url: str = Field(
+        default="https://api.fireworks.ai/inference/v1", alias="FIREWORKS_BASE_URL"
     )
-    # When True (default) the server sends an explicit thinking directive on every
-    # call (enabled/disabled per request). Set False ONLY for a provider that does
-    # not understand the field at all — NOT for DeepSeek: DeepSeek defaults thinking
-    # to ENABLED when the field is absent, so omitting it would silently turn
-    # thinking on and 400 the selector's forced tool_choice.
-    deepseek_send_thinking: bool = Field(default=True, alias="DEEPSEEK_SEND_THINKING")
+    fireworks_api_key: SecretStr = Field(default=SecretStr(""), alias="FIREWORKS_API_KEY")
 
-    # ---- Main-model thinking (DeepSeek) --------------------------------
+    # Fireworks controls reasoning through `reasoning_effort` (always sent), not a
+    # `thinking` object: "none" disables thinking (DeepSeek V4 defaults reasoning ON
+    # when it is absent, and the selector's forced tool_choice requires non-thinking,
+    # so "none" must be sent explicitly); "high"/"max" are the GLM thinking tiers used
+    # by the skill builder/improver. prompt_cache_key improves prefix-cache routing and
+    # defaults ON; flip off only for a provider/model that rejects it.
+    fireworks_send_prompt_cache_key: bool = Field(
+        default=True, alias="FIREWORKS_SEND_PROMPT_CACHE_KEY"
+    )
+
+    # ---- Main-model thinking -------------------------------------------
     # The selector and utility tasks always run NON-thinking — the selector's
     # forced tool_choice is incompatible with thinking mode. The main /respond
     # call is the only one that can use it. Default OFF: thinking adds latency and
-    # reasoning tokens, and DeepSeek's effort floor is "high" (low/medium remap to
-    # high), so there is no cheap middle ground. When enabled, the model's
-    # reasoning_content round-trips through the wire contract so tool-call turns
-    # replay it (a hard DeepSeek requirement; missing it 400s). Thinking mode also
-    # ignores temperature/top_p/penalties.
+    # reasoning tokens. When enabled, the model's reasoning_content round-trips
+    # through the wire contract so tool-call turns replay it (missing it 400s on
+    # DeepSeek). Thinking mode also ignores temperature/top_p/penalties.
     main_thinking_enabled: bool = Field(default=False, alias="MAIN_THINKING_ENABLED")
     main_reasoning_effort: Literal["high", "max"] = Field(
         default="high", alias="MAIN_REASONING_EFFORT"
@@ -132,7 +131,7 @@ class Settings(BaseSettings):
     selector_max_output_tokens: int = Field(default=500, alias="SELECTOR_MAX_OUTPUT_TOKENS")
 
     # ---- Retries --------------------------------------------------------
-    # Applies to every upstream DeepSeek call (main completion, stream open,
+    # Applies to every upstream call (main completion, stream open,
     # selector, utility tasks): retries transient failures only, and only before
     # any public bytes are emitted. 3 retries = up to 4 attempts.
     max_upstream_retries: int = Field(default=3, ge=0, alias="MAX_UPSTREAM_RETRIES")
@@ -164,21 +163,92 @@ class Settings(BaseSettings):
     cap_mcp_block_bytes: int = Field(default=64 * 1024, alias="CAP_MCP_BLOCK_BYTES")
     cap_tool_index_desc: int = Field(default=256, alias="CAP_TOOL_INDEX_DESC")
 
+    # ---- Skill learning (LOCAL DEVELOPMENT ONLY) ------------------------
+    # A backend-internal harness that watches completed local workflows and, when
+    # warranted, writes or improves skill files so the catalog "learns". It is
+    # entirely invisible to the CLI: no new wire fields, no feedback tool, and the
+    # main assistant model is never told it exists — a created skill simply appears
+    # as a normal dynamic skill load. It MUST be off in production: an enabled mode
+    # fails readiness there (see local_only_problems). Modes:
+    #   off     — disabled (default)
+    #   propose — run the gate + GLM builder/improver and write the proposed skill
+    #             markdown + an audit JSON under the audit dir's proposals/, but never
+    #             touch the real skill files or the catalog
+    #   apply   — also write/rewrite the skill file and reload the catalog in place
+    skill_learning_mode: Literal["off", "propose", "apply"] = Field(
+        default="off", alias="SKILL_LEARNING_MODE"
+    )
+    # Where created/improved skills are written. Empty → the packaged skills dir
+    # (edit-in-place: improvements show up in `git diff`, ready to commit). Set to a
+    # separate directory to keep the source tree untouched — the catalog then loads
+    # packaged skills PLUS this overlay, and overlay skills win on an id collision.
+    skill_learning_dir: str = Field(default="", alias="SKILL_LEARNING_DIR")
+    # Per-change audit JSON records (old/new hash, gate verdict, diff) land here.
+    skill_learning_audit_dir: str = Field(
+        default=".daintree/skill-learning", alias="SKILL_LEARNING_AUDIT_DIR"
+    )
+    # GLM builder/improver thinking tier ("high" or "max"). The gate stays non-thinking.
+    skill_learning_reasoning_effort: Literal["high", "max"] = Field(
+        default="high", alias="SKILL_LEARNING_REASONING_EFFORT"
+    )
+    # Gate verdicts below this confidence never write.
+    skill_learning_min_confidence: float = Field(
+        default=0.75, ge=0.0, le=1.0, alias="SKILL_LEARNING_MIN_CONFIDENCE"
+    )
+    # Learning is only considered once the conversation has at least this many
+    # messages — there must be prior work to learn from before the gate runs.
+    skill_learning_min_messages: int = Field(
+        default=3, ge=1, alias="SKILL_LEARNING_MIN_MESSAGES"
+    )
+    # Transcript token budget the gate/builder see. Learning runs full detection over
+    # the whole (newest-biased) message history — cost is not a concern in this local
+    # harness — so this is much larger than the selector's context budget.
+    skill_learning_context_tokens: int = Field(
+        default=200000, alias="SKILL_LEARNING_CONTEXT_TOKENS"
+    )
+    skill_learning_timeout_seconds: float = Field(
+        default=120.0, alias="SKILL_LEARNING_TIMEOUT_SECONDS"
+    )
+    skill_gate_max_output_tokens: int = Field(
+        default=700, alias="SKILL_GATE_MAX_OUTPUT_TOKENS"
+    )
+    skill_build_max_output_tokens: int = Field(
+        default=4000, alias="SKILL_BUILD_MAX_OUTPUT_TOKENS"
+    )
+
     # ---- Tracing --------------------------------------------------------
     otel_exporter_otlp_endpoint: str = Field(default="", alias="OTEL_EXPORTER_OTLP_ENDPOINT")
 
     # ---- Derived helpers ------------------------------------------------
 
+    @property
+    def skill_learning_enabled(self) -> bool:
+        """True when skill learning runs at all (``propose`` or ``apply``)."""
+        return self.skill_learning_mode != "off"
+
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty."""
         missing: list[str] = []
-        if not self.deepseek_api_key.get_secret_value():
-            missing.append("DEEPSEEK_API_KEY")
+        if not self.fireworks_api_key.get_secret_value():
+            missing.append("FIREWORKS_API_KEY")
         if not self.daintree_api_key.get_secret_value():
             missing.append("DAINTREE_API_KEY")
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
         return missing
+
+    def local_only_problems(self) -> list[str]:
+        """Local-development-only features that must never run in production.
+
+        These join ``missing_secrets()`` / ``weak_secrets()`` in readiness gating,
+        so a production (or Cloud Run) deploy that leaves skill learning enabled
+        fails ``/readyz`` rather than mutating the catalog from model output at
+        runtime. Empty in development.
+        """
+        problems: list[str] = []
+        if self.environment == "production" and self.skill_learning_enabled:
+            problems.append("SKILL_LEARNING_MODE must be 'off' in production")
+        return problems
 
     def weak_secrets(self) -> list[str]:
         """Production-only: secrets that are present but too weak/default.

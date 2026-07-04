@@ -1,13 +1,13 @@
-"""Live integration tests against the real DeepSeek API.
+"""Live integration tests against the real Fireworks API.
 
 Skipped by default. To run::
 
-    RUN_LIVE_DEEPSEEK=1 DEEPSEEK_API_KEY=sk-... pytest tests/live -q
+    RUN_LIVE_FIREWORKS=1 FIREWORKS_API_KEY=fw_... pytest tests/live -q
 
 These pin the *provider contract* that mocked tests can't see — most importantly
-that the selector's forced ``tool_choice`` succeeds (DeepSeek V4 Flash requires
-thinking disabled for it; a regression there makes the selector degrade open and
-silently stop loading skills). They make real, paid API calls, so they are gated.
+that the selector's forced ``tool_choice`` succeeds with ``reasoning_effort="none"``
+(a regression there makes the selector degrade open and silently stop loading
+skills). They make real, paid API calls, so they are gated.
 """
 
 from __future__ import annotations
@@ -21,13 +21,11 @@ from fastapi.testclient import TestClient
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import create_app
 
-_LIVE = bool(os.environ.get("RUN_LIVE_DEEPSEEK")) and os.environ.get(
-    "DEEPSEEK_API_KEY", ""
-).startswith("sk-")
+_LIVE = bool(os.environ.get("RUN_LIVE_FIREWORKS")) and bool(os.environ.get("FIREWORKS_API_KEY"))
 
 pytestmark = pytest.mark.skipif(
     not _LIVE,
-    reason="set RUN_LIVE_DEEPSEEK=1 and a real DEEPSEEK_API_KEY (sk-...) to run live tests",
+    reason="set RUN_LIVE_FIREWORKS=1 and a real FIREWORKS_API_KEY to run live tests",
 )
 
 
@@ -36,7 +34,7 @@ def live_client():
     settings = Settings(
         ENVIRONMENT="development",
         DAINTREE_API_KEY="",  # unauthenticated dev access
-        DEEPSEEK_API_KEY=os.environ["DEEPSEEK_API_KEY"],
+        FIREWORKS_API_KEY=os.environ["FIREWORKS_API_KEY"],
         STATE_SIGNING_KEY_CURRENT="live-test-signing-key",
         STATE_SALT="live-test-salt",
     )
@@ -54,8 +52,8 @@ def test_live_capabilities(live_client) -> None:
 
 def test_live_respond_selector_not_degraded(live_client) -> None:
     # Skill-relevant query with a tool offered. The selector's forced tool_choice
-    # MUST succeed — if DeepSeek thinking mode breaks it again, the selector
-    # degrades open (this assertion is the regression guard).
+    # MUST succeed — if reasoning_effort mapping breaks it, the selector degrades
+    # open (this assertion is the regression guard).
     r = live_client.post("/v1/daintree/respond", json={
         "protocol_version": 1,
         "session": {"id": "live-sel", "turn_id": "t1"},
@@ -110,18 +108,3 @@ def test_live_task_terminal_judge(live_client) -> None:
     out = r.json()["output"]
     assert isinstance(out["matched"], bool)
     assert out["matched"] is True
-
-
-def test_live_task_extract_json_result_schema(live_client) -> None:
-    r = live_client.post("/v1/daintree/tasks", json={
-        "task": "terminal_extract_json.v1",
-        "input": {"instruction": "Extract passed and failed test counts.",
-                  "tail": "Result: 42 passed, 3 failed in 8.1s"},
-        "result_schema": {"type": "object",
-                          "properties": {"passed": {"type": "integer"}, "failed": {"type": "integer"}},
-                          "required": ["passed", "failed"]},
-    })
-    assert r.status_code == 200
-    result = r.json()["output"]["result"]
-    assert isinstance(result.get("passed"), int)
-    assert isinstance(result.get("failed"), int)

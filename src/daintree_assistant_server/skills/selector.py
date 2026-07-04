@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass, replace
 from typing import Any
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import FIREWORKS_SMALL_MODEL, Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
 from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
@@ -25,7 +25,7 @@ from ..providers.base import (
 )
 from ..providers.retry import retry_upstream
 from ..text_utils import estimate_tokens, head_tail, message_text
-from .catalog import Catalog
+from .catalog import Catalog, CatalogManager
 
 
 # Forced selector function schema (section 7.7). `skill_ids` is bounded by the SAME
@@ -220,14 +220,19 @@ class Selector:
         self,
         provider: ChatProvider,
         prompt_loader: PromptLoader,
-        catalog: Catalog,
+        catalog_manager: CatalogManager,
         settings: Settings,
     ) -> None:
         self.provider = provider
         self.prompt_loader = prompt_loader
-        self.catalog = catalog
+        self.catalog_manager = catalog_manager
         self.settings = settings
         self._select_schema = build_select_skills_schema(settings.max_active_skills)
+
+    @property
+    def catalog(self) -> Catalog:
+        # Read live so a skill-learning reload is picked up on the next turn.
+        return self.catalog_manager.catalog
 
     async def select(
         self,
@@ -254,7 +259,7 @@ class Selector:
 
     async def _run(self, messages: list[dict[str, Any]]) -> SelectionDecision:
         request = ProviderChatRequest(
-            model=DEEPSEEK_MODEL,
+            model=FIREWORKS_SMALL_MODEL,
             messages=messages,
             temperature=0.0,
             max_tokens=self.settings.selector_max_output_tokens,

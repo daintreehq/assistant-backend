@@ -25,10 +25,10 @@ Skill catalog:
 
 - id: daintree.orchestration.basic
   summary: How to inspect Daintree state and choose safe orchestration actions.
-  whenToUse: Use for general requests about current Daintree state, terminals, worktrees, agents, queues, timers, or what to do next.
-  tags: daintree, state, orchestration, mcp, status, monitor
+  whenToUse: Use for general requests about current Daintree state, terminals, worktrees, agents, closed/resumable sessions, queues, timers, or what to do next.
+  tags: daintree, state, orchestration, mcp, status, monitor, sessions
   risk: read
-  requiredTools: context.snapshot, daintree.status, worktree.list, worktree.getCurrent, git.getProjectPulse, daintree.listTools, tool.search, daintree.call, queue.publish, queue.digest, queue.resolve, terminal.read, terminal.summarize, terminal.extract, terminal.extract.async, terminal.awaitAll, terminal.sendCommand, timer.schedule, timer.list, timer.cancel, watcher.terminal.create, watcher.list, watcher.cancel, grant.create, grant.list, grant.revoke
+  requiredTools: context.snapshot, daintree.status, worktree.list, worktree.getCurrent, git.getProjectPulse, daintree.listTools, tool.search, daintree.call, agentTask.spawnForEdits, queue.publish, queue.digest, queue.resolve, terminal.read, terminal.summarize, terminal.extract, terminal.extract.async, terminal.awaitAll, terminal.sendCommand, timer.schedule, timer.list, timer.cancel, watcher.terminal.create, watcher.list, watcher.cancel, grant.create, grant.list, grant.revoke
 
 - id: daintree.orchestration.multi-agent
   summary: Spawn several agents, relay their work between them with terminal.sendCommand, and synthesize one answer — collaborative or competitive multi-agent tasks.

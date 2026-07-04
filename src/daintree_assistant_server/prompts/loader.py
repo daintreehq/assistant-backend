@@ -34,6 +34,11 @@ _ALL_TEMPLATES = (
     TEMPLATE_SELECTOR_SYSTEM,
 )
 
+# Backend-only skill-learning system prompts (raw .md, under prompts/skill_learning/).
+# Always shipped, so a missing one fails readiness even when learning is off. These
+# are pre-release internal prompts — no version suffix (unlike wire-contract task ids).
+SKILL_LEARNING_PROMPTS = ("gate", "build", "improve")
+
 
 class PromptError(Exception):
     """Raised when a prompt is missing or fails to load."""
@@ -79,6 +84,12 @@ class PromptLoader:
             raise PromptError(f"missing task prompt: {task_id}")
         return path.read_text(encoding="utf-8").replace("\r\n", "\n").rstrip("\n")
 
+    def skill_learning_prompt(self, name: str) -> str:
+        path = self.dir / "skill_learning" / f"{name}.md"
+        if not path.is_file():
+            raise PromptError(f"missing skill-learning prompt: {name}")
+        return path.read_text(encoding="utf-8").replace("\r\n", "\n").rstrip("\n")
+
     # ---- rendering ------------------------------------------------------
 
     def render(self, template_name: str, /, **context: object) -> str:
@@ -100,3 +111,5 @@ class PromptLoader:
                 self.env.get_template(name)
             except TemplateError as exc:
                 raise PromptError(f"template {name} failed to load: {exc}") from exc
+        for prompt in SKILL_LEARNING_PROMPTS:
+            self.skill_learning_prompt(prompt)

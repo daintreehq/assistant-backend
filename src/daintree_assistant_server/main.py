@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -36,11 +37,12 @@ from .observability import (
 )
 from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
-from .providers.deepseek import DeepSeekProvider
+from .providers.fireworks import FireworksProvider
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.prompt_assembler import PromptAssembler
+from .services.skill_learning import SkillLearner
 from .services.task_runner import TaskRunner
-from .skills.catalog import load_catalog
+from .skills.catalog import Catalog, CatalogManager, default_skills_dir, load_catalog
 from .skills.selector import Selector
 from .state.codec import StateCodec
 
@@ -117,13 +119,19 @@ class Container:
 
     settings: Settings
     prompt_loader: PromptLoader
-    catalog: Any
+    catalog_manager: CatalogManager
     provider: ChatProvider
     state_codec: StateCodec
     selector: Selector
     assembler: PromptAssembler
     orchestrator: ChatOrchestrator
     task_runner: TaskRunner
+    skill_learner: SkillLearner | None = None
+
+    @property
+    def catalog(self) -> Catalog:
+        """The current catalog (live: the skill-learning harness may reload it)."""
+        return self.catalog_manager.catalog
 
 
 def _build_provider(settings: Settings) -> ChatProvider:
@@ -134,13 +142,12 @@ def _build_provider(settings: Settings) -> ChatProvider:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    return DeepSeekProvider(
+    return FireworksProvider(
         client,
-        api_key=settings.deepseek_api_key.get_secret_value(),
-        base_url=settings.deepseek_base_url,
+        api_key=settings.fireworks_api_key.get_secret_value(),
+        base_url=settings.fireworks_base_url,
         default_timeout=settings.main_timeout_seconds,
-        send_prompt_cache_key=settings.deepseek_send_prompt_cache_key,
-        send_thinking=settings.deepseek_send_thinking,
+        send_prompt_cache_key=settings.fireworks_send_prompt_cache_key,
     )
 
 
@@ -162,30 +169,56 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
     """Construct and validate all service components."""
     prompt_loader = PromptLoader()
     prompt_loader.validate()
-    catalog = load_catalog()
+
+    # The catalog loads the packaged skills, plus an optional local overlay when the
+    # skill-learning harness is configured to write to a separate directory (in the
+    # default edit-in-place mode there is no overlay). A CatalogManager holds it so a
+    # learning write can reload it in place.
+    primary_dir = default_skills_dir()
+    learn_dir = Path(settings.skill_learning_dir) if settings.skill_learning_dir else None
+    overlay_dir = (
+        learn_dir
+        if (learn_dir is not None and learn_dir.resolve() != primary_dir.resolve())
+        else None
+    )
+    catalog = load_catalog(primary_dir, overlay_dir)
+    catalog_manager = CatalogManager(catalog, primary_dir=primary_dir, overlay_dir=overlay_dir)
+
     state_codec = _build_state_codec(settings)
     chat_provider = provider if provider is not None else _build_provider(settings)
-    selector = Selector(chat_provider, prompt_loader, catalog, settings)
+    selector = Selector(chat_provider, prompt_loader, catalog_manager, settings)
     assembler = PromptAssembler(prompt_loader, settings)
+
+    skill_learner: SkillLearner | None = None
+    if settings.skill_learning_enabled:
+        skill_learner = SkillLearner(
+            settings=settings,
+            provider=chat_provider,
+            prompt_loader=prompt_loader,
+            catalog_manager=catalog_manager,
+        )
+
     orchestrator = ChatOrchestrator(
         settings=settings,
-        catalog=catalog,
+        catalog_manager=catalog_manager,
         selector=selector,
         state_codec=state_codec,
         assembler=assembler,
         provider=chat_provider,
+        learner=skill_learner,
     )
     task_runner = TaskRunner(settings=settings, provider=chat_provider, prompt_loader=prompt_loader)
     return Container(
         settings=settings,
         prompt_loader=prompt_loader,
-        catalog=catalog,
+        catalog_manager=catalog_manager,
         provider=chat_provider,
         state_codec=state_codec,
         selector=selector,
         assembler=assembler,
         orchestrator=orchestrator,
         task_runner=task_runner,
+        skill_learner=skill_learner,
     )
 
 
@@ -194,14 +227,18 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     settings: Settings = app.state.settings
     injected: ChatProvider | None = getattr(app.state, "injected_provider", None)
     try:
+        # Local-development-only features (skill learning) must never be enabled in
+        # production; checked always, even with an injected provider.
+        problems = list(settings.local_only_problems())
         if injected is None:
-            problems = settings.missing_secrets() + settings.weak_secrets()
+            secret_problems = settings.missing_secrets() + settings.weak_secrets()
             if settings.environment != "production":
                 # Local dev: a missing inbound API key just enables unauthenticated
                 # access; it must not block the server from booting.
-                problems = [p for p in problems if p != "DAINTREE_API_KEY"]
-            if problems:
-                raise RuntimeError(f"configuration problems: {', '.join(problems)}")
+                secret_problems = [p for p in secret_problems if p != "DAINTREE_API_KEY"]
+            problems.extend(secret_problems)
+        if problems:
+            raise RuntimeError(f"configuration problems: {', '.join(problems)}")
         container = build_container(settings, injected)
         app.state.container = container
         app.state.ready = True
@@ -211,6 +248,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
             catalog_revision=container.catalog.revision,
             skills=len(container.catalog),
             tasks=container.task_runner.task_ids(),
+            skill_learning_mode=settings.skill_learning_mode,
         )
     except Exception as exc:  # noqa: BLE001 - readiness must not crash liveness
         app.state.container = None

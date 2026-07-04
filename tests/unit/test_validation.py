@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from daintree_assistant_server.config import DEEPSEEK_MODEL, Settings
+from daintree_assistant_server.config import FIREWORKS_SMALL_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.validation import validate_respond_request
@@ -12,12 +12,12 @@ from daintree_assistant_server.services.validation import validate_respond_reque
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+    return Settings(DAINTREE_API_KEY="k", FIREWORKS_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
 
 
 def _settings(**overrides: object) -> Settings:
     base: dict[str, object] = {
-        "DAINTREE_API_KEY": "k", "DEEPSEEK_API_KEY": "d", "STATE_SIGNING_KEY_CURRENT": "s",
+        "DAINTREE_API_KEY": "k", "FIREWORKS_API_KEY": "d", "STATE_SIGNING_KEY_CURRENT": "s",
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
@@ -37,7 +37,7 @@ def _req(*, messages: list | None = None, tools: list | None = None, tool_choice
 
 
 def test_valid_request_returns_upstream_model(settings: Settings) -> None:
-    assert validate_respond_request(_req(), settings) == DEEPSEEK_MODEL
+    assert validate_respond_request(_req(), settings) == FIREWORKS_SMALL_MODEL
 
 
 @pytest.mark.parametrize("role", ["system", "developer"])
