@@ -313,3 +313,167 @@ def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> No
         skills=[], upstream_model="deepseek-v4-flash",
     )
     assert pr_auto.thinking_disabled is False
+
+
+def test_tool_schema_tuple_items_normalized_to_prefix_items(
+    assembler: PromptAssembler,
+) -> None:
+    # A client tool authored against draft-07 (array-valued `items` = tuple validation)
+    # must be rewritten to draft 2020-12 `prefixItems`, or Fireworks 400s the whole turn.
+    tool = {
+        "type": "function",
+        "function": {
+            "name": "grant__create",
+            "description": "d",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "range": {
+                        "type": "array",
+                        "items": [{"type": "integer"}, {"type": "integer"}],
+                        "additionalItems": {"type": "integer"},
+                    },
+                    # A NON-tuple items (schema object) must be left untouched.
+                    "ids": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+    }
+    pr = assembler.build_main_request(
+        request=_req(tools=[tool], tool_choice="auto"),
+        skills=[], upstream_model="deepseek-v4-flash",
+    )
+    params = pr.tools[0]["function"]["parameters"]
+    rng = params["properties"]["range"]
+    assert rng["prefixItems"] == [{"type": "integer"}, {"type": "integer"}]
+    assert rng["items"] == {"type": "integer"}  # draft-07 additionalItems folded in
+    assert "additionalItems" not in rng
+    # Non-tuple items untouched.
+    assert params["properties"]["ids"]["items"] == {"type": "string"}
+
+
+def test_tool_schema_tuple_items_normalized_when_nested(assembler: PromptAssembler) -> None:
+    # The legacy form can hide inside $defs / nested objects — normalize everywhere.
+    tool = {
+        "type": "function",
+        "function": {
+            "name": "x__y",
+            "description": "d",
+            "parameters": {
+                "type": "object",
+                "properties": {"a": {"$ref": "#/$defs/T"}},
+                "$defs": {"T": {"type": "array", "items": [{"type": "string"}]}},
+            },
+        },
+    }
+    pr = assembler.build_main_request(
+        request=_req(tools=[tool], tool_choice="auto"),
+        skills=[], upstream_model="deepseek-v4-flash",
+    )
+    tdef = pr.tools[0]["function"]["parameters"]["$defs"]["T"]
+    assert tdef["prefixItems"] == [{"type": "string"}]
+    assert "items" not in tdef  # no additionalItems → no leftover items key
+
+
+def test_tool_schema_without_tuple_items_is_unchanged(assembler: PromptAssembler) -> None:
+    schema = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+    tool = {"type": "function", "function": {"name": "z", "description": "", "parameters": schema}}
+    pr = assembler.build_main_request(
+        request=_req(tools=[tool], tool_choice="auto"),
+        skills=[], upstream_model="deepseek-v4-flash",
+    )
+    assert pr.tools[0]["function"]["parameters"] == schema
+
+
+def _project(assembler: PromptAssembler, schema: dict) -> dict:
+    tool = {"type": "function", "function": {"name": "t", "description": "", "parameters": schema}}
+    pr = assembler.build_main_request(
+        request=_req(tools=[tool], tool_choice="auto"),
+        skills=[], upstream_model="deepseek-v4-flash",
+    )
+    return pr.tools[0]["function"]["parameters"]
+
+
+def test_tool_schema_literal_items_in_data_is_not_rewritten(assembler: PromptAssembler) -> None:
+    # `enum`/`const`/`default`/`examples` hold arbitrary JSON DATA. A data value that
+    # happens to contain an "items" key must be copied verbatim, NOT treated as a
+    # tuple schema — otherwise the walker corrupts the tool's allowed values.
+    schema = {
+        "type": "object",
+        "properties": {
+            "mode": {"enum": [{"items": ["a", "b"], "additionalItems": False}, "plain"]},
+            "cfg": {"type": "object", "default": {"items": [1, 2, 3]}},
+            "c": {"const": {"items": ["x"]}},
+            "ex": {"type": "object", "examples": [{"items": [9]}]},
+        },
+    }
+    out = _project(assembler, schema)
+    props = out["properties"]
+    # Every literal is untouched — no prefixItems anywhere, no additionalItems dropped.
+    assert props["mode"]["enum"] == [{"items": ["a", "b"], "additionalItems": False}, "plain"]
+    assert props["cfg"]["default"] == {"items": [1, 2, 3]}
+    assert props["c"]["const"] == {"items": ["x"]}
+    assert props["ex"]["examples"] == [{"items": [9]}]
+
+
+def test_tool_schema_additional_items_false_folds_to_items_false(
+    assembler: PromptAssembler,
+) -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "a": {"type": "array", "items": [{"type": "integer"}], "additionalItems": False}
+        },
+    }
+    a = _project(assembler, schema)["properties"]["a"]
+    assert a["prefixItems"] == [{"type": "integer"}]
+    assert a["items"] is False  # "no elements past the tuple" preserved
+    assert "additionalItems" not in a
+
+
+def test_tool_schema_bare_additional_items_is_dropped(assembler: PromptAssembler) -> None:
+    # additionalItems without a tuple `items` is meaningless in draft 2020-12.
+    schema = {"type": "object", "properties": {"a": {"type": "array", "additionalItems": {"type": "string"}}}}
+    a = _project(assembler, schema)["properties"]["a"]
+    assert "additionalItems" not in a
+    assert "prefixItems" not in a
+
+
+def test_tool_schema_native_prefix_items_and_boolean_items_preserved(
+    assembler: PromptAssembler,
+) -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "a": {"type": "array", "prefixItems": [{"type": "string"}], "items": False},
+            "b": {"type": "array", "items": {"type": "number"}},
+        },
+    }
+    props = _project(assembler, schema)["properties"]
+    assert props["a"] == {"type": "array", "prefixItems": [{"type": "string"}], "items": False}
+    assert props["b"] == {"type": "array", "items": {"type": "number"}}
+
+
+def test_tool_schema_property_named_items_is_handled_as_a_property(
+    assembler: PromptAssembler,
+) -> None:
+    # A property literally NAMED "items" is a property, not the items keyword; its
+    # subschema is still normalized if it itself uses a tuple.
+    schema = {
+        "type": "object",
+        "properties": {"items": {"type": "array", "items": [{"type": "string"}]}},
+    }
+    items_prop = _project(assembler, schema)["properties"]["items"]
+    assert items_prop["prefixItems"] == [{"type": "string"}]
+
+
+def test_tool_schema_normalize_does_not_mutate_input() -> None:
+    # Call the normalizer directly (pydantic would otherwise copy the schema first),
+    # so this genuinely proves the walk builds fresh structures.
+    import copy
+
+    schema = {"type": "object", "properties": {"a": {"type": "array", "items": [{"type": "integer"}]}}}
+    original = copy.deepcopy(schema)
+    result = PromptAssembler._normalize_tool_schema(schema)
+    assert schema == original  # caller's dict is untouched
+    assert result["properties"]["a"]["prefixItems"] == [{"type": "integer"}]

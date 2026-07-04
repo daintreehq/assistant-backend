@@ -191,6 +191,65 @@ async def test_500_maps_retryable() -> None:
 
 
 @pytest.mark.asyncio
+async def test_400_surfaces_upstream_reason_and_is_not_retryable() -> None:
+    # A 4xx means the upstream rejected OUR request; its message is the whole
+    # diagnostic and must reach the caller (not be flattened to "status 400").
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400,
+            json={"error": {"message": "'items' must be a schema object, got list."}},
+        )
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert exc.value.status_code == 502
+    assert exc.value.retryable is False  # a malformed request must never be retried
+    assert "items' must be a schema object" in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_stream_400_surfaces_upstream_reason() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": "bad tool schema at x."}})
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.open_stream(_req(stream=True))
+    assert exc.value.status_code == 502
+    assert exc.value.retryable is False
+    assert "bad tool schema at x." in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_400_non_json_body_falls_back_to_raw_text() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text="upstream said no (not json)")
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert "upstream said no (not json)" in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_400_empty_body_still_yields_a_sensible_message() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, content=b"")
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    # No detail available, but the message must not be empty or read "None".
+    assert "rejected the request" in exc.value.message.lower()
+    assert "none" not in exc.value.message.lower()
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
 async def test_timeout_maps() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectTimeout("timed out")

@@ -51,6 +51,31 @@ from ..text_utils import (
 
 PROMPT_CACHE_KEY = "daintree-main"
 
+# JSON Schema (draft 2020-12) keywords whose VALUES are, or contain, subschemas.
+# The tool-schema normalizer descends ONLY through these; every other keyword
+# (enum, const, default, examples, type, required, format, …) is data or an
+# annotation and is copied verbatim — so a literal value that merely contains an
+# "items" key is never mistaken for a tuple schema and rewritten. ``items`` is
+# handled separately because its value is a subschema in 2020-12 but a tuple LIST
+# in draft-07 (the case we rewrite).
+_SCHEMA_MAP_KEYS = frozenset(
+    {"properties", "patternProperties", "$defs", "definitions", "dependentSchemas"}
+)
+_SCHEMA_LIST_KEYS = frozenset({"allOf", "anyOf", "oneOf", "prefixItems"})
+_SCHEMA_SINGLE_KEYS = frozenset(
+    {
+        "additionalProperties",
+        "propertyNames",
+        "contains",
+        "not",
+        "if",
+        "then",
+        "else",
+        "unevaluatedItems",
+        "unevaluatedProperties",
+    }
+)
+
 _TIER_DESCRIPTIONS = {
     "operator": "you act on the user's behalf; mutating actions require per-action confirmation.",
     "autopilot": "you may take mutating actions automatically within this tier's limits.",
@@ -288,16 +313,79 @@ class PromptAssembler:
         out: list[dict[str, Any]] = []
         for tool in tools:
             fn = tool.function
+            params = fn.parameters or {"type": "object", "properties": {}}
             out.append(
                 {
                     "type": "function",
                     "function": {
                         "name": fn.name,
                         "description": fn.description or "",
-                        "parameters": fn.parameters or {"type": "object", "properties": {}},
+                        "parameters": self._normalize_tool_schema(params),
                     },
                 }
             )
+        return out
+
+    @staticmethod
+    def _normalize_tool_schema(schema: Any) -> Any:
+        """Rewrite a client tool's JSON Schema into the draft 2020-12 shape Fireworks
+        validates against.
+
+        Client tools are authored by the CLI and may target an OLDER JSON Schema draft
+        (draft-07 and earlier), where an array-valued ``items`` means tuple validation.
+        Draft 2020-12 forbids that — tuple item schemas must live under ``prefixItems``
+        — and Fireworks rejects the ENTIRE request with a 400 if any one tool schema
+        uses the legacy form, sinking the whole turn (an opaque 502 to the user). So a
+        single legacy tool must not be able to break generation: convert array ``items``
+        to ``prefixItems`` (folding draft-07 ``additionalItems`` into 2020-12 ``items``)
+        wherever a subschema can appear.
+
+        The walk is SCHEMA-AWARE: it descends only through keywords whose values are
+        subschemas (see ``_SCHEMA_*_KEYS``) and copies data/annotation keywords
+        (``enum``, ``const``, ``default``, ``examples`` …) verbatim — so a literal
+        value that merely contains an "items" key is never mistaken for a tuple schema.
+        Builds fresh structures; never mutates the caller's ``parameters`` dict.
+        """
+        if not isinstance(schema, dict):
+            # A boolean schema (draft 2020-12 allows ``true``/``false``) or any other
+            # non-object node has nothing to rewrite.
+            return schema
+        out: dict[str, Any] = {}
+        for key, value in schema.items():
+            if key == "additionalItems":
+                # Draft-07 only, and meaningful ONLY next to a tuple ``items`` — it is
+                # folded in by the ``items`` branch below and otherwise dropped (it is
+                # dead in draft 2020-12).
+                continue
+            if key == "items":
+                if isinstance(value, list):
+                    # Draft-07 tuple → draft 2020-12 prefixItems.
+                    out["prefixItems"] = [
+                        PromptAssembler._normalize_tool_schema(v) for v in value
+                    ]
+                    # draft-07 ``additionalItems`` (schema for elements past the tuple)
+                    # is spelled ``items`` in 2020-12. Preserve it when present; its
+                    # absence leaves extras unconstrained, matching draft-07.
+                    if "additionalItems" in schema:
+                        out["items"] = PromptAssembler._normalize_tool_schema(
+                            schema["additionalItems"]
+                        )
+                else:
+                    # A plain (non-tuple) ``items`` is a single subschema — recurse.
+                    out["items"] = PromptAssembler._normalize_tool_schema(value)
+            elif key in _SCHEMA_MAP_KEYS and isinstance(value, dict):
+                out[key] = {
+                    name: PromptAssembler._normalize_tool_schema(sub)
+                    for name, sub in value.items()
+                }
+            elif key in _SCHEMA_LIST_KEYS and isinstance(value, list):
+                out[key] = [PromptAssembler._normalize_tool_schema(v) for v in value]
+            elif key in _SCHEMA_SINGLE_KEYS:
+                out[key] = PromptAssembler._normalize_tool_schema(value)
+            else:
+                # Data or annotation keyword (enum/const/default/examples/type/…):
+                # arbitrary JSON — copy verbatim, never descend.
+                out[key] = value
         return out
 
     def _project_tool_choice(self, tool_choice: Any) -> Any:

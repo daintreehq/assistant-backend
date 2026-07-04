@@ -23,6 +23,7 @@ from typing import Any
 import httpx
 
 from ..errors import DaintreeError, upstream_error, upstream_rate_limited, upstream_timeout
+from ..observability import get_logger
 from .base import (
     ProviderChatRequest,
     ProviderChatResult,
@@ -32,7 +33,40 @@ from .base import (
 )
 from .sse import iter_sse_data, parse_chunk
 
+logger = get_logger("daintree.fireworks")
+
 _CHAT_PATH = "/chat/completions"
+# Cap on how much of an upstream error body we log / surface — enough to carry the
+# provider's reason ("temperature must be between 0.0 and 2.0", a schema complaint)
+# without dumping an unbounded payload into logs or the client error message.
+_ERROR_DETAIL_CAP = 400
+
+
+def _extract_upstream_error(body: bytes | str | None) -> str | None:
+    """Pull a short human-readable reason out of an upstream error body.
+
+    Fireworks returns ``{"error": {"message": "...", ...}}`` on a 4xx/5xx. That
+    message is the single most useful diagnostic for a malformed request, so we
+    surface it rather than discard it. Best-effort: any parse failure falls back to
+    the raw (capped) text, and an empty body yields ``None``.
+    """
+    if not body:
+        return None
+    raw = body.decode("utf-8", "replace") if isinstance(body, bytes) else body
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw[:_ERROR_DETAIL_CAP]
+    err = data.get("error") if isinstance(data, dict) else None
+    if isinstance(err, dict):
+        msg = err.get("message") or err.get("code") or err.get("type")
+        return str(msg)[:_ERROR_DETAIL_CAP] if msg else raw[:_ERROR_DETAIL_CAP]
+    if isinstance(err, str) and err:
+        return err[:_ERROR_DETAIL_CAP]
+    return raw[:_ERROR_DETAIL_CAP]
 
 
 def _looks_rate_limited(err: dict[str, Any]) -> bool:
@@ -196,14 +230,22 @@ class FireworksProvider:
     def _timeout(self, request: ProviderChatRequest) -> float:
         return request.timeout if request.timeout is not None else self._default_timeout
 
-    def _map_http_error(self, status: int, headers: httpx.Headers) -> DaintreeError:
+    def _map_http_error(
+        self, status: int, headers: httpx.Headers, detail: str | None = None
+    ) -> DaintreeError:
         if status == 429:
             return upstream_rate_limited(retry_after=headers.get("retry-after"))
         if status in (408, 504):
             return upstream_timeout()
         if status >= 500:
+            # Transient upstream fault — safe to retry before any public bytes.
             return upstream_error(retryable=True)
-        return upstream_error(f"Upstream returned status {status}.")
+        # A 4xx means the upstream rejected OUR request as malformed: permanent
+        # (never retried) and almost always a server-side bug in what we sent. Carry
+        # the upstream's own reason through so the failure is diagnosable instead of
+        # an opaque "status 400" — the CLI and logs then name the offending field.
+        suffix = f" {detail}" if detail else ""
+        return upstream_error(f"Upstream rejected the request (HTTP {status}).{suffix}")
 
     def _build_result(self, data: dict[str, Any]) -> ProviderChatResult:
         choices = data.get("choices") or []
@@ -234,7 +276,15 @@ class FireworksProvider:
         except httpx.TransportError as exc:
             raise upstream_error("Could not reach the upstream provider.", retryable=True) from exc
         if resp.status_code >= 400:
-            raise self._map_http_error(resp.status_code, resp.headers)
+            detail = _extract_upstream_error(resp.content)
+            logger.warning(
+                "upstream_http_error",
+                phase="complete",
+                model=request.model,
+                status=resp.status_code,
+                detail=detail,
+            )
+            raise self._map_http_error(resp.status_code, resp.headers, detail)
         try:
             data = resp.json()
         except json.JSONDecodeError as exc:
@@ -300,14 +350,23 @@ class FireworksProvider:
         except httpx.TransportError as exc:
             raise upstream_error("Could not reach the upstream provider.", retryable=True) from exc
         if response.status_code >= 400:
+            detail: str | None = None
             try:
                 # Drain the error body best-effort: a transport failure mid-read
-                # must not mask the mapped status error (e.g. a retryable 5xx).
+                # must not mask the mapped status error (e.g. a retryable 5xx). When
+                # it IS readable, keep its reason — it's the whole diagnostic.
                 with contextlib.suppress(httpx.HTTPError):
-                    await response.aread()
+                    detail = _extract_upstream_error(await response.aread())
             finally:
                 await ctx.__aexit__(None, None, None)
-            raise self._map_http_error(response.status_code, response.headers)
+            logger.warning(
+                "upstream_http_error",
+                phase="stream_open",
+                model=request.model,
+                status=response.status_code,
+                detail=detail,
+            )
+            raise self._map_http_error(response.status_code, response.headers, detail)
         return FireworksStream(ctx, response, request.model)
 
     async def aclose(self) -> None:
