@@ -280,10 +280,24 @@ def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
                     )
 
 
+def _validate_generation(req: RespondRequest) -> None:
+    """Fireworks rejects JSON mode combined with function calling, so fail fast with
+    a clear 400 instead of a confusing upstream 502 (and a wasted upstream call).
+    ("text" is the default output mode and is simply not forwarded — see the
+    assembler — so only "json_object" conflicts with tools.)"""
+    if req.generation.response_format == "json_object" and req.input.tools:
+        raise invalid_request(
+            "generation.response_format 'json_object' cannot be combined with input.tools.",
+            param="generation.response_format",
+            code="response_format_with_tools",
+        )
+
+
 def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
     """Run all semantic validation. Returns the (hardcoded) upstream model name."""
     _validate_roles(req.input.messages)
     _validate_message_sequence(req.input.messages)
     _validate_tools(req.input.tools, req.input.tool_choice, settings)
     _validate_content(req.input.messages, settings)
+    _validate_generation(req)
     return FIREWORKS_SMALL_MODEL

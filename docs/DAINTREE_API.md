@@ -122,6 +122,10 @@ Notes:
   it entirely when thinking is off. See Prompt assembly & caching.
 - Tool definitions are bounded (total bytes, schema depth, property count, string sizes);
   `function.parameters` must be a JSON object whose root `type`, when present, is `object`.
+- `generation.response_format` `"text"` is the default output mode — sending it is equivalent
+  to omitting it. `"json_object"` cannot be combined with a non-empty `input.tools` (the
+  upstream rejects JSON mode together with function calling); that combination is rejected
+  with `invalid_request` / `response_format_with_tools`.
 
 ### Response — non-streaming
 

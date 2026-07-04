@@ -23,17 +23,26 @@ def _settings(**overrides: object) -> Settings:
     return Settings(**base)  # type: ignore[arg-type]
 
 
-def _req(*, messages: list | None = None, tools: list | None = None, tool_choice: object = None) -> RespondRequest:
+def _req(
+    *,
+    messages: list | None = None,
+    tools: list | None = None,
+    tool_choice: object = None,
+    generation: dict | None = None,
+) -> RespondRequest:
     inp: dict = {"messages": messages or [{"role": "user", "content": "hi"}]}
     if tools is not None:
         inp["tools"] = tools
     if tool_choice is not None:
         inp["tool_choice"] = tool_choice
-    return RespondRequest.model_validate({
+    body: dict = {
         "protocol_version": 1,
         "session": {"id": "s", "turn_id": "t"},
         "input": inp,
-    })
+    }
+    if generation is not None:
+        body["generation"] = generation
+    return RespondRequest.model_validate(body)
 
 
 def test_valid_request_returns_upstream_model(settings: Settings) -> None:
@@ -228,3 +237,36 @@ def test_valid_nested_tool_schema_accepted(settings: Settings) -> None:
         _req(tools=[{"type": "function", "function": {"name": "fs__read", "parameters": params}}]),
         settings,
     )
+
+
+def test_json_object_response_format_with_tools_rejected(settings: Settings) -> None:
+    """Fireworks rejects JSON mode + function calling; catch it at validation."""
+    req = _req(
+        tools=[{"type": "function", "function": {"name": "git__status"}}],
+        generation={"response_format": "json_object"},
+    )
+    with pytest.raises(DaintreeError) as exc:
+        validate_respond_request(req, settings)
+    assert exc.value.code == "response_format_with_tools"
+    assert exc.value.param == "generation.response_format"
+    assert exc.value.status_code == 400
+
+
+def test_json_object_response_format_without_tools_accepted(settings: Settings) -> None:
+    validate_respond_request(_req(generation={"response_format": "json_object"}), settings)
+
+
+def test_json_object_response_format_with_empty_tools_accepted(settings: Settings) -> None:
+    # tools: [] never reaches upstream as a tools array, so JSON mode is fine.
+    validate_respond_request(
+        _req(tools=[], generation={"response_format": "json_object"}), settings
+    )
+
+
+def test_text_response_format_with_tools_accepted(settings: Settings) -> None:
+    """'text' is the default output mode — fine alongside tools (never forwarded)."""
+    req = _req(
+        tools=[{"type": "function", "function": {"name": "git__status"}}],
+        generation={"response_format": "text"},
+    )
+    validate_respond_request(req, settings)

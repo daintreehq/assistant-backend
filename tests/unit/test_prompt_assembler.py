@@ -244,6 +244,32 @@ def test_main_request_params(assembler: PromptAssembler) -> None:
     assert pr.temperature == 0.5
 
 
+def test_text_response_format_never_forwarded(assembler: PromptAssembler) -> None:
+    # "text" is the upstream default and Fireworks 400s on any response_format
+    # combined with tools — the assembler drops it entirely. Dropping it also
+    # keeps the request eligible for prompt_cache_key (the provider withholds
+    # the cache key whenever response_format is set).
+    req = _req(
+        tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}],
+        generation={"response_format": "text"},
+    )
+    pr = assembler.build_main_request(
+        request=req, skills=[], upstream_model="deepseek-v4-flash",
+    )
+    assert pr.response_format is None
+    assert pr.prompt_cache_key == "daintree-main"
+
+
+def test_json_object_response_format_forwarded_without_tools(
+    assembler: PromptAssembler,
+) -> None:
+    req = _req(generation={"response_format": "json_object"})
+    pr = assembler.build_main_request(
+        request=req, skills=[], upstream_model="deepseek-v4-flash",
+    )
+    assert pr.response_format == {"type": "json_object"}
+
+
 def test_reasoning_content_replayed_verbatim_for_tool_turn(assembler: PromptAssembler) -> None:
     # An assistant turn that performed tool calls must carry its reasoning_content
     # back to DeepSeek (else a 400); the assembler passes it through untouched.

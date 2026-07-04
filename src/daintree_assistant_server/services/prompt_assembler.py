@@ -444,9 +444,14 @@ class PromptAssembler:
         if footer.strip():
             messages.append({"role": "system", "content": footer})
 
+        # "text" is the upstream default, so forwarding it is a no-op — except that
+        # Fireworks rejects ANY response_format alongside tools ("You cannot specify
+        # response format and function call at the same time") and the provider
+        # withholds prompt_cache_key when response_format is set. Only "json_object"
+        # changes behavior, and validation rejects that in combination with tools.
         response_format = None
-        if gen.response_format is not None:
-            response_format = {"type": gen.response_format}
+        if gen.response_format == "json_object":
+            response_format = {"type": "json_object"}
 
         # Thinking is opt-in (default off) and only on the main call. Force it off
         # when the request pins a tool_choice: DeepSeek 400s on thinking + forced
