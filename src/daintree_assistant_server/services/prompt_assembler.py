@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import FIREWORKS_SMALL_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import RuntimeContext, TurnContext
 from ..contracts.openai import (
@@ -145,8 +145,8 @@ class PromptAssembler:
             ],
             mcp_status_line=mcp_status_line,
             mcp_connected=mcp_connected,
-            large_model=DEEPSEEK_MODEL,
-            small_model=DEEPSEEK_MODEL,
+            large_model=FIREWORKS_SMALL_MODEL,
+            small_model=FIREWORKS_SMALL_MODEL,
             scheduler_active=rc.scheduler_active,
             project_instructions=project_instructions,
             open_terminals=open_terminals,
@@ -325,7 +325,7 @@ class PromptAssembler:
         skills: list[Skill],
         upstream_model: str,
     ) -> ProviderChatRequest:
-        """Assemble the upstream request so DeepSeek's prefix cache covers the base
+        """Assemble the upstream request so the provider's prefix cache covers the base
         prompt, the integration surface, and the append-only conversation. The active
         skill bodies and the per-request runtime/turn context follow the conversation,
         so a skill-set change re-encodes only that bounded tail — never the conversation.

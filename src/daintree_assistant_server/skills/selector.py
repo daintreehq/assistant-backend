@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass, replace
 from typing import Any
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import FIREWORKS_SMALL_MODEL, Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
 from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
@@ -25,7 +25,7 @@ from ..providers.base import (
 )
 from ..providers.retry import retry_upstream
 from ..text_utils import estimate_tokens, head_tail, message_text
-from .catalog import Catalog
+from .catalog import Catalog, CatalogManager
 
 
 # Forced selector function schema (section 7.7). `skill_ids` is bounded by the SAME
@@ -84,11 +84,18 @@ class SelectionDecision:
 
 
 def sanitize_for_selector(
-    messages: list[ChatMessage], token_budget: int
+    messages: list[ChatMessage],
+    token_budget: int,
+    *,
+    tool_char_cap: int = _TOOL_RESULT_CHAR_CAP,
+    message_char_cap: int = _MESSAGE_CHAR_CAP,
 ) -> tuple[list[dict[str, Any]], bool]:
     """Build bounded, newest-biased conversation evidence for the selector.
 
     Returns ``(evidence, truncated)`` where evidence is in chronological order.
+    The per-message caps default to the selector's tight limits; the skill-learning
+    harness passes larger ones — its judgments need the actual tool output and
+    assistant responses, not classification-sized excerpts.
     """
     eligible = [m for m in messages if m.role in ("user", "assistant", "tool")]
     kept: list[dict[str, Any]] = []
@@ -97,9 +104,9 @@ def sanitize_for_selector(
     for msg in reversed(eligible):
         text = message_text(msg.content)
         if msg.role == "tool":
-            text = head_tail(text, _TOOL_RESULT_CHAR_CAP)
+            text = head_tail(text, tool_char_cap)
         else:
-            text = head_tail(text, _MESSAGE_CHAR_CAP)
+            text = head_tail(text, message_char_cap)
         tool_names = [tc.function.name for tc in (msg.tool_calls or [])]
         evidence = {
             "role": msg.role,
@@ -220,14 +227,19 @@ class Selector:
         self,
         provider: ChatProvider,
         prompt_loader: PromptLoader,
-        catalog: Catalog,
+        catalog_manager: CatalogManager,
         settings: Settings,
     ) -> None:
         self.provider = provider
         self.prompt_loader = prompt_loader
-        self.catalog = catalog
+        self.catalog_manager = catalog_manager
         self.settings = settings
         self._select_schema = build_select_skills_schema(settings.max_active_skills)
+
+    @property
+    def catalog(self) -> Catalog:
+        # Read live so a skill-learning reload is picked up on the next turn.
+        return self.catalog_manager.catalog
 
     async def select(
         self,
@@ -254,7 +266,7 @@ class Selector:
 
     async def _run(self, messages: list[dict[str, Any]]) -> SelectionDecision:
         request = ProviderChatRequest(
-            model=DEEPSEEK_MODEL,
+            model=FIREWORKS_SMALL_MODEL,
             messages=messages,
             temperature=0.0,
             max_tokens=self.settings.selector_max_output_tokens,

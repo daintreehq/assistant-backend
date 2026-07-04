@@ -15,7 +15,7 @@ from daintree_assistant_server.errors import DaintreeError
 def _settings(**overrides: object) -> Settings:
     base = {
         "DAINTREE_API_KEY": "secret",
-        "DEEPSEEK_API_KEY": "dk",
+        "FIREWORKS_API_KEY": "dk",
         "STATE_SIGNING_KEY_CURRENT": "sk",
     }
     base.update(overrides)
@@ -23,9 +23,9 @@ def _settings(**overrides: object) -> Settings:
 
 
 def test_missing_secrets_reports_each() -> None:
-    s = Settings(DAINTREE_API_KEY="", DEEPSEEK_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
+    s = Settings(DAINTREE_API_KEY="", FIREWORKS_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
     assert set(s.missing_secrets()) == {
-        "DEEPSEEK_API_KEY",
+        "FIREWORKS_API_KEY",
         "DAINTREE_API_KEY",
         "STATE_SIGNING_KEY_CURRENT",
     }
@@ -100,7 +100,7 @@ def test_authenticate_case_insensitive_scheme() -> None:
 def test_authenticate_dev_no_key_allows_unauthenticated() -> None:
     # No key configured in development → unauthenticated access (any/no header).
     s = Settings(
-        ENVIRONMENT="development", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="dk",
+        ENVIRONMENT="development", DAINTREE_API_KEY="", FIREWORKS_API_KEY="dk",
         STATE_SIGNING_KEY_CURRENT="sk",
     )
     assert authenticate(None, s) is DEVELOPMENT_PRINCIPAL
@@ -110,9 +110,38 @@ def test_authenticate_dev_no_key_allows_unauthenticated() -> None:
 def test_authenticate_prod_no_key_rejects() -> None:
     # Production never allows unauthenticated access, even with no key configured.
     s = Settings(
-        ENVIRONMENT="production", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="dk",
+        ENVIRONMENT="production", DAINTREE_API_KEY="", FIREWORKS_API_KEY="dk",
         STATE_SIGNING_KEY_CURRENT="sk",
     )
     with pytest.raises(DaintreeError) as exc:
         authenticate(None, s)
     assert exc.value.code == "invalid_api_key"
+
+
+# ---- skill learning (local-development-only guard) ----------------------
+
+
+def test_skill_learning_off_by_default() -> None:
+    s = _settings()
+    assert s.skill_learning_mode == "off"
+    assert s.skill_learning_enabled is False
+    assert s.local_only_problems() == []
+
+
+@pytest.mark.parametrize("mode", ["propose", "apply"])
+def test_skill_learning_enabled_ok_in_development(mode: str) -> None:
+    s = _settings(SKILL_LEARNING_MODE=mode)
+    assert s.skill_learning_enabled is True
+    assert s.local_only_problems() == []
+
+
+@pytest.mark.parametrize("mode", ["propose", "apply"])
+def test_skill_learning_fails_readiness_in_production(mode: str) -> None:
+    s = _settings(ENVIRONMENT="production", SKILL_LEARNING_MODE=mode)
+    assert any("SKILL_LEARNING_MODE" in p for p in s.local_only_problems())
+
+
+def test_skill_learning_off_ok_in_production() -> None:
+    s = _settings(ENVIRONMENT="production")
+    assert s.skill_learning_enabled is False
+    assert s.local_only_problems() == []

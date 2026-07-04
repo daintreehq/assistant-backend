@@ -1,12 +1,15 @@
 """The immutable skill catalog.
 
 Built once at startup from the packaged skill files. Computes a deterministic
-catalog revision used for prompt-cache identity and skill-state validation.
-Skills are immutable for the lifetime of a deployment revision.
+catalog revision used for prompt-cache identity and skill-state validation. A
+``Catalog`` instance is immutable; where the catalog can change at runtime (the
+local skill-learning harness), a :class:`CatalogManager` holds the current
+instance and swaps in a freshly-loaded one — never mutating in place.
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from collections.abc import Iterable, Sequence
 from pathlib import Path
@@ -79,6 +82,68 @@ class Catalog:
         return [s.public_view() for s in self._skills]
 
 
-def load_catalog(directory: Path | None = None) -> Catalog:
-    """Load and validate the catalog from disk."""
-    return Catalog(load_skills_dir(directory or default_skills_dir()))
+def load_catalog(
+    primary_dir: Path | None = None, overlay_dir: Path | None = None
+) -> Catalog:
+    """Load and validate the catalog from disk.
+
+    ``primary_dir`` is the packaged skills directory. ``overlay_dir`` (used only by
+    the local skill-learning harness when it writes to a separate directory) is a
+    second directory whose skills are merged on top: an overlay skill with the same
+    id REPLACES the packaged one, and a new id is added. When ``overlay_dir`` is the
+    packaged directory itself, or absent/missing, only the primary set is loaded.
+    """
+    primary = load_skills_dir(primary_dir or default_skills_dir())
+    if overlay_dir is None or not overlay_dir.is_dir():
+        return Catalog(primary)
+    if primary_dir is not None and overlay_dir.resolve() == primary_dir.resolve():
+        return Catalog(primary)
+    merged: dict[str, Skill] = {s.id: s for s in primary}
+    for skill in load_skills_dir(overlay_dir):
+        merged[skill.id] = skill  # overlay wins on an id collision
+    return Catalog(merged.values())
+
+
+class CatalogManager:
+    """Holds the current :class:`Catalog` and reloads it from disk on demand.
+
+    The catalog itself stays immutable; a reload builds a brand-new instance and
+    rebinds the reference (an atomic assignment in CPython), so concurrent readers
+    always observe a fully-valid catalog — either the old one or the new one, never
+    a half-built mix. Writers (the skill-learning harness) are expected to
+    serialize their own write+reload critical section.
+    """
+
+    def __init__(
+        self,
+        catalog: Catalog,
+        *,
+        primary_dir: Path,
+        overlay_dir: Path | None = None,
+    ) -> None:
+        self._catalog = catalog
+        self._primary_dir = primary_dir
+        self._overlay_dir = overlay_dir
+
+    @property
+    def catalog(self) -> Catalog:
+        return self._catalog
+
+    @property
+    def primary_dir(self) -> Path:
+        return self._primary_dir
+
+    @property
+    def overlay_dir(self) -> Path | None:
+        return self._overlay_dir
+
+    def reload_sync(self) -> Catalog:
+        self._catalog = load_catalog(self._primary_dir, self._overlay_dir)
+        return self._catalog
+
+    async def reload(self) -> Catalog:
+        """Reload off the event loop (skill files are read with blocking IO)."""
+        new = await asyncio.to_thread(load_catalog, self._primary_dir, self._overlay_dir)
+        self._catalog = new
+        return new
+

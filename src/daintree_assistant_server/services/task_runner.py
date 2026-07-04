@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import FIREWORKS_SMALL_MODEL, Settings
 from ..contracts.tasks import (
     CheckpointInput,
     CheckpointOutput,
@@ -451,7 +451,7 @@ class TaskRunner:
 
         system = self.prompts.task_system_prompt(profile.id)
         user = profile.build_user(input_obj, request)
-        model = DEEPSEEK_MODEL
+        model = FIREWORKS_SMALL_MODEL
         timeout = profile.timeout_seconds or self.settings.utility_timeout_seconds
 
         messages = [

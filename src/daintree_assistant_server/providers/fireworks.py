@@ -1,9 +1,17 @@
-"""The DeepSeek provider adapter (OpenAI-compatible wire format).
+"""The Fireworks provider adapter (OpenAI-compatible wire format).
 
-Translates the normalized :class:`ProviderChatRequest` to DeepSeek's
+Translates the normalized :class:`ProviderChatRequest` to Fireworks'
 ``/chat/completions`` API and maps upstream failures to Daintree errors. A
 single process-wide ``httpx.AsyncClient`` is injected; a client is never built
 per request.
+
+Fireworks speaks the OpenAI wire shape, so most of this mirrors any
+OpenAI-compatible adapter. The one provider-specific detail is reasoning control:
+Fireworks uses a top-level ``reasoning_effort`` field rather than a ``thinking``
+object. ``"none"`` disables thinking (required for the selector's forced
+tool_choice, and to switch off DeepSeek V4's default-on reasoning); ``"high"`` /
+``"max"`` are the thinking tiers used by the main call and the GLM skill
+builder/improver. See ``_build_body``.
 """
 
 from __future__ import annotations
@@ -28,9 +36,7 @@ _CHAT_PATH = "/chat/completions"
 
 
 def _looks_rate_limited(err: dict[str, Any]) -> bool:
-    blob = " ".join(
-        str(err.get(k, "")) for k in ("code", "type", "message")
-    ).lower()
+    blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
     return any(
         token in blob
         for token in ("rate limit", "rate_limit", "429", "quota", "overloaded", "too many requests")
@@ -43,8 +49,8 @@ def map_stream_error(err: dict[str, Any]) -> DaintreeError:
     return upstream_error("The upstream model stream reported an error.")
 
 
-class DeepSeekStream(ProviderStream):
-    """An open DeepSeek SSE stream yielding OpenAI-shaped chunk dicts."""
+class FireworksStream(ProviderStream):
+    """An open Fireworks SSE stream yielding OpenAI-shaped chunk dicts."""
 
     def __init__(self, stream_ctx: Any, response: httpx.Response, model: str) -> None:
         self._ctx = stream_ctx
@@ -100,7 +106,7 @@ class DeepSeekStream(ProviderStream):
     async def prefetch_first_event(self) -> dict[str, Any] | None:
         return await self._read_one()
 
-    def __aiter__(self) -> DeepSeekStream:
+    def __aiter__(self) -> FireworksStream:
         return self
 
     async def __anext__(self) -> dict[str, Any]:
@@ -117,25 +123,23 @@ class DeepSeekStream(ProviderStream):
             await self._ctx.__aexit__(None, None, None)
 
 
-class DeepSeekProvider:
-    """A :class:`ChatProvider` backed by the DeepSeek hosted API."""
+class FireworksProvider:
+    """A :class:`ChatProvider` backed by the Fireworks hosted API."""
 
     def __init__(
         self,
         client: httpx.AsyncClient,
         *,
         api_key: str,
-        base_url: str = "https://api.deepseek.com",
+        base_url: str = "https://api.fireworks.ai/inference/v1",
         default_timeout: float = 60.0,
         send_prompt_cache_key: bool = True,
-        send_thinking: bool = True,
     ) -> None:
         self._client = client
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._default_timeout = default_timeout
         self._send_prompt_cache_key = send_prompt_cache_key
-        self._send_thinking = send_thinking
 
     # ---- helpers --------------------------------------------------------
 
@@ -167,16 +171,15 @@ class DeepSeekProvider:
             body["response_format"] = request.response_format
         if request.stop:
             body["stop"] = request.stop
-        if self._send_thinking:
-            if request.thinking_disabled:
-                body["thinking"] = {"type": "disabled"}
-            else:
-                # Thinking mode: the model emits a chain-of-thought (returned via
-                # reasoning_content) before the answer. reasoning_effort tunes the
-                # depth; DeepSeek remaps low/medium -> high and xhigh -> max.
-                body["thinking"] = {"type": "enabled"}
-                if request.reasoning_effort:
-                    body["reasoning_effort"] = request.reasoning_effort
+        # Fireworks maps reasoning through a single field, ALWAYS sent. Non-thinking
+        # calls (selector, utility tasks, gate, and the default main call) send
+        # "none" — DeepSeek V4 defaults reasoning ON when it is absent, which would
+        # 400 the selector's forced tool_choice, so omitting it is never safe.
+        # Thinking calls send the requested tier ("high"/"max").
+        if request.thinking_disabled:
+            body["reasoning_effort"] = "none"
+        else:
+            body["reasoning_effort"] = request.reasoning_effort or "high"
         # prompt cache key is only valid for plain chat/stream (not json mode).
         if (
             self._send_prompt_cache_key
@@ -258,8 +261,11 @@ class DeepSeekProvider:
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             stream=False,
-            thinking_disabled=request.thinking_disabled,
-            reasoning_effort=request.reasoning_effort,
+            # A forced tool_choice is incompatible with thinking on Fireworks — pin
+            # it non-thinking (reasoning_effort "none") regardless of what the caller
+            # requested, so a forced call can never 400 on a thinking directive.
+            thinking_disabled=True,
+            reasoning_effort=None,
             timeout=request.timeout,
         )
         result = await self.complete(sub)
@@ -302,7 +308,7 @@ class DeepSeekProvider:
             finally:
                 await ctx.__aexit__(None, None, None)
             raise self._map_http_error(response.status_code, response.headers)
-        return DeepSeekStream(ctx, response, request.model)
+        return FireworksStream(ctx, response, request.model)
 
     async def aclose(self) -> None:
         await self._client.aclose()

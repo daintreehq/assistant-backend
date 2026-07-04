@@ -17,6 +17,11 @@ dist/
 # Temporary / scratch
 .tmp/
 
+# Local skill-learning harness: audit records, proposals, and (when configured to
+# a separate overlay dir) generated skill files. The default edit-in-place mode
+# writes to the tracked skills dir instead, so those show up in `git diff`.
+.daintree/
+
 # Testing / tooling caches
 .pytest_cache/
 .coverage

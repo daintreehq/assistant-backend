@@ -211,7 +211,7 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
     result = await task_runner.run(TaskRequest(task="terminal_summarize.v1", input={"tail": "x"}))
     assert result.prompt_version == "terminal_summarize.v1"
     assert result.usage.total_tokens >= 0
-    assert result.model == "deepseek-v4-flash"
+    assert result.model == "accounts/fireworks/models/deepseek-v4-flash"
 
 
 def test_all_nine_profiles_registered(task_runner: TaskRunner) -> None:

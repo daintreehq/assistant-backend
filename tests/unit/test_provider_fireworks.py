@@ -1,4 +1,4 @@
-"""DeepSeek provider adapter tests using a mock HTTP transport."""
+"""Fireworks provider adapter tests using a mock HTTP transport."""
 
 from __future__ import annotations
 
@@ -7,39 +7,55 @@ import pytest
 
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
-from daintree_assistant_server.providers.deepseek import DeepSeekProvider
+from daintree_assistant_server.providers.fireworks import FireworksProvider
+
+_BASE = "https://api.fireworks.ai/inference/v1"
+_MODEL = "accounts/fireworks/models/deepseek-v4-flash"
 
 SSE_OK = (
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-flash",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m",'
     '"choices":[{"index":0,"delta":{"role":"assistant","content":"Hel"}}]}\n\n'
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-flash",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m",'
     '"choices":[{"index":0,"delta":{"content":"lo"}}]}\n\n'
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-flash",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m",'
     '"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],'
     '"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n'
     "data: [DONE]\n\n"
 )
 
 
-def _provider(handler, **kwargs) -> DeepSeekProvider:
+def _provider(handler, **kwargs) -> FireworksProvider:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return DeepSeekProvider(client, api_key="key", base_url="https://api.deepseek.com", **kwargs)
+    return FireworksProvider(client, api_key="key", base_url=_BASE, **kwargs)
 
 
-def _capture_body(captured: dict):
+def _capture(captured: dict):
     import json as _json
 
     def handler(request: httpx.Request) -> httpx.Response:
-        captured.update(_json.loads(request.content))
-        return httpx.Response(200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}})
+        captured["url"] = str(request.url)
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(
+            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
+        )
 
     return handler
 
 
 def _req(**kwargs: object) -> ProviderChatRequest:
-    base: dict[str, object] = {"model": "deepseek-v4-flash", "messages": [{"role": "user", "content": "hi"}]}
+    base: dict[str, object] = {"model": _MODEL, "messages": [{"role": "user", "content": "hi"}]}
     base.update(kwargs)
     return ProviderChatRequest(**base)  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_url_and_auth() -> None:
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req())
+    assert captured["url"] == f"{_BASE}/chat/completions"
+    assert captured["body"]["model"] == _MODEL
+    await provider.aclose()
 
 
 @pytest.mark.asyncio
@@ -51,8 +67,10 @@ async def test_complete_success() -> None:
             json={
                 "id": "abc",
                 "created": 10,
-                "model": "deepseek-v4-flash",
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}],
+                "model": "m",
+                "choices": [
+                    {"index": 0, "message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}
+                ],
                 "usage": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4},
             },
         )
@@ -66,91 +84,81 @@ async def test_complete_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_thinking_disabled_sent_by_default() -> None:
+async def test_non_thinking_sends_reasoning_none() -> None:
+    # thinking_disabled=True (the default) maps to reasoning_effort "none" — this is
+    # what keeps the selector's forced tool_choice working and turns DeepSeek's
+    # default-on reasoning off.
     captured: dict = {}
-    provider = _provider(_capture_body(captured))
+    provider = _provider(_capture(captured))
     await provider.complete(_req())
-    assert captured["thinking"] == {"type": "disabled"}
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_thinking_not_sent_when_disabled_flag_off() -> None:
-    captured: dict = {}
-    provider = _provider(_capture_body(captured), send_thinking=False)
-    await provider.complete(_req())
-    assert "thinking" not in captured
+    assert captured["body"]["reasoning_effort"] == "none"
     await provider.aclose()
 
 
 @pytest.mark.asyncio
 async def test_thinking_enabled_sends_effort() -> None:
     captured: dict = {}
-    provider = _provider(_capture_body(captured))
-    await provider.complete(_req(thinking_disabled=False, reasoning_effort="high"))
-    assert captured["thinking"] == {"type": "enabled"}
-    assert captured["reasoning_effort"] == "high"
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_thinking_enabled_omits_effort_when_unset() -> None:
-    captured: dict = {}
-    provider = _provider(_capture_body(captured))
-    await provider.complete(_req(thinking_disabled=False))
-    assert captured["thinking"] == {"type": "enabled"}
-    assert "reasoning_effort" not in captured
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_disabled_thinking_never_sends_effort() -> None:
-    # reasoning_effort is meaningless without thinking; it must not leak into a
-    # non-thinking request even if a caller set it.
-    captured: dict = {}
-    provider = _provider(_capture_body(captured))
-    await provider.complete(_req(thinking_disabled=True, reasoning_effort="high"))
-    assert captured["thinking"] == {"type": "disabled"}
-    assert "reasoning_effort" not in captured
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_thinking_params_omitted_when_flag_off() -> None:
-    # send_thinking=False means the provider/model doesn't understand the field:
-    # send neither the directive nor the effort, even if a request enables thinking.
-    captured: dict = {}
-    provider = _provider(_capture_body(captured), send_thinking=False)
+    provider = _provider(_capture(captured))
     await provider.complete(_req(thinking_disabled=False, reasoning_effort="max"))
-    assert "thinking" not in captured
-    assert "reasoning_effort" not in captured
+    assert captured["body"]["reasoning_effort"] == "max"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_thinking_enabled_defaults_effort_high() -> None:
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(thinking_disabled=False))
+    assert captured["body"]["reasoning_effort"] == "high"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_reasoning_effort_always_sent() -> None:
+    # There is no opt-out: reasoning_effort is always present so a non-thinking call
+    # can never fall through to DeepSeek's default-on reasoning.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req())
+    assert "reasoning_effort" in captured["body"]
     await provider.aclose()
 
 
 @pytest.mark.asyncio
 async def test_prompt_cache_key_sent_by_default_when_not_json_mode() -> None:
     captured: dict = {}
-    provider = _provider(_capture_body(captured))
+    provider = _provider(_capture(captured))
     await provider.complete(_req(prompt_cache_key="daintree-main"))
-    assert captured["prompt_cache_key"] == "daintree-main"
+    assert captured["body"]["prompt_cache_key"] == "daintree-main"
     await provider.aclose()
 
 
 @pytest.mark.asyncio
 async def test_prompt_cache_key_not_sent_when_flag_off() -> None:
     captured: dict = {}
-    provider = _provider(_capture_body(captured), send_prompt_cache_key=False)
+    provider = _provider(_capture(captured), send_prompt_cache_key=False)
     await provider.complete(_req(prompt_cache_key="daintree-main"))
-    assert "prompt_cache_key" not in captured
+    assert "prompt_cache_key" not in captured["body"]
     await provider.aclose()
 
 
 @pytest.mark.asyncio
 async def test_prompt_cache_key_suppressed_in_json_mode() -> None:
     captured: dict = {}
-    provider = _provider(_capture_body(captured), send_prompt_cache_key=True)
-    await provider.complete(_req(prompt_cache_key="daintree-main", response_format={"type": "json_object"}))
-    assert "prompt_cache_key" not in captured
+    provider = _provider(_capture(captured), send_prompt_cache_key=True)
+    await provider.complete(
+        _req(prompt_cache_key="daintree-main", response_format={"type": "json_object"})
+    )
+    assert "prompt_cache_key" not in captured["body"]
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_json_response_format_passed_through() -> None:
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(response_format={"type": "json_object"}))
+    assert captured["body"]["response_format"] == {"type": "json_object"}
     await provider.aclose()
 
 
@@ -225,10 +233,7 @@ async def test_stream_error_status_before_headers() -> None:
 
 @pytest.mark.asyncio
 async def test_stream_inline_error_chunk_raises() -> None:
-    sse = (
-        'data: {"error":{"message":"rate limit exceeded","code":"429"}}\n\n'
-        "data: [DONE]\n\n"
-    )
+    sse = 'data: {"error":{"message":"rate limit exceeded","code":"429"}}\n\ndata: [DONE]\n\n'
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=sse)
@@ -244,7 +249,6 @@ async def test_stream_inline_error_chunk_raises() -> None:
 
 @pytest.mark.asyncio
 async def test_stream_eof_before_done_raises() -> None:
-    # No [DONE] marker -> truncated stream -> must raise, not finish cleanly.
     sse = (
         'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"m",'
         '"choices":[{"index":0,"delta":{"content":"partial"}}]}\n\n'
@@ -266,9 +270,7 @@ async def test_stream_eof_before_done_raises() -> None:
 
 @pytest.mark.asyncio
 async def test_stream_transport_interruption_is_retryable() -> None:
-    # A dropped connection while reading the stream maps to a *retryable*
-    # upstream_error, so a prefetch failure (before public bytes) can be retried.
-    from daintree_assistant_server.providers.deepseek import DeepSeekStream
+    from daintree_assistant_server.providers.fireworks import FireworksStream
 
     class _Ctx:
         async def __aexit__(self, *_a: object) -> bool:
@@ -279,7 +281,7 @@ async def test_stream_transport_interruption_is_retryable() -> None:
             raise httpx.ReadError("connection dropped")
             yield ""  # pragma: no cover - makes this an async generator
 
-    stream = DeepSeekStream(_Ctx(), _Resp(), "deepseek-v4-flash")
+    stream = FireworksStream(_Ctx(), _Resp(), _MODEL)
     with pytest.raises(DaintreeError) as exc:
         await stream.prefetch_first_event()
     assert exc.value.code == "upstream_error"
@@ -294,6 +296,8 @@ async def test_structured_tool_call() -> None:
 
         body = _json.loads(request.content)
         assert body["tool_choice"]["function"]["name"] == "select_skills"
+        # A forced tool call must go non-thinking.
+        assert body["reasoning_effort"] == "none"
         return httpx.Response(
             200,
             json={
@@ -304,7 +308,8 @@ async def test_structured_tool_call() -> None:
                         "message": {
                             "role": "assistant",
                             "tool_calls": [
-                                {"id": "c", "type": "function", "function": {"name": "select_skills", "arguments": "{\"skill_ids\":[]}"}}
+                                {"id": "c", "type": "function",
+                                 "function": {"name": "select_skills", "arguments": "{\"skill_ids\":[]}"}}
                             ],
                         },
                         "finish_reason": "tool_calls",
@@ -320,4 +325,19 @@ async def test_structured_tool_call() -> None:
     )
     assert result.name == "select_skills"
     assert result.arguments_json == '{"skill_ids":[]}'
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_structured_tool_call_forces_non_thinking() -> None:
+    # Even if the caller enabled thinking, a forced tool call MUST go non-thinking
+    # (reasoning_effort "none") — otherwise Fireworks 400s the forced tool_choice.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.structured_tool_call(
+        _req(thinking_disabled=False, reasoning_effort="max"),
+        function_name="select_skills",
+        function_schema={"type": "object"},
+    )
+    assert captured["body"]["reasoning_effort"] == "none"
     await provider.aclose()

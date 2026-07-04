@@ -2,7 +2,7 @@
 id: daintree.orchestration.basic
 title: Daintree orchestration basics
 summary: How to inspect Daintree state and choose safe orchestration actions.
-whenToUse: Use for general requests about current Daintree state, terminals, worktrees, agents, queues, timers, or what to do next.
+whenToUse: Use for general requests about current Daintree state, terminals, worktrees, agents, closed/resumable sessions, queues, timers, or what to do next.
 priority: 100
 risk: read
 tags:
@@ -12,6 +12,7 @@ tags:
   - mcp
   - status
   - monitor
+  - sessions
 requiredTools:
   - context.snapshot
   - daintree.status
@@ -21,6 +22,7 @@ requiredTools:
   - daintree.listTools
   - tool.search
   - daintree.call
+  - agentTask.spawnForEdits
   - queue.publish
   - queue.digest
   - queue.resolve
@@ -52,4 +54,5 @@ Procedure:
      alertWhen: { modelJudge: "Did the build fail or report errors?" } })
    Special case — "stop when the AGENT finishes its turn": do NOT use a bare `stateIs: "waiting"` stopWhen. A `waiting` state is an unreliable proxy — an agent reads "waiting" before it starts, when paused, or when its window is backgrounded — so a raw `stateIs: "waiting"` stop fires too early. For an explore agent you usually need NO custom stopWhen: the default supervisor already treats working→waiting as a candidate and CONFIRMS it with a small-model tail check before stopping (and publishes completed_*). If you must express "finished" yourself, pair the state with a judge so a bare idle can't false-trip: `stopWhen: { all: [{ stateIs: "waiting" }, { modelJudge: "Has the agent finished its work and stopped, not just paused?" }] }`. Trust that confirmed completion — never hand-poll the terminal in a loop to decide it yourself. (For IN-TURN coordination you do not need a watcher at all: terminal.awaitAll blocks on the whole cohort's agentState and hands the result straight back — reach for it instead of building a watcher just to block once. Note awaitAll is state-based, not a small-model check, so verify its result by reading the tail and self-heal a terminal that still looks busy.)
 6. Use queue.digest to summarize sub-thread updates. When you have fully handled an inbox item — reported a finished agent, surfaced a result the user has now seen — resolve it with queue.resolve {"id": "<id>"} so the "needs attention" badge reflects only what still needs the user; a finished watch has already stopped its own watcher, so resolve the item rather than trying to watcher.cancel it. Leave OPEN anything still awaiting the user (an agent waiting on a question).
+7. Closed / resumable sessions. When the user asks to see or reopen a session they closed, list them with `daintree.call agentSessionHistory.list` (optional `worktreeId` scopes it to one worktree; omit it to list every resumable session across all worktrees). It returns records — `{ sessionId, agentId, worktreeId, title, projectId, savedAt (newest-first), agentLaunchFlags?, agentModelId?, cwd?, branch? }` — so surface the relevant ones by title / branch / when. There is NO restore tool, and you cannot read a closed session's transcript. To bring one back, spawn a FRESH agent in that worktree with agentTask.spawnForEdits (reuse the record's worktreeId and agentId; write a taskPrompt for what to continue) — and tell the user plainly it is a new agent in the old worktree, not a faithful resume of the original session (its prior conversation is not restored).
 Report back: a concise status, any watcher/timer ids, and the next checkpoint.

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import FIREWORKS_SMALL_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.openai import (
     ChatMessage,
@@ -286,4 +286,4 @@ def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
     _validate_message_sequence(req.input.messages)
     _validate_tools(req.input.tools, req.input.tool_choice, settings)
     _validate_content(req.input.messages, settings)
-    return DEEPSEEK_MODEL
+    return FIREWORKS_SMALL_MODEL

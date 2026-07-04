@@ -39,12 +39,13 @@ from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
 from ..providers.retry import retry_upstream
-from ..skills.catalog import Catalog
+from ..skills.catalog import Catalog, CatalogManager
 from ..skills.load_events import SkillLoadExecution
 from ..skills.selector import SelectionDecision, Selector
 from ..state.codec import StateCodec
 from ..text_utils import sanitize_line
 from .prompt_assembler import PromptAssembler
+from .skill_learning import SkillLearner
 
 logger = get_logger("daintree.respond")
 
@@ -100,18 +101,25 @@ class ChatOrchestrator:
         self,
         *,
         settings: Settings,
-        catalog: Catalog,
+        catalog_manager: CatalogManager,
         selector: Selector,
         state_codec: StateCodec,
         assembler: PromptAssembler,
         provider: ChatProvider,
+        learner: SkillLearner | None = None,
     ) -> None:
         self.settings = settings
-        self.catalog = catalog
+        self.catalog_manager = catalog_manager
         self.selector = selector
         self.state_codec = state_codec
         self.assembler = assembler
         self.provider = provider
+        self.learner = learner
+
+    @property
+    def catalog(self) -> Catalog:
+        # Read live: the skill-learning harness may reload it in place mid-request.
+        return self.catalog_manager.catalog
 
     # ---- cadence --------------------------------------------------------
 
@@ -214,6 +222,36 @@ class ChatOrchestrator:
         active_ids, newly_loaded_ids = merge_active_skills(
             decision.skill_ids, prior_active_ids, self.catalog, self.settings.max_active_skills
         )
+
+        # Skill learning (local development only, invisible to the CLI). It fires
+        # ONLY at a genuine new-instruction boundary — a new turn_id, a mid-turn
+        # interjection (instruction_revision bump), or no usable state — where the
+        # prior workflow has completed. This is deliberately narrower than the
+        # selector cadence: a catalog-revision change or selection.force can rerun
+        # the selector on a plain tool-continuation round (e.g. a concurrent
+        # session's learner just applied a change), and learning must not fire
+        # mid-workflow on a half-finished transcript.
+        # On a change it reloads the catalog IN PLACE; a newly created skill is
+        # folded to the front of this turn's active set and renders as a normal
+        # dynamic load. It fails open: a learning error can never break the response.
+        payload = verification.payload if verification.valid else None
+        new_instruction = (
+            payload is None
+            or request.session.turn_id != payload.last_turn_id
+            or request.session.instruction_revision != payload.last_instruction_revision
+        )
+        if self.learner is not None and new_instruction:
+            outcome = await self.learner.run(request=request, active_ids=active_ids)
+            if outcome.created_id:
+                # An improve changes only the body (re-fetched fresh below); only a
+                # CREATE alters the active set, so only then is the merge redone.
+                active_ids, newly_loaded_ids = merge_active_skills(
+                    [outcome.created_id, *decision.skill_ids],
+                    prior_active_ids,
+                    self.catalog,
+                    self.settings.max_active_skills,
+                )
+
         skills = self.catalog.get_many(active_ids)
         executions = [
             SkillLoadExecution.from_skill(new_call_id(), self.catalog.get(sid))  # type: ignore[arg-type]
