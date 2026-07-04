@@ -71,11 +71,15 @@ class Settings(BaseSettings):
     # ---- Main-model thinking -------------------------------------------
     # The selector and utility tasks always run NON-thinking — the selector's
     # forced tool_choice is incompatible with thinking mode. The main /respond
-    # call is the only one that can use it. Default OFF: thinking adds latency and
-    # reasoning tokens. When enabled, the model's reasoning_content round-trips
+    # call is the only one that can use it. Default ON: with thinking suppressed
+    # (reasoning_effort "none"), deepseek-v4-flash leaks chain-of-thought into the
+    # visible content on complex tool turns (fabricated context recaps, stray
+    # </think>); enabled, the CoT routes to reasoning_content — which round-trips
     # through the wire contract so tool-call turns replay it (missing it 400s on
-    # DeepSeek). Thinking mode also ignores temperature/top_p/penalties.
-    main_thinking_enabled: bool = Field(default=False, alias="MAIN_THINKING_ENABLED")
+    # DeepSeek) — and tool orchestration is markedly better. Costs reasoning
+    # tokens/latency per turn; set MAIN_THINKING_ENABLED=false to trade quality
+    # for speed. Thinking mode also ignores temperature/top_p/penalties.
+    main_thinking_enabled: bool = Field(default=True, alias="MAIN_THINKING_ENABLED")
     main_reasoning_effort: Literal["high", "max"] = Field(
         default="high", alias="MAIN_REASONING_EFFORT"
     )

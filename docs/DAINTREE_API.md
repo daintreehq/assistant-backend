@@ -261,12 +261,13 @@ top-level `reasoning_effort` field, which is always sent: `"none"` disables thin
 `high`/`max` select a thinking tier.
 
 The selector and utility tasks **always** run non-thinking (`reasoning_effort:"none"`) — the
-selector's forced `tool_choice` is incompatible with thinking mode. The main `/respond` call is
-non-thinking by default too, but can be enabled with `MAIN_THINKING_ENABLED=true`
-(`MAIN_REASONING_EFFORT` = `high` | `max`, default `high`; Fireworks also accepts `low`/`medium`,
-but the server restricts the main call to the two higher tiers). Even when enabled, thinking is
-forced off for any request that pins a `tool_choice` (thinking + a forced tool choice is
-rejected upstream). When enabled, the model returns its chain-of-thought as `reasoning_content`; the
+selector's forced `tool_choice` is incompatible with thinking mode. The main `/respond` call
+runs **thinking by default** (`MAIN_THINKING_ENABLED`, disable with `=false`;
+`MAIN_REASONING_EFFORT` = `high` | `max`, default `high`; Fireworks also accepts `low`/`medium`,
+but the server restricts the main call to the two higher tiers). With thinking suppressed,
+deepseek-v4-flash leaks chain-of-thought into the visible content on complex tool turns, which
+is why the default is on. Even when enabled, thinking is forced off for any request that pins a
+`tool_choice` (thinking + a forced tool choice is rejected upstream). When enabled, the model returns its chain-of-thought as `reasoning_content`; the
 client stores it on the assistant turn and replays it verbatim on any turn that performed tool
 calls (a hard DeepSeek requirement). Thinking mode ignores `temperature`/`top_p`/penalties.
 
