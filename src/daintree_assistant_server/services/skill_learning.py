@@ -235,8 +235,25 @@ class SkillLearner:
             )
             return LearningOutcome()
 
+        logger.info(
+            "skill_learning_gate",
+            action=verdict.action,
+            target_skill_id=verdict.target_skill_id,
+            confidence=verdict.confidence,
+            related_skill_ids=verdict.related_skill_ids,
+            acted=True,
+        )
+
         is_create = verdict.action == "create_new_skill"
         old_skill = None if is_create else catalog.get(verdict.target_skill_id or "")
+        # A build/improve is a slow (thinking-model) call; log the start so a long
+        # learning turn is observable rather than silent until it applies or fails.
+        logger.info(
+            "skill_learning_building",
+            action=verdict.action,
+            target_skill_id=None if is_create else verdict.target_skill_id,
+            model=SKILL_BUILDER_MODEL if is_create else SKILL_IMPROVER_MODEL,
+        )
         if is_create:
             proposal = await self._build_create(transcript, catalog, verdict, tools)
         else:
