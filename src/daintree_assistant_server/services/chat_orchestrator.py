@@ -10,6 +10,7 @@ OpenAI wire shape *upstream*, behind the provider abstraction.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
@@ -115,6 +116,10 @@ class ChatOrchestrator:
         self.assembler = assembler
         self.provider = provider
         self.learner = learner
+        # In-flight fire-and-forget skill-learning tasks. asyncio holds only a weak
+        # reference to a bare task, so we keep a strong one here (discarded on done)
+        # to stop a learning pass being garbage-collected mid-flight.
+        self._background_tasks: set[asyncio.Task[Any]] = set()
 
     @property
     def catalog(self) -> Catalog:
@@ -223,35 +228,6 @@ class ChatOrchestrator:
             decision.skill_ids, prior_active_ids, self.catalog, self.settings.max_active_skills
         )
 
-        # Skill learning (local development only, invisible to the CLI). It fires
-        # ONLY at a genuine new-instruction boundary — a new turn_id, a mid-turn
-        # interjection (instruction_revision bump), or no usable state — where the
-        # prior workflow has completed. This is deliberately narrower than the
-        # selector cadence: a catalog-revision change or selection.force can rerun
-        # the selector on a plain tool-continuation round (e.g. a concurrent
-        # session's learner just applied a change), and learning must not fire
-        # mid-workflow on a half-finished transcript.
-        # On a change it reloads the catalog IN PLACE; a newly created skill is
-        # folded to the front of this turn's active set and renders as a normal
-        # dynamic load. It fails open: a learning error can never break the response.
-        payload = verification.payload if verification.valid else None
-        new_instruction = (
-            payload is None
-            or request.session.turn_id != payload.last_turn_id
-            or request.session.instruction_revision != payload.last_instruction_revision
-        )
-        if self.learner is not None and new_instruction:
-            outcome = await self.learner.run(request=request, active_ids=active_ids)
-            if outcome.created_id:
-                # An improve changes only the body (re-fetched fresh below); only a
-                # CREATE alters the active set, so only then is the merge redone.
-                active_ids, newly_loaded_ids = merge_active_skills(
-                    [outcome.created_id, *decision.skill_ids],
-                    prior_active_ids,
-                    self.catalog,
-                    self.settings.max_active_skills,
-                )
-
         skills = self.catalog.get_many(active_ids)
         executions = [
             SkillLoadExecution.from_skill(new_call_id(), self.catalog.get(sid))  # type: ignore[arg-type]
@@ -300,12 +276,79 @@ class ChatOrchestrator:
 
         if request.generation.stream:
             stream, first_event = await self._open_stream_with_retry(provider_request)
-            body_iter = self._stream_body(stream, first_event, meta=meta)
+            body_iter = self._stream_body(
+                stream, first_event, meta=meta, request=request, active_ids=active_ids
+            )
             return RespondOutcome(headers=headers, streaming=True, stream=body_iter)
 
         result = await self._complete_with_retry(provider_request)
         body = self._build_nonstream_body(result, meta)
+        self._maybe_learn_after_turn(
+            request=request,
+            active_ids=active_ids,
+            assistant_text=result.text,
+            # finish_reason is a second, independent signal: treat a continuation
+            # round as such even if a malformed upstream drops the tool_calls payload.
+            had_tool_calls=bool(result.tool_calls) or result.finish_reason == "tool_calls",
+        )
         return RespondOutcome(headers=headers, streaming=False, body=body)
+
+    # ---- skill learning (local dev only, off the response path) ---------
+
+    def _maybe_learn_after_turn(
+        self,
+        *,
+        request: RespondRequest,
+        active_ids: list[str],
+        assistant_text: str,
+        had_tool_calls: bool,
+    ) -> None:
+        """Fire skill learning on the just-completed workflow, off the response path.
+
+        Runs ONLY when the turn ended with a final answer (no tool calls) — a
+        tool-continuation round is a half-finished workflow, so we wait for the
+        round that actually closes it. This is exactly what lets the LAST workflow
+        of a session be learned: there is no next instruction to trigger on, but a
+        final answer is the natural completion boundary. The learner reloads the
+        catalog in place, so a created/improved skill is live for the next turn.
+
+        Fire-and-forget: a slow (thinking-model) learning pass must never delay or
+        block the response the user already has, and the learner fails open
+        internally. Invisible to the CLI — no wire fields, no feedback tool.
+        """
+        if self.learner is None or not self.learner.enabled:
+            return
+        if had_tool_calls or not assistant_text.strip():
+            return
+        trailing = [ChatMessage(role="assistant", content=assistant_text)]
+        task = asyncio.create_task(
+            self._run_learner_background(request, list(active_ids), trailing)
+        )
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def _run_learner_background(
+        self,
+        request: RespondRequest,
+        active_ids: list[str],
+        trailing: list[ChatMessage],
+    ) -> None:
+        """Guarded wrapper so a background learning pass can never surface an
+        exception to the (already-detached) task — ``learner.run`` is fail-open,
+        this is belt-and-suspenders for anything around it."""
+        assert self.learner is not None  # guarded by the caller
+        try:
+            await self.learner.run(
+                request=request, active_ids=active_ids, trailing_messages=trailing
+            )
+        except Exception as exc:  # noqa: BLE001 - detached task must swallow everything
+            logger.warning("skill_learning_background_failed", error=str(exc))
+
+    async def drain_background_tasks(self) -> None:
+        """Await any in-flight learning tasks — used on shutdown, before the
+        provider they depend on is closed."""
+        if self._background_tasks:
+            await asyncio.gather(*list(self._background_tasks), return_exceptions=True)
 
     # ---- manual resolve (section 12.2) ---------------------------------
 
@@ -499,24 +542,14 @@ class ChatOrchestrator:
         )
 
     async def _stream_body(
-        self, stream: ProviderStream, first_event: dict[str, Any] | None, *, meta: _RespondMeta
+        self,
+        stream: ProviderStream,
+        first_event: dict[str, Any] | None,
+        *,
+        meta: _RespondMeta,
+        request: RespondRequest,
+        active_ids: list[str],
     ) -> AsyncIterator[str]:
-        # The metadata event is always first, before any token: the client gets
-        # the skill prelude, active set, refreshed state, and selector outcome
-        # up front, then renders the load as if it happened before the reply.
-        yield self._sse(
-            "meta",
-            StreamMeta(
-                request_id=meta.request_id,
-                model=PUBLIC_MODEL_ID,
-                skills=meta.skills,
-                state=meta.state,
-                catalog_revision=meta.catalog_revision,
-                prompt_version=meta.prompt_version,
-                warnings=meta.warnings,
-            ).model_dump(exclude_none=True),
-        )
-
         async def _chunks() -> AsyncIterator[dict[str, Any]]:
             if first_event is not None:
                 yield first_event
@@ -525,12 +558,39 @@ class ChatOrchestrator:
 
         finish_reason: str | None = None
         thinking_signaled = False
+        # Accumulate the reply so post-completion learning can see the workflow it
+        # just finished. content_parts is joined into the final answer; a tool_calls
+        # delta marks this as a continuation round (not a completion boundary).
+        content_parts: list[str] = []
+        saw_tool_calls = False
+        completed = False
         try:
+            # The metadata event is always first, before any token: the client gets
+            # the skill prelude, active set, refreshed state, and selector outcome
+            # up front, then renders the load as if it happened before the reply.
+            # Emitted inside the try so a client disconnect at this very first yield
+            # still runs the stream's aclose() in the finally (no upstream leak).
+            yield self._sse(
+                "meta",
+                StreamMeta(
+                    request_id=meta.request_id,
+                    model=PUBLIC_MODEL_ID,
+                    skills=meta.skills,
+                    state=meta.state,
+                    catalog_revision=meta.catalog_revision,
+                    prompt_version=meta.prompt_version,
+                    warnings=meta.warnings,
+                ).model_dump(exclude_none=True),
+            )
             async for chunk in _chunks():
                 finish_reason = self._chunk_finish_reason(chunk) or finish_reason
                 delta = self._chunk_to_delta(chunk)
                 if delta is None:
                     continue
+                if delta.content:
+                    content_parts.append(delta.content)
+                if delta.tool_calls:
+                    saw_tool_calls = True
                 # Announce the thinking phase once, the instant the model's
                 # chain-of-thought starts streaming, so the CLI can show it.
                 if delta.reasoning_content and not thinking_signaled:
@@ -541,6 +601,7 @@ class ChatOrchestrator:
             yield self._sse(
                 "done", StreamDone(finish_reason=finish_reason, usage=usage).model_dump()
             )
+            completed = True
         except DaintreeError as exc:
             # Failure after the meta event: emit a terminal error event and stop.
             # Never fabricate a successful ``done``.
@@ -554,6 +615,18 @@ class ChatOrchestrator:
             yield self._sse("error", {"error": error_body})
         finally:
             await stream.aclose()
+
+        # Learn only from a stream that reached a clean ``done`` (not an error, and
+        # not an aborted stream — a client disconnect raises GeneratorExit at a
+        # yield above and never reaches here). A tool-continuation round is filtered
+        # by had_tool_calls inside the trigger.
+        if completed:
+            self._maybe_learn_after_turn(
+                request=request,
+                active_ids=active_ids,
+                assistant_text="".join(content_parts),
+                had_tool_calls=saw_tool_calls or finish_reason == "tool_calls",
+            )
 
     @staticmethod
     def _chunk_finish_reason(chunk: dict[str, Any]) -> str | None:

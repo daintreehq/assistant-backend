@@ -34,5 +34,7 @@ Rules:
 - Match this skill's OWN existing formatting conventions (heading style, line style, section names) — do not re-format it to look like another skill; formatting churn buries the real change in the diff.
 - Do NOT delete existing guardrails, weaken safety rules, add unsupported tools, or add project-private facts.
 - Legitimate improvements are general and reusable. Reject anything that is a one-off preference, a single repo's quirk, a transient error, or a secret.
+- Keep every change agent- and environment-agnostic. If the workflow's fix leaned on a specific CLI agent, terminal, model, or path, generalize it: tell the assistant to pick from the agents/tools actually available this turn (its configured-agents roster, open-terminal snapshot, and tool list) by fit — never hardcode "use claude" / "use codex" or a one-repo path.
+- Remember the reader is a small, fast model (DeepSeek V4 Flash): prefer concrete, ordered, unambiguous instructions over abstract advice.
 - Return the COMPLETE body so it can replace the file wholesale, even for a small change.
 - If the current skill already covers the lesson clearly, return {"action":"no_change","skill_id":"<the given id>","confidence":0} and change nothing.

@@ -1,10 +1,13 @@
 """The backend-internal skill-learning pipeline (LOCAL DEVELOPMENT ONLY).
 
-Runs inline in the respond path, between skill selection and prompt assembly, on
-the selector cadence (a genuine new instruction — never a tool-continuation
-round). It looks back at the completed workflow and, when a reusable Daintree
-lesson is present, writes or improves a skill file and reloads the catalog so the
-main model can use the fresh skill THIS turn.
+Runs off the response path, AFTER a turn completes with a final answer (no
+pending tool calls) — the natural boundary where a workflow is actually done.
+The orchestrator fires it fire-and-forget with the just-generated answer appended
+to the transcript, so learning sees the workflow it just finished — including the
+LAST one of a session, which no "next instruction" would ever trigger. It looks
+back at that completed workflow and, when a reusable Daintree lesson is present,
+writes or improves a skill file and reloads the catalog in place, so the fresh
+skill is live for the next relevant turn.
 
 Four separated concerns, each its own backend-only model call — the user-facing
 assistant is never told any of this exists:
@@ -40,6 +43,7 @@ from ..config import (
     Settings,
 )
 from ..contracts.daintree_api import RespondRequest
+from ..contracts.openai import ChatMessage
 from ..contracts.skill_learning import GateVerdict, SkillProposal
 from ..observability import get_logger
 from ..prompts.loader import PromptLoader
@@ -111,12 +115,13 @@ class _IndentDumper(yaml.SafeDumper):
 
 @dataclass
 class LearningOutcome:
-    """What the orchestrator needs after a learning attempt.
+    """What a caller learns from a learning attempt.
 
     ``changed`` is True only when the catalog was actually reloaded (apply mode +
-    a successful write). ``created_id`` is set only for a newly CREATED skill, so
-    the orchestrator can fold it into this turn's active set (it renders to the CLI
-    as a normal dynamic skill load).
+    a successful write). ``created_id`` is set only for a newly CREATED skill.
+    Learning now runs post-completion (fire-and-forget), so the orchestrator does
+    NOT fold this into the just-answered turn — the reloaded catalog is simply live
+    for the next turn's selection. The fields remain for logging and tests.
     """
 
     changed: bool = False
@@ -168,7 +173,7 @@ def _unified_diff(old: str, new: str, skill_id: str) -> str:
 
 
 class SkillLearner:
-    """Runs the inline skill-learning pipeline. Constructed only when enabled."""
+    """Runs the post-completion skill-learning pipeline. Constructed only when enabled."""
 
     def __init__(
         self,
@@ -201,26 +206,42 @@ class SkillLearner:
 
     # ---- entry point ----------------------------------------------------
 
-    async def run(self, *, request: RespondRequest, active_ids: list[str]) -> LearningOutcome:
-        """Attempt to learn from the completed workflow. Never raises."""
-        if not self.enabled or not self._eligible(request):
+    async def run(
+        self,
+        *,
+        request: RespondRequest,
+        active_ids: list[str],
+        trailing_messages: Sequence[ChatMessage] = (),
+    ) -> LearningOutcome:
+        """Attempt to learn from the completed workflow. Never raises.
+
+        ``trailing_messages`` are appended to the request's conversation before the
+        transcript is built. The post-completion trigger passes the just-generated
+        final assistant answer here, so learning sees the workflow it actually
+        finished — the request's own message list stops one turn short of it.
+        """
+        if not self.enabled:
+            return LearningOutcome()
+        messages = [*request.input.messages, *trailing_messages]
+        if not self._eligible(messages):
             return LearningOutcome()
         try:
-            return await self._run(request, active_ids)
+            return await self._run(request, active_ids, messages)
         except Exception as exc:  # noqa: BLE001 - learning must never break /respond
             logger.warning("skill_learning_failed", error=str(exc))
             return LearningOutcome()
 
-    def _eligible(self, request: RespondRequest) -> bool:
-        messages = request.input.messages
+    def _eligible(self, messages: Sequence[ChatMessage]) -> bool:
         if len(messages) < self.settings.skill_learning_min_messages:
             return False
         # There must be prior assistant work to learn from.
         return any(m.role == "assistant" for m in messages)
 
-    async def _run(self, request: RespondRequest, active_ids: list[str]) -> LearningOutcome:
+    async def _run(
+        self, request: RespondRequest, active_ids: list[str], messages: Sequence[ChatMessage]
+    ) -> LearningOutcome:
         catalog = self.catalog_manager.catalog
-        transcript = self._transcript(request)
+        transcript = self._transcript(messages)
         tools = [t.function.name for t in (request.input.tools or [])]
 
         verdict = await self._gate(transcript, catalog, active_ids, tools)
@@ -726,11 +747,11 @@ class SkillLearner:
 
     # ---- prompt helpers -------------------------------------------------
 
-    def _transcript(self, request: RespondRequest) -> str:
+    def _transcript(self, messages: Sequence[ChatMessage]) -> str:
         # Full detection over the whole (bounded, newest-biased) message history,
         # with learning-sized per-message caps — see _LEARNING_*_CHAR_CAP above.
         evidence, truncated = sanitize_for_selector(
-            request.input.messages,
+            list(messages),
             self.settings.skill_learning_context_tokens,
             tool_char_cap=_LEARNING_TOOL_CHAR_CAP,
             message_char_cap=_LEARNING_MESSAGE_CHAR_CAP,

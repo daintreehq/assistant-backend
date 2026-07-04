@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from daintree_assistant_server.skills.catalog import Catalog, load_catalog
+from daintree_assistant_server.skills.catalog import Catalog, default_skills_dir, load_catalog
 from daintree_assistant_server.skills.loader import SkillLoadError, parse_skill
 
 SKILL_A = """---
@@ -32,9 +32,13 @@ def _catalog() -> Catalog:
     return Catalog([parse_skill(SKILL_A, expected_id="a.one"), parse_skill(SKILL_B, expected_id="b.two")])
 
 
-def test_real_catalog_loads_seven() -> None:
+def test_real_catalog_loads_all_packaged_files() -> None:
     catalog = load_catalog()
-    assert len(catalog) == 7
+    # Every packaged skill file loads (no skill silently dropped), whatever the
+    # count — robust to the catalog growing as skill learning writes new skills.
+    packaged = list(default_skills_dir().glob("*.md"))
+    assert packaged, "no packaged skill files found"
+    assert len(catalog) == len(packaged)
     assert catalog.revision.startswith("sha256:")
 
 

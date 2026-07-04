@@ -15,12 +15,14 @@ def test_healthz(client) -> None:
     assert r.json() == {"status": "ok"}
 
 
-def test_readyz(client) -> None:
+def test_readyz(client, app) -> None:
     r = client.get("/readyz")
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ready"
-    assert body["skills"] == 7
+    # Assert the endpoint reports the app's ACTUAL catalog size, not a magic number:
+    # apply-mode skill learning grows the real catalog, and that must not redden this.
+    assert body["skills"] == len(app.state.container.catalog)
 
 
 def test_version(client) -> None:
@@ -42,11 +44,12 @@ def test_capabilities(client, auth) -> None:
     assert body["skills"]["manual_resolve"] is True
 
 
-def test_skills_list_and_etag(client, auth) -> None:
+def test_skills_list_and_etag(client, auth, app) -> None:
     r = client.get("/v1/daintree/skills", headers=auth)
     assert r.status_code == 200
     body = r.json()
-    assert len(body["data"]) == 7
+    # The list reports every catalog skill (robust to the catalog growing via learning).
+    assert len(body["data"]) == len(app.state.container.catalog)
     assert all("body" not in s for s in body["data"])
     assert all("required_tools" in s for s in body["data"])
     etag = r.headers["etag"]

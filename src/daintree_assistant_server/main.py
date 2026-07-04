@@ -260,6 +260,10 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     finally:
         final_container: Container | None = getattr(app.state, "container", None)
         if final_container is not None:
+            with contextlib.suppress(Exception):  # pragma: no cover - best-effort drain
+                # Let any in-flight fire-and-forget learning finish (its write+reload
+                # is cancellation-shielded) before the provider it uses is torn down.
+                await final_container.orchestrator.drain_background_tasks()
             with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
                 await final_container.provider.aclose()
 

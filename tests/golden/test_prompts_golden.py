@@ -25,10 +25,22 @@ from daintree_assistant_server.contracts.extensions import (
 )
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
-from daintree_assistant_server.skills.catalog import load_catalog
+from daintree_assistant_server.skills.catalog import Catalog, load_catalog
 from daintree_assistant_server.skills.load_events import SkillLoadExecution
 
 SNAPSHOTS = Path(__file__).parent / "snapshots"
+
+# The catalog-dependent snapshots render against a PINNED fixture catalog, not the
+# live one, so the self-evolving skill catalog (the local skill-learning harness
+# writing/improving real skill files) never reddens these goldens. What they still
+# protect is the prompt/assembler behavior: template wording, field layout, the
+# active marker, and message ordering. Real-catalog coverage lives in behavioral
+# tests plus the structural smoke test below.
+FIXTURE_SKILLS = Path(__file__).parent / "fixtures" / "skills"
+
+
+def _fixture_catalog() -> Catalog:
+    return load_catalog(FIXTURE_SKILLS)
 
 
 def _settings() -> Settings:
@@ -130,9 +142,8 @@ def test_loaded_skills_empty(assembler: PromptAssembler) -> None:
 
 
 def test_loaded_skills_one(assembler: PromptAssembler) -> None:
-    catalog = load_catalog()
-    skill = catalog.get("daintree.terminals.rename")
-    assert_golden("loaded_skills_rename.md", assembler.render_loaded_skills([skill]))
+    skill = _fixture_catalog().get("daintree.example.alpha")
+    assert_golden("loaded_skills_alpha.md", assembler.render_loaded_skills([skill]))
 
 
 def test_turn_footer(assembler: PromptAssembler) -> None:
@@ -146,13 +157,32 @@ def test_turn_footer(assembler: PromptAssembler) -> None:
 
 
 def test_selector_system(loader: PromptLoader) -> None:
-    catalog = load_catalog()
+    catalog = _fixture_catalog()
     rendered = loader.render(
         "selector/system.md.j2",
-        catalog=catalog.selector_metadata(["daintree.terminals.rename"]),
+        catalog=catalog.selector_metadata(["daintree.example.alpha"]),
         max_active=3,
     )
     assert_golden("selector_system.md", rendered)
+
+
+def test_selector_prompt_renders_real_catalog(loader: PromptLoader) -> None:
+    # Not a byte snapshot (the live catalog evolves) — a structural guard that the
+    # selector template renders the REAL catalog without error and lists every
+    # skill id. This keeps real-catalog coverage after the goldens were pinned to
+    # a fixture catalog above.
+    catalog = load_catalog()
+    assert catalog.skills, "real catalog is empty"
+    rendered = loader.render(
+        "selector/system.md.j2",
+        catalog=catalog.selector_metadata([]),
+        max_active=3,
+    )
+    for skill in catalog.skills:
+        # exact list-item line, plus the trigger text — catches the template
+        # dropping a field, not just an id substring coincidence.
+        assert f"- id: {skill.id}" in rendered
+        assert skill.when_to_use in rendered
 
 
 @pytest.mark.parametrize(
@@ -179,8 +209,7 @@ def test_skill_learning_prompts(loader: PromptLoader, name: str) -> None:
 
 
 def test_full_upstream_messages(assembler: PromptAssembler) -> None:
-    catalog = load_catalog()
-    skill = catalog.get("daintree.workflow.prep-branch-for-review")
+    skill = _fixture_catalog().get("daintree.example.alpha")
     req = RespondRequest.model_validate(
         {
             "protocol_version": 1,
@@ -202,8 +231,7 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
 def test_full_upstream_messages_with_open_terminals(assembler: PromptAssembler) -> None:
     # The open-terminal inventory must reach the assembled upstream request in the
     # volatile per-request tail (runtime context), not just render in isolation.
-    catalog = load_catalog()
-    skill = catalog.get("daintree.workflow.prep-branch-for-review")
+    skill = _fixture_catalog().get("daintree.example.alpha")
     req = RespondRequest.model_validate(
         {
             "protocol_version": 1,
@@ -237,8 +265,7 @@ def test_full_upstream_messages_with_open_terminals(assembler: PromptAssembler) 
 
 
 def test_synthetic_execution_shape() -> None:
-    catalog = load_catalog()
-    skill = catalog.get("daintree.workflow.prep-branch-for-review")
+    skill = _fixture_catalog().get("daintree.example.alpha")
     ex = SkillLoadExecution.from_skill("call_srv_GOLDEN", skill)
     prelude = ex.prelude_execution().model_dump()
     snapshot = json.dumps(prelude, indent=2, ensure_ascii=False)

@@ -23,8 +23,10 @@ pytest -k selector                       # by keyword
 ruff check .
 mypy --strict src
 
-# Prompt/skill golden snapshots — REQUIRED after any intentional prompt or
-# catalog change (see "Golden tests" below); review the diff before committing.
+# Prompt golden snapshots — REQUIRED after any intentional change to a prompt
+# template or the assembler (see "Golden tests" below); review the diff before
+# committing. Skill-catalog edits no longer churn these: the snapshots render
+# against a pinned fixture catalog, not the live one.
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
 # Live Fireworks contract tests (skipped by default; make real API calls)
@@ -50,9 +52,9 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
 2. **Selector cadence** (`_should_run_selector`) — the selector does **not** run on ordinary tool-continuation rounds. It runs on `selection.force`, `policy=="always"`, an invalid token, a catalog-revision change, a new `turn_id`, or a changed `instruction_revision`. Otherwise the prior active set is reused.
 3. **Skill selection** (`skills/selector.py`) — a separate **small-model** call classifies the conversation against the catalog and returns ≤ `max_active_skills` (default 3) IDs via a forced `select_skills` tool call. Output is validated and repaired once; on failure it **fails open** (degrades to the prior active set, never blocks the user).
 4. **Merge** (`merge_active_skills`) — additive, new-first, capped at the limit.
-4.5. **Skill learning** (`services/skill_learning.py`, local dev only — see below) — when enabled and the selector ran, the learner may write/improve a skill and reload the catalog *in place*. A created skill is folded to the front of this turn's active set. Off by default; a no-op (and can never break the turn — it fails open) otherwise.
 5. **Assemble** the upstream request (`services/prompt_assembler.py`) and call the provider.
 6. **Respond** — the skills/selection metadata is delivered first: as the response body's `skills` block (non-streaming) or the first SSE `meta` event (streaming), before any token. Retries only happen *before* any public bytes are emitted; a mid-stream failure emits a terminal `error` event, never a fabricated `done`.
+7. **Skill learning** (`services/skill_learning.py`, local dev only — see below) — *after* the response, on a turn that finished with a **final answer** (no pending tool calls), the orchestrator fires the learner **fire-and-forget** (`_maybe_learn_after_turn`) with the just-generated answer appended to the transcript, so it learns from the workflow it actually completed. It may write/improve a skill and reload the catalog *in place*, live for the **next** turn (it never touches THIS response — already sent — so it adds no latency and is not folded in). A turn ending in a tool call (a continuation round) is skipped: the workflow isn't done. Off by default; fails open — a learning error can never break the turn.
 
 **Invariants to preserve** (also in README): client `system`/`developer` messages are rejected; `skill.find`/`skill.load` are never offered to the main model; only active skill *bodies* are injected (never the full catalog); selector failure fails open; state is portable via the signed token.
 
@@ -80,7 +82,7 @@ Skills are Markdown runbooks that become task-specific operating instructions fo
 **To add a skill:**
 1. Create `skills/files/<id>.md` (it is auto-discovered, sorted by id — no registration).
 2. Run `pytest tests/unit/test_skills_loader.py tests/unit/test_catalog.py`.
-3. **Regenerate golden snapshots** — the selector-system prompt snapshots the whole catalog, so any added/changed skill changes `selector_system.md` (and may change `loaded_skills_*`): `DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/`, then review the diff.
+3. **Run the golden tests** (`pytest tests/golden/`). The prompt snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/skills/`), not the live one, so adding or changing a real skill no longer churns `selector_system.md` / `loaded_skills_*` — only editing a prompt template or the assembler does. A structural smoke test (`test_selector_prompt_renders_real_catalog`) still verifies the real catalog renders through the selector prompt.
 
 ## Skill learning (local development only)
 
@@ -88,20 +90,20 @@ A backend-internal harness (`services/skill_learning.py`) that watches completed
 
 **Hard boundaries** (do not weaken):
 - **Off by default** (`SKILL_LEARNING_MODE=off`) and **impossible in production**: an enabled mode is a `local_only_problems()` entry that fails `/readyz` when `ENVIRONMENT=production`.
-- **Invisible to the CLI**: no new wire fields, no capabilities flag, no dev endpoints. The main assistant model is **never** told learning exists — nothing is appended to its prompt and it is offered no feedback tool. A created skill simply appears in the existing `skills` block (`newly_loaded` + prelude) as an ordinary dynamic load; the only other observable is a slightly slower turn while generating.
+- **Invisible to the CLI**: no new wire fields, no capabilities flag, no dev endpoints. The main assistant model is **never** told learning exists — nothing is appended to its prompt and it is offered no feedback tool. A created/improved skill simply becomes live in the catalog and appears — on the **next** relevant turn — in the existing `skills` block (`newly_loaded` + prelude) as an ordinary dynamic load. Because learning runs fire-and-forget *after* the response, the triggering turn is not slowed and shows nothing new.
 - **Fails open**: `SkillLearner.run` swallows every exception and returns a no-op. Learning must never break `/respond`.
 - The **skill loader is the authority for disk**: a proposal is rendered to markdown and run through `parse_skill(expected_id=...)`; it only lands on disk if that (plus an id-format guard, a path-containment check, and a conservative secret scan) passes.
 
-**Pipeline** (inline, at a genuine new-instruction boundary — a new `turn_id` or a mid-turn interjection — never a tool-continuation round, even when the selector reruns for a catalog-revision change or `selection.force`):
-1. **Gate** (`prompts/skill_learning/gate.md`, small model, non-thinking JSON) reads the whole workflow transcript and returns none / improve / create. Strong triggers: the user signalling a problem ("what happened here?", "this shouldn't have happened") or the assistant visibly struggling; a cleanly completed repeatable workflow can justify a *create*. Only a `general_daintree_workflow` lesson above `SKILL_LEARNING_MIN_CONFIDENCE`, backed by concrete evidence, writes.
-2. **Build/improve** (`build.md` / `improve.md`, GLM 5.2, thinking) diagnoses what worked and what failed in the workflow, then returns a `SkillProposal`; the diagnosis plus a unified diff land in the audit record.
-3. **Validate → write → reload**: atomic write + reload as one cancellation-shielded unit (`CatalogManager.reload()`, rollback on failure), and (create only) fold into this turn's active set.
+**Pipeline** (fire-and-forget *after* a turn that completed with a final answer — `_maybe_learn_after_turn` in the orchestrator; a turn ending in a tool call is a continuation round and is skipped, so learning only ever sees a finished workflow — including the last one of a session, which no next instruction would ever trigger):
+1. **Gate** (`prompts/skill_learning/gate.md`, small model, non-thinking JSON) reads the whole workflow transcript (with the just-generated final answer appended) and returns none / improve / create. Strong triggers: the user signalling a problem ("what happened here?", "this shouldn't have happened") or the assistant visibly struggling; a cleanly completed repeatable workflow can justify a *create*. Only a `general_daintree_workflow` lesson above `SKILL_LEARNING_MIN_CONFIDENCE`, backed by concrete evidence, writes.
+2. **Build/improve** (`build.md` / `improve.md`, GLM 5.2, thinking) diagnoses what worked and what failed in the workflow, then returns a `SkillProposal`; the diagnosis plus a unified diff land in the audit record. The prompts require **generic, project- and agent-agnostic** skills — no hardcoded repo/path/CLI-agent; a step that needs an agent tells the model to pick the best-fit one from the configured-agents roster it sees at runtime — because the catalog must transfer across projects, users, and CLI agents.
+3. **Validate → write → reload**: atomic write + reload as one cancellation-shielded unit (`CatalogManager.reload()`, rollback on failure). The reloaded catalog is live for the next turn's selection; nothing is folded into the just-answered turn (its response is already sent).
 
 **Modes** (`SKILL_LEARNING_MODE`): `off` | `propose` (run the pipeline, write only a proposal + audit JSON under `SKILL_LEARNING_AUDIT_DIR`, never touch skill files) | `apply` (write the skill file + reload).
 
 **Write target** (`SKILL_LEARNING_DIR`): empty → the packaged `skills/files/` (edit-in-place; improvements land in `git diff`). Set to a separate dir to overlay instead — the catalog then loads packaged + overlay (`load_catalog(primary, overlay)`), overlay winning on id collision, leaving the source tree untouched.
 
-**Prompts have no version suffix** (`gate.md`, not `gate.v1.md`) — pre-release internal prompts, unlike wire-contract `tasks/<task>.v1.md`. They are snapshotted in `tests/golden/` like every other prompt. Because apply-mode writes real skill files, an interactive session will dirty the catalog and the golden snapshots — that is expected; regenerate goldens when you keep a change.
+**Prompts have no version suffix** (`gate.md`, not `gate.v1.md`) — pre-release internal prompts, unlike wire-contract `tasks/<task>.v1.md`. They are snapshotted in `tests/golden/` like every other prompt. Because apply-mode writes real skill files, an interactive session will dirty the catalog (`git diff` under `skills/files/`) — but **not** the golden snapshots, which render against a pinned fixture catalog. Regenerate goldens only when you change a prompt template or the assembler.
 
 ## Prompts / system messages
 
@@ -145,7 +147,7 @@ something to reintroduce incidentally.
 
 ## Golden tests
 
-`tests/golden/` snapshots rendered prompts and the fully-assembled upstream message array into `tests/golden/snapshots/`. **Any** intentional change to a prompt, the assembler, or the skill catalog will fail these until you regenerate with `DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/` — treat the resulting snapshot diff as the human-reviewable record of what the model will actually see.
+`tests/golden/` snapshots rendered prompts and the fully-assembled upstream message array into `tests/golden/snapshots/`. Any intentional change to a **prompt template or the assembler** will fail these until you regenerate with `DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/` — treat the resulting snapshot diff as the human-reviewable record of what the model will actually see. The catalog-dependent snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/skills/`), deliberately decoupled from the live catalog so the self-evolving skill files (skill learning) never redden the suite; `test_selector_prompt_renders_real_catalog` keeps a structural check over the real catalog.
 
 ## Utility tasks (`POST /v1/daintree/tasks`)
 

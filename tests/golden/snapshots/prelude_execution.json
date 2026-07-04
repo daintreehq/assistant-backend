@@ -4,13 +4,13 @@
     "type": "function",
     "function": {
       "name": "skill__load",
-      "arguments": "{\"skillId\":\"daintree.workflow.prep-branch-for-review\"}"
+      "arguments": "{\"skillId\":\"daintree.example.alpha\"}"
     }
   },
   "result": {
     "role": "tool",
     "tool_call_id": "call_srv_GOLDEN",
-    "content": "{\"ok\":true,\"summary\":\"Get a read-only review-readiness verdict, then do the real prep \\u2014 commit, push, open the PR \\u2014 branching on what the verdict reports.\",\"data\":{\"id\":\"daintree.workflow.prep-branch-for-review\"}}"
+    "content": "{\"ok\":true,\"summary\":\"A representative fixture skill used to pin golden prompt rendering.\",\"data\":{\"id\":\"daintree.example.alpha\"}}"
   },
   "display_name": "skill.load"
 }

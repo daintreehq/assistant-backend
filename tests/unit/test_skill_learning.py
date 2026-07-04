@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fakes import FakeProvider, make_result
+from fakes import FakeProvider, make_result, make_text_chunks
 
 from daintree_assistant_server.config import FIREWORKS_SMALL_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
@@ -489,7 +489,7 @@ def test_truncated_transcript_carries_marker(tmp_path: Path) -> None:
             {"role": "user", "content": "what happened here?"},
         ]
     )
-    transcript = learner._transcript(req)
+    transcript = learner._transcript(req.input.messages)
     assert transcript.startswith("[transcript truncated: oldest messages dropped]")
     assert "what happened here?" in transcript
 
@@ -544,7 +544,7 @@ def test_transcript_keeps_long_messages_and_tool_results(tmp_path: Path) -> None
             {"role": "user", "content": "what happened here?"},
         ]
     )
-    transcript = learner._transcript(req)
+    transcript = learner._transcript(req.input.messages)
     assert long_assistant in transcript
     assert long_tool in transcript
     assert "…[truncated]…" not in transcript
@@ -614,17 +614,15 @@ def test_secret_scan_allows_normal_prose(text: str) -> None:
     assert _contains_secret(text) is False
 
 
-@pytest.mark.asyncio
-async def test_orchestrator_surfaces_created_skill_as_load(tmp_path: Path) -> None:
-    # End-to-end: a created skill is folded into THIS turn's active set and renders
-    # to the CLI as an ordinary dynamic skill load (newly_loaded), and the main
-    # completion still returns normally.
+def _orchestrator_with_learner(
+    tmp_path: Path, fake: FakeProvider
+) -> tuple[Any, CatalogManager, Path]:
+    """A wired orchestrator whose learner writes edit-in-place into `primary`."""
     from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
     from daintree_assistant_server.services.prompt_assembler import PromptAssembler
     from daintree_assistant_server.skills.selector import Selector
     from daintree_assistant_server.state.codec import StateCodec
 
-    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     primary = _primary(tmp_path)
     settings = _settings(tmp_path)  # edit-in-place into `primary`
     manager = CatalogManager(load_catalog(primary), primary_dir=primary)
@@ -643,65 +641,170 @@ async def test_orchestrator_surfaces_created_skill_as_load(tmp_path: Path) -> No
         provider=fake,
         learner=learner,
     )
-
-    outcome = await orch.complete(_request(), upstream_model=FIREWORKS_SMALL_MODEL)
-    assert outcome.body is not None
-    active = [s["id"] for s in outcome.body["skills"]["active"]]
-    newly = [s["id"] for s in outcome.body["skills"]["newly_loaded"]]
-    assert "daintree.test.created" in active
-    assert "daintree.test.created" in newly
-    assert (primary / "daintree.test.created.md").is_file()
-    # The main completion still ran and produced its normal reply.
-    assert outcome.body["message"]["content"] == "ok"
+    return orch, manager, primary
 
 
 @pytest.mark.asyncio
-async def test_learner_skipped_on_continuation_round(tmp_path: Path) -> None:
-    # A catalog-revision change reruns the SELECTOR on a plain tool-continuation
-    # round (same turn_id + instruction_revision) — e.g. a concurrent session's
-    # learner just applied a change. Learning must NOT fire there: the transcript
-    # is a half-finished workflow, not a completed one.
-    from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
-    from daintree_assistant_server.services.prompt_assembler import PromptAssembler
-    from daintree_assistant_server.skills.selector import Selector
-    from daintree_assistant_server.state.codec import StateCodec
-
+async def test_learns_after_completed_turn(tmp_path: Path) -> None:
+    # A completed turn (final answer, no tool calls) triggers learning OFF the
+    # response path: the main reply returns immediately and unchanged, and the
+    # background pass then writes/reloads the skill so it is live for the next turn.
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
-    primary = _primary(tmp_path)
-    settings = _settings(tmp_path)
-    manager = CatalogManager(load_catalog(primary), primary_dir=primary)
-    loader = _loader()
-    learner = SkillLearner(
-        settings=settings, provider=fake, prompt_loader=loader, catalog_manager=manager
-    )
-    selector = Selector(fake, loader, manager, settings)
-    codec = StateCodec(current_key=b"k" * 16, current_kid="k1", salt=b"salt", ttl_seconds=3600)
-    orch = ChatOrchestrator(
-        settings=settings,
-        catalog_manager=manager,
-        selector=selector,
-        state_codec=codec,
-        assembler=PromptAssembler(loader, settings),
-        provider=fake,
-        learner=learner,
-    )
+    orch, manager, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    # Valid token matching the request's turn_id/instruction_revision, but a stale
-    # catalog revision: the selector reruns, yet this is not an instruction boundary.
-    state = codec.issue(
-        session_id="s",
-        active_skills=[],
-        catalog_revision="sha256:stale",
-        turn_id="t",
-        instruction_revision=0,
-    )
-    outcome = await orch.complete(
-        _request(state=state), upstream_model=FIREWORKS_SMALL_MODEL
-    )
+    outcome = await orch.complete(_request(), upstream_model=FIREWORKS_SMALL_MODEL)
     assert outcome.body is not None
-    assert fake.tool_call_requests  # the selector DID rerun (revision mismatch)
-    gate_calls = [
-        r for r in fake.requests if "skill-learning gate" in r.messages[0]["content"]
-    ]
-    assert gate_calls == []  # ...but learning did not
+    # The main completion returned its normal reply straight away...
+    assert outcome.body["message"]["content"] == "ok"
+    # ...and the just-learned skill is NOT folded into THIS turn — you can't use a
+    # skill to guide the very workflow that taught it. It lands for the next turn.
+    active = [s["id"] for s in outcome.body["skills"]["active"]]
+    assert "daintree.test.created" not in active
+    # Fire-and-forget: complete() returned BEFORE the learner ran (no await between
+    # spawning the task and returning), so nothing is written yet — this proves the
+    # work is off the response path, not synchronously awaited before the reply.
     assert not (primary / "daintree.test.created.md").exists()
+
+    await orch.drain_background_tasks()
+
+    assert (primary / "daintree.test.created.md").is_file()
+    assert "daintree.test.created" in manager.catalog
+
+
+@pytest.mark.asyncio
+async def test_learner_skipped_when_turn_ends_in_tool_calls(tmp_path: Path) -> None:
+    # A turn that ends by calling tools is a half-finished workflow, not a
+    # completion boundary: learning must NOT fire. It waits for the round that
+    # returns a final answer.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+
+    def _complete(req: Any) -> Any:
+        system = req.messages[0]["content"]
+        if "skill-learning gate" in system:
+            return make_result(content=json.dumps(GATE_CREATE))
+        if "skill builder" in system or "skill improver" in system:
+            return make_result(content=json.dumps(PROPOSAL_CREATE))
+        # The main completion ends the round with a tool call, not a final answer.
+        return make_result(
+            content=None,
+            tool_calls=[
+                {
+                    "id": "c1",
+                    "type": "function",
+                    "function": {"name": "terminal.read", "arguments": "{}"},
+                }
+            ],
+            finish_reason="tool_calls",
+        )
+
+    fake.complete_result = _complete
+    orch, _, primary = _orchestrator_with_learner(tmp_path, fake)
+
+    outcome = await orch.complete(_request(), upstream_model=FIREWORKS_SMALL_MODEL)
+    assert outcome.body is not None
+    await orch.drain_background_tasks()  # nothing was spawned; a no-op
+
+    gate_calls = [r for r in fake.requests if "skill-learning gate" in r.messages[0]["content"]]
+    assert gate_calls == []  # learning never ran on the continuation round
+    assert not (primary / "daintree.test.created.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_learns_after_streamed_completion(tmp_path: Path) -> None:
+    # The streaming path learns after a clean `done`, from the accumulated reply.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    fake.stream_chunks = make_text_chunks("all done here")
+    orch, manager, primary = _orchestrator_with_learner(tmp_path, fake)
+
+    req = RespondRequest.model_validate(
+        {
+            "protocol_version": 1,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": MESSAGES},
+            "generation": {"stream": True},
+        }
+    )
+    outcome = await orch.complete(req, upstream_model=FIREWORKS_SMALL_MODEL)
+    assert outcome.stream is not None
+    async for _event in outcome.stream:  # drain the SSE stream to completion
+        pass
+
+    await orch.drain_background_tasks()
+
+    assert (primary / "daintree.test.created.md").is_file()
+    assert "daintree.test.created" in manager.catalog
+
+
+@pytest.mark.asyncio
+async def test_learner_skipped_when_streamed_turn_ends_in_tool_calls(tmp_path: Path) -> None:
+    # The streaming path has its OWN tool-call detector (saw_tool_calls / finish_reason),
+    # separate from the non-stream path: a stream whose deltas carry tool_calls and
+    # finishes with reason "tool_calls" is a continuation round and must NOT learn.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    fake.stream_chunks = [
+        {"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
+        {
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {
+                        "tool_calls": [
+                            {
+                                "index": 0,
+                                "id": "c1",
+                                "type": "function",
+                                "function": {"name": "terminal.read", "arguments": "{}"},
+                            }
+                        ]
+                    },
+                    "finish_reason": None,
+                }
+            ]
+        },
+        {
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}],
+            "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7},
+        },
+    ]
+    orch, _, primary = _orchestrator_with_learner(tmp_path, fake)
+
+    req = RespondRequest.model_validate(
+        {
+            "protocol_version": 1,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": MESSAGES},
+            "generation": {"stream": True},
+        }
+    )
+    outcome = await orch.complete(req, upstream_model=FIREWORKS_SMALL_MODEL)
+    assert outcome.stream is not None
+    async for _event in outcome.stream:
+        pass
+    await orch.drain_background_tasks()
+
+    gate_calls = [r for r in fake.requests if "skill-learning gate" in r.messages[0]["content"]]
+    assert gate_calls == []
+    assert not (primary / "daintree.test.created.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_drain_background_tasks_awaits_pending(tmp_path: Path) -> None:
+    # drain with zero tasks is a no-op; with a pending task it awaits to completion
+    # and the done-callback discards it from the set.
+    fake = _provider(GATE_NONE, None)
+    orch, _, _ = _orchestrator_with_learner(tmp_path, fake)
+    await orch.drain_background_tasks()  # zero tasks: must not raise
+
+    done = asyncio.Event()
+
+    async def _work() -> None:
+        await asyncio.sleep(0)
+        done.set()
+
+    task = asyncio.create_task(_work())
+    orch._background_tasks.add(task)
+    task.add_done_callback(orch._background_tasks.discard)
+
+    await orch.drain_background_tasks()
+    assert done.is_set()
+    assert not orch._background_tasks  # discarded on completion
