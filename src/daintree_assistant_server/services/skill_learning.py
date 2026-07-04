@@ -159,6 +159,97 @@ def _contains_secret(text: str) -> bool:
     return any(pat.search(text) for pat in _SECRET_PATTERNS)
 
 
+def _redact_secrets(text: str) -> str:
+    for pat in _SECRET_PATTERNS:
+        text = pat.sub("[REDACTED-SECRET]", text)
+    return text
+
+
+def _redact_secrets_in_obj(obj: Any) -> Any:
+    """Recursively mask secret-shaped values anywhere in an audit payload.
+
+    The skill markdown itself is already secret-scanned and the whole proposal is
+    rejected on a hit, but the audit record ALSO stores model free-text (gate
+    evidence, the what-worked/what-failed diagnosis, the diff) that the model can
+    copy verbatim from tool output. That evidence would otherwise persist to disk
+    unscanned, so redact it here before it is written — matching the "never persist
+    secrets" posture the rest of the pipeline holds.
+    """
+    if isinstance(obj, str):
+        return _redact_secrets(obj)
+    if isinstance(obj, dict):
+        return {k: _redact_secrets_in_obj(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_redact_secrets_in_obj(v) for v in obj]
+    return obj
+
+
+# House style for GENERATED/IMPROVED skills. The skill loader enforces structure
+# (frontmatter, size, tool-name syntax, id match) but not the operating-runbook
+# style that makes a small model actually follow a skill. These checks run ONLY on
+# learning proposals — never on hand-authored packaged skills at load — and are
+# calibrated so EVERY packaged skill passes, so the improve path never rejects a
+# faithful edit of an existing skill. build.md / improve.md instruct this same style.
+_HOUSE_MIN_BODY_CHARS = 60
+_HOUSE_MAX_BODY_BYTES = 48 * 1024  # generated-skill ceiling (the loader caps at 256 KB)
+_NUMBERED_STEP_RE = re.compile(r"(?m)^\s*\d+\.\s")
+_MD_HEADER_RE = re.compile(r"(?m)^#{1,6}\s")
+# "use/spawn/prefer/… claude" and friends — the prompts forbid hardcoding a specific
+# CLI agent; a step that needs one must pick from the runtime configured-agents roster.
+# Anchored on an imperative VERB + the agent name (optionally quoted/backticked) so it
+# fires on directives like "spawn codex" / "use the `claude` agent" but NOT on the
+# roster EXAMPLES real skills legitimately list ("agent id: claude, codex, …", "all
+# 'Claude' tabs") — those have no preceding verb. "pick the best-fit agent" (no agent
+# named) also does not match. An assignment form ("agentId: claude") is deliberately
+# NOT matched: it collides with those example lists.
+_HARDCODED_AGENT_RE = re.compile(
+    r"(?i)\b(?:use|spawn|launch|load|run|pick|choose|prefer|select|assign)\s+"
+    r"(?:the\s+)?['\"`]?(?:claude|codex|gemini|cursor|aider|copilot|cline|windsurf|goose)\b"
+)
+# An absolute user/home path is a project-specific leak — skills must be portable.
+_USER_PATH_RE = re.compile(r"(?:/Users/|/home/[^/\s]|/root/|[A-Za-z]:\\Users\\)")
+# Narrow references back to the originating transcript: a skill is a self-contained
+# runbook, not a narrative of the run it was learned from. Kept narrow ON PURPOSE —
+# bare "this run" / "this runbook" are legitimate operational prose (and appear in the
+# packaged catalog), so only unmistakable origin-references are rejected.
+_EPISODIC_RE = re.compile(
+    r"(?i)\bas (?:seen|shown) in this\b|\bthe workflow above\b"
+    r"|\bin this (?:transcript|conversation)\b"
+)
+
+
+def _house_style_problems(body: str) -> list[str]:
+    """Return human-readable house-style problems for a proposed skill body.
+
+    Empty list == passes. Every packaged skill satisfies these checks.
+    """
+    text = body.strip()
+    problems: list[str] = []
+    first_line = text.split("\n", 1)[0].strip().lower() if text else ""
+    if not (first_line.startswith("use when:") or first_line.startswith("use when ")):
+        problems.append("body must open with a 'Use when:' line")
+    if len(text) < _HOUSE_MIN_BODY_CHARS:
+        problems.append("body is too short to be a runbook")
+    if len(body.encode("utf-8")) > _HOUSE_MAX_BODY_BYTES:
+        problems.append("body exceeds the generated-skill size ceiling")
+    has_procedure = (
+        "procedure:" in text.lower()
+        or len(_NUMBERED_STEP_RE.findall(text)) >= 3
+        or len(_MD_HEADER_RE.findall(text)) >= 2
+    )
+    if not has_procedure:
+        problems.append("body needs a Procedure: section, numbered steps, or step headers")
+    if "report" not in text.lower():
+        problems.append("body must end with a report-back instruction")
+    if _HARDCODED_AGENT_RE.search(text):
+        problems.append("body hardcodes a specific CLI agent (use the configured-agents roster)")
+    if _USER_PATH_RE.search(text):
+        problems.append("body contains an absolute user/home path (skills must be portable)")
+    if _EPISODIC_RE.search(text):
+        problems.append("body references the originating workflow (skills must be self-contained)")
+    return problems
+
+
 def _unified_diff(old: str, new: str, skill_id: str) -> str:
     """A reviewable old→new diff for the audit record (empty old = a create)."""
     return "\n".join(
@@ -565,6 +656,19 @@ class SkillLearner:
             )
             return None
 
+        # House style: the loader validates STRUCTURE; this validates the operating
+        # runbook shape a small model actually follows (and generality guardrails).
+        # Calibrated so every packaged skill passes → the improve path is never blocked.
+        house_problems = _house_style_problems(skill.body)
+        if house_problems:
+            logger.warning(
+                "skill_learning_rejected",
+                reason="not_house_style",
+                skill_id=skill_id,
+                detail="; ".join(house_problems),
+            )
+            return None
+
         root = self._write_dir.resolve()
         path = (root / f"{skill_id}.md").resolve()
         if os.path.commonpath([str(root), str(path)]) != str(root) or path.parent != root:
@@ -602,6 +706,10 @@ class SkillLearner:
             "diff": _unified_diff(old_text, markdown, skill.id),
             "gate": verdict.model_dump(),
         }
+        # The audit stores model free-text (gate evidence, diagnosis, diff) that can
+        # carry secret-shaped values copied from tool output — mask them before the
+        # record is persisted, so the audit trail holds no credentials.
+        audit = _redact_secrets_in_obj(audit)
         short = skill.content_hash.split(":")[-1][:8]
 
         if self.mode == "propose":

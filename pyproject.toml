@@ -54,6 +54,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 daintree_assistant_server = [
     "prompts/main/*.md",
+    "prompts/main/base/*.md",
     "prompts/main/*.j2",
     "prompts/selector/*.j2",
     "prompts/tasks/*.md",

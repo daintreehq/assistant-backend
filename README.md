@@ -101,12 +101,13 @@ backend-internal pipeline can write a brand-new skill or improve an existing one
 so the catalog gets better as you use it. It is **off by default** and **cannot run
 in production** (an enabled mode fails `/readyz` when `ENVIRONMENT=production`).
 
-It is invisible to the CLI. The main assistant model is never told it exists; the
-CLI just sees a slightly slower turn when a skill is being generated, and then the
-new/improved skill shows up as an ordinary dynamic skill load. Keep pointing your
-CLI at the same server — nothing about the wire protocol changes.
+It is invisible to the CLI. The main assistant model is never told it exists.
+Learning runs **off the response path, in the background, after** the turn's answer
+is already sent, so the triggering turn is not slowed at all; the new/improved skill
+simply shows up as an ordinary dynamic skill load on a **later** relevant turn. Keep
+pointing your CLI at the same server — nothing about the wire protocol changes.
 
-**How it works (per turn, at a genuine new-instruction boundary):**
+**How it works (fire-and-forget, after a turn completes with a final answer):**
 
 1. A cheap **gate** (`deepseek-v4-flash`) reads the just-completed workflow and
    decides: nothing to learn / improve an existing skill / create a new one. Strong
@@ -117,9 +118,11 @@ CLI at the same server — nothing about the wire protocol changes.
    the current skill, if improving) did that worked and where it failed — then
    writes the new skill or the improved one. The diagnosis is kept in the audit
    record so you can review *why* each change landed.
-3. The backend validates it through the real skill loader (frontmatter, house
-   style, tool-name rules, size caps, secret scan), writes the `.md` file, and
-   reloads the catalog. A created skill is used **this same turn**.
+3. The backend validates it through the real skill loader (frontmatter, tool-name
+   rules, size caps) plus a learning-layer gate (house-style checks + a secret
+   scan), writes the `.md` file, and reloads the catalog. The created/improved
+   skill is **never** folded into the turn it learned from (that answer is already
+   sent) — it becomes live for the **next** relevant turn's selection.
 
 **Enable it locally.** The fastest way is to prefix the run command — no `.env`
 edit needed (a real env var wins over `.env` anyway):
@@ -128,7 +131,7 @@ edit needed (a real env var wins over `.env` anyway):
 SKILL_LEARNING_MODE=apply python -m daintree_assistant_server
 ```
 
-That is the everything-on-defaults mode: the gate runs on each new instruction,
+That is the everything-on-defaults mode: the gate runs after each completed turn,
 GLM writes/improves a skill when warranted, changes land in the real
 `skills/files/` (so they show up in `git diff`), and the catalog reloads live.
 Point your CLI at the server as usual and just work. For a safe dry run that
@@ -154,10 +157,12 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
   `skill_learning_applied` events. Changed skills change the catalog revision, so
   regenerate golden snapshots before committing (`DAINTREE_UPDATE_GOLDEN=1 pytest
   tests/golden/`).
-- Learning fires on your **next** instruction (it looks back at the just-completed
-  workflow), so the *last* workflow before you close a session is never learned
-  from. If the final workflow was the interesting one, send a throwaway follow-up
-  ("thanks") to give the gate a boundary to trigger on.
+- Learning fires **after** a turn that ends in a final answer — not after tool-call
+  continuation rounds (those aren't a finished workflow) — and runs in the
+  background, so it never delays the response. Because it triggers on completion
+  rather than on your *next* message, even the **last** workflow of a session is
+  learned from; no throwaway follow-up is needed. What it writes lands for a later
+  turn, never the one it learned from.
 
 ## Endpoints
 

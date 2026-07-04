@@ -14,7 +14,11 @@ from daintree_assistant_server.config import FIREWORKS_SMALL_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import upstream_error
 from daintree_assistant_server.prompts.loader import PromptLoader
-from daintree_assistant_server.services.skill_learning import SkillLearner, _contains_secret
+from daintree_assistant_server.services.skill_learning import (
+    SkillLearner,
+    _contains_secret,
+    _house_style_problems,
+)
 from daintree_assistant_server.skills.catalog import CatalogManager, load_catalog
 
 # --------------------------------------------------------------------------
@@ -350,6 +354,115 @@ async def test_secret_in_body_rejected(tmp_path: Path) -> None:
     outcome = await learner.run(request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_non_house_style_body_rejected(tmp_path: Path) -> None:
+    # Passes the loader (valid frontmatter, non-empty body) but violates house style:
+    # no "Use when:" opening. The learning-layer gate must reject it so the catalog
+    # only gains runbooks a small model can actually follow.
+    off_style = {
+        **PROPOSAL_CREATE,
+        "body": "Do the thing.\n\nProcedure:\n1. Step one.\n2. Step two.\n\nReport back: done.",
+    }
+    fake = _provider(GATE_CREATE, off_style)
+    learner, _, write_dir = _learner(tmp_path, fake)
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is False
+    assert not (write_dir / "daintree.test.created.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_hardcoded_agent_body_rejected(tmp_path: Path) -> None:
+    # Skills must be agent-agnostic: a body that names a specific CLI agent is
+    # rejected so the catalog transfers across agents/users.
+    hardcoded = {
+        **PROPOSAL_CREATE,
+        "body": "Use when: fixing.\n\nProcedure:\n1. Spawn claude to make the edits.\n"
+        "2. Wait for it.\n\nReport back: done.",
+    }
+    fake = _provider(GATE_CREATE, hardcoded)
+    learner, _, write_dir = _learner(tmp_path, fake)
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is False
+    assert not (write_dir / "daintree.test.created.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_audit_redacts_secretlike_evidence(tmp_path: Path) -> None:
+    # The skill body is secret-scanned, but the audit ALSO stores model free-text
+    # (the what-worked/what-failed diagnosis, gate evidence, diff). A secret-shaped
+    # value copied there must be masked before the audit record hits disk.
+    secret = "fw_" + "a" * 24
+    proposal = {**PROPOSAL_IMPROVE, "what_worked": [f"reused the key {secret}"]}
+    fake = _provider(GATE_IMPROVE, proposal)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is True
+    audits = list((tmp_path / "audit").glob("daintree.test.target.*.json"))
+    assert len(audits) == 1
+    raw = audits[0].read_text(encoding="utf-8")
+    assert secret not in raw
+    audit = json.loads(raw)
+    assert audit["what_worked"] == ["reused the key [REDACTED-SECRET]"]
+
+
+def test_house_style_accepts_every_packaged_skill() -> None:
+    # The house-style gate also runs on the IMPROVE path over existing skills, so
+    # every packaged skill must pass it — otherwise learning could never improve the
+    # real catalog. This guards the "improve path is never blocked" invariant.
+    for skill in load_catalog().skills:
+        assert _house_style_problems(skill.body) == [], skill.id
+
+
+def test_house_style_problems_flags_each_violation() -> None:
+    # Each check fires in isolation on an otherwise-conforming body.
+    good = "Use when: X happens.\n\nProcedure:\n1. A.\n2. B.\n3. C.\n\nReport back: done."
+    assert _house_style_problems(good) == []
+    no_opener = "Does a thing.\n\nProcedure:\n1. A.\n2. B.\n3. C.\n\nReport back: done."
+    assert any("Use when" in p for p in _house_style_problems(no_opener))
+    agent = "Use when: x.\n\nProcedure:\n1. spawn codex now.\n\nReport back: y."
+    assert any("CLI agent" in p for p in _house_style_problems(agent))
+    path = "Use when: x.\n\nProcedure:\n1. open /Users/greg/repo.\n\nReport back: y."
+    assert any("path" in p for p in _house_style_problems(path))
+    episodic = "Use when: x.\n\nProcedure:\n1. do it as seen in this workflow.\n\nReport back: y."
+    assert any("self-contained" in p for p in _house_style_problems(episodic))
+    # "Use whenever" is not the house opener; "pick the best-fit agent" is not a hardcode.
+    assert any("Use when" in p for p in _house_style_problems("Use whenever.\n\nProcedure:\n1. a.\n2. b.\n3. c.\n\nReport back: y."))
+    agnostic = "Use when: x.\n\nProcedure:\n1. pick the best-fit agent.\n2. b.\n3. c.\n\nReport back: y."
+    assert _house_style_problems(agnostic) == []
+
+
+@pytest.mark.asyncio
+async def test_gate_transcript_includes_trailing_final_answer(tmp_path: Path) -> None:
+    # Post-completion learning appends the just-generated final assistant answer to
+    # the transcript, and gate.md now judges "the workflow ending at that final
+    # answer". Lock that threading: the gate must SEE the final answer, positioned
+    # AFTER the conversation's last user message (i.e. genuinely appended last).
+    from daintree_assistant_server.contracts.openai import ChatMessage
+
+    seen: dict[str, str] = {}
+    fake = FakeProvider()
+
+    def _complete(req: Any) -> Any:
+        if "skill-learning gate" in req.messages[0]["content"]:
+            seen["transcript"] = "\n".join(
+                m["content"] for m in req.messages if isinstance(m.get("content"), str)
+            )
+            return make_result(content=json.dumps(GATE_NONE))
+        return make_result(content="ok")
+
+    fake.complete_result = _complete
+    learner, _, _ = _learner(tmp_path, fake)
+    final = "FINAL-ANSWER-SENTINEL-9c3f"
+    await learner.run(
+        request=_request(),
+        active_ids=[],
+        trailing_messages=[ChatMessage(role="assistant", content=final)],
+    )
+    transcript = seen["transcript"]
+    assert final in transcript
+    assert transcript.index(final) > transcript.index("what happened here?")
 
 
 @pytest.mark.asyncio
