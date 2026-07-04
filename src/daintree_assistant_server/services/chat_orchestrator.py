@@ -344,11 +344,33 @@ class ChatOrchestrator:
         except Exception as exc:  # noqa: BLE001 - detached task must swallow everything
             logger.warning("skill_learning_background_failed", error=str(exc))
 
-    async def drain_background_tasks(self) -> None:
-        """Await any in-flight learning tasks — used on shutdown, before the
-        provider they depend on is closed."""
-        if self._background_tasks:
-            await asyncio.gather(*list(self._background_tasks), return_exceptions=True)
+    async def drain_background_tasks(self, timeout: float = 30.0) -> None:
+        """Give in-flight learning tasks a BOUNDED grace period on shutdown, then
+        cancel — used before the provider they depend on is closed.
+
+        A learning pass is a slow (thinking-model) call that can legitimately run
+        for minutes, so an unbounded await here would hang server shutdown after a
+        Ctrl-C (the common case: stopping the local server right when the last
+        turn's pass just fired). We wait up to ``timeout`` for passes to finish, then
+        cancel the stragglers. Cancelling only interrupts the model call; a pass
+        already inside its write+reload is cancellation-shielded (see
+        ``SkillLearner._apply``), so the catalog is never left half-written. Losing
+        an unfinished pass is acceptable — learning is fire-and-forget and
+        best-effort, and the same workflow can be re-learned on a later run.
+        """
+        tasks = list(self._background_tasks)
+        if not tasks:
+            return
+        logger.info("skill_learning_drain_wait", pending=len(tasks), timeout=timeout)
+        _, pending = await asyncio.wait(tasks, timeout=timeout)
+        if pending:
+            logger.warning("skill_learning_drain_timeout", abandoned=len(pending))
+            for task in pending:
+                task.cancel()
+            # A cancelled pass unwinds fast unless it is in the shielded commit,
+            # which finishes on its own first (a file write + reload, not a model
+            # call), so this final gather stays bounded.
+            await asyncio.gather(*pending, return_exceptions=True)
 
     # ---- manual resolve (section 12.2) ---------------------------------
 

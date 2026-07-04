@@ -921,3 +921,29 @@ async def test_drain_background_tasks_awaits_pending(tmp_path: Path) -> None:
     await orch.drain_background_tasks()
     assert done.is_set()
     assert not orch._background_tasks  # discarded on completion
+
+
+@pytest.mark.asyncio
+async def test_drain_background_tasks_cancels_after_timeout(tmp_path: Path) -> None:
+    # A pass still running past the grace period is cancelled, so shutdown can't
+    # hang on a slow (minutes-long) learning call.
+    fake = _provider(GATE_NONE, None)
+    orch, _, _ = _orchestrator_with_learner(tmp_path, fake)
+
+    cancelled = asyncio.Event()
+
+    async def _slow() -> None:
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+
+    task = asyncio.create_task(_slow())
+    orch._background_tasks.add(task)
+    task.add_done_callback(orch._background_tasks.discard)
+
+    await orch.drain_background_tasks(timeout=0.05)
+    assert cancelled.is_set()
+    assert task.cancelled()
+    assert not orch._background_tasks

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# Run the Daintree Assistant Server locally, with skill learning ON by default so
+# a work session improves the skill catalog in place (changes land in `git diff`).
+#
+#   ./dev            # apply mode — learns + writes/improves real skill files (default)
+#   ./dev propose    # dry-run — run the pipeline, write proposals only, touch nothing
+#   ./dev off        # plain server, no skill learning
+#
+# The mode can also come from the environment (SKILL_LEARNING_MODE); a positional
+# arg wins over it. Everything else (FIREWORKS_API_KEY, PORT, …) is read from .env
+# as usual. In production the server refuses to boot with learning enabled — this
+# is a LOCAL convenience only.
+set -euo pipefail
+
+# Resolve the repo root (this script's own directory) so ./dev works from anywhere.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+# Interpreter: prefer the project venv, then a system 3.12, then whatever python3.
+if [[ -x "$ROOT/.venv/bin/python" ]]; then
+  PY="$ROOT/.venv/bin/python"
+elif command -v python3.12 >/dev/null 2>&1; then
+  PY="python3.12"
+else
+  PY="python3"
+fi
+
+# Skill-learning mode: first positional arg, else an existing env var, else apply.
+export SKILL_LEARNING_MODE="${1:-${SKILL_LEARNING_MODE:-apply}}"
+case "$SKILL_LEARNING_MODE" in
+  off|propose|apply) ;;
+  *) echo "✗ Unknown mode '$SKILL_LEARNING_MODE' (use: off | propose | apply)" >&2; exit 2 ;;
+esac
+
+# Friendly heads-up: without a key the server still boots, but /readyz stays 503.
+if [[ ! -f "$ROOT/.env" && -z "${FIREWORKS_API_KEY:-}" ]]; then
+  echo "⚠  No .env and no FIREWORKS_API_KEY — server will boot but /readyz will be 503." >&2
+  echo "   Run:  cp .env.example .env   then set FIREWORKS_API_KEY." >&2
+fi
+
+echo "▶ Daintree Assistant Server   SKILL_LEARNING_MODE=$SKILL_LEARNING_MODE"
+echo "  python: $PY"
+exec "$PY" -m daintree_assistant_server

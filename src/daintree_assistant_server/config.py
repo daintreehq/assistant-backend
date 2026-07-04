@@ -206,14 +206,22 @@ class Settings(BaseSettings):
     skill_learning_context_tokens: int = Field(
         default=200000, alias="SKILL_LEARNING_CONTEXT_TOKENS"
     )
+    # Per-call timeout for the learning model calls. The build/improve call thinks
+    # at high effort and must emit a COMPLETE skill body — minutes, not seconds —
+    # and it runs off the response path, so a generous timeout costs nothing.
     skill_learning_timeout_seconds: float = Field(
-        default=120.0, alias="SKILL_LEARNING_TIMEOUT_SECONDS"
+        default=300.0, alias="SKILL_LEARNING_TIMEOUT_SECONDS"
     )
     skill_gate_max_output_tokens: int = Field(
         default=700, alias="SKILL_GATE_MAX_OUTPUT_TOKENS"
     )
+    # Must cover the improver's REQUIRED output — the complete replacement body
+    # (the largest packaged skill is ~24 KB ≈ 6k tokens before JSON escaping) plus
+    # the diagnosis fields plus GLM's reasoning tokens, which count against
+    # max_tokens. Too small and the JSON truncates: the parse fails, the repair
+    # retry truncates identically, and the improve path can never land.
     skill_build_max_output_tokens: int = Field(
-        default=4000, alias="SKILL_BUILD_MAX_OUTPUT_TOKENS"
+        default=24000, alias="SKILL_BUILD_MAX_OUTPUT_TOKENS"
     )
 
     # ---- Tracing --------------------------------------------------------

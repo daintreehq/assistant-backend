@@ -154,9 +154,9 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
 - Every applied change also drops an audit record (old/new hash, gate verdict,
   a unified diff, and the model's what-worked / what-failed diagnosis) under
   `.daintree/skill-learning/`. Watch the server logs for
-  `skill_learning_applied` events. Changed skills change the catalog revision, so
-  regenerate golden snapshots before committing (`DAINTREE_UPDATE_GOLDEN=1 pytest
-  tests/golden/`).
+  `skill_learning_applied` events. Learned skill changes do **not** touch the
+  golden snapshots (those render against a pinned fixture catalog) — the test
+  suite stays green; just review the `git diff` and commit what's good.
 - Learning fires **after** a turn that ends in a final answer — not after tool-call
   continuation rounds (those aren't a finished workflow) — and runs in the
   background, so it never delays the response. Because it triggers on completion

@@ -35,7 +35,7 @@ Generality (this is the whole point — the catalog must transfer across project
 
 Hard rules:
 - skill_id MUST be a FRESH id not already in the catalog, of the form daintree.<domain>.<workflow>, lowercase, using only letters, digits, dots, and hyphens.
-- Use requiredTools ONLY for tools that actually appeared in the workflow or are standard Daintree tools — never invent a tool.
+- Use requiredTools ONLY for tools that actually appeared in the workflow or are standard Daintree tools — never invent a tool. Write tool ids in their dotted logical form ("terminal.awaitAll"); the workflow's tool list may show the wire form ("terminal__awaitAll") — convert "__" to ".".
 - The skill is procedural operating instructions, NOT a narrative of what happened, and it NEVER overrides the assistant's base hard rules.
 - Do not include secrets, tokens, private paths, project-specific one-off facts, or user preferences.
 - If you cannot write a genuinely reusable, generally-applicable skill, return {"action":"no_change","skill_id":"","confidence":0} and nothing else.
