@@ -121,7 +121,20 @@ CLI at the same server — nothing about the wire protocol changes.
    style, tool-name rules, size caps, secret scan), writes the `.md` file, and
    reloads the catalog. A created skill is used **this same turn**.
 
-**Enable it locally** (in `.env`):
+**Enable it locally.** The fastest way is to prefix the run command — no `.env`
+edit needed (a real env var wins over `.env` anyway):
+
+```bash
+SKILL_LEARNING_MODE=apply python -m daintree_assistant_server
+```
+
+That is the everything-on-defaults mode: the gate runs on each new instruction,
+GLM writes/improves a skill when warranted, changes land in the real
+`skills/files/` (so they show up in `git diff`), and the catalog reloads live.
+Point your CLI at the server as usual and just work. For a safe dry run that
+never touches the skill files, swap `apply` for `propose`.
+
+Or set it in `.env` to make it the default for every run:
 
 ```bash
 SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (writes files)
@@ -141,6 +154,10 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
   `skill_learning_applied` events. Changed skills change the catalog revision, so
   regenerate golden snapshots before committing (`DAINTREE_UPDATE_GOLDEN=1 pytest
   tests/golden/`).
+- Learning fires on your **next** instruction (it looks back at the just-completed
+  workflow), so the *last* workflow before you close a session is never learned
+  from. If the final workflow was the interesting one, send a throwaway follow-up
+  ("thanks") to give the gate a boundary to trigger on.
 
 ## Endpoints
 
