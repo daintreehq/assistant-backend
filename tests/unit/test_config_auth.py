@@ -130,9 +130,21 @@ def test_skill_learning_off_by_default() -> None:
 
 @pytest.mark.parametrize("mode", ["propose", "apply"])
 def test_skill_learning_enabled_ok_in_development(mode: str) -> None:
-    s = _settings(SKILL_LEARNING_MODE=mode)
+    # The GPT-5.5 builder/improver need an OpenAI key; with it present, dev learning
+    # is ready. OPENAI_API_KEY is passed explicitly so the check is hermetic even when
+    # the developer's own environment has the key set.
+    s = _settings(SKILL_LEARNING_MODE=mode, OPENAI_API_KEY="ok")
     assert s.skill_learning_enabled is True
     assert s.local_only_problems() == []
+
+
+@pytest.mark.parametrize("mode", ["propose", "apply"])
+def test_skill_learning_enabled_needs_openai_key(mode: str) -> None:
+    # Enabled without the OpenAI key its builder/improver require fails readiness,
+    # rather than silently failing open the first time learning runs. Explicit empty
+    # key overrides any ambient OPENAI_API_KEY in the developer's environment.
+    s = _settings(SKILL_LEARNING_MODE=mode, OPENAI_API_KEY="")
+    assert any("OPENAI_API_KEY" in p for p in s.local_only_problems())
 
 
 @pytest.mark.parametrize("mode", ["propose", "apply"])

@@ -38,6 +38,7 @@ from .observability import (
 from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
 from .providers.deepseek import DeepSeekProvider
+from .providers.openai import OpenAIProvider
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.prompt_assembler import PromptAssembler
 from .services.skill_learning import SkillLearner
@@ -127,11 +128,36 @@ class Container:
     orchestrator: ChatOrchestrator
     task_runner: TaskRunner
     skill_learner: SkillLearner | None = None
+    # The skill-learning builder/improver provider (OpenAI GPT-5.5). Distinct from
+    # ``provider`` (DeepSeek) and only built when learning is enabled; ``None``
+    # otherwise. Torn down alongside ``provider`` on shutdown.
+    skill_builder_provider: ChatProvider | None = None
 
     @property
     def catalog(self) -> Catalog:
         """The current catalog (live: the skill-learning harness may reload it)."""
         return self.catalog_manager.catalog
+
+    async def aclose(self) -> None:
+        """Drain in-flight background work, then close the providers.
+
+        Best-effort teardown usable by any owner (the app lifespan, or a direct
+        ``build_container`` caller). The OpenAI builder provider is closed only when it
+        is a distinct real client — in tests it is the injected fake, shared with
+        ``provider`` and closed once below.
+        """
+        with contextlib.suppress(Exception):  # pragma: no cover - best-effort drain
+            # Let any in-flight fire-and-forget learning finish (its write+reload is
+            # cancellation-shielded) before the providers it uses are torn down.
+            await self.orchestrator.drain_background_tasks()
+        if (
+            self.skill_builder_provider is not None
+            and self.skill_builder_provider is not self.provider
+        ):
+            with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
+                await self.skill_builder_provider.aclose()
+        with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
+            await self.provider.aclose()
 
 
 def _build_provider(settings: Settings) -> ChatProvider:
@@ -149,6 +175,20 @@ def _build_provider(settings: Settings) -> ChatProvider:
         default_timeout=settings.main_timeout_seconds,
         send_prompt_cache_key=settings.deepseek_send_prompt_cache_key,
         send_thinking=settings.deepseek_send_thinking,
+    )
+
+
+def _build_skill_builder_provider(settings: Settings) -> OpenAIProvider:
+    """The OpenAI GPT-5.5 provider for the skill-learning builder/improver.
+
+    Only built when skill learning is enabled (local dev). Manages its own httpx
+    client internally (via the ``openai`` SDK), so unlike ``_build_provider`` there is
+    no shared client to inject; ``aclose`` on shutdown tears it down.
+    """
+    return OpenAIProvider(
+        api_key=settings.openai_api_key.get_secret_value(),
+        base_url=settings.openai_base_url,
+        default_timeout=settings.skill_learning_timeout_seconds,
     )
 
 
@@ -191,12 +231,21 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
     assembler = PromptAssembler(prompt_loader, settings)
 
     skill_learner: SkillLearner | None = None
+    skill_builder_provider: ChatProvider | None = None
     if settings.skill_learning_enabled:
+        # Build/improve run on OpenAI GPT-5.5, NOT the DeepSeek chat provider. When a
+        # provider is injected (tests), reuse it for the builder too so no real network
+        # client is created; otherwise build the OpenAI adapter (its key is guaranteed
+        # present here — local_only_problems fails readiness before this if it isn't).
+        skill_builder_provider = (
+            provider if provider is not None else _build_skill_builder_provider(settings)
+        )
         skill_learner = SkillLearner(
             settings=settings,
             provider=chat_provider,
             prompt_loader=prompt_loader,
             catalog_manager=catalog_manager,
+            builder_provider=skill_builder_provider,
         )
 
     orchestrator = ChatOrchestrator(
@@ -220,6 +269,7 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
         orchestrator=orchestrator,
         task_runner=task_runner,
         skill_learner=skill_learner,
+        skill_builder_provider=skill_builder_provider,
     )
 
 
@@ -261,12 +311,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     finally:
         final_container: Container | None = getattr(app.state, "container", None)
         if final_container is not None:
-            with contextlib.suppress(Exception):  # pragma: no cover - best-effort drain
-                # Let any in-flight fire-and-forget learning finish (its write+reload
-                # is cancellation-shielded) before the provider it uses is torn down.
-                await final_container.orchestrator.drain_background_tasks()
-            with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
-                await final_container.provider.aclose()
+            await final_container.aclose()
 
 
 def create_app(
