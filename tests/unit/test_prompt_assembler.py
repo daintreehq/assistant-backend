@@ -55,12 +55,15 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
     # skill bodies(system), runtime(system), footer(system).
     assert msgs[0]["role"] == "system"  # base prompt
     assert msgs[1]["role"] == "user"    # conversation begins right after base (skills moved to the tail)
-    assert msgs[-1]["role"] == "system"  # turn footer last
-    # The append-only conversation is the cached bulk; skill bodies + runtime now follow it.
-    skill_idx = next(i for i, m in enumerate(msgs) if "# Loaded skills" in (m.get("content") or ""))
+    assert msgs[-1]["role"] == "system"  # response contract last
+    assert msgs[-1]["content"].startswith("# Response contract")
+    # The append-only conversation is the cached bulk; skill bodies + runtime + contract
+    # follow it. Match "## Skill 1:" — the base prompt now mentions "# Loaded skills" in prose.
+    skill_idx = next(i for i, m in enumerate(msgs) if "## Skill 1:" in (m.get("content") or ""))
+    runtime_idx = next(i for i, m in enumerate(msgs) if "Permission tier:" in (m.get("content") or ""))
     last_convo_idx = max(i for i, m in enumerate(msgs) if m["role"] in ("user", "assistant", "tool"))
     assert skill_idx > last_convo_idx
-    assert any("# Runtime context" in (m.get("content") or "") for m in msgs[-2:])
+    assert runtime_idx > last_convo_idx
     # Skills reach the model as plain context only — never a synthetic skill__load tool call.
     assert not any(
         m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "skill__load"
@@ -85,8 +88,8 @@ def test_no_skill_block_when_set_is_empty(assembler: PromptAssembler) -> None:
         request=_req(messages=[{"role": "user", "content": "go"}]),
         skills=[], upstream_model="deepseek-v4-flash",
     )
-    # Empty active set emits no loaded-skills system message right before generation.
-    assert not any("# Loaded skills" in (m.get("content") or "") for m in pr.messages)
+    # Empty active set emits no loaded-skills system message (no rendered skill body).
+    assert not any("## Skill 1:" in (m.get("content") or "") for m in pr.messages)
 
 
 def test_no_skills_fallback(assembler: PromptAssembler) -> None:

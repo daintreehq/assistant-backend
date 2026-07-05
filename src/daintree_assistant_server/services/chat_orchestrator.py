@@ -51,17 +51,8 @@ from .skill_learning import SkillLearner
 logger = get_logger("daintree.respond")
 
 
-def merge_active_skills(
-    selected_ids: list[str],
-    prior_active_ids: list[str],
-    catalog: Catalog,
-    max_active: int,
-) -> tuple[list[str], list[str]]:
-    """Additive, new-first merge (section 7.9).
-
-    Returns ``(active, newly_loaded)``.
-    """
-    candidate = list(selected_ids) + [p for p in prior_active_ids if p not in selected_ids]
+def _filter_dedup_cap(candidate: list[str], catalog: Catalog, max_active: int) -> list[str]:
+    """Keep the first ``max_active`` known, de-duplicated ids in order."""
     active: list[str] = []
     seen: set[str] = set()
     for sid in candidate:
@@ -71,6 +62,52 @@ def merge_active_skills(
         active.append(sid)
         if len(active) >= max_active:
             break
+    return active
+
+
+def merge_active_skills(
+    selected_ids: list[str],
+    prior_active_ids: list[str],
+    catalog: Catalog,
+    max_active: int,
+) -> tuple[list[str], list[str]]:
+    """Additive, new-first merge — the EXPLICIT-load path (``resolve`` action ``load``).
+
+    A caller that already knows which skills to ADD on top of the prior set uses this;
+    the prior set is preserved and the new ids land first. The automatic per-turn path
+    uses :func:`resolve_active_skills` instead, where a selector run is authoritative.
+
+    Returns ``(active, newly_loaded)``.
+    """
+    candidate = list(selected_ids) + [p for p in prior_active_ids if p not in selected_ids]
+    active = _filter_dedup_cap(candidate, catalog, max_active)
+    newly = [sid for sid in active if sid not in prior_active_ids]
+    return active, newly
+
+
+def resolve_active_skills(
+    decision: SelectionDecision,
+    prior_active_ids: list[str],
+    catalog: Catalog,
+    max_active: int,
+) -> tuple[list[str], list[str]]:
+    """Per-turn active set from a selection decision (section 7.9).
+
+    A SUCCESSFUL selector run is authoritative: its ``skill_ids`` ARE the complete
+    active set for this instruction — a topic-shift replacement, so an empty list
+    clears all prior skills. When the selector did NOT run (a tool-continuation round,
+    ``SelectionDecision.reuse``) or failed OPEN (``degraded``), the prior active set is
+    reused unchanged — a classifier hiccup never evicts an in-progress runbook. The
+    paired selector prompt therefore instructs the model to re-list any active skill it
+    wants to keep.
+
+    Returns ``(active, newly_loaded)``.
+    """
+    if decision.ran and not decision.degraded:
+        candidate = list(decision.skill_ids)  # authoritative — replaces the prior set
+    else:
+        candidate = list(prior_active_ids)  # reuse (no run) / fail-open (degraded)
+    active = _filter_dedup_cap(candidate, catalog, max_active)
     newly = [sid for sid in active if sid not in prior_active_ids]
     return active, newly
 
@@ -224,8 +261,10 @@ class ChatOrchestrator:
             decision = SelectionDecision.reuse(prior_active_ids)
         warnings.extend(decision.warnings)
 
-        active_ids, newly_loaded_ids = merge_active_skills(
-            decision.skill_ids, prior_active_ids, self.catalog, self.settings.max_active_skills
+        # A successful selector run is authoritative (topic-shift replacement); a
+        # no-run continuation round or a degraded selector reuses the prior set.
+        active_ids, newly_loaded_ids = resolve_active_skills(
+            decision, prior_active_ids, self.catalog, self.settings.max_active_skills
         )
 
         skills = self.catalog.get_many(active_ids)
@@ -415,8 +454,9 @@ class ChatOrchestrator:
             conversation = [ChatMessage(role="user", content=query or "")]
             decision = await self.selector.select(conversation, prior_active_ids)
             warnings.extend(decision.warnings)
-            active_ids, newly_loaded_ids = merge_active_skills(
-                decision.skill_ids, prior_active_ids, self.catalog, self.settings.max_active_skills
+            # A find re-selects: the selector result is authoritative, same as a turn.
+            active_ids, newly_loaded_ids = resolve_active_skills(
+                decision, prior_active_ids, self.catalog, self.settings.max_active_skills
             )
         else:
             raise DaintreeError(

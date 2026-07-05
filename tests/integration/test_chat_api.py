@@ -19,11 +19,13 @@ def _main_request(provider: FakeProvider):
 
 
 def _loaded_skills_message(provider: FakeProvider) -> str:
-    # Skill bodies now follow the conversation (cache layout), so find by content, not position.
+    # Skill bodies now follow the conversation (cache layout), so find by content, not
+    # position. Match "## Skill 1:" — the base prompt mentions "# Loaded skills" in prose
+    # (the anti-recitation rule), so that header alone no longer uniquely marks the block.
     return next(
         m["content"]
         for m in _main_request(provider).messages
-        if "# Loaded skills" in (m.get("content") or "")
+        if "## Skill 1:" in (m.get("content") or "")
     )
 
 
@@ -119,20 +121,39 @@ def test_scenario5_interjection_reruns_once(client, auth, fake_provider) -> None
     assert meta_of(r2.json())["selector"]["ran"] is True
 
 
-def test_scenario6_cap_three_pushes_oldest_out(client, auth, fake_provider, app) -> None:
+def test_scenario6_selector_run_caps_at_three(client, auth, fake_provider, app) -> None:
+    # A single authoritative selector run is capped: 4 returned ids → the first 3 load.
     ids = sorted(app.state.container.catalog.known_ids)
-    state = None
-    for i in range(4):
-        fake_provider.tool_call_result = tool_call_for([ids[i]])
-        r = client.post(URL, headers=auth, json=respond_body(
-            [{"role": "user", "content": f"task {i}"}], session_id="s6", turn_id=f"t{i}", state=state,
-        ))
-        state = r.json()["state"]
+    fake_provider.tool_call_result = tool_call_for([ids[0], ids[1], ids[2], ids[3]])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "a big multi-workflow task"}], session_id="s6", turn_id="t1",
+    ))
     meta = meta_of(r.json())
     active = [s["id"] for s in meta["active_skills"]]
-    assert len(active) == 3
-    assert ids[3] == active[0]
+    assert active == [ids[0], ids[1], ids[2]]
+    assert ids[3] not in active
+
+
+def test_scenario6b_new_instruction_replaces_prior(client, auth, fake_provider, app) -> None:
+    # A successful selector run on a NEW turn is authoritative: it REPLACES the prior
+    # active set (topic shift), rather than accumulating additively.
+    ids = sorted(app.state.container.catalog.known_ids)
+    fake_provider.tool_call_result = tool_call_for([ids[0]])
+    r1 = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "task a"}], session_id="s6b", turn_id="t1",
+    ))
+    state = r1.json()["state"]
+    fake_provider.tool_call_requests.clear()
+    fake_provider.tool_call_result = tool_call_for([ids[1]])
+    r2 = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "a totally different task b"}],
+        session_id="s6b", turn_id="t2", state=state,
+    ))
+    meta = meta_of(r2.json())
+    active = [s["id"] for s in meta["active_skills"]]
+    assert active == [ids[1]]  # prior ids[0] evicted — authoritative replacement
     assert ids[0] not in active
+    assert [s["id"] for s in meta["newly_loaded_skills"]] == [ids[1]]
 
 
 def test_scenario7_unknown_and_duplicate_ids(client, auth, fake_provider) -> None:

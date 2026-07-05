@@ -5,7 +5,9 @@ from __future__ import annotations
 from daintree_assistant_server.services.chat_orchestrator import (
     ChatOrchestrator,
     merge_active_skills,
+    resolve_active_skills,
 )
+from daintree_assistant_server.skills.selector import SelectionDecision
 
 
 def test_merge_additive_new_first(catalog) -> None:
@@ -41,6 +43,63 @@ def test_merge_no_duplicate_load(catalog) -> None:
     active, newly = merge_active_skills([ids[0]], [ids[0]], catalog, 3)
     assert active == [ids[0]]
     assert newly == []
+
+
+# ---- resolve_active_skills: per-turn authoritative selection ----------------
+
+
+def test_resolve_successful_run_replaces_prior(catalog) -> None:
+    # A successful selector run is authoritative: prior skills not re-listed are evicted.
+    ids = sorted(catalog.known_ids)
+    decision = SelectionDecision(skill_ids=[ids[1]], ran=True, degraded=False)
+    active, newly = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    assert active == [ids[1]]
+    assert newly == [ids[1]]
+
+
+def test_resolve_empty_successful_run_clears_prior(catalog) -> None:
+    # An empty result on a real run CLEARS the active set (topic shift to no-task).
+    ids = sorted(catalog.known_ids)
+    decision = SelectionDecision(skill_ids=[], ran=True, degraded=False)
+    active, newly = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    assert active == []
+    assert newly == []
+
+
+def test_resolve_degraded_keeps_prior(catalog) -> None:
+    # A selector that failed open must NOT evict — reuse the prior set.
+    ids = sorted(catalog.known_ids)
+    decision = SelectionDecision.degraded_open(["selector_failed"])
+    active, newly = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    assert active == [ids[0]]
+    assert newly == []
+
+
+def test_resolve_no_run_reuses_prior(catalog) -> None:
+    # A tool-continuation round does not run the selector → reuse decision → keep prior.
+    ids = sorted(catalog.known_ids)
+    decision = SelectionDecision.reuse([ids[0], ids[1]])
+    active, newly = resolve_active_skills(decision, [ids[0], ids[1]], catalog, 3)
+    assert active == [ids[0], ids[1]]
+    assert newly == []
+
+
+def test_resolve_keeps_active_when_relisted(catalog) -> None:
+    # Re-listing an active skill keeps it; a genuinely new one loads alongside.
+    ids = sorted(catalog.known_ids)
+    decision = SelectionDecision(skill_ids=[ids[0], ids[1]], ran=True, degraded=False)
+    active, newly = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    assert active == [ids[0], ids[1]]
+    assert newly == [ids[1]]
+
+
+def test_resolve_caps_and_drops_unknown(catalog) -> None:
+    ids = sorted(catalog.known_ids)
+    decision = SelectionDecision(
+        skill_ids=["nope", ids[0], ids[1], ids[2], ids[3]], ran=True, degraded=False
+    )
+    active, _ = resolve_active_skills(decision, [], catalog, 3)
+    assert active == [ids[0], ids[1], ids[2]]
 
 
 def _delta_chunk(delta: dict) -> dict:
