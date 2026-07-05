@@ -1,9 +1,9 @@
-"""The negotiated Daintree extension: request fields and response metadata.
+"""Typed request-context and response-metadata models for the Daintree-native envelope.
 
-These travel alongside the OpenAI-compatible payload. A generic OpenAI client
-may omit the request extension entirely (stateless compatibility mode); the
-response metadata is delivered in the ``X-Daintree-Meta`` header and, for
-non-streaming responses, also in a top-level ``daintree`` field.
+These are first-class fields of ``POST /v1/daintree/respond`` (not an OpenAI add-on):
+the request carries ``runtime`` and ``turn`` context plus the ``selection`` policy, and
+the response returns its skill/selection metadata in the ``skills`` block (non-streaming)
+or the first SSE ``meta`` event (streaming). See ``docs/DAINTREE_API.md``.
 """
 
 from __future__ import annotations

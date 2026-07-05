@@ -217,8 +217,12 @@ Skill selection is removed from the main thread:
    `selection.policy == "always"`; the catalog revision changed; the `turn_id` changed; or
    `instruction_revision` changed. It does **not** re-run on ordinary tool-continuation
    rounds (same turn). Selector failure **fails open** — the prior active set is retained.
-2. **Active set.** Newly selected skills are merged additively (new-first) with the prior
-   active set and capped (default 3).
+2. **Active set.** A **successful** selector run is *authoritative*: its returned ids are the
+   complete active set for the instruction (a topic-shift **replacement** — an empty result
+   clears the active set), capped (default 3). A tool-continuation round (no run) or a
+   degraded selector reuses the prior set unchanged, so a classifier hiccup never evicts an
+   in-progress runbook. The selector is instructed to re-list any active skill it means to
+   keep. (The explicit `resolve` `load` action, by contrast, is additive over the prior set.)
 3. **Injection.** Only the active skill *bodies* are injected into the main prompt — never
    the full catalog — and they reach the model as **plain context** (the "Loaded skills"
    system block), not a tool call. The model is **not** shown a synthetic `skill__load`
@@ -249,6 +253,7 @@ conversation, and the runbook lands near generation (better for the small model)
 | 4 | Active skill bodies | per-request tail (omitted when the active set is empty) |
 | 5 | Runtime context | per-request |
 | 6 | Turn footer | per-request |
+| 7 | Response contract | per-request — output-shape rules, last so they sit nearest generation |
 
 All client-provided context (ids, names, MCP details, project instructions, memories,
 worktrees) is treated as untrusted data: single-line fields collapse whitespace; multiline
