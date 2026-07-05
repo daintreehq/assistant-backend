@@ -71,15 +71,20 @@ class Settings(BaseSettings):
     # ---- Main-model thinking -------------------------------------------
     # The selector and utility tasks always run NON-thinking — the selector's
     # forced tool_choice is incompatible with thinking mode. The main /respond
-    # call is the only one that can use it. Default ON: with thinking suppressed
-    # (reasoning_effort "none"), deepseek-v4-flash leaks chain-of-thought into the
-    # visible content on complex tool turns (fabricated context recaps, stray
-    # </think>); enabled, the CoT routes to reasoning_content — which round-trips
-    # through the wire contract so tool-call turns replay it (missing it 400s on
-    # DeepSeek) — and tool orchestration is markedly better. Costs reasoning
-    # tokens/latency per turn; set MAIN_THINKING_ENABLED=false to trade quality
-    # for speed. Thinking mode also ignores temperature/top_p/penalties.
-    main_thinking_enabled: bool = Field(default=True, alias="MAIN_THINKING_ENABLED")
+    # call is the only one that can use it. Default OFF (reverted 2026-07-05): thinking
+    # ON was observed to DESTABILIZE multi-agent orchestration — the model reasons out
+    # the whole multi-round plan, then dumps it as one giant speculative tool batch
+    # (60+ calls in round 0: spawn + read + await + CLOSE all at once, against terminals
+    # and artifacts that don't exist yet, so most fail). Thinking OFF the model steps
+    # measuredly (check → spawn → wait → read → judge), which is the validated behavior.
+    # The tradeoff of OFF: with reasoning_effort "none" deepseek-v4-flash can leak
+    # chain-of-thought into visible content on complex tool turns (fabricated context
+    # recaps, stray </think>); when CoT routes to reasoning_content (ON) it round-trips
+    # through the wire contract (a tool-call turn missing it 400s on DeepSeek). That
+    # leakage is a cosmetic issue to solve separately (content sanitizing / prompt) —
+    # far less costly than the broken orchestration ON produced. Set
+    # MAIN_THINKING_ENABLED=true to re-enable. Thinking mode ignores temperature/top_p.
+    main_thinking_enabled: bool = Field(default=False, alias="MAIN_THINKING_ENABLED")
     main_reasoning_effort: Literal["high", "max"] = Field(
         default="high", alias="MAIN_REASONING_EFFORT"
     )
