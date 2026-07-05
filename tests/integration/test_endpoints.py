@@ -38,7 +38,7 @@ def test_capabilities(client, auth) -> None:
     assert body["respond"]["system_messages_accepted"] is False
     assert body["respond"]["max_active_skills"] == 3
     assert body["respond"]["stream_events"] == ["meta", "status", "delta", "done", "error"]
-    assert body["respond"]["thinking_enabled"] is True  # default; disable via MAIN_THINKING_ENABLED
+    assert body["respond"]["thinking_enabled"] is False  # default off; enable via MAIN_THINKING_ENABLED
     assert body["respond"]["multimodal_images"]["remote_urls"] is False
     assert len(body["tasks"]) == 9
     assert body["skills"]["manual_resolve"] is True

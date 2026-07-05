@@ -236,10 +236,11 @@ def test_main_request_params(assembler: PromptAssembler) -> None:
     pr = assembler.build_main_request(
         request=req, skills=[], upstream_model="deepseek-v4-flash",
     )
-    # Thinking is on by default (MAIN_THINKING_ENABLED) — suppressed thinking
-    # leaks CoT into visible content on complex tool turns.
-    assert pr.thinking_disabled is False
-    assert pr.reasoning_effort == "high"
+    # Thinking is OFF by default (MAIN_THINKING_ENABLED) — thinking ON destabilized
+    # multi-agent orchestration (whole plan dumped as one speculative tool batch), so
+    # the validated step-by-step default is non-thinking with reasoning_effort omitted.
+    assert pr.thinking_disabled is True
+    assert pr.reasoning_effort is None
     assert pr.prompt_cache_key == "daintree-main"
     assert pr.stream is True
     assert pr.include_usage is True
