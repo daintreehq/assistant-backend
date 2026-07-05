@@ -963,5 +963,12 @@ class SkillLearner:
             sort_keys=False,
             allow_unicode=True,
             default_flow_style=False,
+            # Effectively unlimited line width: keep long scalar values (summary,
+            # whenToUse, title) on a single line instead of folding them at yaml.dump's
+            # 80-column default. Folding is only cosmetic — YAML rejoins a wrapped plain
+            # scalar into one string on load — but single-line values match the
+            # hand-authored skills and keep git diffs clean. Block sequences (tags,
+            # requiredTools) stay one-item-per-line regardless (default_flow_style=False).
+            width=1_000_000_000,
         )
         return f"---\n{yaml_text}---\n{body.strip()}\n"

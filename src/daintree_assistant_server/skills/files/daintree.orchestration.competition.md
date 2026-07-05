@@ -1,11 +1,8 @@
 ---
 id: daintree.orchestration.competition
 title: Orchestrate a competition or peer-judging among agents
-summary: Spawn a cohort of agents to produce independent responses, then judge and
-  tally the best one — competitive evaluation pattern.
-whenToUse: Use when you need to spawn several agents to produce independent outputs
-  (facts, ideas, solutions) and then aggregate or judge the best through scoring,
-  voting, or peer review.
+summary: Spawn a cohort of agents to produce independent responses, then judge and tally the best one — competitive evaluation pattern.
+whenToUse: Use when you need to spawn several agents to produce independent outputs (facts, ideas, solutions) and then aggregate or judge the best through scoring, voting, or peer review.
 priority: 90
 risk: project
 tags:
