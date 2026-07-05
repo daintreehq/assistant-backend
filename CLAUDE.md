@@ -8,10 +8,13 @@ The Daintree Assistant Server moves the model-orchestration boundary off the loc
 
 The public API is **Daintree-native** (`POST /v1/daintree/respond`), not OpenAI-compatible — the session/skill envelope is first-class and skills are their own response block. The upstream is **DeepSeek** (OpenAI wire shape, spoken *internally* behind the `ChatProvider` abstraction in `providers/`): `deepseek-v4-flash` for the main/selector/utility calls, `deepseek-v4-pro` for the local skill-learning builder/improver — all hardcoded. The full wire contract is `docs/DAINTREE_API.md`; code comments cite it as "section X.Y" — read it when changing wire shapes or selector/task behavior.
 
+**The CLI source is vendored at `cli/`** — a git submodule tracking `github.com/daintreehq/assistant` (the Go CLI that talks to this server). It's checked in so the two repos can evolve together and so this repo can read the CLI's actual tool/function definitions as we move toward sourcing them from there; it is **not** part of the Python package, build, or test scope (ruff `extend-exclude`, pytest `testpaths`, and mypy/coverage are all pinned to `src`/`tests`, and CI does not fetch submodules). After cloning, run `git submodule update --init cli` to populate it; it is otherwise pinned to a commit and does not update on its own.
+
 ## Commands
 
 ```bash
 # Setup
+git submodule update --init cli          # populate the vendored CLI source (Go)
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 

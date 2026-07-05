@@ -65,6 +65,9 @@ daintree_assistant_server = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# The CLI submodule (Go project) is not part of this package; keep its vendored
+# files — including a stray .claude skill .py — out of our lint scope.
+extend-exclude = ["cli"]
 
 [tool.ruff.lint]
 select = [
