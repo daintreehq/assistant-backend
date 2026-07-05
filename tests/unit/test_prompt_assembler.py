@@ -239,11 +239,11 @@ def test_main_request_params(assembler: PromptAssembler) -> None:
     pr = assembler.build_main_request(
         request=req, skills=[], upstream_model="deepseek-v4-flash",
     )
-    # Thinking is OFF by default (MAIN_THINKING_ENABLED) — thinking ON destabilized
-    # multi-agent orchestration (whole plan dumped as one speculative tool batch), so
-    # the validated step-by-step default is non-thinking with reasoning_effort omitted.
-    assert pr.thinking_disabled is True
-    assert pr.reasoning_effort is None
+    # Thinking is ON by default (MAIN_THINKING_ENABLED) now that the upstream is
+    # DeepSeek; with no forced tool_choice the main call runs with reasoning, and effort
+    # stays at "high" — DeepSeek's floor (there is no lower thinking level than "high").
+    assert pr.thinking_disabled is False
+    assert pr.reasoning_effort == "high"
     assert pr.prompt_cache_key == "daintree-main"
     assert pr.stream is True
     assert pr.include_usage is True

@@ -72,22 +72,21 @@ class Settings(BaseSettings):
     deepseek_send_thinking: bool = Field(default=True, alias="DEEPSEEK_SEND_THINKING")
 
     # ---- Main-model thinking -------------------------------------------
-    # The selector and utility tasks always run NON-thinking — the selector's
-    # forced tool_choice is incompatible with thinking mode. The main /respond
-    # call is the only one that can use it. Default OFF (reverted 2026-07-05): thinking
-    # ON was observed to DESTABILIZE multi-agent orchestration — the model reasons out
-    # the whole multi-round plan, then dumps it as one giant speculative tool batch
-    # (60+ calls in round 0: spawn + read + await + CLOSE all at once, against terminals
-    # and artifacts that don't exist yet, so most fail). Thinking OFF the model steps
-    # measuredly (check → spawn → wait → read → judge), which is the validated behavior.
-    # The tradeoff of OFF: with thinking disabled deepseek-v4-flash can leak
-    # chain-of-thought into visible content on complex tool turns (fabricated context
-    # recaps, stray </think>); when CoT routes to reasoning_content (ON) it round-trips
-    # through the wire contract (a tool-call turn missing it 400s on DeepSeek). That
-    # leakage is a cosmetic issue to solve separately (content sanitizing / prompt) —
-    # far less costly than the broken orchestration ON produced. Set
-    # MAIN_THINKING_ENABLED=true to re-enable. Thinking mode ignores temperature/top_p.
-    main_thinking_enabled: bool = Field(default=False, alias="MAIN_THINKING_ENABLED")
+    # The selector and utility tasks always run NON-thinking — a forced tool_choice
+    # is incompatible with thinking mode on DeepSeek. The main /respond call is the
+    # only one that can use it, and it is ON by default. Thinking was previously
+    # disabled back when the upstream was Fireworks (thinking ON there destabilized
+    # multi-agent orchestration — the model reasoned out the whole multi-round plan and
+    # dumped it as one giant speculative tool batch); now that the upstream is DeepSeek
+    # directly we run with reasoning on. reasoning_content round-trips through the wire
+    # contract — an assistant tool-call turn that omits it 400s on DeepSeek — which the
+    # assembler preserves; on a forced tool_choice the assembler degrades that turn to
+    # non-thinking. Note there is no "low" thinking level to request: DeepSeek's
+    # reasoning_effort only meaningfully supports "high"/"max" (it silently maps
+    # low/medium UP to high), so effort stays at "high" — the FLOOR, the lightest
+    # thinking available; the only step below it is thinking OFF. Set
+    # MAIN_THINKING_ENABLED=false to disable. Thinking mode ignores temperature/top_p.
+    main_thinking_enabled: bool = Field(default=True, alias="MAIN_THINKING_ENABLED")
     main_reasoning_effort: Literal["high", "max"] = Field(
         default="high", alias="MAIN_REASONING_EFFORT"
     )

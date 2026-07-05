@@ -269,13 +269,13 @@ directive is sent explicitly.
 
 The selector and utility tasks **always** run non-thinking (`thinking:{"type":"disabled"}`) — the
 selector's forced `tool_choice` is incompatible with thinking mode. The main `/respond` call
-runs **non-thinking by default** (`MAIN_THINKING_ENABLED`, enable with `=true`;
+runs **thinking by default** (`MAIN_THINKING_ENABLED`, disable with `=false`;
 `MAIN_REASONING_EFFORT` = `high` | `max`, default `high`; DeepSeek also accepts `low`/`medium`
-but remaps them to `high`, so the server restricts the main call to the two higher tiers). Thinking was reverted to off
-because with it on the orchestration model dumps its whole multi-round plan as one giant
-speculative tool batch instead of stepping measuredly; the tradeoff of off is that
-deepseek-v4-flash can leak chain-of-thought into visible content on complex tool turns (a
-cosmetic issue to solve separately). Even when enabled, thinking is forced off for any request that pins a
+but remaps them to `high`, so the server restricts the main call to the two higher tiers —
+`high` is thus the lightest thinking available, the only lower setting being thinking off). It
+was previously off while the upstream was Fireworks (thinking on there destabilized multi-agent
+orchestration — the model dumped its whole multi-round plan as one speculative tool batch); on
+DeepSeek directly it runs with reasoning on. Thinking is forced off for any request that pins a
 `tool_choice` (thinking + a forced tool choice is rejected upstream). When enabled, the model returns its chain-of-thought as `reasoning_content`; the
 client stores it on the assistant turn and replays it verbatim on any turn that performed tool
 calls (a hard DeepSeek requirement). Thinking mode ignores `temperature`/`top_p`/penalties.

@@ -229,7 +229,7 @@ def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider) -> 
     assert kinds[0] == "meta"  # metadata before any token
     assert kinds[-1] == "done"
     assert "delta" in kinds
-    assert "status" not in kinds  # no thinking phase when thinking is off
+    assert "status" not in kinds  # no thinking-phase status event: the fake stream emits no reasoning_content
     meta = meta_of(events[0][1])
     assert [sk["id"] for sk in meta["active_skills"]] == [SKILL_PREP]
     streamed = "".join(d.get("content", "") for e, d in events if e == "delta")
