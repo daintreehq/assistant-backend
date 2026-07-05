@@ -1,10 +1,8 @@
 ---
 id: daintree.agents.ask-and-relay
 title: Ask an agent and relay its answer
-summary: Spawn a configured agent in read-only mode, ask it a question, wait for completion,
-  and report its answer cleanly.
-whenToUse: Use when the user asks you to create/spawn/open an agent terminal, ask
-  it a question, and tell them what it says.
+summary: Spawn a configured agent in read-only mode, ask it a question, wait for completion, and report its answer cleanly.
+whenToUse: Use when the user asks you to create/spawn/open an agent terminal, ask it a question, and tell them what it says.
 priority: 120
 risk: project
 tags:

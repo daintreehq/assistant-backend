@@ -1,11 +1,8 @@
 ---
 id: daintree.orchestration.tie-breaker-runoff
 title: Resolve a tied multi-agent vote
-summary: Run a focused tie-breaker round for an existing multi-agent competition by
-  collecting new entries from tied agents, polling the original voters, and tallying
-  the runoff cleanly.
-whenToUse: Use when a multi-agent competition, poll, or peer-vote ends in a tie and
-  the user asks for a tie-breaking or runoff round using the same agents.
+summary: Run a focused tie-breaker round for an existing multi-agent competition by collecting new entries from tied agents, polling the original voters, and tallying the runoff cleanly.
+whenToUse: Use when a multi-agent competition, poll, or peer-vote ends in a tie and the user asks for a tie-breaking or runoff round using the same agents.
 priority: 100
 risk: terminal
 tags:
