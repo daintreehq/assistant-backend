@@ -195,6 +195,7 @@ class Settings(BaseSettings):
     cap_project_instructions: int = Field(default=32 * 1024, alias="CAP_PROJECT_INSTRUCTIONS")
     cap_goal: int = Field(default=8 * 1024, alias="CAP_GOAL")
     cap_workflow_runs: int = Field(default=24 * 1024, alias="CAP_WORKFLOW_RUNS")
+    cap_async_operations: int = Field(default=8 * 1024, alias="CAP_ASYNC_OPERATIONS")
     cap_pinned_memories: int = Field(default=16 * 1024, alias="CAP_PINNED_MEMORIES")
     cap_relevant_memories: int = Field(default=16 * 1024, alias="CAP_RELEVANT_MEMORIES")
     cap_active_worktree: int = Field(default=512, alias="CAP_ACTIVE_WORKTREE")

@@ -95,6 +95,7 @@ The single generation endpoint. Returns a native JSON body, or — when
   "turn": {                                    // per-turn context (optional)
     "goal": "…", "is_wake": false,
     "workflow_runs": ["…"],
+    "async_operations": ["…"],                 // live runtime-owned async futures (one line each)
     "memories": { "pinned": ["…"], "relevant": ["…"] },
     "session_ended_watchers": ["…"]
   },

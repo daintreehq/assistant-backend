@@ -108,6 +108,10 @@ class TurnContext(BaseModel):
     goal: str | None = None
     is_wake: bool = False
     workflow_runs: list[str] = Field(default_factory=list)
+    # Live runtime-owned async operations (terminal.run.async /
+    # terminal.await.async), one pre-formatted line each — rendered so the model
+    # always sees its in-flight async work and never re-issues it.
+    async_operations: list[str] = Field(default_factory=list)
     memories: Memories = Field(default_factory=Memories)
     session_ended_watchers: list[str] = Field(default_factory=list)
 

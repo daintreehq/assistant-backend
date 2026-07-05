@@ -254,6 +254,9 @@ class PromptAssembler:
         goal = sanitize_line(turn.goal, self.settings.cap_goal)
         worktree = sanitize_line(active_worktree, self.settings.cap_active_worktree)
         workflow_runs = _cap_list_combined(turn.workflow_runs, self.settings.cap_workflow_runs)
+        async_operations = _cap_list_combined(
+            turn.async_operations, self.settings.cap_async_operations
+        )
         pinned = _cap_list_combined(turn.memories.pinned, self.settings.cap_pinned_memories)
         relevant = _cap_list_combined(turn.memories.relevant, self.settings.cap_relevant_memories)
         watchers = _cap_list_combined(
@@ -265,6 +268,7 @@ class PromptAssembler:
         turn_context = {
             "goal": goal,
             "workflow_runs": workflow_runs,
+            "async_operations": async_operations,
             "memories": {"pinned": pinned, "relevant": relevant},
             "active_worktree": worktree,
             "session_ended_watchers": watchers,
