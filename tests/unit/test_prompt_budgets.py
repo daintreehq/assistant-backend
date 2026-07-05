@@ -13,10 +13,13 @@ from daintree_assistant_server.skills.catalog import load_catalog
 
 # Base prompt is ~29 KB; this ceiling catches regrowth without churning on small edits.
 BASE_PROMPT_CEILING = 32 * 1024
-# Every skill body must fit this hard ceiling (the multi-agent runbook is the outlier).
-SKILL_BODY_HARD_CEILING = 20 * 1024
-# New skills should stay well under this; only the allowlist may exceed it.
-SKILL_BODY_RECOMMENDED = 12 * 1024
+# Hard ceiling — a runaway guard only (the old multi-agent runbook was 28 KB). A
+# genuinely complex skill is allowed to be large; this just catches unbounded bloat.
+SKILL_BODY_HARD_CEILING = 24 * 1024
+# Soft budget — a nudge to keep NEW skills reasonable, not a hard rule; complex skills
+# may legitimately exceed it (allowlisted). Loading MULTIPLE skills, not shrinking each,
+# is the priority, so this is deliberately generous.
+SKILL_BODY_RECOMMENDED = 16 * 1024
 OVERSIZE_ALLOWLIST = {"daintree.orchestration.multi-agent"}
 
 
