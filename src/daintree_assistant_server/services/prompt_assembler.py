@@ -14,6 +14,8 @@ build_main_request:
 4. loaded-skills system message — active skill bodies (omitted when the active set is empty)
 5. runtime-context system message — server-rendered typed local facts (per-request)
 6. trailing turn-context (turn-footer) system message (per-request)
+7. response-contract system message — the output-shape rules, LAST so they sit nearest
+   generation (the position a small model follows best)
 
 All local context is treated as untrusted data: control characters are
 stripped and every field has an explicit byte cap.
@@ -36,6 +38,7 @@ from ..contracts.openai import (
 from ..prompts.loader import (
     TEMPLATE_INTEGRATIONS,
     TEMPLATE_LOADED_SKILLS,
+    TEMPLATE_RESPONSE_CONTRACT,
     TEMPLATE_RUNTIME_CONTEXT,
     TEMPLATE_TURN_FOOTER,
     PromptLoader,
@@ -229,6 +232,17 @@ class PromptAssembler:
 
     def render_loaded_skills(self, skills: list[Skill]) -> str:
         return self.prompts.render(TEMPLATE_LOADED_SKILLS, loaded_skills=skills)
+
+    def render_response_contract(self) -> str:
+        """The output-shape contract, rendered LAST so it sits nearest generation.
+
+        Width comes from settings (the narrow Daintree terminal is ~56 columns);
+        a future runtime field can override it per-request without moving the block.
+        """
+        return self.prompts.render(
+            TEMPLATE_RESPONSE_CONTRACT,
+            terminal_width=self.settings.main_terminal_width,
+        )
 
     def render_turn_footer(
         self, turn: TurnContext | None, active_worktree: str | None = None
@@ -443,6 +457,10 @@ class PromptAssembler:
         footer = self.render_turn_footer(turn, runtime.active_worktree if runtime else None)
         if footer.strip():
             messages.append({"role": "system", "content": footer})
+        # 6. response contract LAST — the output-shape rules sit nearest generation.
+        contract = self.render_response_contract()
+        if contract.strip():
+            messages.append({"role": "system", "content": contract})
 
         # "text" is the upstream default, so forwarding it is a no-op — except that
         # DeepSeek rejects ANY response_format alongside tools ("You cannot specify
@@ -461,13 +479,20 @@ class PromptAssembler:
             request.input.tool_choice
         )
 
+        # max_tokens policy: fill a compact default when the client omits one, then clamp
+        # to a hard ceiling either way so a degenerate turn (the observed prompt-recitation
+        # dump) can't run unbounded. The ceiling is generous — it catches absurd runaways,
+        # not a legitimately long synthesis.
+        max_tokens = gen.max_tokens or self.settings.main_default_max_tokens
+        max_tokens = min(max_tokens, self.settings.main_max_tokens_ceiling)
+
         return ProviderChatRequest(
             model=upstream_model,
             messages=messages,
             tools=self._project_tools(request.input.tools),
             tool_choice=self._project_tool_choice(request.input.tool_choice),
             temperature=gen.temperature,
-            max_tokens=gen.max_tokens,
+            max_tokens=max_tokens,
             response_format=response_format,
             stop=gen.stop,
             stream=gen.stream,

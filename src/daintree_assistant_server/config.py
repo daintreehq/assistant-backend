@@ -92,6 +92,29 @@ class Settings(BaseSettings):
         default="high", alias="MAIN_REASONING_EFFORT"
     )
 
+    # ---- Main-model output shape ---------------------------------------
+    # The narrow Daintree terminal is ~56 columns wide; the response contract (the
+    # final system message) and the output linter both reference this width.
+    main_terminal_width: int = Field(default=56, ge=20, alias="MAIN_TERMINAL_WIDTH")
+    # max_tokens policy. The client MAY send generation.max_tokens; when it omits one
+    # we apply a sane compact default, and either way we clamp to a hard ceiling so a
+    # degenerate turn (the observed 7k-token prompt-recitation dump) cannot run
+    # unbounded. The ceiling is deliberately generous — it catches absurd runaways
+    # without truncating a legitimately long final synthesis.
+    main_default_max_tokens: int = Field(default=2048, ge=1, alias="MAIN_DEFAULT_MAX_TOKENS")
+    main_max_tokens_ceiling: int = Field(default=8000, ge=1, alias="MAIN_MAX_TOKENS_CEILING")
+
+    # ---- Main-model output linting (observability + optional repair) ----
+    # The non-stream path lints the final assistant message (pipe-table width, visible
+    # <think> leakage, oversized dumps) and LOGS violations — pure observability by
+    # default. Turn repair on to also deterministically convert an over-width pipe table
+    # to a per-entity list before returning (never a model call; streaming is untouched).
+    main_output_lint_enabled: bool = Field(default=True, alias="MAIN_OUTPUT_LINT_ENABLED")
+    main_output_repair_tables: bool = Field(default=False, alias="MAIN_OUTPUT_REPAIR_TABLES")
+    # A final assistant message larger than this many characters is flagged as an
+    # oversized dump (the recitation failure mode). Observability only.
+    main_output_warn_chars: int = Field(default=8000, ge=1, alias="MAIN_OUTPUT_WARN_CHARS")
+
     # ---- Authentication -------------------------------------------------
     daintree_api_key: SecretStr = Field(default=SecretStr(""), alias="DAINTREE_API_KEY")
 

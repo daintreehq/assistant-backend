@@ -156,6 +156,28 @@ def test_turn_footer(assembler: PromptAssembler) -> None:
     assert_golden("turn_footer.md", assembler.render_turn_footer(turn, active_worktree="feature/x"))
 
 
+def test_response_contract(assembler: PromptAssembler) -> None:
+    assert_golden("response_contract.md", assembler.render_response_contract())
+
+
+def test_response_contract_is_final_system_message(assembler: PromptAssembler) -> None:
+    # The output-shape contract must land LAST (nearest generation). Assemble a full
+    # request and assert the trailing message is the contract, carrying the width.
+    req = RespondRequest.model_validate(
+        {
+            "protocol_version": 1,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": [{"role": "user", "content": "hi"}]},
+            "runtime": {"permission_tier": "operator", "project_path": "/p"},
+        }
+    )
+    pr = assembler.build_main_request(request=req, skills=[], upstream_model="m")
+    last = pr.messages[-1]
+    assert last["role"] == "system"
+    assert last["content"].startswith("# Response contract")
+    assert str(assembler.settings.main_terminal_width) in last["content"]
+
+
 def test_selector_system(loader: PromptLoader) -> None:
     catalog = _fixture_catalog()
     rendered = loader.render(

@@ -24,6 +24,7 @@ TEMPLATE_RUNTIME_CONTEXT = "main/runtime_context.md.j2"
 TEMPLATE_INTEGRATIONS = "main/integrations.md.j2"
 TEMPLATE_LOADED_SKILLS = "main/loaded_skills.md.j2"
 TEMPLATE_TURN_FOOTER = "main/turn_footer.md.j2"
+TEMPLATE_RESPONSE_CONTRACT = "main/response_contract.md.j2"
 TEMPLATE_SELECTOR_SYSTEM = "selector/system.md.j2"
 
 _ALL_TEMPLATES = (
@@ -31,6 +32,7 @@ _ALL_TEMPLATES = (
     TEMPLATE_INTEGRATIONS,
     TEMPLATE_LOADED_SKILLS,
     TEMPLATE_TURN_FOOTER,
+    TEMPLATE_RESPONSE_CONTRACT,
     TEMPLATE_SELECTOR_SYSTEM,
 )
 
