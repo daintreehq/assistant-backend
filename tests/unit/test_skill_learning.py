@@ -25,6 +25,7 @@ from daintree_assistant_server.services.skill_learning import (
     _house_style_problems,
 )
 from daintree_assistant_server.skills.catalog import CatalogManager, load_catalog
+from daintree_assistant_server.skills.loader import parse_skill
 
 # --------------------------------------------------------------------------
 # Fixtures / helpers
@@ -301,6 +302,39 @@ async def test_gate_and_builder_use_separate_providers(tmp_path: Path) -> None:
     assert builder_fake.requests and all(
         r.model == SKILL_BUILDER_MODEL for r in builder_fake.requests
     )
+
+
+def test_render_markdown_keeps_long_scalars_on_one_line() -> None:
+    # yaml.dump folds scalars past 80 columns by default, which split long summary/
+    # whenToUse values across lines in generated skills. The renderer disables that so
+    # values stay single-line (matching hand-authored skills); folding is only cosmetic
+    # but the on-disk form should not wrap. Guard both: no fold, and still loads clean.
+    long_summary = (
+        "Run a focused tie-breaker round for an existing multi-agent competition by "
+        "collecting new entries from tied agents, polling the original voters, and "
+        "tallying the runoff cleanly."
+    )
+    long_when = "Use when a multi-agent competition ends in a tie and " + "x " * 40
+    meta = {
+        "id": "daintree.test.longscalars",
+        "title": "Resolve a tied multi-agent vote across a long descriptive title here",
+        "summary": long_summary,
+        "whenToUse": long_when.strip(),
+        "priority": 100,
+        "risk": "read",
+        "tags": ["daintree", "test"],
+        "requiredTools": [],
+    }
+    body = "Use when: demonstrating.\n\nProcedure:\n1. Show it.\n\nReport back: shown."
+    markdown = SkillLearner._render_markdown(meta, body)
+
+    # The long values appear verbatim on a single line (no continuation lines).
+    assert f"summary: {long_summary}\n" in markdown
+    assert f"whenToUse: {long_when.strip()}\n" in markdown
+    # And it still round-trips through the real loader to single-line strings.
+    skill = parse_skill(markdown, expected_id="daintree.test.longscalars")
+    assert "\n" not in skill.summary
+    assert "\n" not in skill.when_to_use
 
 
 @pytest.mark.asyncio

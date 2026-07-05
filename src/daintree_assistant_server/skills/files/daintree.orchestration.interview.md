@@ -1,10 +1,8 @@
 ---
 id: daintree.orchestration.interview
 title: Run a judged interview competition among agents
-summary: Have one agent interview others on a topic and select a winner, with the
-  assistant relaying questions and answers.
-whenToUse: Use when the user asks to have an agent interview other agents on a topic
-  (e.g., choose a pair programmer, evaluate candidates) and expects a winner.
+summary: Have one agent interview others on a topic and select a winner, with the assistant relaying questions and answers.
+whenToUse: Use when the user asks to have an agent interview other agents on a topic (e.g., choose a pair programmer, evaluate candidates) and expects a winner.
 priority: 85
 risk: project
 tags:

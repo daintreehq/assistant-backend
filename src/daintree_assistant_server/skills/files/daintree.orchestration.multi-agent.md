@@ -1,11 +1,8 @@
 ---
 id: daintree.orchestration.multi-agent
 title: Orchestrate multiple agents on one problem
-summary: Spawn several agents, relay their work between them with terminal.sendCommand,
-  and synthesize one answer — collaborative or competitive multi-agent tasks.
-whenToUse: Use when the user wants several agents to work one problem TOGETHER (or
-  against each other) — collaborate, cross-check, debate, vote, or combine outputs
-  — and you must coordinate the back-and-forth between the terminals.
+summary: Spawn several agents, relay their work between them with terminal.sendCommand, and synthesize one answer — collaborative or competitive multi-agent tasks.
+whenToUse: Use when the user wants several agents to work one problem TOGETHER (or against each other) — collaborate, cross-check, debate, vote, or combine outputs — and you must coordinate the back-and-forth between the terminals.
 priority: 95
 risk: project
 tags:
