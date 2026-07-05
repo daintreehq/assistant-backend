@@ -12,7 +12,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 `error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** DeepSeek (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-v4-flash` for the main/selector/utility calls, `deepseek-v4-pro` for the local skill-learning builder/improver
+- **Upstream:** DeepSeek (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-v4-flash` for the main/selector/utility calls and the skill-learning gate; the local skill-learning builder/improver run on OpenAI `gpt-5.5` (a second provider)
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Key invariants
@@ -114,9 +114,9 @@ pointing your CLI at the same server — nothing about the wire protocol changes
    triggers are you signalling a problem ("what happened here?", "this shouldn't
    have happened") or the assistant visibly struggling; a cleanly completed,
    repeatable workflow can also justify a *new* skill.
-2. If warranted, **DeepSeek V4 Pro** first diagnoses the workflow — what the assistant (and
-   the current skill, if improving) did that worked and where it failed — then
-   writes the new skill or the improved one. The diagnosis is kept in the audit
+2. If warranted, **OpenAI `gpt-5.5`** (high reasoning) first diagnoses the workflow — what
+   the assistant (and the current skill, if improving) did that worked and where it failed —
+   then writes the new skill or the improved one. The diagnosis is kept in the audit
    record so you can review *why* each change landed.
 3. The backend validates it through the real skill loader (frontmatter, tool-name
    rules, size caps) plus a learning-layer gate (house-style checks + a secret
@@ -124,18 +124,20 @@ pointing your CLI at the same server — nothing about the wire protocol changes
    skill is **never** folded into the turn it learned from (that answer is already
    sent) — it becomes live for the **next** relevant turn's selection.
 
-**Enable it locally.** The fastest way is to prefix the run command — no `.env`
-edit needed (a real env var wins over `.env` anyway):
+**Enable it locally.** The builder/improver run on OpenAI `gpt-5.5`, so this mode
+needs an `OPENAI_API_KEY` (readiness fails without one when learning is enabled).
+The fastest way is to prefix the run command — no `.env` edit needed (a real env
+var wins over `.env` anyway):
 
 ```bash
-SKILL_LEARNING_MODE=apply python -m daintree_assistant_server
+OPENAI_API_KEY=sk-... SKILL_LEARNING_MODE=apply python -m daintree_assistant_server
 ```
 
-That is the everything-on-defaults mode: the gate runs after each completed turn,
-the builder writes/improves a skill when warranted, changes land in the real
-`skills/files/` (so they show up in `git diff`), and the catalog reloads live.
-Point your CLI at the server as usual and just work. For a safe dry run that
-never touches the skill files, swap `apply` for `propose`.
+That is the everything-on-defaults mode: the gate (`deepseek-v4-flash`) runs after
+each completed turn, the GPT-5.5 builder writes/improves a skill when warranted,
+changes land in the real `skills/files/` (so they show up in `git diff`), and the
+catalog reloads live. Point your CLI at the server as usual and just work. For a
+safe dry run that never touches the skill files, swap `apply` for `propose`.
 
 Or set it in `.env` to make it the default for every run:
 

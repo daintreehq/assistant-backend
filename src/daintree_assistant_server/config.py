@@ -16,14 +16,15 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Hardcoded model identities — a product decision, not deployment config. The
-# main completion, the skill selector, and the utility tasks all run on the small
-# model (DEEPSEEK_MODEL). The skill-learning gate also uses the small model; its
-# builder/improver use the stronger DeepSeek V4 Pro model (a harder generation
-# task). PUBLIC_MODEL_ID is the alias returned to clients. Only the DeepSeek API
-# key (and base URL) come from the environment.
+# main completion, the skill selector, the utility tasks, and the skill-learning
+# gate all run on the small model (DEEPSEEK_MODEL). The skill-learning builder and
+# improver run on OpenAI's GPT-5.5 reasoning model — a harder "write a whole skill"
+# generation task, deliberately on a stronger, separate provider (see the OpenAI
+# settings below and providers/openai.py). PUBLIC_MODEL_ID is the alias returned to
+# clients. Only the provider API keys (and base URLs) come from the environment.
 DEEPSEEK_MODEL = "deepseek-v4-flash"
-SKILL_BUILDER_MODEL = "deepseek-v4-pro"
-SKILL_IMPROVER_MODEL = "deepseek-v4-pro"
+SKILL_BUILDER_MODEL = "gpt-5.5"
+SKILL_IMPROVER_MODEL = "gpt-5.5"
 PUBLIC_MODEL_ID = "daintree-assistant"
 
 # The development default salt; rejected in production by weak_secrets().
@@ -70,6 +71,19 @@ class Settings(BaseSettings):
     # to ENABLED when the field is absent, so omitting it would silently turn
     # thinking on and 400 the selector's forced tool_choice.
     deepseek_send_thinking: bool = Field(default=True, alias="DEEPSEEK_SEND_THINKING")
+
+    # ---- Skill-learning provider (OpenAI, GPT-5.5) ----------------------
+    # The skill-learning builder/improver run on OpenAI's GPT-5.5 reasoning model
+    # (SKILL_BUILDER_MODEL/SKILL_IMPROVER_MODEL above), NOT DeepSeek — a deliberately
+    # stronger, separate provider for the hard "write a whole skill" generation task.
+    # Only needed when skill learning is enabled (local dev); the key is then REQUIRED
+    # at readiness (see local_only_problems). GPT-5.5 is a reasoning model: the OpenAI
+    # adapter sends `reasoning_effort` + `max_completion_tokens` and omits temperature
+    # (the model rejects any non-default value) — see providers/openai.py.
+    openai_base_url: str = Field(
+        default="https://api.openai.com/v1", alias="OPENAI_BASE_URL"
+    )
+    openai_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENAI_API_KEY")
 
     # ---- Main-model thinking -------------------------------------------
     # The selector and utility tasks always run NON-thinking — a forced tool_choice
@@ -205,9 +219,9 @@ class Settings(BaseSettings):
     # as a normal dynamic skill load. It MUST be off in production: an enabled mode
     # fails readiness there (see local_only_problems). Modes:
     #   off     — disabled (default)
-    #   propose — run the gate + DeepSeek builder/improver and write the proposed skill
-    #             markdown + an audit JSON under the audit dir's proposals/, but never
-    #             touch the real skill files or the catalog
+    #   propose — run the gate (DeepSeek) + OpenAI GPT-5.5 builder/improver and write the
+    #             proposed skill markdown + an audit JSON under the audit dir's proposals/,
+    #             but never touch the real skill files or the catalog
     #   apply   — also write/rewrite the skill file and reload the catalog in place
     skill_learning_mode: Literal["off", "propose", "apply"] = Field(
         default="off", alias="SKILL_LEARNING_MODE"
@@ -221,8 +235,9 @@ class Settings(BaseSettings):
     skill_learning_audit_dir: str = Field(
         default=".daintree/skill-learning", alias="SKILL_LEARNING_AUDIT_DIR"
     )
-    # Builder/improver thinking tier ("high" or "max"). The gate stays non-thinking.
-    skill_learning_reasoning_effort: Literal["high", "max"] = Field(
+    # Builder/improver reasoning tier ("high" or "xhigh") — OpenAI GPT-5.5 effort
+    # levels (its top two tiers). The gate stays non-thinking and runs on DeepSeek.
+    skill_learning_reasoning_effort: Literal["high", "xhigh"] = Field(
         default="high", alias="SKILL_LEARNING_REASONING_EFFORT"
     )
     # Gate verdicts below this confidence never write.
@@ -251,9 +266,11 @@ class Settings(BaseSettings):
     )
     # Must cover the improver's REQUIRED output — the complete replacement body
     # (the largest packaged skill is ~24 KB ≈ 6k tokens before JSON escaping) plus
-    # the diagnosis fields plus the builder's reasoning tokens, which count against
-    # max_tokens. Too small and the JSON truncates: the parse fails, the repair
-    # retry truncates identically, and the improve path can never land.
+    # the diagnosis fields plus the builder's reasoning tokens. On GPT-5.5 this maps
+    # to `max_completion_tokens`, which bounds reasoning AND visible output together,
+    # so high-effort reasoning eats into this budget. Too small and the JSON
+    # truncates: the parse fails, the repair retry truncates identically, and the
+    # improve path can never land.
     skill_build_max_output_tokens: int = Field(
         default=24000, alias="SKILL_BUILD_MAX_OUTPUT_TOKENS"
     )
@@ -280,16 +297,21 @@ class Settings(BaseSettings):
         return missing
 
     def local_only_problems(self) -> list[str]:
-        """Local-development-only features that must never run in production.
+        """Local-development-only features that must never run in production, plus
+        their required config.
 
         These join ``missing_secrets()`` / ``weak_secrets()`` in readiness gating,
         so a production (or Cloud Run) deploy that leaves skill learning enabled
         fails ``/readyz`` rather than mutating the catalog from model output at
-        runtime. Empty in development.
+        runtime. Empty in development *unless* skill learning is enabled without the
+        OpenAI key its builder/improver need — that surfaces here rather than as a
+        silent fail-open the first time learning tries to run.
         """
         problems: list[str] = []
         if self.environment == "production" and self.skill_learning_enabled:
             problems.append("SKILL_LEARNING_MODE must be 'off' in production")
+        if self.skill_learning_enabled and not self.openai_api_key.get_secret_value():
+            problems.append("OPENAI_API_KEY is required when skill learning is enabled")
         return problems
 
     def weak_secrets(self) -> list[str]:

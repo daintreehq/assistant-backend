@@ -245,12 +245,12 @@ async def test_create_overlay_dir(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_uses_pro_builder_model_with_thinking(tmp_path: Path) -> None:
-    # Regression guard for the DeepSeek model split (see config.py): the gate runs on
-    # the small model NON-thinking, while the builder runs on deepseek-v4-pro WITH
-    # thinking at the configured effort. The fake records every request, so a silent
-    # regression back to the small model (or thinking off) for the builder is caught.
-    assert SKILL_BUILDER_MODEL == "deepseek-v4-pro"
+async def test_create_uses_gpt55_builder_model_with_reasoning(tmp_path: Path) -> None:
+    # Regression guard for the model split (see config.py): the gate runs on the
+    # DeepSeek small model NON-thinking, while the builder runs on GPT-5.5 WITH
+    # reasoning at the configured effort. The fake records every request, so a silent
+    # regression back to the small model (or reasoning off) for the builder is caught.
+    assert SKILL_BUILDER_MODEL == "gpt-5.5"
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake)
     await learner.run(request=_request(), active_ids=[])
@@ -263,8 +263,8 @@ async def test_create_uses_pro_builder_model_with_thinking(tmp_path: Path) -> No
 
 
 @pytest.mark.asyncio
-async def test_improve_uses_pro_improver_model_with_thinking(tmp_path: Path) -> None:
-    assert SKILL_IMPROVER_MODEL == "deepseek-v4-pro"
+async def test_improve_uses_gpt55_improver_model_with_reasoning(tmp_path: Path) -> None:
+    assert SKILL_IMPROVER_MODEL == "gpt-5.5"
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
     await learner.run(request=_request(), active_ids=["daintree.test.target"])
@@ -272,6 +272,35 @@ async def test_improve_uses_pro_improver_model_with_thinking(tmp_path: Path) -> 
     improve_reqs = [r for r in fake.requests if r.model == SKILL_IMPROVER_MODEL]
     assert improve_reqs and all(r.thinking_disabled is False for r in improve_reqs)
     assert all(r.reasoning_effort == "high" for r in improve_reqs)
+
+
+@pytest.mark.asyncio
+async def test_gate_and_builder_use_separate_providers(tmp_path: Path) -> None:
+    # The gate runs on `provider` (DeepSeek small model); build/improve run on the
+    # distinct `builder_provider` (OpenAI GPT-5.5). Wire two fakes and assert the
+    # gate call lands on one and the builder call on the other.
+    gate_fake = FakeProvider()
+    gate_fake.complete_result = lambda _req: make_result(content=json.dumps(GATE_CREATE))
+    builder_fake = FakeProvider()
+    builder_fake.complete_result = lambda _req: make_result(content=json.dumps(PROPOSAL_CREATE))
+
+    primary = _primary(tmp_path)
+    settings = _settings(tmp_path)
+    manager = CatalogManager(load_catalog(primary), primary_dir=primary)
+    learner = SkillLearner(
+        settings=settings,
+        provider=gate_fake,
+        prompt_loader=_loader(),
+        catalog_manager=manager,
+        builder_provider=builder_fake,
+    )
+    outcome = await learner.run(request=_request(), active_ids=[])
+
+    assert outcome.changed is True
+    assert [r.model for r in gate_fake.requests] == [DEEPSEEK_MODEL]
+    assert builder_fake.requests and all(
+        r.model == SKILL_BUILDER_MODEL for r in builder_fake.requests
+    )
 
 
 @pytest.mark.asyncio
