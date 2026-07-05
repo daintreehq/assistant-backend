@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass, replace
 from typing import Any
 
-from ..config import FIREWORKS_SMALL_MODEL, Settings
+from ..config import DEEPSEEK_MODEL, Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
 from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
@@ -266,7 +266,7 @@ class Selector:
 
     async def _run(self, messages: list[dict[str, Any]]) -> SelectionDecision:
         request = ProviderChatRequest(
-            model=FIREWORKS_SMALL_MODEL,
+            model=DEEPSEEK_MODEL,
             messages=messages,
             temperature=0.0,
             max_tokens=self.settings.selector_max_output_tokens,

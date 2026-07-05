@@ -37,7 +37,7 @@ from .observability import (
 )
 from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
-from .providers.fireworks import FireworksProvider
+from .providers.deepseek import DeepSeekProvider
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.prompt_assembler import PromptAssembler
 from .services.skill_learning import SkillLearner
@@ -142,12 +142,13 @@ def _build_provider(settings: Settings) -> ChatProvider:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    return FireworksProvider(
+    return DeepSeekProvider(
         client,
-        api_key=settings.fireworks_api_key.get_secret_value(),
-        base_url=settings.fireworks_base_url,
+        api_key=settings.deepseek_api_key.get_secret_value(),
+        base_url=settings.deepseek_base_url,
         default_timeout=settings.main_timeout_seconds,
-        send_prompt_cache_key=settings.fireworks_send_prompt_cache_key,
+        send_prompt_cache_key=settings.deepseek_send_prompt_cache_key,
+        send_thinking=settings.deepseek_send_thinking,
     )
 
 

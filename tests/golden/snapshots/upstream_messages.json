@@ -13,7 +13,7 @@
   },
   {
     "role": "system",
-    "content": "# Runtime context\nPermission tier: operator — you act on the user's behalf; mutating actions require per-action confirmation.\nProject path: /p\nProject id: (none)\nDaintree MCP: not connected\nModels: large=accounts/fireworks/models/deepseek-v4-flash, small=accounts/fireworks/models/deepseek-v4-flash\nNOTE: Daintree MCP is NOT connected. You are in degraded local mode: fs/timer/watcher/queue tools work, but Daintree orchestration tools will fail until a connection is provided. Tell the user clearly rather than pretending.\n\n"
+    "content": "# Runtime context\nPermission tier: operator — you act on the user's behalf; mutating actions require per-action confirmation.\nProject path: /p\nProject id: (none)\nDaintree MCP: not connected\nModels: large=deepseek-v4-flash, small=deepseek-v4-flash\nNOTE: Daintree MCP is NOT connected. You are in degraded local mode: fs/timer/watcher/queue tools work, but Daintree orchestration tools will fail until a connection is provided. Tell the user clearly rather than pretending.\n\n"
   },
   {
     "role": "system",

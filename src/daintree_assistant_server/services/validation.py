@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 
-from ..config import FIREWORKS_SMALL_MODEL, Settings
+from ..config import DEEPSEEK_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.openai import (
     ChatMessage,
@@ -281,7 +281,7 @@ def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
 
 
 def _validate_generation(req: RespondRequest) -> None:
-    """Fireworks rejects JSON mode combined with function calling, so fail fast with
+    """DeepSeek rejects JSON mode combined with function calling, so fail fast with
     a clear 400 instead of a confusing upstream 502 (and a wasted upstream call).
     ("text" is the default output mode and is simply not forwarded — see the
     assembler — so only "json_object" conflicts with tools.)"""
@@ -300,4 +300,4 @@ def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
     _validate_tools(req.input.tools, req.input.tool_choice, settings)
     _validate_content(req.input.messages, settings)
     _validate_generation(req)
-    return FIREWORKS_SMALL_MODEL
+    return DEEPSEEK_MODEL

@@ -1,12 +1,12 @@
-"""Live integration tests against the real Fireworks API.
+"""Live integration tests against the real DeepSeek API.
 
 Skipped by default. To run::
 
-    RUN_LIVE_FIREWORKS=1 FIREWORKS_API_KEY=fw_... pytest tests/live -q
+    RUN_LIVE_DEEPSEEK=1 DEEPSEEK_API_KEY=sk-... pytest tests/live -q
 
 These pin the *provider contract* that mocked tests can't see — most importantly
-that the selector's forced ``tool_choice`` succeeds with ``reasoning_effort="none"``
-(a regression there makes the selector degrade open and silently stop loading
+that the selector's forced ``tool_choice`` succeeds with thinking disabled (a
+regression there makes the selector degrade open and silently stop loading
 skills). They make real, paid API calls, so they are gated.
 """
 
@@ -21,11 +21,11 @@ from fastapi.testclient import TestClient
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import create_app
 
-_LIVE = bool(os.environ.get("RUN_LIVE_FIREWORKS")) and bool(os.environ.get("FIREWORKS_API_KEY"))
+_LIVE = bool(os.environ.get("RUN_LIVE_DEEPSEEK")) and bool(os.environ.get("DEEPSEEK_API_KEY"))
 
 pytestmark = pytest.mark.skipif(
     not _LIVE,
-    reason="set RUN_LIVE_FIREWORKS=1 and a real FIREWORKS_API_KEY to run live tests",
+    reason="set RUN_LIVE_DEEPSEEK=1 and a real DEEPSEEK_API_KEY (sk-...) to run live tests",
 )
 
 
@@ -34,7 +34,7 @@ def live_client():
     settings = Settings(
         ENVIRONMENT="development",
         DAINTREE_API_KEY="",  # unauthenticated dev access
-        FIREWORKS_API_KEY=os.environ["FIREWORKS_API_KEY"],
+        DEEPSEEK_API_KEY=os.environ["DEEPSEEK_API_KEY"],
         STATE_SIGNING_KEY_CURRENT="live-test-signing-key",
         STATE_SALT="live-test-salt",
     )
@@ -52,7 +52,7 @@ def test_live_capabilities(live_client) -> None:
 
 def test_live_respond_selector_not_degraded(live_client) -> None:
     # Skill-relevant query with a tool offered. The selector's forced tool_choice
-    # MUST succeed — if reasoning_effort mapping breaks it, the selector degrades
+    # MUST succeed — if DeepSeek thinking mode breaks it again, the selector degrades
     # open (this assertion is the regression guard).
     r = live_client.post("/v1/daintree/respond", json={
         "protocol_version": 1,

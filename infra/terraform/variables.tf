@@ -77,7 +77,7 @@ variable "secret_ids" {
   type        = map(string)
   default = {
     DAINTREE_API_KEY          = "daintree-api-key"
-    FIREWORKS_API_KEY         = "fireworks-api-key"
+    DEEPSEEK_API_KEY          = "deepseek-api-key"
     STATE_SIGNING_KEY_CURRENT = "state-signing-key-current"
     STATE_SALT                = "state-salt"
   }

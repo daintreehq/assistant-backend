@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The Daintree Assistant Server moves the model-orchestration boundary off the local CLI and onto the server. **The server owns** the permanent system prompt, the skill catalog and bodies, automatic skill selection, prompt assembly, the small-model utility prompts, and upstream credentials. **The CLI owns** local state and local tool execution.
 
-The public API is **Daintree-native** (`POST /v1/daintree/respond`), not OpenAI-compatible — the session/skill envelope is first-class and skills are their own response block. The upstream is **Fireworks** (OpenAI wire shape, spoken *internally* behind the `ChatProvider` abstraction in `providers/`): `accounts/fireworks/models/deepseek-v4-flash` for the main/selector/utility calls, `accounts/fireworks/models/glm-5p2` for the local skill-learning builder/improver — all hardcoded. The full wire contract is `docs/DAINTREE_API.md`; code comments cite it as "section X.Y" — read it when changing wire shapes or selector/task behavior.
+The public API is **Daintree-native** (`POST /v1/daintree/respond`), not OpenAI-compatible — the session/skill envelope is first-class and skills are their own response block. The upstream is **DeepSeek** (OpenAI wire shape, spoken *internally* behind the `ChatProvider` abstraction in `providers/`): `deepseek-v4-flash` for the main/selector/utility calls, `deepseek-v4-pro` for the local skill-learning builder/improver — all hardcoded. The full wire contract is `docs/DAINTREE_API.md`; code comments cite it as "section X.Y" — read it when changing wire shapes or selector/task behavior.
 
 ## Commands
 
@@ -29,11 +29,11 @@ mypy --strict src
 # against a pinned fixture catalog, not the live one.
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
-# Live Fireworks contract tests (skipped by default; make real API calls)
-RUN_LIVE_FIREWORKS=1 FIREWORKS_API_KEY=fw_... pytest tests/live -q
+# Live DeepSeek contract tests (skipped by default; make real API calls)
+RUN_LIVE_DEEPSEEK=1 DEEPSEEK_API_KEY=sk-... pytest tests/live -q
 
 # Run locally (binds HOST/PORT from .env; default 127.0.0.1:8473)
-cp .env.example .env   # then set FIREWORKS_API_KEY
+cp .env.example .env   # then set DEEPSEEK_API_KEY
 python -m daintree_assistant_server
 uvicorn daintree_assistant_server.main:app --reload --port 8473
 
@@ -96,7 +96,7 @@ A backend-internal harness (`services/skill_learning.py`) that watches completed
 
 **Pipeline** (fire-and-forget *after* a turn that completed with a final answer — `_maybe_learn_after_turn` in the orchestrator; a turn ending in a tool call is a continuation round and is skipped, so learning only ever sees a finished workflow — including the last one of a session, which no next instruction would ever trigger):
 1. **Gate** (`prompts/skill_learning/gate.md`, small model, non-thinking JSON) reads the whole workflow transcript (with the just-generated final answer appended) and returns none / improve / create. Strong triggers: the user signalling a problem ("what happened here?", "this shouldn't have happened") or the assistant visibly struggling; a cleanly completed repeatable workflow can justify a *create*. Only a `general_daintree_workflow` lesson above `SKILL_LEARNING_MIN_CONFIDENCE`, backed by concrete evidence, writes.
-2. **Build/improve** (`build.md` / `improve.md`, GLM 5.2, thinking) diagnoses what worked and what failed in the workflow, then returns a `SkillProposal`; the diagnosis plus a unified diff land in the audit record. The prompts require **generic, project- and agent-agnostic** skills — no hardcoded repo/path/CLI-agent; a step that needs an agent tells the model to pick the best-fit one from the configured-agents roster it sees at runtime — because the catalog must transfer across projects, users, and CLI agents.
+2. **Build/improve** (`build.md` / `improve.md`, DeepSeek V4 Pro, thinking) diagnoses what worked and what failed in the workflow, then returns a `SkillProposal`; the diagnosis plus a unified diff land in the audit record. The prompts require **generic, project- and agent-agnostic** skills — no hardcoded repo/path/CLI-agent; a step that needs an agent tells the model to pick the best-fit one from the configured-agents roster it sees at runtime — because the catalog must transfer across projects, users, and CLI agents.
 3. **Validate → write → reload**: atomic write + reload as one cancellation-shielded unit (`CatalogManager.reload()`, rollback on failure). The reloaded catalog is live for the next turn's selection; nothing is folded into the just-answered turn (its response is already sent).
 
 **Modes** (`SKILL_LEARNING_MODE`): `off` | `propose` (run the pipeline, write only a proposal + audit JSON under `SKILL_LEARNING_AUDIT_DIR`, never touch skill files) | `apply` (write the skill file + reload).
@@ -155,7 +155,7 @@ something to reintroduce incidentally.
 
 ## Config & readiness
 
-`config.py` `Settings` is parsed once, immutable, env-driven (`.env`). Models are **hardcoded** (`FIREWORKS_SMALL_MODEL`, `SKILL_BUILDER_MODEL`/`SKILL_IMPROVER_MODEL`, `PUBLIC_MODEL_ID`) — a product decision, not config; only the Fireworks key/base-URL come from the environment. Secrets are `SecretStr`. Missing required secrets (and, in `production`, weak/default ones) **fail readiness** (`/readyz` → 503) rather than crashing the process — liveness (`/healthz`) stays green. Local-only features also gate readiness: `local_only_problems()` fails `/readyz` if skill learning is enabled in production. `main.py` builds the immutable service `Container` and validates it during lifespan startup; a malformed prompt or skill prevents readiness without taking down liveness.
+`config.py` `Settings` is parsed once, immutable, env-driven (`.env`). Models are **hardcoded** (`DEEPSEEK_MODEL`, `SKILL_BUILDER_MODEL`/`SKILL_IMPROVER_MODEL`, `PUBLIC_MODEL_ID`) — a product decision, not config; only the DeepSeek key/base-URL come from the environment. Secrets are `SecretStr`. Missing required secrets (and, in `production`, weak/default ones) **fail readiness** (`/readyz` → 503) rather than crashing the process — liveness (`/healthz`) stays green. Local-only features also gate readiness: `local_only_problems()` fails `/readyz` if skill learning is enabled in production. `main.py` builds the immutable service `Container` and validates it during lifespan startup; a malformed prompt or skill prevents readiness without taking down liveness.
 
 ## Conventions
 

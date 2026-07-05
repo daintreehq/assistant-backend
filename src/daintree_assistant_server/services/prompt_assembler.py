@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..config import FIREWORKS_SMALL_MODEL, Settings
+from ..config import DEEPSEEK_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import RuntimeContext, TurnContext
 from ..contracts.openai import (
@@ -170,8 +170,8 @@ class PromptAssembler:
             ],
             mcp_status_line=mcp_status_line,
             mcp_connected=mcp_connected,
-            large_model=FIREWORKS_SMALL_MODEL,
-            small_model=FIREWORKS_SMALL_MODEL,
+            large_model=DEEPSEEK_MODEL,
+            small_model=DEEPSEEK_MODEL,
             scheduler_active=rc.scheduler_active,
             project_instructions=project_instructions,
             open_terminals=open_terminals,
@@ -328,13 +328,13 @@ class PromptAssembler:
 
     @staticmethod
     def _normalize_tool_schema(schema: Any) -> Any:
-        """Rewrite a client tool's JSON Schema into the draft 2020-12 shape Fireworks
+        """Rewrite a client tool's JSON Schema into the draft 2020-12 shape DeepSeek
         validates against.
 
         Client tools are authored by the CLI and may target an OLDER JSON Schema draft
         (draft-07 and earlier), where an array-valued ``items`` means tuple validation.
         Draft 2020-12 forbids that — tuple item schemas must live under ``prefixItems``
-        — and Fireworks rejects the ENTIRE request with a 400 if any one tool schema
+        — and DeepSeek rejects the ENTIRE request with a 400 if any one tool schema
         uses the legacy form, sinking the whole turn (an opaque 502 to the user). So a
         single legacy tool must not be able to break generation: convert array ``items``
         to ``prefixItems`` (folding draft-07 ``additionalItems`` into 2020-12 ``items``)
@@ -413,7 +413,7 @@ class PromptAssembler:
         skills: list[Skill],
         upstream_model: str,
     ) -> ProviderChatRequest:
-        """Assemble the upstream request so the provider's prefix cache covers the base
+        """Assemble the upstream request so DeepSeek's prefix cache covers the base
         prompt, the integration surface, and the append-only conversation. The active
         skill bodies and the per-request runtime/turn context follow the conversation,
         so a skill-set change re-encodes only that bounded tail — never the conversation.
@@ -445,7 +445,7 @@ class PromptAssembler:
             messages.append({"role": "system", "content": footer})
 
         # "text" is the upstream default, so forwarding it is a no-op — except that
-        # Fireworks rejects ANY response_format alongside tools ("You cannot specify
+        # DeepSeek rejects ANY response_format alongside tools ("You cannot specify
         # response format and function call at the same time") and the provider
         # withholds prompt_cache_key when response_format is set. Only "json_object"
         # changes behavior, and validation rejects that in combination with tools.

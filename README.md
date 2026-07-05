@@ -12,7 +12,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 `error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** Fireworks (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-v4-flash` for the main/selector/utility calls, `glm-5p2` for the local skill-learning builder/improver
+- **Upstream:** DeepSeek (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-v4-flash` for the main/selector/utility calls, `deepseek-v4-pro` for the local skill-learning builder/improver
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Key invariants
@@ -34,7 +34,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 src/daintree_assistant_server/
   api/            # FastAPI routers (chat, models, capabilities, skills, tasks, health)
   contracts/      # Pydantic wire models (OpenAI subset, extension, tasks, errors)
-  providers/      # ChatProvider protocol + Fireworks adapter + SSE parser
+  providers/      # ChatProvider protocol + DeepSeek adapter + SSE parser
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader (incl. skill_learning/)
   skills/         # Skill models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed skill-state token codec
@@ -58,9 +58,9 @@ mypy src/
 # Regenerate prompt golden snapshots after an intentional change
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
-# Live provider-contract tests (skipped by default; make real Fireworks calls).
+# Live provider-contract tests (skipped by default; make real DeepSeek calls).
 # Pins the things mocks can't see — e.g. the selector's forced tool_choice.
-RUN_LIVE_FIREWORKS=1 FIREWORKS_API_KEY=fw_... pytest tests/live -q
+RUN_LIVE_DEEPSEEK=1 DEEPSEEK_API_KEY=sk-... pytest tests/live -q
 ```
 
 CI (`.github/workflows/ci.yml`) runs ruff + `mypy --strict` + pytest on every
@@ -73,7 +73,7 @@ Set these (see `.env.example` for the full list):
 
 ```bash
 export DAINTREE_API_KEY=...               # public bearer key (dev)
-export FIREWORKS_API_KEY=...              # upstream provider key
+export DEEPSEEK_API_KEY=...               # upstream provider key
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
 ```
 
@@ -83,10 +83,10 @@ Missing required secrets do not crash the process — they fail **readiness**
 ### Run locally
 
 ```bash
-# Copy the env scaffold and add your Fireworks key; it binds HOST/PORT from .env
+# Copy the env scaffold and add your DeepSeek key; it binds HOST/PORT from .env
 # (default 127.0.0.1:8473). In development, leaving DAINTREE_API_KEY unset means
 # unauthenticated access.
-cp .env.example .env   # then edit FIREWORKS_API_KEY (+ PORT if you like)
+cp .env.example .env   # then edit DEEPSEEK_API_KEY (+ PORT if you like)
 python -m daintree_assistant_server
 ```
 
@@ -114,7 +114,7 @@ pointing your CLI at the same server — nothing about the wire protocol changes
    triggers are you signalling a problem ("what happened here?", "this shouldn't
    have happened") or the assistant visibly struggling; a cleanly completed,
    repeatable workflow can also justify a *new* skill.
-2. If warranted, **GLM 5.2** first diagnoses the workflow — what the assistant (and
+2. If warranted, **DeepSeek V4 Pro** first diagnoses the workflow — what the assistant (and
    the current skill, if improving) did that worked and where it failed — then
    writes the new skill or the improved one. The diagnosis is kept in the audit
    record so you can review *why* each change landed.
@@ -132,7 +132,7 @@ SKILL_LEARNING_MODE=apply python -m daintree_assistant_server
 ```
 
 That is the everything-on-defaults mode: the gate runs after each completed turn,
-GLM writes/improves a skill when warranted, changes land in the real
+the builder writes/improves a skill when warranted, changes land in the real
 `skills/files/` (so they show up in `git diff`), and the catalog reloads live.
 Point your CLI at the server as usual and just work. For a safe dry run that
 never touches the skill files, swap `apply` for `propose`.

@@ -17,13 +17,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Hardcoded model identities — a product decision, not deployment config. The
 # main completion, the skill selector, and the utility tasks all run on the small
-# model. The skill-learning gate also uses the small model; its builder/improver
-# use the stronger GLM model (a harder generation task). PUBLIC_MODEL_ID is the
-# alias returned to clients. Only the Fireworks API key (and base URL) come from
-# the environment. Fireworks speaks the OpenAI wire shape.
-FIREWORKS_SMALL_MODEL = "accounts/fireworks/models/deepseek-v4-flash"
-SKILL_BUILDER_MODEL = "accounts/fireworks/models/glm-5p2"
-SKILL_IMPROVER_MODEL = "accounts/fireworks/models/glm-5p2"
+# model (DEEPSEEK_MODEL). The skill-learning gate also uses the small model; its
+# builder/improver use the stronger DeepSeek V4 Pro model (a harder generation
+# task). PUBLIC_MODEL_ID is the alias returned to clients. Only the DeepSeek API
+# key (and base URL) come from the environment.
+DEEPSEEK_MODEL = "deepseek-v4-flash"
+SKILL_BUILDER_MODEL = "deepseek-v4-pro"
+SKILL_IMPROVER_MODEL = "deepseek-v4-pro"
 PUBLIC_MODEL_ID = "daintree-assistant"
 
 # The development default salt; rejected in production by weak_secrets().
@@ -50,23 +50,26 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", alias="HOST")
     port: int = Field(default=8080, alias="PORT")
 
-    # ---- Upstream provider (Fireworks, OpenAI-compatible) --------------
+    # ---- Upstream provider (DeepSeek, OpenAI-compatible) ---------------
     # Models are hardcoded (see the constants above); only the key and base URL
     # come from the environment.
-    fireworks_base_url: str = Field(
-        default="https://api.fireworks.ai/inference/v1", alias="FIREWORKS_BASE_URL"
-    )
-    fireworks_api_key: SecretStr = Field(default=SecretStr(""), alias="FIREWORKS_API_KEY")
+    deepseek_base_url: str = Field(default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
+    deepseek_api_key: SecretStr = Field(default=SecretStr(""), alias="DEEPSEEK_API_KEY")
 
-    # Fireworks controls reasoning through `reasoning_effort` (always sent), not a
-    # `thinking` object: "none" disables thinking (DeepSeek V4 defaults reasoning ON
-    # when it is absent, and the selector's forced tool_choice requires non-thinking,
-    # so "none" must be sent explicitly); "high"/"max" are the GLM thinking tiers used
-    # by the skill builder/improver. prompt_cache_key improves prefix-cache routing and
-    # defaults ON; flip off only for a provider/model that rejects it.
-    fireworks_send_prompt_cache_key: bool = Field(
-        default=True, alias="FIREWORKS_SEND_PROMPT_CACHE_KEY"
+    # DeepSeek V4 specifics, confirmed against the live endpoint:
+    #  - thinking must be DISABLED for the selector's forced tool_choice to work
+    #    ("Thinking mode does not support this tool_choice"); the field is accepted.
+    #  - prompt_cache_key is accepted and improves prefix-cache routing.
+    # Both default ON; flip off only for a provider/model that rejects them.
+    deepseek_send_prompt_cache_key: bool = Field(
+        default=True, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
     )
+    # When True (default) the server sends an explicit thinking directive on every
+    # call (enabled/disabled per request). Set False ONLY for a provider that does
+    # not understand the field at all — NOT for DeepSeek: DeepSeek defaults thinking
+    # to ENABLED when the field is absent, so omitting it would silently turn
+    # thinking on and 400 the selector's forced tool_choice.
+    deepseek_send_thinking: bool = Field(default=True, alias="DEEPSEEK_SEND_THINKING")
 
     # ---- Main-model thinking -------------------------------------------
     # The selector and utility tasks always run NON-thinking — the selector's
@@ -77,7 +80,7 @@ class Settings(BaseSettings):
     # (60+ calls in round 0: spawn + read + await + CLOSE all at once, against terminals
     # and artifacts that don't exist yet, so most fail). Thinking OFF the model steps
     # measuredly (check → spawn → wait → read → judge), which is the validated behavior.
-    # The tradeoff of OFF: with reasoning_effort "none" deepseek-v4-flash can leak
+    # The tradeoff of OFF: with thinking disabled deepseek-v4-flash can leak
     # chain-of-thought into visible content on complex tool turns (fabricated context
     # recaps, stray </think>); when CoT routes to reasoning_content (ON) it round-trips
     # through the wire contract (a tool-call turn missing it 400s on DeepSeek). That
@@ -180,7 +183,7 @@ class Settings(BaseSettings):
     # as a normal dynamic skill load. It MUST be off in production: an enabled mode
     # fails readiness there (see local_only_problems). Modes:
     #   off     — disabled (default)
-    #   propose — run the gate + GLM builder/improver and write the proposed skill
+    #   propose — run the gate + DeepSeek builder/improver and write the proposed skill
     #             markdown + an audit JSON under the audit dir's proposals/, but never
     #             touch the real skill files or the catalog
     #   apply   — also write/rewrite the skill file and reload the catalog in place
@@ -196,7 +199,7 @@ class Settings(BaseSettings):
     skill_learning_audit_dir: str = Field(
         default=".daintree/skill-learning", alias="SKILL_LEARNING_AUDIT_DIR"
     )
-    # GLM builder/improver thinking tier ("high" or "max"). The gate stays non-thinking.
+    # Builder/improver thinking tier ("high" or "max"). The gate stays non-thinking.
     skill_learning_reasoning_effort: Literal["high", "max"] = Field(
         default="high", alias="SKILL_LEARNING_REASONING_EFFORT"
     )
@@ -226,7 +229,7 @@ class Settings(BaseSettings):
     )
     # Must cover the improver's REQUIRED output — the complete replacement body
     # (the largest packaged skill is ~24 KB ≈ 6k tokens before JSON escaping) plus
-    # the diagnosis fields plus GLM's reasoning tokens, which count against
+    # the diagnosis fields plus the builder's reasoning tokens, which count against
     # max_tokens. Too small and the JSON truncates: the parse fails, the repair
     # retry truncates identically, and the improve path can never land.
     skill_build_max_output_tokens: int = Field(
@@ -246,8 +249,8 @@ class Settings(BaseSettings):
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty."""
         missing: list[str] = []
-        if not self.fireworks_api_key.get_secret_value():
-            missing.append("FIREWORKS_API_KEY")
+        if not self.deepseek_api_key.get_secret_value():
+            missing.append("DEEPSEEK_API_KEY")
         if not self.daintree_api_key.get_secret_value():
             missing.append("DAINTREE_API_KEY")
         if not self.state_signing_key_current.get_secret_value():

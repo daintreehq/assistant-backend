@@ -2,7 +2,7 @@
 
 These are NOT part of the public wire contract — no client ever sends or receives
 them. They are the structured shapes the two backend-only model calls return: the
-cheap gate's verdict, and the GLM builder/improver's skill proposal. Both parse
+cheap gate's verdict, and the builder/improver's skill proposal. Both parse
 model output, so they are tolerant (``extra="ignore"``); the real validation of a
 proposal happens when it is rendered to markdown and run through the skill loader.
 """
@@ -26,7 +26,7 @@ LessonType = Literal[
 class GateVerdict(BaseModel):
     """The cheap gate's decision about whether a completed workflow is learnable.
 
-    The gate never writes anything; it only decides whether spending a GLM
+    The gate never writes anything; it only decides whether spending a
     build/improve call is worthwhile, and which kind.
     """
 
@@ -41,14 +41,14 @@ class GateVerdict(BaseModel):
     reason: str = ""
     evidence: list[str] = Field(default_factory=list)
     # Catalog ids the gate judged closest to this workflow's domain. The cheap
-    # small model picks them; the GLM builder/improver then sees those skills as
+    # small model picks them; the builder/improver then sees those skills as
     # its house-style/scope exemplars instead of arbitrary ones. Unknown ids are
     # filtered against the catalog before use.
     related_skill_ids: list[str] = Field(default_factory=list)
 
 
 class SkillProposal(BaseModel):
-    """The GLM builder/improver's proposed skill, before validation.
+    """The builder/improver's proposed skill, before validation.
 
     Field names mirror the on-disk frontmatter (camelCase accepted via aliases).
     A ``no_change`` proposal is a valid, expected outcome — the improver returns it

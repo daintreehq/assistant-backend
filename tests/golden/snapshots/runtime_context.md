@@ -4,7 +4,7 @@ Project path: /home/user/project
 Project id: project_123
 Configured agents: claude, codex — the user-configured Daintree roster that agentTask.spawnForEdits accepts (it rejects ids not configured here). Name one of these to spawn an agent; other installed agents must be configured first.
 Daintree MCP: connected (stdio transport, 42 tools)
-Models: large=accounts/fireworks/models/deepseek-v4-flash, small=accounts/fireworks/models/deepseek-v4-flash
+Models: large=deepseek-v4-flash, small=deepseek-v4-flash
 
 
 # Open terminals

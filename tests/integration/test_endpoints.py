@@ -139,7 +139,7 @@ def test_dev_boots_and_serves_unauthenticated_without_api_key() -> None:
     from daintree_assistant_server.main import create_app
 
     settings = Settings(
-        ENVIRONMENT="development", DAINTREE_API_KEY="", FIREWORKS_API_KEY="d",
+        ENVIRONMENT="development", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="d",
         STATE_SIGNING_KEY_CURRENT="sk", STATE_SALT="x",
     )
     app = create_app(settings=settings)  # real lifespan (no injected provider)
@@ -156,7 +156,7 @@ def test_prod_not_ready_without_api_key() -> None:
     from daintree_assistant_server.main import create_app
 
     settings = Settings(
-        ENVIRONMENT="production", DAINTREE_API_KEY="", FIREWORKS_API_KEY="d" * 32,
+        ENVIRONMENT="production", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="d" * 32,
         STATE_SIGNING_KEY_CURRENT="s" * 48, STATE_SALT="a-real-salt-value",
     )
     app = create_app(settings=settings)
@@ -176,7 +176,7 @@ def test_prod_not_ready_when_skill_learning_enabled(fake_provider) -> None:
     settings = Settings(
         ENVIRONMENT="production",
         DAINTREE_API_KEY="x" * 24,
-        FIREWORKS_API_KEY="d" * 32,
+        DEEPSEEK_API_KEY="d" * 32,
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",
         SKILL_LEARNING_MODE="apply",
@@ -197,7 +197,7 @@ def test_not_ready_returns_503(fake_provider) -> None:
 
     broken = Settings(
         DAINTREE_API_KEY="test-api-key",
-        FIREWORKS_API_KEY="d",
+        DEEPSEEK_API_KEY="d",
         STATE_SIGNING_KEY_CURRENT="",  # makes build_container raise -> not ready
     )
     app = create_app(settings=broken, provider=fake_provider)

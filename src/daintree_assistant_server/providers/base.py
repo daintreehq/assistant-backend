@@ -1,6 +1,6 @@
 """The narrow provider protocol and its normalized request/result types.
 
-Business logic depends only on these types, never on provider wire shapes. A
+Business logic depends only on these types, never on DeepSeek wire shapes. A
 later provider (another hosted API, or a self-hosted PyTorch model) implements
 the same protocol without touching request validation, skill selection, state,
 prompt construction, or the public endpoints.
@@ -51,10 +51,9 @@ class ProviderChatRequest:
     stream: bool = False
     include_usage: bool = False
     thinking_disabled: bool = True
-    # Reasoning effort, only meaningful when thinking is enabled
-    # (``thinking_disabled=False``); accepts "high"/"max". The Fireworks provider
-    # always sends a reasoning field: "none" when thinking is disabled, else this
-    # value (defaulting to "high" when left ``None``).
+    # DeepSeek reasoning effort, only meaningful when thinking is enabled
+    # (``thinking_disabled=False``). DeepSeek accepts "high"/"max" (low/medium map
+    # to high, xhigh to max). ``None`` lets the provider default apply.
     reasoning_effort: str | None = None
     prompt_cache_key: str | None = None
     timeout: float | None = None

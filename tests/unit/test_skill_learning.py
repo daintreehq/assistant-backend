@@ -10,7 +10,12 @@ from typing import Any
 import pytest
 from fakes import FakeProvider, make_result, make_text_chunks
 
-from daintree_assistant_server.config import FIREWORKS_SMALL_MODEL, Settings
+from daintree_assistant_server.config import (
+    DEEPSEEK_MODEL,
+    SKILL_BUILDER_MODEL,
+    SKILL_IMPROVER_MODEL,
+    Settings,
+)
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import upstream_error
 from daintree_assistant_server.prompts.loader import PromptLoader
@@ -144,7 +149,7 @@ def _settings(
         extra["SKILL_LEARNING_CONTEXT_TOKENS"] = context_tokens
     return Settings(
         DAINTREE_API_KEY="k",
-        FIREWORKS_API_KEY="fw",
+        DEEPSEEK_API_KEY="fw",
         STATE_SIGNING_KEY_CURRENT="s",
         RETRY_BACKOFF_BASE_SECONDS=0.0,
         SKILL_LEARNING_MODE=mode,
@@ -240,6 +245,36 @@ async def test_create_overlay_dir(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_uses_pro_builder_model_with_thinking(tmp_path: Path) -> None:
+    # Regression guard for the DeepSeek model split (see config.py): the gate runs on
+    # the small model NON-thinking, while the builder runs on deepseek-v4-pro WITH
+    # thinking at the configured effort. The fake records every request, so a silent
+    # regression back to the small model (or thinking off) for the builder is caught.
+    assert SKILL_BUILDER_MODEL == "deepseek-v4-pro"
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    learner, _, _ = _learner(tmp_path, fake)
+    await learner.run(request=_request(), active_ids=[])
+
+    gate_reqs = [r for r in fake.requests if r.model == DEEPSEEK_MODEL]
+    build_reqs = [r for r in fake.requests if r.model == SKILL_BUILDER_MODEL]
+    assert gate_reqs and all(r.thinking_disabled for r in gate_reqs)
+    assert build_reqs and all(r.thinking_disabled is False for r in build_reqs)
+    assert all(r.reasoning_effort == "high" for r in build_reqs)
+
+
+@pytest.mark.asyncio
+async def test_improve_uses_pro_improver_model_with_thinking(tmp_path: Path) -> None:
+    assert SKILL_IMPROVER_MODEL == "deepseek-v4-pro"
+    fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    await learner.run(request=_request(), active_ids=["daintree.test.target"])
+
+    improve_reqs = [r for r in fake.requests if r.model == SKILL_IMPROVER_MODEL]
+    assert improve_reqs and all(r.thinking_disabled is False for r in improve_reqs)
+    assert all(r.reasoning_effort == "high" for r in improve_reqs)
+
+
+@pytest.mark.asyncio
 async def test_improve_rewrites_target(tmp_path: Path) -> None:
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, manager, _ = _learner(tmp_path, fake, with_target=True)
@@ -266,7 +301,7 @@ async def test_gate_none_does_nothing(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_gate_without_evidence_does_nothing(tmp_path: Path) -> None:
     # The gate prompt demands concrete evidence for a write; the code enforces it
-    # too, so an evidence-free verdict never spends a GLM build call.
+    # too, so an evidence-free verdict never spends a builder call.
     gate = {**GATE_CREATE, "evidence": []}
     fake = _provider(gate, PROPOSAL_CREATE)
     learner, _, write_dir = _learner(tmp_path, fake)
@@ -610,7 +645,7 @@ def test_truncated_transcript_carries_marker(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_gate_related_skills_become_builder_examples(tmp_path: Path) -> None:
     # The cheap gate names the catalog skills nearest the workflow's domain; the
-    # GLM builder must see those first among its house-style exemplars.
+    # The builder must see those first among its house-style exemplars.
     gate = {**GATE_CREATE, "related_skill_ids": ["daintree.test.target"]}
     fake = _provider(gate, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
@@ -765,7 +800,7 @@ async def test_learns_after_completed_turn(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     orch, manager, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    outcome = await orch.complete(_request(), upstream_model=FIREWORKS_SMALL_MODEL)
+    outcome = await orch.complete(_request(), upstream_model=DEEPSEEK_MODEL)
     assert outcome.body is not None
     # The main completion returned its normal reply straight away...
     assert outcome.body["message"]["content"] == "ok"
@@ -813,7 +848,7 @@ async def test_learner_skipped_when_turn_ends_in_tool_calls(tmp_path: Path) -> N
     fake.complete_result = _complete
     orch, _, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    outcome = await orch.complete(_request(), upstream_model=FIREWORKS_SMALL_MODEL)
+    outcome = await orch.complete(_request(), upstream_model=DEEPSEEK_MODEL)
     assert outcome.body is not None
     await orch.drain_background_tasks()  # nothing was spawned; a no-op
 
@@ -837,7 +872,7 @@ async def test_learns_after_streamed_completion(tmp_path: Path) -> None:
             "generation": {"stream": True},
         }
     )
-    outcome = await orch.complete(req, upstream_model=FIREWORKS_SMALL_MODEL)
+    outcome = await orch.complete(req, upstream_model=DEEPSEEK_MODEL)
     assert outcome.stream is not None
     async for _event in outcome.stream:  # drain the SSE stream to completion
         pass
@@ -889,7 +924,7 @@ async def test_learner_skipped_when_streamed_turn_ends_in_tool_calls(tmp_path: P
             "generation": {"stream": True},
         }
     )
-    outcome = await orch.complete(req, upstream_model=FIREWORKS_SMALL_MODEL)
+    outcome = await orch.complete(req, upstream_model=DEEPSEEK_MODEL)
     assert outcome.stream is not None
     async for _event in outcome.stream:
         pass

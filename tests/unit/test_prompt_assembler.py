@@ -248,7 +248,7 @@ def test_main_request_params(assembler: PromptAssembler) -> None:
 
 
 def test_text_response_format_never_forwarded(assembler: PromptAssembler) -> None:
-    # "text" is the upstream default and Fireworks 400s on any response_format
+    # "text" is the upstream default and DeepSeek 400s on any response_format
     # combined with tools — the assembler drops it entirely. Dropping it also
     # keeps the request eligible for prompt_cache_key (the provider withholds
     # the cache key whenever response_format is set).
@@ -310,7 +310,7 @@ def test_reasoning_content_absent_when_not_supplied(assembler: PromptAssembler) 
 
 def test_thinking_enabled_via_settings(prompt_loader: PromptLoader) -> None:
     settings = Settings(
-        DAINTREE_API_KEY="k", FIREWORKS_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
+        DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
         MAIN_THINKING_ENABLED=True, MAIN_REASONING_EFFORT="max",
     )
     pr = PromptAssembler(prompt_loader, settings).build_main_request(
@@ -324,7 +324,7 @@ def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> No
     # DeepSeek 400s on thinking + forced tool_choice; the assembler must degrade to
     # non-thinking rather than fail the turn (the same constraint as the selector).
     settings = Settings(
-        DAINTREE_API_KEY="k", FIREWORKS_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
+        DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
         MAIN_THINKING_ENABLED=True,
     )
     assembler = PromptAssembler(prompt_loader, settings)
@@ -348,7 +348,7 @@ def test_tool_schema_tuple_items_normalized_to_prefix_items(
     assembler: PromptAssembler,
 ) -> None:
     # A client tool authored against draft-07 (array-valued `items` = tuple validation)
-    # must be rewritten to draft 2020-12 `prefixItems`, or Fireworks 400s the whole turn.
+    # must be rewritten to draft 2020-12 `prefixItems`, or DeepSeek 400s the whole turn.
     tool = {
         "type": "function",
         "function": {

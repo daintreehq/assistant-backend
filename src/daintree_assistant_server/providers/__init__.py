@@ -1,1 +1,1 @@
-"""Provider abstraction and the Fireworks adapter."""
+"""Provider abstraction and the DeepSeek adapter."""

@@ -5,7 +5,7 @@ OpenAI-compatible. There is exactly one client (the Daintree Assistant CLI), whi
 the server fully controls, so the wire contract is purpose-built rather than
 shaped around a third-party schema.
 
-The upstream provider is Fireworks — its OpenAI-compatible wire shape is spoken
+The upstream provider is DeepSeek — its OpenAI-compatible wire shape is spoken
 *internally*, behind a provider abstraction; the main model is `deepseek-v4-flash`.
 That is invisible to clients.
 
@@ -235,7 +235,7 @@ reserved and rejected if a client offers them as tools or replays them in histor
 ## Prompt assembly & caching
 
 The upstream message array keeps the large **append-only conversation** in the upstream
-provider's cached prefix (Fireworks prompt caching, keyed by `prompt_cache_key`); the small
+provider's cached prefix (DeepSeek prompt caching, keyed by `prompt_cache_key`); the small
 per-request tail (skill bodies + runtime + footer) follows it. The active
 skill set changes by wholesale replacement on a topic shift, so the bodies sit *after* the
 conversation — a skill load/evict then re-encodes only that bounded tail, never the
@@ -256,15 +256,17 @@ fields (project instructions, MCP instructions) are framed in delimited, escape-
 data blocks so they cannot inject new instructions.
 
 The main request is sent with `prompt_cache_key` ("daintree-main") by default
-(`FIREWORKS_SEND_PROMPT_CACHE_KEY`; suppressed in JSON mode). Reasoning is controlled by the
-top-level `reasoning_effort` field, which is always sent: `"none"` disables thinking, and
-`high`/`max` select a thinking tier.
+(`DEEPSEEK_SEND_PROMPT_CACHE_KEY`; suppressed in JSON mode). Reasoning is controlled by a
+top-level `thinking` object (`DEEPSEEK_SEND_THINKING`, always sent by default): `{"type":
+"disabled"}` turns thinking off, `{"type": "enabled"}` (optionally with a `reasoning_effort`
+tier) turns it on. DeepSeek defaults thinking ON when the field is absent, so the disable
+directive is sent explicitly.
 
-The selector and utility tasks **always** run non-thinking (`reasoning_effort:"none"`) — the
+The selector and utility tasks **always** run non-thinking (`thinking:{"type":"disabled"}`) — the
 selector's forced `tool_choice` is incompatible with thinking mode. The main `/respond` call
 runs **non-thinking by default** (`MAIN_THINKING_ENABLED`, enable with `=true`;
-`MAIN_REASONING_EFFORT` = `high` | `max`, default `high`; Fireworks also accepts `low`/`medium`,
-but the server restricts the main call to the two higher tiers). Thinking was reverted to off
+`MAIN_REASONING_EFFORT` = `high` | `max`, default `high`; DeepSeek also accepts `low`/`medium`
+but remaps them to `high`, so the server restricts the main call to the two higher tiers). Thinking was reverted to off
 because with it on the orchestration model dumps its whole multi-round plan as one giant
 speculative tool batch instead of stepping measuredly; the tradeoff of off is that
 deepseek-v4-flash can leak chain-of-thought into visible content on complex tool turns (a

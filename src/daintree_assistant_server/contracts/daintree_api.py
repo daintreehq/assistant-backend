@@ -6,7 +6,7 @@ envelope is first-class (not a bolted-on extension), the request is strict
 block in the response because dynamic skill loading is the system's core value.
 
 Conversation messages and tool definitions reuse the internal canonical models
-(:mod:`.openai`) so the selector, assembler, and Fireworks provider — which speak
+(:mod:`.openai`) so the selector, assembler, and DeepSeek provider — which speak
 the OpenAI wire shape *upstream* — need no translation. Only the public envelope
 and the response/stream serialization are Daintree-native.
 """

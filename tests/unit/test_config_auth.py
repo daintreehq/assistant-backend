@@ -15,7 +15,7 @@ from daintree_assistant_server.errors import DaintreeError
 def _settings(**overrides: object) -> Settings:
     base = {
         "DAINTREE_API_KEY": "secret",
-        "FIREWORKS_API_KEY": "dk",
+        "DEEPSEEK_API_KEY": "dk",
         "STATE_SIGNING_KEY_CURRENT": "sk",
     }
     base.update(overrides)
@@ -23,9 +23,9 @@ def _settings(**overrides: object) -> Settings:
 
 
 def test_missing_secrets_reports_each() -> None:
-    s = Settings(DAINTREE_API_KEY="", FIREWORKS_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
+    s = Settings(DAINTREE_API_KEY="", DEEPSEEK_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
     assert set(s.missing_secrets()) == {
-        "FIREWORKS_API_KEY",
+        "DEEPSEEK_API_KEY",
         "DAINTREE_API_KEY",
         "STATE_SIGNING_KEY_CURRENT",
     }
@@ -100,7 +100,7 @@ def test_authenticate_case_insensitive_scheme() -> None:
 def test_authenticate_dev_no_key_allows_unauthenticated() -> None:
     # No key configured in development → unauthenticated access (any/no header).
     s = Settings(
-        ENVIRONMENT="development", DAINTREE_API_KEY="", FIREWORKS_API_KEY="dk",
+        ENVIRONMENT="development", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="dk",
         STATE_SIGNING_KEY_CURRENT="sk",
     )
     assert authenticate(None, s) is DEVELOPMENT_PRINCIPAL
@@ -110,7 +110,7 @@ def test_authenticate_dev_no_key_allows_unauthenticated() -> None:
 def test_authenticate_prod_no_key_rejects() -> None:
     # Production never allows unauthenticated access, even with no key configured.
     s = Settings(
-        ENVIRONMENT="production", DAINTREE_API_KEY="", FIREWORKS_API_KEY="dk",
+        ENVIRONMENT="production", DAINTREE_API_KEY="", DEEPSEEK_API_KEY="dk",
         STATE_SIGNING_KEY_CURRENT="sk",
     )
     with pytest.raises(DaintreeError) as exc:

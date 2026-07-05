@@ -8,7 +8,7 @@
 #   ./dev off        # plain server, no skill learning
 #
 # The mode can also come from the environment (SKILL_LEARNING_MODE); a positional
-# arg wins over it. Everything else (FIREWORKS_API_KEY, PORT, …) is read from .env
+# arg wins over it. Everything else (DEEPSEEK_API_KEY, PORT, …) is read from .env
 # as usual. In production the server refuses to boot with learning enabled — this
 # is a LOCAL convenience only.
 set -euo pipefail
@@ -34,9 +34,9 @@ case "$SKILL_LEARNING_MODE" in
 esac
 
 # Friendly heads-up: without a key the server still boots, but /readyz stays 503.
-if [[ ! -f "$ROOT/.env" && -z "${FIREWORKS_API_KEY:-}" ]]; then
-  echo "⚠  No .env and no FIREWORKS_API_KEY — server will boot but /readyz will be 503." >&2
-  echo "   Run:  cp .env.example .env   then set FIREWORKS_API_KEY." >&2
+if [[ ! -f "$ROOT/.env" && -z "${DEEPSEEK_API_KEY:-}" ]]; then
+  echo "⚠  No .env and no DEEPSEEK_API_KEY — server will boot but /readyz will be 503." >&2
+  echo "   Run:  cp .env.example .env   then set DEEPSEEK_API_KEY." >&2
 fi
 
 echo "▶ Daintree Assistant Server   SKILL_LEARNING_MODE=$SKILL_LEARNING_MODE"

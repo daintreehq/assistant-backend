@@ -44,7 +44,7 @@ def _fixture_catalog() -> Catalog:
 
 
 def _settings() -> Settings:
-    return Settings(DAINTREE_API_KEY="k", FIREWORKS_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+    return Settings(DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
 
 
 def assert_golden(name: str, content: str) -> None:

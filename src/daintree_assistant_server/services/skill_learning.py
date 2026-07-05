@@ -13,8 +13,8 @@ Four separated concerns, each its own backend-only model call — the user-facin
 assistant is never told any of this exists:
 
   gate     (small model)  decides none / improve / create; never writes
-  build    (GLM)          writes a new skill from a repeatable workflow
-  improve  (GLM)          edits one existing skill from workflow evidence
+  build    (V4 Pro)       writes a new skill from a repeatable workflow
+  improve  (V4 Pro)       edits one existing skill from workflow evidence
   validate (deterministic) the real skill loader is the gate to disk
 
 Every failure fails OPEN: any exception is swallowed and the turn proceeds
@@ -37,7 +37,7 @@ from typing import Any
 import yaml
 
 from ..config import (
-    FIREWORKS_SMALL_MODEL,
+    DEEPSEEK_MODEL,
     SKILL_BUILDER_MODEL,
     SKILL_IMPROVER_MODEL,
     Settings,
@@ -77,7 +77,7 @@ _SECRET_PATTERNS = (
     # Vendor key/token prefixes — specific enough not to fire on ordinary prose.
     re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{16,}"),               # Anthropic
     re.compile(r"\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{16,}"),  # OpenAI project keys
-    re.compile(r"\bsk-[A-Za-z0-9]{16,}"),                      # OpenAI classic
+    re.compile(r"\bsk-[A-Za-z0-9]{16,}"),                      # OpenAI classic / DeepSeek
     re.compile(r"\bsk_(?:live|test)_[A-Za-z0-9]{16,}"),        # Stripe
     re.compile(r"\bfw_[A-Za-z0-9]{20,}"),                      # Fireworks
     re.compile(r"\bAKIA[0-9A-Z]{12,}"),                        # AWS access key id
@@ -420,7 +420,7 @@ class SkillLearner:
         if verdict.confidence < self.settings.skill_learning_min_confidence:
             return False
         # The gate prompt demands concrete evidence for a write; enforce it here too
-        # so an over-eager verdict with nothing to point at never spends a GLM call.
+        # so an over-eager verdict with nothing to point at never spends a builder call.
         if not any(e.strip() for e in verdict.evidence):
             return False
         if verdict.action == "create_new_skill":
@@ -443,7 +443,7 @@ class SkillLearner:
             "Return the JSON verdict now."
         )
         data = await self._complete_json(
-            model=FIREWORKS_SMALL_MODEL,
+            model=DEEPSEEK_MODEL,
             system=system,
             user=user,
             max_tokens=self.settings.skill_gate_max_output_tokens,

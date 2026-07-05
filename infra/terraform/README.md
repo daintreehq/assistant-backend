@@ -9,7 +9,7 @@ Create the Secret Manager secrets referenced by `var.secret_ids` (values managed
 out-of-band; never in Terraform state):
 
 ```bash
-for s in daintree-api-key fireworks-api-key state-signing-key-current state-salt; do
+for s in daintree-api-key deepseek-api-key state-signing-key-current state-salt; do
   gcloud secrets create "$s" --replication-policy=automatic 2>/dev/null || true
 done
 # add a version to each, e.g.:
