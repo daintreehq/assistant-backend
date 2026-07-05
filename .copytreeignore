@@ -42,6 +42,15 @@ htmlcov/
 *.tfstate.*
 .terraform.lock.hcl
 
+# --- Claude Code tooling + git worktrees (huge; pure duplication) ---
+# .claude/worktrees/<name>/ is a full second checkout of this repo created by
+# `git worktree`. It's gitignored, but because each worktree is its own git
+# boundary, copytree re-evaluates ignore rules *inside* it (where everything is
+# tracked) and walks the entire duplicate — ~850 KB / a quarter of the export.
+# None of .claude/ (local settings, worktrees, session state) belongs in an LLM
+# bundle of the project, so drop the whole directory.
+.claude/
+
 # --- VCS / OS / editor noise ---
 .git/
 .DS_Store
