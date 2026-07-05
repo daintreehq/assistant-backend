@@ -155,6 +155,7 @@ def _settings(
     mode: str = "apply",
     write_dir: Path | None = None,
     context_tokens: int | None = None,
+    allow_foundation: bool = False,
 ) -> Settings:
     extra: dict[str, Any] = {}
     if context_tokens is not None:
@@ -169,6 +170,7 @@ def _settings(
         SKILL_LEARNING_AUDIT_DIR=str(tmp_path / "audit"),
         SKILL_LEARNING_MIN_MESSAGES=1,
         SKILL_LEARNING_MIN_CONFIDENCE=0.75,
+        SKILL_LEARNING_ALLOW_FOUNDATION_CREATE=allow_foundation,
         **extra,
     )
 
@@ -199,6 +201,7 @@ def _learner(
     target_text: str = _TARGET,
     overlay: bool = False,
     context_tokens: int | None = None,
+    allow_foundation: bool = False,
 ) -> tuple[SkillLearner, CatalogManager, Path]:
     primary = _primary(tmp_path, with_target=with_target, target_text=target_text)
     write_dir = (tmp_path / "overlay") if overlay else primary
@@ -208,6 +211,7 @@ def _learner(
         mode=mode,
         write_dir=write_dir if overlay else None,
         context_tokens=context_tokens,
+        allow_foundation=allow_foundation,
     )
     manager = CatalogManager(
         load_catalog(primary, overlay_dir), primary_dir=primary, overlay_dir=overlay_dir
@@ -379,6 +383,72 @@ async def test_improve_preserves_foundation_flag(tmp_path: Path) -> None:
     assert skill is not None
     assert skill.summary == "An improved target summary."  # the improve landed
     assert skill.meta.foundation is True  # ...and foundation survived the rewrite
+
+
+@pytest.mark.asyncio
+async def test_create_foundation_suppressed_without_optin(tmp_path: Path) -> None:
+    # A create that asks for foundation:true lands as a NON-foundation skill unless the
+    # opt-in is set — minting a foundation is a human curation decision by default.
+    proposal = {**PROPOSAL_CREATE, "foundation": True}
+    fake = _provider(GATE_CREATE, proposal)
+    learner, manager, _ = _learner(tmp_path, fake, allow_foundation=False)
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is True
+    skill = manager.catalog.get("daintree.test.created")
+    assert skill is not None
+    assert skill.meta.foundation is False  # requested, but suppressed
+
+
+@pytest.mark.asyncio
+async def test_create_foundation_allowed_with_optin(tmp_path: Path) -> None:
+    proposal = {**PROPOSAL_CREATE, "foundation": True}
+    fake = _provider(GATE_CREATE, proposal)
+    learner, manager, _ = _learner(tmp_path, fake, allow_foundation=True)
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is True
+    skill = manager.catalog.get("daintree.test.created")
+    assert skill is not None
+    assert skill.meta.foundation is True
+
+
+@pytest.mark.asyncio
+async def test_audit_records_suppressed_foundation_request(tmp_path: Path) -> None:
+    # A requested-but-suppressed foundation must be reviewable: the audit records the
+    # landed tier (foundation=false) alongside what the model asked for (requested=true).
+    proposal = {**PROPOSAL_CREATE, "foundation": True}
+    fake = _provider(GATE_CREATE, proposal)
+    learner, _, _ = _learner(tmp_path, fake, allow_foundation=False)
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is True
+    audits = list((tmp_path / "audit").glob("daintree.test.created.*.json"))
+    assert len(audits) == 1
+    audit = json.loads(audits[0].read_text(encoding="utf-8"))
+    assert audit["foundation_requested"] is True
+    assert audit["foundation"] is False
+
+
+@pytest.mark.asyncio
+async def test_improve_cannot_promote_specific_without_optin(tmp_path: Path) -> None:
+    # Improving a NON-foundation skill can never turn it into one without the opt-in,
+    # even if the improver proposes foundation:true.
+    proposal = {**PROPOSAL_IMPROVE, "foundation": True}
+    fake = _provider(GATE_IMPROVE, proposal)
+    learner, manager, _ = _learner(tmp_path, fake, with_target=True, allow_foundation=False)
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is True
+    skill = manager.catalog.get("daintree.test.target")
+    assert skill is not None and skill.meta.foundation is False
+
+
+@pytest.mark.asyncio
+async def test_improve_promotes_specific_with_optin(tmp_path: Path) -> None:
+    proposal = {**PROPOSAL_IMPROVE, "foundation": True}
+    fake = _provider(GATE_IMPROVE, proposal)
+    learner, manager, _ = _learner(tmp_path, fake, with_target=True, allow_foundation=True)
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is True
+    skill = manager.catalog.get("daintree.test.target")
+    assert skill is not None and skill.meta.foundation is True
 
 
 @pytest.mark.asyncio

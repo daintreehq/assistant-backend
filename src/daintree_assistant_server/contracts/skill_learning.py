@@ -70,6 +70,10 @@ class SkillProposal(BaseModel):
     )
     priority: int = 100
     risk: str = "read"
+    # The builder/improver's requested tier. Advisory only: `_validate` never lets this
+    # DEMOTE an existing foundation, and only lets it PROMOTE (turn on where off) when
+    # SKILL_LEARNING_ALLOW_FOUNDATION_CREATE is set — otherwise it is dropped and logged.
+    foundation: bool = False
     tags: list[str] = Field(default_factory=list)
     required_tools: list[str] = Field(
         default_factory=list,

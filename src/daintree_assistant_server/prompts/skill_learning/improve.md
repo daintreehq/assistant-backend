@@ -20,6 +20,7 @@ Return ONLY a JSON object (no prose, no code fences):
   "whenToUse": "<keep or refine>",
   "priority": 100,                               // 0-1000
   "risk": "read|local|ui|terminal|project|external|git|system",
+  "foundation": <keep the given skill's value>,  // true only if it already is one — see the rule
   "tags": ["daintree", "..."],
   "requiredTools": ["..."],
   "body": "<the FULL improved body — not a diff>",
@@ -31,6 +32,7 @@ Return ONLY a JSON object (no prose, no code fences):
 
 Rules:
 - Keep skill_id EXACTLY as given. Preserve the house style (Use when / Procedure / Report back, with a Confirmation line only where the procedure mutates state).
+- Foundation: if the given skill's frontmatter has `foundation: true`, it is a domain's base runbook — keep it foundational (set "foundation": true) and keep the guidance domain-general; do NOT narrow it down to the single workflow that triggered this improvement. If the given skill is NOT a foundation, leave "foundation" false in the normal case; set it true ONLY in the rare case that this skill is genuinely turning into the base runbook for its whole domain. Promotion is a gated curation decision — unless the operator has enabled foundation promotion it will be suppressed and the skill lands as an ordinary improvement, so your edit must stand on its own as a normal skill regardless.
 - Match this skill's OWN existing formatting conventions (heading style, line style, section names) — do not re-format it to look like another skill; formatting churn buries the real change in the diff.
 - Do NOT delete existing guardrails, weaken safety rules, add unsupported tools, or add project-private facts. If you add a requiredTools entry, write it in the dotted logical form the skill already uses ("terminal.awaitAll", not the wire form "terminal__awaitAll").
 - Legitimate improvements are general and reusable. Reject anything that is a one-off preference, a single repo's quirk, a transient error, or a secret.

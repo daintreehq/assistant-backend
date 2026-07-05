@@ -13,6 +13,7 @@ Return ONLY a JSON object (no prose, no code fences) with exactly these fields:
   "whenToUse": "<the primary trigger, phrased 'Use when ...'>",
   "priority": 100,                               // 0-1000
   "risk": "read|local|ui|terminal|project|external|git|system",
+  "foundation": false,                           // almost always false — see the rule below
   "tags": ["daintree", "..."],
   "requiredTools": ["<tool ids seen in the workflow or already used by similar skills>"],
   "body": "<the runbook markdown — see house style below>",
@@ -33,6 +34,11 @@ Generality (this is the whole point — the catalog must transfer across project
 - Write for ANY project. No repo names, languages, frameworks, file paths, or one-off facts from this workflow — abstract them into the general shape of the task. If the lesson only makes sense for this one repo, it is not a skill; return no_change.
 - Do NOT hardcode a specific CLI agent, terminal, or tool instance that merely happened to be present this run. When a step needs an agent (or a terminal, or an MCP tool), tell the assistant to look at what is actually available THIS turn — the configured-agents roster and open-terminal snapshot in its runtime context, and its current tool list — and pick the best fit for the task. Write "spawn whichever configured agent is best suited to <kind of work>", never "use claude" / "use codex".
 - The reader is a small, fast model (DeepSeek V4 Flash). It follows concrete, unambiguous, ordered steps far better than abstract advice — make each step something it can act on directly, with the exact tool/argument shape where the workflow showed one matters.
+
+Foundation (almost always false):
+- A "foundation" skill is the BASE runbook for a whole domain — how to inspect that domain's state and choose safe actions — not a single workflow. The catalog shows existing ones as [foundation]. A foundation is near-always paired into selection, so the bar is very high.
+- Set "foundation": true ONLY if this skill genuinely is that domain-level base judgment AND no [foundation] skill already exists for the domain. If a domain foundation already exists, do NOT create a second one — that base judgment belongs in the existing foundation (the gate routes such lessons to improve it). If you are writing a concrete, self-contained workflow (the normal case), set false.
+- Minting a foundation is gated: unless the operator has enabled it, validation SUPPRESSES the flag and the skill still lands as an ordinary (non-foundation) skill. So whatever you write must stand on its own as a normal skill — if it only makes sense as a domain foundation and not as a regular skill, return no_change instead. When unsure, set false and write a specific skill.
 
 Hard rules:
 - skill_id MUST be a FRESH id not already in the catalog, of the form daintree.<domain>.<workflow>, lowercase, using only letters, digits, dots, and hyphens.

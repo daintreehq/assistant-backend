@@ -245,6 +245,14 @@ class Settings(BaseSettings):
     skill_learning_min_confidence: float = Field(
         default=0.75, ge=0.0, le=1.0, alias="SKILL_LEARNING_MIN_CONFIDENCE"
     )
+    # Whether the learner may MINT a new foundation skill or PROMOTE a specific one to
+    # foundation. Off by default: a foundation is near-always paired into selection, so
+    # tiering one wrong is costly — promotion is a human curation decision. The learner
+    # can always IMPROVE (and grow) an EXISTING foundation regardless of this flag; this
+    # only gates turning `foundation` ON where it was off. See skill_learning.py._validate.
+    skill_learning_allow_foundation_create: bool = Field(
+        default=False, alias="SKILL_LEARNING_ALLOW_FOUNDATION_CREATE"
+    )
     # Learning is only considered once the conversation has at least this many
     # messages — there must be prior work to learn from before the gate runs.
     skill_learning_min_messages: int = Field(
