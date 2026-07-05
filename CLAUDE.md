@@ -75,6 +75,7 @@ Skills are Markdown runbooks that become task-specific operating instructions fo
 | `title` | yes | |
 | `summary` | yes | selector signal |
 | `whenToUse` | yes | the *primary* selector signal (camelCase key → `when_to_use`) |
+| `foundation` | no | `true` marks a domain **foundation** skill; the selector pairs it with the specific workflow skill(s) it picks (default `false`) |
 | `tags` | no | lowercased, deduped |
 | `priority` | no | 0–1000 |
 | `risk` | no | enum: `read local ui terminal project external git system` |

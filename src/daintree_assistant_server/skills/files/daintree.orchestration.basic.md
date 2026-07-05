@@ -2,8 +2,8 @@
 id: daintree.orchestration.basic
 title: Daintree orchestration basics
 summary: How to inspect Daintree state and choose safe orchestration actions.
-whenToUse: Use for general requests about current Daintree state, terminals, worktrees,
-  agents, closed/resumable sessions, queues, timers, or what to do next.
+whenToUse: Use for general requests about current Daintree state, terminals, worktrees, agents, closed/resumable sessions, queues, timers, or what to do next.
+foundation: true
 priority: 100
 risk: read
 tags:

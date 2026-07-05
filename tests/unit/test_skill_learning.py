@@ -51,6 +51,17 @@ _TARGET = (
     "Use when: the original condition.\n\nProcedure:\n1. Original step.\n\nReport back: original.\n"
 )
 
+_TARGET_FOUNDATION = (
+    "---\n"
+    "id: daintree.test.target\n"
+    "title: Target\n"
+    "summary: The original target summary.\n"
+    "whenToUse: Use when improving the target.\n"
+    "foundation: true\n"
+    "---\n"
+    "Use when: the original condition.\n\nProcedure:\n1. Original step.\n\nReport back: original.\n"
+)
+
 GATE_CREATE = {
     "workflow_complete": True,
     "learnable": True,
@@ -162,12 +173,14 @@ def _settings(
     )
 
 
-def _primary(tmp_path: Path, *, with_target: bool = False) -> Path:
+def _primary(
+    tmp_path: Path, *, with_target: bool = False, target_text: str = _TARGET
+) -> Path:
     primary = tmp_path / "skills"
     primary.mkdir()
     (primary / "daintree.test.example.md").write_text(_EXAMPLE, encoding="utf-8")
     if with_target:
-        (primary / "daintree.test.target.md").write_text(_TARGET, encoding="utf-8")
+        (primary / "daintree.test.target.md").write_text(target_text, encoding="utf-8")
     return primary
 
 
@@ -183,10 +196,11 @@ def _learner(
     *,
     mode: str = "apply",
     with_target: bool = False,
+    target_text: str = _TARGET,
     overlay: bool = False,
     context_tokens: int | None = None,
 ) -> tuple[SkillLearner, CatalogManager, Path]:
-    primary = _primary(tmp_path, with_target=with_target)
+    primary = _primary(tmp_path, with_target=with_target, target_text=target_text)
     write_dir = (tmp_path / "overlay") if overlay else primary
     overlay_dir = write_dir if overlay else None
     settings = _settings(
@@ -348,6 +362,23 @@ async def test_improve_rewrites_target(tmp_path: Path) -> None:
     assert skill is not None
     assert skill.summary == "An improved target summary."
     assert "New guardrail." in skill.body
+
+
+@pytest.mark.asyncio
+async def test_improve_preserves_foundation_flag(tmp_path: Path) -> None:
+    # The improver's proposal never carries `foundation`, so re-rendering an improved
+    # skill must preserve the target's existing flag — otherwise an apply-mode improve
+    # would silently demote a foundation skill (e.g. daintree.orchestration.basic).
+    fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
+    learner, manager, _ = _learner(
+        tmp_path, fake, with_target=True, target_text=_TARGET_FOUNDATION
+    )
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is True
+    skill = manager.catalog.get("daintree.test.target")
+    assert skill is not None
+    assert skill.summary == "An improved target summary."  # the improve landed
+    assert skill.meta.foundation is True  # ...and foundation survived the rewrite
 
 
 @pytest.mark.asyncio

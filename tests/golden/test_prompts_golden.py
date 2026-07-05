@@ -205,6 +205,9 @@ def test_selector_prompt_renders_real_catalog(loader: PromptLoader) -> None:
         # dropping a field, not just an id substring coincidence.
         assert f"- id: {skill.id}" in rendered
         assert skill.when_to_use in rendered
+        # foundation skills carry the marker the pairing rule keys off of.
+        if skill.meta.foundation:
+            assert f"- id: {skill.id} [foundation]" in rendered
 
 
 @pytest.mark.parametrize(

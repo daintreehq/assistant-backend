@@ -645,19 +645,29 @@ class SkillLearner:
         # the schema's range and normalize the risk token's case, so a trivially
         # out-of-bounds value doesn't discard an otherwise sound proposal. A WRONG
         # risk value still fails the loader's enum check below, on purpose.
-        markdown = self._render_markdown(
+        meta_fields: dict[str, Any] = {
+            "id": skill_id,
+            "title": proposal.title,
+            "summary": proposal.summary,
+            "whenToUse": proposal.when_to_use,
+        }
+        # `foundation` is a human curation decision, not something the fire-and-forget
+        # learner toggles: preserve the target skill's flag verbatim across an improve
+        # (a create is never a foundation). Without this, re-rendering an improved skill
+        # would silently drop `foundation: true` and demote a foundation skill.
+        if not is_create:
+            existing = catalog.get(skill_id)
+            if existing is not None and existing.meta.foundation:
+                meta_fields["foundation"] = True
+        meta_fields.update(
             {
-                "id": skill_id,
-                "title": proposal.title,
-                "summary": proposal.summary,
-                "whenToUse": proposal.when_to_use,
                 "priority": min(1000, max(0, proposal.priority)),
                 "risk": proposal.risk.strip().lower(),
                 "tags": list(proposal.tags),
                 "requiredTools": list(proposal.required_tools),
-            },
-            proposal.body,
+            }
         )
+        markdown = self._render_markdown(meta_fields, proposal.body)
         if _contains_secret(markdown):
             logger.warning("skill_learning_rejected", reason="secret_detected", skill_id=skill_id)
             return None
@@ -944,16 +954,25 @@ class SkillLearner:
 
     @staticmethod
     def _meta_dict(skill: Skill) -> dict[str, Any]:
-        return {
+        meta: dict[str, Any] = {
             "id": skill.meta.id,
             "title": skill.meta.title,
             "summary": skill.meta.summary,
             "whenToUse": skill.meta.when_to_use,
-            "priority": skill.meta.priority,
-            "risk": skill.meta.risk,
-            "tags": list(skill.meta.tags),
-            "requiredTools": list(skill.meta.required_tools),
         }
+        # Only emit `foundation` when set, so non-foundation skills stay clean; shown
+        # to the improver so it can see it's editing a domain foundation.
+        if skill.meta.foundation:
+            meta["foundation"] = True
+        meta.update(
+            {
+                "priority": skill.meta.priority,
+                "risk": skill.meta.risk,
+                "tags": list(skill.meta.tags),
+                "requiredTools": list(skill.meta.required_tools),
+            }
+        )
+        return meta
 
     @staticmethod
     def _render_markdown(meta: dict[str, Any], body: str) -> str:

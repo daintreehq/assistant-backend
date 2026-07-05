@@ -74,6 +74,28 @@ def test_selector_metadata_active_flag_and_no_body() -> None:
     # The selector now sees risk + required_tools (to avoid over-selecting risky skills).
     assert "risk" in by_id["a.one"]
     assert "required_tools" in by_id["a.one"]
+    # ...and the foundation marker, so it can pair a domain's foundation with a specific.
+    assert by_id["a.one"]["foundation"] is False
+
+
+def test_foundation_flag_defaults_false_and_parses_true() -> None:
+    plain = parse_skill(SKILL_A, expected_id="a.one")
+    assert plain.meta.foundation is False
+    marked = parse_skill(
+        SKILL_A.replace("risk: read", "foundation: true\nrisk: read"),
+        expected_id="a.one",
+    )
+    assert marked.meta.foundation is True
+    assert marked.selector_view(active=False)["foundation"] is True
+
+
+def test_orchestration_basic_is_the_only_foundation() -> None:
+    # Exactly one foundation skill exists today: orchestration.basic. Asserting the
+    # full set (not just membership) catches a specific workflow accidentally being
+    # flagged foundation — which would make the foundation+specific pairing moot.
+    catalog = load_catalog()
+    foundations = {s.id for s in catalog.skills if s.meta.foundation}
+    assert foundations == {"daintree.orchestration.basic"}
 
 
 def test_public_list_includes_required_tools_no_body() -> None:
@@ -81,6 +103,8 @@ def test_public_list_includes_required_tools_no_body() -> None:
     entries = catalog.public_list()
     assert all("body" not in e for e in entries)
     assert all("required_tools" in e for e in entries)
+    # foundation is a selector-only concern; it must not leak to the public wire.
+    assert all("foundation" not in e for e in entries)
 
 
 def test_duplicate_id_rejected() -> None:

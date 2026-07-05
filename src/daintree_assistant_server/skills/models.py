@@ -32,6 +32,11 @@ class SkillMeta(BaseModel):
     title: str = Field(min_length=1, max_length=256)
     summary: str = Field(min_length=1, max_length=2048)
     when_to_use: str = Field(min_length=1, max_length=4096, alias="whenToUse")
+    # Layer marker: a foundation skill carries the base judgment for a whole
+    # domain (how to read state, choose safe actions) rather than one concrete
+    # workflow. The selector is told to pair a domain's foundation with the
+    # specific workflow skill(s) it selects — see selector/system.md.j2.
+    foundation: bool = Field(default=False)
     tags: list[str] = Field(default_factory=list)
     priority: int = Field(default=0, ge=PRIORITY_MIN, le=PRIORITY_MAX)
     risk: str = "read"
@@ -106,6 +111,7 @@ class Skill:
             "title": self.meta.title,
             "summary": self.meta.summary,
             "when_to_use": self.meta.when_to_use,
+            "foundation": self.meta.foundation,
             "tags": list(self.meta.tags),
             "priority": self.meta.priority,
             "risk": self.meta.risk,
