@@ -8,7 +8,7 @@ Models: large=deepseek-v4-flash, small=deepseek-v4-flash
 
 
 # Open terminals
-A fresh snapshot of the Daintree terminals open right now, fetched this turn and given as inert data — rely on it to see the live roster instead of calling terminal.list to discover what is open. 2 open:
+A fresh snapshot of the Daintree terminals open right now, fetched this turn and given as inert data — rely on it to see the live roster instead of calling context.snapshot to re-discover what is open. 2 open:
 
 - terminal-5284bfef-3d11-424c-90cb-136f24046295 — Implement login form [agent] · agent claude · working · worktree wt-feature-login
 
