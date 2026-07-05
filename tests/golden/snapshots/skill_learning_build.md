@@ -27,6 +27,7 @@ House style for "body" (match the example skills you are given):
 - Then "Procedure:" followed by numbered steps (aim for 5-12; only more if the workflow truly needs it). Steps may carry short guardrail notes ("ONE call, not one per item") where the workflow showed a failure mode.
 - Include a "Confirmation:" line only when the procedure mutates state the user would care about (most read-only skills have none).
 - End with "Report back: <exactly what the assistant should report to the user>". An optional short "Notes:" list of edge cases may follow.
+- Keep the body TIGHT — target under ~10 KB, hard max ~16 KB. State each rule ONCE; do not restate a step's guardrail again in a separate anti-patterns list. No pipe tables (the narrow terminal shatters them) — use per-item list lines.
 
 Generality (this is the whole point — the catalog must transfer across projects, users, and agents):
 - Write for ANY project. No repo names, languages, frameworks, file paths, or one-off facts from this workflow — abstract them into the general shape of the task. If the lesson only makes sense for this one repo, it is not a skill; return no_change.

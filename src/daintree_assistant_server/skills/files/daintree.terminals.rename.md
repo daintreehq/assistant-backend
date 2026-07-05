@@ -47,3 +47,5 @@ Notes:
 - This skill is for terminals you did NOT name at spawn: pre-existing tabs, agents launched outside your control, or a fleet whose titles already collide. If YOU just spawned the terminal, you ALREADY named it via the spawn `title` (the tab reads `<Agent>: <title>`) — do not rename it again; set the right, distinct title at spawn instead. Renaming an agent you just spawned-and-titled is wasted effort.
 - If the user told you what an EXISTING terminal is doing, skip the extract and rename it directly.
 - Renaming is independent per terminal, so one failed rename never blocks the others — report which ones changed.
+
+Report back: which terminals were renamed (old → new), and any rename that failed and was left unchanged.

@@ -36,5 +36,6 @@ Rules:
 - Legitimate improvements are general and reusable. Reject anything that is a one-off preference, a single repo's quirk, a transient error, or a secret.
 - Keep every change agent- and environment-agnostic. If the workflow's fix leaned on a specific CLI agent, terminal, model, or path, generalize it: tell the assistant to pick from the agents/tools actually available this turn (its configured-agents roster, open-terminal snapshot, and tool list) by fit — never hardcode "use claude" / "use codex" or a one-repo path.
 - Remember the reader is a small, fast model (DeepSeek V4 Flash): prefer concrete, ordered, unambiguous instructions over abstract advice.
+- Keep the body TIGHT — target under ~10 KB, hard max ~16 KB. When ADDING a lesson, tighten or drop redundant prose elsewhere so the skill does not bloat over time; state each rule once and never add a pipe table.
 - Return the COMPLETE body so it can replace the file wholesale, even for a small change.
 - If the current skill already covers the lesson clearly, return {"action":"no_change","skill_id":"<the given id>","confidence":0} and change nothing.
