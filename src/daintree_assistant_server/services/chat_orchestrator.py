@@ -45,6 +45,7 @@ from ..skills.load_events import SkillLoadExecution
 from ..skills.selector import SelectionDecision, Selector
 from ..state.codec import StateCodec
 from ..text_utils import sanitize_line
+from .output_policy import lint_output, repair_tables
 from .prompt_assembler import PromptAssembler
 from .skill_learning import SkillLearner
 
@@ -321,16 +322,71 @@ class ChatOrchestrator:
             return RespondOutcome(headers=headers, streaming=True, stream=body_iter)
 
         result = await self._complete_with_retry(provider_request)
+        # finish_reason is a second, independent signal: treat a continuation round as
+        # such even if a malformed upstream drops the tool_calls payload.
+        had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
+        self._lint_final_output(result, request_id=request_id, had_tool_calls=had_tool_calls)
         body = self._build_nonstream_body(result, meta)
         self._maybe_learn_after_turn(
             request=request,
             active_ids=active_ids,
             assistant_text=result.text,
-            # finish_reason is a second, independent signal: treat a continuation
-            # round as such even if a malformed upstream drops the tool_calls payload.
-            had_tool_calls=bool(result.tool_calls) or result.finish_reason == "tool_calls",
+            had_tool_calls=had_tool_calls,
         )
         return RespondOutcome(headers=headers, streaming=False, body=body)
+
+    # ---- output linting (non-stream backstop; observability) ------------
+
+    def _lint_final_output(
+        self, result: Any, *, request_id: str, had_tool_calls: bool
+    ) -> None:
+        """Lint the final assistant message: observability, plus optional table repair.
+
+        Runs only when the turn ENDED (no tool calls) with visible content — a
+        continuation round's content is interstitial. Logs any contract violation
+        (over-budget pipe table, visible ``<think>`` leakage, oversized dump). When
+        ``main_output_repair_tables`` is on, an over-budget table is rewritten to a
+        per-entity list in place. Never raises — a lint bug must not break a response
+        the user is already owed. Streaming bypasses this (bytes already sent).
+        """
+        if not self.settings.main_output_lint_enabled or had_tool_calls:
+            return
+        try:
+            message = result.message or {}
+            text = message.get("content") or ""
+            if not text.strip():
+                return
+            findings = lint_output(
+                text,
+                terminal_width=self.settings.main_terminal_width,
+                warn_chars=self.settings.main_output_warn_chars,
+            )
+            if not findings.has_violation:
+                return
+            violating = findings.violating_tables
+            repaired = False
+            if self.settings.main_output_repair_tables and violating:
+                new_text = repair_tables(text, findings)
+                if new_text != text:
+                    message["content"] = new_text
+                    repaired = True
+            logger.info(
+                "main_output_lint",
+                request_id=request_id,
+                violations=findings.violation_types(),
+                content_chars=findings.char_count,
+                table_count=len(findings.tables),
+                violating_table_count=len(violating),
+                max_table_cols=max((f.table.columns for f in violating), default=0),
+                max_table_rows=max((f.table.rows for f in violating), default=0),
+                max_table_width=max((f.table.width for f in violating), default=0),
+                think_leak=findings.think_leak,
+                oversized=findings.oversized,
+                repair_attempted=self.settings.main_output_repair_tables and bool(violating),
+                repair_succeeded=repaired,
+            )
+        except Exception as exc:  # noqa: BLE001 - observability must never break the turn
+            logger.warning("main_output_lint_error", request_id=request_id, error=str(exc))
 
     # ---- skill learning (local dev only, off the response path) ---------
 
