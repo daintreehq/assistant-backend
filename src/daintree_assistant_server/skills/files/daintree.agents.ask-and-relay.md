@@ -2,7 +2,7 @@
 id: daintree.agents.ask-and-relay
 title: Ask an agent and relay its answer
 summary: Spawn a configured agent in read-only mode, ask it a question, wait for completion, and report its answer cleanly.
-whenToUse: Use when the user asks you to create/spawn/open an agent terminal, ask it a question, and tell them what it says.
+whenToUse: Use when the user asks you to spawn a single agent, ask it one question, and relay its answer. Do not use to poll the whole pinned/configured fleet (use the poll-pinned-agents skill) or for multi-round debate, a scoring competition, or interviews (use the relevant orchestration skill).
 priority: 120
 risk: project
 tags:

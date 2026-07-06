@@ -1,8 +1,8 @@
 ---
 id: daintree.agents.poll-pinned-agents
 title: Poll pinned agents
-summary: Poll every pinned agent with the same question, collect structured verdicts, and synthesize the consensus.
-whenToUse: Use when the user asks to ask or poll all pinned agents for an opinion, verdict, or short answer and wants a synthesized response.
+summary: Poll the pinned or configured agent fleet with one question, collect structured verdicts, and synthesize a consensus.
+whenToUse: Use when the user asks to poll the pinned or configured agent fleet (or several named agents) for independent opinions, verdicts, recommendations, or short answers and wants a synthesized consensus. Do not use for a single agent (use the ask-and-relay skill), for multi-round debate or collaboration (use the multi-agent skill), for a judged scoring competition or interview (use the competition or interview skill), or for breaking a tie (use the runoff tie-breaker skill).
 priority: 100
 risk: project
 tags:
@@ -25,7 +25,7 @@ requiredTools:
 Use when: the user asks to poll/ask all pinned agents — not existing open terminals — for a decision, opinion, or short answer, and wants a synthesized consensus.
 
 Procedure:
-1. Get the roster. Call `context.snapshot` to see current terminals and `daintree.call` for `agentSettings.get`; filter returned agents to `pinned:true`. Treat "pinned terminals" as shorthand for pinned agents unless the user explicitly says open terminals. Do NOT use docs search to discover pinned agents, and never relay raw settings/env/secrets — only agent ids/display names and pinned status.
+1. Get the roster. Call `context.snapshot` to see current terminals and `daintree.call` for `agentSettings.get`; filter returned agents to `pinned:true`. If the user says the configured fleet, all configured agents, or several named agents, use the configured roster (or just the named ones) instead of filtering to `pinned:true`. Treat "pinned terminals" as shorthand for pinned agents unless the user explicitly says open terminals; a pinned/configured agent may have zero open terminals. Do NOT use docs search to discover agents, and never relay raw settings/env/secrets — only agent ids/display names and pinned status.
 2. If the user only asked "can you see them?", report the pinned-agent count and names. If they asked to poll/ask them, continue. If no pinned agents exist, report that and stop.
 3. Compose one neutral, self-contained prompt with the user's question/brief. Tell each agent it is being polled independently, to not modify files, and to finish with a compact structured answer: `verdict` plus 2-5 `reasons`. Do not first do your own local investigation unless the user asked for your opinion too; put any needed context into the prompt.
 4. Spawn one fresh read-only terminal per pinned agent using `agentTask.spawnForEdits`, e.g. `{"agent":"<agentId>","mode":"explore","title":"poll: <agent name>","taskPrompt":"<neutral poll prompt>"}`. Use one call per agent, in one batch or groups of about 4. Build from fresh spawns; do not commandeer an existing terminal unless the user explicitly named it. Ensure each call's JSON args are valid; if a spawn call fails, retry only the missing agent(s), not the successful ones.
@@ -43,3 +43,4 @@ Report back: the pinned agents polled, consensus tally, per-agent verdicts with 
 Notes:
 - If `agentSettings.get` returns sensitive env/config fields, ignore them and never quote them.
 - If the user corrects you midstream that they wanted an agent poll, stop local analysis and switch to the poll; do not keep digging locally.
+- This is a one-shot independent poll. If the user then wants the agents to debate or vote on each other, a judged/scoring competition, an interview, or a tie-breaker, switch to the multi-agent, competition, interview, or runoff tie-breaker skill instead of extending this one.

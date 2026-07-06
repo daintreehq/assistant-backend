@@ -2,7 +2,7 @@
 id: daintree.orchestration.verified-interview
 title: Run a multi-round interview with codebase verification
 summary: Orchestrate a deeper interview where the judge creates questions, contestants answer, the judge verifies answers by exploring the codebase and issues challenging follow-ups, then narrows to top 2 and selects a winner.
-whenToUse: Use when the user wants one agent to deeply interview several others, with the judge actively verifying claims and asking follow-up challenges, and expects a narrow-to-top-2-then-winner verdict.
+whenToUse: Use when the user wants one agent to deeply interview several others, with the judge actively verifying claims and asking follow-up challenges, and expects a narrow-to-top-2-then-winner verdict. Do not use for a light interview with no evidence-checking (use the interview skill) or a one-round poll (use the poll-pinned-agents skill).
 priority: 82
 risk: project
 tags:

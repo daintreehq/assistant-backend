@@ -2,7 +2,7 @@
 id: daintree.orchestration.interview
 title: Run a judged interview competition among agents
 summary: Have one agent interview others on a topic and select a winner, with the assistant relaying questions and answers.
-whenToUse: Use when the user asks to have an agent interview other agents on a topic (e.g., choose a pair programmer, evaluate candidates) and expects a winner.
+whenToUse: Use when the user asks to have an agent interview other agents on a topic (e.g., choose a pair programmer, evaluate candidates) and expects a winner. Do not use for a plain one-round poll with no interviewer (use the poll-pinned-agents skill) or a scoring-only competition (use the competition skill); if the judge must verify claims against the codebase and narrow to a top 2, use the verified-interview skill.
 priority: 85
 risk: project
 tags:

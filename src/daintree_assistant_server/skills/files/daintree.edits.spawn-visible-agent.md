@@ -2,7 +2,7 @@
 id: daintree.edits.spawn-visible-agent
 title: Spawn a visible agent for edits or exploration
 summary: How to handle requests that need a visible agent — to change files or to explore read-only.
-whenToUse: Use whenever the user asks to implement, refactor, fix, add tests, update docs, or otherwise change project files — OR to spawn/launch a visible agent to explore, investigate, or survey a project read-only.
+whenToUse: Use when the user asks for a direct visible agent to change project files (implement, refactor, fix, add tests, update docs) or to explore/investigate a project read-only, and no more specific workflow applies. Prefer a typed workflow first — start-work-on-issue for a forge issue, prep-branch-for-review for a PR, recipe run-or-create for a workspace recipe, or a poll/competition/interview/multi-agent skill when several agents are involved. This is the fallback single visible-agent path.
 priority: 200
 risk: project
 tags:
@@ -34,7 +34,7 @@ requiredTools:
   - queue.digest
   - queue.resolve
 ---
-Use when: the task needs a visible agent — either to change files (implement, refactor, fix, tests, docs) or to explore/investigate a project read-only.
+Use when: the task needs a single visible agent — either to change files (implement, refactor, fix, tests, docs) or to explore/investigate a project read-only — and no more specific workflow fits. First check for a typed workflow: a forge issue → start-work-on-issue; preparing or opening a PR → prep-branch-for-review; a workspace recipe → recipe run-or-create; several agents polling, competing, or interviewing → the matching orchestration skill. If one of those fits, use it instead; this is the fallback visible-agent path.
 Procedure:
 1. Say plainly that the work needs a visible agent: for edits, "This needs file changes, so I'll spawn a visible agent to do them"; for exploration, "I'll spawn a visible agent to investigate this."
    Decide the supervision mode up front (it shapes the spawn in step 4):
