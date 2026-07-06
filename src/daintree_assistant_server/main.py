@@ -257,7 +257,12 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
         provider=chat_provider,
         learner=skill_learner,
     )
-    task_runner = TaskRunner(settings=settings, provider=chat_provider, prompt_loader=prompt_loader)
+    task_runner = TaskRunner(
+        settings=settings,
+        provider=chat_provider,
+        prompt_loader=prompt_loader,
+        catalog_manager=catalog_manager,
+    )
 
     return Container(
         settings=settings,

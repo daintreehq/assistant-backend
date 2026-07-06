@@ -45,6 +45,20 @@ async def capabilities(
             "manual_resolve": True,
         },
         "tasks": container.task_runner.task_ids(),
+        # Workflow intelligence: the CLI owns the durable execution graphs; the
+        # server contributes the stateless plan/reconcile/resume tasks plus the
+        # turn.workflow_state footer rendering. The CLI gates the feature on
+        # this block during rollout.
+        "workflow_intelligence": {
+            "turn_context_field": "workflow_state",
+            "tasks": [
+                "workflow_plan.v1",
+                "workflow_reconcile.v1",
+                "workflow_resume_digest.v1",
+            ],
+            "max_workflow_digests": settings.cap_workflow_digests,
+            "max_workflow_state_bytes": settings.cap_workflow_state_bytes,
+        },
         "limits": {
             "request_bytes": settings.max_request_bytes,
             "tools": settings.max_tools,

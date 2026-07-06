@@ -214,8 +214,8 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
     assert result.model == "deepseek-v4-flash"
 
 
-def test_all_nine_profiles_registered(task_runner: TaskRunner) -> None:
-    assert len(task_runner.task_ids()) == 9
+def test_all_twelve_profiles_registered(task_runner: TaskRunner) -> None:
+    assert len(task_runner.task_ids()) == 12
 
 
 # ---- result_schema (terminal_extract_json.v1) ---------------------------

@@ -102,6 +102,29 @@ class Memories(BaseModel):
     relevant: list[str] = Field(default_factory=list)
 
 
+class WorkflowDigest(BaseModel):
+    """A bounded summary of one CLIENT-owned durable workflow graph.
+
+    The CLI is the source of truth for the full execution graph (nodes, edges,
+    resources, evidence); it sends only these compact digests per turn so the
+    main model sees its long-running work without the server ever storing
+    workflow state. Strict (``extra="forbid"``): a new digest field is a
+    contract change in both repos, not a silent drop.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(max_length=128)
+    goal: str = Field(max_length=512)
+    status: str = Field(max_length=64)
+    progress: str | None = Field(default=None, max_length=512)
+    active_nodes: list[str] = Field(default_factory=list)
+    resources: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    next_action: str | None = Field(default=None, max_length=512)
+    last_event: str | None = Field(default=None, max_length=512)
+
+
 class TurnContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -117,6 +140,10 @@ class TurnContext(BaseModel):
     # (project-scoped supervision resumed automatically) — sent once, on the
     # first turn. Replaces the pre-supervisor session_ended_watchers field.
     resumed_watchers: list[str] = Field(default_factory=list)
+    # Workflow-intelligence digests (client-owned execution graphs), rendered
+    # into the turn footer. Capped hard at assembly (count, per-line bytes, and
+    # a total block budget) — see PromptAssembler.render_turn_footer.
+    workflow_state: list[WorkflowDigest] = Field(default_factory=list)
 
 
 class Selection(BaseModel):
