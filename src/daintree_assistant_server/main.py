@@ -22,7 +22,6 @@ from . import __version__
 from .api import (
     daintree_capabilities,
     daintree_respond,
-    daintree_runs,
     daintree_skills,
     daintree_tasks,
     health,
@@ -40,11 +39,6 @@ from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
 from .providers.deepseek import DeepSeekProvider
 from .providers.openai import OpenAIProvider
-from .runs.hub import EventHub
-from .runs.replay import RoundReplayer
-from .runs.scheduler import RunMaintenanceScheduler
-from .runs.store import RunStore
-from .runs.supervisor import RunSupervisor
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.prompt_assembler import PromptAssembler
 from .services.skill_learning import SkillLearner
@@ -133,12 +127,6 @@ class Container:
     assembler: PromptAssembler
     orchestrator: ChatOrchestrator
     task_runner: TaskRunner
-    # The durable run runtime (Run Supervisor, /v2/runs — docs/RUN_SUPERVISOR.md).
-    run_store: RunStore
-    event_hub: EventHub
-    run_supervisor: RunSupervisor
-    run_scheduler: RunMaintenanceScheduler
-    run_replayer: RoundReplayer
     skill_learner: SkillLearner | None = None
     # The skill-learning builder/improver provider (OpenAI GPT-5.5). Distinct from
     # ``provider`` (DeepSeek) and only built when learning is enabled; ``None``
@@ -158,12 +146,6 @@ class Container:
         is a distinct real client — in tests it is the injected fake, shared with
         ``provider`` and closed once below.
         """
-        with contextlib.suppress(Exception):  # pragma: no cover - best-effort stop
-            # Stop maintenance first so no new wake turns start mid-teardown, then
-            # cancel live drivers (their state is durable; recovery resumes them).
-            await self.run_scheduler.stop()
-        with contextlib.suppress(Exception):  # pragma: no cover - best-effort drain
-            await self.run_supervisor.aclose()
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort drain
             # Let any in-flight fire-and-forget learning finish (its write+reload is
             # cancellation-shielded) before the providers it uses are torn down.
@@ -176,8 +158,6 @@ class Container:
                 await self.skill_builder_provider.aclose()
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
             await self.provider.aclose()
-        with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
-            await self.run_store.aclose()
 
 
 def _build_provider(settings: Settings) -> ChatProvider:
@@ -279,30 +259,6 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
     )
     task_runner = TaskRunner(settings=settings, provider=chat_provider, prompt_loader=prompt_loader)
 
-    # The durable run runtime (docs/RUN_SUPERVISOR.md). The store opens here so
-    # a broken DB path fails readiness, not the first /v2 request.
-    run_store = RunStore(settings.runs_db_path)
-    run_store.open()
-    event_hub = EventHub()
-    run_supervisor = RunSupervisor(
-        settings=settings,
-        store=run_store,
-        hub=event_hub,
-        catalog_manager=catalog_manager,
-        selector=selector,
-        assembler=assembler,
-        provider=chat_provider,
-        learner=skill_learner,
-    )
-    run_scheduler = RunMaintenanceScheduler(
-        settings=settings, store=run_store, supervisor=run_supervisor, hub=event_hub
-    )
-    run_replayer = RoundReplayer(
-        store=run_store,
-        catalog_manager=catalog_manager,
-        assembler=assembler,
-        settings=settings,
-    )
     return Container(
         settings=settings,
         prompt_loader=prompt_loader,
@@ -313,11 +269,6 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
         assembler=assembler,
         orchestrator=orchestrator,
         task_runner=task_runner,
-        run_store=run_store,
-        event_hub=event_hub,
-        run_supervisor=run_supervisor,
-        run_scheduler=run_scheduler,
-        run_replayer=run_replayer,
         skill_learner=skill_learner,
         skill_builder_provider=skill_builder_provider,
     )
@@ -343,10 +294,6 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         container = build_container(settings, injected)
         app.state.container = container
         app.state.ready = True
-        # Resume durable work interrupted by the previous process, then start
-        # server-side maintenance (wakeups, lease deadlines, claim expiry).
-        await container.run_supervisor.recover()
-        container.run_scheduler.start()
         logger.info(
             "startup_ready",
             environment=settings.environment,
@@ -405,7 +352,6 @@ def create_app(
 
     app.include_router(health.router)
     app.include_router(daintree_respond.router)
-    app.include_router(daintree_runs.router)
     app.include_router(daintree_capabilities.router)
     app.include_router(daintree_skills.router)
     app.include_router(daintree_tasks.router)

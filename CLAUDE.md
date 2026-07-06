@@ -61,55 +61,6 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
 
 **Invariants to preserve** (also in README): client `system`/`developer` messages are rejected; `skill.find`/`skill.load` are never offered to the main model; only active skill *bodies* are injected (never the full catalog); selector failure fails open; state is portable via the signed token.
 
-## Durable run runtime (`/v2/runs` — the Run Supervisor)
-
-The backend-owned turn loop (`runs/` package; contract in `docs/RUN_SUPERVISOR.md`). v1
-`/respond` is untouched and stays supported; v2 is additive. The CLI submits **user turns**,
-tails the run's SSE event log, claims **tool leases**, executes them locally, and posts
-results — the backend runs selection, assembles prompts from its own stored transcript, and
-continues the loop.
-
-- **Source of truth is the append-only event log** (`runs/store.py`, SQLite WAL at
-  `RUNS_DB_PATH`, default `.daintree/runs.sqlite3`). `runs`/`turns`/`leases`/`approvals`/
-  `executors`/`wakeups` are projections updated in the SAME transaction as each append.
-  Store methods return `StoreOutcome` (kind + committed events); the CALLER publishes those
-  events to the in-memory `EventHub` (publish-after-commit) for live SSE tails. Model deltas
-  are **ephemeral** (SSE-only, seq-less, never persisted) — a reconnect loses only cosmetics.
-- **One driver task per run, one round per invocation** (`runs/supervisor.py`). Selection runs
-  once per turn (per-turn `needs_selection` flag, not a state token); the round persists
-  atomically — tool calls become leases + `awaiting_tools`/`awaiting_approval`, a final
-  answer appends `assistant.message` + `turn.completed` + `idle` in ONE transaction (no
-  crash window). Continuation re-enters via `maybe_continue` → a status CAS
-  (`awaiting_tools → running`) that makes the model continuation at-most-once per round.
-- **Idempotency fences**: turn submission is idempotent on `(run_id, turn_id)` (payload-hash
-  duplicate vs `turn_conflict`); lease claims are single-holder with TTL takeover; lease
-  results are exactly-once (identical duplicate → `duplicate: true`, different → 409);
-  lease creation is insert-or-ignore on `(run_id, round, tool_call_id)` so crash re-drives
-  never mint duplicates.
-- **Every tool call always gets a tool message** — declined/cancelled/expired leases
-  synthesize one (DeepSeek 400s on an unanswered tool call in replayed transcripts). Do not
-  break this when touching cancellation/expiry paths.
-- **Approval posture**: interactive turns keep CLI-local confirmation (no server approval);
-  a **wake-sourced** turn parks any lease whose advertised risk is not read-only
-  (`read`/`local`/`ui`; unknown counts as mutating) behind `POST /v2/approvals/{id}`.
-  Background mutation is never auto-authorized — preserve this.
-- **Mid-stream upstream failure retries the whole round** (deltas are advisory, so there is
-  no v1-style "public bytes" point of no return); exhaustion → `round.failed` + run
-  `failed` (a new turn resets it). Restart recovery (`RunSupervisor.recover`, called in
-  lifespan) re-drives `running` runs and re-checks `awaiting_tools` — the driver is a
-  resumable state machine keyed off persisted events.
-- **Prompt assembly reuses `PromptAssembler` verbatim** — same layered, cache-optimized
-  layout as v1, fed from the server-side transcript. `round.started` records a
-  `prompt_fingerprint`; `runs/replay.py` re-derives any round's exact request from the log
-  and verifies it (`GET /v2/runs/{id}/rounds/{n}/replay`).
-- **Durable wakeups** (`runs/scheduler.py`): server-side timers that submit a wake turn
-  whether or not a CLI is connected; resulting local tool calls wait durably as pending
-  leases ("durably waiting" ≠ "actively supervising" — executor presence comes from
-  heartbeats). The scheduler also expires overdue leases and lapsed claims.
-- Tests: `tests/unit/test_run_store.py`, `tests/unit/test_run_supervisor.py`,
-  `tests/integration/test_runs_api.py`. The conftest `settings` fixture pins `RUNS_DB_PATH`
-  into `tmp_path` — keep it there so tests never write a repo-local DB.
-
 ## Skills — the main area of ongoing work
 
 Skills are Markdown runbooks that become task-specific operating instructions for the main model.
@@ -184,13 +135,9 @@ engineer for backward compatibility.** There are no external users: the only cli
 vendored CLI, and both repos move together. Concretely:
 
 - **Do not create parallel versioned API surfaces to protect old clients.** A protocol
-  change edits the existing endpoints in place; the CLI is updated in lockstep. (The run
-  protocol living under `/v2/` is a *namespace* separating it from the respond protocol,
-  not a compatibility commitment — breaking changes land directly in it, and it could be
-  collapsed into `/v1/` without ceremony.)
+  change edits the existing endpoints in place; the CLI is updated in lockstep.
 - **No compatibility shims, deprecation cycles, or migration paths.** Wire contracts,
-  storage schemas (hard-reset the runs DB rather than write a migration), event shapes,
-  and prompts can all be broken freely.
+  storage schemas, event shapes, and prompts can all be broken freely.
 - **Throwing code away is fine.** If a design is wrong, delete and replace it — don't
   preserve, wrap, or route around it for continuity's sake.
 

@@ -46,8 +46,6 @@ def settings(tmp_path: Any) -> Settings:
         STATE_SIGNING_KID="k1",
         STATE_SALT="test-salt",
         RETRY_BACKOFF_BASE_SECONDS=0.0,
-        # The durable run store must never land in the repo working tree.
-        RUNS_DB_PATH=str(tmp_path / "runs.sqlite3"),
     )
 
 
