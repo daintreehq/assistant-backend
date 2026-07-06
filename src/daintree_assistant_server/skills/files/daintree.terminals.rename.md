@@ -23,7 +23,7 @@ The tool is terminal.rename({ terminalId, name }). It is always callable by name
 
 Always pass BOTH terminalId AND a non-empty name: omitting name opens an interactive rename dialog instead of renaming, and omitting terminalId targets the focused tab. Be explicit on every call.
 
-Tool calls in one response are dispatched ONE AFTER ANOTHER, not in parallel — so the way to go fast is FEWER model calls, not "a big batch". Read every terminal in ONE terminal.extract over all the ids (a single small-model call), not one terminal.summarize per terminal.
+Most tool calls in one response are dispatched ONE AFTER ANOTHER (only no-wait terminal.extract/.json batches run concurrently) — and for THIS job the fast path is still FEWER model calls, not a big batch: one question ("title each terminal") spans the whole cohort, so read every terminal in ONE terminal.extract over all the ids (a single small-model call), not one extract or summarize per terminal.
 
 Procedure:
 1. GET THE IDS. If you don't already have the terminal ids + current titles, call context.snapshot (it embeds the terminal list). If the user pointed at a subset ("these three"), keep only those ids.

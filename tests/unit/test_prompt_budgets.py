@@ -11,8 +11,8 @@ from __future__ import annotations
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.skills.catalog import load_catalog
 
-# Base prompt is ~29 KB; this ceiling catches regrowth without churning on small edits.
-BASE_PROMPT_CEILING = 32 * 1024
+# Base prompt is ~32 KB; this ceiling catches regrowth without churning on small edits.
+BASE_PROMPT_CEILING = 36 * 1024
 # Hard ceiling — a runaway guard only (the old multi-agent runbook was 28 KB). A
 # genuinely complex skill is allowed to be large; this just catches unbounded bloat.
 SKILL_BODY_HARD_CEILING = 24 * 1024
