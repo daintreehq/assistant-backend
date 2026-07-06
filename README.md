@@ -38,7 +38,6 @@ src/daintree_assistant_server/
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader (incl. skill_learning/)
   skills/         # Skill models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed skill-state token codec
-  runs/           # Durable run runtime: event store, supervisor, leases, replay, scheduler
   services/       # validation, prompt_assembler, chat_orchestrator, task_runner, skill_learning
   config.py auth.py errors.py observability.py main.py
 tests/            # unit / integration / contract / golden
