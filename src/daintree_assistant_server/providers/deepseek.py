@@ -9,11 +9,12 @@ DeepSeek speaks the OpenAI wire shape, so most of this mirrors any
 OpenAI-compatible adapter. The one provider-specific detail is reasoning control:
 DeepSeek uses a ``thinking`` object (``{"type": "disabled"}`` /
 ``{"type": "enabled"}``) plus an optional ``reasoning_effort`` tier, NOT a flat
-``reasoning_effort`` field. Thinking must be DISABLED for the selector's forced
-tool_choice ("Thinking mode does not support this tool_choice"), and DeepSeek
-defaults thinking ON when the field is absent — so the directive is sent
-explicitly on every call. ``send_thinking=False`` drops it entirely for a
-provider/model that does not understand the field. See ``_build_body``.
+``reasoning_effort`` field. Thinking must be DISABLED for ANY forced tool_choice
+("Thinking mode does not support this tool_choice") — json_object output and
+non-forced (auto/none) tool calling are both fine with thinking on — and DeepSeek
+defaults thinking ON when the field is absent, so the directive is sent explicitly
+on every call. ``send_thinking=False`` drops it entirely for a provider/model that
+does not understand the field. See ``_build_body``.
 """
 
 from __future__ import annotations
@@ -212,7 +213,7 @@ class DeepSeekProvider:
         if self._send_thinking:
             if request.thinking_disabled:
                 # An explicit disable is mandatory: DeepSeek defaults thinking ON when
-                # the field is absent, which would 400 the selector's forced tool_choice.
+                # the field is absent, which would 400 any forced tool_choice call.
                 body["thinking"] = {"type": "disabled"}
             else:
                 # Thinking mode: the model emits a chain-of-thought (returned via

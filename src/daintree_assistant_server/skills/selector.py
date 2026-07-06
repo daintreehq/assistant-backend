@@ -2,15 +2,19 @@
 
 Before the main-model call, a dedicated small-model request classifies the
 conversation against the catalog and returns up to ``max_active_skills`` skill
-IDs through a forced ``select_skills`` function call. Output is validated and
-repaired once; on failure the selector fails *open* (the request degrades to
-the prior active set rather than blocking the user).
+IDs as a JSON object (``response_format`` = ``json_object``). It is NOT a forced
+function call: the selector runs thinking-high by default, and a forced
+tool_choice is the one thing incompatible with thinking on DeepSeek — json_object
+is compatible, so the model reasons first (chain-of-thought in ``reasoning_content``)
+and emits clean JSON in ``content``. Output is validated and repaired once; on
+failure the selector fails *open* (the request degrades to the prior active set
+rather than blocking the user).
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any
 
 from ..config import DEEPSEEK_MODEL, Settings
@@ -20,35 +24,18 @@ from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
 from ..providers.base import (
     ChatProvider,
     ProviderChatRequest,
-    ProviderToolCallResult,
+    ProviderChatResult,
     ProviderUsage,
 )
 from ..providers.retry import retry_upstream
 from ..text_utils import estimate_tokens, head_tail, message_text
 from .catalog import Catalog, CatalogManager
 
-
-# Forced selector function schema (section 7.7). `skill_ids` is bounded by the SAME
-# settings.max_active_skills used by the prompt ("ZERO to {{max_active}}") + parse +
-# merge — never a hardcoded ceiling that could silently disagree with the configured cap.
-def build_select_skills_schema(max_active: int) -> dict[str, Any]:
-    return {
-        "type": "object",
-        "additionalProperties": False,
-        "required": ["skill_ids", "confidence", "task_type"],
-        "properties": {
-            "skill_ids": {"type": "array", "items": {"type": "string"}, "maxItems": max_active},
-            "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-            "task_type": {"type": "string", "maxLength": 80},
-            "reason": {"type": "string", "maxLength": 300},
-        },
-    }
-
 _REPAIR_INSTRUCTION = (
-    "Your previous response was not a valid select_skills function call. "
-    "Call the select_skills function now with valid JSON arguments: skill_ids "
-    "(an array of catalog skill IDs, possibly empty), confidence (a number "
-    "between 0 and 1), and task_type (a short string)."
+    "Your previous response was not a valid JSON object. Reply now with ONLY a "
+    "JSON object (no prose, no code fence) with these keys: skill_ids (an array "
+    "of catalog skill IDs, possibly empty), confidence (a number between 0 and 1), "
+    "and task_type (a short string)."
 )
 
 _TOOL_RESULT_CHAR_CAP = 2000
@@ -156,7 +143,7 @@ def build_selector_user_message(
             lines.append(f"{prefix} {text}".rstrip())
         else:
             lines.append(f"[user] {text}")
-    lines.extend(["", "Call select_skills now."])
+    lines.extend(["", "Return the JSON object now."])
     return "\n".join(lines)
 
 
@@ -190,9 +177,13 @@ def parse_select_args(
     if not isinstance(data, dict):
         return None
 
-    raw_ids = data.get("skill_ids", [])
-    if raw_ids is None:
-        raw_ids = []
+    # Require a proper skill_ids array. A valid-JSON object that omits it (e.g. `{}` or
+    # a typo'd key) is MALFORMED, not an authoritative "clear all skills" — treat it like
+    # unparseable output so the caller repairs, then fails open to the prior set. An
+    # explicit empty array is the only way to clear (the prompt says so). This guard used
+    # to be softer (missing → []); it matters more now the forced-function schema is gone
+    # and nothing upstream forces the key to be present.
+    raw_ids = data.get("skill_ids")
     if not isinstance(raw_ids, list):
         return None
 
@@ -234,7 +225,6 @@ class Selector:
         self.prompt_loader = prompt_loader
         self.catalog_manager = catalog_manager
         self.settings = settings
-        self._select_schema = build_select_skills_schema(settings.max_active_skills)
 
     @property
     def catalog(self) -> Catalog:
@@ -264,15 +254,28 @@ class Selector:
         ]
         return await self._run(messages)
 
-    async def _run(self, messages: list[dict[str, Any]]) -> SelectionDecision:
-        request = ProviderChatRequest(
+    def _build_request(self, messages: list[dict[str, Any]]) -> ProviderChatRequest:
+        # json_object (not a forced tool_choice) so thinking can be enabled: forced
+        # tool_choice is the one thing DeepSeek rejects under thinking. The output cap
+        # gets reasoning headroom when thinking is on, since max_tokens is shared by
+        # reasoning + the visible JSON. Temperature is ignored in thinking mode.
+        thinking = self.settings.selector_thinking_enabled
+        max_tokens = self.settings.selector_max_output_tokens
+        if thinking:
+            max_tokens += self.settings.deepseek_thinking_headroom_tokens
+        return ProviderChatRequest(
             model=DEEPSEEK_MODEL,
             messages=messages,
             temperature=0.0,
-            max_tokens=self.settings.selector_max_output_tokens,
-            thinking_disabled=True,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+            thinking_disabled=not thinking,
+            reasoning_effort=self.settings.selector_reasoning_effort if thinking else None,
             timeout=self.settings.selector_timeout_seconds,
         )
+
+    async def _run(self, messages: list[dict[str, Any]]) -> SelectionDecision:
+        request = self._build_request(messages)
 
         try:
             result = await self._call_once(request)
@@ -280,14 +283,11 @@ class Selector:
             return SelectionDecision.degraded_open(["skill_selector_failed_open"])
 
         usage: ProviderUsage | None = result.usage
-        parsed = parse_select_args(
-            result.arguments_json, self.catalog, self.settings.max_active_skills
-        )
+        parsed = parse_select_args(result.text, self.catalog, self.settings.max_active_skills)
 
         if parsed is None:
-            repair_request = replace(
-                request,
-                messages=[*messages, {"role": "user", "content": _REPAIR_INSTRUCTION}],
+            repair_request = self._build_request(
+                [*messages, {"role": "user", "content": _REPAIR_INSTRUCTION}]
             )
             try:
                 repair = await self._call_once(repair_request)
@@ -295,7 +295,7 @@ class Selector:
                 return SelectionDecision.degraded_open(["skill_selector_failed_open"], usage=usage)
             usage = _sum_usage(usage, repair.usage)
             parsed = parse_select_args(
-                repair.arguments_json, self.catalog, self.settings.max_active_skills
+                repair.text, self.catalog, self.settings.max_active_skills
             )
             if parsed is None:
                 return SelectionDecision.degraded_open(
@@ -314,17 +314,13 @@ class Selector:
             warnings=[],
         )
 
-    async def _call_once(self, request: ProviderChatRequest) -> ProviderToolCallResult:
+    async def _call_once(self, request: ProviderChatRequest) -> ProviderChatResult:
         """Call the provider, retrying transient (retryable) errors.
 
         Exhausted retries raise; ``_run`` then degrades the selector open.
         """
         return await retry_upstream(
-            lambda: self.provider.structured_tool_call(
-                request,
-                function_name="select_skills",
-                function_schema=self._select_schema,
-            ),
+            lambda: self.provider.complete(request),
             retries=self.settings.max_upstream_retries,
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
         )

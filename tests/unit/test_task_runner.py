@@ -34,6 +34,21 @@ async def test_terminal_summarize_text(task_runner: TaskRunner, fake_provider: F
 
 
 @pytest.mark.asyncio
+async def test_utility_task_runs_thinking_high_with_headroom(
+    task_runner: TaskRunner, fake_provider: FakeProvider, settings
+) -> None:
+    # Utility tasks run thinking-high by default, with reasoning headroom added to the
+    # profile's small output cap (DeepSeek shares max_tokens between reasoning + output).
+    # Without the headroom, max_tokens would be the sub-headroom profile cap.
+    fake_provider.complete_result = make_result(content="Tests are green.")
+    await _run(task_runner, "terminal_summarize.v1", {"purpose": "p", "tail": "x"})
+    req = fake_provider.requests[-1]
+    assert req.thinking_disabled is False
+    assert req.reasoning_effort == "high"
+    assert req.max_tokens > settings.deepseek_thinking_headroom_tokens
+
+
+@pytest.mark.asyncio
 async def test_checkpoint(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(
         content=json.dumps({"goal": "ship", "next_actions": ["do x"]})

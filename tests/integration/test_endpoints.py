@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from fakes import make_result, tool_call_for
+from fakes import make_result, selection_result
 
 SKILL_PREP = "daintree.workflow.prep-branch-for-review"
 
@@ -65,7 +65,7 @@ def test_skills_list_and_etag(client, auth, app) -> None:
 
 
 def test_skills_resolve_find(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
         "protocol_version": 1, "session_id": "s", "action": "find", "query": "prep branch",
     })

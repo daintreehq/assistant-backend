@@ -704,13 +704,23 @@ class TaskRunner:
             {"role": "user", "content": user},
         ]
         response_format = {"type": "json_object"} if profile.output_mode == "json" else None
+        # Utility tasks run thinking-high by default. json_object (and plain text) are
+        # both compatible with thinking on DeepSeek — no utility task uses a forced
+        # tool call. The profile cap sizes the visible output; add reasoning headroom
+        # when thinking is on, since DeepSeek's max_tokens is shared with the CoT.
+        thinking = self.settings.utility_thinking_enabled
+        reasoning_effort = self.settings.utility_reasoning_effort if thinking else None
+        max_tokens = profile.max_output_tokens
+        if thinking:
+            max_tokens += self.settings.deepseek_thinking_headroom_tokens
         provider_request = ProviderChatRequest(
             model=model,
             messages=messages,
             temperature=profile.temperature,
-            max_tokens=profile.max_output_tokens,
+            max_tokens=max_tokens,
             response_format=response_format,
-            thinking_disabled=True,
+            thinking_disabled=not thinking,
+            reasoning_effort=reasoning_effort,
             timeout=timeout,
         )
 
@@ -728,9 +738,10 @@ class TaskRunner:
                 model=model,
                 messages=[*messages, {"role": "user", "content": repair_text}],
                 temperature=profile.temperature,
-                max_tokens=profile.max_output_tokens,
+                max_tokens=max_tokens,
                 response_format=response_format,
-                thinking_disabled=True,
+                thinking_disabled=not thinking,
+                reasoning_effort=reasoning_effort,
                 timeout=timeout,
             )
             repair = await self._complete_with_retry(repair_request)

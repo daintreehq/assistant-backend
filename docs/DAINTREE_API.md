@@ -227,8 +227,9 @@ Guarantees:
 
 Skill selection is removed from the main thread:
 
-1. **Selector cadence.** A separate small-model call (`select_skills`, a forced function
-   call) runs when: there is no valid `state`; `selection.force` is set or
+1. **Selector cadence.** A separate small-model call (returning a JSON object via
+   `response_format` json_object, so it can run thinking-on) runs when: there is no valid
+   `state`; `selection.force` is set or
    `selection.policy == "always"`; the catalog revision changed; the `turn_id` changed; or
    `instruction_revision` changed. It does **not** re-run on ordinary tool-continuation
    rounds (same turn). Selector failure **fails open** — the prior active set is retained.
@@ -282,16 +283,21 @@ top-level `thinking` object (`DEEPSEEK_SEND_THINKING`, always sent by default): 
 tier) turns it on. DeepSeek defaults thinking ON when the field is absent, so the disable
 directive is sent explicitly.
 
-The selector and utility tasks **always** run non-thinking (`thinking:{"type":"disabled"}`) — the
-selector's forced `tool_choice` is incompatible with thinking mode. The main `/respond` call
-runs **thinking by default** (`MAIN_THINKING_ENABLED`, disable with `=false`;
-`MAIN_REASONING_EFFORT` = `high` | `max`, default `high`; DeepSeek also accepts `low`/`medium`
-but remaps them to `high`, so the server restricts the main call to the two higher tiers —
-`high` is thus the lightest thinking available, the only lower setting being thinking off). It
-was previously off while the upstream was Fireworks (thinking on there destabilized multi-agent
-orchestration — the model dumped its whole multi-round plan as one speculative tool batch); on
-DeepSeek directly it runs with reasoning on. Thinking is forced off for any request that pins a
-`tool_choice` (thinking + a forced tool choice is rejected upstream). When enabled, the model returns its chain-of-thought as `reasoning_content`; the
+Every DeepSeek-flash call runs **thinking by default** — the main `/respond` call, the
+selector, the utility tasks, and the skill-learning gate — each behind its own toggle
+(`MAIN_THINKING_ENABLED`, `SELECTOR_THINKING_ENABLED`, `UTILITY_THINKING_ENABLED`,
+`SKILL_GATE_THINKING_ENABLED`) and effort (`*_REASONING_EFFORT` = `high` | `max`, default
+`high`). Because a forced `tool_choice` is the one thing incompatible with thinking on
+DeepSeek, the selector was moved off its forced `select_skills` call onto `response_format`
+json_object (json_object output and non-forced tool calling are both compatible with
+thinking). DeepSeek accepts only `high`/`max` and silently remaps `low`/`medium` up to
+`high` — so `high` is the lightest thinking available, the only lower setting being thinking
+off. Since DeepSeek's `max_tokens` is shared by reasoning + visible output, the small-output
+calls (selector, utility tasks, gate) add `DEEPSEEK_THINKING_HEADROOM_TOKENS` to their tight
+caps so the chain-of-thought can't starve the answer into a length truncation; the main
+`/respond` call instead runs on its own flat budget (`MAIN_DEFAULT_MAX_TOKENS` ==
+`MAIN_MAX_TOKENS_CEILING`, already sized for reasoning + output). Thinking is still forced off
+for any request that pins a `tool_choice` (thinking + a forced tool choice is rejected upstream). When enabled, the model returns its chain-of-thought as `reasoning_content`; the
 client stores it on the assistant turn and replays it verbatim on any turn that performed tool
 calls (a hard DeepSeek requirement). Thinking mode ignores `temperature`/`top_p`/penalties.
 

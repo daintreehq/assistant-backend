@@ -134,12 +134,29 @@ class FakeProvider:
     def __init__(self) -> None:
         self.requests: list[ProviderChatRequest] = []
         self.tool_call_requests: list[ProviderChatRequest] = []
+        self.selection_requests: list[ProviderChatRequest] = []
         self.stream_requests: list[ProviderChatRequest] = []
         self.closed = False
 
         # Configurable behavior.
-        self.complete_result: ProviderChatResult | Callable[[ProviderChatRequest], ProviderChatResult] | None = None
+        self.complete_result: (
+            ProviderChatResult
+            | Callable[[ProviderChatRequest], ProviderChatResult]
+            | list[ProviderChatResult]
+            | None
+        ) = None
         self.complete_error: Exception | None = None
+        # The selector now runs `complete()` with response_format json_object (not a
+        # forced tool call). When a shared fake serves BOTH the selector and the main
+        # call, these slots let a test drive the selector's response distinctly from the
+        # main completion: a json_object request routes here whenever one is configured.
+        self.selection_result: (
+            ProviderChatResult
+            | Callable[[ProviderChatRequest], ProviderChatResult]
+            | list[ProviderChatResult]
+            | None
+        ) = None
+        self.selection_error: Exception | None = None
         self.tool_call_result: (
             ProviderToolCallResult
             | Callable[[ProviderChatRequest], ProviderToolCallResult]
@@ -153,14 +170,37 @@ class FakeProvider:
         self.last_stream: FakeStream | None = None
 
     async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:
+        # Route a selector-shaped call (json_object output) to the selection slot when
+        # one is configured, so a shared fake distinguishes it from the main call. This
+        # discriminator assumes the MAIN call in the same test is not json_object — true
+        # for every /respond test today (the CLI never asks the main model for JSON). If a
+        # test ever drives a json_object main call while also setting selection_result,
+        # give the fake an explicit selector-vs-main signal instead of widening this.
+        if request.response_format == {"type": "json_object"} and (
+            self.selection_result is not None or self.selection_error is not None
+        ):
+            self.selection_requests.append(request)
+            if self.selection_error is not None:
+                raise self.selection_error
+            selection = self.selection_result
+            if isinstance(selection, list):
+                return selection.pop(0)
+            if callable(selection):
+                return selection(request)
+            assert selection is not None
+            return selection
         self.requests.append(request)
         if self.complete_error is not None:
             raise self.complete_error
-        if self.complete_result is None:
+        result = self.complete_result
+        if result is None:
             return make_result(content="ok")
-        if callable(self.complete_result):
-            return self.complete_result(request)
-        return self.complete_result
+        if isinstance(result, list):
+            # Queue: pop the next response (used for repair scenarios).
+            return result.pop(0)
+        if callable(result):
+            return result(request)
+        return result
 
     async def structured_tool_call(
         self,
@@ -212,6 +252,25 @@ def tool_call_for(skill_ids: list[str], *, confidence: float = 0.9, task_type: s
     return ProviderToolCallResult(
         name="select_skills",
         arguments_json=json.dumps(
+            {"skill_ids": skill_ids, "confidence": confidence, "task_type": task_type}
+        ),
+        usage=ProviderUsage(
+            prompt_tokens=3000, completion_tokens=50, total_tokens=3050, cached_tokens=2800
+        ),
+    )
+
+
+def selection_result(
+    skill_ids: list[str], *, confidence: float = 0.9, task_type: str = "task"
+) -> ProviderChatResult:
+    """A selector completion result: the choice as a JSON object in ``content``.
+
+    The selector runs response_format json_object (not a forced tool call), so its
+    output is parsed from ``message.content`` — the chain-of-thought would land in
+    ``reasoning_content`` separately.
+    """
+    return make_result(
+        content=json.dumps(
             {"skill_ids": skill_ids, "confidence": confidence, "task_type": task_type}
         ),
         usage=ProviderUsage(

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 from conftest import meta_of, parse_sse, respond_body
-from fakes import FakeProvider, make_result, make_text_chunks, tool_call_for
+from fakes import FakeProvider, make_result, make_text_chunks, selection_result
 
 from daintree_assistant_server.errors import upstream_error
 
@@ -30,7 +30,7 @@ def _loaded_skills_message(provider: FakeProvider) -> str:
 
 
 def test_scenario1_new_session_skill_selected(client, auth, fake_provider, app) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep this branch for review"}],
         session_id="s1", turn_id="t1",
@@ -53,7 +53,7 @@ def test_scenario1_new_session_skill_selected(client, auth, fake_provider, app) 
 
 
 def test_scenario2_no_relevant_skill_no_prelude(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([])
+    fake_provider.selection_result = selection_result([])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hello"}], session_id="s2", turn_id="t1",
     ))
@@ -63,12 +63,12 @@ def test_scenario2_no_relevant_skill_no_prelude(client, auth, fake_provider) -> 
 
 
 def test_scenario3_same_turn_round_does_not_rerun(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep branch"}], session_id="s3", turn_id="t1", round=0,
     ))
     state = r1.json()["state"]
-    fake_provider.tool_call_requests.clear()
+    fake_provider.selection_requests.clear()
 
     r2 = client.post(URL, headers=auth, json=respond_body(
         [
@@ -81,50 +81,50 @@ def test_scenario3_same_turn_round_does_not_rerun(client, auth, fake_provider) -
         session_id="s3", turn_id="t1", round=1, state=state,
     ))
     meta = meta_of(r2.json())
-    assert len(fake_provider.tool_call_requests) == 0  # selector NOT rerun
+    assert len(fake_provider.selection_requests) == 0  # selector NOT rerun
     assert meta["selector"]["ran"] is False
     assert [s["id"] for s in meta["active_skills"]] == [SKILL_PREP]
     assert meta["newly_loaded_skills"] == []
 
 
 def test_scenario4_new_turn_reruns(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep branch"}], session_id="s4", turn_id="t1",
     ))
     state = r1.json()["state"]
-    fake_provider.tool_call_requests.clear()
-    fake_provider.tool_call_result = tool_call_for([SKILL_RENAME])
+    fake_provider.selection_requests.clear()
+    fake_provider.selection_result = selection_result([SKILL_RENAME])
 
     r2 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "rename terminals"}], session_id="s4", turn_id="t2", state=state,
     ))
     meta = meta_of(r2.json())
-    assert len(fake_provider.tool_call_requests) == 1
+    assert len(fake_provider.selection_requests) == 1
     assert meta["selector"]["ran"] is True
     assert SKILL_RENAME in [s["id"] for s in meta["active_skills"]]
 
 
 def test_scenario5_interjection_reruns_once(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep branch"}], session_id="s5", turn_id="t1", instruction_revision=0,
     ))
     state = r1.json()["state"]
-    fake_provider.tool_call_requests.clear()
+    fake_provider.selection_requests.clear()
 
     r2 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "actually rename terminals"}],
         session_id="s5", turn_id="t1", instruction_revision=1, state=state,
     ))
-    assert len(fake_provider.tool_call_requests) == 1
+    assert len(fake_provider.selection_requests) == 1
     assert meta_of(r2.json())["selector"]["ran"] is True
 
 
 def test_scenario6_selector_run_caps_at_three(client, auth, fake_provider, app) -> None:
     # A single authoritative selector run is capped: 4 returned ids → the first 3 load.
     ids = sorted(app.state.container.catalog.known_ids)
-    fake_provider.tool_call_result = tool_call_for([ids[0], ids[1], ids[2], ids[3]])
+    fake_provider.selection_result = selection_result([ids[0], ids[1], ids[2], ids[3]])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "a big multi-workflow task"}], session_id="s6", turn_id="t1",
     ))
@@ -138,13 +138,13 @@ def test_scenario6b_new_instruction_replaces_prior(client, auth, fake_provider, 
     # A successful selector run on a NEW turn is authoritative: it REPLACES the prior
     # active set (topic shift), rather than accumulating additively.
     ids = sorted(app.state.container.catalog.known_ids)
-    fake_provider.tool_call_result = tool_call_for([ids[0]])
+    fake_provider.selection_result = selection_result([ids[0]])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "task a"}], session_id="s6b", turn_id="t1",
     ))
     state = r1.json()["state"]
-    fake_provider.tool_call_requests.clear()
-    fake_provider.tool_call_result = tool_call_for([ids[1]])
+    fake_provider.selection_requests.clear()
+    fake_provider.selection_result = selection_result([ids[1]])
     r2 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "a totally different task b"}],
         session_id="s6b", turn_id="t2", state=state,
@@ -157,7 +157,7 @@ def test_scenario6b_new_instruction_replaces_prior(client, auth, fake_provider, 
 
 
 def test_scenario7_unknown_and_duplicate_ids(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP, "nonexistent", SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP, "nonexistent", SKILL_PREP])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="s7", turn_id="t1",
     ))
@@ -166,12 +166,12 @@ def test_scenario7_unknown_and_duplicate_ids(client, auth, fake_provider) -> Non
 
 
 def test_scenario8_selector_fails_retains_prior(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="s8", turn_id="t1",
     ))
     state = r1.json()["state"]
-    fake_provider.tool_call_error = upstream_error("selector down")
+    fake_provider.selection_error = upstream_error("selector down")
 
     r2 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "next task"}], session_id="s8", turn_id="t2", state=state,
@@ -189,7 +189,7 @@ def test_scenario9_catalog_revision_change_reruns(client, auth, fake_provider, a
         session_id="s9", active_skills=[SKILL_PREP],
         catalog_revision="sha256:stale", turn_id="t1", instruction_revision=0,
     )
-    fake_provider.tool_call_result = tool_call_for([SKILL_RENAME])
+    fake_provider.selection_result = selection_result([SKILL_RENAME])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "rename"}], session_id="s9", turn_id="t1", state=stale,
     ))
@@ -199,12 +199,12 @@ def test_scenario9_catalog_revision_change_reruns(client, auth, fake_provider, a
 
 
 def test_scenario10_replayed_state_other_session(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="sessionA", turn_id="t1",
     ))
     state = r1.json()["state"]
-    fake_provider.tool_call_result = tool_call_for([])
+    fake_provider.selection_result = selection_result([])
     r2 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="sessionB", turn_id="t1", state=state,
     ))
@@ -215,7 +215,7 @@ def test_scenario10_replayed_state_other_session(client, auth, fake_provider) ->
 
 
 def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     fake_provider.stream_chunks = make_text_chunks("hello there")
     body = respond_body(
         [{"role": "user", "content": "prep"}], session_id="ss", turn_id="t1",
@@ -239,7 +239,7 @@ def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider) -> 
 def test_nonstream_surfaces_reasoning_content(client, auth, fake_provider) -> None:
     # When the upstream returns a thinking-mode chain-of-thought, it is delivered
     # to the client on the assistant message so it can be replayed next turn.
-    fake_provider.tool_call_result = tool_call_for([])
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = make_result(content="done", reasoning_content="my cot")
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hi"}], session_id="rc1", turn_id="t1",
@@ -249,7 +249,7 @@ def test_nonstream_surfaces_reasoning_content(client, auth, fake_provider) -> No
 
 
 def test_nonstream_omits_reasoning_content_when_absent(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([])
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = make_result(content="done")
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hi"}], session_id="rc1b", turn_id="t1",
@@ -258,7 +258,7 @@ def test_nonstream_omits_reasoning_content_when_absent(client, auth, fake_provid
 
 
 def test_stream_surfaces_reasoning_content(client, auth, fake_provider) -> None:
-    fake_provider.tool_call_result = tool_call_for([])
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_chunks = [
         {"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
         {"choices": [{"index": 0, "delta": {"reasoning_content": "cot "}, "finish_reason": None}]},

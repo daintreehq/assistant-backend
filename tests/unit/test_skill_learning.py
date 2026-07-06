@@ -266,9 +266,10 @@ async def test_create_overlay_dir(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_create_uses_gpt55_builder_model_with_reasoning(tmp_path: Path) -> None:
     # Regression guard for the model split (see config.py): the gate runs on the
-    # DeepSeek small model NON-thinking, while the builder runs on GPT-5.5 WITH
-    # reasoning at the configured effort. The fake records every request, so a silent
-    # regression back to the small model (or reasoning off) for the builder is caught.
+    # DeepSeek small model (thinking-high by default now), while the builder runs on
+    # GPT-5.5 WITH reasoning at the configured effort. The fake records every request,
+    # so a silent regression back to the small model (or reasoning off) for the builder
+    # is caught.
     assert SKILL_BUILDER_MODEL == "gpt-5.5"
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake)
@@ -276,7 +277,8 @@ async def test_create_uses_gpt55_builder_model_with_reasoning(tmp_path: Path) ->
 
     gate_reqs = [r for r in fake.requests if r.model == DEEPSEEK_MODEL]
     build_reqs = [r for r in fake.requests if r.model == SKILL_BUILDER_MODEL]
-    assert gate_reqs and all(r.thinking_disabled for r in gate_reqs)
+    assert gate_reqs and all(r.thinking_disabled is False for r in gate_reqs)
+    assert all(r.reasoning_effort == "high" for r in gate_reqs)
     assert build_reqs and all(r.thinking_disabled is False for r in build_reqs)
     assert all(r.reasoning_effort == "high" for r in build_reqs)
 

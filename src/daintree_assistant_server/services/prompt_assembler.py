@@ -525,8 +525,9 @@ class PromptAssembler:
         if gen.response_format == "json_object":
             response_format = {"type": "json_object"}
 
-        # Thinking is ON by default (MAIN_THINKING_ENABLED) and only ever on the main
-        # call. Force it off when the request pins a tool_choice: DeepSeek 400s on
+        # Thinking is ON by default (MAIN_THINKING_ENABLED); the selector, utility
+        # tasks, and skill-learning gate think too, each with its own flag. Force it
+        # off here only when the request pins a tool_choice: DeepSeek 400s on
         # thinking + forced tool_choice, so degrade to non-thinking rather than
         # fail the turn.
         thinking_enabled = self.settings.main_thinking_enabled and not self._is_forced_tool_choice(
@@ -553,10 +554,9 @@ class PromptAssembler:
             stop=gen.stop,
             stream=gen.stream,
             include_usage=gen.stream,
-            # The main call is the only server call that may use thinking (the
-            # selector's forced tool_choice forbids it). ON by default; when enabled,
-            # reasoning_content round-trips through the wire contract so tool-call
-            # turns can replay it. Thinking mode ignores temperature/top_p.
+            # ON by default (only a client-pinned forced tool_choice degrades it off,
+            # above). When enabled, reasoning_content round-trips through the wire
+            # contract so tool-call turns can replay it. Thinking ignores temperature/top_p.
             thinking_disabled=not thinking_enabled,
             reasoning_effort=self.settings.main_reasoning_effort if thinking_enabled else None,
             prompt_cache_key=PROMPT_CACHE_KEY,

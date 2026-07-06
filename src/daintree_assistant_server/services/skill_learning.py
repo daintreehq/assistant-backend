@@ -452,14 +452,21 @@ class SkillLearner:
             f'"""\n{transcript}\n"""\n\n'
             "Return the JSON verdict now."
         )
+        # The gate stays on DeepSeek (cheap triage) but runs thinking-high by default:
+        # its verdict is json_object, which is compatible with thinking. Add reasoning
+        # headroom on top of the small verdict cap, since max_tokens is shared with CoT.
+        thinking = self.settings.skill_gate_thinking_enabled
+        gate_max_tokens = self.settings.skill_gate_max_output_tokens
+        if thinking:
+            gate_max_tokens += self.settings.deepseek_thinking_headroom_tokens
         data = await self._complete_json(
             model=DEEPSEEK_MODEL,
             system=system,
             user=user,
-            max_tokens=self.settings.skill_gate_max_output_tokens,
+            max_tokens=gate_max_tokens,
             temperature=0.0,
-            thinking_disabled=True,
-            reasoning_effort=None,
+            thinking_disabled=not thinking,
+            reasoning_effort=self.settings.skill_gate_reasoning_effort if thinking else None,
         )
         return GateVerdict.model_validate(_clamp_confidence(data))
 
