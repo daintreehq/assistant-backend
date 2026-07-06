@@ -260,7 +260,7 @@ class PromptAssembler:
         pinned = _cap_list_combined(turn.memories.pinned, self.settings.cap_pinned_memories)
         relevant = _cap_list_combined(turn.memories.relevant, self.settings.cap_relevant_memories)
         watchers = _cap_list_combined(
-            turn.session_ended_watchers,
+            turn.resumed_watchers,
             self.settings.cap_watchers_bytes,
             max_count=self.settings.cap_watchers_count,
         )
@@ -271,7 +271,7 @@ class PromptAssembler:
             "async_operations": async_operations,
             "memories": {"pinned": pinned, "relevant": relevant},
             "active_worktree": worktree,
-            "session_ended_watchers": watchers,
+            "resumed_watchers": watchers,
         }
         return self.prompts.render(TEMPLATE_TURN_FOOTER, turn_context=turn_context)
 

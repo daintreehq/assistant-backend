@@ -9,5 +9,5 @@ Memories:
   Pinned: uses pnpm
   Relevant: last run failed on lint
 Active worktree: feature/x
-Session-ended watcher names (these stopped when the assistant last closed and are only informational): watcher-1
+Resumed watchers (these were created in a previous session, kept running while the assistant was closed, and are still being supervised — use watcher.list to inspect or watcher.cancel to stop one): watcher-1
 

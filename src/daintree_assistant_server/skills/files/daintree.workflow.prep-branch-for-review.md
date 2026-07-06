@@ -107,6 +107,6 @@ Once the agent has fixed the branch, return to step 3 (re-check) → step 4/5.
 ## Report back
 State the verdict you got, what you committed/pushed, and the PR number + url — or, if
 blocked, exactly what is blocking and the next action (and, if you spawned a fixer agent,
-its terminalId + watcherId and that supervision runs only while the assistant is open).
+its terminalId + watcherId; supervision is durable — the background supervisor keeps watching if the user closes the assistant).
 Never claim "the PR is ready" off `prepBranchForReview` alone: that verdict only means the
 tree is in a committable shape, not that a PR exists.

@@ -10,5 +10,5 @@
 {% if turn_context.memories.pinned %}  Pinned: {{ turn_context.memories.pinned | join(", ") }}
 {% endif %}{% if turn_context.memories.relevant %}  Relevant: {{ turn_context.memories.relevant | join(", ") }}
 {% endif %}{% endif %}{% if turn_context.active_worktree %}Active worktree: {{ turn_context.active_worktree }}
-{% endif %}{% if turn_context.session_ended_watchers %}Session-ended watcher names (these stopped when the assistant last closed and are only informational): {{ turn_context.session_ended_watchers | join(", ") }}
+{% endif %}{% if turn_context.resumed_watchers %}Resumed watchers (these were created in a previous session, kept running while the assistant was closed, and are still being supervised — use watcher.list to inspect or watcher.cancel to stop one): {{ turn_context.resumed_watchers | join(", ") }}
 {% endif %}{% endif %}

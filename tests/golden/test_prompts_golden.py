@@ -151,7 +151,7 @@ def test_turn_footer(assembler: PromptAssembler) -> None:
         goal="Prepare the branch for review",
         workflow_runs=["wfr_1 — preparing branch"],
         memories=Memories(pinned=["uses pnpm"], relevant=["last run failed on lint"]),
-        session_ended_watchers=["watcher-1"],
+        resumed_watchers=["watcher-1"],
     )
     assert_golden("turn_footer.md", assembler.render_turn_footer(turn, active_worktree="feature/x"))
 

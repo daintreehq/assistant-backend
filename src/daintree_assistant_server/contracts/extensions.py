@@ -113,7 +113,10 @@ class TurnContext(BaseModel):
     # always sees its in-flight async work and never re-issues it.
     async_operations: list[str] = Field(default_factory=list)
     memories: Memories = Field(default_factory=Memories)
-    session_ended_watchers: list[str] = Field(default_factory=list)
+    # Live watchers the CLI ADOPTED from a prior owner at ownership boot
+    # (project-scoped supervision resumed automatically) — sent once, on the
+    # first turn. Replaces the pre-supervisor session_ended_watchers field.
+    resumed_watchers: list[str] = Field(default_factory=list)
 
 
 class Selection(BaseModel):

@@ -114,8 +114,9 @@ Procedure:
    to the attention queue when it settles — you do not wait inside the turn, and you do
    NOT hand-poll the terminal. Do NOT also call terminal.awaitAll / terminal.sendCommand
    here (that double-supervises the agent the watcher already owns). Tell the user the
-   work is running and the next checkpoint is the watcher's completed_* event — and that
-   supervision runs only while the assistant is open (foreground-only, session-scoped).
+   work is running and the next checkpoint is the watcher's completed_* event —
+   supervision is durable (the background supervisor keeps watching if the user closes
+   the assistant, and the outcome greets them on the next launch).
 
 7. Why trust the watcher and not your own glance: the agent FSM's "completed" is
    TRANSIENT — working->completed fires only on a detected completion event, then
@@ -157,5 +158,6 @@ confirm before launch per the active tier (external risk).
 
 Report back: which issue was started (title + url), the worktree path / branch / the
 real terminalId and watcherId, whether it was assigned and context injected, any partial
-failure, and that supervision runs only while the assistant is open — the next
-checkpoint is the watcher's completed_* event, not a status you poll yourself.
+failure, and that supervision continues even if they close the assistant (the
+background supervisor takes over) — the next checkpoint is the watcher's completed_*
+event, not a status you poll yourself.
