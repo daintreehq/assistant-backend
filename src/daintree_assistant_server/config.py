@@ -110,11 +110,15 @@ class Settings(BaseSettings):
     # final system message) and the output linter both reference this width.
     main_terminal_width: int = Field(default=56, ge=20, alias="MAIN_TERMINAL_WIDTH")
     # max_tokens policy. The client MAY send generation.max_tokens; when it omits one
-    # we apply a sane compact default, and either way we clamp to a hard ceiling so a
-    # degenerate turn (the observed 7k-token prompt-recitation dump) cannot run
-    # unbounded. The ceiling is deliberately generous — it catches absurd runaways
-    # without truncating a legitimately long final synthesis.
-    main_default_max_tokens: int = Field(default=2048, ge=1, alias="MAIN_DEFAULT_MAX_TOKENS")
+    # we apply the default, and either way we clamp to a hard ceiling so a degenerate
+    # turn (the observed 7k-token prompt-recitation dump) cannot run unbounded. The
+    # default matches the ceiling: the completion budget is SHARED by reasoning +
+    # prose + tool-call arguments, and the old compact 2048 default repeatedly cut
+    # real multi-spawn tool batches off mid-arguments (finish_reason=length, three
+    # sessions on 2026-07-05/06) — each truncation costing a full extra round to
+    # re-issue the amputated calls, strictly more expensive than finishing the
+    # generation. Runaway containment is the ceiling's job, not the default's.
+    main_default_max_tokens: int = Field(default=8000, ge=1, alias="MAIN_DEFAULT_MAX_TOKENS")
     main_max_tokens_ceiling: int = Field(default=8000, ge=1, alias="MAIN_MAX_TOKENS_CEILING")
 
     # ---- Main-model output linting (observability + optional repair) ----

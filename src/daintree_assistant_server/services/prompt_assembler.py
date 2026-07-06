@@ -533,10 +533,12 @@ class PromptAssembler:
             request.input.tool_choice
         )
 
-        # max_tokens policy: fill a compact default when the client omits one, then clamp
-        # to a hard ceiling either way so a degenerate turn (the observed prompt-recitation
-        # dump) can't run unbounded. The ceiling is generous — it catches absurd runaways,
-        # not a legitimately long synthesis.
+        # max_tokens policy: fill the default when the client omits one, then clamp to a
+        # hard ceiling either way so a degenerate turn (the observed prompt-recitation
+        # dump) can't run unbounded. The completion budget is shared by reasoning +
+        # prose + tool-call arguments, so the default is deliberately NOT compact — a
+        # low default amputates multi-spawn tool batches mid-arguments
+        # (finish_reason=length) and forces a strictly more expensive retry round.
         max_tokens = gen.max_tokens or self.settings.main_default_max_tokens
         max_tokens = min(max_tokens, self.settings.main_max_tokens_ceiling)
 
