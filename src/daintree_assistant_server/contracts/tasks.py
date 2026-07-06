@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # --------------------------------------------------------------------------
 # Envelope.
@@ -198,3 +198,278 @@ class ExtractionVerdictOutput(BaseModel):
     # ``pass`` is a Python keyword; expose it via an alias.
     passed: bool = Field(alias="pass")
     reason: str = ""
+
+
+# --------------------------------------------------------------------------
+# Workflow intelligence tasks (workflow_plan.v1 / workflow_reconcile.v1 /
+# workflow_resume_digest.v1).
+#
+# The execution graph is CLIENT-OWNED durable state: the CLI stores it locally
+# and sends bounded snapshots here. These tasks are pure functions of their
+# input — the server never persists workflow state. Outputs are typed and
+# hard-capped so a hallucinating small model cannot flood the client with an
+# unbounded "plan"; the client additionally validates every plan/patch against
+# its own invariants before committing anything.
+# --------------------------------------------------------------------------
+
+# Hard output caps (also cited in the task prompts).
+MAX_PLAN_NODES = 20
+MAX_PLAN_EDGES = 40
+MAX_PATCH_RESOURCES = 30
+MAX_NODE_TITLE = 120
+MAX_NODE_EVIDENCE = 10
+MAX_NODE_EVIDENCE_CHARS = 200
+
+WorkflowStatus = Literal["planned", "active", "blocked", "done", "cancelled", "failed"]
+NodeKind = Literal[
+    "orient",
+    "delegate",
+    "wait",
+    "verify",
+    "synthesize",
+    "ask_user",
+    "approval",
+    "cleanup",
+    "report",
+]
+NodeStatus = Literal[
+    "pending",
+    "ready",
+    "running",
+    "waiting",
+    "blocked",
+    "done",
+    "skipped",
+    "failed",
+    "cancelled",
+]
+AsyncPolicy = Literal["blocking", "async_ok", "async_required", "wake_only"]
+
+# Node statuses the client may still move; done/skipped/cancelled are final.
+TERMINAL_NODE_STATUSES: frozenset[str] = frozenset({"done", "skipped", "cancelled"})
+
+
+def _truncate_items(items: list[str], *, max_items: int, max_chars: int) -> list[str]:
+    """Tolerantly bound a model-produced string list (truncate, never reject)."""
+    return [item[:max_chars] for item in items[:max_items]]
+
+
+class RecommendedActionOut(BaseModel):
+    """A recommendation, never execution authority: the client dispatches tools
+    through its own safety policy and treats this as advisory text + hints."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    label: str = Field(min_length=1, max_length=200)
+    tool_name: str | None = Field(default=None, max_length=128)
+    args: dict[str, Any] = Field(default_factory=dict)
+    risk: str | None = Field(default=None, max_length=64)
+    requires_confirmation: bool = False
+    node_id: str | None = Field(default=None, max_length=128)
+
+
+class MultipleChoiceQuestionOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    question: str = Field(min_length=1, max_length=512)
+    options: list[str] = Field(min_length=2, max_length=6)
+    allow_other: bool = False
+
+    @field_validator("options")
+    @classmethod
+    def _bound_options(cls, v: list[str]) -> list[str]:
+        return [opt[:200] for opt in v]
+
+
+class WorkflowNodeOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(min_length=1, max_length=128)
+    title: str = Field(min_length=1, max_length=MAX_NODE_TITLE)
+    kind: NodeKind
+    status: NodeStatus = "pending"
+    depends_on: list[str] = Field(default_factory=list, max_length=MAX_PLAN_NODES)
+    tool_name: str | None = Field(default=None, max_length=128)
+    tool_args: dict[str, Any] = Field(default_factory=dict)
+    risk: str | None = Field(default=None, max_length=64)
+    requires_confirm: bool = False
+    expected_evidence: list[str] = Field(default_factory=list)
+    async_policy: AsyncPolicy = "blocking"
+    owner: str = Field(default="assistant", max_length=128)
+
+    @field_validator("expected_evidence")
+    @classmethod
+    def _bound_evidence(cls, v: list[str]) -> list[str]:
+        return _truncate_items(v, max_items=MAX_NODE_EVIDENCE, max_chars=MAX_NODE_EVIDENCE_CHARS)
+
+
+class WorkflowEdgeOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    source: str = Field(min_length=1, max_length=128)
+    target: str = Field(min_length=1, max_length=128)
+
+
+class NodePatchOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    node_id: str = Field(min_length=1, max_length=128)
+    status: NodeStatus | None = None
+    title: str | None = Field(default=None, max_length=MAX_NODE_TITLE)
+    last_error: str | None = Field(default=None, max_length=512)
+    note: str | None = Field(default=None, max_length=512)
+
+
+class ResourcePatchOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    resource_id: str = Field(min_length=1, max_length=256)
+    status: str | None = Field(default=None, max_length=64)
+    node_id: str | None = Field(default=None, max_length=128)
+    label: str | None = Field(default=None, max_length=200)
+
+
+class WorkflowBlockerOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str | None = Field(default=None, max_length=128)
+    summary: str = Field(min_length=1, max_length=512)
+    node_id: str | None = Field(default=None, max_length=128)
+    kind: str = Field(default="other", max_length=64)
+
+
+class WorkflowPatchOut(BaseModel):
+    """A graph patch, applied client-side with optimistic revision checks.
+
+    It updates graph STATE only — it can never execute tools, close terminals,
+    or bypass confirmation/grant policy on the client.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    base_revision: int | None = None
+    new_status: WorkflowStatus | None = None
+    node_updates: list[NodePatchOut] = Field(default_factory=list, max_length=MAX_PLAN_EDGES)
+    add_nodes: list[WorkflowNodeOut] = Field(default_factory=list, max_length=MAX_PLAN_NODES)
+    add_edges: list[WorkflowEdgeOut] = Field(default_factory=list, max_length=MAX_PLAN_EDGES)
+    resource_updates: list[ResourcePatchOut] = Field(
+        default_factory=list, max_length=MAX_PATCH_RESOURCES
+    )
+    add_blockers: list[WorkflowBlockerOut] = Field(default_factory=list, max_length=10)
+    resolve_blockers: list[str] = Field(default_factory=list, max_length=20)
+    rationale: str = Field(default="", max_length=1000)
+
+
+class WorkflowResumeItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    workflow_id: str = Field(min_length=1, max_length=128)
+    rank: int = Field(ge=1)
+    headline: str = Field(min_length=1, max_length=200)
+    status: str = Field(default="", max_length=64)
+    summary: str = Field(default="", max_length=1000)
+    blockers: list[str] = Field(default_factory=list)
+    recommended_action: RecommendedActionOut | None = None
+
+    @field_validator("blockers")
+    @classmethod
+    def _bound_blockers(cls, v: list[str]) -> list[str]:
+        return _truncate_items(v, max_items=10, max_chars=300)
+
+
+# ---- workflow task inputs -------------------------------------------------
+
+
+class WorkflowPlanInput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    goal: str = Field(min_length=1, max_length=8192)
+    scope: str | None = Field(default=None, max_length=4096)
+    runtime_summary: dict[str, Any] = Field(default_factory=dict)
+    tool_inventory: list[dict[str, Any]] = Field(default_factory=list, max_length=256)
+    active_skill_ids: list[str] = Field(default_factory=list, max_length=16)
+    existing_workflow: dict[str, Any] | None = None
+    relevant_memories: list[str] = Field(default_factory=list, max_length=50)
+    open_resources: list[dict[str, Any]] = Field(default_factory=list, max_length=100)
+    constraints: list[str] = Field(default_factory=list, max_length=25)
+
+
+class WorkflowReconcileInput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    workflow: dict[str, Any]
+    recent_events: list[dict[str, Any]] = Field(default_factory=list, max_length=100)
+    runtime_summary: dict[str, Any] = Field(default_factory=dict)
+    queue_events: list[dict[str, Any]] = Field(default_factory=list, max_length=50)
+    latest_user_message: str | None = Field(default=None, max_length=8192)
+    reason: Literal[
+        "tool_result",
+        "queue_event",
+        "wake",
+        "manual",
+        "resume",
+        "failure",
+        "user_interjection",
+    ]
+    tool_inventory: list[dict[str, Any]] = Field(default_factory=list, max_length=256)
+
+
+class WorkflowResumeDigestInput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    workflows: list[dict[str, Any]] = Field(default_factory=list, max_length=20)
+    runtime_summary: dict[str, Any] = Field(default_factory=dict)
+    queue_digest: list[dict[str, Any]] = Field(default_factory=list, max_length=50)
+    user_message: str | None = Field(default=None, max_length=8192)
+
+
+# ---- workflow task outputs ------------------------------------------------
+
+
+class WorkflowPlanOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    goal: str = Field(min_length=1, max_length=8192)
+    status: Literal["planned", "active", "blocked"] = "active"
+    success_criteria: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+    nodes: list[WorkflowNodeOut] = Field(min_length=1, max_length=MAX_PLAN_NODES)
+    edges: list[WorkflowEdgeOut] = Field(default_factory=list, max_length=MAX_PLAN_EDGES)
+    next_action: RecommendedActionOut | None = None
+    user_question: MultipleChoiceQuestionOut | None = None
+    warnings: list[str] = Field(default_factory=list)
+    confidence: float = Field(ge=0, le=1, default=0.7)
+
+    @field_validator("success_criteria", "assumptions", "warnings")
+    @classmethod
+    def _bound_lists(cls, v: list[str]) -> list[str]:
+        return _truncate_items(v, max_items=10, max_chars=300)
+
+
+class WorkflowReconcileOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    patch: WorkflowPatchOut
+    next_action: RecommendedActionOut | None = None
+    user_question: MultipleChoiceQuestionOut | None = None
+    summary: str = Field(default="", max_length=1000)
+    warnings: list[str] = Field(default_factory=list)
+    confidence: float = Field(ge=0, le=1, default=0.7)
+
+    @field_validator("warnings")
+    @classmethod
+    def _bound_warnings(cls, v: list[str]) -> list[str]:
+        return _truncate_items(v, max_items=10, max_chars=300)
+
+
+class WorkflowResumeDigestOutput(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    ranked: list[WorkflowResumeItem] = Field(default_factory=list, max_length=20)
+    suggested_focus_workflow_id: str | None = Field(default=None, max_length=128)
+    assistant_context_lines: list[str] = Field(default_factory=list)
+
+    @field_validator("assistant_context_lines")
+    @classmethod
+    def _bound_lines(cls, v: list[str]) -> list[str]:
+        return _truncate_items(v, max_items=10, max_chars=300)

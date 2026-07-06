@@ -22,6 +22,7 @@ from daintree_assistant_server.contracts.extensions import (
     OpenTerminal,
     RuntimeContext,
     TurnContext,
+    WorkflowDigest,
 )
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
@@ -156,6 +157,31 @@ def test_turn_footer(assembler: PromptAssembler) -> None:
     assert_golden("turn_footer.md", assembler.render_turn_footer(turn, active_worktree="feature/x"))
 
 
+def test_turn_footer_workflow_state(assembler: PromptAssembler) -> None:
+    turn = TurnContext(
+        goal="Fix the watcher tests",
+        workflow_state=[
+            WorkflowDigest(
+                id="wf_123",
+                goal="Fix watcher tests and verify branch",
+                status="active",
+                progress="2/5 nodes done; current: verify tests",
+                active_nodes=["n_verify: Run watcher tests (ready)"],
+                resources=["terminal term_8: Claude repair watcher tests", "async asy_77 done"],
+                next_action="Run tests in the repair worktree",
+                last_event="Agent reported fixes complete",
+            ),
+            WorkflowDigest(
+                id="wf_124",
+                goal="Prepare PR for issue 286",
+                status="blocked",
+                blockers=["waiting on user: choose branch strategy"],
+            ),
+        ],
+    )
+    assert_golden("turn_footer_workflow_state.md", assembler.render_turn_footer(turn))
+
+
 def test_response_contract(assembler: PromptAssembler) -> None:
     assert_golden("response_contract.md", assembler.render_response_contract())
 
@@ -222,6 +248,9 @@ def test_selector_prompt_renders_real_catalog(loader: PromptLoader) -> None:
         "terminal_extract_json.v1",
         "extraction_verdict.v1",
         "skill_step_consistency.v1",
+        "workflow_plan.v1",
+        "workflow_reconcile.v1",
+        "workflow_resume_digest.v1",
     ],
 )
 def test_task_prompts(loader: PromptLoader, task_id: str) -> None:

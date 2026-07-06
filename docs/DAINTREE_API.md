@@ -97,7 +97,13 @@ The single generation endpoint. Returns a native JSON body, or — when
     "workflow_runs": ["…"],
     "async_operations": ["…"],                 // live runtime-owned async futures (one line each)
     "memories": { "pinned": ["…"], "relevant": ["…"] },
-    "session_ended_watchers": ["…"]
+    "session_ended_watchers": ["…"],
+    "workflow_state": [                        // workflow-intelligence digests (client-owned graphs)
+      { "id": "wf_…", "goal": "…", "status": "active",
+        "progress": "2/5 nodes done; current: verify tests",
+        "active_nodes": ["…"], "resources": ["…"], "blockers": ["…"],
+        "next_action": "…", "last_event": "…" }
+    ]
   },
 
   "selection": { "policy": "new_instruction", "force": false },   // "new_instruction" | "always"
@@ -127,6 +133,14 @@ Notes:
   to omitting it. `"json_object"` cannot be combined with a non-empty `input.tools` (the
   upstream rejects JSON mode together with function calling); that combination is rejected
   with `invalid_request` / `response_format_with_tools`.
+- `turn.workflow_state` carries bounded digests of the CLIENT-owned durable workflow graphs
+  (the workflow-intelligence layer). The server renders them into the turn footer and never
+  stores them; caps are hard (max digests, one 512-byte line per string, 16 KiB total block —
+  advertised by `capabilities.workflow_intelligence`). The full graphs live only in the CLI's
+  local store; the server contributes the stateless `workflow_plan.v1` /
+  `workflow_reconcile.v1` / `workflow_resume_digest.v1` tasks (see `/v1/daintree/tasks`),
+  whose plans/patches are recommendations the client validates and applies itself — they
+  carry no execution authority.
 
 ### Response — non-streaming
 

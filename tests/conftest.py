@@ -122,8 +122,18 @@ def orchestrator(
 
 
 @pytest.fixture
-def task_runner(settings: Settings, fake_provider: FakeProvider, prompt_loader: PromptLoader) -> TaskRunner:
-    return TaskRunner(settings=settings, provider=fake_provider, prompt_loader=prompt_loader)
+def task_runner(
+    settings: Settings,
+    fake_provider: FakeProvider,
+    prompt_loader: PromptLoader,
+    catalog_manager: CatalogManager,
+) -> TaskRunner:
+    return TaskRunner(
+        settings=settings,
+        provider=fake_provider,
+        prompt_loader=prompt_loader,
+        catalog_manager=catalog_manager,
+    )
 
 
 @pytest.fixture

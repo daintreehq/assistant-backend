@@ -168,6 +168,18 @@ something to reintroduce incidentally.
 
 `services/task_runner.py` runs named small-model tasks (checkpoint, memory distill, watcher classify, terminal summarize/extract/judge, etc.). Each is a server-owned `TaskProfile` that picks the prompt, output mode (`json`/`text`), temperature, and token cap; clients send only task *data* (never `messages`/`system`). JSON tasks get one repair retry on parse failure. `terminal_extract_json.v1` is the only task that accepts a client `result_schema` (validated for size/depth/keys by `services/result_schema.py`). Adding a task = new `TaskProfile` + input/output models in `contracts/tasks.py` + a `tasks/<id>.md` prompt + a golden snapshot.
 
+## Workflow intelligence (stateless backend half)
+
+The CLI owns durable **workflow execution graphs** (typed DAGs of nodes/resources/blockers, stored in its local SQLite); the backend contributes only stateless intelligence — it never persists workflow state (Cloud Run safe). Three utility tasks (`services/task_runner.py`, semantic checks in `services/workflow_validation.py`, contracts in `contracts/tasks.py`):
+
+- `workflow_plan.v1` — goal + runtime summary + tool inventory (+ compact **outlines** of the active skills, via the task runner's catalog access — step headings only, never bodies) → a typed plan (≤20 nodes / ≤40 edges).
+- `workflow_reconcile.v1` — graph snapshot + recent events → a typed patch + next action.
+- `workflow_resume_digest.v1` — workflow snapshots → ranked, prompt-ready resume package ("where were we?").
+
+Output posture: **structural defects** (cycle, duplicate/unknown node id, moving a `done`/`skipped`/`cancelled` node) are treated like parse failures — one repair retry, then 502; **unknown tool names** degrade instead (`next_action` nulled + warning) so a missing capability never sinks the task. Plans/patches are recommendations only — the client validates and applies them through its own dispatch/confirmation policy; nothing here executes tools.
+
+`turn.workflow_state` (contracts/extensions.py `WorkflowDigest`) carries bounded digests of those client graphs into the turn footer — hard caps: `CAP_WORKFLOW_DIGESTS` (5), one 512-byte sanitized line per string, `CAP_WORKFLOW_STATE_BYTES` (16 KiB) total, head-of-list wins. `/v1/daintree/capabilities` advertises the feature under `workflow_intelligence` (the CLI gates on it during rollout).
+
 ## Config & readiness
 
 `config.py` `Settings` is parsed once, immutable, env-driven (`.env`). Models are **hardcoded** (`DEEPSEEK_MODEL`, `SKILL_BUILDER_MODEL`/`SKILL_IMPROVER_MODEL` = `gpt-5.5`, `PUBLIC_MODEL_ID`) — a product decision, not config; only the provider keys/base-URLs (DeepSeek, plus OpenAI for skill learning) come from the environment. Secrets are `SecretStr`. Missing required secrets (and, in `production`, weak/default ones) **fail readiness** (`/readyz` → 503) rather than crashing the process — liveness (`/healthz`) stays green. Local-only features also gate readiness: `local_only_problems()` fails `/readyz` if skill learning is enabled in production, or if it is enabled without `OPENAI_API_KEY` (which its GPT-5.5 builder/improver need). `main.py` builds the immutable service `Container` and validates it during lifespan startup; a malformed prompt or skill prevents readiness without taking down liveness.

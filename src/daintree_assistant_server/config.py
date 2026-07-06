@@ -203,6 +203,13 @@ class Settings(BaseSettings):
     cap_open_terminals: int = Field(default=32, alias="CAP_OPEN_TERMINALS")
     cap_watchers_count: int = Field(default=20, alias="CAP_WATCHERS_COUNT")
     cap_watchers_bytes: int = Field(default=4 * 1024, alias="CAP_WATCHERS_BYTES")
+    # Workflow-intelligence digests (turn.workflow_state): max digests rendered
+    # per turn, and the total byte budget for the rendered block. Every digest
+    # line is additionally collapsed/capped to a single 512-byte line.
+    cap_workflow_digests: int = Field(default=5, alias="CAP_WORKFLOW_DIGESTS")
+    cap_workflow_state_bytes: int = Field(
+        default=16 * 1024, alias="CAP_WORKFLOW_STATE_BYTES"
+    )
     cap_client_metadata: int = Field(default=2 * 1024, alias="CAP_CLIENT_METADATA")
     cap_message_text_part: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT_PART")
     cap_message_text: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT")

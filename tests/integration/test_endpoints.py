@@ -40,8 +40,14 @@ def test_capabilities(client, auth) -> None:
     assert body["respond"]["stream_events"] == ["meta", "status", "delta", "done", "error"]
     assert body["respond"]["thinking_enabled"] is True  # default on; disable via MAIN_THINKING_ENABLED=false
     assert body["respond"]["multimodal_images"]["remote_urls"] is False
-    assert len(body["tasks"]) == 9
+    assert len(body["tasks"]) == 12
     assert body["skills"]["manual_resolve"] is True
+    wf = body["workflow_intelligence"]
+    assert wf["turn_context_field"] == "workflow_state"
+    assert wf["tasks"] == ["workflow_plan.v1", "workflow_reconcile.v1", "workflow_resume_digest.v1"]
+    assert wf["max_workflow_digests"] == 5
+    assert wf["max_workflow_state_bytes"] == 16384
+    assert set(wf["tasks"]) <= set(body["tasks"])
 
 
 def test_skills_list_and_etag(client, auth, app) -> None:
@@ -112,6 +118,72 @@ def test_tasks_endpoint(client, auth, fake_provider) -> None:
     assert body["object"] == "daintree.task.result"
     assert body["output"]["matched"] is True
     assert body["prompt_version"] == "terminal_judge.v1"
+
+
+def test_workflow_plan_task_endpoint(client, auth, fake_provider) -> None:
+    plan = {
+        "goal": "Fix watcher tests",
+        "status": "active",
+        "nodes": [
+            {"id": "n_orient", "title": "Orient on repo", "kind": "orient", "status": "ready"},
+            {
+                "id": "n_fix",
+                "title": "Spawn agent for edits",
+                "kind": "delegate",
+                "depends_on": ["n_orient"],
+                "tool_name": "agentTask.spawnForEdits",
+            },
+        ],
+        "next_action": {"label": "Orient", "tool_name": "context.snapshot"},
+    }
+    fake_provider.complete_result = make_result(content=json.dumps(plan))
+    r = client.post("/v1/daintree/tasks", headers=auth, json={
+        "task": "workflow_plan.v1",
+        "input": {
+            "goal": "Fix watcher tests",
+            "tool_inventory": [
+                {"name": "context.snapshot", "risk": "read"},
+                {"name": "agentTask.spawnForEdits", "risk": "project"},
+            ],
+        },
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["prompt_version"] == "workflow_plan.v1"
+    assert [n["id"] for n in body["output"]["nodes"]] == ["n_orient", "n_fix"]
+    assert body["output"]["next_action"]["tool_name"] == "context.snapshot"
+
+
+def test_workflow_reconcile_task_endpoint(client, auth, fake_provider) -> None:
+    fake_provider.complete_result = make_result(content=json.dumps({
+        "patch": {"node_updates": [{"node_id": "n_fix", "status": "done"}]},
+        "summary": "Agent finished.",
+    }))
+    r = client.post("/v1/daintree/tasks", headers=auth, json={
+        "task": "workflow_reconcile.v1",
+        "input": {
+            "workflow": {"id": "wf_1", "nodes": [{"id": "n_fix", "status": "waiting"}]},
+            "reason": "queue_event",
+        },
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["output"]["patch"]["node_updates"][0]["status"] == "done"
+
+
+def test_workflow_resume_digest_task_endpoint(client, auth, fake_provider) -> None:
+    fake_provider.complete_result = make_result(content=json.dumps({
+        "ranked": [{"workflow_id": "wf_1", "rank": 1, "headline": "Ready to verify"}],
+        "suggested_focus_workflow_id": "wf_1",
+    }))
+    r = client.post("/v1/daintree/tasks", headers=auth, json={
+        "task": "workflow_resume_digest.v1",
+        "input": {"workflows": [{"id": "wf_1", "goal": "Fix tests", "status": "active"}]},
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["output"]["suggested_focus_workflow_id"] == "wf_1"
+    assert body["output"]["ranked"][0]["headline"] == "Ready to verify"
 
 
 def test_tasks_unknown_404(client, auth) -> None:

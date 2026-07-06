@@ -27,7 +27,7 @@ from typing import Any
 
 from ..config import DEEPSEEK_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
-from ..contracts.extensions import RuntimeContext, TurnContext
+from ..contracts.extensions import RuntimeContext, TurnContext, WorkflowDigest
 from ..contracts.openai import (
     ChatMessage,
     ImageContentPart,
@@ -244,6 +244,55 @@ class PromptAssembler:
             terminal_width=self.settings.main_terminal_width,
         )
 
+    # Workflow-digest line/list bounds (turn.workflow_state). The per-line cap is
+    # part of the wire contract (max string length per line: 512); the digest
+    # count and total block budget come from settings.
+    _WORKFLOW_LINE_BYTES = 512
+    _WORKFLOW_LIST_ITEMS = 8
+
+    def _workflow_digests(self, digests: list[WorkflowDigest]) -> list[dict[str, Any]]:
+        """Sanitize and hard-cap the client's workflow digests.
+
+        Three independent bounds: digest COUNT (cap_workflow_digests), one inert
+        512-byte LINE per string (an untrusted digest cannot inject headings or
+        flood a line), and a TOTAL byte budget (cap_workflow_state_bytes) across
+        the whole block — digests are client-ranked, so when the budget runs out
+        the tail is dropped, never the head.
+        """
+
+        def lines(items: list[str]) -> list[str]:
+            capped = (sanitize_line(item, self._WORKFLOW_LINE_BYTES) for item in items)
+            return [line for line in capped if line][: self._WORKFLOW_LIST_ITEMS]
+
+        out: list[dict[str, Any]] = []
+        used = 0
+        for digest in digests[: self.settings.cap_workflow_digests]:
+            wf_id = sanitize_line(digest.id, 128)
+            if not wf_id:
+                continue
+            rendered: dict[str, Any] = {
+                "id": wf_id,
+                "goal": sanitize_line(digest.goal, self._WORKFLOW_LINE_BYTES),
+                "status": sanitize_line(digest.status, 64),
+                "progress": sanitize_line(digest.progress, self._WORKFLOW_LINE_BYTES),
+                "active_nodes": lines(digest.active_nodes),
+                "resources": lines(digest.resources),
+                "blockers": lines(digest.blockers),
+                "next_action": sanitize_line(digest.next_action, self._WORKFLOW_LINE_BYTES),
+                "last_event": sanitize_line(digest.last_event, self._WORKFLOW_LINE_BYTES),
+            }
+            size = 0
+            for value in rendered.values():
+                if isinstance(value, str):
+                    size += len(value.encode("utf-8")) + 1
+                else:
+                    size += sum(len(item.encode("utf-8")) + 1 for item in value)
+            if out and used + size > self.settings.cap_workflow_state_bytes:
+                break
+            used += size
+            out.append(rendered)
+        return out
+
     def render_turn_footer(
         self, turn: TurnContext | None, active_worktree: str | None = None
     ) -> str:
@@ -272,6 +321,7 @@ class PromptAssembler:
             "memories": {"pinned": pinned, "relevant": relevant},
             "active_worktree": worktree,
             "resumed_watchers": watchers,
+            "workflow_state": self._workflow_digests(turn.workflow_state),
         }
         return self.prompts.render(TEMPLATE_TURN_FOOTER, turn_context=turn_context)
 
