@@ -23,7 +23,6 @@ requiredTools:
   - terminal.sendCommand
   - terminal.awaitAll
   - terminal.extract
-  - terminal.extract.json
   - terminal.read
   - terminal.summarize
   - artifact.read
@@ -35,7 +34,7 @@ Procedure:
 1. Understand the topic, who is the judge and who are the candidates. If the user did not specify, pick a judge agent capable of asking deep, relevant questions (often the one most familiar with the topic) and candidate agents to evaluate. Create a scratch store for state: scratch.create({"name":"interview-competition"}).
 2. Spawn the judge and all candidates in ONE BATCH with agentTask.spawnForEdits. Give each a distinct title and a short, self-contained taskPrompt. For the judge: instruct it to prepare interview questions, then evaluate answers, ask follow-ups, and finally announce the winner with reasoning. For candidates: instruct them to make their case and thoroughly answer the interviewer's questions. Use mode:"explore" unless file changes are required; do not attach watchers (you drive in-turn). Record each terminalId exactly as returned.
 3. Store the terminalIds and roles in the scratch store (scratch.set). Then wait for the judge to produce initial questions (or for candidates to produce opening statements, depending on the task) with ONE terminal.awaitAll over the cohort.
-4. Read every output. First try terminal.extract.json with a schema that fits the expected answer shape; if it fails (502 or parse error), fall back to terminal.extract (plain), terminal.summarize, or terminal.read for the full text. For any unfinished agent, re-await individually (max 2 re-awaits) and drop if hung. For large outputs, use artifact.read if the answer is archived.
+4. Read every output in free-form: a bounded terminal.read per terminal (batched) for the actual prose; terminal.summarize only for garbled multi-screen TUI; plain terminal.extract (an instruction, no schema) only to pull one specific detail from a single terminal's tail. Do NOT ask agents for JSON or run a structured extraction — their own words are the answers. For any unfinished agent, re-await individually (max 2 re-awaits) and drop if hung. For large outputs, use artifact.read if the answer is archived.
 5. Relay to the appropriate party: if the judge gave questions, condense them and send to each candidate via terminal.sendCommand (one per candidate, all in one batch). If the questions are the same for all candidates, send the same condensed message to each; if the judge addresses different follow-ups to specific candidates, craft a distinct message per candidate containing only the questions for that candidate. If candidates gave pitches and the judge hasn't yet produced questions, relay the condensed pitches to the judge so it can formulate questions. Then awaitAll again as the LAST call in the SAME batch.
 6. Repeat the relay cycle: wait for answers, read them, condense the gist, relay to the judge (e.g., "here are the candidates' answers; any follow-ups or is a decision ready?"). The judge may ask follow-ups or give a verdict. Continue until the judge announces a winner. Each relay: sendCommand(s) + awaitAll in one batch.
    - If a candidate asks an off‑topic question (survey, permission prompt), send a short command ("Skip." or "Continue.") to get it back on track. Avoid stalling.
@@ -50,4 +49,4 @@ Notes:
 - When relaying answers, condense to the gist (a few sentences per candidate); never relay raw scrollback.
 - If an agent's output is truncated, page through artifact.read.
 - The judge is the decider; do not override its verdict.
-- Extract.json is best‑effort — fall back to plain extract or summarise when it fails.
+- A summary is a lossy paraphrase — when a summarized verdict conflicts with the visible terminal text, trust the terminal text and re-read it.
