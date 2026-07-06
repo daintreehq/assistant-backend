@@ -301,3 +301,34 @@ def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
     _validate_content(req.input.messages, settings)
     _validate_generation(req)
     return DEEPSEEK_MODEL
+
+
+def validate_turn_submission(
+    messages: list[ChatMessage],
+    tools: list[ToolDef] | None,
+    settings: Settings,
+) -> None:
+    """Semantic validation for a v2 run-turn submission.
+
+    Stricter than v1: the client submits only NEW user messages — assistant
+    and tool messages are server-recorded facts in the durable log, and system
+    authority stays server-owned. Tool definitions get the same reserved-name
+    and schema bounds as v1.
+    """
+    for i, msg in enumerate(messages):
+        if msg.role in FORBIDDEN_ROLES:
+            raise system_messages_not_allowed(param=f"turn.messages[{i}].role")
+        if msg.role != "user":
+            raise invalid_request(
+                f"Only 'user' messages may be submitted to a run turn, got {msg.role!r}.",
+                param=f"turn.messages[{i}].role",
+                code="unsupported_role",
+            )
+        if msg.tool_calls:
+            raise invalid_request(
+                "A submitted turn message cannot carry tool_calls.",
+                param=f"turn.messages[{i}].tool_calls",
+                code="invalid_request",
+            )
+    _validate_tools(tools, None, settings)
+    _validate_content(messages, settings)

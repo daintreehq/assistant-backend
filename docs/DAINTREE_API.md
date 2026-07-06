@@ -9,6 +9,11 @@ The upstream provider is DeepSeek — its OpenAI-compatible wire shape is spoken
 *internally*, behind a provider abstraction; the main model is `deepseek-v4-flash`.
 That is invisible to clients.
 
+> **v2 exists alongside this contract.** The durable run protocol (`/v2/runs`:
+> backend-owned turn loop, per-run event log, tool leases, approvals, wakeups,
+> replay) is specified in [`RUN_SUPERVISOR.md`](RUN_SUPERVISOR.md). Everything
+> below remains the supported v1 contract; v2 is additive.
+
 ## Principles
 
 - **Skills are the core.** Skill selection runs on a separate small model and skill

@@ -11,6 +11,13 @@ not OpenAI-compatible. The session/skill envelope is first-class, skills are sur
 as their own response block, and streaming uses named SSE events (`meta`/`delta`/`done`/
 `error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
+It also ships the **durable orchestration runtime** (`/v2/runs`, the Run
+Supervisor): the backend owns the turn loop and a per-run append-only event
+log; tool calls become durable, claimable **leases** the CLI executes and
+answers; wake-ups, approvals for background mutation, restart recovery, and
+exact prompt replay are all server-side. The CLI becomes a view plus local
+tool executor. Contract and semantics: [`docs/RUN_SUPERVISOR.md`](docs/RUN_SUPERVISOR.md).
+
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
 - **Upstream:** DeepSeek (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-v4-flash` for the main/selector/utility calls and the skill-learning gate; the local skill-learning builder/improver run on OpenAI `gpt-5.5` (a second provider)
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
@@ -38,6 +45,7 @@ src/daintree_assistant_server/
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader (incl. skill_learning/)
   skills/         # Skill models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed skill-state token codec
+  runs/           # Durable run runtime: event store, supervisor, leases, replay, scheduler
   services/       # validation, prompt_assembler, chat_orchestrator, task_runner, skill_learning
   config.py auth.py errors.py observability.py main.py
 tests/            # unit / integration / contract / golden
@@ -175,6 +183,13 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual find / load / clear |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks |
+| `POST` | `/v2/runs` | yes | Create a durable run + first turn (backend-owned loop) |
+| `GET`  | `/v2/runs/{id}/events` | yes | SSE event log: replay after cursor, then live tail |
+| `POST` | `/v2/tool-leases/{id}/claim` / `.../result` | yes | Executor claims work / posts the exactly-once result |
+| `POST` | `/v2/approvals/{id}` | yes | Approve/decline a parked background mutation |
+| `POST` | `/v2/executors/heartbeat` | yes | Tool inventory + capabilities; returns pending leases |
+| `POST` | `/v2/runs/{id}/wakeups` | yes | Durable server-side wake-ups (fire with no CLI attached) |
+| `GET`  | `/v2/runs/{id}/rounds/{n}/replay` | yes | Reproduce + verify the exact prompt of a recorded round |
 | `GET`  | `/healthz` | no | Liveness |
 | `GET`  | `/readyz` | no | Readiness (config, secrets, prompts, catalog, provider) |
 | `GET`  | `/version` | no | Build SHA, version, protocol range |
