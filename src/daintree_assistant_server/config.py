@@ -284,35 +284,6 @@ class Settings(BaseSettings):
         default=24000, alias="SKILL_BUILD_MAX_OUTPUT_TOKENS"
     )
 
-    # ---- Durable run runtime (Run Supervisor, /v2/runs) ------------------
-    # SQLite path for the run event log + projections. Relative paths resolve
-    # against the working directory (the local-dev norm, next to the
-    # skill-learning audit dir).
-    runs_db_path: str = Field(default=".daintree/runs.sqlite3", alias="RUNS_DB_PATH")
-    # How long a tool lease may wait for a result before it expires with a
-    # synthesized error result (keeps a waiting round live-able forever-free).
-    # Generous: "durably waiting for an executor" is a feature, not a fault.
-    runs_lease_deadline_seconds: float = Field(
-        default=86400.0, ge=10.0, alias="RUNS_LEASE_DEADLINE_SECONDS"
-    )
-    # How long one executor's claim is honored before the lease returns to the
-    # pool (executor died mid-execution).
-    runs_lease_claim_ttl_seconds: float = Field(
-        default=300.0, ge=5.0, alias="RUNS_LEASE_CLAIM_TTL_SECONDS"
-    )
-    # SSE keepalive comment interval on /v2/runs/{id}/events.
-    runs_sse_heartbeat_seconds: float = Field(
-        default=15.0, ge=1.0, alias="RUNS_SSE_HEARTBEAT_SECONDS"
-    )
-    # Maintenance tick (wakeups, lease deadlines, claim expiry).
-    runs_scheduler_tick_seconds: float = Field(
-        default=1.0, ge=0.05, alias="RUNS_SCHEDULER_TICK_SECONDS"
-    )
-    # A wakeup that fires while the run is mid-turn is pushed back this far.
-    runs_wake_busy_retry_seconds: float = Field(
-        default=30.0, ge=1.0, alias="RUNS_WAKE_BUSY_RETRY_SECONDS"
-    )
-
     # ---- Tracing --------------------------------------------------------
     otel_exporter_otlp_endpoint: str = Field(default="", alias="OTEL_EXPORTER_OTLP_ENDPOINT")
 
