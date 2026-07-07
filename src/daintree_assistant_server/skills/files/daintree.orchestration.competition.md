@@ -2,7 +2,7 @@
 id: daintree.orchestration.competition
 title: Orchestrate a competition or peer-judging among agents
 summary: Spawn a cohort of agents to produce independent responses, then judge and tally the best one — competitive evaluation pattern.
-whenToUse: Use when you need to spawn several agents to produce independent outputs (facts, ideas, solutions) and then aggregate or judge the best through scoring, voting, or peer review. Do not use for a judge-led interview (use the interview skill), a simple independent fleet poll with no scoring (use the poll-pinned-agents skill), or a runoff after a tie (use the runoff tie-breaker skill).
+whenToUse: Use when you need to spawn several agents to produce independent outputs (facts, ideas, solutions) and then pick the best through scoring, voting, or peer review — including the agents reviewing and voting on each other's submissions. Do not use for a judge-led interview (use the interview skill), a simple independent fleet poll with no scoring (use the poll-pinned-agents skill), or a runoff after a tie (use the runoff tie-breaker skill).
 priority: 90
 risk: project
 tags:

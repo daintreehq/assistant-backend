@@ -2,7 +2,7 @@
 id: daintree.orchestration.multi-agent
 title: Orchestrate multiple agents on one problem
 summary: Spawn several agents, relay their work between them with terminal.sendCommand, and synthesize one answer — collaborative or competitive multi-agent tasks.
-whenToUse: Use when the user wants several agents to work one problem TOGETHER (or against each other) — collaborate, cross-check, debate, vote, or combine outputs — and you must coordinate the back-and-forth between the terminals. Do not use for a one-shot independent poll (use the poll-pinned-agents skill), a scoring competition or judged interview (use the competition or interview skill), or a post-tie runoff (use the runoff tie-breaker skill); this skill is for genuine back-and-forth relay between agents.
+whenToUse: Use when the user wants several agents to work one problem TOGETHER through genuine back-and-forth — collaborate, cross-check, debate, iterate toward convergence — and you must coordinate the relay between the terminals. Do not use when agents produce independent submissions that are then scored, voted on, or peer-reviewed to pick a winner (use the competition skill), for a judged interview (use the interview skill), a one-shot independent poll (use the poll-pinned-agents skill), or a post-tie runoff (use the runoff tie-breaker skill).
 priority: 95
 risk: project
 tags:
@@ -12,7 +12,6 @@ tags:
   - agents
   - collaborate
   - relay
-  - vote
   - debate
   - fan-out
   - sendcommand
