@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.services.chat_orchestrator import (
     ChatOrchestrator,
     merge_active_skills,
@@ -181,3 +182,58 @@ def test_cadence_instruction_change_runs(orchestrator: ChatOrchestrator) -> None
 def test_cadence_same_turn_does_not_run(orchestrator: ChatOrchestrator) -> None:
     # Same turn, valid state, matching catalog/instruction → reuse (no rerun).
     assert _cadence(orchestrator) is False
+
+
+# ---- selector turn context (bounded evidence for the classifier) -------------
+
+
+def _turn_request(turn: dict) -> RespondRequest:
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 1,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": [{"role": "user", "content": "go"}]},
+            "turn": turn,
+        }
+    )
+
+
+def test_selector_turn_context_includes_top_workflow_digest() -> None:
+    req = _turn_request(
+        {
+            "goal": "ship the auth feature",
+            "workflow_state": [
+                {
+                    "id": "wf-1",
+                    "goal": "implement auth",
+                    "status": "in_progress",
+                    "next_action": "spawn an agent for the login form",
+                },
+                {"id": "wf-2", "goal": "second workflow", "status": "blocked"},
+            ],
+        }
+    )
+    ctx = ChatOrchestrator._selector_turn_context(req)
+    assert ctx is not None
+    assert "current goal: ship the auth feature" in ctx
+    assert "top active workflow" in ctx
+    assert "goal: implement auth" in ctx
+    assert "status: in_progress" in ctx
+    assert "next: spawn an agent for the login form" in ctx
+    # Only the client-ranked head digest is surfaced.
+    assert "second workflow" not in ctx
+
+
+def test_selector_turn_context_workflow_digest_is_sanitized() -> None:
+    req = _turn_request(
+        {"workflow_state": [{"id": "wf-1", "goal": "line1\nline2", "status": "ok"}]}
+    )
+    ctx = ChatOrchestrator._selector_turn_context(req)
+    assert ctx is not None
+    assert "\n" not in ctx
+    assert "line1 line2" in ctx
+
+
+def test_selector_turn_context_empty_digest_adds_nothing() -> None:
+    req = _turn_request({"workflow_state": [{"id": "wf-1", "goal": "", "status": ""}]})
+    assert ChatOrchestrator._selector_turn_context(req) is None
