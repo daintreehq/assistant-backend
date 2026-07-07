@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import DEEPSEEK_MODEL, DEEPSEEK_REASONING_EFFORT, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import RuntimeContext, TurnContext, WorkflowDigest
 from ..contracts.openai import (
@@ -529,14 +529,12 @@ class PromptAssembler:
         if gen.response_format == "json_object":
             response_format = {"type": "json_object"}
 
-        # Thinking is ON by default (MAIN_THINKING_ENABLED); the selector, utility
-        # tasks, and skill-learning gate think too, each with its own flag. Force it
-        # off here only when the request pins a tool_choice: DeepSeek 400s on
+        # Thinking is hardcoded ON for the main call (posture lives with the model
+        # ids in config.py; the selector is the one non-thinking exception). Force
+        # it off here only when the request pins a tool_choice: DeepSeek 400s on
         # thinking + forced tool_choice, so degrade to non-thinking rather than
         # fail the turn.
-        thinking_enabled = self.settings.main_thinking_enabled and not self._is_forced_tool_choice(
-            request.input.tool_choice
-        )
+        thinking_enabled = not self._is_forced_tool_choice(request.input.tool_choice)
 
         # max_tokens policy: fill the default when the client omits one, then clamp to a
         # hard ceiling either way so a degenerate turn (the observed prompt-recitation
@@ -558,11 +556,11 @@ class PromptAssembler:
             stop=gen.stop,
             stream=gen.stream,
             include_usage=gen.stream,
-            # ON by default (only a client-pinned forced tool_choice degrades it off,
+            # Hardcoded ON (only a client-pinned forced tool_choice degrades it off,
             # above). When enabled, reasoning_content round-trips through the wire
             # contract so tool-call turns can replay it. Thinking ignores temperature/top_p.
             thinking_disabled=not thinking_enabled,
-            reasoning_effort=self.settings.main_reasoning_effort if thinking_enabled else None,
+            reasoning_effort=DEEPSEEK_REASONING_EFFORT if thinking_enabled else None,
             prompt_cache_key=PROMPT_CACHE_KEY,
             timeout=self.settings.main_timeout_seconds,
         )

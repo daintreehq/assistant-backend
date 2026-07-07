@@ -85,9 +85,10 @@ async def test_complete_success() -> None:
 
 @pytest.mark.asyncio
 async def test_thinking_disabled_sent_by_default() -> None:
-    # thinking_disabled=True (the default) sends an EXPLICIT disable directive — this
-    # is what keeps the selector's forced tool_choice working and turns off DeepSeek's
-    # default-on reasoning.
+    # thinking_disabled=True (the default) sends an EXPLICIT disable directive —
+    # DeepSeek defaults reasoning ON when the field is absent, so this is what keeps
+    # non-thinking calls (the latency-critical selector above all) actually
+    # non-thinking, and what keeps any client-forced tool_choice from 400ing.
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.complete(_req())

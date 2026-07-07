@@ -59,7 +59,8 @@ mypy src/
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
 # Live provider-contract tests (skipped by default; make real DeepSeek calls).
-# Pins the things mocks can't see — e.g. the selector's forced tool_choice.
+# Pins the things mocks can't see — e.g. that the selector's non-thinking
+# json_object call succeeds upstream and doesn't degrade open.
 RUN_LIVE_DEEPSEEK=1 DEEPSEEK_API_KEY=sk-... pytest tests/live -q
 ```
 

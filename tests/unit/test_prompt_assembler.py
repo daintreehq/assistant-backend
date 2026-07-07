@@ -239,8 +239,8 @@ def test_main_request_params(assembler: PromptAssembler) -> None:
     pr = assembler.build_main_request(
         request=req, skills=[], upstream_model="deepseek-v4-flash",
     )
-    # Thinking is ON by default (MAIN_THINKING_ENABLED) now that the upstream is
-    # DeepSeek; with no forced tool_choice the main call runs with reasoning, and effort
+    # Thinking is hardcoded ON for the main call (posture lives with the model ids
+    # in config.py); with no forced tool_choice it runs with reasoning, and effort
     # stays at "high" — DeepSeek's floor (there is no lower thinking level than "high").
     assert pr.thinking_disabled is False
     assert pr.reasoning_effort == "high"
@@ -311,24 +311,12 @@ def test_reasoning_content_absent_when_not_supplied(assembler: PromptAssembler) 
     assert "reasoning_content" not in assistant_wire
 
 
-def test_thinking_enabled_via_settings(prompt_loader: PromptLoader) -> None:
-    settings = Settings(
-        DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
-        MAIN_THINKING_ENABLED=True, MAIN_REASONING_EFFORT="max",
-    )
-    pr = PromptAssembler(prompt_loader, settings).build_main_request(
-        request=_req(), skills=[], upstream_model="deepseek-v4-flash",
-    )
-    assert pr.thinking_disabled is False
-    assert pr.reasoning_effort == "max"
-
-
 def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> None:
     # DeepSeek 400s on thinking + forced tool_choice; the assembler must degrade to
-    # non-thinking rather than fail the turn (the same constraint as the selector).
+    # non-thinking rather than fail the turn. This is the ONLY thing that turns main
+    # thinking off — the posture itself is hardcoded, not configurable.
     settings = Settings(
         DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
-        MAIN_THINKING_ENABLED=True,
     )
     assembler = PromptAssembler(prompt_loader, settings)
     tools = [{"type": "function", "function": {"name": "git__status", "description": "d"}}]

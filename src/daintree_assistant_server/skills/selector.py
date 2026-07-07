@@ -4,16 +4,14 @@ Before the main-model call, a dedicated small-model request classifies the
 conversation against the catalog and returns up to ``max_active_skills`` skill
 IDs as a JSON object (``response_format`` = ``json_object``). This call sits
 directly on the turn's first-byte path (selector → assemble → main TTFB), so it
-runs NON-thinking by default — the selector prompt asks for a reason-first key
-order (``task_type``/``reason`` before ``skill_ids``) so the model still works
-through the decision inline before committing, which benchmarked at the same
-selection quality as thinking-high at a fraction of the latency. It is NOT a
-forced function call: a forced tool_choice is the one thing incompatible with
-thinking on DeepSeek, while json_object is compatible — so flipping
-``SELECTOR_THINKING_ENABLED=true`` re-enables full chain-of-thought (in
-``reasoning_content``) without any wire change. Output is validated and repaired
-once; on failure the selector fails *open* (the request degrades to the prior
-active set rather than blocking the user).
+is hardcoded NON-thinking — the one exception to the server's thinking-high
+posture (a product decision, not config; see ``DEEPSEEK_REASONING_EFFORT`` in
+``config.py``). The selector prompt asks for a reason-first key order
+(``task_type``/``reason`` before ``skill_ids``) so the model still works through
+the decision inline before committing, which benchmarked at the same selection
+quality as thinking-high at a fraction of the latency. Output is validated and
+repaired once; on failure the selector fails *open* (the request degrades to the
+prior active set rather than blocking the user).
 """
 
 from __future__ import annotations
@@ -39,9 +37,19 @@ from .catalog import Catalog, CatalogManager
 _REPAIR_INSTRUCTION = (
     "Your previous response was not a valid JSON object. Reply now with ONLY a "
     "JSON object (no prose, no code fence) with these keys in this order: "
-    "task_type (a short string), reason (a short string), skill_ids (an array "
-    "of catalog skill IDs, possibly empty), and confidence (a number between 0 and 1)."
+    "task_type (a short string), reason (a SHORT string, well under 300 characters), "
+    "skill_ids (an array of catalog skill IDs, possibly empty), and confidence "
+    "(a number between 0 and 1). Keep the whole object brief."
 )
+
+# The selector sits on the turn's first-byte path, so transient failures get ONE
+# retry, not the provider-wide MAX_UPSTREAM_RETRIES budget: with the 8s timeout
+# that bounds a full-timeout selector phase to ~16s before it fails open (the
+# degraded turn reuses the prior active set — cheap), instead of ~34s at 4
+# attempts. A second retry rarely wins anyway: non-thinking calls answer in
+# 1.2-2.6s, so a request that has already timed out twice signals upstream
+# trouble that a third attempt would just prolong.
+_MAX_SELECTOR_RETRIES = 1
 
 _TOOL_RESULT_CHAR_CAP = 2000
 _MESSAGE_CHAR_CAP = 8000
@@ -260,22 +268,18 @@ class Selector:
         return await self._run(messages)
 
     def _build_request(self, messages: list[dict[str, Any]]) -> ProviderChatRequest:
-        # json_object (not a forced tool_choice) so thinking can be enabled: forced
-        # tool_choice is the one thing DeepSeek rejects under thinking. The output cap
-        # gets reasoning headroom when thinking is on, since max_tokens is shared by
-        # reasoning + the visible JSON. Temperature is ignored in thinking mode.
-        thinking = self.settings.selector_thinking_enabled
-        max_tokens = self.settings.selector_max_output_tokens
-        if thinking:
-            max_tokens += self.settings.deepseek_thinking_headroom_tokens
+        # HARDCODED non-thinking (the one exception to the server's thinking-high
+        # posture — see DEEPSEEK_REASONING_EFFORT in config.py): this call gates the
+        # turn's first byte, and the prompt's reason-first key order is the inline
+        # reasoning step instead. json_object output, never a forced tool_choice.
         return ProviderChatRequest(
             model=DEEPSEEK_MODEL,
             messages=messages,
             temperature=0.0,
-            max_tokens=max_tokens,
+            max_tokens=self.settings.selector_max_output_tokens,
             response_format={"type": "json_object"},
-            thinking_disabled=not thinking,
-            reasoning_effort=self.settings.selector_reasoning_effort if thinking else None,
+            thinking_disabled=True,
+            reasoning_effort=None,
             timeout=self.settings.selector_timeout_seconds,
         )
 
@@ -320,12 +324,15 @@ class Selector:
         )
 
     async def _call_once(self, request: ProviderChatRequest) -> ProviderChatResult:
-        """Call the provider, retrying transient (retryable) errors.
+        """Call the provider, retrying a transient (retryable) error ONCE.
 
-        Exhausted retries raise; ``_run`` then degrades the selector open.
+        The selector deliberately uses ``_MAX_SELECTOR_RETRIES`` instead of the
+        provider-wide ``max_upstream_retries``: it gates the turn's first byte,
+        and failing open is cheap. Exhausted retries raise; ``_run`` then
+        degrades the selector open.
         """
         return await retry_upstream(
             lambda: self.provider.complete(request),
-            retries=self.settings.max_upstream_retries,
+            retries=min(_MAX_SELECTOR_RETRIES, self.settings.max_upstream_retries),
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
         )

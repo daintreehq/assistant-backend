@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import DEEPSEEK_MODEL, DEEPSEEK_REASONING_EFFORT, Settings
 from ..contracts.tasks import (
     CheckpointInput,
     CheckpointOutput,
@@ -704,22 +704,20 @@ class TaskRunner:
             {"role": "user", "content": user},
         ]
         response_format = {"type": "json_object"} if profile.output_mode == "json" else None
-        # Utility tasks run thinking-high by default. json_object (and plain text) are
+        # Utility tasks run thinking-high — hardcoded posture (see
+        # DEEPSEEK_REASONING_EFFORT in config.py). json_object (and plain text) are
         # both compatible with thinking on DeepSeek — no utility task uses a forced
-        # tool call. The profile cap sizes the visible output; add reasoning headroom
-        # when thinking is on, since DeepSeek's max_tokens is shared with the CoT.
-        thinking = self.settings.utility_thinking_enabled
-        reasoning_effort = self.settings.utility_reasoning_effort if thinking else None
-        max_tokens = profile.max_output_tokens
-        if thinking:
-            max_tokens += self.settings.deepseek_thinking_headroom_tokens
+        # tool call. The profile cap sizes the visible output; reasoning headroom is
+        # added on top, since DeepSeek's max_tokens is shared with the CoT.
+        reasoning_effort = DEEPSEEK_REASONING_EFFORT
+        max_tokens = profile.max_output_tokens + self.settings.deepseek_thinking_headroom_tokens
         provider_request = ProviderChatRequest(
             model=model,
             messages=messages,
             temperature=profile.temperature,
             max_tokens=max_tokens,
             response_format=response_format,
-            thinking_disabled=not thinking,
+            thinking_disabled=False,
             reasoning_effort=reasoning_effort,
             timeout=timeout,
         )
@@ -740,7 +738,7 @@ class TaskRunner:
                 temperature=profile.temperature,
                 max_tokens=max_tokens,
                 response_format=response_format,
-                thinking_disabled=not thinking,
+                thinking_disabled=False,
                 reasoning_effort=reasoning_effort,
                 timeout=timeout,
             )

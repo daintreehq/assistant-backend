@@ -5,9 +5,9 @@ Skipped by default. To run::
     RUN_LIVE_DEEPSEEK=1 DEEPSEEK_API_KEY=sk-... pytest tests/live -q
 
 These pin the *provider contract* that mocked tests can't see — most importantly
-that the selector's forced ``tool_choice`` succeeds with thinking disabled (a
-regression there makes the selector degrade open and silently stop loading
-skills). They make real, paid API calls, so they are gated.
+that the selector's non-thinking ``response_format`` json_object call succeeds
+and parses (a regression there makes the selector degrade open and silently
+stop loading skills). They make real, paid API calls, so they are gated.
 """
 
 from __future__ import annotations
@@ -51,9 +51,9 @@ def test_live_capabilities(live_client) -> None:
 
 
 def test_live_respond_selector_not_degraded(live_client) -> None:
-    # Skill-relevant query with a tool offered. The selector's forced tool_choice
-    # MUST succeed — if DeepSeek thinking mode breaks it again, the selector degrades
-    # open (this assertion is the regression guard).
+    # Skill-relevant query with a tool offered. The selector's non-thinking
+    # json_object call MUST succeed and parse — if the upstream contract breaks it,
+    # the selector degrades open (this assertion is the regression guard).
     r = live_client.post("/v1/daintree/respond", json={
         "protocol_version": 1,
         "session": {"id": "live-sel", "turn_id": "t1"},

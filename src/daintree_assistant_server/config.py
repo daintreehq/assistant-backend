@@ -27,6 +27,22 @@ SKILL_BUILDER_MODEL = "gpt-5.5"
 SKILL_IMPROVER_MODEL = "gpt-5.5"
 PUBLIC_MODEL_ID = "daintree-assistant"
 
+# Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
+# There is one optimum and the server ships it: every DeepSeek call runs
+# thinking-high EXCEPT (a) the skill selector — it gates the turn's first byte,
+# and thinking there benchmarked strictly worse (median ~4-5s with a 13-20s
+# timeout-retry tail vs a consistent 1.2-2.6s non-thinking) for no selection-
+# quality gain once its prompt asked for reason-first JSON (task_type/reason as
+# working notes BEFORE skill_ids) — and (b) a main call whose client pinned a
+# forced tool_choice, which DeepSeek rejects under thinking, so that request
+# degrades to non-thinking at runtime. "high" is DeepSeek's lightest tier
+# (low/medium silently map up to it; the only step below is off). The
+# skill-learning builder/improver on GPT-5.5 likewise pin "high" — its xhigh
+# top tier is excluded on purpose: high already covers the "write a whole
+# skill" task, and learning runs only in local dev.
+DEEPSEEK_REASONING_EFFORT = "high"
+SKILL_LEARNING_REASONING_EFFORT = "high"
+
 # The development default salt; rejected in production by weak_secrets().
 DEFAULT_STATE_SALT = "daintree-state-salt"
 
@@ -61,16 +77,13 @@ class Settings(BaseSettings):
     #  - thinking must be DISABLED for any forced tool_choice to work
     #    ("Thinking mode does not support this tool_choice"); the field is accepted.
     #  - prompt_cache_key is accepted and improves prefix-cache routing.
-    # Both default ON; flip off only for a provider/model that rejects them.
+    # Defaults ON; flip off only for a provider/model that rejects the field. (The
+    # provider's explicit per-call thinking directive is NOT configurable — DeepSeek
+    # defaults reasoning ON when the field is absent, and the explicit disable is
+    # what keeps the non-thinking selector actually non-thinking.)
     deepseek_send_prompt_cache_key: bool = Field(
         default=True, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
     )
-    # When True (default) the server sends an explicit thinking directive on every
-    # call (enabled/disabled per request). Set False ONLY for a provider that does
-    # not understand the field at all — NOT for DeepSeek: DeepSeek defaults thinking
-    # to ENABLED when the field is absent, so omitting it would silently turn
-    # thinking on and 400 the selector's forced tool_choice.
-    deepseek_send_thinking: bool = Field(default=True, alias="DEEPSEEK_SEND_THINKING")
 
     # ---- Skill-learning provider (OpenAI, GPT-5.5) ----------------------
     # The skill-learning builder/improver run on OpenAI's GPT-5.5 reasoning model
@@ -85,43 +98,24 @@ class Settings(BaseSettings):
     )
     openai_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENAI_API_KEY")
 
-    # ---- DeepSeek thinking (main, selector, utility, skill-learning gate) -----
-    # The main /respond call, the utility tasks, and the skill-learning gate run
-    # with thinking ON by default. The SELECTOR is the one exception: it gates the
-    # turn's first byte (selector -> assemble -> main TTFB), and thinking there
-    # benchmarked at median ~4s with a 13-20s tail (each 20s timeout then retried)
-    # versus a consistent 1.2-2.6s non-thinking — so it defaults OFF and leans on
-    # a reason-first JSON key order in its prompt as the cheap inline scratchpad
-    # (bench: same skill picks, including the foundation pairing, at ~1/3 the
-    # latency; see PR "perf/first-query-latency"). The ONLY thing incompatible
-    # with thinking on DeepSeek is a FORCED tool_choice ("Thinking mode does not
-    # support this tool_choice") — so the selector was moved off its forced
-    # select_skills call onto response_format json_object (json_object + thinking
-    # are fully compatible, so SELECTOR_THINKING_ENABLED=true still works), and
-    # the main call still degrades to non-thinking if a client pins a tool_choice.
-    # reasoning_content round-trips through the wire contract (an assistant
-    # tool-call turn that omits it 400s on DeepSeek), which the assembler preserves.
-    #
-    # There is NO "low" thinking tier to request. DeepSeek's reasoning_effort natively
-    # accepts only "high"/"max" and SILENTLY maps low/medium UP to high (xhigh -> max);
-    # there is no reasoning-token budget parameter either. So "high" is the FLOOR — the
-    # lightest thinking available — and the only step below it is thinking fully OFF
-    # (set the matching *_THINKING_ENABLED=false). Thinking mode ignores temperature/top_p.
+    # ---- DeepSeek thinking headroom --------------------------------------
+    # The thinking POSTURE itself is hardcoded (see DEEPSEEK_REASONING_EFFORT at
+    # the top of this module): main/utility/gate think-high, the selector is
+    # non-thinking, and only a client-pinned forced tool_choice degrades the main
+    # call off at runtime. reasoning_content round-trips through the wire contract
+    # (an assistant tool-call turn that omits it 400s on DeepSeek), which the
+    # assembler preserves. Thinking mode ignores temperature/top_p.
     #
     # Because DeepSeek's max_tokens is SHARED by reasoning + visible output, the
-    # small-output calls (selector, utility tasks, skill-learning gate) add
-    # DEEPSEEK_THINKING_HEADROOM_TOKENS to their tight output caps when thinking is on, so
-    # the chain-of-thought can't starve the answer into a finish_reason=length truncation.
-    # The main /respond call does NOT use this: it runs on a single flat budget
-    # (MAIN_DEFAULT_MAX_TOKENS == MAIN_MAX_TOKENS_CEILING, already sized for reasoning +
-    # output and clamped for runaway containment), and a client MAY request its own
-    # main max_tokens — so headroom there would fight the ceiling rather than help.
+    # small-output thinking calls (utility tasks, skill-learning gate) add this
+    # headroom to their tight output caps so the chain-of-thought can't starve the
+    # answer into a finish_reason=length truncation. The main /respond call does
+    # NOT use this: it runs on a single flat budget (MAIN_DEFAULT_MAX_TOKENS ==
+    # MAIN_MAX_TOKENS_CEILING, already sized for reasoning + output and clamped
+    # for runaway containment), and a client MAY request its own main max_tokens —
+    # so headroom there would fight the ceiling rather than help.
     deepseek_thinking_headroom_tokens: int = Field(
         default=4000, ge=0, alias="DEEPSEEK_THINKING_HEADROOM_TOKENS"
-    )
-    main_thinking_enabled: bool = Field(default=True, alias="MAIN_THINKING_ENABLED")
-    main_reasoning_effort: Literal["high", "max"] = Field(
-        default="high", alias="MAIN_REASONING_EFFORT"
     )
 
     # ---- Main-model output shape ---------------------------------------
@@ -190,12 +184,14 @@ class Settings(BaseSettings):
     max_meta_header_bytes: int = Field(default=6 * 1024, alias="MAX_META_HEADER_BYTES")
 
     # ---- Timeouts (seconds) --------------------------------------------
-    # The selector gates the turn's first byte and a timeout is retried (up to
-    # MAX_UPSTREAM_RETRIES more attempts), so this bound is a latency budget, not
-    # just a failure guard. Non-thinking selector calls benchmark at 1.2-2.6s
-    # worst-case; 8s is generous slack on top of that while keeping the absolute
-    # worst first-byte stall (timeout x retries) bounded. Raise it if you turn
-    # selector thinking back on — thinking calls routinely run 4-14s.
+    # The selector gates the turn's first byte, so this bound is a latency budget,
+    # not just a failure guard. Non-thinking selector calls benchmark at 1.2-2.6s
+    # worst-case; 8s is generous slack on top of that. A transient failure gets ONE
+    # retry (the selector's own cap, not MAX_UPSTREAM_RETRIES), bounding a
+    # full-timeout selector phase to ~16s before it fails open; a malformed-then-
+    # repaired response can double that in the worst case. (httpx applies this as
+    # per-phase connect/read/write timeouts, not one total wall clock — close
+    # enough for a budget.)
     selector_timeout_seconds: float = Field(default=8.0, alias="SELECTOR_TIMEOUT_SECONDS")
     main_timeout_seconds: float = Field(default=840.0, alias="MAIN_TIMEOUT_SECONDS")
     utility_timeout_seconds: float = Field(default=60.0, alias="UTILITY_TIMEOUT_SECONDS")
@@ -204,32 +200,22 @@ class Settings(BaseSettings):
     )
 
     # ---- Selector -------------------------------------------------------
+    # The selector is HARDCODED non-thinking (see DEEPSEEK_REASONING_EFFORT at the
+    # top of this module for the rationale); its prompt's reason-first JSON key
+    # order is the inline reasoning step.
     selector_context_tokens: int = Field(default=64000, alias="SELECTOR_CONTEXT_TOKENS")
-    # Visible-output cap only; thinking headroom is added on top when thinking is on.
-    selector_max_output_tokens: int = Field(default=500, alias="SELECTOR_MAX_OUTPUT_TOKENS")
-    # The selector runs NON-thinking by default: it sits directly on the first-byte
-    # path and thinking cost a median ~3s extra with a 13-20s tail for no measured
-    # selection-quality gain once the prompt asked for reason-first JSON (the model
-    # writes task_type + reason as working notes before committing to skill_ids).
-    # It returns its choice as a JSON object (response_format json_object), NOT a
-    # forced tool call — forced tool_choice is the one thing incompatible with
-    # thinking on DeepSeek — so setting this true re-enables thinking cleanly
-    # (raise SELECTOR_TIMEOUT_SECONDS with it).
-    selector_thinking_enabled: bool = Field(default=False, alias="SELECTOR_THINKING_ENABLED")
-    selector_reasoning_effort: Literal["high", "max"] = Field(
-        default="high", alias="SELECTOR_REASONING_EFFORT"
-    )
+    # Sized with wide margin over the observed 120-190-token completions: the
+    # reason-first key order puts skill_ids LAST in the JSON, so a length
+    # truncation would now lose the critical key (parse fail -> repair -> possibly
+    # degraded). The cap is runaway containment, not a spend target.
+    selector_max_output_tokens: int = Field(default=800, alias="SELECTOR_MAX_OUTPUT_TOKENS")
 
     # ---- Utility tasks --------------------------------------------------
     # Named small-model tasks (checkpoint, summarize, classify, workflow_plan, …) run
-    # thinking-high by default. Each TaskProfile's max_output_tokens sizes its VISIBLE
-    # output; thinking headroom is added on top. json tasks use response_format
-    # json_object (compatible with thinking); no utility task uses a forced tool call.
-    # Set false to run all utility tasks non-thinking.
-    utility_thinking_enabled: bool = Field(default=True, alias="UTILITY_THINKING_ENABLED")
-    utility_reasoning_effort: Literal["high", "max"] = Field(
-        default="high", alias="UTILITY_REASONING_EFFORT"
-    )
+    # thinking-high — hardcoded, like all thinking posture. Each TaskProfile's
+    # max_output_tokens sizes its VISIBLE output; thinking headroom is added on top.
+    # json tasks use response_format json_object (compatible with thinking); no
+    # utility task uses a forced tool call.
 
     # ---- Retries --------------------------------------------------------
     # Applies to every upstream call (main completion, stream open,
@@ -296,22 +282,10 @@ class Settings(BaseSettings):
     skill_learning_audit_dir: str = Field(
         default=".daintree/skill-learning", alias="SKILL_LEARNING_AUDIT_DIR"
     )
-    # Builder/improver reasoning tier — OpenAI GPT-5.5 effort. Pinned to "high" (its
-    # xhigh top tier is deliberately excluded): high already gives the deep reasoning
-    # the "write a whole skill" task needs, and skill learning only ever runs in local
-    # dev, so there is no cost pressure that would justify climbing past it.
-    skill_learning_reasoning_effort: Literal["medium", "high"] = Field(
-        default="high", alias="SKILL_LEARNING_REASONING_EFFORT"
-    )
-    # The gate (none/improve/create triage) stays on DeepSeek but now runs thinking-high
-    # by default — it emits its verdict as json_object, which is compatible with
-    # thinking. Set false to run the gate non-thinking.
-    skill_gate_thinking_enabled: bool = Field(
-        default=True, alias="SKILL_GATE_THINKING_ENABLED"
-    )
-    skill_gate_reasoning_effort: Literal["high", "max"] = Field(
-        default="high", alias="SKILL_GATE_REASONING_EFFORT"
-    )
+    # The builder/improver reasoning tier (GPT-5.5) and the gate's thinking-high
+    # posture (DeepSeek, json_object verdict) are hardcoded — see
+    # SKILL_LEARNING_REASONING_EFFORT / DEEPSEEK_REASONING_EFFORT at the top of
+    # this module.
     # Gate verdicts below this confidence never write.
     skill_learning_min_confidence: float = Field(
         default=0.75, ge=0.0, le=1.0, alias="SKILL_LEARNING_MIN_CONFIDENCE"

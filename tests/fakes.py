@@ -266,12 +266,18 @@ def selection_result(
     """A selector completion result: the choice as a JSON object in ``content``.
 
     The selector runs response_format json_object (not a forced tool call), so its
-    output is parsed from ``message.content`` — the chain-of-thought would land in
-    ``reasoning_content`` separately.
+    output is parsed from ``message.content``. Keys mirror the prompt's reason-first
+    order (task_type/reason written before skill_ids — the non-thinking selector's
+    inline scratchpad); parsing itself is order-agnostic.
     """
     return make_result(
         content=json.dumps(
-            {"skill_ids": skill_ids, "confidence": confidence, "task_type": task_type}
+            {
+                "task_type": task_type,
+                "reason": "matches the current task",
+                "skill_ids": skill_ids,
+                "confidence": confidence,
+            }
         ),
         usage=ProviderUsage(
             prompt_tokens=3000, completion_tokens=50, total_tokens=3050, cached_tokens=2800

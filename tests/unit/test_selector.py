@@ -47,6 +47,32 @@ def test_parse_select_args_malformed_returns_none(catalog) -> None:
     assert parse_select_args("not json", catalog, 3) is None
     assert parse_select_args("", catalog, 3) is None
     assert parse_select_args("[1,2,3]", catalog, 3) is None  # not an object
+    # A length-truncated reason-first response: skill_ids is the LAST key now, so a
+    # mid-object cut loses it entirely — must repair/fail open, never mis-parse.
+    truncated = '{"task_type": "orchestration", "reason": "the task needs", "skill_i'
+    assert parse_select_args(truncated, catalog, 3) is None
+
+
+def test_parse_select_args_reason_first_order(catalog) -> None:
+    # The prompt now asks for task_type/reason BEFORE skill_ids (the inline
+    # scratchpad for the non-thinking selector). Parsing is order-agnostic; a long
+    # working-notes reason is truncated to 300 chars and confidence still clamps.
+    known = sorted(catalog.known_ids)
+    raw = json.dumps(
+        {
+            "task_type": "multi-agent orchestration",
+            "reason": "Working through the decision procedure: " + "x" * 400,
+            "skill_ids": known[:2],
+            "confidence": 1.7,
+        }
+    )
+    parsed = parse_select_args(raw, catalog, 3)
+    assert parsed is not None
+    ids, confidence, task_type, reason = parsed
+    assert ids == known[:2]
+    assert confidence == 1.0
+    assert task_type == "multi-agent orchestration"
+    assert len(reason) == 300
 
 
 def test_parse_select_args_missing_skill_ids_is_malformed(catalog) -> None:
@@ -124,12 +150,12 @@ async def test_selector_selects_known_skill(selector: Selector, fake_provider: F
 
 
 @pytest.mark.asyncio
-async def test_selector_uses_json_mode_non_thinking_by_default(
+async def test_selector_uses_json_mode_and_is_hardcoded_non_thinking(
     selector: Selector, fake_provider: FakeProvider, catalog, settings
 ) -> None:
-    # The selector gates the turn's first byte, so it runs NON-thinking by default
-    # (the prompt's reason-first key order is the inline reasoning step) on a flat
-    # output cap, and asks for json_object with no forced tool_choice.
+    # The selector gates the turn's first byte, so it is HARDCODED non-thinking (the
+    # prompt's reason-first key order is the inline reasoning step — no env toggle
+    # exists) on a flat output cap, asking for json_object with no forced tool_choice.
     fake_provider.complete_result = selection_result([sorted(catalog.known_ids)[0]])
     await selector.select(_msgs("do the task"), [])
     req = fake_provider.requests[-1]
@@ -138,29 +164,6 @@ async def test_selector_uses_json_mode_non_thinking_by_default(
     assert req.thinking_disabled is True
     assert req.reasoning_effort is None
     assert req.max_tokens == settings.selector_max_output_tokens
-
-
-@pytest.mark.asyncio
-async def test_selector_thinking_opt_in_adds_headroom(
-    selector: Selector, fake_provider: FakeProvider, catalog, settings
-) -> None:
-    # SELECTOR_THINKING_ENABLED=true must re-enable thinking cleanly (json_object is
-    # compatible with thinking; only a forced tool_choice is not), with reasoning
-    # headroom added to the output cap (max_tokens is shared by reasoning + the JSON).
-    thinking_settings = settings.model_copy(update={"selector_thinking_enabled": True})
-    thinking_selector = Selector(
-        fake_provider, selector.prompt_loader, selector.catalog_manager, thinking_settings
-    )
-    fake_provider.complete_result = selection_result([sorted(catalog.known_ids)[0]])
-    await thinking_selector.select(_msgs("do the task"), [])
-    req = fake_provider.requests[-1]
-    assert req.response_format == {"type": "json_object"}
-    assert req.tool_choice is None
-    assert req.thinking_disabled is False
-    assert req.reasoning_effort == "high"
-    assert req.max_tokens == (
-        settings.selector_max_output_tokens + settings.deepseek_thinking_headroom_tokens
-    )
 
 
 @pytest.mark.asyncio
@@ -249,4 +252,6 @@ async def test_selector_exhausts_retries_then_fails_open(
     decision = await selector.select(_msgs("task"), [])
     assert decision.degraded is True
     assert "skill_selector_failed_open" in decision.warnings
-    assert calls[0] == 4  # 1 try + 3 retries, then fail open
+    # The selector caps itself at ONE retry (not MAX_UPSTREAM_RETRIES): it gates
+    # the turn's first byte, and failing open (prior active set) is cheap.
+    assert calls[0] == 2  # 1 try + 1 retry, then fail open

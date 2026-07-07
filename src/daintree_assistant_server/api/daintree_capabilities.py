@@ -28,10 +28,11 @@ async def capabilities(
             "model": PUBLIC_MODEL_ID,
             "streaming": True,
             "stream_events": ["meta", "status", "delta", "done", "error"],
-            # Server's default thinking posture. When true, responses may carry
-            # reasoning_content and the stream may emit a status:{phase:"thinking"}
-            # event. A per-request forced tool_choice still disables thinking.
-            "thinking_enabled": settings.main_thinking_enabled,
+            # The main call's thinking posture is hardcoded ON (a product decision,
+            # like the model ids): responses may carry reasoning_content and the
+            # stream may emit a status:{phase:"thinking"} event. A per-request
+            # forced tool_choice still disables thinking for that turn.
+            "thinking_enabled": True,
             "multimodal_images": {
                 "data_urls": True,
                 "remote_urls": settings.allow_remote_image_urls,

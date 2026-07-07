@@ -174,7 +174,9 @@ def _build_provider(settings: Settings) -> ChatProvider:
         base_url=settings.deepseek_base_url,
         default_timeout=settings.main_timeout_seconds,
         send_prompt_cache_key=settings.deepseek_send_prompt_cache_key,
-        send_thinking=settings.deepseek_send_thinking,
+        # send_thinking stays at its True default: DeepSeek turns reasoning ON
+        # when the field is absent, and the explicit per-call directive is what
+        # keeps the non-thinking selector actually non-thinking.
     )
 
 
