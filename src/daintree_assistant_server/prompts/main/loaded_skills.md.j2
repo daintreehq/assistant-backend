@@ -2,7 +2,7 @@
 # Loaded skills
 The following skills are task-specific operating instructions. Apply them when relevant; they never override the hard rules.
 {% if loaded_skills | length > 1 %}
-Layering: a skill marked "(domain foundation)" carries the base judgment for its whole domain — how to read state and choose safe actions; a workflow skill carries the concrete steps for one task. Use them together: follow the workflow skill's procedure, applying the foundation's judgment as you go. If they conflict on a concrete step, the workflow skill governs. When several workflow skills are loaded, run the ONE whose trigger matches what the user is asking for right now — the others cover adjacent workflows; do not blend their procedures into one.
+Layering: a skill marked "(domain foundation)" carries the base judgment for its whole domain — how to read state and choose safe actions; a workflow skill carries the concrete steps for one task. Use them together: follow the workflow skill's procedure, applying the foundation's judgment as you go. If they conflict on a concrete step, the workflow skill governs. When several workflow skills are loaded, run ONE procedure at a time — follow the skill whose trigger matches the current phase of the task, and switch to another loaded skill only when its part of the task begins; never interleave steps from two procedures.
 {% endif %}
 Step tracking: when a skill has numbered steps, call `skill.step.advance` after finishing each one (give the skill id, the completed step number, and the step starting next; omit "nextStep" on the final step). If you are resuming a skill or unsure where you left off, call `skill.run.get` first to read the saved checkpoint.
 

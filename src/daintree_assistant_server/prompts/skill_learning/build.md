@@ -24,7 +24,7 @@ Return ONLY a JSON object (no prose, no code fences) with exactly these fields:
 }
 
 Trigger quality (whenToUse / summary / tags):
-- "whenToUse" is the SELECTOR's routing signal: a small classifier chooses skills seeing ONLY id, summary, whenToUse, and tags — never the body. A perfectly-written body behind a vague trigger will simply never load.
+- "whenToUse" is the SELECTOR's primary routing signal: a small classifier chooses skills from catalog metadata alone (id, summary, whenToUse, tags, risk, requiredTools) — it NEVER sees the body. A perfectly-written body behind a vague trigger will simply never load.
 - Write whenToUse so conversations that need THIS workflow match it and neighboring ones don't: name the concrete user intents it covers ("Use when the user asks to X, Y, or Z"), in the words a user would actually use.
 - When the catalog has adjacent skills the workflow could be confused with, add the catalog's routing style: "Do not use for X (use the <other-skill> skill)". This mutual-exclusion phrasing is how the existing catalog keeps the selector precise.
 - Tags are secondary selector signal — include the domain and the workflow's key nouns/verbs.

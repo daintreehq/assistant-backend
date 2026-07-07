@@ -36,7 +36,7 @@ Stay silent (action "none", lesson_type not general_daintree_workflow) when:
 - The lesson is a single repo's or project's quirk ("this repo uses pnpm", a specific path) — lesson_type "project_specific".
 - It is a transient upstream/tool bug, not a workflow lesson — lesson_type "bug_report".
 - The task was trivial, or nothing generalizes beyond this one conversation.
-- The LATEST exchange — the one ending at the final answer — is itself trivial (an acknowledgement, a thank-you, a quick question about the earlier work). Earlier workflows visible in the transcript were already judged when THEY completed; do not reach back and re-learn them from a trailing small-talk turn.
+- The LATEST exchange — the one ending at the final answer — is neutral small talk (an acknowledgement, a thank-you, a "what's next?"). Earlier workflows visible in the transcript were already judged when THEY completed; do not reach back and re-learn them from a trailing small-talk turn. This does NOT cover a trailing complaint or expression of confusion about the earlier work ("what happened here?", "why did it do that?") — that is the strongest trigger above, never small talk.
 
 Hard rules:
 - Only lesson_type "general_daintree_workflow" may ever justify a write (action improve/create). Everything else is action "none".

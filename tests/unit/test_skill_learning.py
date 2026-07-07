@@ -1167,6 +1167,8 @@ async def test_improve_lands_once_per_session(tmp_path: Path) -> None:
     assert second.changed is False
     # The damp skips BEFORE the improver call: only the gate ran the second time.
     assert len(fake.requests) == after_first + 1
+    # A completed pass always releases its in-flight reservation.
+    assert not learner._improves_in_flight
 
 
 @pytest.mark.asyncio
@@ -1222,3 +1224,30 @@ def test_session_damp_registry_is_bounded(tmp_path: Path) -> None:
     assert "session-0" not in learner._session_landed  # oldest evicted
     assert learner._already_landed(f"session-{limit + 4}", "daintree.test.target")
     assert not learner._already_landed("session-0", "daintree.test.target")
+
+
+@pytest.mark.asyncio
+async def test_no_change_verdict_consumes_session_damp(tmp_path: Path) -> None:
+    # The improver examined the skill and declared it settled — the same session
+    # must not re-spend the improver on the same evidence every later turn.
+    no_change = {"action": "no_change", "skill_id": "daintree.test.target", "confidence": 0}
+    fake = _provider(GATE_IMPROVE, no_change)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    first = await learner.run(request=_request(), active_ids=[])
+    assert first.changed is False
+    after_first = len(fake.requests)  # gate + improver
+    await learner.run(request=_request(), active_ids=[])
+    assert len(fake.requests) == after_first + 1  # gate only — improver not re-spent
+
+
+@pytest.mark.asyncio
+async def test_inflight_improve_reservation_blocks_overlapping_pass(tmp_path: Path) -> None:
+    fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    # Simulate a concurrent pass parked inside its builder call for the same skill.
+    learner._improves_in_flight.add(("s", "daintree.test.target"))
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is False
+    assert len(fake.requests) == 1  # gate only — no double builder spend
+    # The reservation belongs to the (simulated) first pass — not consumed here.
+    assert ("s", "daintree.test.target") in learner._improves_in_flight

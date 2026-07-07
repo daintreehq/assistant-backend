@@ -22,7 +22,7 @@ Decision procedure — work through it in order:
 7. Order and cap: best-match first. If more skills fit than the cap of 3, keep them in this order until the cap is reached: any in-progress active skill first, then the task's domain foundation, then the most specific workflow skills.
 
 Illustrative outcomes (patterns, not ids — always choose real ids from the catalog below):
-- The user asks to continue or finish work the active skills already govern → return the same active ids again, unchanged.
+- The user asks to continue or finish work the active skills already govern → return the same active ids again (adding the domain's foundation only if it is missing).
 - Topic shift: the previous task is done and the user starts a different workflow → return the new workflow's skill(s) plus its domain foundation; the old skills are simply omitted (evicted).
 - "thanks, looks good" with nothing in progress → `"skill_ids": []`.
 - A substantive multi-step request that matches no specific runbook → the closest `[foundation]` id alone.

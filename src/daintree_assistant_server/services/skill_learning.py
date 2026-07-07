@@ -306,15 +306,20 @@ class SkillLearner:
         # there is no cross-process writer to coordinate with. Model calls run OUTSIDE
         # this lock so one request's learning never blocks another request's answer.
         self._lock = asyncio.Lock()
-        # Skill ids a learning pass already changed (or proposed a change for), per
-        # session — the completed workflow stays in the conversation history for many
-        # turns, and every later final answer re-fires the gate over it. The identical-
+        # Skill ids a learning pass already spent an improver call on, per session —
+        # the completed workflow stays in the conversation history for many turns,
+        # and every later final answer re-fires the gate over it. The identical-
         # render guard catches byte-identical re-applies, but a thinking model re-run
         # on the same evidence usually lands a slightly DIFFERENT body each time —
         # unchecked, one workflow keeps rewriting the same skill all session (drift
-        # bloat). One landed change per skill per session; a genuinely new lesson for
-        # that skill re-fires in a later session.
+        # bloat). One improver spend per skill per session (a landed change, a
+        # no_change verdict, or an identical render all count); a genuinely new
+        # lesson for that skill re-fires in a later session. Sessions are evicted
+        # least-recently-USED (reads refresh recency).
         self._session_landed: OrderedDict[str, set[str]] = OrderedDict()
+        # (session_id, skill_id) improves currently awaiting their builder call, so
+        # two overlapping passes in one session can't double-spend on the same skill.
+        self._improves_in_flight: set[tuple[str, str]] = set()
 
     @property
     def enabled(self) -> bool:
@@ -359,7 +364,12 @@ class SkillLearner:
         if not skill_id:
             return False
         landed = self._session_landed.get(session_id)
-        return landed is not None and skill_id in landed
+        if landed is None or skill_id not in landed:
+            return False
+        # A hit refreshes recency, so a long-lived active session keeps its damp
+        # even after many other sessions land changes (true LRU, not last-landed).
+        self._session_landed.move_to_end(session_id)
+        return True
 
     def _mark_landed(self, session_id: str, skill_id: str) -> None:
         landed = self._session_landed.setdefault(session_id, set())
@@ -387,20 +397,49 @@ class SkillLearner:
             )
             return LearningOutcome()
 
-        # One landed change per skill per session: the same completed workflow keeps
+        # One improver spend per skill per session: the same completed workflow keeps
         # re-firing the gate on every later final answer, and each improver re-run
-        # lands a slightly different rewrite. Skip before spending a builder call.
+        # over the same evidence lands a slightly different rewrite. Skip before
+        # spending a builder call. The in-flight reservation additionally stops two
+        # overlapping passes in one session from double-spending on the same skill
+        # while the first is still awaiting its (slow) builder call.
         session_id = request.session.id
-        if verdict.action == "improve_existing_skill" and self._already_landed(
-            session_id, verdict.target_skill_id
-        ):
-            logger.info(
-                "skill_learning_session_cooldown",
-                skill_id=verdict.target_skill_id,
+        damp_key: tuple[str, str] | None = None
+        if verdict.action == "improve_existing_skill":
+            target_id = verdict.target_skill_id or ""
+            if (
+                self._already_landed(session_id, target_id)
+                or (session_id, target_id) in self._improves_in_flight
+            ):
+                logger.info(
+                    "skill_learning_session_cooldown",
+                    skill_id=target_id,
+                    session_id=session_id,
+                )
+                return LearningOutcome()
+            damp_key = (session_id, target_id)
+            self._improves_in_flight.add(damp_key)
+        try:
+            return await self._build_and_apply(
+                verdict=verdict,
+                catalog=catalog,
+                transcript=transcript,
+                tools=tools,
                 session_id=session_id,
             )
-            return LearningOutcome()
+        finally:
+            if damp_key is not None:
+                self._improves_in_flight.discard(damp_key)
 
+    async def _build_and_apply(
+        self,
+        *,
+        verdict: GateVerdict,
+        catalog: Catalog,
+        transcript: str,
+        tools: list[str],
+        session_id: str,
+    ) -> LearningOutcome:
         logger.info(
             "skill_learning_gate",
             action=verdict.action,
@@ -427,6 +466,11 @@ class SkillLearner:
             proposal = await self._build_improve(old_skill, transcript, verdict, tools, catalog)
 
         if proposal.action == "no_change":
+            # The improver examined this skill against this session's evidence and
+            # declared it settled — that verdict consumes the session's damp too,
+            # so the same stale evidence can't re-spend the improver every turn.
+            if old_skill is not None:
+                self._mark_landed(session_id, old_skill.id)
             logger.info(
                 "skill_learning_no_change", action=verdict.action, skill_id=proposal.skill_id
             )
@@ -451,6 +495,9 @@ class SkillLearner:
             and old_skill is not None
             and skill.content_hash == old_skill.content_hash
         ):
+            # An identical render also consumes the damp: the improver already spent
+            # its call on this evidence and confirmed the skill needs nothing new.
+            self._mark_landed(session_id, skill.id)
             logger.info("skill_learning_identical_skipped", skill_id=skill.id)
             return LearningOutcome()
 
