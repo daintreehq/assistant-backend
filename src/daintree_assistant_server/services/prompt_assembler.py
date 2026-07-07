@@ -231,7 +231,11 @@ class PromptAssembler:
         return capped
 
     def render_loaded_skills(self, skills: list[Skill]) -> str:
-        return self.prompts.render(TEMPLATE_LOADED_SKILLS, loaded_skills=skills)
+        # Foundations render first so the domain's base judgment reads before the
+        # workflow steps that build on it. Render order only — the active SET (and
+        # the selector's best-match order within each tier) is untouched.
+        ordered = sorted(skills, key=lambda s: not s.meta.foundation)
+        return self.prompts.render(TEMPLATE_LOADED_SKILLS, loaded_skills=ordered)
 
     def render_response_contract(self) -> str:
         """The output-shape contract, rendered LAST so it sits nearest generation.
