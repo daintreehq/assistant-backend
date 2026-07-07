@@ -1,0 +1,117 @@
+# Neighbor-skill routing traps: the whenToUse lines route between skills that share
+# keywords. Picking the trap skill is a precision failure (extra).
+
+cases:
+  - id: close-terminals-not-rename
+    category: routing-trap
+    note: Closing terminals is general orchestration, NOT the rename skill.
+    messages:
+      - role: user
+        content: Close all the idle terminals, but keep the one running the build.
+    expect:
+      required: [daintree.orchestration.basic]
+
+  - id: independent-poll-not-multi-agent
+    category: routing-trap
+    note: Independent opinions with no cross-talk -> poll, not multi-agent relay.
+    messages:
+      - role: user
+        content: >-
+          Get independent takes from my pinned agents on this API design — no
+          discussion between them — then give me the consensus.
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.orchestration.basic]
+
+  - id: debate-is-multi-agent
+    category: routing-trap
+    note: Genuine back-and-forth relay -> multi-agent, not poll/competition.
+    messages:
+      - role: user
+        content: >-
+          Spawn three agents and have them debate the best approach to the cache
+          invalidation bug — relay the arguments between them until they converge.
+    expect:
+      required: [daintree.orchestration.multi-agent]
+      optional: [daintree.orchestration.basic]
+
+  - id: peer-vote-is-competition
+    category: routing-trap
+    note: Independent outputs + peer scoring -> competition, not interview.
+    messages:
+      - role: user
+        content: >-
+          Have four agents each write a release announcement, then have them
+          peer-review each other's drafts and vote for the best one.
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.orchestration.basic]
+
+  - id: judge-led-interview
+    category: routing-trap
+    note: Judge interviews candidates, no codebase verification -> interview skill.
+    messages:
+      - role: user
+        content: >-
+          Spawn an interviewer agent to interview three candidate agents about
+          testing strategy and pick a winner.
+    expect:
+      required: [daintree.orchestration.interview]
+      optional: [daintree.orchestration.basic]
+
+  - id: interview-with-verification
+    category: routing-trap
+    note: Judge verifies claims against the codebase + narrows to top 2 -> verified-interview.
+    messages:
+      - role: user
+        content: >-
+          Run an interview where the judge actually checks the candidates' claims
+          against the codebase, asks challenging follow-ups, narrows to a top 2,
+          and then picks the winner.
+    expect:
+      required: [daintree.orchestration.verified-interview]
+      optional: [daintree.orchestration.basic]
+
+  - id: tie-needs-runoff
+    category: routing-trap
+    note: A tie in an existing vote -> runoff tie-breaker, not a fresh competition.
+    messages:
+      - role: user
+        content: >-
+          Earlier the four agents voted on the two logo taglines and it ended 2-2.
+          Run a tie-breaker round with the same agents.
+    expect:
+      required: [daintree.orchestration.runoff-tiebreaker]
+      optional: [daintree.orchestration.basic]
+
+  - id: single-agent-not-poll
+    category: routing-trap
+    note: One named agent -> ask-and-relay, not a fleet poll.
+    messages:
+      - role: user
+        content: Ask nova — just nova — what she thinks about the new queue design.
+    expect:
+      required: [daintree.agents.ask-and-relay]
+      optional: [daintree.orchestration.basic]
+
+  - id: finished-issue-is-prep
+    category: routing-trap
+    note: Wrapping up finished work -> prep-branch-for-review, not start-work-on-issue.
+    messages:
+      - role: user
+        content: >-
+          The work on issue 88 is finished. Wrap it up and get it in front of
+          reviewers.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.orchestration.basic]
+
+  - id: worktree-with-recipe
+    category: routing-trap
+    note: Worktree + startup recipe -> recipe skill, not start-work-on-issue.
+    messages:
+      - role: user
+        content: Create a new worktree with the standard dev recipe.
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.orchestration.basic]

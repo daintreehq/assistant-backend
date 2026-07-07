@@ -1,0 +1,98 @@
+# Topic shifts: the previous task is done (or abandoned) and the user starts a
+# different workflow. The old active skill must be evicted — returning it is a
+# precision failure — and the new workflow's skill(s) selected.
+
+cases:
+  - id: shift-rename-to-issue
+    category: topic-shift
+    active: [daintree.terminals.rename]
+    messages:
+      - role: user
+        content: Rename my terminals so I can tell them apart.
+      - role: assistant
+        content: Done — all six terminals now have descriptive titles.
+      - role: user
+        content: Done with that. Now let's pick up issue 231 and get an agent on it.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.orchestration.basic]
+
+  - id: shift-issue-to-poll
+    category: topic-shift
+    active: [daintree.workflow.start-work-on-issue, daintree.orchestration.basic]
+    messages:
+      - role: user
+        content: Start work on issue 88.
+      - role: assistant
+        content: >-
+          Issue 88 is underway — the agent is working in terminal 3 with a
+          supervisor watcher attached.
+      - role: user
+        content: >-
+          Pause that for now. Poll the pinned agents on whether we should migrate
+          the build to uv, and give me the consensus.
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.orchestration.basic]
+
+  - id: shift-experiment-to-prep
+    category: topic-shift
+    active: [daintree.orchestration.multi-agent, daintree.orchestration.basic]
+    messages:
+      - role: user
+        content: Have two agents debate the queue design and relay between them.
+      - role: assistant
+        content: >-
+          The debate wrapped up — both agents converged on the token-bucket
+          approach after three rounds.
+      - role: user
+        content: >-
+          Enough of that experiment, close those terminals. Is my feature branch
+          ready for a PR? If so, prep it.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.orchestration.basic]
+
+  - id: shift-work-to-chitchat
+    category: topic-shift
+    note: New "topic" is not a task at all — everything must clear.
+    active: [daintree.edits.spawn-visible-agent]
+    messages:
+      - role: user
+        content: Spawn an agent to fix the linter errors.
+      - role: assistant
+        content: The agent finished — lint is clean and the changes are committed.
+      - role: user
+        content: nice. unrelated — what's a good name for a black cat?
+    expect:
+      required: []
+
+  - id: shift-poll-to-runoff
+    category: topic-shift
+    active: [daintree.agents.poll-pinned-agents]
+    messages:
+      - role: user
+        content: Poll the pinned agents — proposal A or proposal B for the schema split?
+      - role: assistant
+        content: 'Poll complete: 2 votes for A, 2 votes for B. A dead tie.'
+      - role: user
+        content: Run a runoff between the top two options with the same agents to break the tie.
+    expect:
+      required: [daintree.orchestration.runoff-tiebreaker]
+      optional: [daintree.orchestration.basic]
+
+  - id: shift-recipe-to-rename
+    category: topic-shift
+    active: [daintree.recipe.run-or-create, daintree.orchestration.basic]
+    messages:
+      - role: user
+        content: Run the fullstack dev recipe.
+      - role: assistant
+        content: >-
+          The recipe is up — five terminals opened: api server, web dev server,
+          worker, logs, and a scratch shell.
+      - role: user
+        content: The workspace looks good. Give all these terminals proper names.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.orchestration.basic]

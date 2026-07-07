@@ -1,0 +1,54 @@
+# Genuinely compound requests spanning several distinct workflows: multiple
+# specifics are correct, up to the cap of 3.
+
+cases:
+  - id: issue-plus-poll
+    category: multi-skill
+    messages:
+      - role: user
+        content: >-
+          Start work on issue 512, and while that runs, poll the pinned fleet for
+          opinions on the release naming scheme.
+    expect:
+      required:
+        - daintree.workflow.start-work-on-issue
+        - daintree.agents.poll-pinned-agents
+      optional: [daintree.orchestration.basic]
+
+  - id: recipe-plus-rename
+    category: multi-skill
+    messages:
+      - role: user
+        content: >-
+          Spin up the review recipe, and once its terminals open give them all
+          clear names.
+    expect:
+      required:
+        - daintree.recipe.run-or-create
+        - daintree.terminals.rename
+      optional: [daintree.orchestration.basic]
+
+  - id: issue-plus-prep-other-branch
+    category: multi-skill
+    messages:
+      - role: user
+        content: >-
+          Two things: kick off issue 77 in a fresh worktree, and prep the current
+          branch for review so I can open the PR.
+    expect:
+      required:
+        - daintree.workflow.start-work-on-issue
+        - daintree.workflow.prep-branch-for-review
+      optional: [daintree.orchestration.basic]
+
+  - id: spawn-with-watcher
+    category: multi-skill
+    note: One workflow, not two — the spawn skill itself covers watchers/supervision.
+    messages:
+      - role: user
+        content: >-
+          Spawn an agent to fix the flaky integration test and set a watcher so I
+          know the moment it's done.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.orchestration.basic]

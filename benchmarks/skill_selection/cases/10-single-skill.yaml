@@ -1,0 +1,105 @@
+# Clean single-skill matches: one obviously-right specific skill, no prior active set.
+# The foundation (daintree.orchestration.basic) is optional on these — pairing it in is
+# the documented default and is fine, but a lean pick of just the specific also passes.
+
+cases:
+  - id: rename-terminals-basic
+    category: single-skill
+    note: The canonical rename request.
+    messages:
+      - role: user
+        content: Rename my terminals so I can tell the agents apart.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.orchestration.basic]
+
+  - id: rename-figure-out-titles
+    category: single-skill
+    messages:
+      - role: user
+        content: >-
+          I've got six tabs all called "Claude". Figure out what each one is doing
+          and give them proper titles.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.orchestration.basic]
+
+  - id: start-issue-pickup
+    category: single-skill
+    messages:
+      - role: user
+        content: Let's start on issue #142 — set up a worktree and get an agent going on it.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.orchestration.basic]
+
+  - id: prep-branch-open-pr
+    category: single-skill
+    messages:
+      - role: user
+        content: >-
+          I think we're done here. Get this branch ready for review and open the PR.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.orchestration.basic]
+
+  - id: recipe-run-workspace
+    category: single-skill
+    messages:
+      - role: user
+        content: Load the pr-review recipe in this workspace.
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.orchestration.basic]
+
+  - id: spawn-agent-fix-tests
+    category: single-skill
+    messages:
+      - role: user
+        content: Spawn an agent to fix the failing auth tests in this repo.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.orchestration.basic]
+
+  - id: ask-single-agent-relay
+    category: single-skill
+    messages:
+      - role: user
+        content: >-
+          Ask the claude agent whether the migration script handles rollbacks,
+          and tell me what it says.
+    expect:
+      required: [daintree.agents.ask-and-relay]
+      optional: [daintree.orchestration.basic]
+
+  - id: poll-pinned-fleet
+    category: single-skill
+    messages:
+      - role: user
+        content: >-
+          Poll all my pinned agents: should we use Redis or in-process caching for
+          the session layer? Summarize the consensus.
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.orchestration.basic]
+
+  - id: status-overview
+    category: single-skill
+    note: State/status questions ARE the foundation skill's own whenToUse.
+    messages:
+      - role: user
+        content: What's the current state of my terminals and agents? Anything need attention?
+    expect:
+      required: [daintree.orchestration.basic]
+
+  - id: explore-readonly-agent
+    category: single-skill
+    note: Read-only investigation routes to spawn-visible-agent per its whenToUse.
+    messages:
+      - role: user
+        content: >-
+          Have an agent investigate why the dev server takes 8 seconds to boot —
+          read only, don't change anything yet.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.orchestration.basic]

@@ -22,6 +22,9 @@ dist/
 # writes to the tracked skills dir instead, so those show up in `git diff`.
 .daintree/
 
+# Benchmark run outputs (local records, not source)
+benchmarks/*/results/
+
 # Testing / tooling caches
 .pytest_cache/
 .coverage

@@ -1,0 +1,48 @@
+# Background wakes: no new user message — the turn context carries the goal. The
+# selector must use turn_context + workflow evidence, keeping an in-progress skill
+# or picking by the stated goal.
+
+cases:
+  - id: wake-watcher-fired
+    category: background-wake
+    turn_context: >-
+      Background wake: watcher fired on terminal "deploy" (error pattern matched).
+      Goal: triage the failure and decide the next action.
+    active: [daintree.orchestration.basic]
+    available_tools: [context.snapshot, terminal.read, terminal.summarize, watcher.list]
+    messages:
+      - role: user
+        content: Keep an eye on the deploy terminal while I'm in a meeting.
+      - role: assistant
+        content: Watcher attached to the deploy terminal — I'll act if anything trips.
+    expect:
+      required: [daintree.orchestration.basic]
+
+  - id: wake-issue-agent-finished
+    category: background-wake
+    note: The start-work skill governs resolving the completion queue message.
+    turn_context: >-
+      Background wake: the agent working issue #88 reported completion; a queue
+      message is pending resolution.
+    active: [daintree.workflow.start-work-on-issue]
+    available_tools: [context.snapshot, queue.resolve, terminal.summarize, watcher.cancel]
+    messages:
+      - role: user
+        content: Start work on issue 88 and supervise it.
+      - role: assistant
+        content: >-
+          Issue 88 started — agent running in terminal 6, supervisor watcher
+          attached. I'll follow up when it reports.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.orchestration.basic]
+
+  - id: snapshot-with-tools-offered
+    category: background-wake
+    note: Plain state request with the snapshot tool already offered this turn.
+    available_tools: [context.snapshot, daintree.status]
+    messages:
+      - role: user
+        content: Snapshot the current Daintree state and summarize what's running.
+    expect:
+      required: [daintree.orchestration.basic]

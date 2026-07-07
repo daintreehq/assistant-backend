@@ -1,0 +1,60 @@
+# Substantive tasks with NO squarely-matching specific skill: the selector should
+# load the domain foundation ALONE rather than forcing a poor specific match or
+# returning nothing.
+
+cases:
+  - id: novel-timer-nudge
+    category: foundation-only
+    messages:
+      - role: user
+        content: >-
+          Set up a timer that nudges the build terminal with an "any progress?"
+          message every 30 minutes overnight.
+    expect:
+      required: [daintree.orchestration.basic]
+
+  - id: novel-queue-cleanup
+    category: foundation-only
+    messages:
+      - role: user
+        content: Go through the Daintree queue and resolve anything stale or already handled.
+    expect:
+      required: [daintree.orchestration.basic]
+
+  - id: novel-watcher-on-deploy
+    category: foundation-only
+    messages:
+      - role: user
+        content: >-
+          Add a watcher on the deploy terminal that alerts me if anything that
+          looks like an error scrolls past.
+    expect:
+      required: [daintree.orchestration.basic]
+
+  - id: novel-grant-for-agent
+    category: foundation-only
+    messages:
+      - role: user
+        content: >-
+          Create a grant so the agent in terminal 4 can run git push without
+          asking me every time.
+    expect:
+      required: [daintree.orchestration.basic]
+
+  - id: novel-resume-session
+    category: foundation-only
+    messages:
+      - role: user
+        content: Can we resume the session I closed yesterday afternoon? The parser one.
+    expect:
+      required: [daintree.orchestration.basic]
+
+  - id: novel-summarize-terminal
+    category: foundation-only
+    messages:
+      - role: user
+        content: >-
+          Something went wrong in the worker terminal while I was out — read
+          through it and tell me what happened.
+    expect:
+      required: [daintree.orchestration.basic]
