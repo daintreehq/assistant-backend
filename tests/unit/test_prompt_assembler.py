@@ -509,3 +509,52 @@ def test_tool_schema_normalize_does_not_mutate_input() -> None:
     result = PromptAssembler._normalize_tool_schema(schema)
     assert schema == original  # caller's dict is untouched
     assert result["properties"]["a"]["prefixItems"] == [{"type": "integer"}]
+
+
+# ---- loaded-skills layering (foundation-first render order) ------------------
+
+_FOUNDATION_MD = """---
+id: daintree.test.foundation
+title: Test Foundation
+summary: Domain base judgment.
+whenToUse: Use for the test domain.
+foundation: true
+---
+Use when: base judgment is needed.
+
+Report back: done.
+"""
+
+_SPECIFIC_MD = """---
+id: daintree.test.specific
+title: Test Specific
+summary: One concrete workflow.
+whenToUse: Use for the specific test workflow.
+---
+Use when: the specific workflow runs.
+
+Report back: done.
+"""
+
+
+def test_loaded_skills_renders_foundation_first(assembler: PromptAssembler) -> None:
+    from daintree_assistant_server.skills.loader import parse_skill
+
+    foundation = parse_skill(_FOUNDATION_MD, expected_id="daintree.test.foundation")
+    specific = parse_skill(_SPECIFIC_MD, expected_id="daintree.test.specific")
+    # Selector order put the specific first; render order puts the foundation first.
+    rendered = assembler.render_loaded_skills([specific, foundation])
+    assert rendered.index("Test Foundation") < rendered.index("Test Specific")
+    assert "## Skill 1: Test Foundation (domain foundation)" in rendered
+    assert "## Skill 2: Test Specific\n" in rendered
+    # The layering rule renders only when skills must be combined.
+    assert "Layering:" in rendered
+
+
+def test_loaded_skills_single_skill_has_no_layering_note(assembler: PromptAssembler) -> None:
+    from daintree_assistant_server.skills.loader import parse_skill
+
+    specific = parse_skill(_SPECIFIC_MD, expected_id="daintree.test.specific")
+    rendered = assembler.render_loaded_skills([specific])
+    assert "Layering:" not in rendered
+    assert "(domain foundation)" not in rendered

@@ -5,7 +5,7 @@ The following skills are task-specific operating instructions. Apply them when r
 Step tracking: when a skill has numbered steps, call `skill.step.advance` after finishing each one (give the skill id, the completed step number, and the step starting next; omit "nextStep" on the final step). If you are resuming a skill or unsure where you left off, call `skill.run.get` first to read the saved checkpoint.
 
 
-## Skill 1: Example Alpha Workflow
+## Skill 1: Example Alpha Workflow (domain foundation)
 Skill id: daintree.example.alpha
 
 Use when: you are pinning the assembled prompt bytes in a golden test.

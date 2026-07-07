@@ -223,11 +223,14 @@ def _learner(
 
 
 def _request(
-    messages: list[dict[str, Any]] | None = None, *, state: str | None = None
+    messages: list[dict[str, Any]] | None = None,
+    *,
+    state: str | None = None,
+    session_id: str = "s",
 ) -> RespondRequest:
     payload: dict[str, Any] = {
         "protocol_version": 1,
-        "session": {"id": "s", "turn_id": "t"},
+        "session": {"id": session_id, "turn_id": "t"},
         "input": {"messages": messages or MESSAGES},
     }
     if state is not None:
@@ -1148,3 +1151,103 @@ async def test_drain_background_tasks_cancels_after_timeout(tmp_path: Path) -> N
     assert cancelled.is_set()
     assert task.cancelled()
     assert not orch._background_tasks
+
+
+# ---- per-session learned-skill damp -----------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_improve_lands_once_per_session(tmp_path: Path) -> None:
+    fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    first = await learner.run(request=_request(), active_ids=[])
+    assert first.changed is True
+    after_first = len(fake.requests)  # gate + improver
+    second = await learner.run(request=_request(), active_ids=[])
+    assert second.changed is False
+    # The damp skips BEFORE the improver call: only the gate ran the second time.
+    assert len(fake.requests) == after_first + 1
+    # A completed pass always releases its in-flight reservation.
+    assert not learner._improves_in_flight
+
+
+@pytest.mark.asyncio
+async def test_improve_damp_is_per_session(tmp_path: Path) -> None:
+    fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    await learner.run(request=_request(), active_ids=[])
+    after_first = len(fake.requests)
+    # A different session is entitled to its own change for the same skill: the
+    # improver runs again (gate + builder), even though the identical render then
+    # lands nothing new.
+    outcome = await learner.run(request=_request(session_id="s2"), active_ids=[])
+    assert len(fake.requests) == after_first + 2
+    assert outcome.changed is False  # identical to the already-applied improvement
+
+
+@pytest.mark.asyncio
+async def test_create_marks_new_skill_for_session_damp(tmp_path: Path) -> None:
+    # After a create lands, a same-session improve verdict targeting the freshly
+    # minted skill (the same workflow re-gated on a later turn) spends no builder call.
+    gate_improve_created = {
+        **GATE_IMPROVE,
+        "target_skill_id": "daintree.test.created",
+    }
+    calls = {"gate": 0}
+    fake = FakeProvider()
+
+    def _complete(req: Any) -> Any:
+        system = req.messages[0]["content"]
+        if "skill-learning gate" in system:
+            calls["gate"] += 1
+            verdict = GATE_CREATE if calls["gate"] == 1 else gate_improve_created
+            return make_result(content=json.dumps(verdict))
+        return make_result(content=json.dumps(PROPOSAL_CREATE))
+
+    fake.complete_result = _complete
+    learner, _, _ = _learner(tmp_path, fake)
+    first = await learner.run(request=_request(), active_ids=[])
+    assert first.created_id == "daintree.test.created"
+    after_first = len(fake.requests)
+    second = await learner.run(request=_request(), active_ids=[])
+    assert second.changed is False
+    assert len(fake.requests) == after_first + 1  # gate only
+
+
+def test_session_damp_registry_is_bounded(tmp_path: Path) -> None:
+    fake = _provider(GATE_NONE, None)
+    learner, _, _ = _learner(tmp_path, fake)
+    limit = SkillLearner._MAX_COOLDOWN_SESSIONS
+    for i in range(limit + 5):
+        learner._mark_landed(f"session-{i}", "daintree.test.target")
+    assert len(learner._session_landed) == limit
+    assert "session-0" not in learner._session_landed  # oldest evicted
+    assert learner._already_landed(f"session-{limit + 4}", "daintree.test.target")
+    assert not learner._already_landed("session-0", "daintree.test.target")
+
+
+@pytest.mark.asyncio
+async def test_no_change_verdict_consumes_session_damp(tmp_path: Path) -> None:
+    # The improver examined the skill and declared it settled — the same session
+    # must not re-spend the improver on the same evidence every later turn.
+    no_change = {"action": "no_change", "skill_id": "daintree.test.target", "confidence": 0}
+    fake = _provider(GATE_IMPROVE, no_change)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    first = await learner.run(request=_request(), active_ids=[])
+    assert first.changed is False
+    after_first = len(fake.requests)  # gate + improver
+    await learner.run(request=_request(), active_ids=[])
+    assert len(fake.requests) == after_first + 1  # gate only — improver not re-spent
+
+
+@pytest.mark.asyncio
+async def test_inflight_improve_reservation_blocks_overlapping_pass(tmp_path: Path) -> None:
+    fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    # Simulate a concurrent pass parked inside its builder call for the same skill.
+    learner._improves_in_flight.add(("s", "daintree.test.target"))
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is False
+    assert len(fake.requests) == 1  # gate only — no double builder spend
+    # The reservation belongs to the (simulated) first pass — not consumed here.
+    assert ("s", "daintree.test.target") in learner._improves_in_flight

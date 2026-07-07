@@ -193,7 +193,9 @@ class ChatOrchestrator:
         """A short, bounded turn-context hint for the selector (evidence only).
 
         For background wake-ups and terse queue events the conversation alone may
-        not carry enough task signal, so surface the goal and wake flag.
+        not carry enough task signal, so surface the goal and wake flag — plus the
+        top client workflow digest (client-ranked, head of list) so a resumed
+        workflow selects the runbook that was governing it.
         """
         turn = request.turn
         if turn is None:
@@ -204,6 +206,17 @@ class ChatOrchestrator:
             parts.append(f"current goal: {goal}")
         if turn.is_wake:
             parts.append("triggered by a background wake (no new user message)")
+        if turn.workflow_state:
+            digest = turn.workflow_state[0]
+            bits: list[str] = []
+            if wf_goal := sanitize_line(digest.goal, 256):
+                bits.append(f"goal: {wf_goal}")
+            if wf_status := sanitize_line(digest.status, 64):
+                bits.append(f"status: {wf_status}")
+            if wf_next := sanitize_line(digest.next_action, 256):
+                bits.append(f"next: {wf_next}")
+            if bits:
+                parts.append(f"top active workflow — {'; '.join(bits)}")
         return " | ".join(parts) or None
 
     @staticmethod
