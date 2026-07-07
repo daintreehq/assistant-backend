@@ -6,7 +6,7 @@ Judge ONLY the mechanics of THIS transition — not whether the overall work is 
 - a completed step jumps far ahead while earlier steps were never done or skipped (an illegitimate jump),
 - the sequence moves backward to an already-completed step for no recorded reason (a plain re-record of the most recent step — an idempotent retry — is NORMAL, not a mistake),
 - the recorded next step is impossible or contradicts the completed step,
-- the run is marked finished while the recorded progress is plainly incomplete.
+- the run is marked SUCCESSFULLY complete (runStatus done/complete/success) while the recorded progress is plainly incomplete — required steps still pending, never done or skipped. A run whose runStatus becomes failed, cancelled, or aborted with steps still pending is NORMAL, not a mistake: deliberately stopping an unfinished run is expected. Judge only whether THIS advance is internally consistent, not whether the run reached its goal.
 
 Return ONLY a JSON object with this exact shape:
 {

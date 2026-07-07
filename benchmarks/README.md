@@ -8,6 +8,7 @@ run makes **real, paid API calls**.
 | benchmark | measures | entry point |
 |---|---|---|
 | `skill_selection/` | accuracy + latency of the automatic skill selector | `python -m benchmarks.skill_selection.bench` |
+| `utility_tasks/` | accuracy + latency of the utility-task classifiers/judges | `python -m benchmarks.utility_tasks.bench` |
 
 Conventions for adding a new benchmark:
 

@@ -223,7 +223,12 @@ def _u_extraction_verdict(inp: ExtractionVerdictInput, _req: TaskRequest) -> str
 
 
 def _u_skill_consistency(inp: SkillStepConsistencyInput, _req: TaskRequest) -> str:
-    next_step = inp.requested_next or "finish (run marked complete)"
+    # A null next step carries no claim about WHY (run ending, mid-run retry, …);
+    # the run's outcome is carried by runStatus below. Keep the rendering neutral —
+    # asserting "complete" here made a deliberately-failed run read as a false
+    # "marked complete" contradiction, and asserting "ending" would be equally
+    # false for an active-run advance that simply omitted requestedNext.
+    next_step = inp.requested_next or "(none recorded; see runStatus)"
     before = json.dumps(inp.progress_before, indent=2) if inp.progress_before else "[]"
     after = json.dumps(inp.progress_after, indent=2) if inp.progress_after else "[]"
     return (
