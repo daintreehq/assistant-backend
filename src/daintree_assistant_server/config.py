@@ -86,15 +86,21 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENAI_API_KEY")
 
     # ---- DeepSeek thinking (main, selector, utility, skill-learning gate) -----
-    # ALL of our DeepSeek-flash calls run with thinking ON by default: the main
-    # /respond call, the skill selector, the utility tasks, and the skill-learning
-    # gate. The ONLY thing incompatible with thinking on DeepSeek is a FORCED
-    # tool_choice ("Thinking mode does not support this tool_choice") — so the
-    # selector was moved off its forced select_skills call onto response_format
-    # json_object (json_object + thinking are fully compatible), and the main call
-    # still degrades to non-thinking if a client pins a tool_choice. reasoning_content
-    # round-trips through the wire contract (an assistant tool-call turn that omits it
-    # 400s on DeepSeek), which the assembler preserves.
+    # The main /respond call, the utility tasks, and the skill-learning gate run
+    # with thinking ON by default. The SELECTOR is the one exception: it gates the
+    # turn's first byte (selector -> assemble -> main TTFB), and thinking there
+    # benchmarked at median ~4s with a 13-20s tail (each 20s timeout then retried)
+    # versus a consistent 1.2-2.6s non-thinking — so it defaults OFF and leans on
+    # a reason-first JSON key order in its prompt as the cheap inline scratchpad
+    # (bench: same skill picks, including the foundation pairing, at ~1/3 the
+    # latency; see PR "perf/first-query-latency"). The ONLY thing incompatible
+    # with thinking on DeepSeek is a FORCED tool_choice ("Thinking mode does not
+    # support this tool_choice") — so the selector was moved off its forced
+    # select_skills call onto response_format json_object (json_object + thinking
+    # are fully compatible, so SELECTOR_THINKING_ENABLED=true still works), and
+    # the main call still degrades to non-thinking if a client pins a tool_choice.
+    # reasoning_content round-trips through the wire contract (an assistant
+    # tool-call turn that omits it 400s on DeepSeek), which the assembler preserves.
     #
     # There is NO "low" thinking tier to request. DeepSeek's reasoning_effort natively
     # accepts only "high"/"max" and SILENTLY maps low/medium UP to high (xhigh -> max);
@@ -184,7 +190,13 @@ class Settings(BaseSettings):
     max_meta_header_bytes: int = Field(default=6 * 1024, alias="MAX_META_HEADER_BYTES")
 
     # ---- Timeouts (seconds) --------------------------------------------
-    selector_timeout_seconds: float = Field(default=20.0, alias="SELECTOR_TIMEOUT_SECONDS")
+    # The selector gates the turn's first byte and a timeout is retried (up to
+    # MAX_UPSTREAM_RETRIES more attempts), so this bound is a latency budget, not
+    # just a failure guard. Non-thinking selector calls benchmark at 1.2-2.6s
+    # worst-case; 8s is generous slack on top of that while keeping the absolute
+    # worst first-byte stall (timeout x retries) bounded. Raise it if you turn
+    # selector thinking back on — thinking calls routinely run 4-14s.
+    selector_timeout_seconds: float = Field(default=8.0, alias="SELECTOR_TIMEOUT_SECONDS")
     main_timeout_seconds: float = Field(default=840.0, alias="MAIN_TIMEOUT_SECONDS")
     utility_timeout_seconds: float = Field(default=60.0, alias="UTILITY_TIMEOUT_SECONDS")
     upstream_connect_timeout_seconds: float = Field(
@@ -195,11 +207,15 @@ class Settings(BaseSettings):
     selector_context_tokens: int = Field(default=64000, alias="SELECTOR_CONTEXT_TOKENS")
     # Visible-output cap only; thinking headroom is added on top when thinking is on.
     selector_max_output_tokens: int = Field(default=500, alias="SELECTOR_MAX_OUTPUT_TOKENS")
-    # The selector runs thinking-high by default. It returns its choice as a JSON
-    # object (response_format json_object), NOT a forced tool call — forced tool_choice
-    # is the one thing incompatible with thinking on DeepSeek. Set false to run the
-    # classifier non-thinking (faster time-to-first-token, no reasoning).
-    selector_thinking_enabled: bool = Field(default=True, alias="SELECTOR_THINKING_ENABLED")
+    # The selector runs NON-thinking by default: it sits directly on the first-byte
+    # path and thinking cost a median ~3s extra with a 13-20s tail for no measured
+    # selection-quality gain once the prompt asked for reason-first JSON (the model
+    # writes task_type + reason as working notes before committing to skill_ids).
+    # It returns its choice as a JSON object (response_format json_object), NOT a
+    # forced tool call — forced tool_choice is the one thing incompatible with
+    # thinking on DeepSeek — so setting this true re-enables thinking cleanly
+    # (raise SELECTOR_TIMEOUT_SECONDS with it).
+    selector_thinking_enabled: bool = Field(default=False, alias="SELECTOR_THINKING_ENABLED")
     selector_reasoning_effort: Literal["high", "max"] = Field(
         default="high", alias="SELECTOR_REASONING_EFFORT"
     )

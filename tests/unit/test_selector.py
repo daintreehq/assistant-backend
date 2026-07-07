@@ -124,14 +124,35 @@ async def test_selector_selects_known_skill(selector: Selector, fake_provider: F
 
 
 @pytest.mark.asyncio
-async def test_selector_uses_json_mode_and_thinking(
+async def test_selector_uses_json_mode_non_thinking_by_default(
     selector: Selector, fake_provider: FakeProvider, catalog, settings
 ) -> None:
-    # The selector must NOT force a tool_choice (incompatible with thinking on DeepSeek):
-    # it asks for json_object and runs thinking-on by default, with reasoning headroom
-    # added to the output cap (max_tokens is shared by reasoning + the visible JSON).
+    # The selector gates the turn's first byte, so it runs NON-thinking by default
+    # (the prompt's reason-first key order is the inline reasoning step) on a flat
+    # output cap, and asks for json_object with no forced tool_choice.
     fake_provider.complete_result = selection_result([sorted(catalog.known_ids)[0]])
     await selector.select(_msgs("do the task"), [])
+    req = fake_provider.requests[-1]
+    assert req.response_format == {"type": "json_object"}
+    assert req.tool_choice is None
+    assert req.thinking_disabled is True
+    assert req.reasoning_effort is None
+    assert req.max_tokens == settings.selector_max_output_tokens
+
+
+@pytest.mark.asyncio
+async def test_selector_thinking_opt_in_adds_headroom(
+    selector: Selector, fake_provider: FakeProvider, catalog, settings
+) -> None:
+    # SELECTOR_THINKING_ENABLED=true must re-enable thinking cleanly (json_object is
+    # compatible with thinking; only a forced tool_choice is not), with reasoning
+    # headroom added to the output cap (max_tokens is shared by reasoning + the JSON).
+    thinking_settings = settings.model_copy(update={"selector_thinking_enabled": True})
+    thinking_selector = Selector(
+        fake_provider, selector.prompt_loader, selector.catalog_manager, thinking_settings
+    )
+    fake_provider.complete_result = selection_result([sorted(catalog.known_ids)[0]])
+    await thinking_selector.select(_msgs("do the task"), [])
     req = fake_provider.requests[-1]
     assert req.response_format == {"type": "json_object"}
     assert req.tool_choice is None

@@ -283,14 +283,18 @@ top-level `thinking` object (`DEEPSEEK_SEND_THINKING`, always sent by default): 
 tier) turns it on. DeepSeek defaults thinking ON when the field is absent, so the disable
 directive is sent explicitly.
 
-Every DeepSeek-flash call runs **thinking by default** — the main `/respond` call, the
-selector, the utility tasks, and the skill-learning gate — each behind its own toggle
-(`MAIN_THINKING_ENABLED`, `SELECTOR_THINKING_ENABLED`, `UTILITY_THINKING_ENABLED`,
-`SKILL_GATE_THINKING_ENABLED`) and effort (`*_REASONING_EFFORT` = `high` | `max`, default
-`high`). Because a forced `tool_choice` is the one thing incompatible with thinking on
-DeepSeek, the selector was moved off its forced `select_skills` call onto `response_format`
-json_object (json_object output and non-forced tool calling are both compatible with
-thinking). DeepSeek accepts only `high`/`max` and silently remaps `low`/`medium` up to
+DeepSeek-flash calls run **thinking by default** — the main `/respond` call, the utility
+tasks, and the skill-learning gate — each behind its own toggle (`MAIN_THINKING_ENABLED`,
+`SELECTOR_THINKING_ENABLED`, `UTILITY_THINKING_ENABLED`, `SKILL_GATE_THINKING_ENABLED`) and
+effort (`*_REASONING_EFFORT` = `high` | `max`, default `high`). The **selector is the one
+exception**: it gates the turn's first byte, so it defaults **non-thinking**
+(`SELECTOR_THINKING_ENABLED=false`) and its prompt instead asks for a reason-first JSON key
+order (`task_type`/`reason` written before `skill_ids`) as the inline reasoning step —
+benchmarked at equal selection quality and a fraction of the latency. Because a forced
+`tool_choice` is the one thing incompatible with thinking on DeepSeek, the selector was
+moved off its forced `select_skills` call onto `response_format` json_object (json_object
+output and non-forced tool calling are both compatible with thinking), so re-enabling
+selector thinking is a pure env flip. DeepSeek accepts only `high`/`max` and silently remaps `low`/`medium` up to
 `high` — so `high` is the lightest thinking available, the only lower setting being thinking
 off. Since DeepSeek's `max_tokens` is shared by reasoning + visible output, the small-output
 calls (selector, utility tasks, gate) add `DEEPSEEK_THINKING_HEADROOM_TOKENS` to their tight

@@ -2,13 +2,18 @@
 
 Before the main-model call, a dedicated small-model request classifies the
 conversation against the catalog and returns up to ``max_active_skills`` skill
-IDs as a JSON object (``response_format`` = ``json_object``). It is NOT a forced
-function call: the selector runs thinking-high by default, and a forced
-tool_choice is the one thing incompatible with thinking on DeepSeek — json_object
-is compatible, so the model reasons first (chain-of-thought in ``reasoning_content``)
-and emits clean JSON in ``content``. Output is validated and repaired once; on
-failure the selector fails *open* (the request degrades to the prior active set
-rather than blocking the user).
+IDs as a JSON object (``response_format`` = ``json_object``). This call sits
+directly on the turn's first-byte path (selector → assemble → main TTFB), so it
+runs NON-thinking by default — the selector prompt asks for a reason-first key
+order (``task_type``/``reason`` before ``skill_ids``) so the model still works
+through the decision inline before committing, which benchmarked at the same
+selection quality as thinking-high at a fraction of the latency. It is NOT a
+forced function call: a forced tool_choice is the one thing incompatible with
+thinking on DeepSeek, while json_object is compatible — so flipping
+``SELECTOR_THINKING_ENABLED=true`` re-enables full chain-of-thought (in
+``reasoning_content``) without any wire change. Output is validated and repaired
+once; on failure the selector fails *open* (the request degrades to the prior
+active set rather than blocking the user).
 """
 
 from __future__ import annotations
@@ -33,9 +38,9 @@ from .catalog import Catalog, CatalogManager
 
 _REPAIR_INSTRUCTION = (
     "Your previous response was not a valid JSON object. Reply now with ONLY a "
-    "JSON object (no prose, no code fence) with these keys: skill_ids (an array "
-    "of catalog skill IDs, possibly empty), confidence (a number between 0 and 1), "
-    "and task_type (a short string)."
+    "JSON object (no prose, no code fence) with these keys in this order: "
+    "task_type (a short string), reason (a short string), skill_ids (an array "
+    "of catalog skill IDs, possibly empty), and confidence (a number between 0 and 1)."
 )
 
 _TOOL_RESULT_CHAR_CAP = 2000
