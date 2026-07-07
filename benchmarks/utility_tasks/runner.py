@@ -143,6 +143,10 @@ async def _run_trial(
 
 async def run_bench(config: BenchConfig) -> dict[str, Any]:
     """Run the full suite for one prompt variant; returns the results document."""
+    if config.trials < 1:
+        raise BenchError(f"--trials must be >= 1 (got {config.trials})")
+    if config.concurrency < 1:
+        raise BenchError(f"--concurrency must be >= 1 (got {config.concurrency})")
     settings = _build_settings(config)
     overlay_dir = resolve_overlay_dir(config.variant)
     loader = OverlayPromptLoader(overlay_dir)

@@ -25,22 +25,25 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.task_runner import build_profiles
+from daintree_assistant_server.services.validation import reject_forbidden_prompt_keys
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
 
-# The classifier/judge tasks this suite scores, mapped to their output fields.
+# The classifier/judge tasks this suite scores, mapped to their DECISION fields.
 # Only these tasks have a single, unambiguous ground-truth field (or enum), so
 # only these are benchmarkable as strict accuracy. (Text tasks — summarize,
 # extract_text — and the compaction tasks need a judge/reference scorer and are
-# out of scope here.) An ``expect`` key outside a task's field set fails at load.
+# out of scope here.) Free-text/list outputs (reason, summary, evidence) and
+# confidence are deliberately NOT expectable: equality over them is meaningless,
+# and a list value in ``expect`` always means an acceptable set. An ``expect``
+# key outside a task's field set fails at load.
 SUPPORTED_TASKS: dict[str, frozenset[str]] = {
-    "terminal_judge": frozenset({"matched", "confidence", "reason"}),
-    "watcher_classify": frozenset(
-        {"classification", "confidence", "summary", "evidence", "recommendedAction"}
-    ),
-    "extraction_verdict": frozenset({"pass", "reason"}),
-    "skill_step_consistency": frozenset({"matched", "confidence", "reason"}),
+    "terminal_judge": frozenset({"matched"}),
+    "watcher_classify": frozenset({"classification", "recommendedAction"}),
+    "extraction_verdict": frozenset({"pass"}),
+    "skill_step_consistency": frozenset({"matched"}),
 }
 
 _PROFILES = build_profiles()
@@ -61,12 +64,20 @@ class TaskCase:
     note: str
 
 
+def _eq(got: Any, want: Any) -> bool:
+    """Strict equality: a bool never equals a non-bool, so ``expect: {matched: 1}``
+    cannot silently pass against ``True`` (Python's ``True == 1``)."""
+    if isinstance(got, bool) != isinstance(want, bool):
+        return False
+    return bool(got == want)
+
+
 def _matches(got: Any, want: Any) -> bool:
     """A single ``expect`` assertion: membership when ``want`` is a list of
     acceptable values, exact equality otherwise."""
     if isinstance(want, list):
-        return got in want
-    return got == want
+        return any(_eq(got, w) for w in want)
+    return _eq(got, want)
 
 
 def mismatches(output: dict[str, Any], expect: dict[str, Any]) -> list[str]:
@@ -92,6 +103,12 @@ def _build_case(raw: dict[str, Any], source: str) -> TaskCase:
     payload = raw.get("input")
     if not isinstance(payload, dict):
         raise CaseError(f"{case_id}: 'input' must be a mapping")
+    # Production runs this before TaskRunner.run (api/daintree_tasks.py); a case
+    # that would 400 at the endpoint must not be benchmarkable as a live call.
+    try:
+        reject_forbidden_prompt_keys(payload, param="input")
+    except DaintreeError as exc:
+        raise CaseError(f"{case_id}: {exc.message}") from exc
     try:
         _PROFILES[task].input_model.model_validate(payload)
     except ValidationError as exc:

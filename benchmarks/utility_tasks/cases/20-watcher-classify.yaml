@@ -160,6 +160,25 @@ cases:
         make: *** [test] Error 1
     expect: {classification: tests_failed}
 
+  - id: watch-build-error-before-tests
+    task: watcher_classify
+    category: watch-failure
+    note: |
+      Counter-case for the precedence rule: the test COMMAND died on an import
+      error before any test ran — no failing tests, so command_failed, not
+      tests_failed.
+    input:
+      goal: Run CI locally.
+      terminal_state: {agent_state: idle, runtime_status: running, last_output_at: "2026-07-07T10:00:00Z"}
+      previous_classification: still_working
+      tail: |
+        $ make test
+        ImportError while loading conftest '/app/tests/conftest.py'.
+        ModuleNotFoundError: No module named 'sqlalchemy'
+        collected 0 items / 1 error
+        make: *** [test] Error 2
+    expect: {classification: command_failed}
+
   # ---- no_change detection ------------------------------------------------
   - id: watch-no-change
     task: watcher_classify

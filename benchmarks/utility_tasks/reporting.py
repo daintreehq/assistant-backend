@@ -87,11 +87,17 @@ def print_failures(doc: dict[str, Any], max_reason: int = 160) -> None:
                 print(f"    reason: {reason[:max_reason]}")
 
 
+def _run_label(doc: dict[str, Any]) -> str:
+    # variant alone is ambiguous once a winner is promoted (both runs then say
+    # "baseline"); the start timestamp identifies the actual run.
+    meta = doc["meta"]
+    return f"{meta['variant']} @ {meta.get('started_at', '?')}"
+
+
 def print_compare(a: dict[str, Any], b: dict[str, Any]) -> None:
     sa, sb = a["summary"], b["summary"]
     la, lb = sa["latency_s"], sb["latency_s"]
-    name_a, name_b = a["meta"]["variant"], b["meta"]["variant"]
-    print(f"\n== compare: A={name_a} vs B={name_b} ==")
+    print(f"\n== compare: A={_run_label(a)} vs B={_run_label(b)} ==")
     print(
         f"strict cases   A {sa['cases_passed']}/{sa['cases_total']}   "
         f"B {sb['cases_passed']}/{sb['cases_total']}"
