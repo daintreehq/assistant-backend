@@ -174,7 +174,7 @@ class Settings(BaseSettings):
         default=16 * 1024, alias="MAX_TOOL_SCHEMA_STRING_BYTES"
     )
 
-    # ---- Task result_schema bounds (terminal_extract_json.v1 only) ------
+    # ---- Task result_schema bounds (terminal_extract_json only) ------
     max_result_schema_bytes: int = Field(default=32 * 1024, alias="MAX_RESULT_SCHEMA_BYTES")
     max_result_schema_depth: int = Field(default=12, alias="MAX_RESULT_SCHEMA_DEPTH")
     max_result_schema_properties: int = Field(default=128, alias="MAX_RESULT_SCHEMA_PROPERTIES")

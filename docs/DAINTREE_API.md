@@ -137,8 +137,8 @@ Notes:
   (the workflow-intelligence layer). The server renders them into the turn footer and never
   stores them; caps are hard (max digests, one 512-byte line per string, 16 KiB total block —
   advertised by `capabilities.workflow_intelligence`). The full graphs live only in the CLI's
-  local store; the server contributes the stateless `workflow_plan.v1` /
-  `workflow_reconcile.v1` / `workflow_resume_digest.v1` tasks (see `/v1/daintree/tasks`),
+  local store; the server contributes the stateless `workflow_plan` /
+  `workflow_reconcile` / `workflow_resume_digest` tasks (see `/v1/daintree/tasks`),
   whose plans/patches are recommendations the client validates and applies itself — they
   carry no execution authority.
 

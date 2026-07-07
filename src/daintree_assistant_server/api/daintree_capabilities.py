@@ -53,9 +53,9 @@ async def capabilities(
         "workflow_intelligence": {
             "turn_context_field": "workflow_state",
             "tasks": [
-                "workflow_plan.v1",
-                "workflow_reconcile.v1",
-                "workflow_resume_digest.v1",
+                "workflow_plan",
+                "workflow_reconcile",
+                "workflow_resume_digest",
             ],
             "max_workflow_digests": settings.cap_workflow_digests,
             "max_workflow_state_bytes": settings.cap_workflow_state_bytes,

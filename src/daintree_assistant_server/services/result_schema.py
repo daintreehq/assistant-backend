@@ -1,4 +1,4 @@
-"""Caller-supplied ``result_schema`` validation for ``terminal_extract_json.v1``.
+"""Caller-supplied ``result_schema`` validation for ``terminal_extract_json``.
 
 The schema is caller data that is BOTH rendered into a server-owned prompt and
 used to check the model's output. So it is:

@@ -44,7 +44,7 @@ def test_capabilities(client, auth) -> None:
     assert body["skills"]["manual_resolve"] is True
     wf = body["workflow_intelligence"]
     assert wf["turn_context_field"] == "workflow_state"
-    assert wf["tasks"] == ["workflow_plan.v1", "workflow_reconcile.v1", "workflow_resume_digest.v1"]
+    assert wf["tasks"] == ["workflow_plan", "workflow_reconcile", "workflow_resume_digest"]
     assert wf["max_workflow_digests"] == 5
     assert wf["max_workflow_state_bytes"] == 16384
     assert set(wf["tasks"]) <= set(body["tasks"])
@@ -111,13 +111,13 @@ def test_tasks_endpoint(client, auth, fake_provider) -> None:
         content=json.dumps({"reason": "ok", "confidence": 0.8, "matched": True})
     )
     r = client.post("/v1/daintree/tasks", headers=auth, json={
-        "task": "terminal_judge.v1", "input": {"question": "pass?", "tail": "OK"},
+        "task": "terminal_judge", "input": {"question": "pass?", "tail": "OK"},
     })
     assert r.status_code == 200
     body = r.json()
     assert body["object"] == "daintree.task.result"
     assert body["output"]["matched"] is True
-    assert body["prompt_version"] == "terminal_judge.v1"
+    assert body["prompt_version"] == "terminal_judge"
 
 
 def test_workflow_plan_task_endpoint(client, auth, fake_provider) -> None:
@@ -138,7 +138,7 @@ def test_workflow_plan_task_endpoint(client, auth, fake_provider) -> None:
     }
     fake_provider.complete_result = make_result(content=json.dumps(plan))
     r = client.post("/v1/daintree/tasks", headers=auth, json={
-        "task": "workflow_plan.v1",
+        "task": "workflow_plan",
         "input": {
             "goal": "Fix watcher tests",
             "tool_inventory": [
@@ -149,7 +149,7 @@ def test_workflow_plan_task_endpoint(client, auth, fake_provider) -> None:
     })
     assert r.status_code == 200
     body = r.json()
-    assert body["prompt_version"] == "workflow_plan.v1"
+    assert body["prompt_version"] == "workflow_plan"
     assert [n["id"] for n in body["output"]["nodes"]] == ["n_orient", "n_fix"]
     assert body["output"]["next_action"]["tool_name"] == "context.snapshot"
 
@@ -160,7 +160,7 @@ def test_workflow_reconcile_task_endpoint(client, auth, fake_provider) -> None:
         "summary": "Agent finished.",
     }))
     r = client.post("/v1/daintree/tasks", headers=auth, json={
-        "task": "workflow_reconcile.v1",
+        "task": "workflow_reconcile",
         "input": {
             "workflow": {"id": "wf_1", "nodes": [{"id": "n_fix", "status": "waiting"}]},
             "reason": "queue_event",
@@ -177,7 +177,7 @@ def test_workflow_resume_digest_task_endpoint(client, auth, fake_provider) -> No
         "suggested_focus_workflow_id": "wf_1",
     }))
     r = client.post("/v1/daintree/tasks", headers=auth, json={
-        "task": "workflow_resume_digest.v1",
+        "task": "workflow_resume_digest",
         "input": {"workflows": [{"id": "wf_1", "goal": "Fix tests", "status": "active"}]},
     })
     assert r.status_code == 200
@@ -193,7 +193,7 @@ def test_tasks_unknown_404(client, auth) -> None:
 
 
 def test_tasks_invalid_input_400(client, auth) -> None:
-    r = client.post("/v1/daintree/tasks", headers=auth, json={"task": "terminal_judge.v1", "input": {}})
+    r = client.post("/v1/daintree/tasks", headers=auth, json={"task": "terminal_judge", "input": {}})
     assert r.status_code == 400
 
 
@@ -280,6 +280,6 @@ def test_not_ready_returns_503(fake_provider) -> None:
         r = client.post(
             "/v1/daintree/tasks",
             headers={"Authorization": "Bearer test-api-key"},
-            json={"task": "terminal_judge.v1", "input": {"question": "q"}},
+            json={"task": "terminal_judge", "input": {"question": "q"}},
         )
         assert r.status_code == 503

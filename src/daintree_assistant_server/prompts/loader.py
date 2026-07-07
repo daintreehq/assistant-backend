@@ -37,8 +37,9 @@ _ALL_TEMPLATES = (
 )
 
 # Backend-only skill-learning system prompts (raw .md, under prompts/skill_learning/).
-# Always shipped, so a missing one fails readiness even when learning is off. These
-# are pre-release internal prompts — no version suffix (unlike wire-contract task ids).
+# Always shipped, so a missing one fails readiness even when learning is off. Like every
+# prompt here (task prompts included), they carry no version suffix — pre-release, the
+# file on disk is simply "the current prompt."
 SKILL_LEARNING_PROMPTS = ("gate", "build", "improve")
 
 

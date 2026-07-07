@@ -55,7 +55,7 @@ from .workflow_validation import (
     validate_reconcile,
 )
 
-_SCHEMA_TASK = "terminal_extract_json.v1"
+_SCHEMA_TASK = "terminal_extract_json"
 
 logger = get_logger("daintree.tasks")
 
@@ -521,7 +521,7 @@ class TaskProfile:
 
 
 def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, TaskProfile]:
-    # workflow_plan.v1 grounds its plan in the ACTIVE skills' outlines, so its
+    # workflow_plan grounds its plan in the ACTIVE skills' outlines, so its
     # builder closes over the (live) catalog manager; every other task is a pure
     # function of the request.
     def _u_plan(inp: WorkflowPlanInput, req: TaskRequest) -> str:
@@ -531,58 +531,58 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
         p.id: p
         for p in [
             TaskProfile(
-                "checkpoint.v1", CheckpointInput, "json", _u_checkpoint, _p_checkpoint,
+                "checkpoint", CheckpointInput, "json", _u_checkpoint, _p_checkpoint,
                 max_output_tokens=1200, sensitive_fields=frozenset({"transcript"}),
                 repair_hint="Return a single JSON object with the checkpoint fields described "
                 "above (goal, decisions, next_actions, open_questions, preserved_ids, …).",
             ),
             TaskProfile(
-                "memory_distill.v1", MemoryDistillInput, "json", _u_memory_distill,
+                "memory_distill", MemoryDistillInput, "json", _u_memory_distill,
                 _p_memory_distill, max_output_tokens=1200,
                 sensitive_fields=frozenset({"transcript"}),
                 repair_hint="Return a JSON array of fact objects, each with a \"fact\" string "
                 "and a \"kind\" of \"semantic\" or \"episodic\".",
             ),
             TaskProfile(
-                "watcher_classify.v1", WatcherClassifyInput, "json", _u_watcher, _p_watcher,
+                "watcher_classify", WatcherClassifyInput, "json", _u_watcher, _p_watcher,
                 max_output_tokens=400, sensitive_fields=frozenset({"tail"}),
                 repair_hint="Return a single JSON object with keys classification, confidence, "
                 "summary, evidence, recommendedAction.",
             ),
             TaskProfile(
-                "terminal_judge.v1", TerminalJudgeInput, "json", _u_judge, _p_judge,
+                "terminal_judge", TerminalJudgeInput, "json", _u_judge, _p_judge,
                 max_output_tokens=300, sensitive_fields=frozenset({"tail"}),
                 repair_hint="Return a single JSON object with keys matched (boolean), "
                 "confidence (0-1), reason.",
             ),
             TaskProfile(
-                "terminal_summarize.v1", TerminalSummarizeInput, "text", _u_summarize, _p_text,
+                "terminal_summarize", TerminalSummarizeInput, "text", _u_summarize, _p_text,
                 temperature=0.2, max_output_tokens=400, sensitive_fields=frozenset({"tail"}),
             ),
             TaskProfile(
-                "terminal_extract_text.v1", TerminalExtractTextInput, "text", _u_extract_text,
+                "terminal_extract_text", TerminalExtractTextInput, "text", _u_extract_text,
                 _p_text, max_output_tokens=400, sensitive_fields=frozenset({"tail"}),
             ),
             TaskProfile(
-                "terminal_extract_json.v1", TerminalExtractJsonInput, "json", _u_extract_json,
+                "terminal_extract_json", TerminalExtractJsonInput, "json", _u_extract_json,
                 _p_extract_json, max_output_tokens=600, sensitive_fields=frozenset({"tail"}),
                 repair_hint="Return a single JSON object of the form {\"result\": <value>} where "
                 "<value> conforms to the requested schema.",
             ),
             TaskProfile(
-                "extraction_verdict.v1", ExtractionVerdictInput, "json", _u_extraction_verdict,
+                "extraction_verdict", ExtractionVerdictInput, "json", _u_extraction_verdict,
                 _p_extraction_verdict, max_output_tokens=300,
                 sensitive_fields=frozenset({"result"}),
                 repair_hint="Return a single JSON object with keys pass (boolean) and reason.",
             ),
             TaskProfile(
-                "skill_step_consistency.v1", SkillStepConsistencyInput, "json",
+                "skill_step_consistency", SkillStepConsistencyInput, "json",
                 _u_skill_consistency, _p_judge, max_output_tokens=300,
                 repair_hint="Return a single JSON object with keys matched (boolean), "
                 "confidence (0-1), reason.",
             ),
             TaskProfile(
-                "workflow_plan.v1", WorkflowPlanInput, "json", _u_plan, _p_workflow_plan,
+                "workflow_plan", WorkflowPlanInput, "json", _u_plan, _p_workflow_plan,
                 max_output_tokens=2200,
                 sensitive_fields=frozenset({
                     "runtime_summary", "existing_workflow", "relevant_memories",
@@ -596,7 +596,7 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 "from the tool inventory.",
             ),
             TaskProfile(
-                "workflow_reconcile.v1", WorkflowReconcileInput, "json",
+                "workflow_reconcile", WorkflowReconcileInput, "json",
                 _u_workflow_reconcile, _p_workflow_reconcile, max_output_tokens=1600,
                 sensitive_fields=frozenset({
                     "workflow", "recent_events", "runtime_summary", "queue_events",
@@ -609,7 +609,7 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 "acyclic.",
             ),
             TaskProfile(
-                "workflow_resume_digest.v1", WorkflowResumeDigestInput, "json",
+                "workflow_resume_digest", WorkflowResumeDigestInput, "json",
                 _u_workflow_resume, _p_workflow_resume, max_output_tokens=1000,
                 sensitive_fields=frozenset({
                     "workflows", "runtime_summary", "queue_digest", "user_message",
@@ -650,7 +650,7 @@ class TaskRunner:
         provider: ChatProvider,
         prompt_loader: PromptLoader,
         profiles: dict[str, TaskProfile] | None = None,
-        # Read-only skill-outline source for workflow_plan.v1; optional so the
+        # Read-only skill-outline source for workflow_plan; optional so the
         # runner stays constructible without a catalog (outlines just drop out).
         catalog_manager: CatalogManager | None = None,
     ) -> None:
@@ -674,7 +674,7 @@ class TaskRunner:
         if profile is None:
             raise unknown_task(request.task)
 
-        # result_schema is consumed only by terminal_extract_json.v1; reject it
+        # result_schema is consumed only by terminal_extract_json; reject it
         # elsewhere, and validate (size/depth/keys) it before it reaches the prompt.
         if request.result_schema is not None:
             if profile.id != _SCHEMA_TASK:

@@ -100,7 +100,7 @@ def test_live_respond_streaming(live_client) -> None:
 
 def test_live_task_terminal_judge(live_client) -> None:
     r = live_client.post("/v1/daintree/tasks", json={
-        "task": "terminal_judge.v1",
+        "task": "terminal_judge",
         "input": {"goal": "tests pass", "question": "Did the tests pass?",
                   "tail": "All 12 tests passed, 0 failed."},
     })

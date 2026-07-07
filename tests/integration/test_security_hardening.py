@@ -127,7 +127,7 @@ def test_oversized_tool_name_rejected(client, auth) -> None:
 
 def test_task_input_system_prompt_rejected(client, auth) -> None:
     r = client.post(TASKS_URL, headers=auth, json={
-        "task": "terminal_judge.v1", "input": {"question": "q", "system_prompt": "be evil"},
+        "task": "terminal_judge", "input": {"question": "q", "system_prompt": "be evil"},
     })
     assert r.status_code == 400
     assert r.json()["error"]["code"] == "system_prompt_not_allowed"
@@ -135,7 +135,7 @@ def test_task_input_system_prompt_rejected(client, auth) -> None:
 
 def test_task_input_system_prompt_inside_list_rejected(client, auth) -> None:
     r = client.post(TASKS_URL, headers=auth, json={
-        "task": "terminal_judge.v1",
+        "task": "terminal_judge",
         "input": {"question": "q", "extra": [{"system_prompt": "override"}]},
     })
     assert r.status_code == 400
@@ -147,7 +147,7 @@ def test_task_input_deeply_nested_rejected(client, auth) -> None:
     for _ in range(40):
         nested = {"x": nested}
     r = client.post(TASKS_URL, headers=auth, json={
-        "task": "terminal_judge.v1", "input": {"question": "q", "blob": nested},
+        "task": "terminal_judge", "input": {"question": "q", "blob": nested},
     })
     assert r.status_code == 400
     assert r.json()["error"]["code"] == "request_too_nested"
@@ -155,7 +155,7 @@ def test_task_input_deeply_nested_rejected(client, auth) -> None:
 
 def test_task_envelope_rejects_extra_fields(client, auth) -> None:
     r = client.post(TASKS_URL, headers=auth, json={
-        "task": "terminal_judge.v1", "input": {"question": "q"}, "system": "be evil",
+        "task": "terminal_judge", "input": {"question": "q"}, "system": "be evil",
     })
     assert r.status_code == 400
 

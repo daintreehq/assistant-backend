@@ -135,8 +135,8 @@ def test_response_and_skills_block_shape() -> None:
 
 
 def test_task_request_and_verdict_alias() -> None:
-    tr = TaskRequest.model_validate({"task": "terminal_judge.v1", "input": {"question": "q"}})
-    assert tr.task == "terminal_judge.v1"
+    tr = TaskRequest.model_validate({"task": "terminal_judge", "input": {"question": "q"}})
+    assert tr.task == "terminal_judge"
     verdict = ExtractionVerdictOutput.model_validate({"pass": True, "reason": "ok"})
     assert verdict.passed is True
     assert verdict.model_dump(by_alias=True) == {"pass": True, "reason": "ok"}
@@ -145,11 +145,11 @@ def test_task_request_and_verdict_alias() -> None:
 def test_task_result_shape() -> None:
     result = TaskResult(
         id="taskrun_1",
-        task="terminal_summarize.v1",
+        task="terminal_summarize",
         model="daintree-utility",
         output={"text": "hi"},
         usage=TaskUsage(prompt_tokens=1, completion_tokens=2, total_tokens=3),
-        prompt_version="terminal_summarize.v1",
+        prompt_version="terminal_summarize",
     )
     dumped = result.model_dump()
     assert dumped["object"] == "daintree.task.result"

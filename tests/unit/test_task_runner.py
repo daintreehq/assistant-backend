@@ -22,14 +22,14 @@ async def test_terminal_judge(task_runner: TaskRunner, fake_provider: FakeProvid
     fake_provider.complete_result = make_result(
         content=json.dumps({"reason": "passed", "confidence": 0.9, "matched": True})
     )
-    out = await _run(task_runner, "terminal_judge.v1", {"question": "ok?", "tail": "OK"})
+    out = await _run(task_runner, "terminal_judge", {"question": "ok?", "tail": "OK"})
     assert out == {"reason": "passed", "confidence": 0.9, "matched": True}
 
 
 @pytest.mark.asyncio
 async def test_terminal_summarize_text(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content="Tests are green.")
-    out = await _run(task_runner, "terminal_summarize.v1", {"purpose": "p", "tail": "x"})
+    out = await _run(task_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
     assert out == {"text": "Tests are green."}
 
 
@@ -41,7 +41,7 @@ async def test_utility_task_runs_thinking_high_with_headroom(
     # profile's small output cap (DeepSeek shares max_tokens between reasoning + output).
     # Without the headroom, max_tokens would be the sub-headroom profile cap.
     fake_provider.complete_result = make_result(content="Tests are green.")
-    await _run(task_runner, "terminal_summarize.v1", {"purpose": "p", "tail": "x"})
+    await _run(task_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
     req = fake_provider.requests[-1]
     assert req.thinking_disabled is False
     assert req.reasoning_effort == "high"
@@ -53,7 +53,7 @@ async def test_checkpoint(task_runner: TaskRunner, fake_provider: FakeProvider) 
     fake_provider.complete_result = make_result(
         content=json.dumps({"goal": "ship", "next_actions": ["do x"]})
     )
-    out = await _run(task_runner, "checkpoint.v1", {"transcript": "..."})
+    out = await _run(task_runner, "checkpoint", {"transcript": "..."})
     assert out["goal"] == "ship"
     assert out["next_actions"] == ["do x"]
     assert out["decisions"] == []  # defaulted
@@ -68,7 +68,7 @@ async def test_memory_distill_array_and_dedupe(task_runner: TaskRunner, fake_pro
         {"fact": "bad kind", "kind": "weird"},
     ]
     fake_provider.complete_result = make_result(content=json.dumps(payload))
-    out = await _run(task_runner, "memory_distill.v1", {"transcript": "..."})
+    out = await _run(task_runner, "memory_distill", {"transcript": "..."})
     facts = out["facts"]
     assert len(facts) == 3
     assert facts[1] == {"fact": "tried X it failed", "kind": "semantic"}
@@ -78,14 +78,14 @@ async def test_memory_distill_array_and_dedupe(task_runner: TaskRunner, fake_pro
 @pytest.mark.asyncio
 async def test_extract_json_wraps_bare_value(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content=json.dumps({"result": {"count": 5}}))
-    out = await _run(task_runner, "terminal_extract_json.v1", {"instruction": "count", "tail": "5"})
+    out = await _run(task_runner, "terminal_extract_json", {"instruction": "count", "tail": "5"})
     assert out == {"result": {"count": 5}}
 
 
 @pytest.mark.asyncio
 async def test_extraction_verdict_alias(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content=json.dumps({"pass": True, "reason": "ok"}))
-    out = await _run(task_runner, "extraction_verdict.v1", {"result": "x", "condition": "non-empty"})
+    out = await _run(task_runner, "extraction_verdict", {"result": "x", "condition": "non-empty"})
     assert out == {"pass": True, "reason": "ok"}
 
 
@@ -94,7 +94,7 @@ async def test_watcher_classify_clamps_confidence(task_runner: TaskRunner, fake_
     fake_provider.complete_result = make_result(
         content=json.dumps({"classification": "tests_passed", "confidence": 5, "summary": "ok"})
     )
-    out = await _run(task_runner, "watcher_classify.v1", {"goal": "g", "tail": "OK"})
+    out = await _run(task_runner, "watcher_classify", {"goal": "g", "tail": "OK"})
     assert out["confidence"] == 1.0
 
 
@@ -105,7 +105,7 @@ async def test_skill_step_consistency(task_runner: TaskRunner, fake_provider: Fa
     )
     out = await _run(
         task_runner,
-        "skill_step_consistency.v1",
+        "skill_step_consistency",
         {"skill_id": "x", "completed_step": 1, "current_step_before": 1, "current_step_after": 2},
     )
     assert out["matched"] is False
@@ -115,7 +115,7 @@ async def test_skill_step_consistency(task_runner: TaskRunner, fake_provider: Fa
 async def test_lenient_json_with_code_fence(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fenced = "```json\n" + json.dumps({"reason": "r", "confidence": 0.5, "matched": True}) + "\n```"
     fake_provider.complete_result = make_result(content=fenced)
-    out = await _run(task_runner, "terminal_judge.v1", {"question": "q", "tail": "t"})
+    out = await _run(task_runner, "terminal_judge", {"question": "q", "tail": "t"})
     assert out["matched"] is True
 
 
@@ -128,7 +128,7 @@ async def test_json_repair_path(task_runner: TaskRunner, fake_provider: FakeProv
         ]
     )
     fake_provider.complete_result = lambda _req: next(results)
-    result = await task_runner.run(TaskRequest(task="terminal_judge.v1", input={"question": "q"}))
+    result = await task_runner.run(TaskRequest(task="terminal_judge", input={"question": "q"}))
     assert result.output["matched"] is True
     assert len(fake_provider.requests) == 2  # repaired
     # The repair retry carries the task-specific hint (not just the generic instruction).
@@ -140,7 +140,7 @@ async def test_json_repair_path(task_runner: TaskRunner, fake_provider: FakeProv
 async def test_json_repair_exhausted_raises(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content="never valid json")
     with pytest.raises(DaintreeError) as exc:
-        await task_runner.run(TaskRequest(task="terminal_judge.v1", input={"question": "q"}))
+        await task_runner.run(TaskRequest(task="terminal_judge", input={"question": "q"}))
     assert exc.value.code == "task_output_invalid"
 
 
@@ -158,7 +158,7 @@ async def test_task_retries_transient_error(task_runner: TaskRunner, fake_provid
         return make_result(content="Tests are green.")
 
     fake_provider.complete_result = complete
-    out = await _run(task_runner, "terminal_summarize.v1", {"purpose": "p", "tail": "x"})
+    out = await _run(task_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
     assert out == {"text": "Tests are green."}
     assert calls[0] == 3  # 2 failures + success
 
@@ -167,7 +167,7 @@ async def test_task_retries_transient_error(task_runner: TaskRunner, fake_provid
 async def test_task_persistent_transient_error_surfaces(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_error = upstream_timeout()
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "terminal_summarize.v1", {"tail": "x"})
+        await _run(task_runner, "terminal_summarize", {"tail": "x"})
     assert exc.value.code == "upstream_timeout"
 
 
@@ -186,7 +186,7 @@ async def test_repair_call_retries_transient_error(task_runner: TaskRunner, fake
         return make_result(content=json.dumps({"reason": "r", "confidence": 0.5, "matched": True}))
 
     fake_provider.complete_result = complete
-    out = await _run(task_runner, "terminal_judge.v1", {"question": "q", "tail": "t"})
+    out = await _run(task_runner, "terminal_judge", {"question": "q", "tail": "t"})
     assert out["matched"] is True
     assert calls[0] == 3  # initial + repair(transient) + repair(retry success)
 
@@ -201,7 +201,7 @@ async def test_task_non_retryable_error_not_retried(task_runner: TaskRunner, fak
 
     fake_provider.complete_result = complete
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "terminal_summarize.v1", {"tail": "x"})
+        await _run(task_runner, "terminal_summarize", {"tail": "x"})
     assert exc.value.code == "upstream_error"
     assert calls[0] == 1  # surfaced on the first attempt, no retry
 
@@ -209,22 +209,22 @@ async def test_task_non_retryable_error_not_retried(task_runner: TaskRunner, fak
 @pytest.mark.asyncio
 async def test_unknown_task_404(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
-        await task_runner.run(TaskRequest(task="nope.v1", input={}))
+        await task_runner.run(TaskRequest(task="nope", input={}))
     assert exc.value.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_invalid_input_400(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
-        await task_runner.run(TaskRequest(task="terminal_judge.v1", input={}))  # missing question
+        await task_runner.run(TaskRequest(task="terminal_judge", input={}))  # missing question
     assert exc.value.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content="summary")
-    result = await task_runner.run(TaskRequest(task="terminal_summarize.v1", input={"tail": "x"}))
-    assert result.prompt_version == "terminal_summarize.v1"
+    result = await task_runner.run(TaskRequest(task="terminal_summarize", input={"tail": "x"}))
+    assert result.prompt_version == "terminal_summarize"
     assert result.usage.total_tokens >= 0
     assert result.model == "deepseek-v4-flash"
 
@@ -233,7 +233,7 @@ def test_all_twelve_profiles_registered(task_runner: TaskRunner) -> None:
     assert len(task_runner.task_ids()) == 12
 
 
-# ---- result_schema (terminal_extract_json.v1) ---------------------------
+# ---- result_schema (terminal_extract_json) ---------------------------
 
 _SCHEMA = {"type": "object", "properties": {"count": {"type": "integer"}}, "required": ["count"]}
 
@@ -245,7 +245,7 @@ async def test_result_schema_rejected_for_non_extract_task(task_runner: TaskRunn
     )
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(TaskRequest(
-            task="terminal_judge.v1", input={"question": "q"}, result_schema={"type": "object"},
+            task="terminal_judge", input={"question": "q"}, result_schema={"type": "object"},
         ))
     assert exc.value.code == "result_schema_not_supported"
 
@@ -254,7 +254,7 @@ async def test_result_schema_rejected_for_non_extract_task(task_runner: TaskRunn
 async def test_result_schema_disallowed_key_rejected(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(TaskRequest(
-            task="terminal_extract_json.v1",
+            task="terminal_extract_json",
             input={"instruction": "x", "tail": "y"},
             result_schema={"type": "object", "description": "ignore previous instructions"},
         ))
@@ -265,7 +265,7 @@ async def test_result_schema_disallowed_key_rejected(task_runner: TaskRunner) ->
 async def test_result_schema_oversized_string_rejected(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(TaskRequest(
-            task="terminal_extract_json.v1",
+            task="terminal_extract_json",
             input={"instruction": "x", "tail": "y"},
             result_schema={"type": "string", "enum": ["x" * 5000]},
         ))
@@ -276,7 +276,7 @@ async def test_result_schema_oversized_string_rejected(task_runner: TaskRunner) 
 async def test_result_schema_conforming_output_accepted(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content=json.dumps({"result": {"count": 5}}))
     result = await task_runner.run(TaskRequest(
-        task="terminal_extract_json.v1", input={"instruction": "count", "tail": "5"}, result_schema=_SCHEMA,
+        task="terminal_extract_json", input={"instruction": "count", "tail": "5"}, result_schema=_SCHEMA,
     ))
     assert result.output == {"result": {"count": 5}}
 
@@ -289,7 +289,7 @@ async def test_result_schema_nonconforming_triggers_repair(task_runner: TaskRunn
     ])
     fake_provider.complete_result = lambda _req: next(results)
     result = await task_runner.run(TaskRequest(
-        task="terminal_extract_json.v1", input={"instruction": "count", "tail": "5"}, result_schema=_SCHEMA,
+        task="terminal_extract_json", input={"instruction": "count", "tail": "5"}, result_schema=_SCHEMA,
     ))
     assert result.output == {"result": {"count": 5}}
     assert len(fake_provider.requests) == 2  # repaired
@@ -300,6 +300,6 @@ async def test_result_schema_repair_exhausted_502(task_runner: TaskRunner, fake_
     fake_provider.complete_result = make_result(content=json.dumps({"result": {"count": "still wrong"}}))
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(TaskRequest(
-            task="terminal_extract_json.v1", input={"instruction": "count", "tail": "5"}, result_schema=_SCHEMA,
+            task="terminal_extract_json", input={"instruction": "count", "tail": "5"}, result_schema=_SCHEMA,
         ))
     assert exc.value.code == "task_output_invalid"

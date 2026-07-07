@@ -25,7 +25,7 @@ class TaskRequest(BaseModel):
     task: str = Field(min_length=1, max_length=128)
     request_id: str | None = Field(default=None, max_length=256)
     input: dict[str, Any] = Field(default_factory=dict)
-    # Only consumed by terminal_extract_json.v1.
+    # Only consumed by terminal_extract_json.
     result_schema: dict[str, Any] | None = None
 
 
@@ -201,8 +201,8 @@ class ExtractionVerdictOutput(BaseModel):
 
 
 # --------------------------------------------------------------------------
-# Workflow intelligence tasks (workflow_plan.v1 / workflow_reconcile.v1 /
-# workflow_resume_digest.v1).
+# Workflow intelligence tasks (workflow_plan / workflow_reconcile /
+# workflow_resume_digest).
 #
 # The execution graph is CLIENT-OWNED durable state: the CLI stores it locally
 # and sends bounded snapshots here. These tasks are pure functions of their

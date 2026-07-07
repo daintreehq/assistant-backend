@@ -73,7 +73,7 @@ async def _run(runner: TaskRunner, task: str, inp: dict[str, Any]) -> dict[str, 
 
 
 # --------------------------------------------------------------------------
-# workflow_plan.v1
+# workflow_plan
 # --------------------------------------------------------------------------
 
 
@@ -81,7 +81,7 @@ async def _run(runner: TaskRunner, task: str, inp: dict[str, Any]) -> dict[str, 
 async def test_plan_happy_path(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content=json.dumps(plan_payload()))
     out = await _run(
-        task_runner, "workflow_plan.v1", {"goal": "Fix watcher tests", "tool_inventory": TOOLS}
+        task_runner, "workflow_plan", {"goal": "Fix watcher tests", "tool_inventory": TOOLS}
     )
     assert out["goal"] == "Fix watcher tests"
     assert [n["id"] for n in out["nodes"]] == ["n_orient", "n_fix", "n_verify"]
@@ -101,7 +101,7 @@ async def test_plan_duplicate_node_ids_repair(
         make_result(content=json.dumps(plan_payload())),
     ])
     fake_provider.complete_result = lambda _req: next(results)
-    out = await _run(task_runner, "workflow_plan.v1", {"goal": "g", "tool_inventory": TOOLS})
+    out = await _run(task_runner, "workflow_plan", {"goal": "g", "tool_inventory": TOOLS})
     assert len(fake_provider.requests) == 2  # repaired
     assert [n["id"] for n in out["nodes"]] == ["n_orient", "n_fix", "n_verify"]
     # The repair retry re-anchors on the plan contract.
@@ -117,7 +117,7 @@ async def test_plan_cycle_rejected(task_runner: TaskRunner, fake_provider: FakeP
     )
     fake_provider.complete_result = make_result(content=json.dumps(cyclic))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_plan.v1", {"goal": "g"})
+        await _run(task_runner, "workflow_plan", {"goal": "g"})
     assert exc.value.code == "task_output_invalid"
 
 
@@ -132,7 +132,7 @@ async def test_plan_cycle_via_edges_rejected(
     )
     fake_provider.complete_result = make_result(content=json.dumps(cyclic))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_plan.v1", {"goal": "g"})
+        await _run(task_runner, "workflow_plan", {"goal": "g"})
     assert exc.value.code == "task_output_invalid"
 
 
@@ -143,7 +143,7 @@ async def test_plan_unknown_dependency_rejected(
     bad = plan_payload(nodes=[node("n_a", depends_on=["n_ghost"])], next_action=None)
     fake_provider.complete_result = make_result(content=json.dumps(bad))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_plan.v1", {"goal": "g"})
+        await _run(task_runner, "workflow_plan", {"goal": "g"})
     assert exc.value.code == "task_output_invalid"
 
 
@@ -154,7 +154,7 @@ async def test_plan_edge_unknown_endpoint_rejected(
     bad = plan_payload(edges=[{"source": "n_orient", "target": "n_ghost"}], next_action=None)
     fake_provider.complete_result = make_result(content=json.dumps(bad))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_plan.v1", {"goal": "g"})
+        await _run(task_runner, "workflow_plan", {"goal": "g"})
     assert exc.value.code == "task_output_invalid"
 
 
@@ -165,7 +165,7 @@ async def test_plan_too_many_nodes_rejected(
     bad = plan_payload(nodes=[node(f"n_{i}") for i in range(21)], next_action=None)
     fake_provider.complete_result = make_result(content=json.dumps(bad))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_plan.v1", {"goal": "g"})
+        await _run(task_runner, "workflow_plan", {"goal": "g"})
     assert exc.value.code == "task_output_invalid"
 
 
@@ -177,7 +177,7 @@ async def test_plan_unknown_next_action_tool_dropped_with_warning(
         next_action={"label": "Do magic", "tool_name": "magic.wand", "node_id": "n_orient"}
     )
     fake_provider.complete_result = make_result(content=json.dumps(payload))
-    out = await _run(task_runner, "workflow_plan.v1", {"goal": "g", "tool_inventory": TOOLS})
+    out = await _run(task_runner, "workflow_plan", {"goal": "g", "tool_inventory": TOOLS})
     # Degrades, never 502s: recommendation dropped, warning explains.
     assert out["next_action"] is None
     assert any("magic.wand" in w for w in out["warnings"])
@@ -191,7 +191,7 @@ async def test_plan_unknown_node_tool_warns_but_keeps_node(
     payload = plan_payload()
     payload["nodes"][2]["tool_name"] = "tests.runMagically"
     fake_provider.complete_result = make_result(content=json.dumps(payload))
-    out = await _run(task_runner, "workflow_plan.v1", {"goal": "g", "tool_inventory": TOOLS})
+    out = await _run(task_runner, "workflow_plan", {"goal": "g", "tool_inventory": TOOLS})
     assert out["nodes"][2]["tool_name"] == "tests.runMagically"
     assert any("tests.runMagically" in w for w in out["warnings"])
     assert out["next_action"] is not None  # its own tool is valid
@@ -205,7 +205,7 @@ async def test_plan_without_inventory_skips_tool_grounding(
         next_action={"label": "Do magic", "tool_name": "magic.wand", "node_id": "n_orient"}
     )
     fake_provider.complete_result = make_result(content=json.dumps(payload))
-    out = await _run(task_runner, "workflow_plan.v1", {"goal": "g"})
+    out = await _run(task_runner, "workflow_plan", {"goal": "g"})
     assert out["next_action"]["tool_name"] == "magic.wand"
     assert out["warnings"] == []
 
@@ -215,7 +215,7 @@ async def test_plan_confidence_clamped(
     task_runner: TaskRunner, fake_provider: FakeProvider
 ) -> None:
     fake_provider.complete_result = make_result(content=json.dumps(plan_payload(confidence=5)))
-    out = await _run(task_runner, "workflow_plan.v1", {"goal": "g"})
+    out = await _run(task_runner, "workflow_plan", {"goal": "g"})
     assert out["confidence"] == 1.0
 
 
@@ -226,7 +226,7 @@ async def test_plan_prompt_includes_skill_outline_not_body(
     fake_provider.complete_result = make_result(content=json.dumps(plan_payload()))
     await _run(
         task_runner,
-        "workflow_plan.v1",
+        "workflow_plan",
         {"goal": "g", "tool_inventory": TOOLS, "active_skill_ids": [SKILL_PREP]},
     )
     user_msg = fake_provider.requests[0].messages[-1]["content"]
@@ -243,7 +243,7 @@ async def test_plan_unknown_skill_id_ignored(
 ) -> None:
     fake_provider.complete_result = make_result(content=json.dumps(plan_payload()))
     await _run(
-        task_runner, "workflow_plan.v1", {"goal": "g", "active_skill_ids": ["nope.missing"]}
+        task_runner, "workflow_plan", {"goal": "g", "active_skill_ids": ["nope.missing"]}
     )
     user_msg = fake_provider.requests[0].messages[-1]["content"]
     assert "Active skill outlines" not in user_msg
@@ -252,12 +252,12 @@ async def test_plan_unknown_skill_id_ignored(
 @pytest.mark.asyncio
 async def test_plan_requires_goal(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
-        await task_runner.run(TaskRequest(task="workflow_plan.v1", input={}))
+        await task_runner.run(TaskRequest(task="workflow_plan", input={}))
     assert exc.value.status_code == 400
 
 
 # --------------------------------------------------------------------------
-# workflow_reconcile.v1
+# workflow_reconcile
 # --------------------------------------------------------------------------
 
 
@@ -311,7 +311,7 @@ async def test_reconcile_happy_path(
     task_runner: TaskRunner, fake_provider: FakeProvider
 ) -> None:
     fake_provider.complete_result = make_result(content=json.dumps(reconcile_payload()))
-    out = await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+    out = await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert out["patch"]["node_updates"] == [
         {"node_id": "n_fix", "status": "done", "title": None, "last_error": None, "note": None}
     ]
@@ -328,7 +328,7 @@ async def test_reconcile_unknown_node_rejected(
     )
     fake_provider.complete_result = make_result(content=json.dumps(bad))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+        await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert exc.value.code == "task_output_invalid"
 
 
@@ -343,7 +343,7 @@ async def test_reconcile_terminal_transition_rejected(
     )
     fake_provider.complete_result = make_result(content=json.dumps(bad))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+        await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert exc.value.code == "task_output_invalid"
 
 
@@ -355,7 +355,7 @@ async def test_reconcile_same_terminal_status_allowed(
         patch={"node_updates": [{"node_id": "n_orient", "status": "done"}]}, next_action=None
     )
     fake_provider.complete_result = make_result(content=json.dumps(same))
-    out = await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+    out = await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert out["patch"]["node_updates"][0]["status"] == "done"
 
 
@@ -373,7 +373,7 @@ async def test_reconcile_add_nodes_and_edges(
         next_action=None,
     )
     fake_provider.complete_result = make_result(content=json.dumps(payload))
-    out = await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+    out = await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert out["patch"]["add_nodes"][0]["id"] == "n_retry"
     assert out["patch"]["add_blockers"][0]["summary"] == "Agent hit lint errors"
 
@@ -385,7 +385,7 @@ async def test_reconcile_add_node_duplicate_id_rejected(
     bad = reconcile_payload(patch={"add_nodes": [node("n_fix")]}, next_action=None)
     fake_provider.complete_result = make_result(content=json.dumps(bad))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+        await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert exc.value.code == "task_output_invalid"
 
 
@@ -399,7 +399,7 @@ async def test_reconcile_cycle_via_added_edge_rejected(
     )
     fake_provider.complete_result = make_result(content=json.dumps(bad))
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+        await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert exc.value.code == "task_output_invalid"
 
 
@@ -411,7 +411,7 @@ async def test_reconcile_unknown_tool_next_action_dropped(
         next_action={"label": "Do magic", "tool_name": "magic.wand"}
     )
     fake_provider.complete_result = make_result(content=json.dumps(payload))
-    out = await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+    out = await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert out["next_action"] is None
     assert any("magic.wand" in w for w in out["warnings"])
 
@@ -426,7 +426,7 @@ async def test_reconcile_unparseable_snapshot_fails_open(
     fake_provider.complete_result = make_result(content=json.dumps(payload))
     out = await _run(
         task_runner,
-        "workflow_reconcile.v1",
+        "workflow_reconcile",
         reconcile_input(workflow={"id": "wf_1", "nodes": "corrupt"}),
     )
     assert out["patch"]["node_updates"][0]["node_id"] == "n_fix"
@@ -436,7 +436,7 @@ async def test_reconcile_unparseable_snapshot_fails_open(
 async def test_reconcile_requires_reason(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(
-            TaskRequest(task="workflow_reconcile.v1", input={"workflow": workflow_snapshot()})
+            TaskRequest(task="workflow_reconcile", input={"workflow": workflow_snapshot()})
         )
     assert exc.value.status_code == 400
 
@@ -450,7 +450,7 @@ async def test_reconcile_repair_path(
         make_result(content=json.dumps(reconcile_payload())),
     ])
     fake_provider.complete_result = lambda _req: next(results)
-    out = await _run(task_runner, "workflow_reconcile.v1", reconcile_input())
+    out = await _run(task_runner, "workflow_reconcile", reconcile_input())
     assert out["summary"].startswith("Fix node completed")
     assert len(fake_provider.requests) == 2
     repair_text = fake_provider.requests[1].messages[-1]["content"]
@@ -458,7 +458,7 @@ async def test_reconcile_repair_path(
 
 
 # --------------------------------------------------------------------------
-# workflow_resume_digest.v1
+# workflow_resume_digest
 # --------------------------------------------------------------------------
 
 
@@ -500,7 +500,7 @@ def resume_payload(**over: Any) -> dict[str, Any]:
 @pytest.mark.asyncio
 async def test_resume_happy_path(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content=json.dumps(resume_payload()))
-    out = await _run(task_runner, "workflow_resume_digest.v1", resume_input())
+    out = await _run(task_runner, "workflow_resume_digest", resume_input())
     assert [r["workflow_id"] for r in out["ranked"]] == ["wf_2", "wf_1"]
     assert out["suggested_focus_workflow_id"] == "wf_2"
     assert out["assistant_context_lines"]
@@ -518,7 +518,7 @@ async def test_resume_drops_invented_workflows_and_focus(
         suggested_focus_workflow_id="wf_ghost",
     )
     fake_provider.complete_result = make_result(content=json.dumps(payload))
-    out = await _run(task_runner, "workflow_resume_digest.v1", resume_input())
+    out = await _run(task_runner, "workflow_resume_digest", resume_input())
     assert [r["workflow_id"] for r in out["ranked"]] == ["wf_1"]
     assert out["suggested_focus_workflow_id"] is None
 
@@ -534,7 +534,7 @@ async def test_resume_orders_by_rank(
         ]
     )
     fake_provider.complete_result = make_result(content=json.dumps(payload))
-    out = await _run(task_runner, "workflow_resume_digest.v1", resume_input())
+    out = await _run(task_runner, "workflow_resume_digest", resume_input())
     assert [r["rank"] for r in out["ranked"]] == [1, 2]
 
 
@@ -545,7 +545,7 @@ async def test_resume_empty_workflows(
     fake_provider.complete_result = make_result(
         content=json.dumps({"ranked": [], "suggested_focus_workflow_id": None})
     )
-    out = await _run(task_runner, "workflow_resume_digest.v1", {"workflows": []})
+    out = await _run(task_runner, "workflow_resume_digest", {"workflows": []})
     assert out == {
         "ranked": [],
         "suggested_focus_workflow_id": None,

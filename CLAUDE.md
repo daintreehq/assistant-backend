@@ -107,7 +107,7 @@ A backend-internal harness (`services/skill_learning.py`) that watches completed
 
 **Write target** (`SKILL_LEARNING_DIR`): empty → the packaged `skills/files/` (edit-in-place; improvements land in `git diff`). Set to a separate dir to overlay instead — the catalog then loads packaged + overlay (`load_catalog(primary, overlay)`), overlay winning on id collision, leaving the source tree untouched.
 
-**Prompts have no version suffix** (`gate.md`, not `gate.v1.md`) — pre-release internal prompts, unlike wire-contract `tasks/<task>.v1.md`. They are snapshotted in `tests/golden/` like every other prompt. Because apply-mode writes real skill files, an interactive session will dirty the catalog (`git diff` under `skills/files/`) — but **not** the golden snapshots, which render against a pinned fixture catalog. Regenerate goldens only when you change a prompt template or the assembler.
+**Prompts have no version suffix** (`gate.md`, not `gate.v1.md`) — like every prompt in the system, task prompts included (see "Versioning" below). They are snapshotted in `tests/golden/` like every other prompt. Because apply-mode writes real skill files, an interactive session will dirty the catalog (`git diff` under `skills/files/`) — but **not** the golden snapshots, which render against a pinned fixture catalog. Regenerate goldens only when you change a prompt template or the assembler.
 
 ## Prompts / system messages
 
@@ -116,7 +116,7 @@ All prompt text is **server-owned** and lives in `src/daintree_assistant_server/
 - `main/base.md` — the permanent assistant system prompt (persona + hard rules). This is the highest-leverage file in the repo.
 - `main/{runtime_context,integrations,loaded_skills,turn_footer}.md.j2` — the dynamic main-prompt layers.
 - `selector/system.md.j2` — the skill-selector classifier prompt.
-- `tasks/<task>.v1.md` — utility-task system prompts.
+- `tasks/<task>.md` — utility-task system prompts.
 
 **Two things that are easy to get wrong:**
 
@@ -126,9 +126,13 @@ All prompt text is **server-owned** and lives in `src/daintree_assistant_server/
 ## Versioning (pre-release)
 
 This service is **pre-release and running locally** — there is no deployed version to stay
-compatible with. Treat everything on disk as simply "the current version." **Do not add
-version numbers, SemVer, or date stamps to prompts, skills, or prompt-family labels, and do
-not bump them on a change.** Edit freely and let the golden-snapshot diff be the record.
+compatible with. **This is not a versioned system.** Nothing embedded in it — prompts,
+skills, task identifiers, prompt-family labels — carries a version; everything on disk is
+simply "the current version." **Do not add version numbers, SemVer, or date stamps to any
+of it, and do not bump anything on a change.** Edit freely and let the golden-snapshot diff
+be the record. The one `v1` Daintree itself owns is the API URL path prefix
+(`/v1/daintree/...`), kept solely so the URL can change shape in the future — it is not a
+claim that anything behind it is versioned.
 
 **The whole system — this backend AND the CLI — is a pre-release work in progress. Never
 engineer for backward compatibility.** There are no external users: the only client is the
@@ -149,9 +153,12 @@ What this means concretely:
 - **Prompt-family labels** (`MAIN_PROMPT_VERSION` / `SELECTOR_PROMPT_VERSION` in
   `prompts/loader.py`) are fixed names — `"main"` and `"selector"` — surfaced as
   `prompt_version`. They identify *which* prompt, not a revision; leave them alone.
-- The **only `v1` that stays** is the wire identifier: the API URL path (`/v1/daintree/...`)
-  and task identifiers (`<task>.v1`, e.g. `terminal_summarize.v1`, with their matching
-  `tasks/<task>.v1.md` prompt files). Those are part of the request contract — keep them.
+- **Task identifiers are unversioned** — `terminal_summarize`, not `terminal_summarize.v1`,
+  with matching `tasks/<task>.md` prompt files. A task id names *which* task, never a
+  revision of it; a task's behavior changes by editing its prompt/profile in place (CLI
+  updated in lockstep).
+- The **only `v1` that stays** is the API URL path (`/v1/daintree/...`) — a URL-shape
+  escape hatch for the future, not a version claim over anything behind it.
 - Separately, **build/protocol versioning is not in scope here and stays as-is**: the
   `/version` endpoint, `server_version`, `protocol_version` / `X-Daintree-Protocol`, and the
   signed-state-token format version (`TOKEN_VERSION`) are real wire/build metadata, unrelated
@@ -166,15 +173,15 @@ something to reintroduce incidentally.
 
 ## Utility tasks (`POST /v1/daintree/tasks`)
 
-`services/task_runner.py` runs named small-model tasks (checkpoint, memory distill, watcher classify, terminal summarize/extract/judge, etc.). Each is a server-owned `TaskProfile` that picks the prompt, output mode (`json`/`text`), temperature, and token cap; clients send only task *data* (never `messages`/`system`). JSON tasks get one repair retry on parse failure. `terminal_extract_json.v1` is the only task that accepts a client `result_schema` (validated for size/depth/keys by `services/result_schema.py`). Adding a task = new `TaskProfile` + input/output models in `contracts/tasks.py` + a `tasks/<id>.md` prompt + a golden snapshot.
+`services/task_runner.py` runs named small-model tasks (checkpoint, memory distill, watcher classify, terminal summarize/extract/judge, etc.). Each is a server-owned `TaskProfile` that picks the prompt, output mode (`json`/`text`), temperature, and token cap; clients send only task *data* (never `messages`/`system`). JSON tasks get one repair retry on parse failure. `terminal_extract_json` is the only task that accepts a client `result_schema` (validated for size/depth/keys by `services/result_schema.py`). Adding a task = new `TaskProfile` + input/output models in `contracts/tasks.py` + a `tasks/<id>.md` prompt + a golden snapshot.
 
 ## Workflow intelligence (stateless backend half)
 
 The CLI owns durable **workflow execution graphs** (typed DAGs of nodes/resources/blockers, stored in its local SQLite); the backend contributes only stateless intelligence — it never persists workflow state (Cloud Run safe). Three utility tasks (`services/task_runner.py`, semantic checks in `services/workflow_validation.py`, contracts in `contracts/tasks.py`):
 
-- `workflow_plan.v1` — goal + runtime summary + tool inventory (+ compact **outlines** of the active skills, via the task runner's catalog access — step headings only, never bodies) → a typed plan (≤20 nodes / ≤40 edges).
-- `workflow_reconcile.v1` — graph snapshot + recent events → a typed patch + next action.
-- `workflow_resume_digest.v1` — workflow snapshots → ranked, prompt-ready resume package ("where were we?").
+- `workflow_plan` — goal + runtime summary + tool inventory (+ compact **outlines** of the active skills, via the task runner's catalog access — step headings only, never bodies) → a typed plan (≤20 nodes / ≤40 edges).
+- `workflow_reconcile` — graph snapshot + recent events → a typed patch + next action.
+- `workflow_resume_digest` — workflow snapshots → ranked, prompt-ready resume package ("where were we?").
 
 Output posture: **structural defects** (cycle, duplicate/unknown node id, moving a `done`/`skipped`/`cancelled` node) are treated like parse failures — one repair retry, then 502; **unknown tool names** degrade instead (`next_action` nulled + warning) so a missing capability never sinks the task. Plans/patches are recommendations only — the client validates and applies them through its own dispatch/confirmation policy; nothing here executes tools.
 
