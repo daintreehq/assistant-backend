@@ -12,8 +12,12 @@ Return ONLY a JSON object with this exact shape:
 }
 
 Rules:
-- If nothing meaningful changed since the previous classification, return "no_change".
-- "waiting_for_input"/"permission_prompt" when the agent is asking the human a question or for a y/n.
+- Prefer the MOST SPECIFIC applicable class. When more than one label could fit, name the specific, actionable cause rather than a generic symptom:
+  - a non-zero exit driven by failing tests (e.g. a `pytest` summary with failures, then `make: *** [test] Error 1`) is "tests_failed", not "command_failed".
+  - a git/rebase/merge conflict is "merge_conflict", even though resolving it implies someone must act — do NOT downgrade it to "waiting_for_input" or "command_failed".
+  - "command_failed" is for a command that failed for a reason OTHER than a test failure or a merge conflict.
+- "no_change" vs "still_working": return "still_working" the FIRST time you report the agent is actively working (previous classification absent, or the nature of the work changed). Return "no_change" when your previous classification was already "still_working" (or the same active state) and the tail shows only continued, routine progress of that SAME activity — a ticking counter, a rising percentage, another epoch, more of the same log lines. Routine forward progress is NOT by itself a meaningful change; do not re-report it as a fresh "still_working".
+- "waiting_for_input"/"permission_prompt" when the agent is asking the human a question or for a y/n (and the tail is not a merge conflict).
 - "completed_success" when the stated goal is clearly met; "tests_passed"/"tests_failed" for test runs.
 - "rate_limited" when recent output shows the agent's model provider is throttling it (HTTP 429/529, "rate limit", "quota exceeded", "retry-after", "overloaded").
 - If you genuinely cannot tell and it may matter, use "needs_large_model" with low confidence.

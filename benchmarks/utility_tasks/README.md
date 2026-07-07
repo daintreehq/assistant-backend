@@ -86,3 +86,41 @@ output/mismatch/latency/tokens, and the summary block (strict cases, trial pass
 rate, per-task and per-category breakdown, latency percentiles). Latency is
 end-to-end per task call (render + API + parse + any repair retry) — exactly the
 cost `/v1/daintree/tasks` pays.
+
+## Findings (2026-07-07, deepseek-v4-flash, 46 cases x 3 trials)
+
+| run | strict cases | trial pass | p50 | p90 | notes |
+|---|---|---|---|---|---|
+| baseline | 43/46 (93.5%) | 132/138 (95.7%) | 2.14s | 3.68s | all 6 misses in `watcher_classify` |
+| **+ watcher precedence fix** | **46/46 (100%)** | **138/138 (100%)** | 2.50s | 4.44s | 3 cases fixed, 0 regressions |
+
+Per task, all misses were `watcher_classify` (85.7% → 100%); `terminal_judge`,
+`extraction_verdict`, and `skill_step_consistency` were 100% at baseline.
+
+What moved the needle — **the watcher prompt enumerated the classes but gave no
+precedence for overlapping ones**, so the small model picked a defensible-but-wrong
+neighbour:
+
+- **`merge_conflict` → `waiting_for_input` / `command_failed`** (0–1/3): a rebase
+  conflict was downgraded to "waiting for someone to resolve it" or a generic
+  command failure.
+- **`tests_failed` → `command_failed`** (2/3): a `pytest` failure that also
+  tripped `make: *** [test] Error 1` read as a generic non-zero exit.
+- **`no_change` → `still_working`** (0/3): routine forward progress (a training
+  run ticking `epoch 3/50`) was re-reported as fresh activity instead of "nothing
+  meaningfully changed since I last said still_working".
+
+The fix (`tasks/watcher_classify.md`) adds a **most-specific-class-wins** rule
+naming those precedences, and a **still_working vs no_change** rule (first report
+= `still_working`; continued routine progress of the same activity = `no_change`).
+It took the suite to 100% with no regressions across 70 trials.
+
+- **A tighter rewrite lost accuracy for no token saving.** `v3-tight` compressed
+  the same rules into two dense sentences: it dropped a *clear* `tests_passed`
+  trial (92.9% strict) while completion tokens barely moved (292 → 301). As with
+  the selector, the thinking model uses the verbal room; compressing the rules
+  costs reliability without buying latency. The fuller phrasing was promoted.
+- **Cost of the win**: the longer watcher prompt adds ~340 prompt tokens and
+  ~0.4s p50 on that task. Watchers run on the background supervisor queue (60s
+  timeout), not the user's first-byte path, so accuracy is worth far more than
+  the latency here — the opposite of the selector's trade.
