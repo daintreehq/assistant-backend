@@ -3,6 +3,8 @@ scenarios from specification section 19.5 (native protocol)."""
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from conftest import meta_of, parse_sse, respond_body
 from fakes import FakeProvider, make_result, make_text_chunks, selection_result
@@ -318,3 +320,129 @@ def test_unsupported_protocol_426(client, auth) -> None:
     r = client.post(URL, headers={**auth, "X-Daintree-Protocol": "99"},
                     json=respond_body([{"role": "user", "content": "x"}]))
     assert r.status_code == 426
+
+
+# ---- tool-call argument repair (schema-guided, server-side) ------------------
+
+# The real terminal.extract shape from the CLI's registry projection: the batch
+# field is `terminalIds` (array), while most sibling terminal tools take a
+# single `terminalId` string — the near miss the repair layer exists for.
+EXTRACT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "terminal__extract",
+        "parameters": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["terminalIds"],
+            "properties": {
+                "instruction": {"type": "string"},
+                "terminalIds": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+}
+
+
+def test_nonstream_tool_call_arguments_repaired(client, auth, fake_provider) -> None:
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = make_result(
+        tool_calls=[{
+            "id": "call_0", "type": "function", "index": 0,
+            "function": {
+                "name": "terminal__extract",
+                "arguments": '{"terminalId": "terminal-1", "instruction": "vote?"}',
+            },
+        }],
+        finish_reason="tool_calls",
+    )
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the vote"}], session_id="tr1", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    assert r.status_code == 200
+    calls = r.json()["message"]["tool_calls"]
+    assert json.loads(calls[0]["function"]["arguments"]) == {
+        "terminalIds": ["terminal-1"], "instruction": "vote?",
+    }
+    assert "index" not in calls[0]  # provider-specific field still dropped
+
+
+def test_stream_tool_calls_consolidated_and_repaired(client, auth, fake_provider) -> None:
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_chunks = [
+        {"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"content": "Reading votes."}, "finish_reason": None}]},
+        # call 0 arrives fragmented, with the singular near-miss field.
+        {"choices": [{"index": 0, "delta": {"tool_calls": [
+            {"index": 0, "id": "call_0", "type": "function",
+             "function": {"name": "terminal__extract", "arguments": '{"terminalId": "term'}},
+        ]}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"tool_calls": [
+            {"index": 0, "function": {"arguments": 'inal-1", "instruction": "vote?"}'}},
+        ]}, "finish_reason": None}]},
+        # call 1 is already valid — and its opening delta ALSO carries content,
+        # which must still stream out immediately (never held with the calls).
+        {"choices": [{"index": 0, "delta": {"content": " Now call 1.", "tool_calls": [
+            {"index": 1, "id": "call_1", "type": "function",
+             "function": {"name": "terminal__extract",
+                          "arguments": '{"terminalIds": ["terminal-2"], "instruction": "vote?"}'}},
+        ]}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}],
+         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}},
+    ]
+    body = respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="tr2", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    assert [e for e, _ in events][-1] == "done"
+    # Both calls flush together at stream end, in ONE delta placed after every
+    # content delta and before done — one consolidated fragment per call.
+    groups = [d["tool_calls"] for e, d in events if e == "delta" and d.get("tool_calls")]
+    assert len(groups) == 1
+    fragments = groups[0]
+    assert [f["index"] for f in fragments] == [0, 1]
+    assert json.loads(fragments[0]["function"]["arguments"]) == {
+        "terminalIds": ["terminal-1"], "instruction": "vote?",
+    }
+    assert fragments[1]["function"]["arguments"] == (
+        '{"terminalIds": ["terminal-2"], "instruction": "vote?"}'
+    )
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert content == "Reading votes. Now call 1."
+    # The content that rode alongside call 1's fragment streamed BEFORE the calls.
+    kinds_with_calls = [
+        "calls" if d.get("tool_calls") else "content"
+        for e, d in events
+        if e == "delta"
+    ]
+    assert kinds_with_calls[-1] == "calls"
+
+
+def test_stream_tool_calls_passthrough_without_tools(client, auth, fake_provider) -> None:
+    # No input.tools declared -> empty parameter index -> arguments untouched,
+    # but calls still arrive consolidated.
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_chunks = [
+        {"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"tool_calls": [
+            {"index": 0, "id": "call_0", "type": "function",
+             "function": {"name": "terminal__extract",
+                          "arguments": '{"terminalId": "terminal-1"}'}},
+        ]}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}],
+         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}},
+    ]
+    body = respond_body(
+        [{"role": "user", "content": "read"}], session_id="tr3", turn_id="t1",
+        generation={"stream": True},
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    fragments = [c for e, d in events if e == "delta" for c in d.get("tool_calls", [])]
+    assert len(fragments) == 1
+    assert fragments[0]["function"]["arguments"] == '{"terminalId": "terminal-1"}'

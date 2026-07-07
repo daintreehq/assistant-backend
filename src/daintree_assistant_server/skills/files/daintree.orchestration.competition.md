@@ -1,9 +1,9 @@
 ---
 id: daintree.orchestration.competition
 title: Orchestrate a competition or peer-judging among agents
-summary: Spawn a cohort of agents to produce independent responses, then judge and tally the best one — competitive evaluation pattern.
-whenToUse: Use when you need to spawn several agents to produce independent outputs (facts, ideas, solutions) and then pick the best through scoring, voting, or peer review — including the agents reviewing and voting on each other's submissions. Do not use for a judge-led interview (use the interview skill), a simple independent fleet poll with no scoring (use the poll-pinned-agents skill), or a runoff after a tie (use the runoff tie-breaker skill).
-priority: 90
+summary: Ask or spawn named agents for independent submissions (including one interesting fact each), award top-pick points, relay submissions for peer votes, then tally a winner.
+whenToUse: Use when the user asks you to ask/spawn several named agents (Claude, Anti-Gravity, OpenCode, Grok, Codex, etc.) each for an independent item — e.g. “one interesting fact,” “off the top of its head,” an idea, fact, answer, or solution — and then choose the best/top two, award points, send each agent the other agents’ submissions, ask them to vote which is best, score the votes, or tally a winner. Do not use for a judge-led interview (use the interview skill), a simple independent fleet poll with no scoring/voting/tally (use the poll-pinned-agents skill), collaborative debate toward one answer (use the multi-agent skill), or a runoff after a tie (use the runoff tie-breaker skill).
+priority: 100
 risk: project
 tags:
   - daintree
@@ -13,6 +13,10 @@ tags:
   - voting
   - multi-agent
   - peer-review
+  - facts
+  - points
+  - tally
+  - winner
 requiredTools:
   - agentTask.spawnForEdits
   - terminal.awaitAll

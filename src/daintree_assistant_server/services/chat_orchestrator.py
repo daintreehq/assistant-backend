@@ -48,6 +48,12 @@ from ..text_utils import sanitize_line
 from .output_policy import lint_output, repair_tables
 from .prompt_assembler import PromptAssembler
 from .skill_learning import SkillLearner
+from .tool_call_repair import (
+    ParameterIndex,
+    StreamToolCallBuffer,
+    build_parameter_index,
+    repair_tool_call_arguments,
+)
 
 logger = get_logger("daintree.respond")
 
@@ -339,7 +345,9 @@ class ChatOrchestrator:
         # such even if a malformed upstream drops the tool_calls payload.
         had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
         self._lint_final_output(result, request_id=request_id, had_tool_calls=had_tool_calls)
-        body = self._build_nonstream_body(result, meta)
+        body = self._build_nonstream_body(
+            result, meta, param_index=build_parameter_index(request.input.tools)
+        )
         self._maybe_learn_after_turn(
             request=request,
             active_ids=active_ids,
@@ -624,7 +632,9 @@ class ChatOrchestrator:
 
     # ---- response bodies ------------------------------------------------
 
-    def _build_nonstream_body(self, result: Any, meta: _RespondMeta) -> dict[str, Any]:
+    def _build_nonstream_body(
+        self, result: Any, meta: _RespondMeta, *, param_index: ParameterIndex
+    ) -> dict[str, Any]:
         message = result.message or {}
         response = RespondResponse(
             request_id=meta.request_id,
@@ -633,7 +643,11 @@ class ChatOrchestrator:
                 role=message.get("role", "assistant"),
                 content=message.get("content"),
                 reasoning_content=message.get("reasoning_content"),
-                tool_calls=self._normalize_tool_calls(message.get("tool_calls")),
+                tool_calls=self._normalize_tool_calls(
+                    message.get("tool_calls"),
+                    param_index=param_index,
+                    request_id=meta.request_id,
+                ),
             ),
             finish_reason=result.finish_reason,
             usage=self._usage(result.usage),
@@ -645,23 +659,43 @@ class ChatOrchestrator:
         )
         return response.model_dump(exclude_none=True)
 
-    @staticmethod
-    def _normalize_tool_calls(raw: Any) -> list[dict[str, Any]] | None:
+    def _normalize_tool_calls(
+        self, raw: Any, *, param_index: ParameterIndex, request_id: str
+    ) -> list[dict[str, Any]] | None:
         """Project upstream tool-call dicts onto the strict response shape,
-        dropping provider-specific fields (e.g. DeepSeek's ``index``)."""
+        dropping provider-specific fields (e.g. DeepSeek's ``index``) and
+        repairing near-miss arguments against the client-declared schemas."""
         if not raw:
             return None
         out: list[dict[str, Any]] = []
         for call in raw:
             fn = call.get("function") or {}
+            name = fn.get("name", "")
+            arguments, notes = repair_tool_call_arguments(
+                name, fn.get("arguments", ""), param_index
+            )
+            if notes:
+                self._log_tool_call_repairs([(name, notes)], request_id=request_id)
             out.append(
                 {
                     "id": call.get("id", ""),
                     "type": call.get("type", "function"),
-                    "function": {"name": fn.get("name", ""), "arguments": fn.get("arguments", "")},
+                    "function": {"name": name, "arguments": arguments},
                 }
             )
         return out
+
+    @staticmethod
+    def _log_tool_call_repairs(
+        repairs: list[tuple[str, list[str]]], *, request_id: str
+    ) -> None:
+        for tool, notes in repairs:
+            logger.info(
+                "tool_call_arguments_repaired",
+                request_id=request_id,
+                tool=tool,
+                repairs=notes,
+            )
 
     @staticmethod
     def _usage(usage: ProviderUsage) -> RespondUsage:
@@ -695,6 +729,12 @@ class ChatOrchestrator:
         content_parts: list[str] = []
         saw_tool_calls = False
         completed = False
+        # Tool-call fragments are held per call (never forwarded piecemeal) so the
+        # completed arguments can be schema-repaired before the client sees them.
+        # All calls flush together at stream end: the client only dispatches tools
+        # once the round is complete, so consolidation adds no real latency, and
+        # holding everything tolerates providers that interleave call fragments.
+        tool_call_buffer = StreamToolCallBuffer(build_parameter_index(request.input.tools))
         try:
             # The metadata event is always first, before any token: the client gets
             # the skill prelude, active set, refreshed state, and selector outcome
@@ -720,14 +760,30 @@ class ChatOrchestrator:
                     continue
                 if delta.content:
                     content_parts.append(delta.content)
-                if delta.tool_calls:
-                    saw_tool_calls = True
                 # Announce the thinking phase once, the instant the model's
                 # chain-of-thought starts streaming, so the CLI can show it.
                 if delta.reasoning_content and not thinking_signaled:
                     thinking_signaled = True
                     yield self._sse("status", StreamStatus(phase="thinking").model_dump())
+                if delta.tool_calls:
+                    saw_tool_calls = True
+                    ready = tool_call_buffer.add(delta.tool_calls)
+                    if delta.content or delta.reasoning_content:
+                        yield self._sse(
+                            "delta",
+                            StreamDelta(
+                                content=delta.content,
+                                reasoning_content=delta.reasoning_content,
+                            ),
+                        )
+                    if ready:
+                        yield self._sse("delta", StreamDelta(tool_calls=ready))
+                    continue
                 yield self._sse("delta", delta)
+            remaining = tool_call_buffer.flush()
+            if remaining:
+                yield self._sse("delta", StreamDelta(tool_calls=remaining))
+            self._log_tool_call_repairs(tool_call_buffer.repairs, request_id=meta.request_id)
             usage = self._usage(stream.usage or ProviderUsage())
             yield self._sse(
                 "done", StreamDone(finish_reason=finish_reason, usage=usage).model_dump()
