@@ -33,6 +33,7 @@ import difflib
 import json
 import os
 import re
+from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -270,6 +271,12 @@ def _unified_diff(old: str, new: str, skill_id: str) -> str:
 class SkillLearner:
     """Runs the post-completion skill-learning pipeline. Constructed only when enabled."""
 
+    # Per-session learned-skill damp: how many sessions the in-memory registry
+    # remembers (LRU). Like ``_lock``, this is in-process state — fine here because
+    # skill learning is a single-worker LOCAL DEV harness (it can never run in
+    # production, where the backend must stay stateless).
+    _MAX_COOLDOWN_SESSIONS = 64
+
     def __init__(
         self,
         *,
@@ -299,6 +306,15 @@ class SkillLearner:
         # there is no cross-process writer to coordinate with. Model calls run OUTSIDE
         # this lock so one request's learning never blocks another request's answer.
         self._lock = asyncio.Lock()
+        # Skill ids a learning pass already changed (or proposed a change for), per
+        # session — the completed workflow stays in the conversation history for many
+        # turns, and every later final answer re-fires the gate over it. The identical-
+        # render guard catches byte-identical re-applies, but a thinking model re-run
+        # on the same evidence usually lands a slightly DIFFERENT body each time —
+        # unchecked, one workflow keeps rewriting the same skill all session (drift
+        # bloat). One landed change per skill per session; a genuinely new lesson for
+        # that skill re-fires in a later session.
+        self._session_landed: OrderedDict[str, set[str]] = OrderedDict()
 
     @property
     def enabled(self) -> bool:
@@ -337,6 +353,21 @@ class SkillLearner:
         # There must be prior assistant work to learn from.
         return any(m.role == "assistant" for m in messages)
 
+    # ---- per-session damp -------------------------------------------------
+
+    def _already_landed(self, session_id: str, skill_id: str | None) -> bool:
+        if not skill_id:
+            return False
+        landed = self._session_landed.get(session_id)
+        return landed is not None and skill_id in landed
+
+    def _mark_landed(self, session_id: str, skill_id: str) -> None:
+        landed = self._session_landed.setdefault(session_id, set())
+        landed.add(skill_id)
+        self._session_landed.move_to_end(session_id)
+        while len(self._session_landed) > self._MAX_COOLDOWN_SESSIONS:
+            self._session_landed.popitem(last=False)
+
     async def _run(
         self, request: RespondRequest, active_ids: list[str], messages: Sequence[ChatMessage]
     ) -> LearningOutcome:
@@ -353,6 +384,20 @@ class SkillLearner:
                 confidence=verdict.confidence,
                 learnable=verdict.learnable,
                 acted=False,
+            )
+            return LearningOutcome()
+
+        # One landed change per skill per session: the same completed workflow keeps
+        # re-firing the gate on every later final answer, and each improver re-run
+        # lands a slightly different rewrite. Skip before spending a builder call.
+        session_id = request.session.id
+        if verdict.action == "improve_existing_skill" and self._already_landed(
+            session_id, verdict.target_skill_id
+        ):
+            logger.info(
+                "skill_learning_session_cooldown",
+                skill_id=verdict.target_skill_id,
+                session_id=session_id,
             )
             return LearningOutcome()
 
@@ -409,6 +454,11 @@ class SkillLearner:
             logger.info("skill_learning_identical_skipped", skill_id=skill.id)
             return LearningOutcome()
 
+        # Mark BEFORE applying: even a race/stale skip or a rolled-back commit means
+        # this session already spent (or lost) its one change for this skill — a
+        # create is marked too, so re-learning the same workflow can't immediately
+        # re-improve the skill it just minted.
+        self._mark_landed(session_id, skill.id)
         return await self._apply(
             skill=skill,
             markdown=markdown,
