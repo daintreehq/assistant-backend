@@ -20,7 +20,10 @@ SKILL_BODY_HARD_CEILING = 24 * 1024
 # may legitimately exceed it (allowlisted). Loading MULTIPLE skills, not shrinking each,
 # is the priority, so this is deliberately generous.
 SKILL_BODY_RECOMMENDED = 16 * 1024
-OVERSIZE_ALLOWLIST = {"daintree.orchestration.multi-agent"}
+# Empty for now: multi-agent was trimmed back under SKILL_BODY_RECOMMENDED, so nothing
+# currently needs an exemption. Add a skill id here (with justification) if one legitimately
+# grows past the soft budget.
+OVERSIZE_ALLOWLIST: set[str] = set()
 
 
 def _base() -> str:
