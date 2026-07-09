@@ -1,8 +1,8 @@
 ---
 id: daintree.orchestration.competition
 title: Orchestrate a competition or peer-judging among agents
-summary: 'Run a scored named-agent contest: ask Claude/Anti-Gravity/OpenCode/Grok/Codex/etc. for quick independent items such as one interesting fact off the top of its head, pick top entries, relay submissions for peer votes, then tally a winner or tie.'
-whenToUse: Use when the user asks you to ask/spawn several named agents (Claude, Anti-Gravity, OpenCode, Grok, Codex, etc.) each for a quick independent item — especially “one interesting fact,” “off the top of its head,” “not related to the codebase,” or “completely unique” — and then choose/pick the best or top two, give/award points, send each agent the other agents’ submissions/facts, ask them to choose which is best, score the votes, tally points, tell which agent gave the most interesting fact, declare a winner, or handle winner-only follow-up after a tied tally. Do not use for a judge-led interview (use the interview skill), a simple independent fleet poll with no scoring/voting/tally (use the poll-pinned-agents skill), collaborative debate toward one answer (use the multi-agent skill), or a runoff/new voting round after a tie (use the runoff tie-breaker skill).
+summary: 'Run a scored named-agent contest: ask agents such as Claude, Anti-Gravity, OpenCode, Grok, Codex, etc. each for one interesting fact or other quick independent item, pick top entries, relay all submissions for peer votes, tally points, and declare the winner or tie.'
+whenToUse: Use when the user asks you to ask Claude, Anti-Gravity, OpenCode, Grok, Codex, or several named agents to each give one interesting fact, give you one interesting fact off the top of its head, not related to the codebase, something completely unique, or another quick independent item, then choose the best/top two, give or award points, send each agent the facts/submissions from the other agents, ask each open agent to choose which is best, tally everything up, tell which agent gave the most interesting fact, declare a winner, or handle winner-only follow-up after a tied tally. Do not use for a judge-led interview (use the interview skill), a simple independent fleet poll with no scoring/voting/tally (use the poll-pinned-agents skill), collaborative debate toward one answer (use the multi-agent skill), or a runoff/new voting round after a tie (use the runoff tie-breaker skill).
 priority: 100
 risk: project
 tags:
@@ -15,8 +15,10 @@ tags:
   - peer-review
   - facts
   - interesting-fact
+  - off-the-top-of-head
   - named-agents
   - points
+  - top-two
   - tally
   - winner
   - tie
