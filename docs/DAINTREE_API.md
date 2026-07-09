@@ -254,22 +254,23 @@ reserved and rejected if a client offers them as tools or replays them in histor
 
 ## Prompt assembly & caching
 
-The upstream message array keeps the large **append-only conversation** in the upstream
-provider's cached prefix (DeepSeek prompt caching, keyed by `prompt_cache_key`); the small
-per-request tail (skill bodies + runtime + footer) follows it. The active
-skill set changes by wholesale replacement on a topic shift, so the bodies sit *after* the
-conversation — a skill load/evict then re-encodes only that bounded tail, never the
-conversation, and the runbook lands near generation (better for the small model).
+DeepSeek serializes the prompt as **[all system messages, in array order] →
+[tools] → [non-system conversation]** — a system message anywhere in the array
+lands in the leading system region, before the ~18k-token tool schemas
+(measured 2026-07-08: volatile system-role runtime context after the
+conversation cut byte-identical turns to a 36% cache hit; 99% after this
+layout). The rule: **only stable content may be system-role**; per-request
+variable context rides ONE trailing user-role "[Injected context …]" data
+block, where it costs exactly its own tokens.
 
-| # | Message | Stability |
-|---|---------|-----------|
-| 1 | Base system prompt | static — cached across all sessions |
-| 2 | Integrations (MCP servers + tool index) | session-stable |
-| 3 | Conversation | append-only — the cached bulk |
-| 4 | Active skill bodies | per-request tail (omitted when the active set is empty) |
-| 5 | Runtime context | per-request |
-| 6 | Turn footer | per-request |
-| 7 | Response contract | per-request — output-shape rules, last so they sit nearest generation |
+| # | Message | Role | Stability |
+|---|---------|------|-----------|
+| 1 | Base system prompt | system | static — cached across all sessions |
+| 2 | Integrations (MCP servers + tool index) | system | session-stable |
+| 3 | Active skill bodies | system | semi-stable — replaced wholesale on a selector topic shift (omitted when empty) |
+| 4 | Response contract | system | static — output-shape rules |
+| 5 | Conversation | user/assistant/tool | append-only — the cached bulk |
+| 6 | Injected context (runtime + turn footer) | user | per-request tail — the only volatile block |
 
 All client-provided context (ids, names, MCP details, project instructions, memories,
 worktrees) is treated as untrusted data: single-line fields collapse whitespace; multiline

@@ -147,10 +147,13 @@ def test_workflow_state_reaches_assembled_request(assembler: PromptAssembler) ->
         },
     })
     pr = assembler.build_main_request(request=req, skills=[], upstream_model="m")
+    # The turn footer now rides the trailing user-role injected-context block
+    # (volatile content must stay out of the system role for cache stability).
     footers = [
         m["content"]
         for m in pr.messages
-        if m["role"] == "system" and "Durable workflows" in str(m["content"])
+        if m["role"] == "user" and "Durable workflows" in str(m["content"])
     ]
     assert len(footers) == 1
     assert "- wf_9 [blocked] Ship it" in footers[0]
+    assert footers[0].startswith("[Injected context")

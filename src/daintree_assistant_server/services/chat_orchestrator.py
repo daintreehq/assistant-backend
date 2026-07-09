@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -243,6 +244,7 @@ class ChatOrchestrator:
     ) -> RespondOutcome:
         request_id = request_id or new_request_id()
         session_id = request.session.id
+        t_start = time.perf_counter()
 
         warnings: list[str] = []
         verification = self.state_codec.verify(request.state, session_id=session_id)
@@ -270,13 +272,16 @@ class ChatOrchestrator:
             instruction_revision=request.session.instruction_revision,
         )
 
+        selector_ms = 0
         if run_selector:
+            t_sel = time.perf_counter()
             decision = await self.selector.select(
                 request.input.messages,
                 prior_active_ids,
                 turn_context=self._selector_turn_context(request),
                 available_tools=self._available_tool_names(request),
             )
+            selector_ms = round((time.perf_counter() - t_sel) * 1000)
         else:
             decision = SelectionDecision.reuse(prior_active_ids)
         warnings.extend(decision.warnings)
@@ -331,10 +336,21 @@ class ChatOrchestrator:
             active_skills=active_ids,
             newly_loaded=newly_loaded_ids,
             warnings=warnings,
+            selector_ms=selector_ms,
+            pre_upstream_ms=round((time.perf_counter() - t_start) * 1000),
         )
 
         if request.generation.stream:
+            t_open = time.perf_counter()
             stream, first_event = await self._open_stream_with_retry(provider_request)
+            # Phase timing for the round's "dead air": selector (above) + upstream
+            # open-to-first-event. upstream_first_event_ms dominates on cache misses
+            # (prefill) and on thinking-heavy rounds (reasoning precedes the event).
+            logger.info(
+                "respond_upstream_open",
+                request_id=request_id,
+                upstream_first_event_ms=round((time.perf_counter() - t_open) * 1000),
+            )
             body_iter = self._stream_body(
                 stream, first_event, meta=meta, request=request, active_ids=active_ids
             )

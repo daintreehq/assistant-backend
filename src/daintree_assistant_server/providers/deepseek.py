@@ -20,7 +20,10 @@ does not understand the field. See ``_build_body``.
 from __future__ import annotations
 
 import contextlib
+import itertools
 import json
+import os
+import time
 from typing import Any
 
 import httpx
@@ -39,6 +42,27 @@ from .sse import iter_sse_data, parse_chunk
 logger = get_logger("daintree.deepseek")
 
 _CHAT_PATH = "/chat/completions"
+
+# Dev-only diagnostic: when DAINTREE_DUMP_UPSTREAM_DIR is set, every upstream
+# request body is written there as numbered pretty-printed JSON. This is THE
+# tool for prompt-cache forensics — diff two dumps to find the exact byte where
+# two "identical" requests diverge (a cache miss is always a prefix divergence).
+# Never set in production; the dump contains full prompts.
+_DUMP_DIR = os.environ.get("DAINTREE_DUMP_UPSTREAM_DIR") or None
+_dump_seq = itertools.count(1)
+
+
+def _maybe_dump_body(body: dict[str, Any]) -> None:
+    if not _DUMP_DIR:
+        return
+    try:
+        os.makedirs(_DUMP_DIR, exist_ok=True)
+        n = next(_dump_seq)
+        path = os.path.join(_DUMP_DIR, f"{time.strftime('%H%M%S')}-{n:04d}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(body, f, indent=1, ensure_ascii=False, sort_keys=False)
+    except OSError:  # pragma: no cover - diagnostic only, never break a request
+        pass
 # Cap on how much of an upstream error body we log / surface — enough to carry the
 # provider's reason ("temperature must be between 0.0 and 2.0", a schema complaint)
 # without dumping an unbounded payload into logs or the client error message.
@@ -234,6 +258,7 @@ class DeepSeekProvider:
             body["stream"] = True
             if request.include_usage:
                 body["stream_options"] = {"include_usage": True}
+        _maybe_dump_body(body)
         return body
 
     def _timeout(self, request: ProviderChatRequest) -> float:

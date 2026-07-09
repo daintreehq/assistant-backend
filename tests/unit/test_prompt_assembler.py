@@ -51,19 +51,28 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
         request=req, skills=[skill], upstream_model="deepseek-v4-flash",
     )
     msgs = pr.messages
-    # Cache layout: base(system), conversation..., then the per-request tail:
-    # skill bodies(system), runtime(system), footer(system).
+    # Cache-critical layout (DeepSeek groups ALL system messages before tools +
+    # conversation): every system message must be stable, so they all precede the
+    # conversation in the array too — base, skills, contract — and the volatile
+    # runtime/turn context rides ONE trailing user-role data block.
     assert msgs[0]["role"] == "system"  # base prompt
-    assert msgs[1]["role"] == "user"    # conversation begins right after base (skills moved to the tail)
-    assert msgs[-1]["role"] == "system"  # response contract last
-    assert msgs[-1]["content"].startswith("# Response contract")
-    # The append-only conversation is the cached bulk; skill bodies + runtime + contract
-    # follow it. Match "## Skill 1:" — the base prompt now mentions "# Loaded skills" in prose.
     skill_idx = next(i for i, m in enumerate(msgs) if "## Skill 1:" in (m.get("content") or ""))
-    runtime_idx = next(i for i, m in enumerate(msgs) if "Permission tier:" in (m.get("content") or ""))
-    last_convo_idx = max(i for i, m in enumerate(msgs) if m["role"] in ("user", "assistant", "tool"))
-    assert skill_idx > last_convo_idx
-    assert runtime_idx > last_convo_idx
+    contract_idx = next(
+        i for i, m in enumerate(msgs) if (m.get("content") or "").startswith("# Response contract")
+    )
+    first_convo_idx = next(i for i, m in enumerate(msgs) if m["content"] == "go")
+    last_system_idx = max(i for i, m in enumerate(msgs) if m["role"] == "system")
+    assert msgs[skill_idx]["role"] == "system"
+    assert msgs[contract_idx]["role"] == "system"
+    assert skill_idx < contract_idx < first_convo_idx  # stable prefix precedes conversation
+    assert last_system_idx < first_convo_idx  # NO system message after the conversation
+    # The volatile runtime/turn context is the FINAL message, role user, framed as
+    # injected data so the model never reads it as the human speaking.
+    tail = msgs[-1]
+    assert tail["role"] == "user"
+    assert tail["content"].startswith("[Injected context")
+    assert "Permission tier:" in tail["content"]  # runtime block folded in
+    assert "Current objective: g" in tail["content"]  # turn footer folded in
     # Skills reach the model as plain context only — never a synthetic skill__load tool call.
     assert not any(
         m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "skill__load"
@@ -71,16 +80,32 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
     )
 
 
-def test_skill_bodies_follow_conversation(assembler: PromptAssembler, catalog) -> None:
+def test_skill_bodies_precede_conversation(assembler: PromptAssembler, catalog) -> None:
     skill = catalog.skills[0]
     pr = assembler.build_main_request(
         request=_req(messages=[{"role": "user", "content": "go"}]),
         skills=[skill], upstream_model="deepseek-v4-flash",
     )
-    # The conversation is the cached bulk; the skill body now follows it (re-encoded tail).
-    assert pr.messages[1]["role"] == "user"
-    assert pr.messages[2]["role"] == "system"
-    assert skill.title in pr.messages[2]["content"]
+    # Skill bodies are system-role and therefore MUST sit before the conversation
+    # (DeepSeek serializes all system messages first regardless of array order —
+    # the array now matches that reality).
+    skill_idx = next(
+        i for i, m in enumerate(pr.messages) if skill.title in (m.get("content") or "")
+    )
+    convo_idx = next(i for i, m in enumerate(pr.messages) if m["content"] == "go")
+    assert pr.messages[skill_idx]["role"] == "system"
+    assert skill_idx < convo_idx
+
+
+def test_no_injected_tail_without_runtime_or_turn(assembler: PromptAssembler) -> None:
+    # A generic client sending neither runtime nor turn context must not get a
+    # synthetic default-runtime tail — the conversation stays the last message.
+    pr = assembler.build_main_request(
+        request=_req(messages=[{"role": "user", "content": "go"}]),
+        skills=[], upstream_model="deepseek-v4-flash",
+    )
+    assert pr.messages[-1]["content"] == "go"
+    assert not any((m.get("content") or "").startswith("[Injected context") for m in pr.messages)
 
 
 def test_no_skill_block_when_set_is_empty(assembler: PromptAssembler) -> None:

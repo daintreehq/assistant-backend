@@ -187,8 +187,9 @@ def test_response_contract(assembler: PromptAssembler) -> None:
 
 
 def test_response_contract_is_final_system_message(assembler: PromptAssembler) -> None:
-    # The output-shape contract must land LAST (nearest generation). Assemble a full
-    # request and assert the trailing message is the contract, carrying the width.
+    # The output-shape contract is the FINAL system message — the last stable block
+    # before the conversation (system content after the conversation would be
+    # hoisted into DeepSeek's system region and bust the tools+conversation cache).
     req = RespondRequest.model_validate(
         {
             "protocol_version": 1,
@@ -198,10 +199,13 @@ def test_response_contract_is_final_system_message(assembler: PromptAssembler) -
         }
     )
     pr = assembler.build_main_request(request=req, skills=[], upstream_model="m")
-    last = pr.messages[-1]
-    assert last["role"] == "system"
-    assert last["content"].startswith("# Response contract")
-    assert str(assembler.settings.main_terminal_width) in last["content"]
+    system_msgs = [m for m in pr.messages if m["role"] == "system"]
+    last_system = system_msgs[-1]
+    assert last_system["content"].startswith("# Response contract")
+    assert str(assembler.settings.main_terminal_width) in last_system["content"]
+    # And no system message may follow the conversation.
+    convo_idx = next(i for i, m in enumerate(pr.messages) if m["content"] == "hi")
+    assert all(m["role"] != "system" for m in pr.messages[convo_idx:])
 
 
 def test_selector_system(loader: PromptLoader) -> None:

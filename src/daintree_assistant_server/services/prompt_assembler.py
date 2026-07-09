@@ -238,7 +238,8 @@ class PromptAssembler:
         return self.prompts.render(TEMPLATE_LOADED_SKILLS, loaded_skills=ordered)
 
     def render_response_contract(self) -> str:
-        """The output-shape contract, rendered LAST so it sits nearest generation.
+        """The output-shape contract — the final STABLE system block before the
+        conversation (see build_main_request's cache-critical layout).
 
         Width comes from settings (the narrow Daintree terminal is ~56 columns);
         a future runtime field can override it per-request without moving the block.
@@ -486,9 +487,20 @@ class PromptAssembler:
         upstream_model: str,
     ) -> ProviderChatRequest:
         """Assemble the upstream request so DeepSeek's prefix cache covers the base
-        prompt, the integration surface, and the append-only conversation. The active
-        skill bodies and the per-request runtime/turn context follow the conversation,
-        so a skill-set change re-encodes only that bounded tail — never the conversation.
+        prompt, the integration surface, the skill bodies, the tool schemas, and the
+        append-only conversation.
+
+        CACHE-CRITICAL LAYOUT (measured 2026-07-08, latency benchmark): DeepSeek
+        serializes the prompt as [ALL system messages, in array order] → [tools] →
+        [non-system conversation]. A system message ANYWHERE in the array therefore
+        lands in the leading system region, BEFORE the ~18k-token tool schemas and
+        the conversation. The old layout put the volatile runtime/turn context after
+        the conversation as system messages — DeepSeek hoisted them into the system
+        region, so every new session (and any mid-turn roster change) re-encoded
+        tools + conversation: ~36% cache hit on identical back-to-back turns. The
+        rule that follows: ONLY stable content may use role "system"; per-request
+        variable context must ride a NON-system role at the very end, where it costs
+        exactly its own tokens.
         """
         runtime = request.runtime
         turn = request.turn
@@ -502,23 +514,44 @@ class PromptAssembler:
         integrations = self.render_integrations(runtime, request.input.tools)
         if integrations.strip():
             messages.append({"role": "system", "content": integrations})
-        # 3. client conversation: append-only and the largest segment → kept in the cached prefix.
-        messages.extend(self._message_to_wire(m) for m in request.input.messages)
-        # 4. active skill bodies AFTER the conversation: a set change (load/evict) re-encodes only
-        #    this bounded block, never the conversation, and lands the runbook near generation.
+        # 3. active skill bodies: semi-stable (changes only on a selector topic
+        #    shift). System-role, so array position == serialized position; a set
+        #    change re-encodes tools + conversation, which is unavoidable for
+        #    system-region content and rare enough to accept.
         if skills:
             messages.append({"role": "system", "content": self.render_loaded_skills(skills)})
-        # 5. per-request variable context LAST (kept out of the cached prefix).
-        runtime_msg = self.render_runtime_context(runtime)
-        if runtime_msg.strip():
-            messages.append({"role": "system", "content": runtime_msg})
-        footer = self.render_turn_footer(turn, runtime.active_worktree if runtime else None)
-        if footer.strip():
-            messages.append({"role": "system", "content": footer})
-        # 6. response contract LAST — the output-shape rules sit nearest generation.
+        # 4. response contract: static output-shape rules → part of the stable
+        #    system prefix. (DeepSeek serialized it before the conversation even
+        #    when the array placed it last, so this costs no "nearness to
+        #    generation" that ever actually existed.)
         contract = self.render_response_contract()
         if contract.strip():
             messages.append({"role": "system", "content": contract})
+        # 5. client conversation: append-only and the largest segment → cached
+        #    prefix grows with it.
+        messages.extend(self._message_to_wire(m) for m in request.input.messages)
+        # 6. per-request variable context LAST as ONE user-role data block — the
+        #    only place volatile content is cache-cheap (see docstring). The frame
+        #    line keeps the model from reading injected state as the human speaking.
+        variable_parts: list[str] = []
+        # Only render runtime context the client actually SENT: render_runtime_context
+        # materializes a default RuntimeContext (tier "unknown" etc.) for None, which
+        # would append a synthetic tail block to every runtime-less request (generic
+        # OpenAI-style clients) — noise, and it would sit as the newest user message.
+        if runtime is not None:
+            runtime_msg = self.render_runtime_context(runtime)
+            if runtime_msg.strip():
+                variable_parts.append(runtime_msg)
+        footer = self.render_turn_footer(turn, runtime.active_worktree if runtime else None)
+        if footer.strip():
+            variable_parts.append(footer)
+        if variable_parts:
+            framed = (
+                "[Injected context — automated state from the local Daintree runtime, "
+                "not the user speaking. Continue the turn above using it as current state.]\n\n"
+                + "\n\n".join(variable_parts)
+            )
+            messages.append({"role": "user", "content": framed})
 
         # "text" is the upstream default, so forwarding it is a no-op — except that
         # DeepSeek rejects ANY response_format alongside tools ("You cannot specify
