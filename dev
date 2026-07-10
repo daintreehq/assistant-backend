@@ -39,6 +39,12 @@ if [[ ! -f "$ROOT/.env" && -z "${DEEPSEEK_API_KEY:-}" ]]; then
   echo "   Run:  cp .env.example .env   then set DEEPSEEK_API_KEY." >&2
 fi
 
+# Human-readable structured logs in dev so per-round timing lines (`respond`,
+# `respond_upstream_open` → selector_ms / upstream_first_event_ms / skill_speculation)
+# are legible in the terminal instead of raw JSON. Export-only; unset it or set
+# LOG_LEVEL=WARNING in .env to quiet things down.
+export DAINTREE_LOG_CONSOLE="${DAINTREE_LOG_CONSOLE:-1}"
+
 echo "▶ Daintree Assistant Server   SKILL_LEARNING_MODE=$SKILL_LEARNING_MODE"
-echo "  python: $PY"
+echo "  python: $PY   logs: console (DAINTREE_LOG_CONSOLE=$DAINTREE_LOG_CONSOLE)"
 exec "$PY" -m daintree_assistant_server
