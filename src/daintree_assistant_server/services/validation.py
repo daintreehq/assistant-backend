@@ -280,6 +280,18 @@ def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
                     )
 
 
+def _validate_startup(req: RespondRequest, settings: Settings) -> None:
+    instructions = req.startup.project_instructions
+    if (
+        instructions is not None
+        and len(instructions.encode("utf-8")) > settings.cap_project_instructions
+    ):
+        raise request_too_large(
+            "Startup project instructions exceed the size limit.",
+            param="startup.project_instructions",
+        )
+
+
 def _validate_generation(req: RespondRequest) -> None:
     """DeepSeek rejects JSON mode combined with function calling, so fail fast with
     a clear 400 instead of a confusing upstream 502 (and a wasted upstream call).
@@ -299,5 +311,6 @@ def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
     _validate_message_sequence(req.input.messages)
     _validate_tools(req.input.tools, req.input.tool_choice, settings)
     _validate_content(req.input.messages, settings)
+    _validate_startup(req, settings)
     _validate_generation(req)
     return DEEPSEEK_MODEL

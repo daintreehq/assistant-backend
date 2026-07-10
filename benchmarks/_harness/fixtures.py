@@ -33,8 +33,6 @@ def _base_runtime() -> dict[str, Any]:
     """A representative CLI runtime block (permission tier, MCP, terminals)."""
     return {
         "permission_tier": "operator",
-        "project_path": "/Users/dev/Projects/acme/web",
-        "project_id": "acme-web",
         "mcp": {"connected": True, "transport": "http", "tool_count": 24},
         "mcp_servers": [
             {
@@ -46,9 +44,22 @@ def _base_runtime() -> dict[str, Any]:
                 "instructions": "Use terminal.list before sendCommand.",
             }
         ],
-        "configured_agent_ids": ["claude-code", "codex", "gemini"],
         "scheduler_active": True,
-        "active_worktree": "feature/checkout-refactor",
+        "worktree": {
+            "current": {
+                "id": "wt-checkout-refactor",
+                "path": "/Users/dev/Projects/acme/web/.worktrees/checkout-refactor",
+                "branch": "feature/checkout-refactor",
+                "is_main": False,
+                "issue_number": 286,
+                "issue_title": "Expose structured startup context",
+                "pr_number": 418,
+                "pr_title": "Add startup and worktree snapshots",
+                "pr_url": "https://example.test/acme/web/pull/418",
+                "status": "dirty",
+                "last_commit": "abc1234 Add request context",
+            }
+        },
         "open_terminals": [
             {
                 "id": "term-1",
@@ -61,10 +72,61 @@ def _base_runtime() -> dict[str, Any]:
     }
 
 
+def _base_startup() -> dict[str, Any]:
+    """Representative session-stable context sent before visible conversation."""
+    return {
+        "project": {
+            "id": "acme-web",
+            "name": "Acme Web",
+            "path": "/Users/dev/Projects/acme/web",
+            "status": "active",
+            "daintree_config_present": True,
+            "in_repo_settings": True,
+        },
+        "agent_roster": {
+            "agents": [
+                {
+                    "id": "claude-code",
+                    "display_name": "Claude Code",
+                    "source": "user",
+                    "availability": "ready",
+                    "installed": True,
+                    "launchable": True,
+                },
+                {
+                    "id": "codex",
+                    "display_name": "Codex",
+                    "source": "built-in",
+                    "availability": "ready",
+                    "installed": True,
+                    "launchable": True,
+                    "pinned": True,
+                    "toolbar_visible": True,
+                },
+                {
+                    "id": "gemini",
+                    "display_name": "Gemini",
+                    "source": "built-in",
+                    "availability": "missing",
+                    "installed": False,
+                    "launchable": False,
+                    "pinned": False,
+                    "toolbar_visible": False,
+                },
+            ],
+            "complete": True,
+            "availability_complete": True,
+            "total_count": 3,
+        },
+        "project_instructions": "Run project checks before handing work back.",
+    }
+
+
 def build_respond_request(
     *,
     messages: list[dict[str, Any]],
     with_tools: bool = True,
+    startup: dict[str, Any] | None = None,
     runtime: dict[str, Any] | None = "default",  # type: ignore[assignment]
     turn: dict[str, Any] | None = None,
     session_id: str = "bench-session",
@@ -74,13 +136,14 @@ def build_respond_request(
 ) -> RespondRequest:
     """Build a strict, valid ``RespondRequest`` against the committed contract."""
     payload: dict[str, Any] = {
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {
             "id": session_id,
             "turn_id": turn_id,
             "instruction_revision": instruction_revision,
         },
         "input": {"messages": messages},
+        "startup": startup if startup is not None else _base_startup(),
         "generation": {"stream": stream},
     }
     if with_tools:

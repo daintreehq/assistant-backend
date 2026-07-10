@@ -38,7 +38,7 @@ House style for "body" (match the example skills you are given):
 
 Generality (this is the whole point — the catalog must transfer across projects, users, and agents):
 - Write for ANY project. No repo names, languages, frameworks, file paths, or one-off facts from this workflow — abstract them into the general shape of the task. If the lesson only makes sense for this one repo, it is not a skill; return no_change.
-- Do NOT hardcode a specific CLI agent, terminal, or tool instance that merely happened to be present this run. When a step needs an agent (or a terminal, or an MCP tool), tell the assistant to look at what is actually available THIS turn — the configured-agents roster and open-terminal snapshot in its runtime context, and its current tool list — and pick the best fit for the task. Write "spawn whichever configured agent is best suited to <kind of work>", never "use claude" / "use codex".
+- Do NOT hardcode a specific CLI agent, terminal, or tool instance that merely happened to be present this run. When a step needs an agent (or a terminal, or an MCP tool), tell the assistant to look at what is actually available THIS turn — the agent registry in its startup context, the open-terminal snapshot in runtime context, and its current tool list — and pick the best fit for the task. Write "spawn whichever available agent is best suited to <kind of work>", never "use claude" / "use codex".
 - The reader is a small, fast model (DeepSeek V4 Flash). It follows concrete, unambiguous, ordered steps far better than abstract advice — make each step something it can act on directly, with the exact tool/argument shape where the workflow showed one matters.
 
 Foundation (almost always false):

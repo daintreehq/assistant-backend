@@ -231,13 +231,19 @@ class Settings(BaseSettings):
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")
 
     # ---- Context field caps (bytes, unless noted) -----------------------
-    cap_project_instructions: int = Field(default=32 * 1024, alias="CAP_PROJECT_INSTRUCTIONS")
+    # Session-stable agent registry rendered before the visible conversation.
+    # Rows are admitted whole so an exact agent id is never truncated into a
+    # different, unusable identifier.
+    cap_startup_agents: int = Field(default=512, alias="CAP_STARTUP_AGENTS")
+    cap_startup_agent_bytes: int = Field(
+        default=16 * 1024, alias="CAP_STARTUP_AGENT_BYTES"
+    )
+    cap_project_instructions: int = Field(default=16 * 1024, alias="CAP_PROJECT_INSTRUCTIONS")
     cap_goal: int = Field(default=8 * 1024, alias="CAP_GOAL")
     cap_workflow_runs: int = Field(default=24 * 1024, alias="CAP_WORKFLOW_RUNS")
     cap_async_operations: int = Field(default=8 * 1024, alias="CAP_ASYNC_OPERATIONS")
     cap_pinned_memories: int = Field(default=16 * 1024, alias="CAP_PINNED_MEMORIES")
     cap_relevant_memories: int = Field(default=16 * 1024, alias="CAP_RELEVANT_MEMORIES")
-    cap_active_worktree: int = Field(default=512, alias="CAP_ACTIVE_WORKTREE")
     # Max open-terminal inventory rows rendered into the runtime context (issue #286).
     cap_open_terminals: int = Field(default=32, alias="CAP_OPEN_TERMINALS")
     cap_watchers_count: int = Field(default=20, alias="CAP_WATCHERS_COUNT")

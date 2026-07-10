@@ -15,7 +15,8 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
 **Deterministic (no key, no network):**
 
 - **Cacheable-prefix stability per transition** — for `tool_continuation`,
-  `runtime_context_change`, `skill_topic_shift`, and `new_session`, the fraction
+  `runtime_context_change`, `startup_context_change`, `skill_topic_shift`, and
+  `new_session`, the fraction
   of the `[system messages] + [tools]` region that stays a byte prefix of the next
   turn's. Target is **1.0** for the three continuity transitions (the layout's core
   promise — the ~18k-token tool region is fully reused); a topic-shift is an
@@ -44,7 +45,7 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
 
 | metric | value |
 |---|---|
-| system+tools stable — continuation / runtime / new-session | **1.0000** |
+| system+tools stable — continuation / runtime / startup / new-session | **1.0000** |
 | system+tools stable — topic-shift (expected drop) | ~0.39 |
 | tool schemas share of request | ~72 KB, **54%**, ~18k tok |
 | selector prompt | ~6033 tok / 18 skills |
@@ -60,7 +61,6 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
 - The fixture `_harness/fixtures/cli_tool_inventory.json` is the real 72-tool
   projection the Go CLI sends (`Registry.OpenAITools(nil)`); regenerate it if the
   CLI's tool surface changes.
-- Built against committed `main`. When the in-flight `StartupContext` layer lands
-  (a stable user-role snapshot before the conversation), add it as a segmented
-  layer here; it does not change the cache-stability model (it sits in the stable
-  region).
+- The required `startup` snapshot is measured as its own stable user-role layer
+  before the visible conversation. Runtime/worktree changes remain confined to the
+  trailing volatile block, so startup does not change the system+tools stability model.

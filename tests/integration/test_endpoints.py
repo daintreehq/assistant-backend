@@ -29,7 +29,7 @@ def test_version(client) -> None:
     r = client.get("/version")
     assert r.status_code == 200
     assert "server_version" in r.json()
-    assert r.json()["protocol"] == {"min": 1, "max": 1}
+    assert r.json()["protocol"] == {"min": 2, "max": 2}
 
 
 def test_capabilities(client, auth) -> None:
@@ -67,7 +67,7 @@ def test_skills_list_and_etag(client, auth, app) -> None:
 def test_skills_resolve_find(client, auth, fake_provider) -> None:
     fake_provider.selection_result = selection_result([SKILL_PREP])
     r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 1, "session_id": "s", "action": "find", "query": "prep branch",
+        "protocol_version": 2, "session_id": "s", "action": "find", "query": "prep branch",
     })
     assert r.status_code == 200
     body = r.json()
@@ -78,14 +78,14 @@ def test_skills_resolve_find(client, auth, fake_provider) -> None:
 
 def test_skills_resolve_load_and_clear(client, auth, app) -> None:
     r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 1, "session_id": "s", "action": "load", "skill_ids": [SKILL_PREP],
+        "protocol_version": 2, "session_id": "s", "action": "load", "skill_ids": [SKILL_PREP],
     })
     body = r.json()
     assert [s["id"] for s in body["skills"]["active"]] == [SKILL_PREP]
     state = body["state"]
 
     r2 = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 1, "session_id": "s", "action": "clear", "state": state,
+        "protocol_version": 2, "session_id": "s", "action": "clear", "state": state,
     })
     body2 = r2.json()
     assert body2["skills"]["active"] == []
@@ -94,14 +94,14 @@ def test_skills_resolve_load_and_clear(client, auth, app) -> None:
 
 def test_skills_resolve_find_requires_query(client, auth) -> None:
     r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 1, "session_id": "s", "action": "find",
+        "protocol_version": 2, "session_id": "s", "action": "find",
     })
     assert r.status_code == 400
 
 
 def test_skills_resolve_load_requires_ids(client, auth) -> None:
     r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 1, "session_id": "s", "action": "load",
+        "protocol_version": 2, "session_id": "s", "action": "load",
     })
     assert r.status_code == 400
 
@@ -199,7 +199,7 @@ def test_tasks_invalid_input_400(client, auth) -> None:
 
 def test_oversized_body_413(client, auth) -> None:
     headers = {**auth, "Content-Length": str(20 * 1024 * 1024)}
-    r = client.post("/v1/daintree/respond", headers=headers, content=b'{"protocol_version":1}')
+    r = client.post("/v1/daintree/respond", headers=headers, content=b'{"protocol_version":2}')
     assert r.status_code == 413
 
 

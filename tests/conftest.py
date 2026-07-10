@@ -161,11 +161,12 @@ def respond_body(
     state: str | None = None,
     selection: dict[str, Any] | None = None,
     generation: dict[str, Any] | None = None,
+    startup: dict[str, Any] | None = None,
     runtime: dict[str, Any] | None = None,
     turn: dict[str, Any] | None = None,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: Any = None,
-    protocol_version: int = 1,
+    protocol_version: int = 2,
 ) -> dict[str, Any]:
     """Build a native /v1/daintree/respond request body."""
     session: dict[str, Any] = {"id": session_id, "turn_id": turn_id}
@@ -182,6 +183,36 @@ def respond_body(
         "protocol_version": protocol_version,
         "session": session,
         "input": inp,
+        "startup": startup
+        if startup is not None
+        else {
+            "project": {
+                "id": "project-test",
+                "name": "Test Project",
+                "path": "/project",
+                "status": "active",
+                "daintree_config_present": True,
+                "in_repo_settings": True,
+            },
+            "agent_roster": {
+                "agents": [
+                    {
+                        "id": "codex",
+                        "display_name": "Codex",
+                        "source": "built-in",
+                        "availability": "ready",
+                        "installed": True,
+                        "launchable": True,
+                        "pinned": True,
+                        "toolbar_visible": True,
+                    }
+                ],
+                "complete": True,
+                "availability_complete": True,
+                "total_count": 1,
+            },
+            "project_instructions": "Follow the project's checked-in conventions.",
+        },
     }
     if state is not None:
         body["state"] = state

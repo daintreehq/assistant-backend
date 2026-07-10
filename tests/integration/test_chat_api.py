@@ -21,9 +21,9 @@ def _main_request(provider: FakeProvider):
 
 
 def _loaded_skills_message(provider: FakeProvider) -> str:
-    # Skill bodies now follow the conversation (cache layout), so find by content, not
-    # position. Match "## Skill 1:" — the base prompt mentions "# Loaded skills" in prose
-    # (the anti-recitation rule), so that header alone no longer uniquely marks the block.
+    # Find by content, not a brittle fixed position: optional integrations precede
+    # skill bodies, while the stable startup block and visible conversation follow.
+    # Match "## Skill 1:" because the base prompt mentions "# Loaded skills" in prose.
     return next(
         m["content"]
         for m in _main_request(provider).messages
@@ -52,6 +52,47 @@ def test_scenario1_new_session_skill_selected(client, auth, fake_provider, app) 
     )
     skill = app.state.container.catalog.get(SKILL_PREP)
     assert skill.title in _loaded_skills_message(fake_provider)
+
+
+def test_structured_startup_reaches_main_model_but_not_selector(
+    client, auth, fake_provider
+) -> None:
+    marker = "STARTUP-NOT-A-USER-UTTERANCE-2d91"
+    visible = "VISIBLE-SELECTOR-INSTRUCTION-8a42"
+    fake_provider.selection_result = selection_result([])
+    response = client.post(
+        URL,
+        headers=auth,
+        json=respond_body(
+            [{"role": "user", "content": visible}],
+            session_id="startup-isolation",
+            startup={
+                "project": {"id": marker, "name": marker, "path": f"/{marker}"},
+                "agent_roster": {
+                    "agents": [{"id": marker, "source": "plugin"}],
+                    "complete": True,
+                    "total_count": 1,
+                },
+                "project_instructions": marker,
+            },
+        ),
+    )
+    assert response.status_code == 200
+
+    selector_wire = json.dumps(fake_provider.selection_requests[-1].messages)
+    assert visible in selector_wire
+    assert marker not in selector_wire
+
+    main = _main_request(fake_provider).messages
+    startup_idx = next(
+        i
+        for i, message in enumerate(main)
+        if str(message.get("content", "")).startswith("[Injected startup context")
+    )
+    visible_idx = next(i for i, message in enumerate(main) if message.get("content") == visible)
+    assert marker in str(main[startup_idx]["content"])
+    assert main[startup_idx]["role"] == "user"
+    assert startup_idx < visible_idx
 
 
 def test_scenario2_no_relevant_skill_no_prelude(client, auth, fake_provider) -> None:
@@ -292,7 +333,7 @@ def test_stream_surfaces_reasoning_content(client, auth, fake_provider) -> None:
 def test_missing_session_rejected_422(client, auth) -> None:
     # The native protocol has no stateless mode: session is required by schema.
     r = client.post(URL, headers=auth, json={
-        "protocol_version": 1, "input": {"messages": [{"role": "user", "content": "hi"}]},
+        "protocol_version": 2, "input": {"messages": [{"role": "user", "content": "hi"}]},
     })
     assert r.status_code == 400  # RequestValidationError -> invalid_request_error
 

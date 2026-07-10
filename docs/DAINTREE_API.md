@@ -16,11 +16,11 @@ That is invisible to clients.
   block (active set, the newly-loaded prelude, and selector telemetry). A small model
   with the right runbook loaded is the source of the system's intelligence.
 - **The server owns all system text.** Clients cannot send `system`/`developer`
-  messages or any free-form prompt; the request schema is strict (`extra="forbid"`).
-- **Cache-optimized prompt layout.** The upstream prompt keeps the large append-only
-  conversation in the cached prefix (base prompt → integration surface → conversation),
-  then appends the small per-request tail (skill bodies → runtime → turn footer) after it,
-  so a skill load/evict re-encodes only that tail. See [Prompt assembly](#prompt-assembly--caching).
+  messages or a free-form system prompt; the request schema is strict (`extra="forbid"`).
+  Typed startup/project-instruction fields are bounded, server-framed untrusted data.
+- **Cache-optimized prompt layout.** Stable system layers and tool schemas lead, followed
+  by a required session-stable startup block, the append-only visible conversation, and
+  one small volatile runtime/turn tail. See [Prompt assembly](#prompt-assembly--caching).
 - **Honest streaming.** Metadata arrives as the first SSE event; the stream never
   fabricates a successful finish after an upstream failure.
 
@@ -37,9 +37,9 @@ will replace the fixed key later; the wire contract does not change when it does
 
 ## Protocol negotiation
 
-Every request carries `protocol_version` (currently `1`). The supported range is also
+Every request carries `protocol_version` (currently `2`). The supported range is also
 advertised by `/version` and `/v1/daintree/capabilities`. A request may additionally
-send `X-Daintree-Protocol: 1`; an unsupported version yields `426`.
+send `X-Daintree-Protocol: 2`; an unsupported version yields `426`.
 
 ---
 
@@ -52,7 +52,7 @@ The single generation endpoint. Returns a native JSON body, or — when
 
 ```jsonc
 {
-  "protocol_version": 1,                       // required
+  "protocol_version": 2,                       // required
 
   "session": {                                 // required (no anonymous mode)
     "id": "sess_…",                            // required, non-empty
@@ -79,17 +79,42 @@ The single generation endpoint. Returns a native JSON body, or — when
     "tool_choice": "auto"                       // "auto" | "none" | "required" | { "name": "git__status" }
   },
 
+  "startup": {                                  // required, may be {}; stable across rounds
+    "project": {                                // curated project.getCurrent fields only
+      "id": "proj_…", "name": "Example", "path": "/path", "status": "active",
+      "daintree_config_present": true, "in_repo_settings": true
+    },
+    "agent_roster": {                           // curated agent.listAvailable result
+      "agents": [
+        { "id": "codex", "display_name": "Codex", "source": "built-in",
+          "availability": "ready", "installed": true, "launchable": true,
+          "pinned": true, "toolbar_visible": true }
+      ],
+      "complete": true, "availability_complete": true, "total_count": 1
+    },
+    "project_instructions": "…"                // DAINTREE.md; max 16 KiB UTF-8
+  },
+
   "runtime": {                                 // CLI-reported environment (optional, rendered as inert data)
     "permission_tier": "operator",
-    "project_path": "/path", "project_id": "proj_…",
     "mcp_servers": [                           // the CLI's actual MCP surface (server-rendered)
       { "name": "daintree", "transport": "http", "status": "connected",
         "tool_count": 12, "description": "…", "instructions": "…" }
     ],
-    "configured_agent_ids": ["claude", "codex"],
     "scheduler_active": true,
-    "active_worktree": "feature/x",
-    "project_instructions": "…"                // framed as a delimited data block
+    "worktree": {                              // omitted when the live read was unavailable
+      "current": {                             // null means Daintree definitively reported none
+        "id": "wt_…", "path": "/path/.worktrees/x", "branch": "feature/x",
+        "is_main": false,
+        "issue_number": 12, "issue_title": "…",
+        "pr_number": 34, "pr_title": "…", "pr_url": "https://…",
+        "status": "dirty", "last_commit": "abc1234 Add context"
+      }
+    },
+    "open_terminals": [                        // fresh metadata only; no terminal output
+      { "id": "terminal-…", "kind": "agent", "worktree_id": "wt_…",
+        "title": "Fix context", "agent_id": "codex", "agent_state": "working" }
+    ]
   },
 
   "turn": {                                    // per-turn context (optional)
@@ -97,7 +122,7 @@ The single generation endpoint. Returns a native JSON body, or — when
     "workflow_runs": ["…"],
     "async_operations": ["…"],                 // live runtime-owned async futures (one line each)
     "memories": { "pinned": ["…"], "relevant": ["…"] },
-    "session_ended_watchers": ["…"],
+    "resumed_watchers": ["…"],               // adopted durable watchers, sent on resume
     "workflow_state": [                        // workflow-intelligence digests (client-owned graphs)
       { "id": "wf_…", "goal": "…", "status": "active",
         "progress": "2/5 nodes done; current: verify tests",
@@ -121,6 +146,18 @@ The single generation endpoint. Returns a native JSON body, or — when
 Notes:
 - The whole body is strict: unknown top-level keys, unknown `generation` params, and
   `system`/`developer` roles are all rejected.
+- `startup` is required even when empty. It contains only curated, session-stable project
+  identity, agent-registry metadata, and project instructions bounded to 16 KiB of UTF-8.
+  It is deliberately
+  outside `input.messages`: only the main model receives its framed user-role data block;
+  the selector and skill learner see the visible `input.messages` transcript only.
+- Agent ids are launch identifiers. They are preserved exactly and JSON-quoted in the
+  prompt; aggregate limits omit whole agent rows rather than truncating an id. No launch
+  commands, environment variables, presets, authentication paths, raw settings, or secrets
+  belong in `startup`.
+- `runtime.worktree` is a typed, fresh per-request snapshot. An omitted wrapper means the
+  live read was unavailable; `{ "current": null }` means Daintree successfully reported
+  that there is no current worktree.
 - `tools`/`tool_calls` use the standard `{id, type, function:{name, arguments}}` shape.
   `tool_choice` is flattened to `{ "name": … }` for the named case.
 - `reasoning_content` (assistant turns only) carries DeepSeek thinking-mode chain-of-thought.
@@ -146,7 +183,7 @@ Notes:
 
 ```jsonc
 {
-  "protocol_version": 1,
+  "protocol_version": 2,
   "request_id": "req_…",
   "model": "daintree-assistant",
   "message": {
@@ -187,7 +224,7 @@ Notes:
 
 ```
 event: meta
-data: { "protocol_version":1, "request_id":"req_…", "model":"daintree-assistant",
+data: { "protocol_version":2, "request_id":"req_…", "model":"daintree-assistant",
         "skills": { …same skills block… }, "state":"dst1.…",
         "catalog_revision":"sha256:…", "prompt_version":"…", "warnings":[] }
 
@@ -227,8 +264,8 @@ Guarantees:
 
 Skill selection is removed from the main thread:
 
-1. **Selector cadence.** A separate small-model call (returning a JSON object via
-   `response_format` json_object, so it can run thinking-on) runs when: there is no valid
+1. **Selector cadence.** A separate non-thinking small-model call (returning a JSON object via
+   `response_format` json_object) runs when: there is no valid
    `state`; `selection.force` is set or
    `selection.policy == "always"`; the catalog revision changed; the `turn_id` changed; or
    `instruction_revision` changed. It does **not** re-run on ordinary tool-continuation
@@ -269,13 +306,15 @@ block, where it costs exactly its own tokens.
 | 2 | Integrations (MCP servers + tool index) | system | session-stable |
 | 3 | Active skill bodies | system | semi-stable — replaced wholesale on a selector topic shift (omitted when empty) |
 | 4 | Response contract | system | static — output-shape rules |
-| 5 | Conversation | user/assistant/tool | append-only — the cached bulk |
-| 6 | Injected context (runtime + turn footer) | user | per-request tail — the only volatile block |
+| 5 | Injected startup context | user | required, session-stable project/agent/instruction data |
+| 6 | Visible `input.messages` conversation | user/assistant/tool | append-only — selector/learner transcript |
+| 7 | Injected context (runtime + turn footer) | user | per-request tail — the only volatile block |
 
 All client-provided context (ids, names, MCP details, project instructions, memories,
-worktrees) is treated as untrusted data: single-line fields collapse whitespace; multiline
-fields (project instructions, MCP instructions) are framed in delimited, escape-neutralized
-data blocks so they cannot inject new instructions.
+worktrees) is treated as untrusted data. Prose fields collapse whitespace; multiline fields
+(project instructions, MCP instructions) are framed in delimited, escape-neutralized data
+blocks. Agent ids are the exception to prose normalization: the assembler preserves their
+exact value, JSON-quotes it, and admits or omits each complete row under the roster budget.
 
 The main request is sent with `prompt_cache_key` ("daintree-main") by default
 (`DEEPSEEK_SEND_PROMPT_CACHE_KEY`; suppressed in JSON mode). Reasoning is controlled by a

@@ -29,6 +29,7 @@ def _req(
     tools: list | None = None,
     tool_choice: object = None,
     generation: dict | None = None,
+    startup: dict | None = None,
 ) -> RespondRequest:
     inp: dict = {"messages": messages or [{"role": "user", "content": "hi"}]}
     if tools is not None:
@@ -36,9 +37,10 @@ def _req(
     if tool_choice is not None:
         inp["tool_choice"] = tool_choice
     body: dict = {
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": "s", "turn_id": "t"},
         "input": inp,
+        "startup": startup if startup is not None else {},
     }
     if generation is not None:
         body["generation"] = generation
@@ -47,6 +49,27 @@ def _req(
 
 def test_valid_request_returns_upstream_model(settings: Settings) -> None:
     assert validate_respond_request(_req(), settings) == DEEPSEEK_MODEL
+
+
+@pytest.mark.parametrize("instructions", ["12345678", "éééé"])
+def test_startup_project_instructions_accept_exact_byte_limit(instructions: str) -> None:
+    settings = _settings(CAP_PROJECT_INSTRUCTIONS=8)
+    validate_respond_request(
+        _req(startup={"project_instructions": instructions}),
+        settings,
+    )
+
+
+@pytest.mark.parametrize("instructions", ["123456789", "ééééé"])
+def test_startup_project_instructions_reject_over_byte_limit(instructions: str) -> None:
+    settings = _settings(CAP_PROJECT_INSTRUCTIONS=8)
+    with pytest.raises(DaintreeError) as exc:
+        validate_respond_request(
+            _req(startup={"project_instructions": instructions}),
+            settings,
+        )
+    assert exc.value.status_code == 413
+    assert exc.value.param == "startup.project_instructions"
 
 
 @pytest.mark.parametrize("role", ["system", "developer"])

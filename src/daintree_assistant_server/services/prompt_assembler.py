@@ -1,33 +1,33 @@
-"""Assemble the upstream main-model request.
+"""Assemble the cache-aware upstream main-model request.
 
-Layer order — the large APPEND-ONLY conversation is kept in the cached prefix; the small
-per-request tail (skill bodies + runtime + footer) follows it. The active skill set changes
-by wholesale replacement on a topic shift, so placing the bodies AFTER the conversation means
-a load/evict re-encodes only that bounded tail, never the conversation (a mutable block in
-front of the append-only conversation is the one layout prefix caching cannot tolerate). It
-also lands the runbook near generation, which a small model follows better. See
-build_main_request:
+DeepSeek serializes every system message before tools and non-system messages, so only
+stable content may use the system role. The effective order is:
 
-1. base system message — static; cached across all sessions
-2. integrations system message — client MCP servers + tool index (omitted when absent)
-3. client conversation (user / assistant / tool only) — append-only; the cached bulk
-4. loaded-skills system message — active skill bodies (omitted when the active set is empty)
-5. runtime-context system message — server-rendered typed local facts (per-request)
-6. trailing turn-context (turn-footer) system message (per-request)
-7. response-contract system message — the output-shape rules, LAST so they sit nearest
-   generation (the position a small model follows best)
+1. base → integrations → active skill bodies → response contract (stable system region)
+2. tool schemas
+3. stable startup context (one framed user-role data row, omitted when empty)
+4. visible append-only conversation
+5. volatile runtime + turn context (one framed user-role tail, omitted when empty)
 
-All local context is treated as untrusted data: control characters are
-stripped and every field has an explicit byte cap.
+Stable startup facts therefore sit on the cache-friendly side of the conversation without
+masquerading as a user-authored message in the public transcript, selector, or learner.
+All client context is untrusted: fields are sanitized and bounded before rendering.
 """
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ..config import DEEPSEEK_MODEL, DEEPSEEK_REASONING_EFFORT, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
-from ..contracts.extensions import RuntimeContext, TurnContext, WorkflowDigest
+from ..contracts.extensions import (
+    AgentSnapshot,
+    RuntimeContext,
+    StartupContext,
+    TurnContext,
+    WorkflowDigest,
+)
 from ..contracts.openai import (
     ChatMessage,
     ImageContentPart,
@@ -40,6 +40,7 @@ from ..prompts.loader import (
     TEMPLATE_LOADED_SKILLS,
     TEMPLATE_RESPONSE_CONTRACT,
     TEMPLATE_RUNTIME_CONTEXT,
+    TEMPLATE_STARTUP_CONTEXT,
     TEMPLATE_TURN_FOOTER,
     PromptLoader,
 )
@@ -121,6 +122,165 @@ class PromptAssembler:
 
     # ---- system message rendering --------------------------------------
 
+    @staticmethod
+    def _startup_agent_row(agent: AgentSnapshot) -> str:
+        """Render one complete agent row without ever truncating its exact id."""
+        quoted_id = json.dumps(agent.id, ensure_ascii=False)
+        display_name = sanitize_line(agent.display_name, 512)
+        row = f"- id {quoted_id}"
+        if display_name and display_name != agent.id:
+            row += f" — {display_name}"
+        row += f" [{agent.source}]"
+
+        availability: str
+        if agent.availability:
+            availability = agent.availability
+        elif agent.installed is True:
+            availability = "installed"
+        elif agent.installed is False:
+            availability = "missing"
+        else:
+            availability = "availability unknown"
+        row += f" · {availability}"
+
+        if agent.launchable is None:
+            row += " · launchability unknown"
+        elif agent.launchable:
+            row += " · launchable"
+        else:
+            row += " · not launchable"
+
+        if agent.toolbar_visible is None:
+            row += " · toolbar n/a"
+        elif agent.toolbar_visible:
+            row += " · main toolbar"
+        else:
+            row += " · not in main toolbar"
+
+        if agent.pinned is True:
+            row += " (explicitly pinned)"
+        elif agent.pinned is False:
+            row += " (explicitly hidden)"
+        return row
+
+    def render_startup_context(self, startup: StartupContext) -> str:
+        """Render stable typed project/agent facts as one cache-friendly data row.
+
+        The caller inserts this before visible conversation. Agent rows have a
+        combined byte budget and are admitted whole, so a long extension id is
+        either represented exactly or omitted with an explicit count.
+        """
+        project: dict[str, Any] | None = None
+        if startup.project is not None:
+            project_src = startup.project
+            project = {
+                "id": sanitize_line(project_src.id, 256),
+                "name": sanitize_line(project_src.name, 512),
+                "path": sanitize_line(project_src.path, 4096),
+                "status": sanitize_line(project_src.status, 64),
+                "has_config_state": (
+                    project_src.daintree_config_present is not None
+                    or project_src.in_repo_settings is not None
+                ),
+                "config_label": (
+                    "present"
+                    if project_src.daintree_config_present is True
+                    else "absent"
+                    if project_src.daintree_config_present is False
+                    else "unknown"
+                ),
+                "settings_label": (
+                    "in-repository"
+                    if project_src.in_repo_settings is True
+                    else "local"
+                    if project_src.in_repo_settings is False
+                    else "unknown"
+                ),
+            }
+
+        roster: dict[str, Any] | None = None
+        if startup.agent_roster is not None:
+            roster_src = startup.agent_roster
+            rows: list[str] = []
+            used = 0
+            for agent in roster_src.agents[: self.settings.cap_startup_agents]:
+                if not agent.id.strip():
+                    continue
+                row = self._startup_agent_row(agent)
+                cost = len(row.encode("utf-8")) + 1
+                if used + cost > self.settings.cap_startup_agent_bytes:
+                    continue
+                used += cost
+                rows.append(row)
+
+            total = max(roster_src.total_count, len(roster_src.agents))
+            completeness = "complete" if roster_src.complete else "partial"
+            summary = (
+                f"Registered direct-agent catalog: {completeness}; showing {len(rows)}"
+            )
+            if total > len(rows):
+                summary += f" of {total}"
+            if not roster_src.availability_complete:
+                summary += "; one or more availability states are unknown"
+            summary += "."
+            roster = {
+                "rows": rows,
+                "summary": summary,
+                "omitted": max(0, total - len(rows)),
+            }
+
+        project_instructions = frame_data_block(
+            startup.project_instructions,
+            self.settings.cap_project_instructions,
+            tag="project_instructions",
+        )
+        if project is None and roster is None and not project_instructions:
+            return ""
+        return self.prompts.render(
+            TEMPLATE_STARTUP_CONTEXT,
+            project=project,
+            agent_roster=roster,
+            project_instructions=project_instructions,
+        ).strip()
+
+    @staticmethod
+    def _worktree_context(runtime: RuntimeContext) -> dict[str, Any] | None:
+        if runtime.worktree is None:
+            return None
+        if runtime.worktree.current is None:
+            return {"current": None}
+
+        wt = runtime.worktree.current
+        parts: list[str] = []
+        if branch := sanitize_line(wt.branch, 512):
+            parts.append(f"branch {branch}")
+        if wt.is_main:
+            parts.append("main worktree")
+        if wt.issue_number is not None:
+            issue = f"issue #{wt.issue_number}"
+            if title := sanitize_line(wt.issue_title, 512):
+                issue += f" {title}"
+            parts.append(issue)
+        elif title := sanitize_line(wt.issue_title, 512):
+            parts.append(f"issue {title}")
+        if wt.pr_number is not None:
+            pr = f"PR #{wt.pr_number}"
+            if title := sanitize_line(wt.pr_title, 512):
+                pr += f" {title}"
+            parts.append(pr)
+        elif title := sanitize_line(wt.pr_title, 512):
+            parts.append(f"PR {title}")
+        for label, value, cap in (
+            ("PR URL", wt.pr_url, 4096),
+            ("status", wt.status, 64),
+            ("last commit", wt.last_commit, 1024),
+            ("id", wt.id, 4096),
+            ("path", wt.path, 4096),
+        ):
+            if clean := sanitize_line(value, cap):
+                parts.append(f"{label} {clean}")
+        return {"current": {"summary": " · ".join(parts)}}
+
     def render_runtime_context(self, runtime: RuntimeContext | None) -> str:
         rc = runtime or RuntimeContext()
         tier = rc.permission_tier or "unknown"
@@ -137,12 +297,6 @@ class PromptAssembler:
             mcp_status_line = sanitize_line(mcp.status, 64)
         else:
             mcp_status_line = "not connected"
-
-        project_instructions = frame_data_block(
-            rc.project_instructions,
-            self.settings.cap_project_instructions,
-            tag="project_instructions",
-        )
 
         # Open-terminal inventory (issue #286): cap the row count, sanitize every
         # client-supplied string to one inert line, and drop any row whose id sanitizes
@@ -166,17 +320,12 @@ class PromptAssembler:
             TEMPLATE_RUNTIME_CONTEXT,
             tier=sanitize_line(tier, 64),
             tier_description=tier_description,
-            project_path=sanitize_line(rc.project_path, 4096) or "(unknown)",
-            project_id=sanitize_line(rc.project_id, 256),
-            configured_agents=[
-                a for a in (sanitize_line(x, 256) for x in rc.configured_agent_ids) if a
-            ],
             mcp_status_line=mcp_status_line,
             mcp_connected=mcp_connected,
             large_model=DEEPSEEK_MODEL,
             small_model=DEEPSEEK_MODEL,
             scheduler_active=rc.scheduler_active,
-            project_instructions=project_instructions,
+            worktree=self._worktree_context(rc),
             open_terminals=open_terminals,
         )
 
@@ -298,15 +447,12 @@ class PromptAssembler:
             out.append(rendered)
         return out
 
-    def render_turn_footer(
-        self, turn: TurnContext | None, active_worktree: str | None = None
-    ) -> str:
-        if turn is None and not active_worktree:
+    def render_turn_footer(self, turn: TurnContext | None) -> str:
+        if turn is None:
             return self.prompts.render(TEMPLATE_TURN_FOOTER, turn_context=None)
         turn = turn or TurnContext()
 
         goal = sanitize_line(turn.goal, self.settings.cap_goal)
-        worktree = sanitize_line(active_worktree, self.settings.cap_active_worktree)
         workflow_runs = _cap_list_combined(turn.workflow_runs, self.settings.cap_workflow_runs)
         async_operations = _cap_list_combined(
             turn.async_operations, self.settings.cap_async_operations
@@ -324,7 +470,6 @@ class PromptAssembler:
             "workflow_runs": workflow_runs,
             "async_operations": async_operations,
             "memories": {"pinned": pinned, "relevant": relevant},
-            "active_worktree": worktree,
             "resumed_watchers": watchers,
             "workflow_state": self._workflow_digests(turn.workflow_state),
         }
@@ -527,10 +672,17 @@ class PromptAssembler:
         contract = self.render_response_contract()
         if contract.strip():
             messages.append({"role": "system", "content": contract})
-        # 5. client conversation: append-only and the largest segment → cached
+        # 5. session-stable project/agent/instruction data. It is a user-role
+        #    data row so DeepSeek leaves it after tools, but it sits before the
+        #    append-only conversation and is structurally absent from selector /
+        #    learner inputs.
+        startup = self.render_startup_context(request.startup)
+        if startup.strip():
+            messages.append({"role": "user", "content": startup})
+        # 6. client conversation: append-only and the largest segment → cached
         #    prefix grows with it.
         messages.extend(self._message_to_wire(m) for m in request.input.messages)
-        # 6. per-request variable context LAST as ONE user-role data block — the
+        # 7. per-request variable context LAST as ONE user-role data block — the
         #    only place volatile content is cache-cheap (see docstring). The frame
         #    line keeps the model from reading injected state as the human speaking.
         variable_parts: list[str] = []
@@ -542,7 +694,7 @@ class PromptAssembler:
             runtime_msg = self.render_runtime_context(runtime)
             if runtime_msg.strip():
                 variable_parts.append(runtime_msg)
-        footer = self.render_turn_footer(turn, runtime.active_worktree if runtime else None)
+        footer = self.render_turn_footer(turn)
         if footer.strip():
             variable_parts.append(footer)
         if variable_parts:

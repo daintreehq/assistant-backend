@@ -64,9 +64,10 @@ def _request(
     messages: list[dict[str, Any]], state: str | None, session_id: str, turn_id: str
 ) -> RespondRequest:
     payload: dict[str, Any] = {
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": session_id, "turn_id": turn_id, "instruction_revision": 0},
         "input": {"messages": messages, "tools": load_tool_inventory()},
+        "startup": {},
         "generation": {"stream": False},
     }
     if state:

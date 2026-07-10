@@ -24,6 +24,7 @@ from .extensions import (
     Selection,
     SelectorMeta,
     SkillRef,
+    StartupContext,
     TurnContext,
 )
 from .openai import ChatMessage, ToolCall, ToolDef
@@ -88,6 +89,10 @@ class RespondRequest(BaseModel):
     session: RespondSession
     state: str | None = Field(default=None, max_length=16384)
     input: RespondInput
+    # Required even when empty. Keeping stable local context outside
+    # ``input.messages`` makes the conversation semantically pure and lets the
+    # assembler place this data at its cache-friendly boundary.
+    startup: StartupContext
     runtime: RuntimeContext | None = None
     turn: TurnContext | None = None
     selection: Selection = Field(default_factory=Selection)
@@ -134,7 +139,7 @@ class RespondMessage(BaseModel):
 class RespondResponse(BaseModel):
     """Non-streaming response body."""
 
-    protocol_version: int = 1
+    protocol_version: int = 2
     request_id: str
     model: str
     message: RespondMessage
@@ -158,7 +163,7 @@ class StreamMeta(BaseModel):
     token: the skill prelude/active set, the refreshed state token, and the
     selector outcome."""
 
-    protocol_version: int = 1
+    protocol_version: int = 2
     request_id: str
     model: str
     skills: SkillsBlock = Field(default_factory=SkillsBlock)

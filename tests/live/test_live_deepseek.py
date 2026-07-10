@@ -55,8 +55,9 @@ def test_live_respond_selector_not_degraded(live_client) -> None:
     # json_object call MUST succeed and parse — if the upstream contract breaks it,
     # the selector degrades open (this assertion is the regression guard).
     r = live_client.post("/v1/daintree/respond", json={
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": "live-sel", "turn_id": "t1"},
+        "startup": {},
         "input": {
             "messages": [{"role": "user", "content": "Rename my terminals so I can tell the agents apart."}],
             "tools": [{
@@ -80,8 +81,9 @@ def test_live_respond_streaming(live_client) -> None:
     events: list[str] = []
     content = ""
     with live_client.stream("POST", "/v1/daintree/respond", json={
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": "live-stream", "turn_id": "t1"},
+        "startup": {},
         "input": {"messages": [{"role": "user", "content": "Reply with the single word: ready"}]},
         "generation": {"stream": True},
     }) as s:

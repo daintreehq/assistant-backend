@@ -227,11 +227,13 @@ def _request(
     *,
     state: str | None = None,
     session_id: str = "s",
+    startup: dict[str, Any] | None = None,
 ) -> RespondRequest:
     payload: dict[str, Any] = {
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": session_id, "turn_id": "t"},
         "input": {"messages": messages or MESSAGES},
+        "startup": startup or {},
     }
     if state is not None:
         payload["state"] = state
@@ -670,6 +672,39 @@ async def test_gate_transcript_includes_trailing_final_answer(tmp_path: Path) ->
 
 
 @pytest.mark.asyncio
+async def test_gate_transcript_excludes_structured_startup_context(tmp_path: Path) -> None:
+    marker = "STARTUP-MUST-NOT-BECOME-LEARNING-EVIDENCE-7f3c"
+    seen: dict[str, str] = {}
+    fake = FakeProvider()
+
+    def _complete(req: Any) -> Any:
+        if "skill-learning gate" in req.messages[0]["content"]:
+            seen["request"] = "\n".join(
+                m["content"] for m in req.messages if isinstance(m.get("content"), str)
+            )
+        return make_result(content=json.dumps(GATE_NONE))
+
+    fake.complete_result = _complete
+    learner, _, _ = _learner(tmp_path, fake)
+    await learner.run(
+        request=_request(
+            messages=[*MESSAGES, {"role": "user", "content": "VISIBLE-LEARNING-EVIDENCE"}],
+            startup={
+                "project": {"id": marker, "name": marker, "path": f"/{marker}"},
+                "agent_roster": {
+                    "agents": [{"id": marker, "source": "user"}],
+                    "total_count": 1,
+                },
+                "project_instructions": marker,
+            },
+        ),
+        active_ids=[],
+    )
+    assert "VISIBLE-LEARNING-EVIDENCE" in seen["request"]
+    assert marker not in seen["request"]
+
+
+@pytest.mark.asyncio
 async def test_create_id_collision_rejected(tmp_path: Path) -> None:
     # Proposal reuses an existing catalog id: a create must not clobber it.
     collide = {**PROPOSAL_CREATE, "skill_id": "daintree.test.example"}
@@ -1035,9 +1070,10 @@ async def test_learns_after_streamed_completion(tmp_path: Path) -> None:
 
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": MESSAGES},
+            "startup": {},
             "generation": {"stream": True},
         }
     )
@@ -1087,9 +1123,10 @@ async def test_learner_skipped_when_streamed_turn_ends_in_tool_calls(tmp_path: P
 
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": MESSAGES},
+            "startup": {},
             "generation": {"stream": True},
         }
     )

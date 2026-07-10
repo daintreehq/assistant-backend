@@ -18,6 +18,9 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 ## Key invariants
 
 - Client `system`/`developer` messages are rejected (server owns all system text).
+- Every respond request carries required structured `startup` context. Its curated project,
+  agent-roster, and project-instruction data reaches only the main model in a stable framed
+  block; selector and skill-learning transcripts remain exactly `input.messages`.
 - `skill.find` / `skill.load` are never offered to the main model; selection runs
   as a separate small-model call before the main completion.
 - Only the active skill bodies (max 3) are injected — never the full catalog.
@@ -27,6 +30,9 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 - Selector failure fails *open* (keeps the prior active set) rather than blocking
   the assistant.
 - Skill state is portable across instances via a signed, opaque token.
+- Prompt order is cache-critical: stable systems/tools → stable startup user block → visible
+  conversation → one volatile runtime/turn user tail. Runtime worktree state is typed and
+  fresh per request; stable project/agent facts are not duplicated there.
 
 ## Layout
 

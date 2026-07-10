@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from .. import PROTOCOL_VERSION
 from ..config import PUBLIC_MODEL_ID, Settings
 from ..contracts.daintree_api import (
     RespondMessage,
@@ -323,7 +324,7 @@ class ChatOrchestrator:
             warnings=warnings,
         )
         headers = {
-            "X-Daintree-Protocol": "1",
+            "X-Daintree-Protocol": str(PROTOCOL_VERSION),
             "X-Request-Id": request_id,
         }
 

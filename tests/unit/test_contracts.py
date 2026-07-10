@@ -24,9 +24,10 @@ from daintree_assistant_server.contracts.tasks import (
 
 def _req(**overrides) -> dict:
     base = {
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": "s", "turn_id": "t"},
         "input": {"messages": [{"role": "user", "content": "hi"}]},
+        "startup": {},
     }
     base.update(overrides)
     return base
@@ -61,9 +62,61 @@ def test_request_parses_multimodal_content() -> None:
 def test_request_requires_session() -> None:
     with pytest.raises(ValidationError):
         RespondRequest.model_validate({
-            "protocol_version": 1,
+            "protocol_version": 2,
             "input": {"messages": [{"role": "user", "content": "x"}]},
+            "startup": {},
         })
+
+
+def test_request_requires_startup_context() -> None:
+    payload = _req()
+    del payload["startup"]
+    with pytest.raises(ValidationError):
+        RespondRequest.model_validate(payload)
+
+
+def test_request_parses_structured_startup_and_exact_agent_ids() -> None:
+    exact_id = "plugin:vendor/agent.with-punctuation"
+    req = RespondRequest.model_validate(
+        _req(
+            startup={
+                "project": {
+                    "id": "project-1",
+                    "name": "Acme Web",
+                    "path": "/repo/acme",
+                    "status": "active",
+                    "daintree_config_present": True,
+                    "in_repo_settings": False,
+                },
+                "agent_roster": {
+                    "agents": [
+                        {
+                            "id": exact_id,
+                            "display_name": "Vendor Agent",
+                            "source": "plugin",
+                            "availability": "unauthenticated",
+                            "installed": True,
+                            "launchable": True,
+                        }
+                    ],
+                    "complete": True,
+                    "availability_complete": True,
+                    "total_count": 1,
+                },
+                "project_instructions": "Run the project checks.",
+            }
+        )
+    )
+    assert req.startup.project is not None
+    assert req.startup.project.path == "/repo/acme"
+    assert req.startup.agent_roster is not None
+    assert req.startup.agent_roster.agents[0].id == exact_id
+    assert req.startup.project_instructions == "Run the project checks."
+
+
+def test_startup_context_rejects_unknown_nested_fields() -> None:
+    with pytest.raises(ValidationError):
+        RespondRequest.model_validate(_req(startup={"project": {"id": "p", "secret": "x"}}))
 
 
 def test_request_requires_at_least_one_message() -> None:
@@ -109,6 +162,47 @@ def test_request_parses_open_terminals() -> None:
     assert terminals[1].exit_code is None
 
 
+def test_request_parses_typed_current_worktree() -> None:
+    req = RespondRequest.model_validate(
+        _req(
+            runtime={
+                "worktree": {
+                    "current": {
+                        "id": "wt-1",
+                        "path": "/repo/.worktrees/feature-x",
+                        "branch": "feature/x",
+                        "is_main": False,
+                        "issue_number": 12,
+                        "issue_title": "Fix startup context",
+                        "pr_number": 34,
+                        "pr_title": "Structured request context",
+                        "pr_url": "https://example.test/pull/34",
+                        "status": "dirty",
+                        "last_commit": "abc1234 Add contract",
+                    }
+                }
+            }
+        )
+    )
+    assert req.runtime is not None
+    assert req.runtime.worktree is not None
+    assert req.runtime.worktree.current is not None
+    assert req.runtime.worktree.current.branch == "feature/x"
+    assert req.runtime.worktree.current.pr_number == 34
+
+
+def test_runtime_rejects_removed_project_and_string_worktree_fields() -> None:
+    for runtime in (
+        {"project_id": "p"},
+        {"project_path": "/repo"},
+        {"configured_agent_ids": ["codex"]},
+        {"active_worktree": "feature/x"},
+        {"project_instructions": "do this"},
+    ):
+        with pytest.raises(ValidationError):
+            RespondRequest.model_validate(_req(runtime=runtime))
+
+
 def test_open_terminal_rejects_nested_unknown_field() -> None:
     # OpenTerminal is extra="forbid": an unknown field nested in the inventory is
     # a contract change, not a silent drop.
@@ -129,7 +223,7 @@ def test_response_and_skills_block_shape() -> None:
         prompt_version="main",
     )
     dumped = resp.model_dump(exclude_none=True)
-    assert dumped["protocol_version"] == 1
+    assert dumped["protocol_version"] == 2
     assert dumped["skills"]["active"] == []
     assert dumped["message"]["content"] == "ok"
 

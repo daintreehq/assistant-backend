@@ -5,8 +5,9 @@ instead of silently scoring:
 
 - **wire validation** (``guard: wire_validation``) — each case carries a
   ``request`` payload for ``RespondRequest.model_validate`` plus ``expect:
-  reject|pass``. The envelope boilerplate (``protocol_version``/``session``) is
-  default-filled so cases stay readable; a case may override either.
+  reject|pass``. The envelope boilerplate
+  (``protocol_version``/``session``/required empty ``startup``) is default-filled
+  so cases stay readable; a case may override any of it.
 - **result_schema** (``guard: result_schema``) — ``mode: validate`` cases carry
   a ``schema`` (or a settings-sized ``schema_synth``) plus ``expect:
   reject|pass`` and an optional ``injection: true`` marker (the zero-tolerance
@@ -39,8 +40,9 @@ CONFORMS_EXPECTS = frozenset({"conform", "violate"})
 SYNTH_KINDS = frozenset({"over_depth", "over_size", "over_enum", "over_properties"})
 
 _DEFAULT_ENVELOPE: dict[str, Any] = {
-    "protocol_version": 1,
+    "protocol_version": 2,
     "session": {"id": "bench-session", "turn_id": "turn-1"},
+    "startup": {},
 }
 
 

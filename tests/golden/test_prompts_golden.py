@@ -16,13 +16,19 @@ import pytest
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.contracts.extensions import (
+    AgentRosterSnapshot,
+    AgentSnapshot,
+    CurrentWorktreeSnapshot,
     McpInfo,
     McpServer,
     Memories,
     OpenTerminal,
+    ProjectSnapshot,
     RuntimeContext,
+    StartupContext,
     TurnContext,
     WorkflowDigest,
+    WorktreeSnapshot,
 )
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
@@ -46,6 +52,45 @@ def _fixture_catalog() -> Catalog:
 
 def _settings() -> Settings:
     return Settings(DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+
+
+def _startup_payload() -> dict[str, object]:
+    return {
+        "project": {
+            "id": "project_123",
+            "name": "Daintree Example",
+            "path": "/home/user/project",
+            "status": "active",
+            "daintree_config_present": True,
+            "in_repo_settings": True,
+        },
+        "agent_roster": {
+            "agents": [
+                {
+                    "id": "claude",
+                    "display_name": "Claude",
+                    "source": "built-in",
+                    "availability": "ready",
+                    "installed": True,
+                    "launchable": True,
+                    "pinned": True,
+                    "toolbar_visible": True,
+                },
+                {
+                    "id": "plugin:example/custom-agent",
+                    "display_name": "Custom Agent",
+                    "source": "plugin",
+                    "availability": "unauthenticated",
+                    "installed": True,
+                    "launchable": True,
+                },
+            ],
+            "complete": True,
+            "availability_complete": True,
+            "total_count": 2,
+        },
+        "project_instructions": "Always run the linter.",
+    }
 
 
 def assert_golden(name: str, content: str) -> None:
@@ -79,12 +124,22 @@ def test_base_prompt(loader: PromptLoader) -> None:
 def test_runtime_context(assembler: PromptAssembler) -> None:
     rc = RuntimeContext(
         permission_tier="operator",
-        project_path="/home/user/project",
-        project_id="project_123",
         mcp=McpInfo(connected=True, transport="stdio", tool_count=42),
-        configured_agent_ids=["claude", "codex"],
         scheduler_active=True,
-        project_instructions="Always run the linter.",
+        worktree=CurrentWorktreeSnapshot(
+            current=WorktreeSnapshot(
+                id="wt-feature-login",
+                path="/home/user/project/.worktrees/feature-login",
+                branch="feature/login",
+                issue_number=12,
+                issue_title="Add login form",
+                pr_number=34,
+                pr_title="Implement login form",
+                pr_url="https://example.test/pull/34",
+                status="dirty",
+                last_commit="abc1234 Add login form",
+            )
+        ),
         open_terminals=[
             OpenTerminal(
                 id="terminal-5284bfef-3d11-424c-90cb-136f24046295",
@@ -104,6 +159,46 @@ def test_runtime_context(assembler: PromptAssembler) -> None:
     assert_golden("runtime_context.md", assembler.render_runtime_context(rc))
 
 
+def test_startup_context(assembler: PromptAssembler) -> None:
+    startup = StartupContext(
+        project=ProjectSnapshot(
+            id="project_123",
+            name="Daintree Example",
+            path="/home/user/project",
+            status="active",
+            daintree_config_present=True,
+            in_repo_settings=True,
+        ),
+        agent_roster=AgentRosterSnapshot(
+            agents=[
+                AgentSnapshot(
+                    id="claude",
+                    display_name="Claude",
+                    source="built-in",
+                    availability="ready",
+                    installed=True,
+                    launchable=True,
+                    pinned=True,
+                    toolbar_visible=True,
+                ),
+                AgentSnapshot(
+                    id="plugin:example/custom-agent",
+                    display_name="Custom Agent",
+                    source="plugin",
+                    availability="unauthenticated",
+                    installed=True,
+                    launchable=True,
+                ),
+            ],
+            complete=True,
+            availability_complete=True,
+            total_count=2,
+        ),
+        project_instructions="Always run the linter.",
+    )
+    assert_golden("startup_context.md", assembler.render_startup_context(startup))
+
+
 def test_integrations(assembler: PromptAssembler) -> None:
     rc = RuntimeContext(
         mcp_servers=[
@@ -120,8 +215,9 @@ def test_integrations(assembler: PromptAssembler) -> None:
     )
     tools = RespondRequest.model_validate(
         {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
+            "startup": {},
             "input": {
                 "messages": [{"role": "user", "content": "hi"}],
                 "tools": [
@@ -154,7 +250,7 @@ def test_turn_footer(assembler: PromptAssembler) -> None:
         memories=Memories(pinned=["uses pnpm"], relevant=["last run failed on lint"]),
         resumed_watchers=["watcher-1"],
     )
-    assert_golden("turn_footer.md", assembler.render_turn_footer(turn, active_worktree="feature/x"))
+    assert_golden("turn_footer.md", assembler.render_turn_footer(turn))
 
 
 def test_turn_footer_workflow_state(assembler: PromptAssembler) -> None:
@@ -192,10 +288,11 @@ def test_response_contract_is_final_system_message(assembler: PromptAssembler) -
     # hoisted into DeepSeek's system region and bust the tools+conversation cache).
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "hi"}]},
-            "runtime": {"permission_tier": "operator", "project_path": "/p"},
+            "startup": _startup_payload(),
+            "runtime": {"permission_tier": "operator"},
         }
     )
     pr = assembler.build_main_request(request=req, skills=[], upstream_model="m")
@@ -270,10 +367,23 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     skill = _fixture_catalog().get("daintree.example.alpha")
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
-            "runtime": {"permission_tier": "operator", "project_path": "/p"},
+            "startup": _startup_payload(),
+            "runtime": {
+                "permission_tier": "operator",
+                "worktree": {
+                    "current": {
+                        "id": "wt-review",
+                        "path": "/home/user/project/.worktrees/review",
+                        "branch": "feature/review",
+                        "is_main": False,
+                        "status": "clean",
+                        "last_commit": "def5678 Prepare branch",
+                    }
+                },
+            },
             "turn": {"goal": "Prepare this branch for review."},
         }
     )
@@ -292,12 +402,23 @@ def test_full_upstream_messages_with_open_terminals(assembler: PromptAssembler) 
     skill = _fixture_catalog().get("daintree.example.alpha")
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
+            "startup": _startup_payload(),
             "runtime": {
                 "permission_tier": "operator",
-                "project_path": "/p",
+                "worktree": {
+                    "current": {
+                        "id": "wt-feature-login",
+                        "path": "/home/user/project/.worktrees/feature-login",
+                        "branch": "feature/login",
+                        "issue_number": 12,
+                        "issue_title": "Add login form",
+                        "status": "dirty",
+                        "last_commit": "abc1234 Add login form",
+                    }
+                },
                 "open_terminals": [
                     {
                         "id": "terminal-5284bfef-3d11-424c-90cb-136f24046295",

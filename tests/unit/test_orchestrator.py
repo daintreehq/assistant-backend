@@ -190,9 +190,10 @@ def test_cadence_same_turn_does_not_run(orchestrator: ChatOrchestrator) -> None:
 def _turn_request(turn: dict) -> RespondRequest:
     return RespondRequest.model_validate(
         {
-            "protocol_version": 1,
+            "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "go"}]},
+            "startup": {},
             "turn": turn,
         }
     )

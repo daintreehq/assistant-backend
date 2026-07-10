@@ -49,9 +49,19 @@ def test_invalid_protocol_version_rejected(client, auth) -> None:
     assert r.status_code == 400
 
 
+def test_previous_protocol_version_rejected_with_upgrade_required(client, auth) -> None:
+    r = client.post(
+        "/v1/daintree/respond",
+        headers=auth,
+        json=respond_body([{"role": "user", "content": "hi"}], protocol_version=1),
+    )
+    assert r.status_code == 426
+    assert r.json()["error"]["code"] == "unsupported_daintree_protocol"
+
+
 def test_missing_session_rejected(client, auth) -> None:
     r = client.post(URL, headers=auth, json={
-        "protocol_version": 1, "input": {"messages": [{"role": "user", "content": "hi"}]},
+        "protocol_version": 2, "input": {"messages": [{"role": "user", "content": "hi"}]},
     })
     assert r.status_code == 400
 
@@ -175,7 +185,7 @@ def test_oversized_body_with_content_length_rejected() -> None:
 
 def test_oversized_body_without_content_length_rejected() -> None:
     payload = (
-        b'{"protocol_version":1,"session":{"id":"s","turn_id":"t"},'
+        b'{"protocol_version":2,"session":{"id":"s","turn_id":"t"},'
         b'"input":{"messages":[{"role":"user","content":"' + b"x" * 5000 + b'"}]}}'
     )
 

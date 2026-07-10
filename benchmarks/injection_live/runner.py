@@ -55,11 +55,14 @@ def _canary(case_id: str, trial: int) -> str:
 
 
 def _build_request(case: dict[str, Any], payload: str, i: int) -> RespondRequest:
-    runtime: dict[str, Any] = {"permission_tier": "operator", "project_id": "acme"}
+    startup: dict[str, Any] = {
+        "project": {"id": "acme", "name": "Acme", "path": "/repo/acme"},
+    }
+    runtime: dict[str, Any] = {"permission_tier": "operator"}
     turn: dict[str, Any] = {}
     carrier = case["carrier"]
     if carrier == "project_instructions":
-        runtime["project_instructions"] = payload
+        startup["project_instructions"] = payload
     elif carrier == "mcp_instructions":
         runtime["mcp_servers"] = [
             {"name": "daintree", "status": "connected", "tool_count": 3, "instructions": payload}
@@ -71,7 +74,7 @@ def _build_request(case: dict[str, Any], payload: str, i: int) -> RespondRequest
             {"id": "wf-1", "goal": payload, "status": "active", "next_action": payload}
         ]
     payload_dict: dict[str, Any] = {
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": f"inj-{case['id']}-{i}", "turn_id": f"t-{i}"},
         # Send the real tool inventory (production always does), so a tool-hijack
         # payload CAN formally call the forbidden tool — otherwise that grading
@@ -79,6 +82,7 @@ def _build_request(case: dict[str, Any], payload: str, i: int) -> RespondRequest
         # scoring as "resisted".
         "input": {"messages": [{"role": "user", "content": case["user"]}],
                   "tools": load_tool_inventory()},
+        "startup": startup,
         "runtime": runtime,
         "generation": {"stream": False, "max_tokens": 1200},
     }

@@ -132,9 +132,11 @@ def _transitions(
 
     # 2. runtime-context change: same conversation/skills; the volatile runtime rides
     #    the trailing user-role block, so system+tools must stay byte-identical.
-    rt1 = {"permission_tier": "operator", "project_id": "acme-web",
+    rt1 = {"permission_tier": "operator",
+           "worktree": {"current": {"id": "wt-1", "branch": "feature/checkout"}},
            "open_terminals": [{"id": "t1", "agent_state": "working"}]}
-    rt2 = {"permission_tier": "operator", "project_id": "acme-web",
+    rt2 = {"permission_tier": "operator",
+           "worktree": {"current": {"id": "wt-1", "branch": "feature/checkout-v2"}},
            "open_terminals": [{"id": "t1", "agent_state": "idle", "exit_code": 0}]}
     before = _body_for(assembler, settings, req([_USER], runtime=rt1), skills)
     after = _body_for(assembler, settings, req([_USER], runtime=rt2), skills)
@@ -145,7 +147,37 @@ def _transitions(
         **_stability(before, after),
     })
 
-    # 3. skill topic-shift: the active skill set changes → the loaded-skills system
+    # 3. startup-context change: project/roster changes intentionally invalidate the
+    #    cache from the stable startup row onward, but never the expensive system +
+    #    tool-schema region before it.
+    startup1 = {
+        "project": {"id": "acme-web", "name": "Acme Web", "path": "/repo/acme"},
+        "agent_roster": {
+            "agents": [{"id": "codex", "source": "built-in", "pinned": True}],
+            "complete": True,
+            "availability_complete": True,
+            "total_count": 1,
+        },
+    }
+    startup2 = {
+        "project": {"id": "acme-api", "name": "Acme API", "path": "/repo/api"},
+        "agent_roster": {
+            "agents": [{"id": "claude", "source": "built-in", "pinned": True}],
+            "complete": True,
+            "availability_complete": True,
+            "total_count": 1,
+        },
+    }
+    before = _body_for(assembler, settings, req([_USER], startup=startup1), skills)
+    after = _body_for(assembler, settings, req([_USER], startup=startup2), skills)
+    out.append({
+        "transition": "startup_context_change",
+        "expect": "system_tools_stable == 1.0 (startup changes only its following prefix)",
+        "floor_system_tools_stable": 1.0,
+        **_stability(before, after),
+    })
+
+    # 4. skill topic-shift: the active skill set changes → the loaded-skills system
     #    message changes → the contract + tools that follow it re-encode. EXPECTED
     #    drop; only base+integrations stay stable (measured below as the floor).
     if b:
@@ -160,7 +192,7 @@ def _transitions(
             **stab,
         })
 
-    # 4. new session: different conversation, identical tools/skills/runtime — the
+    # 5. new session: different conversation, identical tools/skills/runtime — the
     #    static system prefix + the whole tool region are still reused cross-session.
     before = _body_for(assembler, settings, req(
         [{"role": "user", "content": "Which worktrees are ready?"}],
@@ -188,14 +220,18 @@ def _layer_budget(
     integrations = assembler.render_integrations(request.runtime, request.input.tools)
     skills_block = assembler.render_loaded_skills(skills)
     contract = assembler.render_response_contract()
+    startup_block = assembler.render_startup_context(request.startup)
     runtime_block = assembler.render_runtime_context(request.runtime)
-    footer = assembler.render_turn_footer(request.turn, None)
-    # Conversation bytes from the assembled wire body. EXCLUDE the trailing injected
-    # user-role block (runtime + footer): it is rendered separately as the two tail
-    # layers below, so counting it here too would double-count the tail and make the
-    # layer budget non-disjoint.
+    footer = assembler.render_turn_footer(request.turn)
+    # Conversation bytes from the assembled wire body. EXCLUDE both server-injected
+    # user-role blocks: stable startup is counted separately, as is the volatile
+    # runtime/footer tail, keeping the layer budget disjoint.
     body = _body_for(assembler, settings, request, skills)
     conv_msgs = [m for m in body["messages"] if m.get("role") != "system"]
+    if conv_msgs and str(conv_msgs[0].get("content", "")).startswith(
+        "[Injected startup context"
+    ):
+        conv_msgs = conv_msgs[1:]
     if conv_msgs and str(conv_msgs[-1].get("content", "")).startswith("[Injected context"):
         conv_msgs = conv_msgs[:-1]
     convo = "".join(dumps(m).decode("utf-8") for m in conv_msgs)
@@ -207,6 +243,7 @@ def _layer_budget(
         ("loaded_skills", skills_block),
         ("response_contract", contract),
         ("tool_schemas", tools_str),
+        ("startup_context (stable user block)", startup_block),
         ("conversation", convo),
         ("runtime_context (tail)", runtime_block),
         ("turn_footer (tail)", footer),
@@ -285,7 +322,13 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
 
     continuity = [
         t for t in transitions
-        if t["transition"] in {"tool_continuation", "runtime_context_change", "new_session"}
+        if t["transition"]
+        in {
+            "tool_continuation",
+            "runtime_context_change",
+            "startup_context_change",
+            "new_session",
+        }
     ]
     min_stable = min((t["system_tools_stable"] for t in continuity), default=0.0)
     # A continuity transition MUST keep the [system+tools] region byte-identical

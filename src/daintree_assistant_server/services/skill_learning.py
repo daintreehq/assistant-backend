@@ -202,7 +202,7 @@ _HOUSE_MAX_BODY_BYTES = 48 * 1024  # generated-skill ceiling (the loader caps at
 _NUMBERED_STEP_RE = re.compile(r"(?m)^\s*\d+\.\s")
 _MD_HEADER_RE = re.compile(r"(?m)^#{1,6}\s")
 # "use/spawn/prefer/… claude" and friends — the prompts forbid hardcoding a specific
-# CLI agent; a step that needs one must pick from the runtime configured-agents roster.
+# CLI agent; a step that needs one must pick from the startup agent registry.
 # Anchored on an imperative VERB + the agent name (optionally quoted/backticked) so it
 # fires on directives like "spawn codex" / "use the `claude` agent" but NOT on the
 # roster EXAMPLES real skills legitimately list ("agent id: claude, codex, …", "all

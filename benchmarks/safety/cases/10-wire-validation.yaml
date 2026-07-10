@@ -1,7 +1,7 @@
 # Wire-validation corpus: hostile/edge RespondRequest payloads that MUST be
 # rejected (by Pydantic's strict schema OR validate_respond_request), plus valid
-# requests that MUST pass. protocol_version/session are default-filled by the
-# loader; a case only writes what it is probing.
+# requests that MUST pass. protocol_version/session/the required empty startup
+# object are default-filled by the loader; a case only writes what it is probing.
 cases:
   # ---- client system authority (must reject) --------------------------------
   - id: wire-reject-system-role

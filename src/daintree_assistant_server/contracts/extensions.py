@@ -1,9 +1,10 @@
 """Typed request-context and response-metadata models for the Daintree-native envelope.
 
 These are first-class fields of ``POST /v1/daintree/respond`` (not an OpenAI add-on):
-the request carries ``runtime`` and ``turn`` context plus the ``selection`` policy, and
-the response returns its skill/selection metadata in the ``skills`` block (non-streaming)
-or the first SSE ``meta`` event (streaming). See ``docs/DAINTREE_API.md``.
+the request carries stable ``startup`` data, fresh ``runtime``/``turn`` context, and the
+``selection`` policy. The response returns skill/selection metadata in the ``skills``
+block (non-streaming) or first SSE ``meta`` event (streaming). See
+``docs/DAINTREE_API.md``.
 """
 
 from __future__ import annotations
@@ -75,20 +76,105 @@ class OpenTerminal(BaseModel):
     exit_code: int | None = None
 
 
+class ProjectSnapshot(BaseModel):
+    """Curated, session-stable project identity from ``project.getCurrent``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str | None = Field(default=None, max_length=256)
+    name: str | None = Field(default=None, max_length=512)
+    path: str | None = Field(default=None, max_length=4096)
+    status: str | None = Field(default=None, max_length=64)
+    daintree_config_present: bool | None = None
+    in_repo_settings: bool | None = None
+
+
+class AgentSnapshot(BaseModel):
+    """One registered direct-agent candidate with narrow, non-secret metadata.
+
+    Agent ids are kept intact so the model can pass the exact identifier back to
+    ``agent.launch``.  The renderer omits a whole row when the aggregate catalog
+    budget is exhausted; it never truncates an id into a different identifier.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=16384)
+    display_name: str | None = Field(default=None, max_length=512)
+    source: Literal["built-in", "user", "plugin"]
+    availability: Literal[
+        "missing", "installed", "ready", "blocked", "unauthenticated"
+    ] | None = None
+    installed: bool | None = None
+    launchable: bool | None = None
+    pinned: bool | None = None
+    toolbar_visible: bool | None = None
+
+
+class AgentRosterSnapshot(BaseModel):
+    """A successful agent-registry read, including its completeness markers."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    agents: list[AgentSnapshot] = Field(default_factory=list, max_length=512)
+    complete: bool = False
+    availability_complete: bool = False
+    total_count: int = Field(default=0, ge=0)
+
+
+class StartupContext(BaseModel):
+    """Session-stable Daintree data repeated before the visible conversation.
+
+    This is deliberately separate from ``input.messages``: it reaches the main
+    model as a framed data row but is never mistaken for a user utterance by the
+    skill selector or the skill-learning transcript.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    project: ProjectSnapshot | None = None
+    agent_roster: AgentRosterSnapshot | None = None
+    project_instructions: str | None = None
+
+
+class WorktreeSnapshot(BaseModel):
+    """The useful non-null portion of ``worktree.getCurrent``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str | None = Field(default=None, max_length=4096)
+    path: str | None = Field(default=None, max_length=4096)
+    branch: str | None = Field(default=None, max_length=512)
+    is_main: bool = False
+    issue_number: int | None = None
+    issue_title: str | None = Field(default=None, max_length=512)
+    pr_number: int | None = None
+    pr_title: str | None = Field(default=None, max_length=512)
+    pr_url: str | None = Field(default=None, max_length=4096)
+    status: str | None = Field(default=None, max_length=64)
+    last_commit: str | None = Field(default=None, max_length=1024)
+
+
+class CurrentWorktreeSnapshot(BaseModel):
+    """A successful worktree read; ``current=None`` means definitively none."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current: WorktreeSnapshot | None = None
+
+
 class RuntimeContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     permission_tier: str | None = Field(default=None, max_length=64)
-    project_path: str | None = Field(default=None, max_length=4096)
-    project_id: str | None = Field(default=None, max_length=256)
     mcp: McpInfo | None = None
     # The CLI's actual integration surface, sent per request so the server need
     # not hardcode (and drift from) the tool reference. Rendered as inert data.
     mcp_servers: list[McpServer] = Field(default_factory=list)
-    configured_agent_ids: list[str] = Field(default_factory=list)
     scheduler_active: bool = True
-    active_worktree: str | None = Field(default=None, max_length=512)
-    project_instructions: str | None = None
+    # ``None`` means the live read was unavailable. A present wrapper whose
+    # ``current`` is None means Daintree definitively reported no active worktree.
+    worktree: CurrentWorktreeSnapshot | None = None
     # Fresh per-request snapshot of the open terminals (issue #286): the live
     # roster the CLI fetched this turn, rendered as inert data so the model can
     # see what is open without a mid-turn terminal.list discovery call.

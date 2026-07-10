@@ -40,9 +40,10 @@ def footer(assembler: PromptAssembler, digests: list[WorkflowDigest]) -> str:
 
 def test_respond_request_accepts_workflow_state() -> None:
     req = RespondRequest.model_validate({
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": "s", "turn_id": "t"},
         "input": {"messages": [{"role": "user", "content": "hi"}]},
+        "startup": {},
         "turn": {
             "workflow_state": [
                 {"id": "wf_1", "goal": "Fix tests", "status": "active"},
@@ -139,9 +140,10 @@ def test_footer_total_byte_budget_drops_tail_digests(assembler: PromptAssembler)
 
 def test_workflow_state_reaches_assembled_request(assembler: PromptAssembler) -> None:
     req = RespondRequest.model_validate({
-        "protocol_version": 1,
+        "protocol_version": 2,
         "session": {"id": "s", "turn_id": "t"},
         "input": {"messages": [{"role": "user", "content": "hi"}]},
+        "startup": {},
         "turn": {
             "workflow_state": [{"id": "wf_9", "goal": "Ship it", "status": "blocked"}],
         },
