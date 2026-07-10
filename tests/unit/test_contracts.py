@@ -9,7 +9,9 @@ from daintree_assistant_server.contracts.daintree_api import (
     RespondRequest,
     RespondResponse,
     SkillsBlock,
+    StreamError,
 )
+from daintree_assistant_server.contracts.errors import ErrorDetail
 from daintree_assistant_server.contracts.openai import (
     ImageContentPart,
     TextContentPart,
@@ -141,6 +143,19 @@ def test_request_generation_and_selection_defaults() -> None:
     assert req.selection.force is False
     assert req.session.instruction_revision == 0
     assert req.session.round == 0
+
+
+def test_stream_error_preserves_optional_raw_retry_after() -> None:
+    detail = ErrorDetail(
+        message="Rate limited.", type="rate_limit_error", code="upstream_rate_limited"
+    )
+    without_retry = StreamError(error=detail).model_dump(exclude_none=True)
+    with_retry = StreamError(error=detail, retry_after="Wed, 21 Oct 2015 07:28:00 GMT").model_dump(
+        exclude_none=True
+    )
+
+    assert "retry_after" not in without_retry
+    assert with_retry["retry_after"] == "Wed, 21 Oct 2015 07:28:00 GMT"
 
 
 def test_request_parses_open_terminals() -> None:

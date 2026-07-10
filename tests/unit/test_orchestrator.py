@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import json
+
+import pytest
+from fakes import FakeProvider, selection_result
+
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.services.chat_orchestrator import (
     ChatOrchestrator,
@@ -127,6 +132,42 @@ def test_chunk_to_delta_surfaces_content_and_reasoning() -> None:
 
 def test_chunk_to_delta_empty_delta_is_none() -> None:
     assert ChatOrchestrator._chunk_to_delta(_delta_chunk({})) is None
+
+
+@pytest.mark.asyncio
+async def test_stream_meta_is_yielded_before_upstream_open(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([skill_id])
+    request = RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": "stream-session", "turn_id": "turn-1"},
+            "input": {"messages": [{"role": "user", "content": "hello"}]},
+            "startup": {},
+            "generation": {"stream": True},
+        }
+    )
+
+    outcome = await orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+    assert outcome.stream is not None
+    assert fake_provider.stream_requests == []
+
+    first = await anext(outcome.stream)
+    assert first.startswith("event: meta\n")
+    meta = json.loads(first.split("data: ", 1)[1])
+    assert [skill["id"] for skill in meta["skills"]["newly_loaded"]] == [skill_id]
+    # The generator suspends at the metadata yield. Opening and prefetching the
+    # provider cannot begin until the client asks for the next SSE event.
+    assert fake_provider.stream_requests == []
+
+    second = await anext(outcome.stream)
+    assert second.startswith("event: delta\n")
+    assert len(fake_provider.stream_requests) == 1
+    await outcome.stream.aclose()
+    assert fake_provider.last_stream is not None
+    assert fake_provider.last_stream.closed is True
 
 
 def _cadence(

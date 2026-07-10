@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .errors import ErrorDetail
 from .extensions import (
     ClientInfo,
     Prelude,
@@ -159,9 +160,12 @@ class RespondResponse(BaseModel):
 
 
 class StreamMeta(BaseModel):
-    """First streamed event — everything the client needs before the first
-    token: the skill prelude/active set, the refreshed state token, and the
-    selector outcome."""
+    """Immediate first streamed event, emitted before the upstream model opens.
+
+    It carries everything the client needs to surface selection progress before
+    the first model token: the skill prelude/active set, refreshed state token,
+    and selector outcome.
+    """
 
     protocol_version: int = 2
     request_id: str
@@ -195,3 +199,15 @@ class StreamStatus(BaseModel):
 class StreamDone(BaseModel):
     finish_reason: str | None = None
     usage: RespondUsage = Field(default_factory=RespondUsage)
+
+
+class StreamError(BaseModel):
+    """Terminal streaming error.
+
+    ``retry_after`` preserves the upstream's raw ``Retry-After`` header when a
+    rate-limited open/prefetch exhausts its internal retries after SSE metadata
+    has already committed the HTTP 200. It is absent for every other error.
+    """
+
+    error: ErrorDetail
+    retry_after: str | None = None

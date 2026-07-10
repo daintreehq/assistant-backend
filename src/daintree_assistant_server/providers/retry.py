@@ -1,15 +1,16 @@
 """Shared transient-error retry for upstream provider calls.
 
 Every DeepSeek request — the main completion, the stream open (before the first
-public byte), the skill selector, and the utility tasks — funnels through
+model delta), the skill selector, and the utility tasks — funnels through
 :func:`retry_upstream` so the retry policy is uniform and config-driven
 (``MAX_UPSTREAM_RETRIES`` + ``RETRY_BACKOFF_BASE_SECONDS``).
 
 Only :class:`DaintreeError` marked ``retryable`` is retried (transient failures:
 5xx, timeouts, rate limits, transport errors); client errors propagate
-immediately. Retrying is only ever safe *before* any public bytes are emitted —
-a mid-stream failure stays terminal by design (the conversation continuation has
-already been partially delivered and must not be replayed).
+immediately. Retrying is only ever safe before model output is emitted (the
+stream's metadata-only progress event may already be public); a mid-generation
+failure stays terminal because conversation content has already been delivered
+and must not be replayed.
 """
 
 from __future__ import annotations

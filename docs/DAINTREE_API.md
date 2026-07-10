@@ -21,8 +21,9 @@ That is invisible to clients.
 - **Cache-optimized prompt layout.** Stable system layers and tool schemas lead, followed
   by a required session-stable startup block, the append-only visible conversation, and
   one small volatile runtime/turn tail. See [Prompt assembly](#prompt-assembly--caching).
-- **Honest streaming.** Metadata arrives as the first SSE event; the stream never
-  fabricates a successful finish after an upstream failure.
+- **Honest streaming.** Metadata arrives as the first SSE event, before the upstream
+  model is opened, and the stream never fabricates a successful finish after an
+  upstream failure.
 
 ## Authentication
 
@@ -239,22 +240,24 @@ data: { "finish_reason": "stop",
         "usage": { "prompt_tokens":0, "completion_tokens":0, "total_tokens":0, "cached_tokens":0 } }
 
 event: error
-data: { "error": { "type":"…","code":"…","message":"…","param":"…" } }
+data: { "error": { "type":"…","code":"…","message":"…","param":"…" },
+        "retry_after":"5" }                    // optional raw Retry-After on rate limits
 ```
 
 Guarantees:
 - `meta` is always first, before any token — so the client renders the skill prelude and
-  active set up front, as if the skill load happened before the reply. Its arrival also marks
-  the upstream as connected (the first token is already in hand): show a "connecting" state
-  until `meta`, then switch to generation.
+  active set up front, as if the skill load happened before the reply. It is emitted as soon
+  as selection and prompt assembly finish, **before** the upstream model is opened. Its
+  arrival marks skill selection complete, not generation connected; clients can show the
+  skill-load cue immediately while retaining their analyzing/connecting state.
 - `status` (optional) marks a generation phase. Today the only phase is `thinking`, emitted
   once the instant the model's chain-of-thought begins; the `reasoning_content` deltas that
   follow are the CoT to display. It never appears when thinking is off. Unknown future phases
   should be ignored by clients.
-- The server **prefetches the first upstream token before committing the `200`**, so a
-  pre-stream upstream failure is delivered as an ordinary JSON error (with retries),
-  not a broken stream.
-- After `meta`, a mid-stream upstream failure emits a terminal `error` event and stops.
+- After `meta`, the server opens the upstream stream and prefetches its first event. A
+  transient open/prefetch failure is retried internally before any model delta; exhaustion
+  emits a terminal `error` event in the already-open SSE stream.
+- A later mid-stream upstream failure likewise emits a terminal `error` event and stops.
   The stream **never** emits `done` it did not earn (a truncated upstream stream is an error).
 - `done` replaces any `[DONE]` sentinel; there is no OpenAI framing.
 
@@ -345,7 +348,8 @@ calls (a hard DeepSeek requirement). Thinking mode ignores `temperature`/`top_p`
 
 ## Errors
 
-Stable envelope (pre-stream as JSON, mid-stream as an `error` event):
+Stable envelope (request/auth/validation failures before SSE as JSON; generation failures
+after streaming `meta` as an `error` event):
 
 ```jsonc
 { "error": { "type": "invalid_request" | "authentication" | "rate_limit" | "api_error",
@@ -361,6 +365,12 @@ Stable envelope (pre-stream as JSON, mid-stream as an `error` event):
 | 429  | `upstream_rate_limited` (with `Retry-After`) |
 | 502 / 504 | `upstream_error` / `upstream_timeout` |
 | 503  | not ready (`/readyz` failing) |
+
+For a streaming `/respond`, upstream open/prefetch starts after the `200` and `meta` event;
+its exhausted 429/502/504 failure therefore uses the SSE `error` shape rather than changing
+the already-committed HTTP status. When an exhausted rate limit carried `Retry-After`, its
+raw string value is preserved as the optional top-level SSE `retry_after` field; other
+terminal stream errors omit the field.
 
 ---
 

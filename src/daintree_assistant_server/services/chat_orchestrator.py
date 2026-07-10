@@ -1,5 +1,5 @@
 """The respond orchestrator: selection cadence, prompt assembly, skill metadata,
-and the delayed streaming start.
+and immediate metadata streaming.
 
 It coordinates state verification, the skill selector, the prompt assembler, and
 the provider, producing a native Daintree response (non-streaming body, or a
@@ -27,6 +27,7 @@ from ..contracts.daintree_api import (
     SkillsBlock,
     StreamDelta,
     StreamDone,
+    StreamError,
     StreamMeta,
     StreamStatus,
 )
@@ -342,18 +343,8 @@ class ChatOrchestrator:
         )
 
         if request.generation.stream:
-            t_open = time.perf_counter()
-            stream, first_event = await self._open_stream_with_retry(provider_request)
-            # Phase timing for the round's "dead air": selector (above) + upstream
-            # open-to-first-event. upstream_first_event_ms dominates on cache misses
-            # (prefill) and on thinking-heavy rounds (reasoning precedes the event).
-            logger.info(
-                "respond_upstream_open",
-                request_id=request_id,
-                upstream_first_event_ms=round((time.perf_counter() - t_open) * 1000),
-            )
             body_iter = self._stream_body(
-                stream, first_event, meta=meta, request=request, active_ids=active_ids
+                provider_request, meta=meta, request=request, active_ids=active_ids
             )
             return RespondOutcome(headers=headers, streaming=True, stream=body_iter)
 
@@ -725,19 +716,12 @@ class ChatOrchestrator:
 
     async def _stream_body(
         self,
-        stream: ProviderStream,
-        first_event: dict[str, Any] | None,
+        provider_request: ProviderChatRequest,
         *,
         meta: _RespondMeta,
         request: RespondRequest,
         active_ids: list[str],
     ) -> AsyncIterator[str]:
-        async def _chunks() -> AsyncIterator[dict[str, Any]]:
-            if first_event is not None:
-                yield first_event
-            async for chunk in stream:
-                yield chunk
-
         finish_reason: str | None = None
         thinking_signaled = False
         # Accumulate the reply so post-completion learning can see the workflow it
@@ -752,12 +736,13 @@ class ChatOrchestrator:
         # once the round is complete, so consolidation adds no real latency, and
         # holding everything tolerates providers that interleave call fragments.
         tool_call_buffer = StreamToolCallBuffer(build_parameter_index(request.input.tools))
+        stream: ProviderStream | None = None
         try:
             # The metadata event is always first, before any token: the client gets
             # the skill prelude, active set, refreshed state, and selector outcome
-            # up front, then renders the load as if it happened before the reply.
-            # Emitted inside the try so a client disconnect at this very first yield
-            # still runs the stream's aclose() in the finally (no upstream leak).
+            # as soon as selection finishes. Upstream connection/prefill deliberately
+            # starts only after this yield, so the visible skill-load cue is not held
+            # behind model latency.
             yield self._sse(
                 "meta",
                 StreamMeta(
@@ -770,6 +755,26 @@ class ChatOrchestrator:
                     warnings=meta.warnings,
                 ).model_dump(exclude_none=True),
             )
+
+            t_open = time.perf_counter()
+            opened_stream, first_event = await self._open_stream_with_retry(provider_request)
+            stream = opened_stream
+            # Phase timing for the round's remaining "dead air": upstream
+            # open-to-first-event. It dominates on cache misses (prefill) and on
+            # thinking-heavy rounds (reasoning precedes the event), but no longer
+            # delays the already-emitted skill metadata.
+            logger.info(
+                "respond_upstream_open",
+                request_id=meta.request_id,
+                upstream_first_event_ms=round((time.perf_counter() - t_open) * 1000),
+            )
+
+            async def _chunks() -> AsyncIterator[dict[str, Any]]:
+                if first_event is not None:
+                    yield first_event
+                async for chunk in opened_stream:
+                    yield chunk
+
             async for chunk in _chunks():
                 finish_reason = self._chunk_finish_reason(chunk) or finish_reason
                 delta = self._chunk_to_delta(chunk)
@@ -801,24 +806,31 @@ class ChatOrchestrator:
             if remaining:
                 yield self._sse("delta", StreamDelta(tool_calls=remaining))
             self._log_tool_call_repairs(tool_call_buffer.repairs, request_id=meta.request_id)
-            usage = self._usage(stream.usage or ProviderUsage())
+            usage = self._usage(opened_stream.usage or ProviderUsage())
             yield self._sse(
                 "done", StreamDone(finish_reason=finish_reason, usage=usage).model_dump()
             )
             completed = True
         except DaintreeError as exc:
-            # Failure after the meta event: emit a terminal error event and stop.
-            # Never fabricate a successful ``done``.
+            # Every provider operation now starts after the meta event. An exhausted
+            # open/prefetch retry and a later stream failure therefore share the same
+            # honest terminal SSE error shape; never fabricate a successful ``done``.
             logger.warning(
                 "stream_error_after_start",
                 request_id=meta.request_id,
                 code=exc.code,
                 status=exc.status_code,
             )
-            error_body = exc.envelope().model_dump(exclude_none=True)["error"]
-            yield self._sse("error", {"error": error_body})
+            yield self._sse(
+                "error",
+                StreamError(
+                    error=exc.envelope().error,
+                    retry_after=exc.headers.get("Retry-After"),
+                ),
+            )
         finally:
-            await stream.aclose()
+            if stream is not None:
+                await stream.aclose()
 
         # Learn only from a stream that reached a clean ``done`` (not an error, and
         # not an aborted stream — a client disconnect raises GeneratorExit at a
@@ -856,12 +868,16 @@ class ChatOrchestrator:
         )
 
     @staticmethod
-    def _sse(event: str, data: dict[str, Any] | StreamDelta) -> str:
-        payload = data.model_dump(exclude_none=True) if isinstance(data, StreamDelta) else data
+    def _sse(event: str, data: dict[str, Any] | StreamDelta | StreamError) -> str:
+        payload = (
+            data.model_dump(exclude_none=True)
+            if isinstance(data, (StreamDelta, StreamError))
+            else data
+        )
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         return f"event: {event}\ndata: {body}\n\n"
 
-    # ---- retries (only before any public bytes) -------------------------
+    # ---- retries (before any model output is emitted) -------------------
 
     async def _complete_with_retry(self, request: ProviderChatRequest) -> Any:
         return await retry_upstream(
@@ -874,11 +890,11 @@ class ChatOrchestrator:
         self, request: ProviderChatRequest
     ) -> tuple[ProviderStream, dict[str, Any] | None]:
         # Opening the stream and reading its first event are one retryable unit:
-        # a failure in either is transient and recoverable so long as no public
-        # bytes have left the building. A failed prefetch must close its
-        # half-open stream before the attempt unwinds — on ANY exception,
-        # including cancellation, so the httpx context never leaks. Only
-        # DaintreeError is retried (retry_upstream catches nothing else).
+        # a failure in either is transient and recoverable before model output,
+        # even though the public metadata event is already visible. A failed
+        # prefetch must close its half-open stream before the attempt unwinds — on
+        # ANY exception, including cancellation, so the httpx context never leaks.
+        # Only DaintreeError is retried (retry_upstream catches nothing else).
         async def _open() -> tuple[ProviderStream, dict[str, Any] | None]:
             stream = await self.provider.open_stream(request)
             ok = False

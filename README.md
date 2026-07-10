@@ -187,7 +187,9 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
 | `GET`  | `/version` | no | Build SHA, version, protocol range |
 
 Skill/selection metadata is delivered in the response body's `skills` block
-(non-streaming) or as the first SSE `meta` event (streaming), before any token.
+(non-streaming) or as the first SSE `meta` event (streaming). The streaming event
+is emitted as soon as selection completes, before the upstream model is opened,
+so a client can surface newly loaded skills while generation is still starting.
 
 ## Deployment
 

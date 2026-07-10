@@ -140,8 +140,8 @@ class DeepSeekStream(ProviderStream):
             raise upstream_timeout() from exc
         except httpx.TransportError as exc:
             self._done = True
-            # A dropped connection is transient. Retrying is only acted on before
-            # any public bytes are emitted (a failed prefetch); the mid-stream
+            # A dropped connection is transient. Retrying is only acted on during
+            # open/prefetch, before any model delta is exposed; the mid-stream
             # consumer ignores the flag and surfaces a terminal error instead.
             raise upstream_error(
                 "The upstream model stream was interrupted.", retryable=True
@@ -272,7 +272,7 @@ class DeepSeekProvider:
         if status in (408, 504):
             return upstream_timeout()
         if status >= 500:
-            # Transient upstream fault — safe to retry before any public bytes.
+            # Transient upstream fault — retry while no model output is exposed.
             return upstream_error(retryable=True)
         # A 4xx means the upstream rejected OUR request as malformed: permanent
         # (never retried) and almost always a server-side bug in what we sent. Carry

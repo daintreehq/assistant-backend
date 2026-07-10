@@ -48,8 +48,9 @@ class DaintreeError(Exception):
         self.code = code
         self.param = param
         self.headers = headers or {}
-        # Whether retrying the operation that raised this error may succeed.
-        # Only meaningful before any public bytes have been sent.
+        # Whether retrying the operation that raised this error may succeed. The
+        # caller is responsible for retrying only while no model output or other
+        # replay-unsafe side effect has been exposed.
         self.retryable = retryable
 
     def envelope(self) -> ErrorEnvelope:

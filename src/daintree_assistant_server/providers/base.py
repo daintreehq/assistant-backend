@@ -103,7 +103,7 @@ class ProviderStream(abc.ABC):
 
         stream = await provider.open_stream(req)
         first = await stream.prefetch_first_event()   # may raise / be None
-        # ... send public headers now ...
+        # ... retry open/prefetch before forwarding any model chunk ...
         if first is not None:
             yield first
         async for chunk in stream:                     # remaining chunks

@@ -119,7 +119,7 @@ class OpenAIProvider:
         if status in (408, 504):
             return upstream_timeout()
         if status >= 500:
-            # Transient upstream fault — safe to retry before any public bytes.
+            # Transient upstream fault — retry while no model output is exposed.
             return upstream_error(retryable=True)
         # A 4xx means OpenAI rejected OUR request as malformed: permanent (never
         # retried). Carry its own reason through so the failure is diagnosable.

@@ -79,13 +79,20 @@ def test_stream_open_retries_before_success(client, auth, fake_provider) -> None
     assert "done" in [e for e, _ in parse_sse(text)]
 
 
-def test_stream_open_persistent_error_is_json_not_stream(client, auth, fake_provider) -> None:
+def test_stream_open_persistent_error_is_terminal_sse_after_meta(
+    client, auth, fake_provider
+) -> None:
     fake_provider.selection_result = selection_result([])
-    fake_provider.stream_error = upstream_rate_limited()
-    # Failure before public headers -> ordinary JSON error, not a stream.
-    r = client.post(URL, headers=auth, json=_stream_body())
-    assert r.status_code == 429
-    assert r.json()["error"]["code"] == "upstream_rate_limited"
+    fake_provider.stream_error = upstream_rate_limited(retry_after="5")
+    # Skill metadata commits the stream before provider connection begins. An
+    # exhausted open retry therefore terminates honestly inside SSE.
+    with client.stream("POST", URL, headers=auth, json=_stream_body()) as s:
+        assert s.status_code == 200
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    assert [event for event, _ in events] == ["meta", "error"]
+    assert events[-1][1]["error"]["code"] == "upstream_rate_limited"
+    assert events[-1][1]["retry_after"] == "5"
     # Default budget: 1 try + 3 retries = 4 stream-open attempts before surfacing.
     assert len(fake_provider.stream_requests) == 4
 
@@ -114,6 +121,8 @@ def test_stream_breaks_after_first_token_no_fabricated_finish(client, auth, fake
     assert "partial" in streamed
     assert "error" in kinds       # terminal error event
     assert "done" not in kinds    # no fabricated successful finish
+    error_event = next(data for event, data in events if event == "error")
+    assert "retry_after" not in error_event
 
 
 def test_stream_closes_upstream_on_completion(client, auth, fake_provider) -> None:

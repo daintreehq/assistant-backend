@@ -219,8 +219,9 @@ class Settings(BaseSettings):
 
     # ---- Retries --------------------------------------------------------
     # Applies to every upstream call (main completion, stream open,
-    # selector, utility tasks): retries transient failures only, and only before
-    # any public bytes are emitted. 3 retries = up to 4 attempts.
+    # selector, utility tasks): retries transient failures only while no model
+    # output or replay-unsafe side effect has been exposed. Streaming metadata may
+    # already be public during an open/prefetch retry. 3 retries = up to 4 attempts.
     max_upstream_retries: int = Field(default=3, ge=0, alias="MAX_UPSTREAM_RETRIES")
     retry_backoff_base_seconds: float = Field(
         default=0.25, ge=0.0, alias="RETRY_BACKOFF_BASE_SECONDS"
