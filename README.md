@@ -29,6 +29,11 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
   change, or `selection.force`.
 - Selector failure fails *open* (keeps the prior active set) rather than blocking
   the assistant.
+- Streamed selector turns with verified, catalog-current active skills race the
+  selector against a private main stream built from the exact ordered prior set.
+  An exact resolved match reuses that stream; any set/revision change closes it
+  and starts the authoritative prompt. Empty/untrusted state stays serial, and no
+  speculative model event is exposed before the first `meta` event.
 - Skill state is portable across instances via a signed, opaque token.
 - Prompt order is cache-critical: stable systems/tools → stable startup user block → visible
   conversation → one volatile runtime/turn user tail. Runtime worktree state is typed and
@@ -188,8 +193,9 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
 
 Skill/selection metadata is delivered in the response body's `skills` block
 (non-streaming) or as the first SSE `meta` event (streaming). The streaming event
-is emitted as soon as selection completes, before the upstream model is opened,
-so a client can surface newly loaded skills while generation is still starting.
+is emitted as soon as selection completes and always precedes model output. On an
+eligible later turn, the backend may already have privately prefetched the matching
+main stream, so useful output can follow immediately after `meta`.
 
 ## Deployment
 

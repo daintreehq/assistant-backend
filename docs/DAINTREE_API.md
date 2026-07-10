@@ -21,9 +21,9 @@ That is invisible to clients.
 - **Cache-optimized prompt layout.** Stable system layers and tool schemas lead, followed
   by a required session-stable startup block, the append-only visible conversation, and
   one small volatile runtime/turn tail. See [Prompt assembly](#prompt-assembly--caching).
-- **Honest streaming.** Metadata arrives as the first SSE event, before the upstream
-  model is opened, and the stream never fabricates a successful finish after an
-  upstream failure.
+- **Honest streaming.** Metadata is always the first public SSE event and no private
+  speculative model event can precede it. The stream never fabricates a successful
+  finish after an upstream failure.
 
 ## Authentication
 
@@ -247,16 +247,17 @@ data: { "error": { "type":"…","code":"…","message":"…","param":"…" },
 Guarantees:
 - `meta` is always first, before any token — so the client renders the skill prelude and
   active set up front, as if the skill load happened before the reply. It is emitted as soon
-  as selection and prompt assembly finish, **before** the upstream model is opened. Its
-  arrival marks skill selection complete, not generation connected; clients can show the
-  skill-load cue immediately while retaining their analyzing/connecting state.
+  as authoritative selection and prompt assembly finish. An eligible speculative main
+  stream may already be open privately, but none of its status, reasoning, content,
+  tool-call, usage, or error events can cross this boundary. `meta` marks skill selection
+  complete; clients can show the skill-load cue immediately.
 - `status` (optional) marks a generation phase. Today the only phase is `thinking`, emitted
   once the instant the model's chain-of-thought begins; the `reasoning_content` deltas that
   follow are the CoT to display. It never appears when thinking is off. Unknown future phases
   should be ignored by clients.
-- After `meta`, the server opens the upstream stream and prefetches its first event. A
-  transient open/prefetch failure is retried internally before any model delta; exhaustion
-  emits a terminal `error` event in the already-open SSE stream.
+- After `meta`, the server either consumes an exact-match speculative winner or opens the
+  canonical upstream stream. Transient open/prefetch failure is retried internally before
+  any model delta; exhaustion emits a terminal `error` event in the already-open SSE stream.
 - A later mid-stream upstream failure likewise emits a terminal `error` event and stops.
   The stream **never** emits `done` it did not earn (a truncated upstream stream is an error).
 - `done` replaces any `[DONE]` sentinel; there is no OpenAI framing.
@@ -279,18 +280,35 @@ Skill selection is removed from the main thread:
    degraded selector reuses the prior set unchanged, so a classifier hiccup never evicts an
    in-progress runbook. The selector is instructed to re-list any active skill it means to
    keep. (The explicit `resolve` `load` action, by contrast, is additive over the prior set.)
-3. **Injection.** Only the active skill *bodies* are injected into the main prompt — never
+3. **Streaming speculation.** Only when all of these are true — streaming response, selector
+   run required, valid session-bound state, catalog revision current, and a non-empty prior
+   active set — the server races the authoritative selector against a private main stream
+   assembled from that exact ordered prior set. The private producer applies chunk and
+   serialized-byte backpressure. If the final resolved ids match in exact order (including
+   selector fail-open reuse), the already-running request becomes canonical. An empty,
+   added, removed, reordered, or catalog-changed result closes and discards it before a new
+   canonical request starts. Empty, invalid, expired, wrong-session, and stale-catalog state
+   always waits for selection serially. The non-streaming path is unchanged.
+4. **Injection.** Only the active skill *bodies* are injected into the main prompt — never
    the full catalog — and they reach the model as **plain context** (the "Loaded skills"
    system block), not a tool call. The model is **not** shown a synthetic `skill__load`
    self-call; a `skills.prelude` is still returned for the client to render a visible
    "Skill loaded" card.
-4. **State token.** `state` is an opaque, signed (`HMAC-SHA256`, key-ring/`kid` rotation),
+5. **State token.** `state` is an opaque, signed (`HMAC-SHA256`, key-ring/`kid` rotation),
    session-bound, expiring token carrying the active skills + catalog revision + cadence
    keys. It is verified fail-closed; an invalid/expired/wrong-session token is ignored
    (selection simply re-runs) and a `warnings` entry is added.
 
 `skill.find` / `skill.load` (and their wire-safe `skill__find` / `skill__load` forms) are
 reserved and rejected if a client offers them as tools or replays them in history.
+
+Operational controls are `SKILL_SPECULATION_MAX_CONCURRENCY` (`0` is the kill switch),
+`SKILL_SPECULATION_BUFFER_CHUNKS`, `SKILL_SPECULATION_BUFFER_BYTES`, and
+`SKILL_SPECULATION_CLAIM_TIMEOUT_SECONDS` (closes a winner whose HTTP body is never
+iterated). The `respond` log carries `skill_speculation` plus bounded-buffer/open stats;
+`respond_upstream_open` records speculative reuse and post-`meta` wait. Dedicated
+`skill_speculation_fallback`, `skill_speculation_abandoned`, and cleanup-timeout events
+cover degraded lifecycle paths without logging request content.
 
 ## Prompt assembly & caching
 
@@ -366,11 +384,14 @@ after streaming `meta` as an `error` event):
 | 502 / 504 | `upstream_error` / `upstream_timeout` |
 | 503  | not ready (`/readyz` failing) |
 
-For a streaming `/respond`, upstream open/prefetch starts after the `200` and `meta` event;
-its exhausted 429/502/504 failure therefore uses the SSE `error` shape rather than changing
-the already-committed HTTP status. When an exhausted rate limit carried `Retry-After`, its
-raw string value is preserved as the optional top-level SSE `retry_after` field; other
-terminal stream errors omit the field.
+For a streaming `/respond`, public generation begins only after the `200` and `meta` event;
+an exhausted canonical 429/502/504 failure therefore uses the SSE `error` shape rather than
+changing the already-committed HTTP status. A failed private speculative open is never
+exposed before `meta`: a private post-open/buffer failure can fall back to a fresh canonical
+open, while an already-exhausted open/prefetch retry budget is preserved (not doubled) and
+becomes the terminal SSE error if that exact speculative request wins selection. When an
+exhausted rate limit carried `Retry-After`, its raw string value is preserved as the optional
+top-level SSE `retry_after` field; other terminal stream errors omit the field.
 
 ---
 

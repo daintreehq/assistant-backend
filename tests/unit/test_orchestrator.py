@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import Callable
+from typing import Any
 
 import pytest
-from fakes import FakeProvider, selection_result
+from fakes import FakeProvider, FakeStream, make_text_chunks, selection_result
 
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
+from daintree_assistant_server.errors import upstream_error
+from daintree_assistant_server.providers.base import ProviderStream
+from daintree_assistant_server.services import chat_orchestrator as orchestrator_module
 from daintree_assistant_server.services.chat_orchestrator import (
     ChatOrchestrator,
+    _SpeculativeStream,
     merge_active_skills,
     resolve_active_skills,
 )
@@ -168,6 +175,610 @@ async def test_stream_meta_is_yielded_before_upstream_open(
     await outcome.stream.aclose()
     assert fake_provider.last_stream is not None
     assert fake_provider.last_stream.closed is True
+
+
+# ---- selector/main-stream speculation ---------------------------------------
+
+
+def _stream_request_with_state(
+    orchestrator: ChatOrchestrator,
+    active_ids: list[str],
+    *,
+    session_id: str = "spec-session",
+    prior_turn_id: str = "turn-0",
+    turn_id: str = "turn-1",
+    catalog_revision: str | None = None,
+    state: str | None = None,
+) -> RespondRequest:
+    if state is None:
+        state = orchestrator.state_codec.issue(
+            session_id=session_id,
+            active_skills=active_ids,
+            catalog_revision=catalog_revision or orchestrator.catalog.revision,
+            turn_id=prior_turn_id,
+            instruction_revision=0,
+        )
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": session_id, "turn_id": turn_id},
+            "input": {"messages": [{"role": "user", "content": "next instruction"}]},
+            "startup": {},
+            "generation": {"stream": True},
+            "state": state,
+        }
+    )
+
+
+def _gate_selector(
+    monkeypatch: pytest.MonkeyPatch,
+    orchestrator: ChatOrchestrator,
+    decision: SelectionDecision,
+) -> tuple[asyncio.Event, asyncio.Event]:
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def select(*args: object, **kwargs: object) -> SelectionDecision:
+        started.set()
+        await release.wait()
+        return decision
+
+    monkeypatch.setattr(orchestrator.selector, "select", select)
+    return started, release
+
+
+async def _wait_until(predicate: Callable[[], bool], attempts: int = 100) -> None:
+    for _ in range(attempts):
+        if predicate():
+            return
+        await asyncio.sleep(0)
+    raise AssertionError("condition did not become true")
+
+
+async def _drain(stream: object) -> list[str]:
+    events: list[str] = []
+    async for event in stream:  # type: ignore[attr-defined]
+        events.append(event)
+    return events
+
+
+def _streamed_content(events: list[str]) -> str:
+    out: list[str] = []
+    for event in events:
+        if not event.startswith("event: delta\n"):
+            continue
+        data = json.loads(event.split("data: ", 1)[1])
+        out.append(data.get("content", ""))
+    return "".join(out)
+
+
+@pytest.mark.asyncio
+async def test_speculation_starts_during_selector_and_exact_match_reuses_once(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False),
+    )
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        stream = FakeStream(make_text_chunks("speculative winner"))
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    request = _stream_request_with_state(orchestrator, [skill_id])
+    original_build = orchestrator.assembler.build_main_request
+    assembled: list[object] = []
+
+    def tracked_build(**kwargs: Any) -> Any:
+        built = original_build(**kwargs)
+        assembled.append(built)
+        return built
+
+    monkeypatch.setattr(orchestrator.assembler, "build_main_request", tracked_build)
+
+    pending = asyncio.create_task(
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+    )
+    await started.wait()
+    await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
+    assert pending.done() is False  # no public outcome/bytes before authoritative selection
+
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    assert len(fake_provider.stream_requests) == 1
+    # A committed-but-unclaimed buffer still occupies overlap capacity.
+    assert orchestrator._skill_speculations_in_flight == 1
+
+    events = await _drain(outcome.stream)
+    assert events[0].startswith("event: meta\n")
+    assert events[-1].startswith("event: done\n")
+    assert _streamed_content(events) == "speculative winner "
+    assert len(assembled) == 1  # no duplicate 100+ KiB assembly/deep comparison
+    assert fake_provider.stream_requests[0] is assembled[0]
+    assert len(fake_provider.stream_requests) == 1  # winner consumed exactly once
+    assert streams[0].closed is True
+    assert orchestrator._skill_speculations_in_flight == 0
+
+
+@pytest.mark.asyncio
+async def test_degraded_selector_reuses_speculative_prior_stream(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision.degraded_open(["skill_selector_failed_open"]),
+    )
+    request = _stream_request_with_state(orchestrator, [skill_id])
+    pending = asyncio.create_task(
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+    )
+    await started.wait()
+    await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+
+    assert len(fake_provider.stream_requests) == 1
+    meta = json.loads(events[0].split("data: ", 1)[1])
+    assert meta["skills"]["selector"]["degraded"] is True
+    assert [s["id"] for s in meta["skills"]["active"]] == [skill_id]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("selection", ["empty", "reordered", "additional"])
+async def test_changed_selection_discards_private_stream_and_opens_canonical(
+    selection: str,
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ids = sorted(orchestrator.catalog.known_ids)
+    prior = ids[:2]
+    selected = {
+        "empty": [],
+        "reordered": list(reversed(prior)),
+        "additional": [prior[0], ids[2]],
+    }[selection]
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=selected, ran=True, degraded=False),
+    )
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        label = "private loser" if not streams else "canonical winner"
+        chunks = make_text_chunks(label)
+        chunks[-1]["usage"] = {
+            "prompt_tokens": 900 if not streams else 12,
+            "completion_tokens": 90 if not streams else 8,
+            "total_tokens": 990 if not streams else 20,
+        }
+        stream = FakeStream(chunks)
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, prior),
+            upstream_model="deepseek-v4-flash",
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: len(streams) == 1)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+
+    assert streams[0].closed is True
+    assert len(fake_provider.stream_requests) == 1
+    assert orchestrator._skill_speculations_in_flight == 0
+    first = await anext(outcome.stream)
+    assert first.startswith("event: meta\n")
+    assert len(fake_provider.stream_requests) == 1  # canonical still starts after meta
+    remaining = await _drain(outcome.stream)
+    events = [first, *remaining]
+
+    assert len(fake_provider.stream_requests) == 2
+    assert _streamed_content(events) == "canonical winner "
+    assert "private loser" not in "".join(events)
+    done = json.loads(events[-1].split("data: ", 1)[1])
+    assert done["usage"]["total_tokens"] == 20  # winner usage only
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state_kind", ["empty", "stale", "invalid"])
+async def test_empty_invalid_and_stale_state_never_speculates(
+    state_kind: str,
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    if state_kind == "empty":
+        request = _stream_request_with_state(orchestrator, [])
+    elif state_kind == "stale":
+        request = _stream_request_with_state(
+            orchestrator, [skill_id], catalog_revision="sha256:stale"
+        )
+    else:
+        request = _stream_request_with_state(orchestrator, [], state="not-a-state-token")
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+    )
+
+    pending = asyncio.create_task(
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+    )
+    await started.wait()
+    await asyncio.sleep(0)
+    assert fake_provider.stream_requests == []
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    first = await anext(outcome.stream)
+    assert first.startswith("event: meta\n")
+    assert fake_provider.stream_requests == []
+    await outcome.stream.aclose()
+
+
+@pytest.mark.asyncio
+async def test_continuation_round_with_active_skill_does_not_speculate(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    request = _stream_request_with_state(
+        orchestrator,
+        [skill_id],
+        prior_turn_id="same-turn",
+        turn_id="same-turn",
+    )
+
+    async def unexpected_select(*args: object, **kwargs: object) -> SelectionDecision:
+        raise AssertionError("selector must not run on a continuation round")
+
+    monkeypatch.setattr(orchestrator.selector, "select", unexpected_select)
+    outcome = await orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+    assert outcome.stream is not None
+    first = await anext(outcome.stream)
+    assert first.startswith("event: meta\n")
+    assert fake_provider.stream_requests == []
+    await outcome.stream.aclose()
+
+
+@pytest.mark.asyncio
+async def test_private_midstream_failure_falls_back_to_fresh_canonical_stream(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orchestrator.settings = orchestrator.settings.model_copy(
+        update={"max_upstream_retries": 0}
+    )
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False),
+    )
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        if not streams:
+            stream = FakeStream(
+                make_text_chunks("private partial"),
+                error_at=1,
+                error=upstream_error("private stream failed"),
+            )
+        else:
+            stream = FakeStream(make_text_chunks("fallback winner"))
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, [skill_id]),
+            upstream_model="deepseek-v4-flash",
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: bool(streams) and streams[0].closed)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+
+    assert len(fake_provider.stream_requests) == 2
+    assert all(stream.closed for stream in streams)
+    assert _streamed_content(events) == "fallback winner "
+    assert orchestrator._skill_speculations_in_flight == 0
+
+
+@pytest.mark.asyncio
+async def test_exhausted_speculative_open_does_not_get_second_retry_budget(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orchestrator.settings = orchestrator.settings.model_copy(
+        update={"max_upstream_retries": 2}
+    )
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False),
+    )
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        stream = FakeStream(
+            [],
+            error_at=0,
+            error=upstream_error("private open exhausted", retryable=True),
+        )
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, [skill_id]),
+            upstream_model="deepseek-v4-flash",
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: len(streams) == 3 and all(stream.closed for stream in streams))
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+
+    assert [event.split("\n", 1)[0] for event in events] == [
+        "event: meta",
+        "event: error",
+    ]
+    assert len(fake_provider.stream_requests) == 3  # exactly 1 + max_upstream_retries
+    assert orchestrator._skill_speculations_in_flight == 0
+
+
+@pytest.mark.asyncio
+async def test_oversized_private_event_respects_byte_cap_and_falls_back(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orchestrator.settings = orchestrator.settings.model_copy(
+        update={"skill_speculation_buffer_bytes": 1024}
+    )
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False),
+    )
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        chunks = (
+            make_text_chunks("x" * 2048)
+            if not streams
+            else make_text_chunks("bounded fallback")
+        )
+        stream = FakeStream(chunks)
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, [skill_id]),
+            upstream_model="deepseek-v4-flash",
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: bool(streams) and streams[0].closed)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+
+    assert len(fake_provider.stream_requests) == 2
+    assert _streamed_content(events) == "bounded fallback "
+    assert orchestrator._skill_speculations_in_flight == 0
+
+
+@pytest.mark.asyncio
+async def test_uniterated_winner_expires_closes_and_late_consumer_falls_back(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orchestrator.settings = orchestrator.settings.model_copy(
+        update={
+            "skill_speculation_buffer_chunks": 1,
+            "skill_speculation_claim_timeout_seconds": 0.01,
+        }
+    )
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False),
+    )
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        text = " ".join(["private"] * 300) if not streams else "late canonical"
+        stream = FakeStream(make_text_chunks(text))
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, [skill_id]),
+            upstream_model="deepseek-v4-flash",
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: bool(streams))
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    assert orchestrator._skill_speculations_in_flight == 1
+
+    await asyncio.sleep(0.03)
+    assert streams[0].closed is True
+    assert orchestrator._skill_speculations_in_flight == 0
+
+    events = await _drain(outcome.stream)
+    assert len(fake_provider.stream_requests) == 2
+    assert _streamed_content(events) == "late canonical "
+
+
+@pytest.mark.asyncio
+async def test_mismatch_cancels_producer_blocked_on_chunk_backpressure(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orchestrator.settings = orchestrator.settings.model_copy(
+        update={"skill_speculation_buffer_chunks": 2}
+    )
+    ids = sorted(orchestrator.catalog.known_ids)
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[ids[1]], ran=True, degraded=False),
+    )
+    stream = FakeStream(make_text_chunks(" ".join(["chunk"] * 500)))
+    fake_provider.stream_factory = lambda _request: stream
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, [ids[0]]),
+            upstream_model="deepseek-v4-flash",
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: stream._index >= 3)
+    await asyncio.sleep(0)
+    assert stream._index <= 3  # two buffered chunks plus one producer-local event
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    assert stream.closed is True
+    assert orchestrator._skill_speculations_in_flight == 0
+    await outcome.stream.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cleanup_timeout_keeps_capacity_until_resistant_producer_finishes(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(orchestrator_module, "_SPECULATION_CLOSE_TIMEOUT_SECONDS", 0.01)
+    ids = sorted(orchestrator.catalog.known_ids)
+    started, release_selector = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[ids[1]], ran=True, degraded=False),
+    )
+    allow_close = asyncio.Event()
+
+    class ResistantCloseStream(FakeStream):
+        async def aclose(self) -> None:
+            while not allow_close.is_set():
+                try:
+                    await allow_close.wait()
+                except asyncio.CancelledError:
+                    # Simulate a provider primitive that does not promptly honor
+                    # task cancellation; the overlap gate must remain occupied.
+                    continue
+            self.closed = True
+
+    upstream: ProviderStream = ResistantCloseStream(make_text_chunks("private loser"))
+    fake_provider.stream_factory = lambda _request: upstream
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, [ids[0]]),
+            upstream_model="deepseek-v4-flash",
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
+    release_selector.set()
+    outcome = await pending
+    assert outcome.stream is not None
+
+    assert orchestrator._skill_speculations_in_flight == 1
+    allow_close.set()
+    await _wait_until(lambda: orchestrator._skill_speculations_in_flight == 0)
+    assert upstream.closed is True  # type: ignore[attr-defined]
+    await outcome.stream.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cancellation_inside_claim_still_closes_provisional_owner(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orchestrator.settings = orchestrator.settings.model_copy(
+        update={"skill_speculation_buffer_chunks": 1}
+    )
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+
+    async def matching_select(*args: object, **kwargs: object) -> SelectionDecision:
+        await asyncio.sleep(0)
+        return SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False)
+
+    monkeypatch.setattr(orchestrator.selector, "select", matching_select)
+    upstream = FakeStream(make_text_chunks(" ".join(["held"] * 300)))
+    fake_provider.stream_factory = lambda _request: upstream
+    outcome = await orchestrator.complete(
+        _stream_request_with_state(orchestrator, [skill_id]),
+        upstream_model="deepseek-v4-flash",
+    )
+    assert outcome.stream is not None
+    claim_started = asyncio.Event()
+    never = asyncio.Event()
+
+    async def blocking_claim(self: _SpeculativeStream) -> bool:
+        self._claimed = True
+        claim_started.set()
+        await never.wait()
+        return True
+
+    monkeypatch.setattr(_SpeculativeStream, "claim", blocking_claim)
+    first_event = asyncio.create_task(anext(outcome.stream))
+    await claim_started.wait()
+    first_event.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await first_event
+
+    assert upstream.closed is True
+    assert orchestrator._skill_speculations_in_flight == 0
 
 
 def _cadence(

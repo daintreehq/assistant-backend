@@ -227,6 +227,31 @@ class Settings(BaseSettings):
         default=0.25, ge=0.0, alias="RETRY_BACKOFF_BASE_SECONDS"
     )
 
+    # ---- Skill-selection speculation -----------------------------------
+    # On a streamed new instruction with a verified, catalog-current, non-empty
+    # active skill set, the main stream can start privately alongside the
+    # authoritative selector. If the selector preserves the exact ordered set,
+    # that stream becomes canonical; otherwise it is closed and discarded. A
+    # zero concurrency cap is the deployment kill switch. The private producer
+    # applies both chunk and serialized-byte backpressure while selection is
+    # pending; an oversized indivisible event abandons the private attempt.
+    skill_speculation_max_concurrency: int = Field(
+        default=8, ge=0, alias="SKILL_SPECULATION_MAX_CONCURRENCY"
+    )
+    skill_speculation_buffer_chunks: int = Field(
+        default=128, ge=1, alias="SKILL_SPECULATION_BUFFER_CHUNKS"
+    )
+    skill_speculation_buffer_bytes: int = Field(
+        default=1024 * 1024, ge=1024, alias="SKILL_SPECULATION_BUFFER_BYTES"
+    )
+    # ``complete()`` starts speculation before it returns the public async
+    # iterator. If that iterator is never consumed (disconnect before body
+    # iteration), this deadline transfers ownership back to the server and closes
+    # the otherwise-orphaned upstream stream. A late consumer opens canonically.
+    skill_speculation_claim_timeout_seconds: float = Field(
+        default=5.0, gt=0.0, alias="SKILL_SPECULATION_CLAIM_TIMEOUT_SECONDS"
+    )
+
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")

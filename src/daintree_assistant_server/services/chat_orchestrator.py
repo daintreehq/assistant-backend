@@ -13,7 +13,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import AsyncIterator
+from collections import deque
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -59,6 +60,8 @@ from .tool_call_repair import (
 )
 
 logger = get_logger("daintree.respond")
+
+_SPECULATION_CLOSE_TIMEOUT_SECONDS = 2.0
 
 
 def _filter_dedup_cap(candidate: list[str], catalog: Catalog, max_active: int) -> list[str]:
@@ -144,6 +147,352 @@ class RespondOutcome:
     stream: AsyncIterator[str] | None = None
 
 
+class _SpeculationBufferOverflow(Exception):
+    """A pre-handoff provider event exceeded the private byte budget."""
+
+
+class _SpeculativeStream(ProviderStream):
+    """A private, bounded producer for a possible main-stream winner.
+
+    The producer is the sole reader of the upstream ``ProviderStream``. While the
+    selector is pending it advances generation into a byte-and-chunk bounded
+    deque; after an exact selection match, ``_stream_body`` claims this object and
+    consumes that deque followed by live chunks through the same iterator. A
+    mismatch (or abandoned handoff) cancels the producer and awaits its upstream
+    close, so no half-open request or unobserved task survives.
+
+    No public wire object is built here. Chunks, errors, and usage remain private
+    until the orchestrator has committed the authoritative selector result.
+    """
+
+    def __init__(
+        self,
+        *,
+        request: ProviderChatRequest,
+        open_stream: Callable[
+            [ProviderChatRequest],
+            Awaitable[tuple[ProviderStream, dict[str, Any] | None]],
+        ],
+        max_chunks: int,
+        max_bytes: int,
+        claim_timeout_seconds: float,
+        request_id: str,
+        release_slot: Callable[[], None],
+    ) -> None:
+        self._request = request
+        self._open_stream = open_stream
+        self._max_chunks = max_chunks
+        self._max_bytes = max_bytes
+        self._claim_timeout_seconds = claim_timeout_seconds
+        self._request_id = request_id
+        self._release_slot_callback = release_slot
+        self._slot_released = False
+        self._cleanup_pending: set[asyncio.Task[Any]] = set()
+
+        self._condition = asyncio.Condition()
+        self._buffer: deque[tuple[dict[str, Any], int]] = deque()
+        self._buffered_bytes = 0
+        self._peak_buffered_bytes = 0
+        self._peak_buffered_chunks = 0
+        self._prefetched_chunks = 0
+        self._prefetched_bytes = 0
+        self._done = False
+        self._error: BaseException | None = None
+        self._discarded = False
+        self._claimed = False
+        self._committed = False
+        self._stream_completed = False
+        self._upstream_opened = False
+        self.claim_failure_reason: str | None = None
+        self._started_at = time.perf_counter()
+        self.open_ms: int | None = None
+        self.usage: ProviderUsage | None = None
+        self._expiry_task: asyncio.Task[None] | None = None
+        self._producer_task = asyncio.create_task(
+            self._produce(), name=f"skill-speculation:{request_id}"
+        )
+        self._producer_task.add_done_callback(self._consume_task_exception)
+
+    @staticmethod
+    def _consume_task_exception(task: asyncio.Task[Any]) -> None:
+        if not task.cancelled():
+            task.exception()
+
+    @staticmethod
+    def _chunk_bytes(chunk: dict[str, Any]) -> int:
+        # This is also the representation used on the upstream/public JSON wires,
+        # making it a useful deterministic memory-pressure proxy.
+        return len(
+            json.dumps(chunk, separators=(",", ":"), ensure_ascii=False, default=str).encode(
+                "utf-8"
+            )
+        )
+
+    async def _put(self, chunk: dict[str, Any]) -> bool:
+        size = self._chunk_bytes(chunk)
+        # Before handoff this is optional work: fail the private attempt rather
+        # than let one malicious/malformed event defeat its byte budget. ``claim``
+        # observes the error and opens canonically. After claim the source is the
+        # canonical response, so an indivisible event must be delivered intact.
+        if size > self._max_bytes and not self._claimed:
+            raise _SpeculationBufferOverflow
+        async with self._condition:
+            await self._condition.wait_for(
+                lambda: self._discarded
+                or (
+                    len(self._buffer) < self._max_chunks
+                    and (
+                        not self._buffer
+                        or self._buffered_bytes + size <= self._max_bytes
+                    )
+                )
+            )
+            if self._discarded:
+                return False
+            self._buffer.append((chunk, size))
+            self._buffered_bytes += size
+            self._prefetched_chunks += 1
+            self._prefetched_bytes += size
+            self._peak_buffered_chunks = max(
+                self._peak_buffered_chunks, len(self._buffer)
+            )
+            self._peak_buffered_bytes = max(
+                self._peak_buffered_bytes, self._buffered_bytes
+            )
+            self._condition.notify_all()
+            return True
+
+    async def _set_terminal(self, error: BaseException | None) -> None:
+        async with self._condition:
+            if error is not None:
+                self._error = error
+            self._done = True
+            self._condition.notify_all()
+
+    async def _produce(self) -> None:
+        upstream: ProviderStream | None = None
+        error: BaseException | None = None
+        try:
+            upstream, first_event = await self._open_stream(self._request)
+            self._upstream_opened = True
+            self.open_ms = round((time.perf_counter() - self._started_at) * 1000)
+            if first_event is not None and not await self._put(first_event):
+                return
+            async for chunk in upstream:
+                if not await self._put(chunk):
+                    return
+            self._stream_completed = True
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # propagated privately by ``__anext__``
+            error = exc
+            # Publish the failure before close cleanup so claim can distinguish an
+            # exhausted pre-open retry budget (preserve as terminal) from a private
+            # post-open failure (safe to replay through one canonical fallback).
+            async with self._condition:
+                self._error = exc
+                self._condition.notify_all()
+        finally:
+            if upstream is not None:
+                self.usage = upstream.usage
+                try:
+                    async with asyncio.timeout(_SPECULATION_CLOSE_TIMEOUT_SECONDS):
+                        await upstream.aclose()
+                except TimeoutError:
+                    logger.warning(
+                        "skill_speculation_close_timeout",
+                        request_id=self._request_id,
+                        timeout_ms=round(_SPECULATION_CLOSE_TIMEOUT_SECONDS * 1000),
+                    )
+                except Exception as exc:  # pragma: no cover - provider close is best-effort
+                    logger.warning(
+                        "skill_speculation_close_failed",
+                        request_id=self._request_id,
+                        error_type=type(exc).__name__,
+                    )
+            await self._set_terminal(error)
+
+    def commit(self) -> None:
+        """Transfer the matching source toward the public iterator.
+
+        The iterator does not actually own it until ``claim`` runs. The deadline
+        closes it if FastAPI/the client never begins body iteration.
+        """
+        if self._discarded or self._committed:
+            return
+        self._committed = True
+        self._expiry_task = asyncio.create_task(
+            self._expire_unclaimed(), name=f"skill-speculation-handoff:{self._request_id}"
+        )
+
+    async def _expire_unclaimed(self) -> None:
+        try:
+            await asyncio.sleep(self._claim_timeout_seconds)
+            if not self._claimed:
+                await self.discard()
+                logger.info(
+                    "skill_speculation_abandoned",
+                    request_id=self._request_id,
+                    claim_timeout_ms=round(self._claim_timeout_seconds * 1000),
+                )
+        except asyncio.CancelledError:
+            return
+
+    async def claim(self) -> bool:
+        """Claim a committed winner, or decline a failed/expired source.
+
+        An exhausted open/prefetch retry budget is claimed and preserved as the
+        terminal SSE result after authoritative metadata; it never receives a
+        race-dependent second budget. A private post-open failure or buffer-cap
+        overflow declines the source so the caller can open canonically. Once
+        claimed, later failures keep ordinary terminal SSE semantics.
+        """
+        if self._discarded or not self._committed:
+            self.claim_failure_reason = (
+                "discarded" if self._discarded else "not_committed"
+            )
+            return False
+        self._claimed = True
+        expiry = self._expiry_task
+        if expiry is not None and expiry is not asyncio.current_task():
+            expiry.cancel()
+            await asyncio.gather(expiry, return_exceptions=True)
+        if self._error is not None:
+            # `_open_stream_with_retry` already spent the canonical retry budget.
+            # Preserve that exhausted error for SSE after authoritative `meta`
+            # instead of race-dependently granting a second full budget. A private
+            # failure after a stream DID open is replay-safe (no model bytes were
+            # public), so it may still fall back to one fresh canonical stream.
+            if isinstance(self._error, DaintreeError) and not self._upstream_opened:
+                self.claim_failure_reason = "upstream_open_exhausted"
+                self._release_slot()
+                return True
+            self.claim_failure_reason = (
+                "buffer_overflow"
+                if isinstance(self._error, _SpeculationBufferOverflow)
+                else "private_stream_error"
+            )
+            await self.discard()
+            return False
+        # Claimed means the request is now the one canonical main stream, not an
+        # overlapping speculative attempt. Its bounded buffer is immediately
+        # owned/drained by the public iterator, so release overlap capacity here.
+        self._release_slot()
+        return True
+
+    async def prefetch_first_event(self) -> dict[str, Any] | None:
+        try:
+            return await self.__anext__()
+        except StopAsyncIteration:
+            return None
+
+    def __aiter__(self) -> _SpeculativeStream:
+        return self
+
+    async def __anext__(self) -> dict[str, Any]:
+        async with self._condition:
+            await self._condition.wait_for(lambda: bool(self._buffer) or self._done)
+            if self._buffer:
+                chunk, size = self._buffer.popleft()
+                self._buffered_bytes -= size
+                self._condition.notify_all()
+                return chunk
+            if self._error is not None:
+                raise self._error
+            raise StopAsyncIteration
+
+    async def discard(self) -> None:
+        """Cancel production, await closure, and make buffered chunks unreachable."""
+        # Mark synchronously before the first await. This makes expiry vs claim an
+        # atomic event-loop transition: either claim sets ``_claimed`` first and
+        # expiry does nothing, or expiry/discard sets ``_discarded`` first and a
+        # late claim cleanly falls back to the canonical request.
+        newly_discarded = not self._discarded
+        self._discarded = True
+        if newly_discarded:
+            async with self._condition:
+                self._buffer.clear()
+                self._buffered_bytes = 0
+                self._condition.notify_all()
+
+        current = asyncio.current_task()
+        expiry = self._expiry_task
+        if expiry is not None and expiry is not current:
+            expiry.cancel()
+        producer = self._producer_task
+        if not producer.done() and producer is not current:
+            producer.cancel()
+
+        waits = [
+            task
+            for task in (producer, expiry)
+            if task is not None and task is not current
+        ]
+        defer_slot_release = False
+        try:
+            if waits:
+                done, pending = await asyncio.wait(
+                    waits, timeout=_SPECULATION_CLOSE_TIMEOUT_SECONDS
+                )
+                for task in done:
+                    if not task.cancelled():
+                        task.exception()
+                if pending:
+                    defer_slot_release = self._defer_slot_release(waits)
+                    logger.warning(
+                        "skill_speculation_cleanup_timeout",
+                        request_id=self._request_id,
+                        timeout_ms=round(_SPECULATION_CLOSE_TIMEOUT_SECONDS * 1000),
+                    )
+        except BaseException:
+            # A caller cancellation must not make overlap capacity available while
+            # a cancellation-resistant producer still owns an upstream request.
+            defer_slot_release = self._defer_slot_release(waits)
+            raise
+        finally:
+            # A loser occupies overlap capacity until its upstream has actually
+            # closed. Idempotence also covers selector/request cancellation races.
+            if not defer_slot_release:
+                self._release_slot()
+
+    async def aclose(self) -> None:
+        await self.discard()
+
+    def _release_slot(self) -> None:
+        if self._slot_released:
+            return
+        self._slot_released = True
+        self._release_slot_callback()
+
+    def _defer_slot_release(self, tasks: list[asyncio.Task[Any]]) -> bool:
+        pending = {task for task in tasks if not task.done()}
+        if not pending:
+            return False
+        for task in pending - self._cleanup_pending:
+            task.add_done_callback(self._cleanup_finished)
+        self._cleanup_pending.update(pending)
+        return True
+
+    def _cleanup_finished(self, task: asyncio.Task[Any]) -> None:
+        if not task.cancelled():
+            task.exception()
+        self._cleanup_pending.discard(task)
+        if not self._cleanup_pending:
+            self._release_slot()
+
+    def stats(self) -> dict[str, Any]:
+        return {
+            "open_ms": self.open_ms,
+            "buffered_chunks": len(self._buffer),
+            "buffered_bytes": self._buffered_bytes,
+            "peak_buffered_chunks": self._peak_buffered_chunks,
+            "peak_buffered_bytes": self._peak_buffered_bytes,
+            "prefetched_chunks": self._prefetched_chunks,
+            "prefetched_bytes": self._prefetched_bytes,
+            "stream_completed": self._stream_completed,
+        }
+
+
 class ChatOrchestrator:
     def __init__(
         self,
@@ -167,6 +516,10 @@ class ChatOrchestrator:
         # reference to a bare task, so we keep a strong one here (discarded on done)
         # to stop a learning pass being garbage-collected mid-flight.
         self._background_tasks: set[asyncio.Task[Any]] = set()
+        # This counter is mutated without an ``await`` between check/increment, so
+        # it is an event-loop-local non-blocking capacity gate. A turn that finds
+        # the cap full stays on the serial path; it never queues behind speculation.
+        self._skill_speculations_in_flight = 0
 
     @property
     def catalog(self) -> Catalog:
@@ -249,6 +602,7 @@ class ChatOrchestrator:
         t_start = time.perf_counter()
 
         warnings: list[str] = []
+        catalog_at_start = self.catalog
         verification = self.state_codec.verify(request.state, session_id=session_id)
         if request.state and not verification.valid and verification.reason:
             warnings.append(verification.reason)
@@ -257,7 +611,9 @@ class ChatOrchestrator:
         # invalid/expired/wrong-session token is ignored (selection reruns).
         prior_active_ids: list[str] = []
         if verification.valid and verification.payload is not None:
-            prior_active_ids = self.catalog.filter_known(verification.payload.active_ids())
+            prior_active_ids = catalog_at_start.filter_known(
+                verification.payload.active_ids()
+            )
 
         run_selector = self._should_run_selector(
             force=request.selection.force,
@@ -274,56 +630,174 @@ class ChatOrchestrator:
             instruction_revision=request.session.instruction_revision,
         )
 
+        # Speculation is intentionally narrower than "has prior ids": the token
+        # must be verified against this session AND describe the exact catalog
+        # snapshot used to assemble the private request. Empty, invalid, expired,
+        # cross-session, and catalog-stale state all retain the serial first-turn
+        # behavior. Non-streaming responses are unchanged.
+        speculation: _SpeculativeStream | None = None
+        speculative_request: ProviderChatRequest | None = None
+        speculative_active_ids: list[str] = []
+        speculation_slot = False
+        speculation_outcome = "non_streaming"
+        speculation_stats: dict[str, Any] | None = None
+
+        def release_speculation_slot() -> None:
+            nonlocal speculation_slot
+            if speculation_slot:
+                self._skill_speculations_in_flight -= 1
+                speculation_slot = False
+
+        if request.generation.stream:
+            if not run_selector:
+                speculation_outcome = "selector_not_run"
+            elif not verification.valid or verification.payload is None:
+                speculation_outcome = "unverified_state"
+            elif verification.payload.catalog_revision != catalog_at_start.revision:
+                speculation_outcome = "stale_catalog"
+            else:
+                speculative_active_ids = _filter_dedup_cap(
+                    prior_active_ids,
+                    catalog_at_start,
+                    self.settings.max_active_skills,
+                )
+                if not speculative_active_ids:
+                    speculation_outcome = "no_active_skills"
+                elif self.settings.skill_speculation_max_concurrency == 0:
+                    speculation_outcome = "disabled"
+                elif (
+                    self._skill_speculations_in_flight
+                    >= self.settings.skill_speculation_max_concurrency
+                ):
+                    speculation_outcome = "capacity"
+                else:
+                    speculation_slot = True
+                    self._skill_speculations_in_flight += 1
+                    speculation_outcome = "eligible"
+                    try:
+                        speculative_request = self.assembler.build_main_request(
+                            request=request,
+                            skills=catalog_at_start.get_many(speculative_active_ids),
+                            upstream_model=upstream_model,
+                        )
+                        speculation = _SpeculativeStream(
+                            request=speculative_request,
+                            open_stream=self._open_stream_with_retry,
+                            max_chunks=self.settings.skill_speculation_buffer_chunks,
+                            max_bytes=self.settings.skill_speculation_buffer_bytes,
+                            claim_timeout_seconds=(
+                                self.settings.skill_speculation_claim_timeout_seconds
+                            ),
+                            request_id=request_id,
+                            release_slot=release_speculation_slot,
+                        )
+                    except BaseException:
+                        release_speculation_slot()
+                        raise
+
         selector_ms = 0
         if run_selector:
             t_sel = time.perf_counter()
-            decision = await self.selector.select(
-                request.input.messages,
-                prior_active_ids,
-                turn_context=self._selector_turn_context(request),
-                available_tools=self._available_tool_names(request),
-            )
-            selector_ms = round((time.perf_counter() - t_sel) * 1000)
+            try:
+                decision = await self.selector.select(
+                    request.input.messages,
+                    prior_active_ids,
+                    turn_context=self._selector_turn_context(request),
+                    available_tools=self._available_tool_names(request),
+                )
+                selector_ms = round((time.perf_counter() - t_sel) * 1000)
+            except BaseException:
+                if speculation is not None:
+                    speculation_stats = speculation.stats()
+                    await speculation.discard()
+                    speculation_outcome = "selector_exception"
+                raise
         else:
             decision = SelectionDecision.reuse(prior_active_ids)
-        warnings.extend(decision.warnings)
+        try:
+            warnings.extend(decision.warnings)
 
-        # A successful selector run is authoritative (topic-shift replacement); a
-        # no-run continuation round or a degraded selector reuses the prior set.
-        active_ids, newly_loaded_ids = resolve_active_skills(
-            decision, prior_active_ids, self.catalog, self.settings.max_active_skills
-        )
+            # A successful selector run is authoritative (topic-shift replacement); a
+            # no-run continuation round or a degraded selector reuses the prior set.
+            # Pin one post-selection catalog snapshot for active resolution, prompt,
+            # state, and metadata. If learning reloaded the catalog during selection,
+            # the speculative prompt can never win even when its ids happen to match.
+            resolved_catalog = self.catalog
+            active_ids, newly_loaded_ids = resolve_active_skills(
+                decision,
+                prior_active_ids,
+                resolved_catalog,
+                self.settings.max_active_skills,
+            )
 
-        skills = self.catalog.get_many(active_ids)
-        executions = [
-            SkillLoadExecution.from_skill(new_call_id(), self.catalog.get(sid))  # type: ignore[arg-type]
-            for sid in newly_loaded_ids
-        ]
+            skills = resolved_catalog.get_many(active_ids)
+            executions = [
+                SkillLoadExecution.from_skill(
+                    new_call_id(), resolved_catalog.get(sid)  # type: ignore[arg-type]
+                )
+                for sid in newly_loaded_ids
+            ]
 
-        new_state = self.state_codec.issue(
-            session_id=session_id,
-            active_skills=[s.id for s in skills],
-            catalog_revision=self.catalog.revision,
-            turn_id=request.session.turn_id,
-            instruction_revision=request.session.instruction_revision,
-        )
+            new_state = self.state_codec.issue(
+                session_id=session_id,
+                active_skills=[s.id for s in skills],
+                catalog_revision=resolved_catalog.revision,
+                turn_id=request.session.turn_id,
+                instruction_revision=request.session.instruction_revision,
+            )
 
-        provider_request = self.assembler.build_main_request(
-            request=request,
-            skills=skills,
-            upstream_model=upstream_model,
-        )
+            if speculation is not None:
+                speculation_stats = speculation.stats()
+                exact_winner = (
+                    resolved_catalog.revision == catalog_at_start.revision
+                    and active_ids == speculative_active_ids
+                )
+                if exact_winner:
+                    # The request, settings, and catalog snapshot that produced
+                    # this object are unchanged. Reuse the exact object already
+                    # executing upstream instead of rebuilding/deep-comparing a
+                    # prompt + tool payload that can exceed 100 KiB.
+                    assert speculative_request is not None
+                    provider_request = speculative_request
+                    speculation_outcome = "reused"
+                else:
+                    t_discard = time.perf_counter()
+                    await speculation.discard()
+                    speculation_stats["discard_ms"] = round(
+                        (time.perf_counter() - t_discard) * 1000
+                    )
+                    speculation_outcome = "discarded"
+                    speculation = None
+                    provider_request = self.assembler.build_main_request(
+                        request=request,
+                        skills=skills,
+                        upstream_model=upstream_model,
+                    )
+            else:
+                provider_request = self.assembler.build_main_request(
+                    request=request,
+                    skills=skills,
+                    upstream_model=upstream_model,
+                )
 
-        meta = self._build_meta(
-            request_id=request_id,
-            state=new_state,
-            active_ids=active_ids,
-            newly_loaded_ids=newly_loaded_ids,
-            executions=executions,
-            decision=decision,
-            run_selector=run_selector,
-            warnings=warnings,
-        )
+            meta = self._build_meta(
+                request_id=request_id,
+                state=new_state,
+                active_ids=active_ids,
+                newly_loaded_ids=newly_loaded_ids,
+                executions=executions,
+                decision=decision,
+                run_selector=run_selector,
+                warnings=warnings,
+                catalog=resolved_catalog,
+            )
+            if speculation is not None:
+                speculation.commit()
+        except BaseException:
+            if speculation is not None:
+                await speculation.discard()
+            raise
+
         headers = {
             "X-Daintree-Protocol": str(PROTOCOL_VERSION),
             "X-Request-Id": request_id,
@@ -339,12 +813,18 @@ class ChatOrchestrator:
             newly_loaded=newly_loaded_ids,
             warnings=warnings,
             selector_ms=selector_ms,
+            skill_speculation=speculation_outcome,
+            skill_speculation_stats=speculation_stats,
             pre_upstream_ms=round((time.perf_counter() - t_start) * 1000),
         )
 
         if request.generation.stream:
             body_iter = self._stream_body(
-                provider_request, meta=meta, request=request, active_ids=active_ids
+                provider_request,
+                meta=meta,
+                request=request,
+                active_ids=active_ids,
+                speculative_stream=speculation,
             )
             return RespondOutcome(headers=headers, streaming=True, stream=body_iter)
 
@@ -595,11 +1075,14 @@ class ChatOrchestrator:
         decision: SelectionDecision,
         run_selector: bool,
         warnings: list[str],
+        catalog: Catalog | None = None,
     ) -> _RespondMeta:
+        selected_catalog = catalog or self.catalog
+
         def refs(ids: list[str]) -> list[SkillRef]:
             out: list[SkillRef] = []
             for sid in ids:
-                skill = self.catalog.get(sid)
+                skill = selected_catalog.get(sid)
                 if skill is not None:
                     out.append(SkillRef(**skill.ref()))
             return out
@@ -632,7 +1115,7 @@ class ChatOrchestrator:
         return _RespondMeta(
             request_id=request_id,
             state=state,
-            catalog_revision=self.catalog.revision,
+            catalog_revision=selected_catalog.revision,
             prompt_version=MAIN_PROMPT_VERSION,
             skills=skills,
             warnings=warnings,
@@ -721,6 +1204,7 @@ class ChatOrchestrator:
         meta: _RespondMeta,
         request: RespondRequest,
         active_ids: list[str],
+        speculative_stream: _SpeculativeStream | None = None,
     ) -> AsyncIterator[str]:
         finish_reason: str | None = None
         thinking_signaled = False
@@ -737,12 +1221,29 @@ class ChatOrchestrator:
         # holding everything tolerates providers that interleave call fragments.
         tool_call_buffer = StreamToolCallBuffer(build_parameter_index(request.input.tools))
         stream: ProviderStream | None = None
+        used_speculation = False
         try:
+            if speculative_stream is not None:
+                # Provisional ownership is installed before ``claim`` awaits its
+                # handoff-timer cleanup. If cancellation lands inside that await,
+                # this method's ``finally`` still closes the producer.
+                stream = speculative_stream
+                if await speculative_stream.claim():
+                    used_speculation = True
+                else:
+                    stream = None
+                    logger.info(
+                        "skill_speculation_fallback",
+                        request_id=meta.request_id,
+                        reason=speculative_stream.claim_failure_reason,
+                        **speculative_stream.stats(),
+                    )
+
             # The metadata event is always first, before any token: the client gets
             # the skill prelude, active set, refreshed state, and selector outcome
-            # as soon as selection finishes. Upstream connection/prefill deliberately
-            # starts only after this yield, so the visible skill-load cue is not held
-            # behind model latency.
+            # as soon as selection finishes. An eligible speculative upstream may
+            # already be privately producing, but none of its status/reasoning/
+            # content/tool/usage events can cross this authoritative boundary.
             yield self._sse(
                 "meta",
                 StreamMeta(
@@ -757,8 +1258,14 @@ class ChatOrchestrator:
             )
 
             t_open = time.perf_counter()
-            opened_stream, first_event = await self._open_stream_with_retry(provider_request)
-            stream = opened_stream
+            if stream is None:
+                opened_stream, first_event = await self._open_stream_with_retry(
+                    provider_request
+                )
+                stream = opened_stream
+            else:
+                opened_stream = stream
+                first_event = await opened_stream.prefetch_first_event()
             # Phase timing for the round's remaining "dead air": upstream
             # open-to-first-event. It dominates on cache misses (prefill) and on
             # thinking-heavy rounds (reasoning precedes the event), but no longer
@@ -766,7 +1273,21 @@ class ChatOrchestrator:
             logger.info(
                 "respond_upstream_open",
                 request_id=meta.request_id,
-                upstream_first_event_ms=round((time.perf_counter() - t_open) * 1000),
+                speculative=used_speculation,
+                upstream_first_event_ms=(
+                    speculative_stream.open_ms
+                    if (
+                        speculative_stream is not None
+                        and speculative_stream.open_ms is not None
+                    )
+                    else round((time.perf_counter() - t_open) * 1000)
+                ),
+                post_meta_first_event_ms=round((time.perf_counter() - t_open) * 1000),
+                speculative_prefetched_chunks=(
+                    speculative_stream.stats()["prefetched_chunks"]
+                    if speculative_stream is not None and used_speculation
+                    else 0
+                ),
             )
 
             async def _chunks() -> AsyncIterator[dict[str, Any]]:
@@ -812,9 +1333,9 @@ class ChatOrchestrator:
             )
             completed = True
         except DaintreeError as exc:
-            # Every provider operation now starts after the meta event. An exhausted
-            # open/prefetch retry and a later stream failure therefore share the same
-            # honest terminal SSE error shape; never fabricate a successful ``done``.
+            # Public provider consumption starts after the meta event. An exhausted
+            # canonical/speculative open and a later stream failure therefore share
+            # one honest terminal SSE shape; never fabricate a successful ``done``.
             logger.warning(
                 "stream_error_after_start",
                 request_id=meta.request_id,
