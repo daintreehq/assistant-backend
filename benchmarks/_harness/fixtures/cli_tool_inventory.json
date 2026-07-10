@@ -1,0 +1,2671 @@
+[
+ {
+  "type": "function",
+  "function": {
+   "name": "agentTask__spawnForEdits",
+   "description": "Spawn a visible Daintree agent in a worktree. Use mode:\"edit\" (default) to make code changes, or mode:\"explore\" for a read-only investigation (the agent is told not to touch files). This is the ONLY way to spawn an agent \u2014 never hand-roll a raw agent.launch via daintree.call. The CLI never edits files itself. To supervise the agent, set the FLAT fields watch:true and watchGoal:\"\u2026\" (top-level scalars) \u2014 do NOT nest them under a \"watcher\" key.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "acceptanceCriteria": {
+      "description": "Task-specific contract that defines 'done'. When set on an edit-mode task, a supervising watcher verifies completion against these criteria (not git cleanliness alone) before reporting success. Provide it whenever there is a concrete, checkable definition of done. Ignored for mode:\"explore\".",
+      "type": "string"
+     },
+     "agentId": {
+      "description": "Agent to launch (default \"claude\").",
+      "type": "string"
+     },
+     "context": {
+      "additionalProperties": false,
+      "properties": {
+       "filePaths": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "includeDiff": {
+        "type": "boolean"
+       }
+      },
+      "type": "object"
+     },
+     "mode": {
+      "description": "Spawn intent (default \"edit\"). \"edit\" tells the agent to make code changes; \"explore\" tells it to investigate read-only and not touch any files.",
+      "enum": [
+       "edit",
+       "explore"
+      ],
+      "type": "string"
+     },
+     "taskPrompt": {
+      "description": "The instructions for the agent. Constraints are appended automatically.",
+      "type": "string"
+     },
+     "title": {
+      "description": "Short title for the task and any watcher.",
+      "type": "string"
+     },
+     "watch": {
+      "description": "Attach a supervisor watcher that reads the agent for you and surfaces its result when it settles. Set true to supervise (recommended for any non-trivial spawn). Providing watchGoal also attaches one. Omit, or set false, to skip supervision.",
+      "type": "boolean"
+     },
+     "watchCadenceMs": {
+      "description": "Supervisor poll cadence in milliseconds (default 3000).",
+      "type": "number"
+     },
+     "watchGoal": {
+      "description": "What the supervisor should do once the agent settles, e.g. \"surface a concise summary of what the agent reported\". Providing this attaches a watcher (no need to also set watch).",
+      "type": "string"
+     },
+     "watcher": {
+      "additionalProperties": false,
+      "description": "LEGACY nested form of watch / watchGoal / watchCadenceMs. Prefer the FLAT watchGoal / watch fields above \u2014 pass those as top-level scalars, never a nested or dotted watcher key.",
+      "properties": {
+       "cadenceMs": {
+        "type": "number"
+       },
+       "create": {
+        "type": "boolean"
+       },
+       "goal": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "create"
+      ],
+      "type": "object"
+     },
+     "worktreeId": {
+      "description": "Worktree to run the agent in. Usually OMIT this: Daintree then runs the agent in the active worktree (the common case). To target a specific worktree, prefer its id \u2014 a PATH like \"/Users/you/Projects/app\". A branch name (e.g. \"main\") is accepted only as a fallback and is resolved to that worktree's id; a value that resolves to no worktree is rejected with the available list.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "title",
+     "taskPrompt"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "agentTask__superviseTerminal",
+   "description": "Adopt an ALREADY-RUNNING agent terminal into supervision without re-spawning it. Use this to re-attach a supervisor watcher to a terminal that is running but unsupervised \u2014 e.g. an agent from a previous session, or a terminal that lost its watcher. Provide the terminalId; supply acceptanceCriteria when there is a concrete definition of done. This does NOT launch an agent and does NOT edit files.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "acceptanceCriteria": {
+      "description": "Task-specific contract that defines 'done'. When set, the supervisor verifies completion against these criteria (not git cleanliness alone) before reporting success.",
+      "type": "string"
+     },
+     "cadenceMs": {
+      "description": "Check cadence in ms (floored to the scheduler tick).",
+      "type": "number"
+     },
+     "goal": {
+      "description": "What the supervisor should watch for. Defaults to general completion supervision.",
+      "type": "string"
+     },
+     "spawnMode": {
+      "description": "The agent's intent (default \"edit\"). \"explore\" marks a read-only investigation so the supervisor does not expect file changes.",
+      "enum": [
+       "edit",
+       "explore"
+      ],
+      "type": "string"
+     },
+     "terminalId": {
+      "description": "The id of the already-running terminal to adopt into supervision.",
+      "type": "string"
+     },
+     "title": {
+      "description": "Short label for the watcher (a \"watch \" prefix is added). Defaults to the terminal id.",
+      "type": "string"
+     },
+     "worktreeId": {
+      "description": "Worktree the agent is working in; scopes the post-completion git verification.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "agentTask__status",
+   "description": "Read back the durable spawn saga for one launch by its launchId (the agt_\u2026 id returned by agentTask.spawnForEdits). Returns the current stage (launch_requested \u2192 agent_started \u2192 terminal_bound \u2192 watcher_attached \u2192 confirmed, or failed/ambiguous), the bound terminalId/watcherId, and any error detail \u2014 so you can confirm a spawn actually landed instead of trusting the launch call's return alone. Read-only.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "launchId": {
+      "description": "The launchId (agt_\u2026) returned by agentTask.spawnForEdits.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "launchId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "agentTask__list",
+   "description": "List recent spawn sagas (newest first) with their stage, bound terminal/watcher, and any error. Use it to see what agentTask.spawnForEdits launches happened and where they stand. By default it lists ONLY this session's launches \u2014 the usual 'did my spawns land?' check \u2014 so stale terminal ids from earlier sessions (whose titles can collide with today's) never mix into the answer; pass scope:\"all\" when the user asks about older history. Read-only. Any launch still in a non-terminal stage belongs to THIS session \u2014 a prior session's in-flight sagas are swept to 'failed' when the DB opens, so a live-looking stage is always current.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "scope": {
+      "default": "session",
+      "description": "\"session\" (default) lists only launches made by THIS session \u2014 the right window for checking whether a batch of spawns landed. \"all\" includes earlier sessions' launches (newest first, up to 20) for history questions.",
+      "enum": [
+       "session",
+       "all"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "artifact__read",
+   "description": "Read ONE page of a large tool result that was archived as an artifact because it overflowed the inline size limit. A page is at most 3500 characters \u2014 a single call NEVER returns the whole artifact. To read it: call with the artifactId and offset 0 (omit limit; it defaults to the 3500 max), then call again with offset set to the returned nextOffset, repeating until eof is true. Do NOT set limit to totalChars (or any value above 3500) to grab it all at once \u2014 that still returns just one 3500-char page; page with offset/nextOffset instead.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "artifactId": {
+      "description": "The artifactId from a truncated tool result.",
+      "type": "string"
+     },
+     "limit": {
+      "description": "Optional page size in characters. Omit to use the default and maximum of 3500 per read. Do NOT set this to totalChars \u2014 one read returns at most 3500 chars regardless.",
+      "maximum": 3500,
+      "minimum": 1,
+      "type": "number"
+     },
+     "offset": {
+      "description": "Character offset where this page starts. Use 0 for the first page, then the nextOffset returned by the previous read.",
+      "minimum": 0,
+      "type": "number"
+     }
+    },
+    "required": [
+     "artifactId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__run__async",
+   "description": "Send a command (or a prompt to an agent) to ONE Daintree terminal and watch it to completion ASYNCHRONOUSLY: the command is typed and run exactly like terminal.sendCommand, then this returns IMMEDIATELY with an async handle (asy_\u2026) and the runtime takes over \u2014 cheap 1-second agent-state polls (no model cost, no output reads) until the terminal settles, then an attention-queue event that WAKES you with the outcome. Use it instead of terminal.sendCommand + terminal.awaitAll whenever the work will take more than a minute or two, or the user should get your reply now while the work continues. AFTER calling it: tell the user what is running and END the turn (or move on to other work) \u2014 do NOT awaitAll/extract-wait the same terminal, do NOT poll async.list for it, and do NOT re-send the command. When the completion wake arrives, read the output then (terminal.summarize or terminal.extract) and continue the task. Finish detection tracks agent state, so it is built for agent terminals. PROJECT-SCOPED AND DURABLE: the watch keeps running after the assistant closes \u2014 the background supervisor adopts it and integrates the completion, so you MAY promise the user an after-close or overnight result (it pauses only if Daintree itself closes, and resumes on the next launch). Mutating (it runs a command), so it confirms like terminal.sendCommand.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "command": {
+      "description": "Command line to type into the terminal and run (for an agent terminal, this is the prompt/reply you are sending it).",
+      "type": "string"
+     },
+     "terminalId": {
+      "description": "The ONE terminal to send the command to (full terminal-<uuid> id).",
+      "minLength": 1,
+      "type": "string"
+     },
+     "timeoutMs": {
+      "default": 1800000,
+      "description": "Deadline in ms (default 30m, max 2h). Past it you are woken with whatever settled.",
+      "maximum": 7200000,
+      "minimum": 10000,
+      "type": "integer"
+     },
+     "title": {
+      "description": "Short human label for this operation (shown in the pending state, the completion event, and async.list). Defaults to the command text.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId",
+     "command"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__await__async",
+   "description": "Watch agent terminal(s) to completion ASYNCHRONOUSLY \u2014 the out-of-turn twin of terminal.awaitAll. Returns IMMEDIATELY with an async handle (asy_\u2026); the runtime polls the cohort's agent state every second (no model cost, no output reads) and WAKES you through the attention queue once EVERY terminal has finished, failed, or asked a question (or the deadline passes \u2014 you are woken with whatever settled). Choose by wait length and user experience: terminal.awaitAll BLOCKS the turn and is right for short waits whose results you need immediately to continue; terminal.await.async lets you reply to the user NOW and end the turn while agents keep working \u2014 right after spawning a cohort with agentTask.spawnForEdits, or after sending long work with terminal.sendCommand. AFTER calling it: report what is running and end the turn \u2014 do NOT also awaitAll/extract-wait the same terminals, and do NOT attach a watcher just for finish detection (watchers are for goal-based observation with classification). When the wake arrives, read outputs with terminal.summarize/terminal.extract and continue. PROJECT-SCOPED AND DURABLE: the watch keeps running after the assistant closes \u2014 the background supervisor adopts it and integrates the completion, so you MAY promise the user an after-close or overnight result (it pauses only if Daintree itself closes, and resumes on the next launch). Read-only; requires Daintree MCP.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "terminalIds": {
+      "description": "The agent terminals to watch \u2014 full terminal-<uuid> ids exactly as listed. ONE call covers the whole cohort \u2014 never one call per agent.",
+      "items": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+     },
+     "timeoutMs": {
+      "default": 1800000,
+      "description": "Deadline in ms (default 30m, max 2h). Past it you are woken with whatever settled.",
+      "maximum": 7200000,
+      "minimum": 10000,
+      "type": "integer"
+     },
+     "title": {
+      "description": "Short human label for this wait (shown in the completion event and async.list).",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalIds"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "async__list",
+   "description": "List asynchronous operations (terminal.run.async / terminal.await.async): the live ones by default, everything recent with includeFinished. Use it to answer 'what is still running?' \u2014 NOT to poll for a completion (completions wake you through the attention queue on their own). Read-only.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "includeFinished": {
+      "description": "Also include finished/cancelled/expired operations (default: live only).",
+      "type": "boolean"
+     }
+    },
+    "required": [],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "async__cancel",
+   "description": "Stop tracking an asynchronous operation: the runtime stops polling it and will NOT wake you for it. The terminal and whatever runs inside it are NOT touched \u2014 nothing is killed or closed. Use it when the user no longer cares about the result. (Actually stopping the process is a separate, explicit user request \u2014 e.g. closing the terminal.)",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "asyncId": {
+      "description": "The asy_\u2026 id returned when the operation started (see async.list).",
+      "type": "string"
+     }
+    },
+    "required": [
+     "asyncId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "audit__export",
+   "description": "Export the audit log as JSON or CSV with optional filters (actor, toolName, outcome, and a tsFrom/tsTo time range in Unix ms). Filters are AND-combined; rows are returned newest-first and bounded by `limit`. Read-only \u2014 returns the serialized content as a string for the caller to save or inspect.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "actor": {
+      "description": "Filter by actor (main, watcher, timer, workflow, system).",
+      "type": "string"
+     },
+     "format": {
+      "description": "Output format for the exported rows.",
+      "enum": [
+       "json",
+       "csv"
+      ],
+      "type": "string"
+     },
+     "limit": {
+      "description": "Maximum rows to return (newest first). Default 200, max 5000.",
+      "type": "number"
+     },
+     "outcome": {
+      "description": "Filter by outcome (ok, error, denied, dedup, grant_ok).",
+      "type": "string"
+     },
+     "toolName": {
+      "description": "Filter by tool name (exact match, e.g. fs.read).",
+      "type": "string"
+     },
+     "tsFrom": {
+      "description": "Inclusive start of the time range, Unix epoch milliseconds.",
+      "type": "number"
+     },
+     "tsTo": {
+      "description": "Inclusive end of the time range, Unix epoch milliseconds.",
+      "type": "number"
+     }
+    },
+    "required": [
+     "format"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "context__snapshot",
+   "description": "Build a compact snapshot of the current workspace: Daintree MCP status, and (when connected) action context, worktrees, terminals, plus the open attention queue. Best-effort and read-only; degrades gracefully when Daintree is offline.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__summarize",
+   "description": "Read a bounded tail of a Daintree terminal's output and summarize it with the small model. This is the DEFAULT way to relay what an agent said: a coding agent's raw scrollback is garbled, repainted TUI output, so summarizing it gives clean prose and keeps it out of your context. Prefer this over terminal.read unless the user needs the exact literal text. PARALLEL: summarize/extract calls batched in ONE reply run CONCURRENTLY \u2014 to relay a whole cohort, emit one summarize per terminal as one batch of calls, not one per turn; the total wait is roughly the slowest single call. Read-only; requires Daintree MCP.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "purpose": {
+      "description": "What this summary is for (focuses the model).",
+      "type": "string"
+     },
+     "tailBytes": {
+      "default": 12000,
+      "description": "Max characters of terminal tail to summarize (default 12000).",
+      "maximum": 100000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "terminalId": {
+      "description": "Daintree terminal id to summarize.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__read",
+   "description": "Read a terminal's raw scrollback tail VERBATIM \u2014 no model, no summarization, no token cap. Use this ONLY when you need the exact literal text (the user asked for a precise quote, or you must inspect exact output). For the common 'tell me what the agent said' case, prefer terminal.summarize: a coding agent's raw scrollback is garbled, repainted TUI output that bloats context and reads as broken when pasted back. Request a bounded tail and never echo the whole frame to the user. Read-only; requires Daintree MCP.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "maxLines": {
+      "default": 200,
+      "description": "Max trailing lines of scrollback to return.",
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "tailBytes": {
+      "description": "Further cap the returned text to the last N characters.",
+      "maximum": 100000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "terminalId": {
+      "description": "Daintree terminal id to read.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__extract",
+   "description": "Read a bounded tail of one or more Daintree terminals and extract caller-specified content as plain TEXT with the small model \u2014 the default way to read what an agent said. Over MULTIPLE terminalIds it MERGES every terminal's tail into ONE answer (it does NOT return one answer per terminal); to collect a DISTINCT answer per agent \u2014 each one's fact/vote/draft \u2014 use terminal.extract.json with an array schema keyed by terminalId, or extract a single id at a time. PARALLEL: no-wait terminal.extract/.json calls batched in ONE reply run CONCURRENTLY \u2014 when you need several independent extractions (a different question per terminal, or one answer per agent), emit them ALL as one batch of calls instead of one per turn; the total wait is roughly the slowest single call. Optionally wait (poll) until a condition is met before extracting (a wait-bearing call is a barrier and runs serially). Omit `instruction` to use it as a finished/condition gate (returns booleans, no extraction model call). A wait that observes the agent FINISH also auto-retires that terminal's spawn-attached supervising watcher (watchersRetired in the result) \u2014 the completion is in your hands, so no completion notification will follow. For STRUCTURED output (several named fields, or one entry per terminal) use terminal.extract.json instead. Read-only; requires Daintree MCP.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "instruction": {
+      "description": "What to extract, as plain TEXT (a number, a name, a yes/no, the agent's answer to relay). Omit to run a wait/finished gate only (no EXTRACTION model call; a wait:{} settle still uses the cheap small-model finished judge). Need several NAMED fields at once, or one answer PER terminal across a cohort? Use terminal.extract.json \u2014 a plain-TEXT extract over multiple terminalIds MERGES them into ONE answer, it does not return one per agent.",
+      "type": "string"
+     },
+     "maxAttempts": {
+      "default": 30,
+      "description": "Hard cap on poll attempts in wait mode.",
+      "maximum": 120,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "maxTokens": {
+      "default": 1024,
+      "description": "Max tokens the extraction model may produce. For a verbatim/full-reproduction instruction prefer terminal.read (raw scrollback, no model, no cap).",
+      "maximum": 2000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "pollIntervalMs": {
+      "default": 2000,
+      "description": "Delay between polls in wait mode, in ms.",
+      "maximum": 60000,
+      "minimum": 0,
+      "type": "integer"
+     },
+     "tailBytes": {
+      "default": 12000,
+      "description": "Max characters of each terminal's tail fed to the model.",
+      "maximum": 100000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "terminalIds": {
+      "description": "Daintree terminal id(s) to read and extract from \u2014 full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids).",
+      "items": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array"
+     },
+     "wait": {
+      "additionalProperties": false,
+      "description": "Poll until this condition is met before extracting; omit to read once. A WatchCondition object with EXACTLY ONE of the keys below \u2014 or the empty object {} to wait until the agent has genuinely FINISHED its turn. Prefer {} for 'wait for the agent to finish': a bare stateIs:'waiting' is an unreliable proxy (a pre-start prompt or a backgrounded window also reads as 'waiting'), while {} prefers a real working->waiting transition (or a stable idle past a short grace) and ALWAYS confirms with a small-model check on the tail before it resolves; completed/exited resolve immediately. {} is single-terminal (one agent's state) \u2014 for a COHORT use terminal.awaitAll, then read with a no-wait extract over the same ids. modelJudge is NOT supported here (watcher-only).",
+      "maxProperties": 1,
+      "properties": {
+       "all": {
+        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape; modelJudge is not supported anywhere in the tree) must hold.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "any": {
+        "description": "OR \u2014 at least one nested condition (same one-key shape; no modelJudge anywhere) holds.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "contains": {
+        "description": "Fires when the terminal tail contains this literal substring (non-empty). Matches the COMBINED tail across multiple terminalIds.",
+        "minLength": 1,
+        "type": "string"
+       },
+       "noOutputForMs": {
+        "description": "Fires once no NEW output has appeared for this many ms.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       "not": {
+        "description": "Negates ONE nested condition (same one-key shape; no modelJudge anywhere). This is a property named not, NOT the JSON-Schema keyword.",
+        "maxProperties": 1,
+        "minProperties": 1,
+        "type": "object"
+       },
+       "regex": {
+        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
+        "minLength": 1,
+        "type": "string"
+       },
+       "runtimeStatusIs": {
+        "description": "Fires on the coarse terminal runtime status.",
+        "enum": [
+         "running",
+         "exited"
+        ],
+        "type": "string"
+       },
+       "stateIs": {
+        "description": "Fires when the agent state equals this value exactly. Do NOT use stateIs:'waiting' to mean finished \u2014 pass {} instead (it confirms a real finish).",
+        "enum": [
+         "idle",
+         "working",
+         "waiting",
+         "directing",
+         "completed",
+         "exited"
+        ],
+        "type": "string"
+       }
+      },
+      "type": "object"
+     }
+    },
+    "required": [
+     "terminalIds"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__extract__json",
+   "description": "Read a bounded tail of one or more Daintree terminals and extract STRUCTURED JSON with the small model \u2014 use this when you need several NAMED fields at once, OR one entry PER terminal when reading a COHORT: the multi-terminal tail is labelled by terminalId, so an array schema keyed by terminalId attributes each agent's answer in ONE call (e.g. collecting every agent's fact, or tallying a cohort's votes into one object). Both `instruction` and `jsonSchema` are required. PARALLEL: no-wait terminal.extract/.json calls batched in ONE reply run CONCURRENTLY \u2014 for several INDEPENDENT extractions (a different question per terminal), emit them all as one batch of calls; use the single multi-id call above only when one question spans the whole cohort. Optionally wait (poll) until a condition is met before extracting (a wait-bearing call is a barrier and runs serially); a wait that observes the agent FINISH also auto-retires that terminal's spawn-attached supervising watcher (watchersRetired in the result) \u2014 no completion notification will follow. For a single value or plain text to relay from ONE terminal, use terminal.extract instead. Read-only; requires Daintree MCP.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "instruction": {
+      "description": "What to extract as STRUCTURED JSON (e.g. each player's vote and reasoning).",
+      "type": "string"
+     },
+     "jsonSchema": {
+      "description": "Required. A REAL JSON Schema object describing the value to extract (the same kind you put under a tool's \"parameters\") \u2014 NOT an example of the value. ONLY these keywords are accepted: type, properties, required, items, enum, const, additionalProperties, anyOf, oneOf, allOf, minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength, maxLength, minItems, maxItems, uniqueItems. Any OTHER key is REJECTED \u2014 in particular no description, title, default, format, examples, $ref, or $schema anywhere in it; put explanation in the instruction argument instead, and there is NO output-size knob (no maxTokens; to make a field optional just leave it out of \"required\"). The small model returns the value under 'result'. For one entry PER terminal across a cohort, make the value an array of objects each carrying its own terminalId. Correct: {\"type\":\"object\",\"properties\":{\"answers\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"terminalId\":{\"type\":\"string\"},\"fact\":{\"type\":\"string\"}},\"required\":[\"terminalId\",\"fact\"]}}},\"required\":[\"answers\"]}. WRONG and REJECTED (a value example, not a schema): {\"answers\":[{\"terminalId\":\"string\",\"fact\":\"string\"}]}.",
+      "type": "string"
+     },
+     "maxAttempts": {
+      "default": 30,
+      "description": "Hard cap on poll attempts in wait mode.",
+      "maximum": 120,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "maxTokens": {
+      "default": 1024,
+      "description": "Max tokens the extraction model may produce. For a verbatim/full-reproduction instruction prefer terminal.read (raw scrollback, no model, no cap).",
+      "maximum": 2000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "pollIntervalMs": {
+      "default": 2000,
+      "description": "Delay between polls in wait mode, in ms.",
+      "maximum": 60000,
+      "minimum": 0,
+      "type": "integer"
+     },
+     "tailBytes": {
+      "default": 12000,
+      "description": "Max characters of each terminal's tail fed to the model.",
+      "maximum": 100000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "terminalIds": {
+      "description": "Daintree terminal id(s) to read and extract from \u2014 full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids).",
+      "items": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array"
+     },
+     "wait": {
+      "additionalProperties": false,
+      "description": "Poll until this condition is met before extracting; omit to read once. A WatchCondition object with EXACTLY ONE of the keys below \u2014 or the empty object {} to wait until the agent has genuinely FINISHED its turn. Prefer {} for 'wait for the agent to finish': a bare stateIs:'waiting' is an unreliable proxy (a pre-start prompt or a backgrounded window also reads as 'waiting'), while {} prefers a real working->waiting transition (or a stable idle past a short grace) and ALWAYS confirms with a small-model check on the tail before it resolves; completed/exited resolve immediately. {} is single-terminal (one agent's state) \u2014 for a COHORT use terminal.awaitAll, then read with a no-wait extract over the same ids. modelJudge is NOT supported here (watcher-only).",
+      "maxProperties": 1,
+      "properties": {
+       "all": {
+        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape; modelJudge is not supported anywhere in the tree) must hold.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "any": {
+        "description": "OR \u2014 at least one nested condition (same one-key shape; no modelJudge anywhere) holds.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "contains": {
+        "description": "Fires when the terminal tail contains this literal substring (non-empty). Matches the COMBINED tail across multiple terminalIds.",
+        "minLength": 1,
+        "type": "string"
+       },
+       "noOutputForMs": {
+        "description": "Fires once no NEW output has appeared for this many ms.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       "not": {
+        "description": "Negates ONE nested condition (same one-key shape; no modelJudge anywhere). This is a property named not, NOT the JSON-Schema keyword.",
+        "maxProperties": 1,
+        "minProperties": 1,
+        "type": "object"
+       },
+       "regex": {
+        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
+        "minLength": 1,
+        "type": "string"
+       },
+       "runtimeStatusIs": {
+        "description": "Fires on the coarse terminal runtime status.",
+        "enum": [
+         "running",
+         "exited"
+        ],
+        "type": "string"
+       },
+       "stateIs": {
+        "description": "Fires when the agent state equals this value exactly. Do NOT use stateIs:'waiting' to mean finished \u2014 pass {} instead (it confirms a real finish).",
+        "enum": [
+         "idle",
+         "working",
+         "waiting",
+         "directing",
+         "completed",
+         "exited"
+        ],
+        "type": "string"
+       }
+      },
+      "type": "object"
+     }
+    },
+    "required": [
+     "terminalIds",
+     "instruction",
+     "jsonSchema"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__extract__async",
+   "description": "Fire-and-forget terminal extraction. Polls the terminal(s) until the wait condition is met, extracts text with the small model, optionally judges the result against a pass/fail condition, and publishes the outcome to the attention queue (instead of blocking the turn). The main thread drains the verdict when next idle. Read-only; requires Daintree MCP.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "dedupeKey": {
+      "description": "Events sharing this key collapse into one in the queue.",
+      "type": "string"
+     },
+     "instruction": {
+      "description": "What to extract from the output, as plain text.",
+      "type": "string"
+     },
+     "maxAttempts": {
+      "default": 30,
+      "description": "Hard cap on poll attempts in wait mode.",
+      "maximum": 120,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "maxTokens": {
+      "default": 1024,
+      "description": "Max tokens the extraction model may produce. For a verbatim/full-reproduction instruction prefer terminal.read (raw scrollback, no model, no cap).",
+      "maximum": 2000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "pollIntervalMs": {
+      "default": 2000,
+      "description": "Delay between polls in wait mode, in ms.",
+      "maximum": 60000,
+      "minimum": 0,
+      "type": "integer"
+     },
+     "tailBytes": {
+      "default": 12000,
+      "description": "Max characters of each terminal's tail fed to the model.",
+      "maximum": 100000,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "terminalIds": {
+      "description": "Daintree terminal id(s) to read and extract from \u2014 full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids).",
+      "items": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array"
+     },
+     "title": {
+      "description": "Short label for the queue event the result is published under.",
+      "type": "string"
+     },
+     "ttlMs": {
+      "description": "Time-to-live for the published event, in ms (omit for no expiry).",
+      "minimum": 1,
+      "type": "integer"
+     },
+     "verdictInstruction": {
+      "description": "A pass/fail question evaluated against the extracted result; drives event severity.",
+      "type": "string"
+     },
+     "wait": {
+      "additionalProperties": false,
+      "description": "Poll until this condition is met before extracting; omit to read once. A WatchCondition object with EXACTLY ONE of the keys below \u2014 or the empty object {} to wait until the agent has genuinely FINISHED its turn. Prefer {} for 'wait for the agent to finish': a bare stateIs:'waiting' is an unreliable proxy (a pre-start prompt or a backgrounded window also reads as 'waiting'), while {} prefers a real working->waiting transition (or a stable idle past a short grace) and ALWAYS confirms with a small-model check on the tail before it resolves; completed/exited resolve immediately. {} is single-terminal (one agent's state) \u2014 for a COHORT use terminal.awaitAll, then read with a no-wait extract over the same ids. modelJudge is NOT supported here (watcher-only).",
+      "maxProperties": 1,
+      "properties": {
+       "all": {
+        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape; modelJudge is not supported anywhere in the tree) must hold.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "any": {
+        "description": "OR \u2014 at least one nested condition (same one-key shape; no modelJudge anywhere) holds.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "contains": {
+        "description": "Fires when the terminal tail contains this literal substring (non-empty). Matches the COMBINED tail across multiple terminalIds.",
+        "minLength": 1,
+        "type": "string"
+       },
+       "noOutputForMs": {
+        "description": "Fires once no NEW output has appeared for this many ms.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       "not": {
+        "description": "Negates ONE nested condition (same one-key shape; no modelJudge anywhere). This is a property named not, NOT the JSON-Schema keyword.",
+        "maxProperties": 1,
+        "minProperties": 1,
+        "type": "object"
+       },
+       "regex": {
+        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
+        "minLength": 1,
+        "type": "string"
+       },
+       "runtimeStatusIs": {
+        "description": "Fires on the coarse terminal runtime status.",
+        "enum": [
+         "running",
+         "exited"
+        ],
+        "type": "string"
+       },
+       "stateIs": {
+        "description": "Fires when the agent state equals this value exactly. Do NOT use stateIs:'waiting' to mean finished \u2014 pass {} instead (it confirms a real finish).",
+        "enum": [
+         "idle",
+         "working",
+         "waiting",
+         "directing",
+         "completed",
+         "exited"
+        ],
+        "type": "string"
+       }
+      },
+      "type": "object"
+     }
+    },
+    "required": [
+     "terminalIds",
+     "instruction"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__awaitAll",
+   "description": "Wait (bounded) for a COHORT of agent terminals to all return to an idle prompt. Pure state-machine: it polls agentState only \u2014 NO model call, NO output read \u2014 so it is fast and light. Returns allFinished plus a perTerminal array whose status is exactly one of \"finished\" | \"failed\" | \"question\" | \"working\" \u2014 and NO content. It also returns top-level stillWorking and askingQuestion arrays of terminal IDs, so when the wait budget runs out you can re-await exactly the stillWorking stragglers (and route answers to askingQuestion) without scanning perTerminal. Use this ONCE for the whole cohort instead of one wait per agent. Terminals that settle finished/failed automatically RETIRE their spawn-attached supervising watcher (watchersRetired in the result) \u2014 the completion is in your hands now, so do NOT watcher.cancel them yourself and do NOT expect a later completion notification for those agents. IMPORTANT: a bare 'waiting' is an imperfect signal \u2014 an agent can momentarily read idle while still working. So AFTER awaitAll returns, read each output yourself (a no-wait terminal.extract/read of the last few lines) to confirm the result makes sense; if a terminal reported 'finished' but its tail shows it is still mid-work, re-await just that one or set a watcher on it and poll. Bound the outer loop: re-await stillWorking IDs at most twice (three awaitAll calls total on the same terminal); after that a still-working terminal is hung \u2014 escalate via queue.publish (severity 'blocked') + watcher.terminal.create and end the turn instead of awaiting it again. INTERRUPTIBLE: if the user sends a message while you are waiting, awaitAll returns EARLY with interruptedByUser:true plus whatever has settled so far \u2014 their message is already folded into the conversation, so READ IT and adapt (they may want to redirect, e.g. 'that agent errored, re-spawn it') before deciding whether to re-await the stillWorking agents. Read-only; requires Daintree MCP.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "maxAttempts": {
+      "default": 30,
+      "description": "Hard cap on poll rounds (default 30 \u2248 60s, max 240 \u2248 480s \u2014 durations assume the default 2s pollIntervalMs). Bounded so it cannot hang. Raise it only for a known-slow cohort whose agents need a single round past 120s \u2014 most waits should leave it at the default.",
+      "maximum": 240,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "pollIntervalMs": {
+      "default": 2000,
+      "description": "Delay between poll rounds in ms.",
+      "maximum": 60000,
+      "minimum": 0,
+      "type": "integer"
+     },
+     "terminalIds": {
+      "description": "All the agent terminals to wait on \u2014 full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids). Polls their agentState (NO model call, NO output read) and returns when EVERY one has returned to an idle prompt. Each result's status is one of \"finished\" | \"failed\" | \"question\" | \"working\". Use ONE awaitAll for the whole cohort, never one wait per agent. The result also carries top-level stillWorking and askingQuestion arrays of terminal IDs \u2014 re-await stillWorking directly (no need to scan perTerminal) and route answers to askingQuestion. AFTER it returns, peek the tail (a no-wait terminal.extract/read) to confirm \u2014 a terminal can briefly read 'waiting' while still working; if a 'finished' one still looks busy, re-await or watch it. BOUND the re-await loop: re-await stillWorking IDs at most twice (three awaitAll calls total on the same terminal). After that a still-working terminal is HUNG \u2014 escalate (publish a blocked inbox item with queue.publish and attach a watcher with watcher.terminal.create) and end the turn rather than awaiting it again.",
+      "items": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+     }
+    },
+    "required": [
+     "terminalIds"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "fs__list",
+   "description": "List directory entries under the project root (read-only). Skips .git, node_modules, and dist. PARALLEL: fs.read/fs.list calls batched in ONE reply run concurrently \u2014 to survey several directories, emit one fs.list each in one batch.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "depth": {
+      "description": "How many directory levels to descend (default 1).",
+      "type": "number"
+     },
+     "path": {
+      "description": "Directory relative to project root (default root).",
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "fs__read",
+   "description": "Read a UTF-8 text file from the project (read-only). PARALLEL: fs.read/fs.list calls batched in ONE reply run concurrently \u2014 to read several files, emit one fs.read each in one batch, not one per turn.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "maxBytes": {
+      "description": "Max bytes to read.",
+      "type": "number"
+     },
+     "path": {
+      "description": "Path relative to project root.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "path"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "fs__search",
+   "description": "Text-search file contents across the project (read-only). Recursive pure-Go walk skipping .git, node_modules, and dist.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "glob": {
+      "description": "Optional filename suffix/extension filter, e.g. \".ts\".",
+      "type": "string"
+     },
+     "maxResults": {
+      "description": "Maximum number of matches to return (default 50).",
+      "type": "number"
+     },
+     "query": {
+      "description": "Substring to search for in file contents.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "daintree__status",
+   "description": "Report Daintree MCP connection status (connected, transport, tool count). Works even when disconnected.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "daintree__listTools",
+   "description": "List the Daintree MCP tools, with their names and descriptions. Each entry carries a `callable` flag: tools marked `callable: false` are known to exist but are not offered in this turn's tool spec (e.g. an active skill narrowed the toolset), so calling them would do nothing.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "tool__search",
+   "description": "Search Daintree MCP tools by keyword. The query is split on spaces and a tool matches when EVERY word appears in its name or description (order and filler words don't matter), so prefer a couple of plain keywords (e.g. `rename terminal`) over a long phrase \u2014 name matches rank first. Each match carries a `callable` flag: tools marked `callable: false` exist but are not offered in this turn's tool spec, so calling them would do nothing \u2014 only `callable: true` results can be invoked now.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "max": {
+      "description": "Max results to return (default 20).",
+      "type": "number"
+     },
+     "query": {
+      "description": "Keywords to match against MCP tool names/descriptions. Split on spaces; every word must appear (AND). Use a few plain words, not a long phrase.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "daintree__call",
+   "description": "Raw passthrough to ANY Daintree MCP tool. Escape hatch \u2014 highest risk ('system'), always confirmed, requires the 'system' tier. Prefer purpose-built tools; use this only when no wrapper exists. Tools that already have a wrapper (e.g. agent.launch, terminal.getOutput, panel.focus) are refused here and redirected to the wrapper.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "description": "Arguments object passed to the MCP tool.",
+      "type": "object"
+     },
+     "name": {
+      "description": "Daintree MCP tool name to invoke.",
+      "type": "string"
+     },
+     "requestKey": {
+      "description": "Optional idempotency / request key forwarded to the tool.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__focus",
+   "description": "Focus/reveal a Daintree terminal in the UI (read-only side effect on the UI; no state mutation).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "terminalId": {
+      "description": "Daintree terminal id to focus in the UI.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__rename",
+   "description": "Set a terminal/agent tab's title. This is how you ORGANISE the workspace: when several agents are all named \"Claude\" (or you've lost track of a fleet), rename each to what it is actually doing so the tabs read at a glance. Pass terminalId + a short name; rename many in ONE batched round (one call per id, all in the same turn). UI-only, no confirmation. Typed wrapper around the Daintree terminal.rename MCP tool \u2014 don't reach for it via tool.search or daintree.call.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "name": {
+      "description": "New tab title. Required: a non-empty name renames programmatically. Keep it short and descriptive (e.g. \"merge pipeline: PRs #10779-84\").",
+      "type": "string"
+     },
+     "terminalId": {
+      "description": "Daintree terminal id to rename (the id field from terminal.list).",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId",
+     "name"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "copyTree__generate",
+   "description": "Generate a Daintree 'copy tree' \u2014 a concatenated digest of a worktree's files \u2014 and return it as text (read-only). Typed wrapper around the Daintree copyTree.generate MCP tool. 'options' is forwarded verbatim; don't invent keys.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "options": {
+      "additionalProperties": true,
+      "description": "Opaque copyTree options forwarded to Daintree verbatim (do not invent keys).",
+      "type": "object"
+     },
+     "worktreeId": {
+      "description": "Worktree to generate the copy tree for; Daintree uses the active worktree when omitted.",
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__sendCommand",
+   "description": "Send a command line to a Daintree terminal \u2014 types it into the terminal's input and runs it. Mutating, so it always confirms. Typed wrapper around the Daintree terminal.sendCommand MCP tool.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "command": {
+      "description": "Shell command text to type into the terminal and run.",
+      "type": "string"
+     },
+     "terminalId": {
+      "description": "Terminal to send the command to.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId",
+     "command"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__close",
+   "description": "Close Daintree terminal(s) \u2014 moves each to the trash and ends the agent or process running in it. ONLY call this when the USER has explicitly asked you to close a terminal or terminals; closing is never your own decision. Do NOT call it to tidy up, to retire agents you spawned, or to recover from a failed/ambiguous/'no terminalId' spawn \u2014 a spawn that returned no terminalId is retried or reported, never 'fixed' by closing terminals. A terminal you did not just spawn yourself may be the user's own live work or another agent mid-task (agentState 'working'/'waiting'), so closing it ends that work irreversibly. Pass a single terminalId, or terminalIds:[...] to close a whole cohort the user asked you to retire in ONE call. Typed wrapper around the Daintree terminal.close MCP tool. (terminal.kill, reachable via daintree.call, deletes PERMANENTLY instead of trashing \u2014 prefer close.)",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "terminalId": {
+      "description": "A single Daintree terminal id to close.",
+      "type": "string"
+     },
+     "terminalIds": {
+      "description": "Several terminal ids to close in ONE confirmed call (e.g. retiring a spawned cohort) \u2014 prefer this over calling terminal.close once per id.",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     }
+    },
+    "required": [],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__arm",
+   "description": "Add a terminal to Daintree's fleet arming set so the human's next broadcast keystrokes are ALSO routed to it. Mutating (reroutes the human's input), so it always confirms. Typed wrapper around the Daintree terminal.arm MCP tool. Reports the resulting armed set so arming is never silent.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "terminalId": {
+      "description": "Terminal to add to / remove from the fleet arming set.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__disarm",
+   "description": "Remove a terminal from Daintree's fleet arming set so it no longer receives the human's broadcast input. Mutating (reroutes the human's input), so it always confirms. Typed wrapper around the Daintree terminal.disarm MCP tool. Reports the resulting armed set so the change is never silent.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "terminalId": {
+      "description": "Terminal to add to / remove from the fleet arming set.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "terminal__disarmAll",
+   "description": "Clear Daintree's entire fleet arming set so no terminal receives the human's broadcast input. Mutating (reroutes the human's input), so it always confirms. Typed wrapper around the Daintree terminal.disarmAll MCP tool. Reports the resulting (empty) armed set so the change is never silent.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "copyTree__injectToTerminal",
+   "description": "Generate a worktree's copy tree and inject it into a Daintree terminal's input. Mutating (writes into a terminal), so it always confirms. Typed wrapper around the Daintree copyTree.injectToTerminal MCP tool. 'options' is forwarded verbatim.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "options": {
+      "additionalProperties": true,
+      "description": "Opaque copyTree options forwarded to Daintree verbatim (do not invent keys).",
+      "type": "object"
+     },
+     "terminalId": {
+      "description": "Terminal to inject the generated copy tree into.",
+      "type": "string"
+     },
+     "worktreeId": {
+      "description": "Worktree to generate the copy tree from; Daintree uses the active worktree when omitted.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "agent__focusNextWaiting",
+   "description": "Focus the next agent terminal that is waiting for input or a decision (UI focus change; no state mutation). Typed wrapper around the Daintree agent.focusNextWaiting MCP tool.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "agent__focusNextWorking",
+   "description": "Focus the next agent terminal that is actively working (UI focus change; no state mutation). Typed wrapper around the Daintree agent.focusNextWorking MCP tool.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "agent__focusNextAgent",
+   "description": "Focus the next agent terminal in order (UI focus change; no state mutation). Typed wrapper around the Daintree agent.focusNextAgent MCP tool.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "agent__focusPreviousAgent",
+   "description": "Focus the previous agent terminal in order (UI focus change; no state mutation). Typed wrapper around the Daintree agent.focusPreviousAgent MCP tool.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "copyTree__generateAndCopyFile",
+   "description": "Generate a worktree's copy tree and copy it to the OS clipboard as a file. System tier \u2014 always confirms. Typed wrapper around the Daintree copyTree.generateAndCopyFile MCP tool. 'options' is forwarded verbatim.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "options": {
+      "additionalProperties": true,
+      "description": "Opaque copyTree options forwarded to Daintree verbatim (do not invent keys).",
+      "type": "object"
+     },
+     "worktreeId": {
+      "description": "Worktree to generate the copy tree for; Daintree uses the active worktree when omitted.",
+      "type": "string"
+     }
+    },
+    "required": [],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "scratch__create",
+   "description": "Create a named in-memory scratch store for ephemeral within-session data and return its storeId. Use scratch.* tools as a temporary key-value workspace to track intermediate results across the steps of a multi-step task. Scratch data lives only for THIS session and is never persisted \u2014 for durable cross-session notes use memory.save instead. Keep the returned storeId; you pass it to scratch.set/get/delete/drop.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "name": {
+      "description": "A short label for this scratch store (e.g. \"pr-triage\"). For your reference only; not required to be unique.",
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "scratch__set",
+   "description": "Write a key/value into a scratch store (upsert \u2014 overwrites an existing key). The value is any JSON (object, array, string, number, boolean, null) and is read back verbatim by scratch.get.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "key": {
+      "description": "The key to write (upsert \u2014 overwrites if it already exists).",
+      "minLength": 1,
+      "type": "string"
+     },
+     "storeId": {
+      "description": "The storeId returned by scratch.create.",
+      "type": "string"
+     },
+     "value": {
+      "description": "Any JSON value to store: object, array, string, number, boolean, or null. Pass it directly as JSON \u2014 do NOT wrap it in a string."
+     }
+    },
+    "required": [
+     "storeId",
+     "key",
+     "value"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "scratch__get",
+   "description": "Read from a scratch store. Pass a key to read one value, or omit key to return every key and value in the store. Values come back as the exact JSON that was stored.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "key": {
+      "description": "The key to read. Omit to return ALL keys and values in the store.",
+      "type": "string"
+     },
+     "storeId": {
+      "description": "The storeId returned by scratch.create.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "storeId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "scratch__delete",
+   "description": "Delete one key from a scratch store. To remove the entire store, use scratch.drop.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "key": {
+      "description": "The key to delete.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "storeId": {
+      "description": "The storeId returned by scratch.create.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "storeId",
+     "key"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "scratch__drop",
+   "description": "Discard an entire scratch store and all of its keys. Frees a slot toward the per-session store limit.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "storeId": {
+      "description": "The storeId returned by scratch.create.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "storeId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "grant__create",
+   "description": "Pre-authorize unattended confirm-required tool use, bounded by TTL, use-count and a tool/risk allowlist. actorType watcher/timer authorizes that one watcher/timer (actorId = its wch_/tmr_ id); actorType \"wake\" with actorId \"wake\" authorizes the supervisor daemon's autonomous wake turns while the user is away (create it when the user asks for unattended work that must MUTATE \u2014 e.g. sending terminal commands overnight).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "actorId": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "actorType": {
+      "enum": [
+       "watcher",
+       "timer",
+       "wake"
+      ],
+      "type": "string"
+     },
+     "allowedRiskClasses": {
+      "items": {
+       "enum": [
+        "read",
+        "local",
+        "ui",
+        "terminal",
+        "project",
+        "git",
+        "external",
+        "system"
+       ],
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "allowedToolNames": {
+      "items": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "maxUses": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "ttlMs": {
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [
+     "actorId",
+     "actorType",
+     "ttlMs",
+     "maxUses"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "grant__list",
+   "description": "List live automation grants (non-revoked, non-expired, with uses remaining).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "actorId": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "grant__revoke",
+   "description": "Revoke an automation grant by id.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "docs__search",
+   "description": "Search Daintree's live documentation to answer a user's how-to or help question (\"how do I\u2026\", \"what is\u2026\", \"how do I configure\u2026\"). Returns ranked doc sections, each with a title, content, and a page PATH (e.g. /docs/worktrees). This is the FIRST tool to reach for when the user asks how to use Daintree \u2014 prefer it over guessing. Cite the pages you use as full URLs by prepending https://daintree.org to the returned path. PARALLEL: docs search/getPage/getRelatedPages calls batched in ONE reply run concurrently \u2014 emit several at once when researching.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "pathPrefix": {
+      "description": "Optional: restrict results to URL paths under this prefix (e.g. \"/docs\").",
+      "type": "string"
+     },
+     "query": {
+      "description": "What to search the Daintree documentation for. Keywords or natural language (e.g. \"create a worktree from a PR\", \"keybindings\").",
+      "minLength": 1,
+      "type": "string"
+     },
+     "topK": {
+      "description": "Max number of results to return (default 10).",
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "docs__getPage",
+   "description": "Fetch the full markdown of a specific Daintree documentation page by its URL path. Use AFTER docs.search when the search snippets lack the detail to answer accurately. Not for discovery \u2014 search first to find the page. PARALLEL: docs calls batched in ONE reply run concurrently \u2014 to read several pages, emit one getPage each in one batch.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "path": {
+      "description": "URL path of the documentation page (e.g. \"/docs/worktrees\"). Use a URL returned by docs.search.",
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "path"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "docs__getRelatedPages",
+   "description": "Find Daintree documentation pages related to a known page, for suggesting further reading. Use only when you already have a page URL (from docs.search) and want connected content \u2014 not for general search.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "path": {
+      "description": "URL path of the source page (e.g. \"/docs/worktrees\"). Use a URL returned by docs.search.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "topK": {
+      "description": "Max number of related pages to return (default 10).",
+      "maximum": 25,
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [
+     "path"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "memory__recall",
+   "description": "Recall project memories most relevant to a query (BM25-ranked full-text search).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "category": {
+      "type": "string"
+     },
+     "limit": {
+      "maximum": 50,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "query": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "query"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "memory__list",
+   "description": "List project memories (pinned first, then most recent).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "category": {
+      "type": "string"
+     },
+     "limit": {
+      "maximum": 200,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "pinnedOnly": {
+      "type": "boolean"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "memory__save",
+   "description": "Save a durable project memory (persists across sessions).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "category": {
+      "type": "string"
+     },
+     "content": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "semantic",
+       "episodic"
+      ],
+      "type": "string"
+     },
+     "source": {
+      "enum": [
+       "user",
+       "assistant"
+      ],
+      "type": "string"
+     },
+     "ttlMs": {
+      "maximum": 3153600000000,
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [
+     "content"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "memory__forget",
+   "description": "Soft-delete a project memory by id.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "memory__pin",
+   "description": "Pin a project memory so it sorts first and resists pruning (idempotent).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "memory__unpin",
+   "description": "Unpin a project memory (idempotent).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "queue__publish",
+   "description": "Publish an event to the attention queue (the human's inbox). Use dedupeKey to collapse repeats.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "dedupeKey": {
+      "type": "string"
+     },
+     "evidence": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "recommendedActions": {
+      "items": {
+       "additionalProperties": false,
+       "properties": {
+        "args": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "label": {
+         "type": "string"
+        },
+        "requiresConfirmation": {
+         "type": "boolean"
+        },
+        "risk": {
+         "type": "string"
+        },
+        "toolName": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "label",
+        "toolName"
+       ],
+       "type": "object"
+      },
+      "type": "array"
+     },
+     "severity": {
+      "enum": [
+       "debug",
+       "info",
+       "attention",
+       "urgent",
+       "blocked",
+       "done",
+       "error"
+      ],
+      "type": "string"
+     },
+     "source": {
+      "enum": [
+       "timer",
+       "terminal_watcher",
+       "worktree_watcher",
+       "pr_watcher",
+       "workflow",
+       "model_worker",
+       "system",
+       "user"
+      ],
+      "type": "string"
+     },
+     "summary": {
+      "type": "string"
+     },
+     "target": {
+      "additionalProperties": false,
+      "properties": {
+       "projectId": {
+        "type": "string"
+       },
+       "terminalId": {
+        "type": "string"
+       },
+       "workflowRunId": {
+        "type": "string"
+       },
+       "worktreeId": {
+        "type": "string"
+       }
+      },
+      "type": "object"
+     },
+     "title": {
+      "type": "string"
+     },
+     "ttlMs": {
+      "type": "number"
+     }
+    },
+    "required": [
+     "source",
+     "severity",
+     "title",
+     "summary"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "queue__digest",
+   "description": "Read a digest of the attention queue, optionally filtered by minimum severity.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "includeResolved": {
+      "type": "boolean"
+     },
+     "maxItems": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "severityAtLeast": {
+      "enum": [
+       "debug",
+       "info",
+       "attention",
+       "urgent",
+       "blocked",
+       "done",
+       "error"
+      ],
+      "type": "string"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "queue__resolve",
+   "description": "Mark an attention-queue event resolved by id.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "user__askMultipleChoice",
+   "description": "Ask the human ONE multiple-choice question and wait for their answer, then continue the same turn using it. Provide a concise `question` and 2\u201326 plain-text `options` (no A/B/C prefixes \u2014 the client assigns the letters). The user answers with the arrow keys + Enter or by typing the option letter. Use this whenever you need a finite decision from the user before proceeding, INSTEAD of asking in prose. Call it ALONE \u2014 never in the same tool batch as any other tool \u2014 and re-plan once the answer comes back. Only works during an interactive session; a watcher, timer, or non-interactive run cannot ask.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "defaultIndex": {
+      "description": "Optional 0-based index of the option to highlight first. Defaults to 0.",
+      "minimum": 0,
+      "type": "integer"
+     },
+     "options": {
+      "items": {
+       "description": "One selectable option as plain text. Do NOT prefix it with a letter \u2014 the client assigns A/B/C\u2026 labels.",
+       "type": "string"
+      },
+      "maxItems": 26,
+      "minItems": 2,
+      "type": "array"
+     },
+     "question": {
+      "description": "The concise, human-facing question. Do NOT include option letters (A/B/C) or restate the options inside it.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "question",
+     "options"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "skill__run__get",
+   "description": "Get the stepwise progress state of a skill run in this session (absence is a normal OK answer).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "skillId": {
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "skillId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "skill__step__advance",
+   "description": "Record that a skill step is complete (or skipped) and advance to the next step. Omitting nextStep finishes the run.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "completedStep": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "nextStep": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "notes": {
+      "type": "string"
+     },
+     "skillId": {
+      "minLength": 1,
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "done",
+       "skipped"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "skillId",
+     "completedStep"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "timer__schedule",
+   "description": "Schedule a durable timer that enqueues a reminder or runs a safe tool at a future time (optionally repeating).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "delayMs": {
+      "description": "Relative delay from now in ms (alternative to fireAt).",
+      "minimum": 1,
+      "type": "integer"
+     },
+     "fireAt": {
+      "description": "ISO-8601 absolute fire time.",
+      "format": "date-time",
+      "type": "string"
+     },
+     "payload": {
+      "additionalProperties": false,
+      "properties": {
+       "message": {
+        "type": "string"
+       },
+       "toolCall": {
+        "additionalProperties": false,
+        "properties": {
+         "args": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "toolName": {
+          "minLength": 1,
+          "type": "string"
+         }
+        },
+        "required": [
+         "toolName"
+        ],
+        "type": "object"
+       },
+       "type": {
+        "enum": [
+         "enqueue",
+         "call_safe_tool"
+        ],
+        "type": "string"
+       }
+      },
+      "required": [
+       "type"
+      ],
+      "type": "object"
+     },
+     "repeat": {
+      "additionalProperties": false,
+      "properties": {
+       "everyMs": {
+        "minimum": 1,
+        "type": "integer"
+       },
+       "maxRuns": {
+        "minimum": 1,
+        "type": "integer"
+       },
+       "until": {
+        "format": "date-time",
+        "type": "string"
+       }
+      },
+      "required": [
+       "everyMs"
+      ],
+      "type": "object"
+     },
+     "target": {
+      "additionalProperties": false,
+      "properties": {
+       "projectId": {
+        "type": "string"
+       },
+       "terminalId": {
+        "type": "string"
+       },
+       "workflowRunId": {
+        "type": "string"
+       },
+       "worktreeId": {
+        "type": "string"
+       }
+      },
+      "type": "object"
+     },
+     "title": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "title",
+     "payload"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "timer__list",
+   "description": "List scheduled (not-yet-fired) timers.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "timer__cancel",
+   "description": "Cancel a scheduled timer by id.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "watcher__terminal__create",
+   "description": "Create a background watcher over one or more terminals that classifies their state and alerts on a condition.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "alertWhen": {
+      "additionalProperties": false,
+      "description": "Condition that publishes an attention alert (the watcher keeps running). A WatchCondition object with EXACTLY ONE of the keys below.",
+      "maxProperties": 1,
+      "minProperties": 1,
+      "properties": {
+       "all": {
+        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape) must hold.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "any": {
+        "description": "OR \u2014 at least one nested condition (same one-key shape) holds.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "contains": {
+        "description": "Fires when the terminal tail contains this literal substring (non-empty).",
+        "minLength": 1,
+        "type": "string"
+       },
+       "modelJudge": {
+        "description": "A yes/no question answered against the terminal tail on each check. Costs one model call per check at the watcher's modelTier (deduped across stopWhen/alertWhen) \u2014 prefer the free deterministic leaves when they can express the condition.",
+        "minLength": 1,
+        "type": "string"
+       },
+       "noOutputForMs": {
+        "description": "Fires once no NEW output has appeared for this many ms.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       "not": {
+        "description": "Negates ONE nested condition (same one-key shape).",
+        "maxProperties": 1,
+        "minProperties": 1,
+        "type": "object"
+       },
+       "regex": {
+        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
+        "minLength": 1,
+        "type": "string"
+       },
+       "runtimeStatusIs": {
+        "description": "Fires on the coarse terminal runtime status.",
+        "enum": [
+         "running",
+         "exited"
+        ],
+        "type": "string"
+       },
+       "stateIs": {
+        "description": "Fires when the agent state equals this value exactly. A bare stateIs:'waiting' fires too early for 'agent finished' (pre-start, paused, and backgrounded agents also read waiting) \u2014 pair it with a modelJudge under all:[...], or rely on the default supervisor's confirmed completion.",
+        "enum": [
+         "idle",
+         "working",
+         "waiting",
+         "directing",
+         "completed",
+         "exited"
+        ],
+        "type": "string"
+       }
+      },
+      "type": "object"
+     },
+     "cadenceMs": {
+      "default": 120000,
+      "description": "How often the watcher checks, in ms.",
+      "minimum": 1,
+      "type": "integer"
+     },
+     "goal": {
+      "description": "What the watcher is observing for, in plain language \u2014 guides its per-check classification.",
+      "type": "string"
+     },
+     "modelTier": {
+      "default": "small",
+      "description": "Model used for per-check classification and modelJudge questions.",
+      "enum": [
+       "small",
+       "medium"
+      ],
+      "type": "string"
+     },
+     "startAfterMs": {
+      "minimum": 0,
+      "type": "integer"
+     },
+     "stopAfterMs": {
+      "description": "Lifetime ceiling in ms; defaults to 86400000 (24 h) when omitted \u2014 a watcher never runs forever.",
+      "minimum": 1,
+      "type": "integer"
+     },
+     "stopWhen": {
+      "additionalProperties": false,
+      "description": "Condition that ENDS the watcher (status condition_met). A WatchCondition object with EXACTLY ONE of the keys below.",
+      "maxProperties": 1,
+      "minProperties": 1,
+      "properties": {
+       "all": {
+        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape) must hold.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "any": {
+        "description": "OR \u2014 at least one nested condition (same one-key shape) holds.",
+        "items": {
+         "maxProperties": 1,
+         "minProperties": 1,
+         "type": "object"
+        },
+        "minItems": 1,
+        "type": "array"
+       },
+       "contains": {
+        "description": "Fires when the terminal tail contains this literal substring (non-empty).",
+        "minLength": 1,
+        "type": "string"
+       },
+       "modelJudge": {
+        "description": "A yes/no question answered against the terminal tail on each check. Costs one model call per check at the watcher's modelTier (deduped across stopWhen/alertWhen) \u2014 prefer the free deterministic leaves when they can express the condition.",
+        "minLength": 1,
+        "type": "string"
+       },
+       "noOutputForMs": {
+        "description": "Fires once no NEW output has appeared for this many ms.",
+        "minimum": 1,
+        "type": "integer"
+       },
+       "not": {
+        "description": "Negates ONE nested condition (same one-key shape).",
+        "maxProperties": 1,
+        "minProperties": 1,
+        "type": "object"
+       },
+       "regex": {
+        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
+        "minLength": 1,
+        "type": "string"
+       },
+       "runtimeStatusIs": {
+        "description": "Fires on the coarse terminal runtime status.",
+        "enum": [
+         "running",
+         "exited"
+        ],
+        "type": "string"
+       },
+       "stateIs": {
+        "description": "Fires when the agent state equals this value exactly. A bare stateIs:'waiting' fires too early for 'agent finished' (pre-start, paused, and backgrounded agents also read waiting) \u2014 pair it with a modelJudge under all:[...], or rely on the default supervisor's confirmed completion.",
+        "enum": [
+         "idle",
+         "working",
+         "waiting",
+         "directing",
+         "completed",
+         "exited"
+        ],
+        "type": "string"
+       }
+      },
+      "type": "object"
+     },
+     "terminalIds": {
+      "description": "Terminals to watch \u2014 full terminal-<uuid> ids exactly as listed.",
+      "items": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "maxItems": 256,
+      "minItems": 1,
+      "type": "array"
+     },
+     "title": {
+      "description": "Short human label for the watcher (shown in watcher.list and attention events).",
+      "type": "string"
+     }
+    },
+    "required": [
+     "terminalIds",
+     "title",
+     "goal"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "watcher__watchPR",
+   "description": "Watch a pull request's state (open/merged/draft/closed) and alert on a change.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "cwd": {
+      "type": "string"
+     },
+     "prNumber": {
+      "minimum": 1,
+      "type": "integer"
+     },
+     "startAfterMs": {
+      "minimum": 0,
+      "type": "integer"
+     },
+     "stopAfterMs": {
+      "description": "Lifetime ceiling in ms; defaults to 86400000 (24 h) when omitted \u2014 a watcher never runs forever.",
+      "minimum": 1,
+      "type": "integer"
+     },
+     "title": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "prNumber"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "watcher__list",
+   "description": "List active watchers.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "watcher__cancel",
+   "description": "Cancel an active watcher by id.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__create",
+   "description": "Create a workflow ledger entry tracking an end-to-end run (issue/branch/worktree/PR).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "branch": {
+      "type": "string"
+     },
+     "issueNumber": {
+      "type": "integer"
+     },
+     "issueTitle": {
+      "type": "string"
+     },
+     "issueUrl": {
+      "type": "string"
+     },
+     "nextAction": {
+      "additionalProperties": false,
+      "properties": {
+       "args": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "label": {
+        "type": "string"
+       },
+       "requiresConfirmation": {
+        "type": "boolean"
+       },
+       "risk": {
+        "type": "string"
+       },
+       "toolName": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "label",
+       "toolName"
+      ],
+      "type": "object"
+     },
+     "notes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "prNumber": {
+      "type": "integer"
+     },
+     "prUrl": {
+      "type": "string"
+     },
+     "queueEventIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "status": {
+      "enum": [
+       "pending",
+       "active",
+       "blocked",
+       "done",
+       "cancelled",
+       "failed"
+      ],
+      "type": "string"
+     },
+     "terminalIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "watcherIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "worktreeId": {
+      "type": "string"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__get",
+   "description": "Get a workflow ledger entry by id.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__list",
+   "description": "List workflow ledger entries, optionally filtered by status.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "status": {
+      "enum": [
+       "pending",
+       "active",
+       "blocked",
+       "done",
+       "cancelled",
+       "failed"
+      ],
+      "type": "string"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__update",
+   "description": "Update a workflow ledger entry. Provided array fields REPLACE the stored arrays.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "branch": {
+      "type": "string"
+     },
+     "id": {
+      "type": "string"
+     },
+     "issueNumber": {
+      "type": "integer"
+     },
+     "issueTitle": {
+      "type": "string"
+     },
+     "issueUrl": {
+      "type": "string"
+     },
+     "nextAction": {
+      "additionalProperties": false,
+      "properties": {
+       "args": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "label": {
+        "type": "string"
+       },
+       "requiresConfirmation": {
+        "type": "boolean"
+       },
+       "risk": {
+        "type": "string"
+       },
+       "toolName": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "label",
+       "toolName"
+      ],
+      "type": "object"
+     },
+     "notes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "prNumber": {
+      "type": "integer"
+     },
+     "prUrl": {
+      "type": "string"
+     },
+     "queueEventIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "status": {
+      "enum": [
+       "pending",
+       "active",
+       "blocked",
+       "done",
+       "cancelled",
+       "failed"
+      ],
+      "type": "string"
+     },
+     "terminalIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "watcherIds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "worktreeId": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ }
+]

@@ -1,0 +1,56 @@
+# workflow_plan cases — goal + tool inventory + runtime → a typed plan (DAG of
+# nodes/edges). Scored on: no 502 (structural validity survived), first-try (no
+# repair round), node/edge counts within the 20/40 caps, and tool grounding of
+# next_action against the supplied inventory.
+cases:
+  - id: plan-fix-flaky-test
+    task: workflow_plan
+    category: plan
+    input:
+      goal: "Find and fix the flaky test in the checkout suite, then open a PR."
+      runtime_summary:
+        permission_tier: operator
+        open_terminals: 0
+      tool_inventory:
+        - {name: agentTask__spawnForEdits}
+        - {name: terminal__run__async}
+        - {name: terminal__awaitAll}
+        - {name: fs__read}
+        - {name: fs__search}
+      active_skill_ids: [daintree.workflow.start-work-on-issue]
+    expect:
+      max_nodes: 20
+      next_action_grounded: true
+
+  - id: plan-three-agent-competition
+    task: workflow_plan
+    category: plan
+    input:
+      goal: "Run three coding agents in a competition on the same issue and pick the best result."
+      runtime_summary: {permission_tier: operator}
+      tool_inventory:
+        - {name: agentTask__spawnForEdits}
+        - {name: terminal__awaitAll}
+        - {name: terminal__read}
+      active_skill_ids: [daintree.orchestration.competition, daintree.orchestration.basic]
+    expect:
+      max_nodes: 20
+      next_action_grounded: true
+
+  - id: plan-tool-grounding-degrade
+    task: workflow_plan
+    category: plan-degrade
+    note: >
+      The goal invites a deploy step, but no deploy tool is in the inventory. A
+      next_action pointing at a missing tool must DEGRADE (nulled + warning), not
+      be returned as a real capability.
+    input:
+      goal: "Build the app and deploy it to production."
+      runtime_summary: {permission_tier: operator}
+      tool_inventory:
+        - {name: terminal__run__async}
+        - {name: terminal__awaitAll}
+        - {name: fs__read}
+    expect:
+      max_nodes: 20
+      next_action_grounded: true
