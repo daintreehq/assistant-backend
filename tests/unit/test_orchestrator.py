@@ -1064,3 +1064,93 @@ async def test_disconnect_during_prep_cancels_selection(
     await asyncio.gather(pull, return_exceptions=True)
     await outcome.stream.aclose()
     await _wait_until(cancelled.is_set)
+
+
+@pytest.mark.asyncio
+async def test_aclose_before_first_poll_cancels_prep(
+    orchestrator: ChatOrchestrator,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Closing the never-polled body cancels selection instead of orphaning it."""
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def select(*args: object, **kwargs: object) -> SelectionDecision:
+        started.set()
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+        raise AssertionError("unreachable")
+
+    monkeypatch.setattr(orchestrator.selector, "select", select)
+
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.stream is not None
+    await started.wait()
+    # Never poll the stream — close it straight away (endpoint failure /
+    # vanished client between scaffold and body).
+    await outcome.stream.aclose()
+    assert cancelled.is_set()
+
+
+@pytest.mark.asyncio
+async def test_aclose_before_first_poll_discards_completed_speculation(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Prep finished (speculation committed) but nobody consumed the stream:
+    closing the body discards the speculative producer immediately."""
+    ids = sorted(orchestrator.catalog.known_ids)
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[ids[0]], ran=True, degraded=False),
+    )
+    fake_provider.stream_factory = lambda _request: FakeStream(
+        make_text_chunks("speculative")
+    )
+    outcome = await orchestrator.complete(
+        _stream_request_with_state(orchestrator, [ids[0]]),
+        upstream_model="deepseek-v4-flash",
+    )
+    assert outcome.stream is not None
+    await started.wait()
+    release.set()
+    # Let prep run to completion (speculation committed, unclaimed).
+    await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
+    await asyncio.sleep(0)
+    await outcome.stream.aclose()
+    await _wait_until(lambda: orchestrator._skill_speculations_in_flight == 0)
+    assert fake_provider.last_stream is not None
+    await _wait_until(lambda: fake_provider.last_stream.closed)
+
+
+@pytest.mark.asyncio
+async def test_provider_close_failure_after_done_emits_nothing_extra(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """A teardown failure after the terminal event must not become a second event."""
+
+    class ExplodingCloseStream(FakeStream):
+        async def aclose(self) -> None:
+            self.closed = True
+            raise RuntimeError("close failed")
+
+    fake_provider.stream_factory = lambda _request: ExplodingCloseStream(
+        make_text_chunks("fine")
+    )
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.stream is not None
+    events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
+    assert events[0].startswith("event: meta\n")
+    assert events[-1].startswith("event: done\n")
+    assert sum(1 for e in events if e.startswith("event: done\n")) == 1
+    assert not any(e.startswith("event: error\n") for e in events)

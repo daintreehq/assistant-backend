@@ -165,6 +165,52 @@ class _PreparedTurn:
     speculation: _SpeculativeStream | None
 
 
+class _PrepOwnedStream:
+    """The streaming body, with explicit ownership of the eager prep task.
+
+    The response body may be closed before it is ever polled (an endpoint
+    failure after ``complete()`` returned, or a client that vanished before the
+    body started). Closing an un-started async generator never enters its body,
+    which would leave selection running and a committed speculation idling
+    until its claim timeout. This wrapper cancels prep in exactly that window;
+    once iteration has started, closure is delegated to the generator, whose
+    finally-chain already cancels prep and closes the provider.
+    """
+
+    def __init__(
+        self,
+        gen: AsyncGenerator[str, None],
+        prep_task: asyncio.Task[_PreparedTurn],
+    ) -> None:
+        self._gen = gen
+        self._prep_task = prep_task
+        self._started = False
+
+    def __aiter__(self) -> _PrepOwnedStream:
+        return self
+
+    async def __anext__(self) -> str:
+        self._started = True
+        return await self._gen.__anext__()
+
+    async def aclose(self) -> None:
+        if not self._started:
+            self._prep_task.cancel()
+            await asyncio.gather(self._prep_task, return_exceptions=True)
+            if (
+                self._prep_task.done()
+                and not self._prep_task.cancelled()
+                and self._prep_task.exception() is None
+            ):
+                # Prep finished before the cancel landed: nobody will ever claim
+                # its speculation, so discard it now instead of letting the
+                # producer idle out its claim timeout.
+                prepared = self._prep_task.result()
+                if prepared.speculation is not None:
+                    await prepared.speculation.discard()
+        await self._gen.aclose()
+
+
 class _SpeculationBufferOverflow(Exception):
     """A pre-handoff provider event exceeded the private byte budget."""
 
@@ -638,11 +684,18 @@ class ChatOrchestrator:
             prep_task.add_done_callback(
                 lambda t: None if t.cancelled() else t.exception()
             )
+            # Shutdown backstop: drain_background_tasks waits for (then cancels)
+            # any prep still in flight before the provider it uses is closed.
+            self._background_tasks.add(prep_task)
+            prep_task.add_done_callback(self._background_tasks.discard)
             return RespondOutcome(
                 headers=headers,
                 streaming=True,
-                stream=self._stream_with_heartbeat(
-                    request, prep_task=prep_task, request_id=request_id
+                stream=_PrepOwnedStream(
+                    self._stream_with_heartbeat(
+                        request, prep_task=prep_task, request_id=request_id
+                    ),
+                    prep_task,
                 ),
             )
 
@@ -1253,7 +1306,7 @@ class ChatOrchestrator:
         *,
         prep_task: asyncio.Task[_PreparedTurn],
         request_id: str,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         """Wrap the event stream with SSE comment heartbeats.
 
         Whenever the inner stream is quiet for ``HEARTBEAT_INTERVAL_SECONDS`` —
@@ -1506,7 +1559,16 @@ class ChatOrchestrator:
             )
         finally:
             if stream is not None:
-                await stream.aclose()
+                try:
+                    await stream.aclose()
+                except Exception:
+                    # A terminal event (done/error) may already be on the wire;
+                    # a teardown failure must never surface as a second one.
+                    logger.warning(
+                        "provider_close_failed",
+                        request_id=meta.request_id,
+                        exc_info=True,
+                    )
 
         # Learn only from a stream that reached a clean ``done`` (not an error, and
         # not an aborted stream — a client disconnect raises GeneratorExit at a
