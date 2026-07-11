@@ -24,26 +24,28 @@ def test_nonstream_retries_before_success(client, auth, fake_provider) -> None:
 
     def complete(_req):
         calls[0] += 1
-        if calls[0] < 3:
+        if calls[0] < 2:
             raise upstream_rate_limited()
         return make_result(content="recovered")
 
     fake_provider.complete_result = complete
     r = client.post(URL, headers=auth, json=_body())
     assert r.status_code == 200
-    assert calls[0] == 3  # 1 try + 2 retries
+    assert calls[0] == 2  # 1 try + 1 retry (the full default budget)
     assert r.json()["message"]["content"] == "recovered"
 
 
 def test_nonstream_persistent_error_surfaces(client, auth, fake_provider) -> None:
     fake_provider.selection_result = selection_result([])
-    fake_provider.complete_error = upstream_rate_limited(retry_after="5")
+    # A tiny Retry-After keeps the test fast: the retry helper honors the header
+    # as a real wait (capped at 10s), so a large value here would sleep for real.
+    fake_provider.complete_error = upstream_rate_limited(retry_after="0.05")
     r = client.post(URL, headers=auth, json=_body())
     assert r.status_code == 429
     assert r.json()["error"]["code"] == "upstream_rate_limited"
-    assert r.headers.get("retry-after") == "5"
-    # Default budget: 1 try + 3 retries = 4 attempts, all exhausted before surfacing.
-    assert len(fake_provider.requests) == 4
+    assert r.headers.get("retry-after") == "0.05"
+    # Default budget: 1 try + 1 retry = 2 attempts, all exhausted before surfacing.
+    assert len(fake_provider.requests) == 2
 
 
 def test_nonstream_non_retryable_error(client, auth, fake_provider) -> None:
@@ -83,7 +85,8 @@ def test_stream_open_persistent_error_is_terminal_sse_after_meta(
     client, auth, fake_provider
 ) -> None:
     fake_provider.selection_result = selection_result([])
-    fake_provider.stream_error = upstream_rate_limited(retry_after="5")
+    # Tiny Retry-After: the retry helper honors the header as a real wait.
+    fake_provider.stream_error = upstream_rate_limited(retry_after="0.05")
     # Skill metadata commits the stream before provider connection begins. An
     # exhausted open retry therefore terminates honestly inside SSE.
     with client.stream("POST", URL, headers=auth, json=_stream_body()) as s:
@@ -92,9 +95,9 @@ def test_stream_open_persistent_error_is_terminal_sse_after_meta(
     events = parse_sse(text)
     assert [event for event, _ in events] == ["meta", "error"]
     assert events[-1][1]["error"]["code"] == "upstream_rate_limited"
-    assert events[-1][1]["retry_after"] == "5"
-    # Default budget: 1 try + 3 retries = 4 stream-open attempts before surfacing.
-    assert len(fake_provider.stream_requests) == 4
+    assert events[-1][1]["retry_after"] == "0.05"
+    # Default budget: 1 try + 1 retry = 2 stream-open attempts before surfacing.
+    assert len(fake_provider.stream_requests) == 2
 
 
 def test_stream_breaks_after_first_token_no_fabricated_finish(client, auth, fake_provider) -> None:

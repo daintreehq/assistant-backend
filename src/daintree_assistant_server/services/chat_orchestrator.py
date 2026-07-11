@@ -14,7 +14,7 @@ import asyncio
 import json
 import time
 from collections import deque
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -39,7 +39,7 @@ from ..contracts.extensions import (
     SkillRef,
 )
 from ..contracts.openai import ChatMessage
-from ..errors import DaintreeError
+from ..errors import DaintreeError, internal_error
 from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
@@ -145,6 +145,24 @@ class RespondOutcome:
     streaming: bool
     body: dict[str, Any] | None = None
     stream: AsyncIterator[str] | None = None
+
+
+# SSE comment-heartbeat cadence while the stream is otherwise quiet (selection,
+# provider open/retries, long thinking gaps). 5–10s keeps load balancers and the
+# CLI's idle watchdog fed without measurable overhead; hardcoded like the rest of
+# the latency posture (one shipped optimum, no env toggle). Read at call time so
+# tests can shrink it.
+HEARTBEAT_INTERVAL_SECONDS = 8.0
+
+
+@dataclass
+class _PreparedTurn:
+    """Everything selection/assembly produces before the provider is consumed."""
+
+    provider_request: ProviderChatRequest
+    meta: _RespondMeta
+    active_ids: list[str]
+    speculation: _SpeculativeStream | None
 
 
 class _SpeculationBufferOverflow(Exception):
@@ -598,6 +616,62 @@ class ChatOrchestrator:
         request_id: str | None = None,
     ) -> RespondOutcome:
         request_id = request_id or new_request_id()
+        headers = {
+            "X-Daintree-Protocol": str(PROTOCOL_VERSION),
+            "X-Request-Id": request_id,
+        }
+
+        if request.generation.stream:
+            # Return the response scaffold immediately: HTTP headers (and SSE
+            # comment heartbeats) reach the client while selection, assembly, and
+            # the provider open still run. Prep starts NOW as a concurrent task —
+            # not lazily on first poll — so selection/speculation overlap the
+            # response handshake. A prep failure becomes a terminal SSE ``error``
+            # event on the stream — never an HTTP error, never a silent hang.
+            prep_task = asyncio.create_task(
+                self._prepare(request, upstream_model=upstream_model, request_id=request_id)
+            )
+            # If the stream is never consumed (client vanished before the body was
+            # iterated), retrieve the exception so it can't surface as an orphaned
+            # "exception was never retrieved" warning. The generator still sees it
+            # via ``result()``.
+            prep_task.add_done_callback(
+                lambda t: None if t.cancelled() else t.exception()
+            )
+            return RespondOutcome(
+                headers=headers,
+                streaming=True,
+                stream=self._stream_with_heartbeat(
+                    request, prep_task=prep_task, request_id=request_id
+                ),
+            )
+
+        prepared = await self._prepare(
+            request, upstream_model=upstream_model, request_id=request_id
+        )
+        result = await self._complete_with_retry(prepared.provider_request)
+        # finish_reason is a second, independent signal: treat a continuation round as
+        # such even if a malformed upstream drops the tool_calls payload.
+        had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
+        self._lint_final_output(result, request_id=request_id, had_tool_calls=had_tool_calls)
+        body = self._build_nonstream_body(
+            result, prepared.meta, param_index=build_parameter_index(request.input.tools)
+        )
+        self._maybe_learn_after_turn(
+            request=request,
+            active_ids=prepared.active_ids,
+            assistant_text=result.text,
+            had_tool_calls=had_tool_calls,
+        )
+        return RespondOutcome(headers=headers, streaming=False, body=body)
+
+    async def _prepare(
+        self,
+        request: RespondRequest,
+        *,
+        upstream_model: str,
+        request_id: str,
+    ) -> _PreparedTurn:
         session_id = request.session.id
         t_start = time.perf_counter()
 
@@ -798,11 +872,6 @@ class ChatOrchestrator:
                 await speculation.discard()
             raise
 
-        headers = {
-            "X-Daintree-Protocol": str(PROTOCOL_VERSION),
-            "X-Request-Id": request_id,
-        }
-
         logger.info(
             "respond",
             request_id=request_id,
@@ -818,31 +887,12 @@ class ChatOrchestrator:
             pre_upstream_ms=round((time.perf_counter() - t_start) * 1000),
         )
 
-        if request.generation.stream:
-            body_iter = self._stream_body(
-                provider_request,
-                meta=meta,
-                request=request,
-                active_ids=active_ids,
-                speculative_stream=speculation,
-            )
-            return RespondOutcome(headers=headers, streaming=True, stream=body_iter)
-
-        result = await self._complete_with_retry(provider_request)
-        # finish_reason is a second, independent signal: treat a continuation round as
-        # such even if a malformed upstream drops the tool_calls payload.
-        had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
-        self._lint_final_output(result, request_id=request_id, had_tool_calls=had_tool_calls)
-        body = self._build_nonstream_body(
-            result, meta, param_index=build_parameter_index(request.input.tools)
-        )
-        self._maybe_learn_after_turn(
-            request=request,
+        return _PreparedTurn(
+            provider_request=provider_request,
+            meta=meta,
             active_ids=active_ids,
-            assistant_text=result.text,
-            had_tool_calls=had_tool_calls,
+            speculation=speculation,
         )
-        return RespondOutcome(headers=headers, streaming=False, body=body)
 
     # ---- output linting (non-stream backstop; observability) ------------
 
@@ -1197,6 +1247,111 @@ class ChatOrchestrator:
             cached_tokens=usage.cached_tokens or 0,
         )
 
+    async def _stream_with_heartbeat(
+        self,
+        request: RespondRequest,
+        *,
+        prep_task: asyncio.Task[_PreparedTurn],
+        request_id: str,
+    ) -> AsyncIterator[str]:
+        """Wrap the event stream with SSE comment heartbeats.
+
+        Whenever the inner stream is quiet for ``HEARTBEAT_INTERVAL_SECONDS`` —
+        during selection, provider open/retries, or long thinking gaps — a
+        ``: hb`` comment goes out so intermediaries and the CLI's idle watchdog
+        see a live stream. Comments are invisible to SSE event parsing.
+        """
+        inner = self._stream_events(request, prep_task=prep_task, request_id=request_id)
+        pending: asyncio.Task[str] | None = None
+        try:
+            while True:
+                if pending is None:
+                    pending = asyncio.ensure_future(anext(inner))
+                done, _ = await asyncio.wait(
+                    {pending}, timeout=HEARTBEAT_INTERVAL_SECONDS
+                )
+                if not done:
+                    yield ": hb\n\n"
+                    continue
+                task, pending = pending, None
+                try:
+                    item = task.result()
+                except StopAsyncIteration:
+                    return
+                yield item
+        finally:
+            # Consumer disconnect (GeneratorExit) or an inner failure lands here.
+            # Cancel a still-pending pull — the CancelledError unwinds the inner
+            # generator's own finally (closing the provider stream) — then close
+            # the inner generator for the non-pending suspension case.
+            if pending is not None:
+                pending.cancel()
+                await asyncio.gather(pending, return_exceptions=True)
+            await inner.aclose()
+
+    async def _stream_events(
+        self,
+        request: RespondRequest,
+        *,
+        prep_task: asyncio.Task[_PreparedTurn],
+        request_id: str,
+    ) -> AsyncGenerator[str, None]:
+        """Await prep inside the stream, then delegate to the provider event body.
+
+        Any failure after the HTTP response has started can only be reported
+        in-band: a prep failure or an unexpected mid-stream exception becomes one
+        terminal SSE ``error`` event — never an abrupt EOF, never a fabricated
+        ``done``. GeneratorExit/CancelledError (client disconnect, shutdown) pass
+        through untouched — except that a disconnect while prep is still running
+        also cancels the prep task, so selection/speculation stop promptly.
+        """
+        try:
+            prepared = await prep_task
+        except asyncio.CancelledError:
+            prep_task.cancel()
+            raise
+        except DaintreeError as exc:
+            logger.warning(
+                "respond_prepare_error",
+                request_id=request_id,
+                code=exc.code,
+                status=exc.status_code,
+            )
+            yield self._sse(
+                "error",
+                StreamError(
+                    error=exc.envelope().error,
+                    retry_after=exc.headers.get("Retry-After"),
+                ),
+            )
+            return
+        except Exception:
+            logger.exception("respond_prepare_unexpected", request_id=request_id)
+            yield self._sse("error", StreamError(error=internal_error().envelope().error))
+            return
+
+        body = self._stream_body(
+            prepared.provider_request,
+            meta=prepared.meta,
+            request=request,
+            active_ids=prepared.active_ids,
+            speculative_stream=prepared.speculation,
+        )
+        try:
+            async for event in body:
+                yield event
+        except Exception:
+            # _stream_body already maps DaintreeError to a terminal event; this
+            # catches what it could not anticipate (e.g. a malformed provider
+            # chunk crashing delta handling) so the client still gets a typed end.
+            logger.exception("respond_stream_unexpected", request_id=request_id)
+            yield self._sse("error", StreamError(error=internal_error().envelope().error))
+        finally:
+            # ``async for`` does not close a generator it abandoned mid-iteration
+            # (GeneratorExit lands HERE, not in the body's finally) — close it
+            # explicitly so the provider stream never outlives the response.
+            await body.aclose()
+
     async def _stream_body(
         self,
         provider_request: ProviderChatRequest,
@@ -1205,7 +1360,7 @@ class ChatOrchestrator:
         request: RespondRequest,
         active_ids: list[str],
         speculative_stream: _SpeculativeStream | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
         # Accumulate the reply so post-completion learning can see the workflow it

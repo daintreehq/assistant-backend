@@ -353,6 +353,141 @@ async def test_stream_eof_before_done_raises() -> None:
     await provider.aclose()
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "[1, 2, 3]",  # list root
+        '"just a string"',  # scalar root
+        '{"choices": {"0": {}}}',  # choices not a list
+        '{"choices": ["not an object"]}',  # choice entry not a dict
+        '{"choices": [{"index": 0, "delta": "text"}]}',  # delta not a dict
+        '{"choices": [{"delta": {"content": 5}}]}',  # content not a string
+        '{"choices": [{"delta": {"reasoning_content": {}}}]}',  # reasoning not a string
+        '{"choices": [{"delta": {"tool_calls": "x"}}]}',  # tool_calls not a list
+        '{"choices": [{"delta": {"tool_calls": ["x"]}}]}',  # tool call not a dict
+        '{"choices": [{"delta": {"tool_calls": [{"function": "f"}]}}]}',  # function not a dict
+        '{"error": "boom"}',  # error not an object
+        '{"usage": "lots"}',  # usage not an object
+    ],
+)
+@pytest.mark.asyncio
+async def test_stream_malformed_chunk_shape_raises_upstream_error(payload: str) -> None:
+    # Malformed-but-valid JSON must surface as a DaintreeError from the provider
+    # read path, never as an AttributeError in the orchestrator.
+    sse = f"data: {payload}\n\ndata: [DONE]\n\n"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=sse)
+
+    provider = _provider(handler)
+    stream = await provider.open_stream(_req(stream=True))
+    with pytest.raises(DaintreeError) as exc:
+        await stream.prefetch_first_event()
+    assert exc.value.code == "upstream_error"
+    assert exc.value.status_code == 502
+    await stream.aclose()
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_stream_usage_only_and_empty_choices_chunks_pass_validation() -> None:
+    # Shape validation must not reject legitimate degenerate chunks: an empty
+    # choices list and a usage-only chunk both occur on real streams.
+    sse = (
+        'data: {"id":"x","choices":[],"usage":{"total_tokens":7}}\n\n'
+        "data: [DONE]\n\n"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=sse)
+
+    provider = _provider(handler)
+    stream = await provider.open_stream(_req(stream=True))
+    first = await stream.prefetch_first_event()
+    assert first == {"id": "x", "choices": [], "usage": {"total_tokens": 7}}
+    assert await stream.prefetch_first_event() is None
+    assert stream.usage is not None and stream.usage.total_tokens == 7
+    await stream.aclose()
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_complete_non_object_response_raises_upstream_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[1, 2, 3])
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert exc.value.code == "upstream_error"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_complete_malformed_choices_raises_upstream_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"id": "x", "created": 0, "model": "m", "choices": ["bad"]})
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert exc.value.code == "upstream_error"
+    await provider.aclose()
+
+
+# ---- request-body dumping (dev-only diagnostic) ---------------------------
+
+
+@pytest.mark.asyncio
+async def test_dump_dir_writes_request_bodies(tmp_path) -> None:
+    import json as _json
+
+    dump_dir = tmp_path / "dumps"
+    provider = _provider(_capture({}), dump_dir=str(dump_dir))
+    await provider.complete(_req())
+    files = list(dump_dir.glob("*.json"))
+    assert len(files) == 1
+    body = _json.loads(files[0].read_text(encoding="utf-8"))
+    assert body["model"] == _MODEL
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_no_dump_without_dump_dir(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The provider must not read the environment: even with the legacy env var
+    # set, nothing is dumped unless dump_dir is wired in explicitly (Settings).
+    monkeypatch.setenv("DAINTREE_DUMP_UPSTREAM_DIR", str(tmp_path / "env-dumps"))
+    provider = _provider(_capture({}))
+    await provider.complete(_req())
+    assert not (tmp_path / "env-dumps").exists()
+    await provider.aclose()
+
+
+# ---- structured timeouts ---------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_per_request_timeout_overrides_read_only() -> None:
+    # The per-call budget must land on READ alone; connect/write/pool keep the
+    # client's structured components instead of being collapsed to the big value.
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["timeout"] = request.extensions.get("timeout")
+        return httpx.Response(
+            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
+        )
+
+    client = httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        timeout=httpx.Timeout(connect=10.0, read=840.0, write=30.0, pool=10.0),
+    )
+    provider = DeepSeekProvider(client, api_key="key", base_url=_BASE, default_timeout=840.0)
+    await provider.complete(_req(timeout=25.0))
+    assert captured["timeout"] == {"connect": 10.0, "read": 25.0, "write": 30.0, "pool": 10.0}
+    await provider.aclose()
+
+
 @pytest.mark.asyncio
 async def test_stream_transport_interruption_is_retryable() -> None:
     from daintree_assistant_server.providers.deepseek import DeepSeekStream

@@ -329,14 +329,15 @@ class PromptAssembler:
             open_terminals=open_terminals,
         )
 
-    def render_integrations(
-        self, runtime: RuntimeContext | None, tools: list[ToolDef] | None
-    ) -> str:
-        """Render the client-reported MCP servers + tool index as inert data.
+    def render_integrations(self, runtime: RuntimeContext | None) -> str:
+        """Render the client-reported MCP servers as inert data.
 
-        Returns ``""`` when the client supplies neither, so a generic OpenAI
-        client (or a CLI that has not yet started sending its integration
-        surface) produces no integrations system message at all.
+        The client's tools are NOT listed here — their schemas are already sent
+        through the function-calling interface, so a name+description index would
+        only duplicate them. Returns ``""`` when the client reports no MCP
+        servers, so a generic OpenAI client (or a CLI that has not yet started
+        sending its integration surface) produces no integrations system message
+        at all.
         """
         servers: list[dict[str, Any]] = []
         if runtime:
@@ -357,25 +358,10 @@ class PromptAssembler:
                     }
                 )
 
-        tool_index: list[dict[str, str]] = []
-        for tool in tools or []:
-            fn = tool.function
-            name = sanitize_line(fn.name, 64)
-            if not name:
-                continue
-            tool_index.append(
-                {
-                    "name": name,
-                    "description": sanitize_line(fn.description, self.settings.cap_tool_index_desc),
-                }
-            )
-
-        if not servers and not tool_index:
+        if not servers:
             return ""
 
-        rendered = self.prompts.render(
-            TEMPLATE_INTEGRATIONS, mcp_servers=servers, tools=tool_index
-        )
+        rendered = self.prompts.render(TEMPLATE_INTEGRATIONS, mcp_servers=servers)
         capped, _ = cap_bytes(rendered, self.settings.cap_mcp_block_bytes)
         return capped
 
@@ -516,10 +502,12 @@ class PromptAssembler:
             wire["name"] = msg.name
         if msg.tool_calls:
             wire["tool_calls"] = [self._tool_call_to_wire(tc) for tc in msg.tool_calls]
-        # Replay the model's prior chain-of-thought verbatim. DeepSeek REQUIRES it
-        # on assistant turns that performed tool calls (else a 400) and ignores it
-        # otherwise; either way it is the model's own output, never transformed.
-        if msg.role == "assistant" and msg.reasoning_content is not None:
+        # Replay the model's prior chain-of-thought verbatim, but ONLY on assistant
+        # turns that performed tool calls — DeepSeek REQUIRES it there (else a 400)
+        # and ignores it everywhere else. On a completed final-answer turn (no
+        # tool_calls) replaying it is pure prompt cost, so it is dropped. When
+        # forwarded it is the model's own output, never transformed.
+        if msg.role == "assistant" and msg.tool_calls and msg.reasoning_content is not None:
             wire["reasoning_content"] = msg.reasoning_content
         return wire
 
@@ -655,8 +643,8 @@ class PromptAssembler:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self.prompts.base_prompt()},
         ]
-        # 2. integration surface (MCP + tools): session-stable → cacheable.
-        integrations = self.render_integrations(runtime, request.input.tools)
+        # 2. integration surface (MCP servers): session-stable → cacheable.
+        integrations = self.render_integrations(runtime)
         if integrations.strip():
             messages.append({"role": "system", "content": integrations})
         # 3. active skill bodies: semi-stable (changes only on a selector topic

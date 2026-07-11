@@ -37,32 +37,12 @@ from .base import (
     ProviderToolCallResult,
     ProviderUsage,
 )
-from .sse import iter_sse_data, parse_chunk
+from .sse import ChunkShapeError, iter_sse_data, parse_chunk
 
 logger = get_logger("daintree.deepseek")
 
 _CHAT_PATH = "/chat/completions"
 
-# Dev-only diagnostic: when DAINTREE_DUMP_UPSTREAM_DIR is set, every upstream
-# request body is written there as numbered pretty-printed JSON. This is THE
-# tool for prompt-cache forensics — diff two dumps to find the exact byte where
-# two "identical" requests diverge (a cache miss is always a prefix divergence).
-# Never set in production; the dump contains full prompts.
-_DUMP_DIR = os.environ.get("DAINTREE_DUMP_UPSTREAM_DIR") or None
-_dump_seq = itertools.count(1)
-
-
-def _maybe_dump_body(body: dict[str, Any]) -> None:
-    if not _DUMP_DIR:
-        return
-    try:
-        os.makedirs(_DUMP_DIR, exist_ok=True)
-        n = next(_dump_seq)
-        path = os.path.join(_DUMP_DIR, f"{time.strftime('%H%M%S')}-{n:04d}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(body, f, indent=1, ensure_ascii=False, sort_keys=False)
-    except OSError:  # pragma: no cover - diagnostic only, never break a request
-        pass
 # Cap on how much of an upstream error body we log / surface — enough to carry the
 # provider's reason ("temperature must be between 0.0 and 2.0", a schema complaint)
 # without dumping an unbounded payload into logs or the client error message.
@@ -152,15 +132,23 @@ class DeepSeekStream(ProviderStream):
         except json.JSONDecodeError as exc:
             self._done = True
             raise upstream_error("Malformed SSE payload from upstream.") from exc
+        except ChunkShapeError as exc:
+            # Valid JSON, unusable structure (list root, non-dict choice/delta, …):
+            # an upstream protocol violation, surfaced here as a DaintreeError so
+            # the consumer never crashes indexing into the chunk.
+            self._done = True
+            raise upstream_error(f"Malformed stream chunk from upstream ({exc}).") from exc
 
         if chunk is None:  # [DONE]
             self._saw_done = True
             self._done = True
             return None
-        if isinstance(chunk, dict) and chunk.get("error"):
+        # parse_chunk guarantees the shape: chunk is a dict, and error/usage, when
+        # present, are dicts.
+        if chunk.get("error"):
             self._done = True
             raise map_stream_error(chunk["error"])
-        if isinstance(chunk, dict) and chunk.get("usage"):
+        if chunk.get("usage"):
             self.usage = ProviderUsage.from_wire(chunk["usage"])
         return chunk
 
@@ -196,6 +184,7 @@ class DeepSeekProvider:
         default_timeout: float = 60.0,
         send_prompt_cache_key: bool = True,
         send_thinking: bool = True,
+        dump_dir: str | None = None,
     ) -> None:
         self._client = client
         self._api_key = api_key
@@ -203,6 +192,26 @@ class DeepSeekProvider:
         self._default_timeout = default_timeout
         self._send_prompt_cache_key = send_prompt_cache_key
         self._send_thinking = send_thinking
+        # Dev-only diagnostic (Settings.dump_upstream_dir, gated out of production
+        # by readiness): when set, every upstream request body is written there as
+        # numbered pretty-printed JSON. This is THE tool for prompt-cache forensics
+        # — diff two dumps to find the exact byte where two "identical" requests
+        # diverge (a cache miss is always a prefix divergence). The dump contains
+        # full prompts.
+        self._dump_dir = dump_dir or None
+        self._dump_seq = itertools.count(1)
+
+    def _maybe_dump_body(self, body: dict[str, Any]) -> None:
+        if not self._dump_dir:
+            return
+        try:
+            os.makedirs(self._dump_dir, exist_ok=True)
+            n = next(self._dump_seq)
+            path = os.path.join(self._dump_dir, f"{time.strftime('%H%M%S')}-{n:04d}.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(body, f, indent=1, ensure_ascii=False, sort_keys=False)
+        except OSError:  # pragma: no cover - diagnostic only, never break a request
+            pass
 
     # ---- helpers --------------------------------------------------------
 
@@ -258,11 +267,22 @@ class DeepSeekProvider:
             body["stream"] = True
             if request.include_usage:
                 body["stream_options"] = {"include_usage": True}
-        _maybe_dump_body(body)
+        self._maybe_dump_body(body)
         return body
 
-    def _timeout(self, request: ProviderChatRequest) -> float:
-        return request.timeout if request.timeout is not None else self._default_timeout
+    def _timeout(self, request: ProviderChatRequest) -> httpx.Timeout:
+        """Per-request timeout preserving the client's structured components.
+
+        The per-call budget applies to READ only (for a streaming response httpx
+        applies it per chunk gap, and a thinking model can legitimately sit far
+        longer between chunks than any sane connect/write/pool bound). A bare
+        float here would override ALL components, collapsing connect/write/pool
+        to the huge main budget — exactly what the structured client timeout in
+        ``main._build_provider`` exists to prevent.
+        """
+        seconds = request.timeout if request.timeout is not None else self._default_timeout
+        base = self._client.timeout
+        return httpx.Timeout(connect=base.connect, read=seconds, write=base.write, pool=base.pool)
 
     def _map_http_error(
         self, status: int, headers: httpx.Headers, detail: str | None = None
@@ -283,6 +303,11 @@ class DeepSeekProvider:
 
     def _build_result(self, data: dict[str, Any]) -> ProviderChatResult:
         choices = data.get("choices") or []
+        # Structural guard mirroring the stream path: consumers index straight
+        # into choices[0]["message"], so a non-list / non-dict shape must fail as
+        # an upstream error here, not as an AttributeError later.
+        if not isinstance(choices, list) or not all(isinstance(c, dict) for c in choices):
+            raise upstream_error("Upstream returned a malformed completion response.")
         finish = choices[0].get("finish_reason") if choices else None
         return ProviderChatResult(
             id=data.get("id", ""),
@@ -323,6 +348,8 @@ class DeepSeekProvider:
             data = resp.json()
         except json.JSONDecodeError as exc:
             raise upstream_error("Upstream returned a non-JSON response.") from exc
+        if not isinstance(data, dict):
+            raise upstream_error("Upstream returned a malformed completion response.")
         return self._build_result(data)
 
     async def structured_tool_call(

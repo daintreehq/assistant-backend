@@ -100,5 +100,6 @@ class ChatMessage(BaseModel):
     # DeepSeek thinking-mode chain-of-thought. The model returns it alongside
     # content; on an assistant turn that performed tool calls it MUST be replayed
     # verbatim in later requests or DeepSeek returns 400 (it is ignored on turns
-    # without tool calls). Carried through prompt assembly untouched.
+    # without tool calls). Prompt assembly forwards it verbatim on tool-call turns
+    # only and drops it on final-answer turns, where it would be pure prompt cost.
     reasoning_content: str | None = Field(default=None, max_length=1_048_576)

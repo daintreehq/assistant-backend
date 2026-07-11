@@ -157,3 +157,29 @@ def test_skill_learning_off_ok_in_production() -> None:
     s = _settings(ENVIRONMENT="production")
     assert s.skill_learning_enabled is False
     assert s.local_only_problems() == []
+
+
+# ---- upstream request dumping (local-development-only guard) --------------
+
+
+def test_dump_dir_unset_by_default() -> None:
+    s = _settings()
+    assert s.dump_upstream_dir is None
+    assert s.local_only_problems() == []
+
+
+def test_dump_dir_allowed_in_development() -> None:
+    s = _settings(DAINTREE_DUMP_UPSTREAM_DIR="/tmp/dumps")
+    assert s.dump_upstream_dir == "/tmp/dumps"
+    assert s.local_only_problems() == []
+
+
+def test_dump_dir_fails_readiness_in_production() -> None:
+    s = _settings(ENVIRONMENT="production", DAINTREE_DUMP_UPSTREAM_DIR="/tmp/dumps")
+    assert any("DAINTREE_DUMP_UPSTREAM_DIR" in p for p in s.local_only_problems())
+
+
+def test_dump_dir_empty_string_is_not_a_problem_in_production() -> None:
+    # An empty value means "unset" — it must not trip the production gate.
+    s = _settings(ENVIRONMENT="production", DAINTREE_DUMP_UPSTREAM_DIR="")
+    assert s.local_only_problems() == []

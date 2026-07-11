@@ -213,25 +213,11 @@ def test_integrations(assembler: PromptAssembler) -> None:
             McpServer(name="filesystem", status="connected", tool_count=5),
         ],
     )
-    tools = RespondRequest.model_validate(
-        {
-            "protocol_version": 2,
-            "session": {"id": "s", "turn_id": "t"},
-            "startup": {},
-            "input": {
-                "messages": [{"role": "user", "content": "hi"}],
-                "tools": [
-                    {"type": "function", "function": {"name": "git__status", "description": "Show git status."}},
-                    {"type": "function", "function": {"name": "fs__read", "description": "Read a file."}},
-                ],
-            },
-        }
-    ).input.tools
-    assert_golden("integrations.md", assembler.render_integrations(rc, tools))
+    assert_golden("integrations.md", assembler.render_integrations(rc))
 
 
 def test_integrations_empty_when_nothing_supplied(assembler: PromptAssembler) -> None:
-    assert assembler.render_integrations(RuntimeContext(), None) == ""
+    assert assembler.render_integrations(RuntimeContext()) == ""
 
 
 def test_loaded_skills_empty(assembler: PromptAssembler) -> None:

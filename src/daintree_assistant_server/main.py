@@ -160,11 +160,24 @@ class Container:
             await self.provider.aclose()
 
 
+# Structured upstream-timeout components, hardcoded (no env toggles — one
+# optimum, like the model ids). READ deliberately stays at the big
+# main_timeout_seconds: on a streaming response httpx applies it to the gap
+# between chunks, and a thinking model can legitimately sit minutes inside a
+# reasoning block before its next delta — a tight read bound would kill healthy
+# turns. Sending our request (write) and waiting for a pooled connection never
+# legitimately take that long, so they get tight bounds of their own.
+_UPSTREAM_WRITE_TIMEOUT_SECONDS = 30.0
+_UPSTREAM_POOL_TIMEOUT_SECONDS = 10.0
+
+
 def _build_provider(settings: Settings) -> ChatProvider:
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(
-            settings.main_timeout_seconds,
             connect=settings.upstream_connect_timeout_seconds,
+            read=settings.main_timeout_seconds,
+            write=_UPSTREAM_WRITE_TIMEOUT_SECONDS,
+            pool=_UPSTREAM_POOL_TIMEOUT_SECONDS,
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
@@ -177,6 +190,7 @@ def _build_provider(settings: Settings) -> ChatProvider:
         # send_thinking stays at its True default: DeepSeek turns reasoning ON
         # when the field is absent, and the explicit per-call directive is what
         # keeps the non-thinking selector actually non-thinking.
+        dump_dir=settings.dump_upstream_dir,
     )
 
 
@@ -346,6 +360,9 @@ def create_app(
     @app.middleware("http")
     async def request_context(request: Request, call_next):  # type: ignore[no-untyped-def]
         request_id = request.headers.get("x-request-id") or new_request_id()
+        # One request identity for the whole turn: handlers read it from
+        # request.state so logs, response headers, and SSE meta never diverge.
+        request.state.request_id = request_id
         bind_request_context(request_id=request_id, path=request.url.path, method=request.method)
         try:
             response = await call_next(request)

@@ -9,7 +9,17 @@ from fakes import FakeProvider, make_result
 
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError, upstream_error, upstream_timeout
-from daintree_assistant_server.services.task_runner import TaskRunner
+from daintree_assistant_server.services.task_runner import TaskRunner, build_profiles
+
+# The heavyweight transcript/graph tasks carry their own 60s budget; every other
+# profile runs inside the tight default (settings.utility_timeout_seconds).
+HEAVY_TASKS = {
+    "checkpoint",
+    "memory_distill",
+    "workflow_plan",
+    "workflow_reconcile",
+    "workflow_resume_digest",
+}
 
 
 async def _run(runner: TaskRunner, task: str, inp: dict, **extra: object) -> dict:
@@ -153,14 +163,32 @@ async def test_task_retries_transient_error(task_runner: TaskRunner, fake_provid
 
     def complete(_req):
         calls[0] += 1
-        if calls[0] < 3:
+        if calls[0] < 2:
             raise upstream_timeout()
         return make_result(content="Tests are green.")
 
     fake_provider.complete_result = complete
     out = await _run(task_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
     assert out == {"text": "Tests are green."}
-    assert calls[0] == 3  # 2 failures + success
+    assert calls[0] == 2  # 1 failure + success (default budget is ONE retry)
+
+
+@pytest.mark.asyncio
+async def test_task_retry_budget_is_two_attempts_by_default(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    # The backend owns retries: the default budget is 1 retry = 2 attempts total.
+    calls = [0]
+
+    def complete(_req):
+        calls[0] += 1
+        raise upstream_timeout()
+
+    fake_provider.complete_result = complete
+    with pytest.raises(DaintreeError) as exc:
+        await _run(task_runner, "terminal_summarize", {"tail": "x"})
+    assert exc.value.code == "upstream_timeout"
+    assert calls[0] == 2
 
 
 @pytest.mark.asyncio
@@ -204,6 +232,42 @@ async def test_task_non_retryable_error_not_retried(task_runner: TaskRunner, fak
         await _run(task_runner, "terminal_summarize", {"tail": "x"})
     assert exc.value.code == "upstream_error"
     assert calls[0] == 1  # surfaced on the first attempt, no retry
+
+
+# ---- per-task timeout budgets ---------------------------------------------
+
+
+def test_heavy_profiles_carry_explicit_60s_timeout() -> None:
+    profiles = build_profiles()
+    assert set(profiles) >= HEAVY_TASKS
+    for profile in profiles.values():
+        if profile.id in HEAVY_TASKS:
+            assert profile.timeout_seconds == 60.0, profile.id
+        else:
+            assert profile.timeout_seconds is None, profile.id  # falls to the default
+
+
+@pytest.mark.asyncio
+async def test_light_task_uses_default_utility_timeout(
+    task_runner: TaskRunner, fake_provider: FakeProvider, settings
+) -> None:
+    fake_provider.complete_result = make_result(
+        content=json.dumps({"reason": "r", "confidence": 0.9, "matched": True})
+    )
+    await _run(task_runner, "terminal_judge", {"question": "q", "tail": "t"})
+    assert fake_provider.requests[-1].timeout == settings.utility_timeout_seconds
+    assert settings.utility_timeout_seconds == 25.0  # the tightened default
+
+
+@pytest.mark.asyncio
+async def test_heavy_task_uses_profile_timeout(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    fake_provider.complete_result = make_result(
+        content=json.dumps({"goal": "ship", "next_actions": []})
+    )
+    await _run(task_runner, "checkpoint", {"transcript": "..."})
+    assert fake_provider.requests[-1].timeout == 60.0
 
 
 @pytest.mark.asyncio

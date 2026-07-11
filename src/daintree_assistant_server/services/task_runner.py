@@ -532,18 +532,25 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
     def _u_plan(inp: WorkflowPlanInput, req: TaskRequest) -> str:
         return _u_workflow_plan(inp, req, catalog_manager)
 
+    # Most tasks are small classify/judge/extract calls and run inside the tight
+    # default budget (settings.utility_timeout_seconds). The heavyweight tasks —
+    # whole-transcript digestion (checkpoint, memory_distill) and the workflow
+    # graph tasks (plan/reconcile/resume digest) — think long and emit large JSON,
+    # so they carry an explicit, larger budget of their own.
+    heavy_timeout = 60.0
     return {
         p.id: p
         for p in [
             TaskProfile(
                 "checkpoint", CheckpointInput, "json", _u_checkpoint, _p_checkpoint,
-                max_output_tokens=1200, sensitive_fields=frozenset({"transcript"}),
+                max_output_tokens=1200, timeout_seconds=heavy_timeout,
+                sensitive_fields=frozenset({"transcript"}),
                 repair_hint="Return a single JSON object with the checkpoint fields described "
                 "above (goal, decisions, next_actions, open_questions, preserved_ids, …).",
             ),
             TaskProfile(
                 "memory_distill", MemoryDistillInput, "json", _u_memory_distill,
-                _p_memory_distill, max_output_tokens=1200,
+                _p_memory_distill, max_output_tokens=1200, timeout_seconds=heavy_timeout,
                 sensitive_fields=frozenset({"transcript"}),
                 repair_hint="Return a JSON array of fact objects, each with a \"fact\" string "
                 "and a \"kind\" of \"semantic\" or \"episodic\".",
@@ -588,7 +595,7 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
             ),
             TaskProfile(
                 "workflow_plan", WorkflowPlanInput, "json", _u_plan, _p_workflow_plan,
-                max_output_tokens=2200,
+                max_output_tokens=2200, timeout_seconds=heavy_timeout,
                 sensitive_fields=frozenset({
                     "runtime_summary", "existing_workflow", "relevant_memories",
                     "open_resources",
@@ -603,6 +610,7 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
             TaskProfile(
                 "workflow_reconcile", WorkflowReconcileInput, "json",
                 _u_workflow_reconcile, _p_workflow_reconcile, max_output_tokens=1600,
+                timeout_seconds=heavy_timeout,
                 sensitive_fields=frozenset({
                     "workflow", "recent_events", "runtime_summary", "queue_events",
                     "latest_user_message",
@@ -616,6 +624,7 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
             TaskProfile(
                 "workflow_resume_digest", WorkflowResumeDigestInput, "json",
                 _u_workflow_resume, _p_workflow_resume, max_output_tokens=1000,
+                timeout_seconds=heavy_timeout,
                 sensitive_fields=frozenset({
                     "workflows", "runtime_summary", "queue_digest", "user_message",
                 }),

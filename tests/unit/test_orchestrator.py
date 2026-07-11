@@ -288,7 +288,9 @@ async def test_speculation_starts_during_selector_and_exact_match_reuses_once(
     )
     await started.wait()
     await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
-    assert pending.done() is False  # no public outcome/bytes before authoritative selection
+    # The response scaffold may already be public (stream-first): the guarantee
+    # that matters is byte-level — no meta/delta can precede authoritative
+    # selection, asserted on the drained stream below.
 
     release.set()
     outcome = await pending
@@ -384,9 +386,11 @@ async def test_changed_selection_discards_private_stream_and_opens_canonical(
     outcome = await pending
     assert outcome.stream is not None
 
+    # Prep (and the losing stream's discard) settles concurrently with the
+    # stream-first scaffold; wait for it rather than assuming it beat ``pending``.
+    await _wait_until(lambda: orchestrator._skill_speculations_in_flight == 0)
     assert streams[0].closed is True
     assert len(fake_provider.stream_requests) == 1
-    assert orchestrator._skill_speculations_in_flight == 0
     first = await anext(outcome.stream)
     assert first.startswith("event: meta\n")
     assert len(fake_provider.stream_requests) == 1  # canonical still starts after meta
@@ -686,8 +690,8 @@ async def test_mismatch_cancels_producer_blocked_on_chunk_backpressure(
     release.set()
     outcome = await pending
     assert outcome.stream is not None
+    await _wait_until(lambda: orchestrator._skill_speculations_in_flight == 0)
     assert stream.closed is True
-    assert orchestrator._skill_speculations_in_flight == 0
     await outcome.stream.aclose()
 
 
@@ -890,3 +894,173 @@ def test_selector_turn_context_workflow_digest_is_sanitized() -> None:
 def test_selector_turn_context_empty_digest_adds_nothing() -> None:
     req = _turn_request({"workflow_state": [{"id": "wf-1", "goal": "", "status": ""}]})
     assert ChatOrchestrator._selector_turn_context(req) is None
+
+
+# ---- stream-first prep, heartbeats, terminal error honesty -------------------
+
+
+def _basic_stream_request(session_id: str = "hb-session") -> RespondRequest:
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": session_id, "turn_id": "turn-1"},
+            "input": {"messages": [{"role": "user", "content": "hello"}]},
+            "startup": {},
+            "generation": {"stream": True},
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_streaming_complete_returns_before_selection_finishes(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The response scaffold (headers) is available while the selector still runs."""
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch, orchestrator, SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False)
+    )
+
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.streaming and outcome.stream is not None
+    assert outcome.headers["X-Request-Id"]
+    # Prep starts eagerly (not lazily on first poll): the selector is already in.
+    await _wait_until(started.is_set)
+    release.set()
+
+    events = await _drain(outcome.stream)
+    named = [e for e in events if not e.startswith(":")]
+    assert named[0].startswith("event: meta\n")
+    assert named[-1].startswith("event: done\n")
+
+
+@pytest.mark.asyncio
+async def test_heartbeat_comments_flow_while_selection_is_quiet(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(orchestrator_module, "HEARTBEAT_INTERVAL_SECONDS", 0.02)
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch, orchestrator, SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False)
+    )
+
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.stream is not None
+    # With the selector gated, the first thing on the wire is a comment heartbeat,
+    # not dead air.
+    first = await anext(outcome.stream)
+    assert first == ": hb\n\n"
+    release.set()
+    events = await _drain(outcome.stream)
+    named = [e for e in events if not e.startswith(":")]
+    assert named[0].startswith("event: meta\n")
+    assert named[-1].startswith("event: done\n")
+
+
+@pytest.mark.asyncio
+async def test_prep_failure_streams_terminal_error_event(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A DaintreeError during prep (post-headers) is reported in-band, once."""
+
+    def boom(**kwargs: object) -> object:
+        raise upstream_error("assembly failed")
+
+    monkeypatch.setattr(orchestrator.assembler, "build_main_request", boom)
+
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.stream is not None
+    events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
+    assert len(events) == 1
+    assert events[0].startswith("event: error\n")
+    payload = json.loads(events[0].split("data: ", 1)[1])
+    assert payload["error"]["code"] == "upstream_error"
+    # The provider was never opened and no done was fabricated.
+    assert fake_provider.stream_requests == []
+
+
+@pytest.mark.asyncio
+async def test_unexpected_prep_exception_streams_internal_error(
+    orchestrator: ChatOrchestrator,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(**kwargs: object) -> object:
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(orchestrator.assembler, "build_main_request", boom)
+
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.stream is not None
+    events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
+    assert len(events) == 1
+    payload = json.loads(events[0].split("data: ", 1)[1])
+    assert payload["error"]["code"] == "internal_error"
+
+
+@pytest.mark.asyncio
+async def test_unexpected_midstream_exception_emits_terminal_error(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """A non-DaintreeError escaping mid-stream ends with an error event, not EOF."""
+    fake_provider.stream_factory = lambda _request: FakeStream(
+        make_text_chunks("partial"), error_at=1, error=ValueError("malformed chunk")
+    )
+
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.stream is not None
+    events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
+    assert events[0].startswith("event: meta\n")
+    assert events[-1].startswith("event: error\n")
+    payload = json.loads(events[-1].split("data: ", 1)[1])
+    assert payload["error"]["code"] == "internal_error"
+    assert not any(e.startswith("event: done\n") for e in events)
+    assert fake_provider.last_stream is not None
+    assert fake_provider.last_stream.closed is True
+
+
+@pytest.mark.asyncio
+async def test_disconnect_during_prep_cancels_selection(
+    orchestrator: ChatOrchestrator,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def select(*args: object, **kwargs: object) -> SelectionDecision:
+        started.set()
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+        raise AssertionError("unreachable")
+
+    monkeypatch.setattr(orchestrator.selector, "select", select)
+
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.stream is not None
+    pull = asyncio.create_task(anext(outcome.stream))
+    await started.wait()
+    pull.cancel()
+    await asyncio.gather(pull, return_exceptions=True)
+    await outcome.stream.aclose()
+    await _wait_until(cancelled.is_set)

@@ -36,7 +36,8 @@ async def respond(
     outcome = await container.orchestrator.complete(
         body,
         upstream_model=upstream_model,
-        request_id=request.headers.get("x-request-id"),
+        # The middleware-resolved id, so logs, X-Request-Id, and SSE meta all agree.
+        request_id=getattr(request.state, "request_id", None),
     )
 
     if outcome.streaming:

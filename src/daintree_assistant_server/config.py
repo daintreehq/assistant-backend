@@ -194,7 +194,11 @@ class Settings(BaseSettings):
     # enough for a budget.)
     selector_timeout_seconds: float = Field(default=8.0, alias="SELECTOR_TIMEOUT_SECONDS")
     main_timeout_seconds: float = Field(default=840.0, alias="MAIN_TIMEOUT_SECONDS")
-    utility_timeout_seconds: float = Field(default=60.0, alias="UTILITY_TIMEOUT_SECONDS")
+    # Default budget for the small utility tasks (classify, judge, summarize,
+    # extract): thinking-high but small-output, so 25s is generous. The heavyweight
+    # transcript/graph tasks (checkpoint, memory_distill, workflow_*) carry an
+    # explicit 60s ``timeout_seconds`` on their TaskProfile instead.
+    utility_timeout_seconds: float = Field(default=25.0, alias="UTILITY_TIMEOUT_SECONDS")
     upstream_connect_timeout_seconds: float = Field(
         default=10.0, alias="UPSTREAM_CONNECT_TIMEOUT_SECONDS"
     )
@@ -221,8 +225,10 @@ class Settings(BaseSettings):
     # Applies to every upstream call (main completion, stream open,
     # selector, utility tasks): retries transient failures only while no model
     # output or replay-unsafe side effect has been exposed. Streaming metadata may
-    # already be public during an open/prefetch retry. 3 retries = up to 4 attempts.
-    max_upstream_retries: int = Field(default=3, ge=0, alias="MAX_UPSTREAM_RETRIES")
+    # already be public during an open/prefetch retry. The backend owns retries;
+    # one retry (= up to 2 attempts) is the normal posture — the CLI must never
+    # stack its own retries on top.
+    max_upstream_retries: int = Field(default=1, ge=0, alias="MAX_UPSTREAM_RETRIES")
     retry_backoff_base_seconds: float = Field(
         default=0.25, ge=0.0, alias="RETRY_BACKOFF_BASE_SECONDS"
     )
@@ -255,6 +261,14 @@ class Settings(BaseSettings):
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")
+
+    # ---- Upstream request dumping (LOCAL DEVELOPMENT ONLY) ---------------
+    # When set, every upstream request body is written to this directory as
+    # numbered pretty-printed JSON — the prompt-cache forensics tool (diff two
+    # dumps to find the byte where two "identical" requests diverge). The dump
+    # contains FULL prompts, so a set value in production fails readiness (see
+    # local_only_problems).
+    dump_upstream_dir: str | None = Field(default=None, alias="DAINTREE_DUMP_UPSTREAM_DIR")
 
     # ---- Context field caps (bytes, unless noted) -----------------------
     # Session-stable agent registry rendered before the visible conversation.
@@ -398,6 +412,11 @@ class Settings(BaseSettings):
             problems.append("SKILL_LEARNING_MODE must be 'off' in production")
         if self.skill_learning_enabled and not self.openai_api_key.get_secret_value():
             problems.append("OPENAI_API_KEY is required when skill learning is enabled")
+        if self.environment == "production" and self.dump_upstream_dir:
+            problems.append(
+                "DAINTREE_DUMP_UPSTREAM_DIR must be unset in production "
+                "(prompt dumping is development-only)"
+            )
         return problems
 
     def weak_secrets(self) -> list[str]:

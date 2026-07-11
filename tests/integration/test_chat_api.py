@@ -487,3 +487,28 @@ def test_stream_tool_calls_passthrough_without_tools(client, auth, fake_provider
     fragments = [c for e, d in events if e == "delta" for c in d.get("tool_calls", [])]
     assert len(fragments) == 1
     assert fragments[0]["function"]["arguments"] == '{"terminalId": "terminal-1"}'
+
+
+def test_request_id_is_unified_across_header_and_meta(client, auth, fake_provider) -> None:
+    """One request identity: middleware, response header, and SSE meta agree."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_chunks = make_text_chunks("hi")
+    body = respond_body(
+        [{"role": "user", "content": "hi"}], session_id="rid1", turn_id="t1",
+        generation={"stream": True},
+    )
+    # No client-supplied id: the middleware mints one and everything uses it.
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        header_id = s.headers["X-Request-Id"]
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    assert events[0][0] == "meta"
+    assert events[0][1]["request_id"] == header_id
+
+    # Client-supplied id: echoed everywhere.
+    with client.stream(
+        "POST", URL, headers={**auth, "x-request-id": "req-supplied-1"}, json=body
+    ) as s:
+        assert s.headers["X-Request-Id"] == "req-supplied-1"
+        text = "".join(s.iter_text())
+    assert parse_sse(text)[0][1]["request_id"] == "req-supplied-1"
