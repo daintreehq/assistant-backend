@@ -194,11 +194,14 @@ class Settings(BaseSettings):
     # enough for a budget.)
     selector_timeout_seconds: float = Field(default=8.0, alias="SELECTOR_TIMEOUT_SECONDS")
     main_timeout_seconds: float = Field(default=840.0, alias="MAIN_TIMEOUT_SECONDS")
-    # Default budget for the small utility tasks (classify, judge, summarize,
-    # extract): thinking-high but small-output, so 25s is generous. The heavyweight
-    # transcript/graph tasks (checkpoint, memory_distill, workflow_*) carry an
-    # explicit 60s ``timeout_seconds`` on their TaskProfile instead.
-    utility_timeout_seconds: float = Field(default=25.0, alias="UTILITY_TIMEOUT_SECONDS")
+    # Default budget for utility tasks. Deliberately NOT tightened to the
+    # aspirational 25s: every profile runs thinking-high with a ~4k-token
+    # reasoning+output budget over inputs up to 120k chars, and DeepSeek can emit
+    # no bytes at all while thinking — a 25s read cap risks repeatable timeouts.
+    # Revisit only from measured latency distributions. The heavyweight
+    # transcript/graph tasks also carry an explicit 60s on their TaskProfile so a
+    # future default cut cannot silently starve them.
+    utility_timeout_seconds: float = Field(default=60.0, alias="UTILITY_TIMEOUT_SECONDS")
     upstream_connect_timeout_seconds: float = Field(
         default=10.0, alias="UPSTREAM_CONNECT_TIMEOUT_SECONDS"
     )
