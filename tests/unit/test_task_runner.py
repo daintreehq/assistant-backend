@@ -67,6 +67,20 @@ async def test_checkpoint(task_runner: TaskRunner, fake_provider: FakeProvider) 
     assert out["goal"] == "ship"
     assert out["next_actions"] == ["do x"]
     assert out["decisions"] == []  # defaulted
+    assert out["user_directives"] == []  # defaulted
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_preserves_user_directives(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    fake_provider.complete_result = make_result(
+        content=json.dumps(
+            {"goal": "ship", "user_directives": ["never close terminals uninvited"]}
+        )
+    )
+    out = await _run(task_runner, "checkpoint", {"transcript": "..."})
+    assert out["user_directives"] == ["never close terminals uninvited"]
 
 
 @pytest.mark.asyncio

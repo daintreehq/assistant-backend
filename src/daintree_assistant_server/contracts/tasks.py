@@ -155,6 +155,10 @@ class CheckpointOutput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     goal: str = ""
+    # Standing user instructions/constraints stated mid-conversation ("never close
+    # terminals", "always branch first") — the highest-value content a compaction can
+    # lose, preserved near-verbatim so the orchestrator keeps honouring them.
+    user_directives: list[str] = Field(default_factory=list)
     active_terminals: list[str] = Field(default_factory=list)
     active_watchers: list[str] = Field(default_factory=list)
     workflow_run_ids: list[str] = Field(default_factory=list)
