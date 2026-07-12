@@ -34,6 +34,35 @@ class Catalog:
         self._by_id = by_id
         self._skills: tuple[Skill, ...] = tuple(sorted(by_id.values(), key=lambda s: s.id))
         self.revision = self._compute_revision(self._skills)
+        # domain -> foundation id, for auto-pairing a selected specific with its
+        # domain foundation (see ``domain_foundation``). Built over the id-sorted
+        # skills so the tie-break (a domain with two foundations) is deterministic.
+        foundation_by_domain: dict[str, str] = {}
+        for skill in self._skills:
+            if skill.meta.foundation:
+                foundation_by_domain.setdefault(self._domain_of(skill.id), skill.id)
+        self._foundation_by_domain = foundation_by_domain
+
+    @staticmethod
+    def _domain_of(skill_id: str) -> str:
+        """The domain key for an id: its namespace minus the final segment.
+
+        ``daintree.orchestration.competition`` and ``daintree.orchestration.basic``
+        share the domain ``daintree.orchestration``. An id with no dot is its own
+        domain (it cannot pair).
+        """
+        prefix, sep, _ = skill_id.rpartition(".")
+        return prefix if sep else skill_id
+
+    def domain_foundation(self, skill_id: str) -> str | None:
+        """The foundation skill id for ``skill_id``'s domain, if any.
+
+        Used to auto-pair a domain's foundation with a selected specific so the
+        foundation loads on the SAME turn its specific is selected rather than a
+        turn late. Returns the id (possibly ``skill_id`` itself, when it is the
+        foundation) or ``None`` when the domain has no foundation.
+        """
+        return self._foundation_by_domain.get(self._domain_of(skill_id))
 
     @staticmethod
     def _compute_revision(skills: Sequence[Skill]) -> str:

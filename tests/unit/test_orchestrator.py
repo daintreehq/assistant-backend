@@ -115,6 +115,58 @@ def test_resolve_caps_and_drops_unknown(catalog) -> None:
     assert active == [ids[0], ids[1], ids[2]]
 
 
+# ---- resolve_active_skills: domain-foundation auto-pairing ------------------
+
+_COMPETITION = "daintree.orchestration.competition"
+_MULTI_AGENT = "daintree.orchestration.multi-agent"
+_FOUNDATION = "daintree.orchestration.basic"
+
+
+def test_resolve_pairs_domain_foundation_on_first_selection(catalog) -> None:
+    # Round 1: selector returns only the specific. The foundation is auto-paired so it
+    # loads on the SAME turn (front-loaded), not a turn late.
+    decision = SelectionDecision(skill_ids=[_COMPETITION], ran=True, degraded=False)
+    active, newly = resolve_active_skills(decision, [], catalog, 3)
+    assert active == [_COMPETITION, _FOUNDATION]
+    assert set(newly) == {_COMPETITION, _FOUNDATION}
+
+
+def test_resolve_stable_across_rounds_no_late_load(catalog) -> None:
+    # Round 2: task still governed by the competition skill. Even if the selector re-lists
+    # only the specific (forgetting the foundation), pairing keeps the set stable — the
+    # foundation is not re-loaded, and nothing new appears mid-conversation.
+    prior = [_COMPETITION, _FOUNDATION]
+    decision = SelectionDecision(skill_ids=[_COMPETITION], ran=True, degraded=False)
+    active, newly = resolve_active_skills(decision, prior, catalog, 3)
+    assert active == [_COMPETITION, _FOUNDATION]
+    assert newly == []
+
+
+def test_resolve_foundation_selected_alone_not_duplicated(catalog) -> None:
+    decision = SelectionDecision(skill_ids=[_FOUNDATION], ran=True, degraded=False)
+    active, _ = resolve_active_skills(decision, [], catalog, 3)
+    assert active == [_FOUNDATION]
+
+
+def test_resolve_explicit_picks_win_cap_over_paired_foundation(catalog) -> None:
+    # When the selection already fills the cap with explicit specifics, the model's picks
+    # win — the auto-paired foundation only fills spare capacity (appended last).
+    ids = [_COMPETITION, _MULTI_AGENT, "daintree.orchestration.interview"]
+    decision = SelectionDecision(skill_ids=ids, ran=True, degraded=False)
+    active, _ = resolve_active_skills(decision, [], catalog, 3)
+    assert active == ids
+    assert _FOUNDATION not in active
+
+
+def test_resolve_reuse_path_does_not_inject_foundation(catalog) -> None:
+    # A continuation round (no selector run) reuses the prior set verbatim — pairing must
+    # not surface a surprise foundation load mid-workflow.
+    decision = SelectionDecision.reuse([_COMPETITION])
+    active, newly = resolve_active_skills(decision, [_COMPETITION], catalog, 3)
+    assert active == [_COMPETITION]
+    assert newly == []
+
+
 def _delta_chunk(delta: dict) -> dict:
     return {"choices": [{"index": 0, "delta": delta, "finish_reason": None}]}
 

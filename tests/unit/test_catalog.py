@@ -98,6 +98,36 @@ def test_orchestration_basic_is_the_only_foundation() -> None:
     assert foundations == {"daintree.orchestration.basic"}
 
 
+def test_domain_foundation_pairs_specific_with_its_foundation() -> None:
+    catalog = load_catalog()
+    # A specific resolves to its domain foundation...
+    assert (
+        catalog.domain_foundation("daintree.orchestration.competition")
+        == "daintree.orchestration.basic"
+    )
+    # ...the foundation resolves to itself (caller dedups)...
+    assert (
+        catalog.domain_foundation("daintree.orchestration.basic")
+        == "daintree.orchestration.basic"
+    )
+    # ...and a domain with no foundation returns None (no forced pairing).
+    assert catalog.domain_foundation("daintree.agents.ask-and-relay") is None
+
+
+def test_domain_foundation_tie_break_is_deterministic() -> None:
+    # Two foundations in one domain → the id-sorted first wins, deterministically.
+    a = parse_skill(
+        SKILL_A.replace("id: a.one", "id: dom.zeta").replace("risk: read", "foundation: true\nrisk: read"),
+        expected_id="dom.zeta",
+    )
+    b = parse_skill(
+        SKILL_B.replace("id: b.two", "id: dom.alpha").replace("risk: project", "foundation: true\nrisk: project"),
+        expected_id="dom.alpha",
+    )
+    catalog = Catalog([a, b])
+    assert catalog.domain_foundation("dom.zeta") == "dom.alpha"
+
+
 def test_public_list_includes_required_tools_no_body() -> None:
     catalog = _catalog()
     entries = catalog.public_list()

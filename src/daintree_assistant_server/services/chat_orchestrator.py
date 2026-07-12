@@ -78,6 +78,31 @@ def _filter_dedup_cap(candidate: list[str], catalog: Catalog, max_active: int) -
     return active
 
 
+def _pair_domain_foundations(candidate: list[str], catalog: Catalog) -> list[str]:
+    """Ensure every selected specific's domain foundation is present.
+
+    The selector prompt asks the model to pair a domain's foundation with the
+    specific(s) it picks, but a classifier can forget — and a foundation that
+    arrives a turn LATE is the expensive case: it re-encodes the tool schemas +
+    conversation (per the assembler's cache rules) instead of riding the
+    specific's initial encode. Enforcing the pairing here makes front-loading
+    deterministic rather than model-dependent.
+
+    Foundations are appended AFTER the explicit candidates so that, in the rare
+    case the selection already fills ``max_active`` with specifics, the model's
+    explicit picks win the cap and auto-pairing only fills spare capacity. In the
+    common one/two-specific case the foundation fits comfortably, which is the
+    whole point.
+    """
+    present = set(candidate)
+    additions: list[str] = []
+    for sid in candidate:
+        foundation_id = catalog.domain_foundation(sid)
+        if foundation_id and foundation_id not in present and foundation_id not in additions:
+            additions.append(foundation_id)
+    return candidate + additions if additions else candidate
+
+
 def merge_active_skills(
     selected_ids: list[str],
     prior_active_ids: list[str],
@@ -114,10 +139,17 @@ def resolve_active_skills(
     paired selector prompt therefore instructs the model to re-list any active skill it
     wants to keep.
 
+    On an authoritative run the selected specifics are paired with their domain
+    foundations (:func:`_pair_domain_foundations`) so a foundation loads on the SAME
+    turn its specific is selected, not a turn late. The reuse/degraded path is left
+    untouched: a prior set resolved on a successful run already carries its foundation,
+    so a continuation round never surfaces a surprise foundation load.
+
     Returns ``(active, newly_loaded)``.
     """
     if decision.ran and not decision.degraded:
-        candidate = list(decision.skill_ids)  # authoritative — replaces the prior set
+        # authoritative — replaces the prior set, foundation-paired
+        candidate = _pair_domain_foundations(list(decision.skill_ids), catalog)
     else:
         candidate = list(prior_active_ids)  # reuse (no run) / fail-open (degraded)
     active = _filter_dedup_cap(candidate, catalog, max_active)
