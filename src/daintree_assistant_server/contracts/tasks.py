@@ -163,6 +163,11 @@ class CheckpointOutput(BaseModel):
     active_watchers: list[str] = Field(default_factory=list)
     workflow_run_ids: list[str] = Field(default_factory=list)
     decisions: list[str] = Field(default_factory=list)
+    # The loop-prevention register: approaches tried and failed (with why), so the
+    # post-compaction assistant does not repeat them. Industry-standard checkpoint
+    # section (Claude Code "Errors and Fixes"; the documented failure mode without it
+    # is the agent re-running the same failing tool call after history is discarded).
+    failed_approaches: list[str] = Field(default_factory=list)
     pending_tool_state: list[str] = Field(default_factory=list)
     next_actions: list[str] = Field(default_factory=list)
     open_questions: list[str] = Field(default_factory=list)

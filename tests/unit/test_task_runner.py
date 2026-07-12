@@ -68,6 +68,7 @@ async def test_checkpoint(task_runner: TaskRunner, fake_provider: FakeProvider) 
     assert out["next_actions"] == ["do x"]
     assert out["decisions"] == []  # defaulted
     assert out["user_directives"] == []  # defaulted
+    assert out["failed_approaches"] == []  # defaulted
 
 
 @pytest.mark.asyncio
