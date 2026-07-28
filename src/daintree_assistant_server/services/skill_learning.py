@@ -59,7 +59,8 @@ from ..providers.retry import retry_upstream
 from ..skills.catalog import Catalog, CatalogManager
 from ..skills.loader import SkillLoadError, parse_skill
 from ..skills.models import Skill
-from ..skills.selector import sanitize_for_selector
+from ..skills.selector import render_evidence_lines, sanitize_for_selector
+from ..text_utils import utf8_len
 
 logger = get_logger("daintree.skill_learning")
 
@@ -101,9 +102,22 @@ _SECRET_PATTERNS = (
     # must be 12+ chars AND contain a digit, so a real credential fires but schema/runbook
     # prose ("token: optional", "apiKey: required") does not.
     re.compile(
-        r"(?i)[a-z0-9_]*(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|"
-        r"private[_-]?key)[a-z0-9_]*\s*[:=]\s*['\"]?"
+        # Bare "key" is deliberately NOT here: a benign versioned identifier like
+        # `cache_key: dependency-graph-v2` satisfies the 12-char + digit guard and
+        # would block a legitimate skill. Only names that denote a CREDENTIAL count.
+        r"(?i)[a-z0-9_]*(?:password|passwd|passphrase|secret|token|credentials?|"
+        r"api[_-]?key|access[_-]?key|private[_-]?key|secret[_-]?key|signing[_-]?key|"
+        r"encryption[_-]?key|auth[_-]?key)[a-z0-9_]*\s*[:=]\s*['\"]?"
         r"(?=[A-Za-z0-9._\-+/]*\d)[A-Za-z0-9._\-+/]{12,}"
+    ),
+    # Credentials embedded in a connection URL (postgres://user:pass@host/db). The
+    # assignment pattern above never sees these — there is no NAME to match on.
+    # Obvious documentation placeholders are excluded so a skill may still SHOW the
+    # shape of a connection string.
+    re.compile(
+        r"(?i)\b[a-z][a-z0-9+.\-]*://[^\s:@/]+:"
+        r"(?!(?:password|passwd|pass|secret|token|xxx+|\.\.\.|<[^>]*>|\{[^}]*\})[@/\s])"
+        r"[^\s:@/]{6,}@"
     ),
 )
 
@@ -225,19 +239,26 @@ _EPISODIC_RE = re.compile(
 )
 
 
-def _house_style_problems(body: str) -> list[str]:
-    """Return human-readable house-style problems for a proposed skill body.
+def _house_style_problems(body: str, metadata: str = "") -> list[str]:
+    """Return human-readable house-style problems for a proposed skill.
 
     Empty list == passes. Every packaged skill satisfies these checks.
+
+    STRUCTURAL checks (opening line, procedure, report-back, size) are body-scoped.
+    The GENERALITY guardrails also run over ``metadata`` — the rendered
+    title/summary/whenToUse — because those are exactly the fields the selector
+    routes on, so a hardcoded path or agent there poisons catalog portability just
+    as badly as one in the body, and is what a future project actually matches against.
     """
     text = body.strip()
+    generality_text = f"{text}\n{metadata}" if metadata else text
     problems: list[str] = []
     first_line = text.split("\n", 1)[0].strip().lower() if text else ""
     if not (first_line.startswith("use when:") or first_line.startswith("use when ")):
         problems.append("body must open with a 'Use when:' line")
     if len(text) < _HOUSE_MIN_BODY_CHARS:
         problems.append("body is too short to be a runbook")
-    if len(body.encode("utf-8")) > _HOUSE_MAX_BODY_BYTES:
+    if utf8_len(body) > _HOUSE_MAX_BODY_BYTES:
         problems.append("body exceeds the generated-skill size ceiling")
     has_procedure = (
         "procedure:" in text.lower()
@@ -248,10 +269,14 @@ def _house_style_problems(body: str) -> list[str]:
         problems.append("body needs a Procedure: section, numbered steps, or step headers")
     if "report" not in text.lower():
         problems.append("body must end with a report-back instruction")
-    if _HARDCODED_AGENT_RE.search(text):
-        problems.append("body hardcodes a specific CLI agent (use the configured-agents roster)")
-    if _USER_PATH_RE.search(text):
-        problems.append("body contains an absolute user/home path (skills must be portable)")
+    if _HARDCODED_AGENT_RE.search(generality_text):
+        problems.append("hardcodes a specific CLI agent (use the configured-agents roster)")
+    if _USER_PATH_RE.search(generality_text):
+        problems.append("contains an absolute user/home path (skills must be portable)")
+    # Episodic phrasing is checked on the BODY only. A whenToUse legitimately describes
+    # the situation a skill applies to — "when the user asks for a handoff of decisions
+    # made in this conversation" is a generic trigger, not a back-reference to the run
+    # that produced the skill — so scanning metadata for it rejects good routing text.
     if _EPISODIC_RE.search(text):
         problems.append("body references the originating workflow (skills must be self-contained)")
     return problems
@@ -829,7 +854,13 @@ class SkillLearner:
         # House style: the loader validates STRUCTURE; this validates the operating
         # runbook shape a small model actually follows (and generality guardrails).
         # Calibrated so every packaged skill passes → the improve path is never blocked.
-        house_problems = _house_style_problems(skill.body)
+        # Pass the routing metadata too: title/summary/whenToUse are what the selector
+        # matches on, so a hardcoded path or agent there is at least as damaging to
+        # catalog portability as one in the body.
+        house_problems = _house_style_problems(
+            skill.body,
+            metadata=f"{skill.meta.title}\n{skill.meta.summary}\n{skill.meta.when_to_use}",
+        )
         if house_problems:
             logger.warning(
                 "skill_learning_rejected",
@@ -1043,18 +1074,10 @@ class SkillLearner:
             # Tell the gate the transcript starts mid-history, so an abrupt opening
             # is not mistaken for the start of the workflow.
             lines.append("[transcript truncated: oldest messages dropped]")
-        for ev in evidence:
-            role = ev["role"]
-            text = ev["text"]
-            if role == "tool":
-                lines.append(f"[tool {ev.get('name') or 'tool'}] {text}")
-            elif role == "assistant":
-                prefix = "[assistant]"
-                if ev["tool_names"]:
-                    prefix = f"[assistant] (tool calls: {', '.join(ev['tool_names'])})"
-                lines.append(f"{prefix} {text}".rstrip())
-            else:
-                lines.append(f"[user] {text}")
+        # Same framing as the selector prompt (shared helper): the learner reads the
+        # same untrusted transcript, so a tool result must not be able to render a
+        # flush-left "[user] ..." line the gate could read as a real instruction.
+        lines.extend(render_evidence_lines(evidence))
         return "\n".join(lines)
 
     @staticmethod

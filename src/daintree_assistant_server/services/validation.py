@@ -26,6 +26,7 @@ from ..errors import (
     reserved_tool_name,
     system_messages_not_allowed,
 )
+from ..text_utils import has_lone_surrogate, utf8_len
 
 ALLOWED_ROLES = frozenset({"user", "assistant", "tool"})
 FORBIDDEN_ROLES = frozenset({"system", "developer"})
@@ -138,7 +139,7 @@ def _walk_tool_schema(
                 item, settings=settings, param=f"{param}[{idx}]", depth=depth + 1, counter=counter
             )
     elif isinstance(node, str):
-        if len(node.encode("utf-8")) > settings.max_tool_schema_string_bytes:
+        if utf8_len(node) > settings.max_tool_schema_string_bytes:
             raise request_too_large(
                 f"A string in tool schema {param} exceeds the size limit.", param=param
             )
@@ -255,7 +256,12 @@ def _validate_message_sequence(messages: list[ChatMessage]) -> None:
 def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
     for i, msg in enumerate(messages):
         if isinstance(msg.content, str):
-            if len(msg.content.encode("utf-8")) > settings.cap_message_text:
+            if has_lone_surrogate(msg.content):
+                raise invalid_request(
+                    "A message's text content is not valid UTF-8.",
+                    param=f"input.messages[{i}].content",
+                )
+            if utf8_len(msg.content) > settings.cap_message_text:
                 raise request_too_large(
                     "A message's text content exceeds the size limit.",
                     param=f"input.messages[{i}].content",
@@ -265,7 +271,12 @@ def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
             continue
         for j, part in enumerate(msg.content):
             if isinstance(part, TextContentPart):
-                if len(part.text.encode("utf-8")) > settings.cap_message_text_part:
+                if has_lone_surrogate(part.text):
+                    raise invalid_request(
+                        "A message text part is not valid UTF-8.",
+                        param=f"input.messages[{i}].content[{j}].text",
+                    )
+                if utf8_len(part.text) > settings.cap_message_text_part:
                     raise request_too_large(
                         "A message text part exceeds the size limit.",
                         param=f"input.messages[{i}].content[{j}].text",
@@ -284,7 +295,7 @@ def _validate_startup(req: RespondRequest, settings: Settings) -> None:
     instructions = req.startup.project_instructions
     if (
         instructions is not None
-        and len(instructions.encode("utf-8")) > settings.cap_project_instructions
+        and utf8_len(instructions) > settings.cap_project_instructions
     ):
         raise request_too_large(
             "Startup project instructions exceed the size limit.",

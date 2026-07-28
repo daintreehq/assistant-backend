@@ -23,7 +23,11 @@ class TaskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task: str = Field(min_length=1, max_length=128)
-    request_id: str | None = Field(default=None, max_length=256)
+    # Echoed into a response HEADER, so constrain it to header-safe characters here.
+    # A non-latin-1 value would otherwise raise UnicodeEncodeError inside JSONResponse
+    # AFTER the upstream call has run and been billed — a 500 for a request that should
+    # have been rejected as a 422 before any spend.
+    request_id: str | None = Field(default=None, max_length=256, pattern=r"^[A-Za-z0-9._:-]+$")
     input: dict[str, Any] = Field(default_factory=dict)
     # Only consumed by terminal_extract_json.
     result_schema: dict[str, Any] | None = None

@@ -204,3 +204,41 @@ def test_oversized_string_message_content_rejected() -> None:
             [{"role": "user", "content": "x" * 500}],
         ))
         assert r.status_code == 413
+
+
+def test_lone_surrogate_in_content_is_rejected_up_front() -> None:
+    """An unpaired surrogate must fail CLOSED during validation.
+
+    ``json.loads`` accepts ``"\\ud800"`` and pydantic passes it straight through,
+    and httpx serializes the outbound request with ``ensure_ascii=False`` plus a
+    STRICT utf-8 encode. So such a value survives every size check and then raises
+    deep inside the provider call — AFTER the selector has already run and been
+    billed, and after a streaming turn has already committed HTTP 200. Rejecting it
+    here as malformed input is the same fail-closed posture as an oversized body.
+    """
+    import json as _json
+
+    body = respond_body([{"role": "user", "content": "\ud800hi"}])
+    with _client() as c:
+        r = c.post(
+            URL,
+            headers={**_AUTH, "Content-Type": "application/json"},
+            content=_json.dumps(body, ensure_ascii=True).encode("ascii"),
+        )
+        assert r.status_code == 400, r.text
+        assert "UTF-8" in r.text
+
+
+def test_lone_surrogate_in_a_text_part_is_rejected() -> None:
+    import json as _json
+
+    body = respond_body(
+        [{"role": "user", "content": [{"type": "text", "text": "a\ud800b"}]}]
+    )
+    with _client() as c:
+        r = c.post(
+            URL,
+            headers={**_AUTH, "Content-Type": "application/json"},
+            content=_json.dumps(body, ensure_ascii=True).encode("ascii"),
+        )
+        assert r.status_code == 400, r.text

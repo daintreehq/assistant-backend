@@ -22,9 +22,15 @@ async def readyz(request: Request) -> JSONResponse:
     ready = bool(getattr(request.app.state, "ready", False))
     body: dict[str, object] = {"status": "ready" if ready else "not_ready"}
     if not ready:
+        # /readyz is UNAUTHENTICATED. The startup-failure text names weak/missing
+        # secrets by variable and can carry filesystem paths and Pydantic detail, so
+        # outside development it stays in the log (main.py already records it) and the
+        # probe gets a stable, uninformative reason.
+        settings = getattr(request.app.state, "settings", None)
         error = getattr(request.app.state, "ready_error", None)
         if error:
-            body["error"] = error
+            hardened = settings is not None and settings.is_hardened
+            body["error"] = "configuration" if hardened else error
         return JSONResponse(status_code=503, content=body)
     container = request.app.state.container
     body["catalog_revision"] = container.catalog.revision

@@ -160,3 +160,33 @@ def test_stateless_token_roundtrips_without_session() -> None:
 def test_codec_requires_current_key() -> None:
     with pytest.raises(ValueError):
         StateCodec(current_key=b"", current_kid="k1", salt=b"s", ttl_seconds=100)
+
+
+def test_non_ascii_signature_is_ignored_not_an_error() -> None:
+    """A malformed token is IGNORED, never a 500 — the documented contract.
+
+    ``hmac.compare_digest`` raises TypeError on str operands holding non-ASCII, and
+    ``.encode("utf-8")`` raises UnicodeEncodeError on an unpaired surrogate. Both
+    are reachable from the caller-supplied token, so the base64url segments are
+    checked for ASCII before either runs.
+    """
+    codec = _codec([1000.0])
+    good = codec.issue(
+        session_id="s1",
+        active_skills=["a"],
+        catalog_revision="rev",
+        turn_id="t1",
+        instruction_revision=0,
+    )
+    stem = good.rsplit(".", 1)[0]
+    for bad_sig in ["\u00e9" * 8, "\ud800", "sig\u2028x"]:
+        result = codec.verify(f"{stem}.{bad_sig}", session_id="s1")
+        assert result.valid is False
+        assert result.reason == REASON_INVALID
+
+
+def test_non_ascii_body_is_ignored_not_an_error() -> None:
+    codec = _codec([1000.0])
+    result = codec.verify("dst1.b\u00f3dy.sig", session_id="s1")
+    assert result.valid is False
+    assert result.reason == REASON_INVALID

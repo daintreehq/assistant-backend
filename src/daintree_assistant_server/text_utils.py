@@ -26,12 +26,41 @@ def strip_control_chars(text: str) -> str:
     )
 
 
+def has_lone_surrogate(text: str) -> bool:
+    """True when ``text`` cannot be encoded as UTF-8 (an unpaired surrogate).
+
+    ``json.loads`` accepts ``"\\ud800"`` and pydantic passes it through, but httpx
+    serializes the outbound request with ``ensure_ascii=False`` and a STRICT utf-8
+    encode — so such a value survives every size check and then raises deep in the
+    provider call, after the selector has already run and been billed. Requests
+    carrying one must be rejected up front (fail closed, like every other malformed
+    input) rather than surfacing as a 500 mid-turn.
+    """
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return True
+    return False
+
+
+def utf8_len(text: str) -> int:
+    """UTF-8 byte length that never raises on a lone surrogate.
+
+    ``json.loads`` accepts ``"\\ud800"`` and pydantic passes it straight through, so
+    a hostile-but-parseable request can carry an unpaired surrogate all the way to a
+    byte-length check. Plain ``.encode("utf-8")`` raises ``UnicodeEncodeError`` there,
+    turning what should be a 400 into a 500 — every size check must use this instead.
+    """
+    return len(text.encode("utf-8", errors="replace"))
+
+
 def cap_bytes(text: str, max_bytes: int) -> tuple[str, bool]:
     """Truncate ``text`` so its UTF-8 encoding fits ``max_bytes``.
 
     Returns ``(text, truncated)``. Truncation happens on a character boundary.
+    Surrogate-safe: see :func:`utf8_len`.
     """
-    encoded = text.encode("utf-8")
+    encoded = text.encode("utf-8", errors="replace")
     if len(encoded) <= max_bytes:
         return text, False
     # Trim to a safe character boundary.
@@ -77,7 +106,16 @@ def frame_data_block(text: str | None, max_bytes: int, *, tag: str) -> str:
     cleaned, _ = sanitize_field(text, max_bytes)
     if not cleaned.strip():
         return ""
-    neutralized = cleaned.replace(f"</{tag}>", f"<\\/{tag}>").replace(f"<{tag}>", f"<\\{tag}>")
+    # Match the delimiter the way a lenient reader would: case-insensitively and
+    # tolerating internal whitespace. Escaping only the two exact byte sequences let
+    # `</TAG>`, `</tag >` and `< /tag>` through un-escaped, any of which a model may
+    # well read as closing the block.
+    neutralized = re.sub(
+        rf"<\s*/?\s*{re.escape(tag)}\s*>",
+        lambda m: m.group(0).replace("<", "<\\", 1),
+        cleaned,
+        flags=re.IGNORECASE,
+    )
     return f"<{tag}>\n{neutralized}\n</{tag}>"
 
 

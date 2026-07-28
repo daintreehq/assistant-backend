@@ -309,7 +309,13 @@ class DeepSeekProvider:
         if status >= 500:
             # Transient upstream fault — retry while no model output is exposed.
             return upstream_error(retryable=True)
-        # A 4xx means the upstream rejected OUR request as malformed: permanent
+        # An auth/billing rejection says nothing about the CLIENT's request — it is
+        # about OUR upstream account. Forwarding that prose leaks provider account and
+        # quota detail to any Daintree-key holder, so keep it to the log (the
+        # upstream_http_error entry already carries the full body).
+        if status in (401, 402, 403):
+            return upstream_error("The upstream provider rejected this server's credentials.")
+        # Any other 4xx means the upstream rejected OUR request as malformed: permanent
         # (never retried) and almost always a server-side bug in what we sent. Carry
         # the upstream's own reason through so the failure is diagnosable instead of
         # an opaque "status 400" — the CLI and logs then name the offending field.

@@ -51,6 +51,7 @@ from ..text_utils import (
     frame_data_block,
     message_text,
     sanitize_line,
+    utf8_len,
 )
 
 PROMPT_CACHE_KEY = "daintree-main"
@@ -105,7 +106,7 @@ def _cap_list_combined(
         value = sanitize_line(str(raw), max_bytes)
         if not value:
             continue
-        size = len(value.encode("utf-8")) + 1
+        size = utf8_len(value) + 1
         if out and total + size > max_bytes:
             break
         total += size
@@ -207,7 +208,7 @@ class PromptAssembler:
                 if not agent.id.strip():
                     continue
                 row = self._startup_agent_row(agent)
-                cost = len(row.encode("utf-8")) + 1
+                cost = utf8_len(row) + 1
                 if used + cost > self.settings.cap_startup_agent_bytes:
                     continue
                 used += cost
@@ -422,9 +423,9 @@ class PromptAssembler:
             size = 0
             for value in rendered.values():
                 if isinstance(value, str):
-                    size += len(value.encode("utf-8")) + 1
+                    size += utf8_len(value) + 1
                 else:
-                    size += sum(len(item.encode("utf-8")) + 1 for item in value)
+                    size += sum(utf8_len(item) + 1 for item in value)
             if out and used + size > self.settings.cap_workflow_state_bytes:
                 break
             used += size
