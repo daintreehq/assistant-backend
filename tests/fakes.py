@@ -79,9 +79,24 @@ def make_text_chunks(
         "model": model,
         "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
     }
-    if with_usage:
-        final["usage"] = {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20}
     chunks.append(final)
+    if with_usage:
+        # A REAL DeepSeek stream reports usage in its own trailing chunk with an
+        # EMPTY choices list, not bolted onto the finish_reason chunk. Bolting it on
+        # made the fake too clean: the orchestrator's `if not choices` guards in
+        # _chunk_finish_reason/_chunk_to_delta never executed under any test, so a
+        # regression there would have been invisible. Emitting the real shape means
+        # every existing streaming test covers both guards.
+        chunks.append(
+            {
+                "id": "chatcmpl-fake",
+                "object": "chat.completion.chunk",
+                "created": 1700000000,
+                "model": model,
+                "choices": [],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20},
+            }
+        )
     return chunks
 
 

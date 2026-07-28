@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from fakes import FakeProvider, make_result
@@ -410,3 +411,24 @@ async def test_result_schema_repair_exhausted_502(task_runner: TaskRunner, fake_
             task="terminal_extract_json", input={"instruction": "count", "tail": "5"}, result_schema=_SCHEMA,
         ))
     assert exc.value.code == "task_output_invalid"
+
+
+def test_readiness_rejects_a_task_whose_prompt_file_is_missing(tmp_path, monkeypatch) -> None:
+    """A registered task with no prompt file must fail READINESS, not a request.
+
+    Without this check such a task passes /readyz and the entire suite, then 500s
+    the first time a client calls it — PromptError has no handler.
+    """
+    import shutil
+
+    from daintree_assistant_server.prompts.loader import PromptError, PromptLoader
+
+    src = Path(__file__).resolve().parents[2] / "src" / "daintree_assistant_server" / "prompts"
+    staged = tmp_path / "prompts"
+    shutil.copytree(src, staged)
+    loader = PromptLoader(staged)
+    loader.validate()  # baseline: the real prompt set validates
+
+    (staged / "tasks" / "checkpoint.md").unlink()
+    with pytest.raises(PromptError, match="checkpoint"):
+        loader.validate()

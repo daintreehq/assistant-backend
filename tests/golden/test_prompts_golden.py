@@ -32,6 +32,7 @@ from daintree_assistant_server.contracts.extensions import (
 )
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
+from daintree_assistant_server.services.task_runner import build_profiles
 from daintree_assistant_server.skills.catalog import Catalog, load_catalog
 from daintree_assistant_server.skills.load_events import SkillLoadExecution
 
@@ -96,9 +97,17 @@ def _startup_payload() -> dict[str, object]:
 def assert_golden(name: str, content: str) -> None:
     SNAPSHOTS.mkdir(exist_ok=True)
     path = SNAPSHOTS / name
-    if os.getenv("DAINTREE_UPDATE_GOLDEN") or not path.exists():
+    if os.getenv("DAINTREE_UPDATE_GOLDEN"):
         path.write_text(content, encoding="utf-8")
         return
+    # A MISSING snapshot must fail, not self-create. Auto-writing it meant a newly
+    # registered task (or any new golden) silently minted its own baseline and went
+    # green on the very first run — the snapshot diff is supposed to BE the
+    # human-reviewable record, and CI does not check for a dirty worktree.
+    assert path.exists(), (
+        f"No golden snapshot for {name}. Review the rendered output, then create it "
+        "with DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/"
+    )
     expected = path.read_text(encoding="utf-8")
     assert content == expected, f"Golden mismatch for {name}; run with DAINTREE_UPDATE_GOLDEN=1 to update."
 
@@ -323,23 +332,10 @@ def test_selector_prompt_renders_real_catalog(loader: PromptLoader) -> None:
             assert f"- id: {skill.id} [foundation]" in rendered
 
 
-@pytest.mark.parametrize(
-    "task_id",
-    [
-        "checkpoint",
-        "memory_distill",
-        "watcher_classify",
-        "terminal_judge",
-        "terminal_summarize",
-        "terminal_extract_text",
-        "terminal_extract_json",
-        "extraction_verdict",
-        "skill_step_consistency",
-        "workflow_plan",
-        "workflow_reconcile",
-        "workflow_resume_digest",
-    ],
-)
+# Driven off the REAL profile registry, not a hardcoded list: a task added without
+# a snapshot (or with a missing/misnamed prompt file) previously passed the whole
+# suite and only failed the first time a client called it.
+@pytest.mark.parametrize("task_id", sorted(build_profiles()))
 def test_task_prompts(loader: PromptLoader, task_id: str) -> None:
     assert_golden(f"task_{task_id}.md", loader.task_system_prompt(task_id))
 

@@ -117,3 +117,11 @@ class PromptLoader:
                 raise PromptError(f"template {name} failed to load: {exc}") from exc
         for prompt in SKILL_LEARNING_PROMPTS:
             self.skill_learning_prompt(prompt)
+        # Every REGISTERED task must have its prompt on disk. Without this a task
+        # whose prompt file is missing or misnamed passes readiness and the whole
+        # test suite, then 500s the first time a client calls it — PromptError has
+        # no handler. Imported lazily: task_runner imports the loader.
+        from ..services.task_runner import build_profiles
+
+        for task_id in build_profiles():
+            self.task_system_prompt(task_id)

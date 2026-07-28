@@ -715,3 +715,69 @@ def test_loaded_skills_single_skill_has_no_layering_note(assembler: PromptAssemb
     rendered = assembler.render_loaded_skills([specific])
     assert "Layering:" not in rendered
     assert "(domain foundation)" not in rendered
+
+
+def test_image_part_survives_to_the_wire(assembler: PromptAssembler) -> None:
+    """Multipart content reaches the upstream unchanged.
+
+    ``capabilities.multimodal_images.data_urls`` advertises this path, but no test
+    drove a list-content message through the assembler, so ``_part_to_wire``'s image
+    branch and the list-content branch were both uncovered.
+    """
+    req = _req(
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "what is this?"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/png;base64,AAAA", "detail": "high"},
+                    },
+                ],
+            }
+        ]
+    )
+    pr = assembler.build_main_request(
+        request=req, skills=[], upstream_model="deepseek-v4-flash"
+    )
+    parts = next(m["content"] for m in pr.messages if isinstance(m.get("content"), list))
+    assert parts[0] == {"type": "text", "text": "what is this?"}
+    assert parts[1] == {
+        "type": "image_url",
+        "image_url": {"url": "data:image/png;base64,AAAA", "detail": "high"},
+    }
+
+
+def test_image_part_without_detail_omits_the_key(assembler: PromptAssembler) -> None:
+    req = _req(
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,BBBB"}}
+                ],
+            }
+        ]
+    )
+    pr = assembler.build_main_request(
+        request=req, skills=[], upstream_model="deepseek-v4-flash"
+    )
+    parts = next(m["content"] for m in pr.messages if isinstance(m.get("content"), list))
+    assert parts[0]["image_url"] == {"url": "data:image/png;base64,BBBB"}
+
+
+def test_oversized_text_part_is_capped_not_dropped(
+    assembler: PromptAssembler, settings: Settings
+) -> None:
+    long_text = "x" * (settings.cap_message_text_part + 500)
+    req = _req(messages=[{"role": "user", "content": [{"type": "text", "text": long_text}]}])
+    pr = assembler.build_main_request(
+        request=req, skills=[], upstream_model="deepseek-v4-flash"
+    )
+    parts = next(m["content"] for m in pr.messages if isinstance(m.get("content"), list))
+    assert parts[0]["type"] == "text"
+    # EXACTLY at the cap, not merely under it: a "<= cap" assertion would also pass
+    # if capping over-truncated the value down to a single character.
+    assert len(parts[0]["text"]) == settings.cap_message_text_part
+    assert parts[0]["text"].startswith("xxxx")
