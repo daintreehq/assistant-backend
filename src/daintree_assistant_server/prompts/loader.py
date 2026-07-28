@@ -17,7 +17,6 @@ from jinja2 import Environment, FileSystemLoader, TemplateError, select_autoesca
 # prompt edits. Everything on disk is simply "the current prompt." If real
 # release versioning is ever needed, that is a deliberate, separate change.
 MAIN_PROMPT_VERSION = "main"
-SELECTOR_PROMPT_VERSION = "selector"
 
 # Main-prompt template names.
 TEMPLATE_STARTUP_CONTEXT = "main/startup_context.md.j2"

@@ -187,7 +187,6 @@ class Settings(BaseSettings):
     max_result_schema_enum: int = Field(default=128, alias="MAX_RESULT_SCHEMA_ENUM")
     max_result_schema_string: int = Field(default=4096, alias="MAX_RESULT_SCHEMA_STRING")
     max_active_skills: int = Field(default=3, ge=0, alias="MAX_ACTIVE_SKILLS")
-    max_meta_header_bytes: int = Field(default=6 * 1024, alias="MAX_META_HEADER_BYTES")
 
     # ---- Timeouts (seconds) --------------------------------------------
     # The selector gates the turn's first byte, so this bound is a latency budget,
@@ -304,14 +303,14 @@ class Settings(BaseSettings):
     cap_workflow_state_bytes: int = Field(
         default=16 * 1024, alias="CAP_WORKFLOW_STATE_BYTES"
     )
-    cap_client_metadata: int = Field(default=2 * 1024, alias="CAP_CLIENT_METADATA")
     cap_message_text_part: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT_PART")
     cap_message_text: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT")
 
-    # ---- CLI-provided integrations (MCP servers + tool index) -----------
+    # ---- CLI-provided integrations (MCP servers) ------------------------
+    # NOT a tool index: client tool schemas already ride the function-calling
+    # interface, so listing them again would only duplicate them.
     cap_mcp_servers: int = Field(default=32, alias="CAP_MCP_SERVERS")
     cap_mcp_block_bytes: int = Field(default=64 * 1024, alias="CAP_MCP_BLOCK_BYTES")
-    cap_tool_index_desc: int = Field(default=256, alias="CAP_TOOL_INDEX_DESC")
 
     # ---- Skill learning (LOCAL DEVELOPMENT ONLY) ------------------------
     # A backend-internal harness that watches completed local workflows and, when
@@ -383,9 +382,6 @@ class Settings(BaseSettings):
     skill_build_max_output_tokens: int = Field(
         default=24000, alias="SKILL_BUILD_MAX_OUTPUT_TOKENS"
     )
-
-    # ---- Tracing --------------------------------------------------------
-    otel_exporter_otlp_endpoint: str = Field(default="", alias="OTEL_EXPORTER_OTLP_ENDPOINT")
 
     # ---- Derived helpers ------------------------------------------------
 

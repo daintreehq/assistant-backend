@@ -30,3 +30,10 @@ jobs:
 
       - name: Pytest
         run: pytest -q
+
+      # benchmarks/ imports src but sits outside `mypy --strict src` and pytest's
+      # testpaths, so a signature change in the assembler rotted this suite silently
+      # (render_integrations lost an argument; every run raised TypeError). The
+      # deterministic mode needs no API key and no network, so it gates cheaply.
+      - name: Benchmarks (deterministic only)
+        run: python -m benchmarks.dashboard.bench run --deterministic-only

@@ -84,7 +84,7 @@ Skills are Markdown runbooks that become task-specific operating instructions fo
 | `risk` | no | enum: `read local ui terminal project external git system` |
 | `requiredTools` | no | camelCase key → `required_tools` |
 
-**Pipeline:** `loader.py` parses/validates (strict — a malformed skill fails `/readyz`, not a request) → `catalog.py` builds the **immutable** catalog and a deterministic `revision` hash → the selector sees only `Skill.selector_view()`, the public `/skills` endpoint sees only `public_view()`, and **neither ever exposes the body** except via injection into the main prompt for active skills. The main model is explicitly told (in `base.md`) not to emit `skill.find`/`skill.load` — selection is automatic and server-side.
+**Pipeline:** `loader.py` parses/validates (strict — a malformed skill fails `/readyz`, not a request) → `catalog.py` builds the **immutable** catalog and a deterministic `revision` hash → the selector sees only `Skill.selector_view()`, the public `/skills` endpoint sees only `public_view()`, and **neither ever exposes the body** except via injection into the main prompt for active skills. The main model is told in `main/base/30-skills.md` that it does not find, load, or manage skills itself — selection is automatic and server-side — and `skill.find`/`skill.load` are additionally refused server-side via `RESERVED_TOOL_NAMES` (`services/validation.py`).
 
 **To add a skill:**
 1. Create `skills/files/<id>.md` (it is auto-discovered, sorted by id — no registration).
@@ -116,15 +116,18 @@ A backend-internal harness (`services/skill_learning.py`) that watches completed
 
 All prompt text is **server-owned** and lives in `src/daintree_assistant_server/prompts/` (`.md` = raw bodies, `.md.j2` = Jinja templates), loaded via `prompts/loader.py`:
 
-- `main/base.md` — the permanent assistant system prompt (persona + hard rules). This is the highest-leverage file in the repo.
-- `main/{startup_context,runtime_context,integrations,loaded_skills,turn_footer}.md.j2` — the structured main-prompt layers.
+- `main/base/*.md` — the permanent assistant system prompt, as seven ordered partials
+  (`00-persona`, `10-hard-rules`, `20-tool-discipline`, `30-skills`, `35-daintree-docs`,
+  `40-communication`, `50-formatting`), concatenated in filename order. Collectively the
+  highest-leverage text in the repo.
+- `main/{startup_context,runtime_context,integrations,loaded_skills,response_contract,turn_footer}.md.j2` — the structured main-prompt layers.
 - `selector/system.md.j2` — the skill-selector classifier prompt.
 - `tasks/<task>.md` — utility-task system prompts.
 
 **Two things that are easy to get wrong:**
 
 - **Assembly order is load-bearing — and role choice IS position on DeepSeek.** DeepSeek serializes [ALL system messages, in array order] → [tools] → [non-system conversation], so a volatile system message ANYWHERE in the array lands before the ~18k-token tool schemas and busts their cache (measured 2026-07-08: 36% hit on byte-identical turns → 99% after the fix). `PromptAssembler.build_main_request` therefore orders stable systems (base → integrations → active skills → response contract), then a stable **user-role** startup block, the append-only visible `input.messages`, and ONE trailing **user-role** "[Injected context …]" block carrying per-request runtime + turn state. Only the final tail re-encodes each round. Startup is required even when empty, stays outside the visible transcript, and is never sent to selector/learning calls. A skill-set change (selector topic shift) re-encodes tools + conversation — rare and accepted. Don't reorder casually, and never add a volatile system message. All client-provided local context is treated as untrusted: sanitized and byte-capped (`text_utils.py`, the `cap_*` settings in `config.py`); exact agent ids are JSON-quoted and rows are admitted whole.
-- **Prompt bytes are behavior.** On a meaningful prompt change, regenerate golden snapshots (below) — that diff is the reviewable record. Do **not** bump version strings: `MAIN_PROMPT_VERSION`/`SELECTOR_PROMPT_VERSION` are fixed family labels (`"main"`/`"selector"`), not per-edit versions (see "Versioning" below).
+- **Prompt bytes are behavior.** On a meaningful prompt change, regenerate golden snapshots (below) — that diff is the reviewable record. Do **not** bump version strings: `MAIN_PROMPT_VERSION` is a fixed family label (`"main"`), not a per-edit version (see "Versioning" below).
 
 ## Versioning (pre-release)
 
@@ -153,9 +156,9 @@ What this means concretely:
 - **Skills** have **no `version` field** — frontmatter carries `id`/`title`/`summary`/etc.
   only. Change busting rides on the skill content hash (which feeds `catalog_revision`), not
   a hand-bumped number.
-- **Prompt-family labels** (`MAIN_PROMPT_VERSION` / `SELECTOR_PROMPT_VERSION` in
-  `prompts/loader.py`) are fixed names — `"main"` and `"selector"` — surfaced as
-  `prompt_version`. They identify *which* prompt, not a revision; leave them alone.
+- **The prompt-family label** (`MAIN_PROMPT_VERSION` in `prompts/loader.py`) is a fixed
+  name — `"main"` — surfaced as `prompt_version`. It identifies *which* prompt, not a
+  revision; leave it alone.
 - **Task identifiers are unversioned** — `terminal_summarize`, not `terminal_summarize.v1`,
   with matching `tasks/<task>.md` prompt files. A task id names *which* task, never a
   revision of it; a task's behavior changes by editing its prompt/profile in place (CLI

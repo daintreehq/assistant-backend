@@ -276,7 +276,10 @@ Skill selection is removed from the main thread:
    rounds (same turn). Selector failure **fails open** — the prior active set is retained.
 2. **Active set.** A **successful** selector run is *authoritative*: its returned ids are the
    complete active set for the instruction (a topic-shift **replacement** — an empty result
-   clears the active set), capped (default 3). A tool-continuation round (no run) or a
+   clears the active set), capped (default 3). Each selected specific is additionally paired
+   with its **domain foundation** (the `[foundation]` skill sharing its id namespace) before
+   the cap is applied, so `skills.active`/`newly_loaded` may include a foundation id the
+   selector did not itself return. A tool-continuation round (no run) or a
    degraded selector reuses the prior set unchanged, so a classifier hiccup never evicts an
    in-progress runbook. The selector is instructed to re-list any active skill it means to
    keep. (The explicit `resolve` `load` action, by contrast, is additive over the prior set.)
@@ -324,7 +327,7 @@ block, where it costs exactly its own tokens.
 | # | Message | Role | Stability |
 |---|---------|------|-----------|
 | 1 | Base system prompt | system | static — cached across all sessions |
-| 2 | Integrations (MCP servers + tool index) | system | session-stable |
+| 2 | Integrations (MCP servers) | system | session-stable — client tools are NOT listed here; their schemas already ride the function-calling interface |
 | 3 | Active skill bodies | system | semi-stable — replaced wholesale on a selector topic shift (omitted when empty) |
 | 4 | Response contract | system | static — output-shape rules |
 | 5 | Injected startup context | user | required, session-stable project/agent/instruction data |
@@ -370,7 +373,7 @@ Stable envelope (request/auth/validation failures before SSE as JSON; generation
 after streaming `meta` as an `error` event):
 
 ```jsonc
-{ "error": { "type": "invalid_request" | "authentication" | "rate_limit" | "api_error",
+{ "error": { "type": "invalid_request_error" | "authentication_error" | "rate_limit_error" | "api_error",
              "code": "…", "message": "…", "param": "…" } }
 ```
 
