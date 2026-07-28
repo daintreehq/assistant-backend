@@ -69,12 +69,14 @@ def _filter_dedup_cap(candidate: list[str], catalog: Catalog, max_active: int) -
     active: list[str] = []
     seen: set[str] = set()
     for sid in candidate:
+        # Check the cap BEFORE admitting: appending first and breaking after would
+        # always let one id through, even at max_active == 0.
+        if len(active) >= max_active:
+            break
         if sid in seen or sid not in catalog:
             continue
         seen.add(sid)
         active.append(sid)
-        if len(active) >= max_active:
-            break
     return active
 
 

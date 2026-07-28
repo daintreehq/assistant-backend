@@ -99,9 +99,14 @@ def _value_satisfiable(value: Any, prop: Any) -> bool:
     own retry (the error then names the field the model actually sent)."""
     if not isinstance(prop, dict):
         return True
+    if "type" not in prop:
+        return True  # genuinely unconstrained — any value fits
     declared = prop.get("type")
     if not isinstance(declared, str):
-        return True
+        # A union or otherwise non-scalar declaration (`"type": ["array", "null"]`).
+        # We cannot cheaply prove the value fits, and a rename that still fails the
+        # schema is worse than leaving the model's own field name in the error. Refuse.
+        return False
     if declared == "array":
         if isinstance(value, list):
             return True
@@ -146,6 +151,12 @@ def repair_arguments(
         if not isinstance(prop, dict):
             continue
         declared = prop.get("type")
+        # A union type (`"type": ["string", "null"]`) is a list, and `list in frozenset`
+        # raises TypeError: unhashable type. Without this guard one union-typed property
+        # aborts the whole call's repair — including a correct rename already applied in
+        # the loop above. Mirrors the same guard in `_value_satisfiable`.
+        if not isinstance(declared, str):
+            continue
         if declared == "array" and value is not None and not isinstance(value, list):
             items = prop.get("items")
             item_type = items.get("type") if isinstance(items, dict) else None

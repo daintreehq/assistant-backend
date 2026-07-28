@@ -776,12 +776,37 @@ class SkillLearner:
             )
         if foundation:
             meta_fields["foundation"] = True
+
+        # On the IMPROVE path a proposal is a partial edit, not a full replacement.
+        # SkillProposal carries per-field defaults (priority=100, risk="read", empty
+        # tags/requiredTools), so a proposal that simply OMITS one would silently reset
+        # the target's real value — and priority/risk/tags/requiredTools all feed the
+        # selector prompt, so that quietly destroys routing signal. Seed each from the
+        # existing skill and let the proposal overwrite only what it actually SET,
+        # mirroring the conservative treatment `foundation` gets above.
+        set_fields = proposal.model_fields_set
+        prior = existing.meta if existing is not None else None
+
+        priority = proposal.priority
+        risk = proposal.risk
+        tags = list(proposal.tags)
+        tools = list(proposal.required_tools)
+        if prior is not None:
+            if "priority" not in set_fields:
+                priority = prior.priority
+            if "risk" not in set_fields:
+                risk = prior.risk
+            if "tags" not in set_fields:
+                tags = list(prior.tags)
+            if "required_tools" not in set_fields:
+                tools = list(prior.required_tools)
+
         meta_fields.update(
             {
-                "priority": min(1000, max(0, proposal.priority)),
-                "risk": proposal.risk.strip().lower(),
-                "tags": list(proposal.tags),
-                "requiredTools": list(proposal.required_tools),
+                "priority": min(1000, max(0, priority)),
+                "risk": risk.strip().lower(),
+                "tags": list(tags),
+                "requiredTools": list(tools),
             }
         )
         markdown = self._render_markdown(meta_fields, proposal.body)

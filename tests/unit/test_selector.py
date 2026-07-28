@@ -87,6 +87,29 @@ def test_parse_select_args_missing_skill_ids_is_malformed(catalog) -> None:
     assert parsed[0] == []
 
 
+def test_parse_select_args_all_unknown_ids_is_malformed(catalog) -> None:
+    # The model NAMED skills but none resolved (stale catalog, hallucinated ids). That
+    # is not an authoritative "clear all" — same reasoning as the missing-key case — so
+    # it must trigger repair/fail-open rather than silently evicting the active set.
+    raw = json.dumps({"skill_ids": ["daintree.nope.one", "daintree.nope.two"]})
+    assert parse_select_args(raw, catalog, 3) is None
+    # ...but a mix still resolves to the known subset (a partial miss is not malformed).
+    known = sorted(catalog.known_ids)[0]
+    mixed = json.dumps({"skill_ids": ["daintree.nope.one", known]})
+    parsed = parse_select_args(mixed, catalog, 3)
+    assert parsed is not None
+    assert parsed[0] == [known]
+
+
+def test_parse_select_args_zero_cap_admits_nothing(catalog) -> None:
+    # The cap is checked BEFORE admitting: appending first and breaking after would
+    # always let exactly one id through, even at max_active == 0.
+    known = sorted(catalog.known_ids)[:2]
+    parsed = parse_select_args(json.dumps({"skill_ids": known}), catalog, 0)
+    assert parsed is not None
+    assert parsed[0] == []
+
+
 def test_sanitize_budget_keeps_newest() -> None:
     messages = _msgs(*[f"message number {i}" for i in range(50)])
     evidence, truncated = sanitize_for_selector(messages, token_budget=10)

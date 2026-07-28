@@ -199,8 +199,16 @@ def _u_extract_text(inp: TerminalExtractTextInput, _req: TaskRequest) -> str:
 
 def _u_extract_json(inp: TerminalExtractJsonInput, req: TaskRequest) -> str:
     schema = req.result_schema
+    # Render COMPACT — the same form `validate_result_schema` already measured against
+    # its 32 KiB limit, so what reaches the prompt is exactly what the operator's cap
+    # bounded (an indented render of a depth-heavy schema expands several-fold).
+    # Deliberately NOT truncated: this schema is the contract the model must conform
+    # to, so a clipped one is worse than a large one — it would silently drop trailing
+    # constraints while output validation still applies the full schema.
     schema_text = (
-        json.dumps(schema, indent=2, sort_keys=True) if schema else "any JSON value"
+        json.dumps(schema, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
+        if schema
+        else "any JSON value"
     )
     return (
         f"Source terminal(s): {', '.join(inp.terminal_ids) or '(unspecified)'}\n"
@@ -396,26 +404,34 @@ def _p_memory_distill(raw: str, _req: TaskRequest) -> dict[str, Any]:
     data = _loads_lenient(raw)
     facts: list[dict[str, str]] = []
     seen: set[str] = set()
-    if isinstance(data, list):
-        for item in data:
-            if isinstance(item, str):
-                fact, kind = item.strip(), "semantic"
-            elif isinstance(item, dict):
-                fact = str(item.get("fact", "")).strip()
-                kind = item.get("kind", "semantic")
-                if kind not in ("semantic", "episodic"):
-                    kind = "semantic"
-            else:
-                continue
-            if not fact:
-                continue
-            key = fact.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            facts.append({"fact": fact[:400], "kind": kind})
-            if len(facts) >= MAX_DISTILLED_FACTS:
-                break
+    # The prompt asks for a bare array, but tolerate the common {"facts": [...]}
+    # envelope. Anything else is a parse FAILURE, not an empty result: silently
+    # returning {"facts": []} on a wrong-shaped payload would 200 with no data and
+    # deny the repair retry its one chance to fix the shape (every sibling parser
+    # raises here).
+    if isinstance(data, dict):
+        data = data.get("facts")
+    if not isinstance(data, list):
+        raise TaskParseError("memory distill output is not a JSON array of facts")
+    for item in data:
+        if isinstance(item, str):
+            fact, kind = item.strip(), "semantic"
+        elif isinstance(item, dict):
+            fact = str(item.get("fact", "")).strip()
+            kind = item.get("kind", "semantic")
+            if kind not in ("semantic", "episodic"):
+                kind = "semantic"
+        else:
+            continue
+        if not fact:
+            continue
+        key = fact.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        facts.append({"fact": fact[:400], "kind": kind})
+        if len(facts) >= MAX_DISTILLED_FACTS:
+            break
     return {"facts": facts}
 
 
@@ -764,7 +780,11 @@ class TaskRunner:
             try:
                 output = profile.parse_output(repair.text, request)
             except (TaskParseError, ValidationError) as exc:
-                hint = _EXTRACT_EMPTY_HINT if profile.id == _SCHEMA_TASK else ""
+                # Don't blame the agent for OUR truncation: _EXTRACT_EMPTY_HINT says the
+                # agent may have crashed, which is a false diagnosis when the repair was
+                # simply cut off at the token cap.
+                truncated = finish == "length"
+                hint = _EXTRACT_EMPTY_HINT if profile.id == _SCHEMA_TASK and not truncated else ""
                 raise _task_output_invalid(profile.id, hint) from exc
 
         logger.info("task_run", task=profile.id, finish_reason=finish)

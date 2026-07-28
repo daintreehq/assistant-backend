@@ -180,7 +180,7 @@ class Settings(BaseSettings):
     max_result_schema_properties: int = Field(default=128, alias="MAX_RESULT_SCHEMA_PROPERTIES")
     max_result_schema_enum: int = Field(default=128, alias="MAX_RESULT_SCHEMA_ENUM")
     max_result_schema_string: int = Field(default=4096, alias="MAX_RESULT_SCHEMA_STRING")
-    max_active_skills: int = Field(default=3, alias="MAX_ACTIVE_SKILLS")
+    max_active_skills: int = Field(default=3, ge=0, alias="MAX_ACTIVE_SKILLS")
     max_meta_header_bytes: int = Field(default=6 * 1024, alias="MAX_META_HEADER_BYTES")
 
     # ---- Timeouts (seconds) --------------------------------------------

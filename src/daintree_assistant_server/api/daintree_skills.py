@@ -74,6 +74,8 @@ async def resolve_skills(
         instruction_revision=body.instruction_revision,
         query=body.query,
         skill_ids=body.skill_ids,
-        request_id=request.headers.get("x-request-id"),
+        # The middleware-resolved id, so the body and X-Request-Id always agree.
+        # Reading the raw header instead mints a SECOND id when the client sends none.
+        request_id=getattr(request.state, "request_id", None),
     )
     return JSONResponse(content=result)

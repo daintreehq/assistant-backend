@@ -51,6 +51,24 @@ _TARGET = (
     "Use when: the original condition.\n\nProcedure:\n1. Original step.\n\nReport back: original.\n"
 )
 
+_TARGET_RICH_META = (
+    "---\n"
+    "id: daintree.test.target\n"
+    "title: Target\n"
+    "summary: The original target summary.\n"
+    "whenToUse: Use when improving the target.\n"
+    "priority: 180\n"
+    "risk: git\n"
+    "tags:\n"
+    "  - daintree\n"
+    "  - worktree\n"
+    "requiredTools:\n"
+    "  - context.snapshot\n"
+    "  - terminal.awaitAll\n"
+    "---\n"
+    "Use when: the original condition.\n\nProcedure:\n1. Original step.\n\nReport back: original.\n"
+)
+
 _TARGET_FOUNDATION = (
     "---\n"
     "id: daintree.test.target\n"
@@ -390,6 +408,55 @@ async def test_improve_preserves_foundation_flag(tmp_path: Path) -> None:
     assert skill is not None
     assert skill.summary == "An improved target summary."  # the improve landed
     assert skill.meta.foundation is True  # ...and foundation survived the rewrite
+
+
+@pytest.mark.asyncio
+async def test_improve_preserves_omitted_frontmatter(tmp_path: Path) -> None:
+    # An improve proposal is a PARTIAL edit. SkillProposal defaults priority to 100,
+    # risk to "read" and tags/requiredTools to empty, so a proposal that simply omits
+    # them must NOT reset the target's real values — all four feed the selector prompt,
+    # so resetting them silently destroys routing signal.
+    proposal = {k: v for k, v in PROPOSAL_IMPROVE.items()
+                if k not in {"priority", "risk", "tags", "requiredTools"}}
+    fake = _provider(GATE_IMPROVE, proposal)
+    learner, manager, _ = _learner(
+        tmp_path, fake, with_target=True, target_text=_TARGET_RICH_META
+    )
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is True
+    skill = manager.catalog.get("daintree.test.target")
+    assert skill is not None
+    assert skill.summary == "An improved target summary."  # the improve landed
+    assert skill.meta.priority == 180  # ...and none of these were reset
+    assert skill.meta.risk == "git"
+    assert skill.meta.tags == ["daintree", "worktree"]
+    assert skill.meta.required_tools == ["context.snapshot", "terminal.awaitAll"]
+
+
+@pytest.mark.asyncio
+async def test_improve_applies_explicitly_set_frontmatter(tmp_path: Path) -> None:
+    # The carry-over must not freeze metadata: a field the proposal actually SETS still
+    # wins, so the improver can still sharpen tags after a diagnosed selection miss.
+    proposal = {k: v for k, v in PROPOSAL_IMPROVE.items() if k != "priority"}
+    # requiredTools is supplied under its camelCase ALIAS: the carry-over keys off
+    # `model_fields_set`, which records the FIELD name, so the alias must still win.
+    proposal |= {
+        "risk": "project",
+        "tags": ["daintree", "sharpened"],
+        "requiredTools": ["context.snapshot"],
+    }
+    fake = _provider(GATE_IMPROVE, proposal)
+    learner, manager, _ = _learner(
+        tmp_path, fake, with_target=True, target_text=_TARGET_RICH_META
+    )
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is True
+    skill = manager.catalog.get("daintree.test.target")
+    assert skill is not None
+    assert skill.meta.risk == "project"
+    assert skill.meta.tags == ["daintree", "sharpened"]
+    assert skill.meta.required_tools == ["context.snapshot"]  # camelCase alias won
+    assert skill.meta.priority == 180  # untouched field still carried over
 
 
 @pytest.mark.asyncio

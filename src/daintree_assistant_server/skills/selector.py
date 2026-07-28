@@ -203,6 +203,10 @@ def parse_select_args(
     clean: list[str] = []
     seen: set[str] = set()
     for item in raw_ids:
+        # Check the cap BEFORE admitting: appending first and breaking after would
+        # always let one id through, even at max_active == 0.
+        if len(clean) >= max_active:
+            break
         if not isinstance(item, str):
             continue
         sid = item.strip()
@@ -210,8 +214,13 @@ def parse_select_args(
             continue
         seen.add(sid)
         clean.append(sid)
-        if len(clean) >= max_active:
-            break
+
+    # The model NAMED skills but none resolved (stale catalog, hallucinated id). That is
+    # not an authoritative "clear all" — same reasoning as the missing-key guard above, so
+    # treat it as malformed: the caller repairs once, then fails open to the prior set.
+    # Only an explicit empty array clears. Skipped when the cap itself left no room.
+    if raw_ids and not clean and max_active > 0:
+        return None
 
     try:
         confidence = float(data.get("confidence", 0.0))
