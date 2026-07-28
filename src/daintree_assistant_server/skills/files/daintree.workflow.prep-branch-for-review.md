@@ -38,7 +38,12 @@ branch, prNumber, prUrl, ... } | null }` — if `prNumber` is already set, a PR 
 this branch and the job is usually "ready/update it," not "create a new one."
 
 ## Step 2 — Don't open a duplicate PR
-`forge.listPRs({ state: "open" })` -> `{ items: [PR...], nextCursor, hasMore }`. Each PR
+`forge.listPRs({ arguments: { state: "open" } })` -> `{ items: [PR...], nextCursor, hasMore }`.
+`forge.listPRs`, `forge.listIssues`, and `forge.getIssue` are passthrough wrappers accepting
+ONLY `arguments` at the top level — nest every query field inside it; a top-level `state` is
+rejected outright. (`forge.getPR` is TYPED: `{ prNumber, cwd? }` at the top level. The
+`daintree.call forge.*` actions in step 4 are a different surface: `daintree.call` itself takes
+`{ name, arguments, requestKey? }`, and the forge payload goes flat inside its `arguments`.) Each PR
 carries `head`/`number`/`url`/`reviewDecision?`/`ciStatus?`. If an open PR's head is this
 branch, you are updating, not creating — skip the PR-create in step 5 and just push.
 

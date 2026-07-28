@@ -36,14 +36,15 @@ Procedure:
 
 1. Orient if the target is ambiguous. recipe.run lands in the focused/active worktree by default, so before mutating anything pin WHERE the recipe should go: context.snapshot (its terminals digest shows what is already running), then worktree.getCurrent / worktree.list for the worktree set. Skip this only when the user already named the worktree (or you're creating a fresh one in step 3).
 
-2. Discover recipes when needed. recipe.list({ worktreeId? }) ->
+2. Discover recipes when needed. recipe.list({ arguments: { worktreeId? } }) ->
    { recipes: [{ id, name, worktreeId, terminalCount, showInEmptyState }], isLoading }.
+   Argument shape (these are strict — a stray top-level key is rejected outright): `recipe.list` takes ONLY `arguments`; `worktree.createWithRecipe` takes a required `arguments` plus an optional top-level `requestKey`; `recipe.run` takes a required top-level `recipeId` (merged last, so it always wins) plus optional top-level `arguments` and `requestKey`. Every recipe-defined field nests inside `arguments`.
    Pick the recipe by name/id with the user. LOOK AHEAD: terminalCount tells you HOW MANY terminals will spawn, but recipe.list gives NO per-terminal kind — you cannot tell from listing whether any terminal is a live agent. You only learn that AFTER the run, by inspecting the terminals (step 5). Don't promise "this is just a dev server" off a recipe.list entry.
 
 3. Run or create. Both are mutating and will confirm; pass a requestKey when you can (Daintree dedupes on it and strips it before validation).
-   - Apply a recipe to an EXISTING worktree -> recipe.run({ recipeId, worktreeId? }) ->
+   - Apply a recipe to an EXISTING worktree -> recipe.run({ recipeId, arguments: { worktreeId? } }) ->
      { spawnedCount, failedCount, failedTerminals: [{ index, reason }] }.
-   - Create a NEW worktree AND run a startup recipe -> worktree.createWithRecipe({ branchName?, baseBranch?, recipeId?, fromRemote?, useExistingBranch?, issueNumber? | pullRequestNumber?, assignToSelf? }) ->
+   - Create a NEW worktree AND run a startup recipe -> worktree.createWithRecipe({ arguments: { branchName?, baseBranch?, recipeId?, fromRemote?, useExistingBranch?, issueNumber? | pullRequestNumber?, assignToSelf? } }) ->
      { worktreeId, worktreePath, branch, recipeLaunched, spawnedTerminalCount, failedTerminalCount, assignedToSelf, assignedUsername, assignmentError }.
      (issueNumber and pullRequestNumber are mutually exclusive.) recipeLaunched is true iff ≥1 terminal spawned.
 

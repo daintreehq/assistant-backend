@@ -45,9 +45,13 @@ Procedure:
    target worktree is ambiguous, resolve it before mutating.
 
 2. Identify the issue. If the user named a number, go straight to step 3. Otherwise
-   list candidates with `forge.listIssues({ state: "open" })` -> `{ items: Issue[],
-   nextCursor, hasMore }` and confirm WHICH one with the user. Then ground the task
-   with `forge.getIssue({ issueNumber })` -> the Issue object (title, body, `labels[]`,
+   list candidates with `forge.listIssues({ arguments: { state: "open" } })` -> `{ items: Issue[],
+   nextCursor, hasMore }` and confirm WHICH one with the user. `forge.listIssues`,
+   `forge.listPRs`, and `forge.getIssue` are passthrough wrappers that accept ONLY
+   `arguments` at the top level — nest every query field inside it; a top-level
+   `state`/`issueNumber` is rejected outright. (`forge.getPR` is the exception: it is TYPED
+   and takes `{ prNumber, cwd? }` at the top level.) Then ground the
+   task with `forge.getIssue({ arguments: { issueNumber } })` -> the Issue object (title, body, `labels[]`,
    `assignees[]`, `commentCount?`, …). Read it before mutating anything — it shapes the
    agent's prompt and tells you if it's already assigned.
 
@@ -56,9 +60,12 @@ Procedure:
    id still creates a terminal, but command generation fails silently -> a dead,
    zero-output panel the watcher then babysits forever. A name the user spoke or typed
    is only a HINT (voice transcription drops letters — "antigravity"->"antiravity"), so
-   resolve it to a REAL configured id from the roster, which you read with
-   `daintree.call agentSettings.get` -> `{ agents }` (keyed by agent id: claude, codex,
-   gemini, antigravity, opencode, aider, …). Never pass an unverified name through.
+   resolve it to a REAL configured id. Start from the agent registry in your startup
+   context rather than `daintree.call agentSettings.get`, which is a system-risk escape
+   hatch requiring typed confirmation. But the registry is not guaranteed complete — it
+   says "complete" or "partial" and reports rows omitted by the size limit — so fall back
+   to `agentSettings.get` whenever it is absent, partial, reports omissions, or simply
+   does not contain the id you are trying to resolve. Never pass an unverified name through.
 
 4. Confirm, then launch. workflow.startWorkOnIssue mutates real state and touches the
    forge (external risk) — confirm per the active tier. The wrapper takes the Daintree

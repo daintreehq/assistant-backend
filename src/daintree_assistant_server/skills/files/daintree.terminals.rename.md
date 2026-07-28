@@ -14,7 +14,7 @@ tags:
   - agent
 requiredTools:
   - context.snapshot
-  - terminal.extract
+  - terminal.extract.json
   - terminal.rename
 ---
 Use when: the user wants terminals/agents/tabs renamed or titled — e.g. "figure out what each of these is doing and give them a proper title", "rename these", "title the agents".
@@ -23,21 +23,20 @@ The tool is terminal.rename({ terminalId, name }). It is always callable by name
 
 Always pass BOTH terminalId AND a non-empty name: omitting name opens an interactive rename dialog instead of renaming, and omitting terminalId targets the focused tab. Be explicit on every call.
 
-Most tool calls in one response are dispatched ONE AFTER ANOTHER (only no-wait terminal.extract/.json batches run concurrently) — and for THIS job the fast path is still FEWER model calls, not a big batch: one question ("title each terminal") spans the whole cohort, so read every terminal in ONE terminal.extract over all the ids (a single small-model call), not one extract or summarize per terminal.
+Most tool calls in one response are dispatched ONE AFTER ANOTHER (only no-wait terminal.extract/.json batches run concurrently) — and for THIS job the fast path is still FEWER model calls, not a big batch: one question ("title each terminal") spans the whole cohort, so read every terminal in ONE terminal.extract.json over all the ids (a single small-model call), not one extract or summarize per terminal.
 
 Procedure:
 1. GET THE IDS. If you don't already have the terminal ids + current titles, call context.snapshot (it embeds the terminal list). If the user pointed at a subset ("these three"), keep only those ids.
-2. UNDERSTAND — in ONE call. Call terminal.extract over ALL the ids at once (it accepts up to 16 terminalIds) with an instruction that asks for a per-terminal title, e.g. instruction: "For EACH terminal, give one line `<terminalId> — <short tab title of what this agent is doing>` (max ~6 words per title)." That is a single model read of the whole cohort. Skip this entirely for any terminal whose job you already know. The extract result is a LEAF — read it, don't re-extract or summarize it.
+2. UNDERSTAND — in ONE call. You need one answer PER terminal across a cohort, which is exactly what `terminal.extract.json` is for; a plain-TEXT `terminal.extract` over several terminalIds MERGES them into ONE answer instead of returning one per terminal. Call it over ALL the ids at once (it accepts up to 16 terminalIds) with an array schema keyed by terminalId:
+   `terminal.extract.json({"terminalIds":[...],"instruction":"For EACH terminal, a short tab title (max ~6 words) describing what it is doing.","jsonSchema":"{\"type\":\"object\",\"properties\":{\"titles\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"terminalId\":{\"type\":\"string\"},\"title\":{\"type\":\"string\"}},\"required\":[\"terminalId\",\"title\"]}}},\"required\":[\"titles\"]}"})`
+   That is a single model read of the whole cohort, attributed per terminal. Skip this entirely for any terminal whose job you already know. The extract result is a LEAF — read it, don't re-extract or summarize it.
 3. RENAME. Emit one terminal.rename per id: terminal.rename({ "terminalId": "<id>", "name": "<short title>" }). Keep names short and scannable, leading with the kind of work. terminal.rename is UI-only (no confirmation) and each call is a cheap local UI op, so renaming the whole set is quick even though the calls run in sequence.
 
 Then report a one-line "what it's doing" for each terminal next to its new title.
 
 Fast-path shape (three agents all titled "Claude"):
   context.snapshot()                               // → ids t1, t2, t3 + current titles
-  terminal.extract({                               // ONE call reads all three
-    terminalIds: ["t1", "t2", "t3"],
-    instruction: "For EACH terminal, output `<terminalId> — <≤6-word title of what it is doing>`."
-  })
+  terminal.extract.json({ terminalIds: ["t1","t2","t3"], ... })   // ONE call, one entry each — step 2's schema
   // then, from that one result:
   terminal.rename({ terminalId: "t1", name: "bug: allowlist gap in WorkspaceHostProcess" })
   terminal.rename({ terminalId: "t2", name: "merge pipeline: PRs #10779-84" })
