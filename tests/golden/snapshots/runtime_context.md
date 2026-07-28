@@ -1,7 +1,6 @@
 # Runtime context
 Permission tier: operator — you act on the user's behalf; mutating actions require per-action confirmation.
 Daintree MCP: connected (stdio transport, 42 tools)
-Models: large=deepseek-v4-flash, small=deepseek-v4-flash
 
 
 # Current worktree

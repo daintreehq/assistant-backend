@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ..config import DEEPSEEK_MODEL, DEEPSEEK_REASONING_EFFORT, Settings
+from ..config import DEEPSEEK_REASONING_EFFORT, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import (
     AgentSnapshot,
@@ -322,8 +322,6 @@ class PromptAssembler:
             tier_description=tier_description,
             mcp_status_line=mcp_status_line,
             mcp_connected=mcp_connected,
-            large_model=DEEPSEEK_MODEL,
-            small_model=DEEPSEEK_MODEL,
             scheduler_active=rc.scheduler_active,
             worktree=self._worktree_context(rc),
             open_terminals=open_terminals,

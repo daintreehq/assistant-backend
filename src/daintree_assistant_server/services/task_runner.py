@@ -545,8 +545,10 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 "checkpoint", CheckpointInput, "json", _u_checkpoint, _p_checkpoint,
                 max_output_tokens=1200, timeout_seconds=heavy_timeout,
                 sensitive_fields=frozenset({"transcript"}),
-                repair_hint="Return a single JSON object with the checkpoint fields described "
-                "above (goal, decisions, next_actions, open_questions, preserved_ids, …).",
+                repair_hint="Return a single JSON object with all twelve checkpoint fields "
+                "described above: goal, user_directives, active_terminals, active_watchers, "
+                "workflow_run_ids, decisions, failed_approaches, pending_tool_state, "
+                "next_actions, open_questions, approvals_grants, preserved_ids.",
             ),
             TaskProfile(
                 "memory_distill", MemoryDistillInput, "json", _u_memory_distill,

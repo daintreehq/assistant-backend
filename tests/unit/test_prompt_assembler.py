@@ -152,9 +152,15 @@ def test_no_skill_block_when_set_is_empty(assembler: PromptAssembler) -> None:
     assert not any("## Skill 1:" in (m.get("content") or "") for m in pr.messages)
 
 
-def test_no_skills_fallback(assembler: PromptAssembler) -> None:
-    rendered = assembler.render_loaded_skills([])
-    assert "No task-specific skills" in rendered
+def test_no_skills_renders_nothing(assembler: PromptAssembler) -> None:
+    """An empty skill set must render no content.
+
+    ``build_main_request`` only appends this message when ``skills`` is
+    non-empty, so an empty render must not emit a stray "Loaded skills"
+    header or fallback prose — there is no reachable empty-state to show.
+    (The template still ends with a newline; only content is pinned here.)
+    """
+    assert assembler.render_loaded_skills([]).strip() == ""
 
 
 def test_startup_context_strips_control_chars(assembler: PromptAssembler) -> None:

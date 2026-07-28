@@ -1,7 +1,6 @@
 # Runtime context
 Permission tier: {{ tier }} — {{ tier_description }}
 Daintree MCP: {{ mcp_status_line }}
-Models: large={{ large_model }}, small={{ small_model }}
 {% if not mcp_connected %}NOTE: Daintree MCP is NOT connected. You are in degraded local mode: fs/timer/watcher/queue tools work, but Daintree orchestration tools will fail until a connection is provided. Tell the user clearly rather than pretending.
 {% endif %}{% if not scheduler_active %}NOTE: the scheduler is NOT running in this one-shot invocation, so nothing is being supervised by THIS process right now. Timers, watchers, and async operations are project-scoped and durable — they persist and are picked up by the interactive assistant or its background supervisor on the next launch — but do not imply this invocation is watching anything live.
 {% endif %}{% if worktree %}

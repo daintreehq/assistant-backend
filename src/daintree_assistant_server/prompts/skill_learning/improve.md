@@ -19,11 +19,11 @@ Return ONLY a JSON object (no prose, no code fences):
   "title": "<keep or refine>",
   "summary": "<keep or refine>",
   "whenToUse": "<keep or refine>",
-  "priority": 100,                               // 0-1000
-  "risk": "read|local|ui|terminal|project|external|git|system",
+  "priority": 100,                               // 0-1000; carry the given skill's value over unless it is genuinely wrong
+  "risk": "read|local|ui|terminal|project|external|git|system",  // carry the given skill's value over unless the procedure's risk actually changed
   "foundation": <keep the given skill's value>,  // true only if it already is one — see the rule
-  "tags": ["daintree", "..."],
-  "requiredTools": ["..."],
+  "tags": ["daintree", "..."],                   // start from the given skill's tags; change one only when you diagnosed it as a routing problem
+  "requiredTools": ["..."],                      // the tools the improved body actually calls: carry the rest over, add new ones, drop any the body no longer uses
   "body": "<the FULL improved body — not a diff>",
   "change_summary": ["<each concrete change, one line>"],
   "what_worked": ["<parts of the skill that performed well and were preserved>"],
