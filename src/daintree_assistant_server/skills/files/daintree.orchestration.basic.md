@@ -30,7 +30,6 @@ requiredTools:
   - terminal.read
   - terminal.summarize
   - terminal.extract
-  - terminal.extract.async
   - terminal.awaitAll
   - terminal.run.async
   - terminal.await.async

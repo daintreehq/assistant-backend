@@ -310,8 +310,34 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
     assert result.model == "deepseek-v4-flash"
 
 
-def test_all_twelve_profiles_registered(task_runner: TaskRunner) -> None:
-    assert len(task_runner.task_ids()) == 12
+# The task ids are a FROZEN WIRE CONTRACT shared with the Go CLI, which hardcodes
+# them in internal/backend/tasks.go (coreTaskIDs) and internal/backend/workflowtasks.go
+# (workflowTaskIDs). Any change here must land in that repo in the same window.
+#
+# This assertion used to be `len(task_ids()) == 12`, and a count is provably blind to
+# the failure that actually happened: on 2026-07-07 every id was de-versioned (a `.v1`
+# suffix dropped), the count stayed 12, this test stayed green — and the CLI 404'd on
+# every task call at runtime. Assert the exact set, never the size.
+EXPECTED_TASK_IDS = frozenset(
+    {
+        "checkpoint",
+        "memory_distill",
+        "watcher_classify",
+        "terminal_judge",
+        "terminal_summarize",
+        "terminal_extract_text",
+        "terminal_extract_json",
+        "extraction_verdict",
+        "skill_step_consistency",
+        "workflow_plan",
+        "workflow_reconcile",
+        "workflow_resume_digest",
+    }
+)
+
+
+def test_task_ids_are_the_frozen_wire_contract(task_runner: TaskRunner) -> None:
+    assert set(task_runner.task_ids()) == EXPECTED_TASK_IDS
 
 
 # ---- result_schema (terminal_extract_json) ---------------------------

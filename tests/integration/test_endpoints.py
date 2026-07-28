@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from fakes import make_result, selection_result
+from unit.test_task_runner import EXPECTED_TASK_IDS
 
 SKILL_PREP = "daintree.workflow.prep-branch-for-review"
 
@@ -40,7 +41,12 @@ def test_capabilities(client, auth) -> None:
     assert body["respond"]["stream_events"] == ["meta", "status", "delta", "done", "error"]
     assert body["respond"]["thinking_enabled"] is True  # hardcoded posture, not config
     assert body["respond"]["multimodal_images"]["remote_urls"] is False
-    assert len(body["tasks"]) == 12
+    # Exact set, not a count: the ids are a frozen wire contract the Go CLI hardcodes
+    # (internal/backend/tasks.go + workflowtasks.go). A count-only assertion passed
+    # straight through the 2026-07-07 de-versioning incident — same 12 tasks, all
+    # renamed, every CLI task call 404'd. See EXPECTED_TASK_IDS in
+    # tests/unit/test_task_runner.py.
+    assert set(body["tasks"]) == EXPECTED_TASK_IDS
     assert body["skills"]["manual_resolve"] is True
     wf = body["workflow_intelligence"]
     assert wf["turn_context_field"] == "workflow_state"
