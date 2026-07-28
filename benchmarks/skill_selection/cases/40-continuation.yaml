@@ -5,7 +5,7 @@
 cases:
   - id: continue-multi-agent-relay
     category: continuation
-    active: [daintree.orchestration.multi-agent, daintree.orchestration.basic]
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
     messages:
       - role: user
         content: >-
@@ -25,10 +25,16 @@ cases:
         content: Great — now relay bravo's critique to alpha and get a revised plan.
     expect:
       required: [daintree.orchestration.multi-agent]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: continue-issue-check-agent
     category: continuation
+    note: >-
+      A progress check on the ONE in-flight issue workflow. The original ending
+      ("Anything stuck?") nearly quoted supervise-fleet's "is anyone stuck?" and
+      recover-agent's stuck clause, which made both defensible picks against a
+      start-work-on-issue-only expectation; there is one agent and no fault, so the
+      workflow skill still governs.
     active: [daintree.workflow.start-work-on-issue]
     messages:
       - role: user
@@ -46,14 +52,14 @@ cases:
           Issue 231 is underway — worktree csv-export-231, agent in terminal 7 with
           a supervisor watcher attached.
       - role: user
-        content: How's the agent doing on the issue? Anything stuck?
+        content: How's the agent getting on with issue 231?
     expect:
       required: [daintree.workflow.start-work-on-issue]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: continue-competition-tally
     category: continuation
-    active: [daintree.orchestration.competition, daintree.orchestration.basic]
+    active: [daintree.orchestration.competition, daintree.foundation]
     messages:
       - role: user
         content: >-
@@ -67,11 +73,11 @@ cases:
         content: Do it — collect the votes and tally the winner now.
     expect:
       required: [daintree.orchestration.competition]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: continue-rename-two-more
     category: continuation
-    active: [daintree.terminals.rename, daintree.orchestration.basic]
+    active: [daintree.terminals.rename, daintree.foundation]
     messages:
       - role: user
         content: Give my terminals clear names.
@@ -81,11 +87,16 @@ cases:
         content: Also rename the two new ones that just opened.
     expect:
       required: [daintree.terminals.rename]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: continue-recipe-supervise
     category: continuation
-    note: The recipe skill covers supervising the LIVE agent the recipe spawned.
+    note: >-
+      The recipe skill covers supervising the LIVE agent the recipe spawned. Phrased as
+      an IN-TURN wait the user sits through: the original "watch that review agent and
+      tell me when it finishes" is watch-outcome's trigger (supervision that OUTLIVES the
+      turn), which made the case unwinnable — watch-outcome is exactly what "woken later,
+      not waited on now" excludes here.
     active: [daintree.recipe.run-or-create]
     messages:
       - role: user
@@ -102,14 +113,16 @@ cases:
         content: >-
           The pr-review recipe is up — the review agent is working in terminal 5.
       - role: user
-        content: Watch that review agent and tell me when it finishes.
+        content: >-
+          Hang on for that review agent and tell me what it came back with — I'm
+          sitting here waiting on it.
     expect:
       required: [daintree.recipe.run-or-create]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: continue-prep-after-verdict
     category: continuation
-    active: [daintree.workflow.prep-branch-for-review, daintree.orchestration.basic]
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
     messages:
       - role: user
         content: Is this branch ready for review?
@@ -127,4 +140,4 @@ cases:
         content: Go ahead — push and open the PR.
     expect:
       required: [daintree.workflow.prep-branch-for-review]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]

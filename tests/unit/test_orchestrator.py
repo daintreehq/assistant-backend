@@ -1,10 +1,11 @@
-"""Respond orchestrator unit tests (merge + selector cadence)."""
+"""Respond orchestrator unit tests (active-set resolution + selector cadence)."""
 
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import pytest
@@ -20,90 +21,133 @@ from daintree_assistant_server.services.chat_orchestrator import (
     merge_active_skills,
     resolve_active_skills,
 )
+from daintree_assistant_server.services.prompt_assembler import (
+    PromptAssembler,
+    render_order_ids,
+)
+from daintree_assistant_server.skills.catalog import Catalog
+from daintree_assistant_server.skills.loader import parse_skill
 from daintree_assistant_server.skills.selector import SelectionDecision
+
+
+def _assert_foundation_closed(catalog, active: list[str]) -> None:
+    """Every admitted skill's domain foundation is admitted too.
+
+    The explicit-load path signs a state token, and the reuse/degraded paths replay
+    that set verbatim — so an unclosed set minted here would propagate a
+    foundation-less active set through every following round.
+    """
+    for sid in active:
+        foundation_id = catalog.domain_foundation(sid)
+        if foundation_id is not None:
+            assert foundation_id in active, f"{sid} admitted without {foundation_id}"
 
 
 def test_merge_additive_new_first(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    active, newly = merge_active_skills([ids[2]], [ids[0], ids[1]], catalog, 3)
-    assert active == [ids[2], ids[0], ids[1]]
-    assert newly == [ids[2]]
+    merged = merge_active_skills([ids[2]], [ids[0], ids[1]], catalog, 3)
+    # The explicitly loaded id leads; prior ids follow in their existing order.
+    assert merged.active[0] == ids[2]
+    assert merged.newly_loaded[0] == ids[2]
+    assert [s for s in merged.active if s in (ids[0], ids[1])] == [
+        s for s in (ids[0], ids[1]) if s in merged.active
+    ]
+    _assert_foundation_closed(catalog, merged.active)
 
 
-def test_merge_caps_at_three(catalog) -> None:
+def test_merge_caps_at_max_active(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    active, newly = merge_active_skills([ids[3]], [ids[0], ids[1], ids[2]], catalog, 3)
-    assert len(active) == 3
-    assert active[0] == ids[3]
-    assert ids[2] not in active  # oldest dropped
+    merged = merge_active_skills([ids[3]], [ids[0], ids[1], ids[2]], catalog, 3)
+    assert len(merged.active) <= 3
+    assert merged.active[0] == ids[3]  # the explicit load always wins its slot
+    assert merged.dropped_over_cap  # the oldest prior ids yield
+    assert set(merged.dropped_over_cap).isdisjoint(merged.active)
+    _assert_foundation_closed(catalog, merged.active)
 
 
 def test_merge_empty_selection_keeps_prior(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    active, newly = merge_active_skills([], [ids[0]], catalog, 3)
-    assert active == [ids[0]]
-    assert newly == []
+    merged = merge_active_skills([], [ids[0]], catalog, 3)
+    assert ids[0] in merged.active
+    # Closure may pull the foundation in, but nothing the caller already had is "new".
+    assert ids[0] not in merged.newly_loaded
+    _assert_foundation_closed(catalog, merged.active)
 
 
 def test_merge_drops_unknown(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    active, newly = merge_active_skills(["nope", ids[0]], [], catalog, 3)
-    assert active == [ids[0]]
+    merged = merge_active_skills(["nope", ids[0]], [], catalog, 3)
+    assert "nope" not in merged.active
+    assert ids[0] in merged.active
+    # An unknown id is not a capacity signal.
+    assert merged.dropped_over_cap == []
+    _assert_foundation_closed(catalog, merged.active)
 
 
 def test_merge_no_duplicate_load(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    active, newly = merge_active_skills([ids[0]], [ids[0]], catalog, 3)
-    assert active == [ids[0]]
-    assert newly == []
+    merged = merge_active_skills([ids[0]], [ids[0]], catalog, 3)
+    assert merged.active.count(ids[0]) == 1
+    assert merged.newly_loaded == [
+        s for s in merged.active if s != ids[0]
+    ]  # only a pulled-in foundation can be new
+    _assert_foundation_closed(catalog, merged.active)
 
 
 # ---- resolve_active_skills: per-turn authoritative selection ----------------
+#
+# These run against the REAL catalog, whose foundation topology moves (ids are
+# reshaped; a foundation may resolve for every skill). They therefore assert the
+# topology-independent half of the contract — what is evicted, what is newly
+# loaded, the cap — while the synthetic-catalog block below pins the exact
+# admission shape and the property test re-checks all of it over real ids.
 
 
 def test_resolve_successful_run_replaces_prior(catalog) -> None:
     # A successful selector run is authoritative: prior skills not re-listed are evicted.
     ids = sorted(catalog.known_ids)
     decision = SelectionDecision(skill_ids=[ids[1]], ran=True, degraded=False)
-    active, newly = resolve_active_skills(decision, [ids[0]], catalog, 3)
-    assert active == [ids[1]]
-    assert newly == [ids[1]]
+    result = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    assert ids[1] in result.active
+    assert ids[0] not in result.active
+    assert ids[1] in result.newly_loaded
 
 
 def test_resolve_empty_successful_run_clears_prior(catalog) -> None:
     # An empty result on a real run CLEARS the active set (topic shift to no-task).
     ids = sorted(catalog.known_ids)
     decision = SelectionDecision(skill_ids=[], ran=True, degraded=False)
-    active, newly = resolve_active_skills(decision, [ids[0]], catalog, 3)
-    assert active == []
-    assert newly == []
+    result = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    assert result.active == []
+    assert result.newly_loaded == []
 
 
 def test_resolve_degraded_keeps_prior(catalog) -> None:
     # A selector that failed open must NOT evict — reuse the prior set.
     ids = sorted(catalog.known_ids)
     decision = SelectionDecision.degraded_open(["selector_failed"])
-    active, newly = resolve_active_skills(decision, [ids[0]], catalog, 3)
-    assert active == [ids[0]]
-    assert newly == []
+    result = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    assert result.active == [ids[0]]
+    assert result.newly_loaded == []
 
 
 def test_resolve_no_run_reuses_prior(catalog) -> None:
     # A tool-continuation round does not run the selector → reuse decision → keep prior.
     ids = sorted(catalog.known_ids)
     decision = SelectionDecision.reuse([ids[0], ids[1]])
-    active, newly = resolve_active_skills(decision, [ids[0], ids[1]], catalog, 3)
-    assert active == [ids[0], ids[1]]
-    assert newly == []
+    result = resolve_active_skills(decision, [ids[0], ids[1]], catalog, 3)
+    assert result.active == [ids[0], ids[1]]
+    assert result.newly_loaded == []
 
 
 def test_resolve_keeps_active_when_relisted(catalog) -> None:
     # Re-listing an active skill keeps it; a genuinely new one loads alongside.
     ids = sorted(catalog.known_ids)
     decision = SelectionDecision(skill_ids=[ids[0], ids[1]], ran=True, degraded=False)
-    active, newly = resolve_active_skills(decision, [ids[0]], catalog, 3)
-    assert active == [ids[0], ids[1]]
-    assert newly == [ids[1]]
+    result = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    assert {ids[0], ids[1]} <= set(result.active)
+    assert ids[1] in result.newly_loaded
+    assert ids[0] not in result.newly_loaded
 
 
 def test_resolve_caps_and_drops_unknown(catalog) -> None:
@@ -111,60 +155,271 @@ def test_resolve_caps_and_drops_unknown(catalog) -> None:
     decision = SelectionDecision(
         skill_ids=["nope", ids[0], ids[1], ids[2], ids[3]], ran=True, degraded=False
     )
-    active, _ = resolve_active_skills(decision, [], catalog, 3)
-    assert active == [ids[0], ids[1], ids[2]]
+    result = resolve_active_skills(decision, [], catalog, 3)
+    assert len(result.active) == 3
+    assert "nope" not in result.active
+    assert result.active[0] == ids[0]  # rank order is preserved
+    # The cap is now reported; the unknown id is not part of that signal.
+    assert result.dropped_over_cap and "nope" not in result.dropped_over_cap
 
 
-# ---- resolve_active_skills: domain-foundation auto-pairing ------------------
+# ---- resolve_active_skills: domain-foundation UNIT admission -----------------
+#
+# A synthetic catalog, so the admission contract is pinned deterministically:
+# the real catalog's foundation topology is being reshaped (single root
+# foundation, nearest-first prefix walk-up), and this contract must hold under
+# ANY topology. The property test below then re-checks it over the real one.
 
-_COMPETITION = "daintree.orchestration.competition"
-_MULTI_AGENT = "daintree.orchestration.multi-agent"
-_FOUNDATION = "daintree.orchestration.basic"
+_DOMAIN_BASE = "spec.dom.base"
+_ONE = "spec.dom.one"
+_TWO = "spec.dom.two"
+_THREE = "spec.dom.three"
+_OTHER_BASE = "spec.other.base"
+_OTHER_ONE = "spec.other.one"
 
 
-def test_resolve_pairs_domain_foundation_on_first_selection(catalog) -> None:
-    # Round 1: selector returns only the specific. The foundation is auto-paired so it
-    # loads on the SAME turn (front-loaded), not a turn late.
-    decision = SelectionDecision(skill_ids=[_COMPETITION], ran=True, degraded=False)
-    active, newly = resolve_active_skills(decision, [], catalog, 3)
-    assert active == [_COMPETITION, _FOUNDATION]
-    assert set(newly) == {_COMPETITION, _FOUNDATION}
+def _skill_markdown(skill_id: str, *, foundation: bool) -> str:
+    return (
+        "---\n"
+        f"id: {skill_id}\n"
+        f"title: {skill_id}\n"
+        "summary: Synthetic admission fixture.\n"
+        "whenToUse: Use only in the admission tests.\n"
+        + ("foundation: true\n" if foundation else "")
+        + "---\n"
+        "Use when: never — this is a test fixture.\n\n"
+        "Report back: done.\n"
+    )
 
 
-def test_resolve_stable_across_rounds_no_late_load(catalog) -> None:
-    # Round 2: task still governed by the competition skill. Even if the selector re-lists
-    # only the specific (forgetting the foundation), pairing keeps the set stable — the
+def _synthetic_catalog() -> Catalog:
+    """Two domains, each with its own foundation, three specifics in the first."""
+    specs = [
+        (_DOMAIN_BASE, True),
+        (_ONE, False),
+        (_TWO, False),
+        (_THREE, False),
+        (_OTHER_BASE, True),
+        (_OTHER_ONE, False),
+    ]
+    return Catalog(
+        parse_skill(_skill_markdown(sid, foundation=f), expected_id=sid)
+        for sid, f in specs
+    )
+
+
+@pytest.fixture
+def paired_catalog() -> Catalog:
+    return _synthetic_catalog()
+
+
+def test_resolve_pairs_domain_foundation_on_first_selection(paired_catalog) -> None:
+    # Round 1: selector returns only the specific. The foundation is admitted with it so
+    # it loads on the SAME turn (front-loaded), not a turn late.
+    decision = SelectionDecision(skill_ids=[_ONE], ran=True, degraded=False)
+    result = resolve_active_skills(decision, [], paired_catalog, 3)
+    assert result.active == [_ONE, _DOMAIN_BASE]
+    assert set(result.newly_loaded) == {_ONE, _DOMAIN_BASE}
+
+
+def test_resolve_stable_across_rounds_no_late_load(paired_catalog) -> None:
+    # Round 2: task still governed by the same specific. Even if the selector re-lists
+    # only the specific (forgetting the foundation), admission keeps the set stable — the
     # foundation is not re-loaded, and nothing new appears mid-conversation.
-    prior = [_COMPETITION, _FOUNDATION]
-    decision = SelectionDecision(skill_ids=[_COMPETITION], ran=True, degraded=False)
-    active, newly = resolve_active_skills(decision, prior, catalog, 3)
-    assert active == [_COMPETITION, _FOUNDATION]
-    assert newly == []
+    prior = [_ONE, _DOMAIN_BASE]
+    decision = SelectionDecision(skill_ids=[_ONE], ran=True, degraded=False)
+    result = resolve_active_skills(decision, prior, paired_catalog, 3)
+    assert result.active == [_ONE, _DOMAIN_BASE]
+    assert result.newly_loaded == []
 
 
-def test_resolve_foundation_selected_alone_not_duplicated(catalog) -> None:
-    decision = SelectionDecision(skill_ids=[_FOUNDATION], ran=True, degraded=False)
-    active, _ = resolve_active_skills(decision, [], catalog, 3)
-    assert active == [_FOUNDATION]
+def test_resolve_foundation_selected_alone_not_duplicated(paired_catalog) -> None:
+    decision = SelectionDecision(skill_ids=[_DOMAIN_BASE], ran=True, degraded=False)
+    result = resolve_active_skills(decision, [], paired_catalog, 3)
+    assert result.active == [_DOMAIN_BASE]
 
 
-def test_resolve_explicit_picks_win_cap_over_paired_foundation(catalog) -> None:
-    # When the selection already fills the cap with explicit specifics, the model's picks
-    # win — the auto-paired foundation only fills spare capacity (appended last).
-    ids = [_COMPETITION, _MULTI_AGENT, "daintree.orchestration.interview"]
-    decision = SelectionDecision(skill_ids=ids, ran=True, degraded=False)
-    active, _ = resolve_active_skills(decision, [], catalog, 3)
-    assert active == ids
-    assert _FOUNDATION not in active
+def test_resolve_paired_foundation_is_never_displaced_by_the_cap(paired_catalog) -> None:
+    # THE inverted contract. The selector truncates its own output to max_active, so a
+    # full set of specifics used to guarantee the appended foundation was the first id
+    # cut — pairing was dead code exactly when it mattered. Now the foundation rides in
+    # with the top-ranked specific as one unit and the MARGINAL specific is what the cap
+    # costs, matching the selector prompt's own tie-break order.
+    decision = SelectionDecision(skill_ids=[_ONE, _TWO, _THREE], ran=True, degraded=False)
+    result = resolve_active_skills(decision, [], paired_catalog, 3)
+    assert result.active == [_ONE, _DOMAIN_BASE, _TWO]
+    assert len(result.active) == 3  # the budget is fully used
+    assert result.dropped_over_cap == [_THREE]
 
 
-def test_resolve_reuse_path_does_not_inject_foundation(catalog) -> None:
-    # A continuation round (no selector run) reuses the prior set verbatim — pairing must
-    # not surface a surprise foundation load mid-workflow.
-    decision = SelectionDecision.reuse([_COMPETITION])
-    active, newly = resolve_active_skills(decision, [_COMPETITION], catalog, 3)
-    assert active == [_COMPETITION]
-    assert newly == []
+def test_resolve_never_evicts_an_active_foundation_mid_workflow(paired_catalog) -> None:
+    # A new full selection used to silently evict the already-loaded foundation (and, per
+    # the assembler's cache rules, force a full tools+conversation re-encode).
+    prior = [_ONE, _DOMAIN_BASE]
+    decision = SelectionDecision(skill_ids=[_ONE, _TWO, _THREE], ran=True, degraded=False)
+    result = resolve_active_skills(decision, prior, paired_catalog, 3)
+    assert _DOMAIN_BASE in result.active
+    assert result.newly_loaded == [_TWO]
+
+
+def test_resolve_skips_an_unaffordable_unit_and_admits_a_later_one(
+    paired_catalog,
+) -> None:
+    # Cross-domain: the second pick needs its OWN foundation (2 slots) and does not fit,
+    # so it is skipped — and the third pick, whose foundation is already in, still fills
+    # the last slot. No slot is reserved for a foundation that is then discarded, and no
+    # slot is left empty while a candidate could have filled it.
+    decision = SelectionDecision(
+        skill_ids=[_ONE, _OTHER_ONE, _TWO], ran=True, degraded=False
+    )
+    result = resolve_active_skills(decision, [], paired_catalog, 3)
+    assert result.active == [_ONE, _DOMAIN_BASE, _TWO]
+    assert result.dropped_over_cap == [_OTHER_ONE]
+    assert _OTHER_BASE not in result.active  # never reserved, never orphaned
+
+
+def test_resolve_reuse_path_does_not_inject_foundation(paired_catalog) -> None:
+    # A continuation round (no selector run) reuses the prior set verbatim — admission
+    # must not surface a surprise foundation load mid-workflow.
+    decision = SelectionDecision.reuse([_ONE])
+    result = resolve_active_skills(decision, [_ONE], paired_catalog, 3)
+    assert result.active == [_ONE]
+    assert result.newly_loaded == []
+
+
+# ---- admission properties over the REAL catalog -----------------------------
+
+# The exact cross-domain selection that broke a proposed "reserve a slot for the
+# foundation" fix: it evicted the third specific AND then dropped the reserved
+# foundation nobody claimed, returning two skills against a budget of three.
+_CROSS_DOMAIN_SELECTION = (
+    "daintree.workflow.start-work-on-issue",
+    "daintree.agents.ask-and-relay",
+    "daintree.orchestration.competition",
+)
+
+
+def _closure_holds(active: Sequence[str], catalog: Catalog) -> bool:
+    """Every admitted skill's domain foundation is itself admitted."""
+    return all(
+        catalog.domain_foundation(sid) is None or catalog.domain_foundation(sid) in active
+        for sid in active
+    )
+
+
+def _max_admissible(selection: Sequence[str], catalog: Catalog, cap: int) -> int:
+    """Brute force: the largest foundation-closed set reachable from ``selection``."""
+    candidates: list[str] = []
+    for sid in selection:
+        if sid in catalog and sid not in candidates:
+            candidates.append(sid)
+    best = 0
+    for size in range(len(candidates) + 1):
+        for combo in itertools.combinations(candidates, size):
+            closed = set(combo)
+            for sid in combo:
+                foundation = catalog.domain_foundation(sid)
+                if foundation is not None:
+                    closed.add(foundation)
+            if len(closed) <= cap:
+                best = max(best, len(closed))
+    return best
+
+
+@pytest.mark.parametrize("max_active", [2, 3, 4])
+def test_admission_properties_over_the_real_catalog(catalog, max_active: int) -> None:
+    ids = sorted(catalog.known_ids)
+    selections: list[list[str]] = [list(c) for c in itertools.combinations(ids, 3)]
+    selections += [list(reversed(sel)) for sel in selections[:64]]
+    selections += [
+        [],
+        [ids[0]],
+        [ids[0], ids[0]],
+        ["unknown.skill", *ids[:3]],
+        ids[:5],
+        ids[-4:],
+    ]
+    for selection in selections:
+        decision = SelectionDecision(skill_ids=selection, ran=True, degraded=False)
+        active = resolve_active_skills(decision, [], catalog, max_active).active
+
+        # (a) never over the budget, never duplicated, never unknown.
+        assert len(active) <= max_active
+        assert len(set(active)) == len(active)
+        assert all(sid in catalog for sid in active)
+
+        # (b) every admitted skill's domain foundation is admitted too.
+        assert _closure_holds(active, catalog), (selection, max_active, active)
+
+        # (c) never shorter than it needs to be: nothing that was skipped could
+        #     still have fit in the leftover budget.
+        free = max_active - len(active)
+        for sid in selection:
+            if sid not in catalog or sid in active:
+                continue
+            foundation = catalog.domain_foundation(sid)
+            cost = 1 + (
+                1 if foundation is not None and foundation not in active else 0
+            )
+            assert cost > free, (selection, max_active, active, sid)
+
+        # ...and, where rank priority and count cannot disagree (at most one
+        # distinct foundation in play — what the real catalog does), the admitted
+        # count equals the brute-forced optimum. With two or more foundations the
+        # top-ranked pick is deliberately kept even when dropping it would fit one
+        # more skill; (c) above is the guarantee that holds in every topology.
+        foundations = {
+            catalog.domain_foundation(sid)
+            for sid in selection
+            if sid in catalog and catalog.domain_foundation(sid) is not None
+        }
+        if len(foundations) <= 1:
+            assert len(active) == _max_admissible(selection, catalog, max_active), (
+                selection,
+                max_active,
+                active,
+            )
+
+
+def test_resolve_cross_domain_selection_never_returns_a_short_set(catalog) -> None:
+    """Regression for the naive "reserve a slot" fix: three cross-domain specifics
+    against a cap of three must still spend all three slots."""
+    selection = [sid for sid in _CROSS_DOMAIN_SELECTION if sid in catalog]
+    if len(selection) != len(_CROSS_DOMAIN_SELECTION):
+        pytest.skip("catalog no longer carries the cross-domain regression ids")
+    decision = SelectionDecision(skill_ids=selection, ran=True, degraded=False)
+    result = resolve_active_skills(decision, [], catalog, 3)
+    assert len(result.active) == 3
+    assert _closure_holds(result.active, catalog)
+    assert result.active[0] == selection[0]  # the top-ranked pick is never sacrificed
+
+
+# ---- speculation winners are compared on RENDER order -----------------------
+
+
+def test_render_order_makes_foundation_placement_the_same_speculation(
+    catalog, assembler: PromptAssembler
+) -> None:
+    # The loaded-skills block renders foundations first, so [foundation, X] and
+    # [X, foundation] assemble to byte-identical requests — an ordered list compare
+    # threw a live speculative stream away to rebuild an identical payload. Swapping
+    # two SPECIFICS does change the bytes, so a set compare would be wrong.
+    foundation = next((s for s in catalog.skills if s.meta.foundation), None)
+    specifics = [s for s in catalog.skills if not s.meta.foundation]
+    assert foundation is not None, "catalog has no foundation skill"
+    assert len(specifics) >= 2
+    first, second = specifics[0], specifics[1]
+
+    assert render_order_ids([foundation, first]) == render_order_ids([first, foundation])
+    assert render_order_ids([first, second]) != render_order_ids([second, first])
+
+    # The helper is the assembler's own sort, so equal render ids mean equal bytes.
+    assert assembler.render_loaded_skills(
+        [foundation, first]
+    ) == assembler.render_loaded_skills([first, foundation])
+    assert assembler.render_loaded_skills(
+        [first, second]
+    ) != assembler.render_loaded_skills([second, first])
 
 
 def _delta_chunk(delta: dict) -> dict:
@@ -216,7 +471,10 @@ async def test_stream_meta_is_yielded_before_upstream_open(
     first = await anext(outcome.stream)
     assert first.startswith("event: meta\n")
     meta = json.loads(first.split("data: ", 1)[1])
-    assert [skill["id"] for skill in meta["skills"]["newly_loaded"]] == [skill_id]
+    # The pick, plus whatever domain foundation the catalog pairs with it.
+    assert [skill["id"] for skill in meta["skills"]["newly_loaded"]] == _resolved(
+        orchestrator, [skill_id]
+    )
     # The generator suspends at the metadata yield. Opening and prefetching the
     # provider cannot begin until the client asks for the next SSE event.
     assert fake_provider.stream_requests == []
@@ -232,6 +490,23 @@ async def test_stream_meta_is_yielded_before_upstream_open(
 # ---- selector/main-stream speculation ---------------------------------------
 
 
+def _resolved(orchestrator: ChatOrchestrator, selected_ids: list[str]) -> list[str]:
+    """The active set a turn selecting ``selected_ids`` actually resolves to.
+
+    Tests that stand in for a PREVIOUS turn (a prior state token) or assert on the
+    active/newly-loaded block go through this instead of hardcoding the selection:
+    the catalog decides which domain foundation rides along, and that topology
+    moves. Hardcoding it would make the speculation match under test an artifact
+    of the fixture rather than of the orchestrator.
+    """
+    return resolve_active_skills(
+        SelectionDecision(skill_ids=selected_ids, ran=True, degraded=False),
+        [],
+        orchestrator.catalog,
+        orchestrator.settings.max_active_skills,
+    ).active
+
+
 def _stream_request_with_state(
     orchestrator: ChatOrchestrator,
     active_ids: list[str],
@@ -245,7 +520,7 @@ def _stream_request_with_state(
     if state is None:
         state = orchestrator.state_codec.issue(
             session_id=session_id,
-            active_skills=active_ids,
+            active_skills=_resolved(orchestrator, active_ids),
             catalog_revision=catalog_revision or orchestrator.catalog.revision,
             turn_id=prior_turn_id,
             instruction_revision=0,
@@ -363,6 +638,58 @@ async def test_speculation_starts_during_selector_and_exact_match_reuses_once(
 
 
 @pytest.mark.asyncio
+async def test_foundation_reordering_still_reuses_the_speculative_stream(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """[foundation, X] and [X, foundation] assemble to identical bytes, so the
+    live speculative stream must be reused rather than rebuilt — this is exactly
+    the turn shape pairing creates (foundation-first one turn, specific-first the
+    next)."""
+    catalog = orchestrator.catalog
+    foundation = next((s.id for s in catalog.skills if s.meta.foundation), None)
+    assert foundation is not None, "catalog has no foundation skill"
+    specific = next(s.id for s in catalog.skills if not s.meta.foundation)
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[specific, foundation], ran=True, degraded=False),
+    )
+    fake_provider.stream_factory = lambda _request: FakeStream(
+        make_text_chunks("speculative winner")
+    )
+    original_build = orchestrator.assembler.build_main_request
+    assembled: list[object] = []
+
+    def tracked_build(**kwargs: Any) -> Any:
+        built = original_build(**kwargs)
+        assembled.append(built)
+        return built
+
+    monkeypatch.setattr(orchestrator.assembler, "build_main_request", tracked_build)
+
+    # Prior turn listed the foundation FIRST; this turn lists it last.
+    request = _stream_request_with_state(orchestrator, [foundation, specific])
+    pending = asyncio.create_task(
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+    )
+    await started.wait()
+    await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+
+    events = await _drain(outcome.stream)
+    assert _streamed_content(events) == "speculative winner "
+    assert len(fake_provider.stream_requests) == 1  # nothing rebuilt, nothing reopened
+    assert len(assembled) == 1
+    meta = json.loads(events[0].split("data: ", 1)[1])
+    # The ACTIVE set keeps selector rank order; only the render order is normalized.
+    assert [s["id"] for s in meta["skills"]["active"]] == [specific, foundation]
+
+
+@pytest.mark.asyncio
 async def test_degraded_selector_reuses_speculative_prior_stream(
     orchestrator: ChatOrchestrator,
     fake_provider: FakeProvider,
@@ -388,7 +715,10 @@ async def test_degraded_selector_reuses_speculative_prior_stream(
     assert len(fake_provider.stream_requests) == 1
     meta = json.loads(events[0].split("data: ", 1)[1])
     assert meta["skills"]["selector"]["degraded"] is True
-    assert [s["id"] for s in meta["skills"]["active"]] == [skill_id]
+    # Fail-open reuses the PRIOR set verbatim — never re-paired, never re-capped.
+    assert [s["id"] for s in meta["skills"]["active"]] == _resolved(
+        orchestrator, [skill_id]
+    )
 
 
 @pytest.mark.asyncio
@@ -835,6 +1165,46 @@ async def test_cancellation_inside_claim_still_closes_provisional_owner(
 
     assert upstream.closed is True
     assert orchestrator._skill_speculations_in_flight == 0
+
+
+@pytest.mark.asyncio
+async def test_respond_log_reports_the_ids_the_cap_dropped(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cap truncation used to be invisible. It is measured on the structured log
+    line only — no new wire warning code the CLI would have to learn."""
+    ids = sorted(orchestrator.catalog.known_ids)[:6]
+
+    async def select(*args: object, **kwargs: object) -> SelectionDecision:
+        return SelectionDecision(skill_ids=ids, ran=True, degraded=False)
+
+    monkeypatch.setattr(orchestrator.selector, "select", select)
+    records: list[tuple[str, dict[str, Any]]] = []
+
+    class _Recorder:
+        def info(self, event: str, **kwargs: Any) -> None:
+            records.append((event, kwargs))
+
+        def warning(self, event: str, **kwargs: Any) -> None:
+            records.append((event, kwargs))
+
+        def exception(self, event: str, **kwargs: Any) -> None:
+            records.append((event, kwargs))
+
+    monkeypatch.setattr(orchestrator_module, "logger", _Recorder())
+    outcome = await orchestrator.complete(
+        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+    )
+    assert outcome.stream is not None
+    await _drain(outcome.stream)
+
+    respond = next(fields for event, fields in records if event == "respond")
+    dropped = respond["dropped_over_cap"]
+    assert dropped, "a 6-id selection against a cap of 3 must report drops"
+    assert set(dropped).isdisjoint(respond["active_skills"])
+    assert set(dropped) <= set(ids)
 
 
 def _cadence(

@@ -6,10 +6,13 @@ Run from the repo root (venv active, DEEPSEEK_API_KEY in .env or the env):
     python -m benchmarks.skill_selection.bench run --variant v2-foo   # a prompts/ variant
     python -m benchmarks.skill_selection.bench run --variant baseline --variant v2-foo
     python -m benchmarks.skill_selection.bench list
+    python -m benchmarks.skill_selection.bench coverage
     python -m benchmarks.skill_selection.bench report results/<run>.json
     python -m benchmarks.skill_selection.bench compare results/a.json results/b.json
 
-Makes REAL, paid DeepSeek API calls (cases x trials per variant).
+Only ``run`` makes API calls (REAL, paid DeepSeek: cases x trials per variant).
+``list``, ``coverage``, ``report``, and ``compare`` are offline and free — they
+need no key, so they work with ``DEEPSEEK_API_KEY=`` blanked.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ import sys
 from pathlib import Path
 
 from .cases import CaseError, load_cases
+from .coverage import print_coverage
 from .reporting import load_doc, print_compare, print_failures, print_summary, save_doc
 from .runner import BenchConfig, BenchError, available_variants, run_bench
 
@@ -60,6 +64,17 @@ def _cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_coverage(args: argparse.Namespace) -> int:
+    """Per-skill case-coverage matrix. Exits 1 on a recall gap."""
+    from daintree_assistant_server.skills.catalog import load_catalog
+
+    catalog = load_catalog()
+    rows = print_coverage(catalog, load_cases(catalog))
+    # `rows and` matters: an empty catalog makes `all(...)` vacuously true, which
+    # would turn the gate into a silent pass in exactly the situation it exists for.
+    return 0 if rows and all(r.has_recall_coverage for r in rows) else 1
+
+
 def _cmd_report(args: argparse.Namespace) -> int:
     doc = load_doc(Path(args.path))
     print_summary(doc)
@@ -90,6 +105,13 @@ def main(argv: list[str] | None = None) -> int:
     lst = sub.add_parser("list", help="list/validate cases and variants (no API calls)")
     lst.add_argument("--filter", help="substring filter on case id/category")
     lst.set_defaults(func=_cmd_list)
+
+    cov = sub.add_parser(
+        "coverage",
+        help="per-skill case-coverage matrix; exit 1 if any skill has no required case "
+        "(no API calls)",
+    )
+    cov.set_defaults(func=_cmd_coverage)
 
     report = sub.add_parser("report", help="re-print a saved results file")
     report.add_argument("path")

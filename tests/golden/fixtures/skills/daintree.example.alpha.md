@@ -7,7 +7,6 @@ foundation: true
 tags:
   - fixture
   - golden
-priority: 100
 risk: read
 requiredTools:
   - context.snapshot

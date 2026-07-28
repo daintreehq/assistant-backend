@@ -19,9 +19,6 @@ RISK_VALUES: frozenset[str] = frozenset(
 
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
-PRIORITY_MIN = 0
-PRIORITY_MAX = 1000
-
 
 class SkillMeta(BaseModel):
     """Validated skill frontmatter."""
@@ -38,9 +35,24 @@ class SkillMeta(BaseModel):
     # specific workflow skill(s) it selects — see selector/system.md.j2.
     foundation: bool = Field(default=False)
     tags: list[str] = Field(default_factory=list)
-    priority: int = Field(default=0, ge=PRIORITY_MIN, le=PRIORITY_MAX)
     risk: str = "read"
     required_tools: list[str] = Field(default_factory=list, alias="requiredTools")
+
+    @field_validator("id")
+    @classmethod
+    def _check_id_segments(cls, v: str) -> str:
+        """Reject empty dotted segments — they silently break foundation pairing.
+
+        ``Catalog._domain_of`` splits an id on its final dot and ``domain_foundation``
+        walks the remaining prefixes, so ``.x`` collapses into the EMPTY domain and
+        ``x.`` makes an id its own domain key. Both load fine and then pair with the
+        wrong foundation (or none) with no error anywhere. This is deliberately only a
+        well-formedness check, not the learner's stricter ``daintree.<domain>.<workflow>``
+        shape: hand-authored ids and test fixtures legitimately use other namespaces.
+        """
+        if any(seg == "" for seg in v.split(".")):
+            raise ValueError(f"skill id {v!r} has an empty dotted segment")
+        return v
 
     @field_validator("risk")
     @classmethod
@@ -104,19 +116,26 @@ class Skill:
     def risk(self) -> str:
         return self.meta.risk
 
-    def selector_view(self, *, active: bool) -> dict[str, object]:
-        """The bounded metadata the selector is allowed to see."""
+    def selector_view(self) -> dict[str, object]:
+        """The bounded metadata the selector is allowed to see.
+
+        Deliberately narrower than the frontmatter: only the fields the selector
+        prompt actually renders AND instructs on. ``title`` restates the summary,
+        and ``tags``/``risk``/``required_tools`` are near-non-discriminative
+        within a single-product catalog with no instruction referencing them —
+        they were pure prompt weight, so they are not shown to the classifier.
+        (They remain in :meth:`public_view` and are still read server-side, e.g.
+        ``required_tools`` for workflow-plan skill outlines.)
+
+        Request-varying state is NOT here: which skills are currently active is
+        rendered once after the catalog block, so the per-skill lines stay
+        byte-identical across turns for DeepSeek's content-prefix cache.
+        """
         return {
             "id": self.meta.id,
-            "title": self.meta.title,
             "summary": self.meta.summary,
             "when_to_use": self.meta.when_to_use,
             "foundation": self.meta.foundation,
-            "tags": list(self.meta.tags),
-            "priority": self.meta.priority,
-            "risk": self.meta.risk,
-            "required_tools": list(self.meta.required_tools),
-            "active": active,
         }
 
     def public_view(self) -> dict[str, object]:
@@ -127,7 +146,6 @@ class Skill:
             "summary": self.meta.summary,
             "when_to_use": self.meta.when_to_use,
             "tags": list(self.meta.tags),
-            "priority": self.meta.priority,
             "risk": self.meta.risk,
             "required_tools": list(self.meta.required_tools),
         }

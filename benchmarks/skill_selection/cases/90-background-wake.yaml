@@ -5,10 +5,16 @@
 cases:
   - id: wake-watcher-fired
     category: background-wake
+    note: >-
+      Re-pointed against the 23-skill catalog. The user's own words — "keep an eye on the
+      deploy terminal while I'm in a meeting" — are watch-outcome's trigger verbatim
+      ("keep an eye on it while I'm out"), and its runbook owns the wake itself ("on the
+      wake you spawn, verify and relay"). Demanding the foundation ALONE made the correct
+      pick score as an extra. One terminal, so not a supervise-fleet cohort sweep.
     turn_context: >-
       Background wake: watcher fired on terminal "deploy" (error pattern matched).
       Goal: triage the failure and decide the next action.
-    active: [daintree.orchestration.basic]
+    active: [daintree.orchestration.watch-outcome, daintree.foundation]
     available_tools: [context.snapshot, terminal.read, terminal.summarize, watcher.list]
     messages:
       - role: user
@@ -16,7 +22,8 @@ cases:
       - role: assistant
         content: Watcher attached to the deploy terminal — I'll act if anything trips.
     expect:
-      required: [daintree.orchestration.basic]
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
 
   - id: wake-issue-agent-finished
     category: background-wake
@@ -35,7 +42,7 @@ cases:
           attached. I'll follow up when it reports.
     expect:
       required: [daintree.workflow.start-work-on-issue]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: snapshot-with-tools-offered
     category: background-wake
@@ -45,4 +52,4 @@ cases:
       - role: user
         content: Snapshot the current Daintree state and summarize what's running.
     expect:
-      required: [daintree.orchestration.basic]
+      required: [daintree.foundation]

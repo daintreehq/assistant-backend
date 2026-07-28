@@ -38,11 +38,11 @@ cases:
         expect: {selector_ran: true, active: [daintree.terminals.rename], learn: true}
       - turn_id: t2                        # new instruction → selector runs, replaces the set
         user: "Now run a competition between three agents on this task."
-        selector_pick: [daintree.orchestration.competition, daintree.orchestration.basic]
+        selector_pick: [daintree.orchestration.competition, daintree.foundation]
         main: {final: "Spinning up the competition."}
         expect:
           selector_ran: true
-          active: [daintree.orchestration.competition, daintree.orchestration.basic]
+          active: [daintree.orchestration.competition, daintree.foundation]
           learn: true
 
   - id: no-task-clears-active

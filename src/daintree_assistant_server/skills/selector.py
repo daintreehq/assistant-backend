@@ -252,9 +252,18 @@ class Selector:
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
     ) -> SelectionDecision:
+        catalog = self.catalog
+        # The catalog block is request-invariant; the active set is rendered ONCE
+        # after it, as a single trailing line. Keeping per-turn state out of the
+        # id-sorted loop is the selector's only prompt-cache lever: this call
+        # always sets response_format, and the provider withholds prompt_cache_key
+        # whenever it does, so DeepSeek can only match a shared content prefix —
+        # which an inline "(currently active)" marker on an early-sorting skill
+        # used to break for most of the prompt on every turn.
         system = self.prompt_loader.render(
             TEMPLATE_SELECTOR_SYSTEM,
-            catalog=self.catalog.selector_metadata(active_ids),
+            catalog=catalog.selector_metadata(),
+            active_ids=catalog.filter_known(active_ids),
             max_active=self.settings.max_active_skills,
         )
         evidence, _truncated = sanitize_for_selector(

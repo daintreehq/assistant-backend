@@ -17,6 +17,7 @@ All client context is untrusted: fields are sanitized and bounded before renderi
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Any
 
 from ..config import DEEPSEEK_REASONING_EFFORT, Settings
@@ -87,6 +88,25 @@ _TIER_DESCRIPTIONS = {
     "readonly": "you may only read state; mutating actions are not permitted.",
 }
 _TIER_FALLBACK = "mutating actions require confirmation according to this tier."
+
+
+def skills_in_render_order(skills: Sequence[Skill]) -> list[Skill]:
+    """THE order the loaded-skills block is rendered in.
+
+    Foundations first (stable sort), so a domain's base judgment reads before the
+    workflow steps that build on it. Render order only — the active SET, and the
+    selector's best-match order within each tier, are untouched.
+
+    This is the single definition: the orchestrator compares speculative vs
+    resolved skill sets through :func:`render_order_ids` so its notion of "the
+    same request" cannot drift from the bytes this produces.
+    """
+    return sorted(skills, key=lambda s: not s.meta.foundation)
+
+
+def render_order_ids(skills: Sequence[Skill]) -> list[str]:
+    """The render-order id list — equal lists mean byte-identical skill blocks."""
+    return [s.id for s in skills_in_render_order(skills)]
 
 
 def _cap_list_combined(
@@ -364,11 +384,9 @@ class PromptAssembler:
         return capped
 
     def render_loaded_skills(self, skills: list[Skill]) -> str:
-        # Foundations render first so the domain's base judgment reads before the
-        # workflow steps that build on it. Render order only — the active SET (and
-        # the selector's best-match order within each tier) is untouched.
-        ordered = sorted(skills, key=lambda s: not s.meta.foundation)
-        return self.prompts.render(TEMPLATE_LOADED_SKILLS, loaded_skills=ordered)
+        return self.prompts.render(
+            TEMPLATE_LOADED_SKILLS, loaded_skills=skills_in_render_order(skills)
+        )
 
     def render_response_contract(self) -> str:
         """The output-shape contract — the final STABLE system block before the

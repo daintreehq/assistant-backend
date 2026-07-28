@@ -38,7 +38,11 @@ cases:
     category: no-task
     note: >-
       Ambiguous by design: the ack itself is no task, but the prior turn arranged an
-      ongoing monitoring commitment — clearing OR carrying the foundation both pass.
+      ongoing monitoring commitment — clearing OR carrying the live supervision both
+      pass. watch-outcome joins the foundation in optional because "keep an eye on it
+      while I'm out" is now its own trigger and it owns that commitment; widening is
+      right here (the documented ambiguity IS the case) and would be wrong on a
+      routing-trap case.
     messages:
       - role: user
         content: Can you keep an eye on things while I grab lunch?
@@ -48,7 +52,7 @@ cases:
         content: ok cool
     expect:
       required: []
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation, daintree.orchestration.watch-outcome]
 
   - id: general-knowledge
     category: no-task

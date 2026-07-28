@@ -15,18 +15,18 @@ A skill is a procedural runbook that gives the assistant the right steps, judgme
 Decision procedure — work through it in order:
 1. Find the CURRENT task: the latest user instruction (or, on a background wake with no new user message, the turn-context goal and workflow evidence). Older turns are context for understanding it — never select for a topic the conversation has moved past.
 2. Decide whether there is a real task at all. Pure conversation, an acknowledgement, or a trivial one-off with no procedure → return an empty `skill_ids` array (this clears any loaded skills; that is correct when nothing is in progress).
-3. If an active skill is governing an IN-PROGRESS workflow that this turn continues, keep it: list its id again. Dropping a mid-workflow skill strands the assistant. Skills marked "(currently active)" are already loaded at no extra cost. Before adding anything to an already-active set, ask whether the active skills are ALREADY ENOUGH for this task: adding a skill mid-conversation is the expensive case (it re-encodes the tool schemas and conversation), so when the active set already covers what this turn needs, return it unchanged rather than tacking on a marginal or overlapping skill. Expand an adequate active set only when it genuinely lacks steps or judgment THIS task needs — and prefer to have loaded such a skill up front (see step 5) over adding it late.
+3. If an active skill is governing an IN-PROGRESS workflow that this turn continues, keep it: list its id again. Dropping a mid-workflow skill strands the assistant. The ids on the "Currently active skills" line (printed after the catalog) are already loaded at no extra cost. Before adding anything to an already-active set, ask whether the active skills are ALREADY ENOUGH for this task: adding a skill mid-conversation is the expensive case (it re-encodes the tool schemas and conversation), so when the active set already covers what this turn needs, return it unchanged rather than tacking on a marginal or overlapping skill. Expand an adequate active set only when it genuinely lacks steps or judgment THIS task needs — and prefer to have loaded such a skill up front (see step 5) over adding it late.
 4. Identify the task's domain and pick the specific skill(s) whose "whenToUse" most specifically match THIS task. Match on the actual workflow, not loose keyword overlap (e.g. a request to CLOSE terminals is a general orchestration task, not a "rename terminals" task just because both mention terminals). Many "whenToUse" lines route between neighboring skills ("do not use for X — use the Y skill"); follow that routing to pick the PRIMARY skill. A skill the primary routes THIS task away from is a mutually-exclusive alternative — do NOT co-load it just for keyword overlap. A neighbor loads ALONGSIDE the primary only when its OWN whenToUse squarely matches this task (a distinct facet it contributes), not when it is the option being routed away from.
 5. Add the domain's foundation skill if one exists — the normal result is foundation + specific(s). Prefer loading EVERY specific whose whenToUse squarely matches this task, including two that overlap when each still contributes distinct steps or judgment (e.g. one gives the conversation's format, another its relay mechanics and failure modes). Skip a further specific only when it is redundant with one already chosen or merely tangential. A genuinely complex task spanning several distinct workflows can load several specifics, up to {{ max_active }}.
 6. If the task is substantive but NO specific skill squarely matches — an unfamiliar or first-of-its-kind workflow — load the closest domain foundation ALONE rather than forcing a poor specific match. Return an empty array only when no domain fits either, or there is no real task.
-7. Order and cap: best-match first. If more skills fit than the cap of {{ max_active }}, keep them in this order until the cap is reached: any in-progress active skill first, then the task's domain foundation, then the most specific workflow skills.
+7. Order and cap: best-match first. If more skills fit than the cap of {{ max_active }}, keep them in this order until the cap is reached: any in-progress skill from the "Currently active skills" line first, then the task's domain foundation, then the most specific workflow skills.
 
 Illustrative outcomes (patterns, not ids — always choose real ids from the catalog below):
 - The user asks to continue or finish work the active skills already govern → return the same active ids again (adding the domain's foundation only if it is missing).
 - Topic shift: the previous task is done and the user starts a different workflow → return the new workflow's skill(s) plus its domain foundation; the old skills are simply omitted (evicted).
 - "thanks, looks good" with nothing in progress → `"skill_ids": []`.
 - A substantive multi-step request that matches no specific runbook → the closest `[foundation]` id alone.
-- A task that squarely fits two COMPLEMENTARY specifics — e.g. a facilitated debate among several agents matches both the group-conversation format skill AND the deeper multi-agent relay skill — → load BOTH, plus the domain foundation.
+- A COMPOUND request that genuinely spans two different workflows — e.g. "start work on that issue, and while it runs ask the fleet what they think of the approach" — → load both specifics, plus the domain foundation. Two skills are complementary when each owns a DIFFERENT part of the task; they are alternatives when both describe the same part.
 - A scored/voted contest already governed by its competition skill → keep that skill (plus the domain foundation); do NOT also add a collaborative multi-agent skill whose whenToUse routes scored/voted work back to the competition skill — it is the excluded alternative here, not a second facet.
 - A follow-up turn whose task the currently-active set already covers → return the same active ids unchanged; adding a marginally-related skill late is not worth the re-encode.
 
@@ -40,10 +40,9 @@ Rules:
 
 Skill catalog:
 {% for skill in catalog %}
-- id: {{ skill.id }}{% if skill.foundation %} [foundation]{% endif %}{% if skill.active %} (currently active){% endif %}
+- id: {{ skill.id }}{% if skill.foundation %} [foundation]{% endif %}
   summary: {{ skill.summary }}
   whenToUse: {{ skill.when_to_use }}
-  tags: {{ skill.tags | join(", ") }}
-  risk: {{ skill.risk }}{% if skill.required_tools %}
-  requiredTools: {{ skill.required_tools | join(", ") }}{% endif %}
 {% endfor %}
+Currently active skills: {% if active_ids %}{{ active_ids | join(", ") }}{% else %}none{% endif %}
+

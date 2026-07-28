@@ -180,7 +180,11 @@ class Settings(BaseSettings):
     max_result_schema_properties: int = Field(default=128, alias="MAX_RESULT_SCHEMA_PROPERTIES")
     max_result_schema_enum: int = Field(default=128, alias="MAX_RESULT_SCHEMA_ENUM")
     max_result_schema_string: int = Field(default=4096, alias="MAX_RESULT_SCHEMA_STRING")
-    max_active_skills: int = Field(default=3, alias="MAX_ACTIVE_SKILLS")
+    # Floored at 2 deliberately: every skill resolves to a domain foundation, and the
+    # orchestrator admits a specific and its foundation as one atomic unit. A budget of 1
+    # can never fit that unit, so a cap of 1 would silently load NOTHING rather than
+    # loading less.
+    max_active_skills: int = Field(default=3, ge=2, alias="MAX_ACTIVE_SKILLS")
     max_meta_header_bytes: int = Field(default=6 * 1024, alias="MAX_META_HEADER_BYTES")
 
     # ---- Timeouts (seconds) --------------------------------------------

@@ -320,7 +320,7 @@ def measure_state_codec(iters: int = 20_000) -> dict[str, Any]:
 
 
 def _probe_requests(tag: str, n: int) -> list[RespondRequest]:
-    """Valid contract requests with the real 72-tool inventory; distinct
+    """Valid contract requests with the captured CLI tool projection; distinct
     session/turn ids per call so every round runs the full selector path."""
     return [
         build_respond_request(

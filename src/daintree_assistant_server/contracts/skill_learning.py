@@ -9,9 +9,9 @@ proposal happens when it is rendered to markdown and run through the skill loade
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 GateAction = Literal["none", "improve_existing_skill", "create_new_skill"]
 LessonType = Literal[
@@ -21,6 +21,11 @@ LessonType = Literal[
     "bug_report",
     "none",
 ]
+# Which HALF of a skill an improve should edit. A selection miss (the right skill
+# existed but the selector never picked it) and a body gap both route through the
+# same "improve" action, and the improver otherwise has to re-derive which kind of
+# edit it is from free text. One field carries that whole distinction.
+LessonKind = Literal["trigger", "procedure"]
 
 
 class GateVerdict(BaseModel):
@@ -28,6 +33,14 @@ class GateVerdict(BaseModel):
 
     The gate never writes anything; it only decides whether spending a
     build/improve call is worthwhile, and which kind.
+
+    ``extra="ignore"`` is deliberate here and NOT the repo's usual ``extra="forbid"``.
+    That convention is for WIRE and CONFIG models, where an unknown key means a client
+    is out of contract and should be told so. These two models parse MODEL OUTPUT in a
+    pipeline that fails open: a stray key in generated JSON is noise, and rejecting the
+    whole verdict over it would throw away a good lesson. The cost is that a misspelled
+    key is silently dropped rather than flagged — accepted, because every field here has
+    a safe default and the downstream validators re-check what actually matters.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -37,6 +50,10 @@ class GateVerdict(BaseModel):
     action: GateAction = "none"
     target_skill_id: str | None = None
     lesson_type: LessonType = "none"
+    # Optional, improve-only hint: "trigger" = the skill existed but was not selected
+    # (edit whenToUse/summary/tags), "procedure" = the skill loaded but its steps fell
+    # short (edit the body). Advisory context for the improver, never a gate on writing.
+    lesson_kind: LessonKind | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason: str = ""
     evidence: list[str] = Field(default_factory=list)
@@ -45,6 +62,19 @@ class GateVerdict(BaseModel):
     # its house-style/scope exemplars instead of arbitrary ones. Unknown ids are
     # filtered against the catalog before use.
     related_skill_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("lesson_kind", mode="before")
+    @classmethod
+    def _coerce_lesson_kind(cls, v: Any) -> Any:
+        """Anything the model invents outside the enum degrades to ``None``.
+
+        The whole verdict is parsed from small-model output; an off-enum value here
+        must never raise and cost the pipeline a whole learning pass over an
+        ADVISORY field. Unknown → no hint, and the improver falls back to prose.
+        """
+        if isinstance(v, str) and v.strip().lower() in ("trigger", "procedure"):
+            return v.strip().lower()
+        return None
 
 
 class SkillProposal(BaseModel):
@@ -68,7 +98,6 @@ class SkillProposal(BaseModel):
     when_to_use: str = Field(
         default="", validation_alias=AliasChoices("when_to_use", "whenToUse")
     )
-    priority: int = 100
     risk: str = "read"
     # The builder/improver's requested tier. Advisory only: `_validate` never lets this
     # DEMOTE an existing foundation, and only lets it PROMOTE (turn on where off) when

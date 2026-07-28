@@ -10,6 +10,22 @@ frozen conversation plus the prior active-skill set and the EXPECTED selection:
 Anything picked outside ``required + optional`` is an ``extra`` (precision
 failure). Every id is validated against the real catalog at load time so a typo
 fails fast instead of silently scoring as a miss.
+
+**The foundation convention, enforced at load.** This suite scores the RAW
+classifier output, while the backend pairs a selected specific with its domain
+foundation deterministically *downstream* (``resolve_active_skills``). So on a
+case whose answer is a SPECIFIC, demanding the foundation would fail a correct
+lean pick for something the classifier never has to say: the foundation belongs
+in ``optional`` there, never in ``required``. A case whose answer IS the
+foundation — no runbook squarely matches, load it ALONE — is the one shape that
+may require it, and it must then be the ONLY required id. ``_check_foundation_
+convention`` rejects the mixed shape rather than leaving it to review.
+
+The rule is deliberately about the SHAPE of ``required``, not about the
+``category`` label: "load the foundation alone" is the right answer in several
+categories (a routing trap that must not over-pick, adversarial keyword bait, a
+background wake), and forcing those into the ``foundation-only`` category to
+satisfy a load check would gut the category signal the report groups on.
 """
 
 from __future__ import annotations
@@ -77,6 +93,19 @@ def _validate_ids(ids: list[str], catalog: Catalog, case_id: str, kind: str) -> 
     return list(ids)
 
 
+def _check_foundation_convention(required: list[str], catalog: Catalog, case_id: str) -> None:
+    """Reject a foundation id demanded ALONGSIDE a specific (see module docstring)."""
+    foundations = [sid for sid in required if (s := catalog.get(sid)) and s.meta.foundation]
+    if foundations and len(required) > 1:
+        others = [sid for sid in required if sid not in foundations]
+        raise CaseError(
+            f"{case_id}: foundation skill(s) {', '.join(foundations)} in expect.required "
+            f"alongside specific(s) {', '.join(others)}. The backend pairs the foundation "
+            "downstream, so a case whose answer is a specific must list the foundation in "
+            "expect.optional. Only a foundation-ALONE case may require it."
+        )
+
+
 def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase:
     case_id = raw.get("id")
     if not case_id or not isinstance(case_id, str):
@@ -85,13 +114,15 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
     if not messages_raw:
         raise CaseError(f"{case_id}: no messages")
     expect = raw.get("expect") or {}
+    required = _validate_ids(expect.get("required") or [], catalog, case_id, "required")
+    _check_foundation_convention(required, catalog, case_id)
     return BenchCase(
         id=case_id,
         category=str(raw.get("category") or "uncategorized"),
         source=source,
         messages=[_build_message(m, case_id, i) for i, m in enumerate(messages_raw)],
         active=_validate_ids(raw.get("active") or [], catalog, case_id, "active"),
-        required=_validate_ids(expect.get("required") or [], catalog, case_id, "required"),
+        required=required,
         optional=_validate_ids(expect.get("optional") or [], catalog, case_id, "optional"),
         turn_context=raw.get("turn_context"),
         available_tools=list(raw.get("available_tools") or []),

@@ -1,11 +1,14 @@
 """Realistic request fixtures — the captured CLI tool inventory + RespondRequest
 builders every request-driving suite reuses.
 
-``cli_tool_inventory.json`` is the real 72-tool projection the Go CLI sends every
-turn (``Registry.OpenAITools(nil)``, ~75 KB / ~18k tokens), captured once so the
+``cli_tool_inventory.json`` is the captured CLI tool projection the Go CLI sends
+every turn (``(*tools.Registry).OpenAITools(nil)``), captured once so the
 prompt-cost, tool-repair, and injection suites exercise the true tool-schema
-region rather than a toy stub. Regenerate it by dumping the CLI registry (see the
-benchmark README) if the CLI's tool surface changes.
+region — the largest and most cache-critical part of a request — rather than a
+toy stub. The tool count is data in that file and is deliberately not restated
+here, so a stale capture shows up as a measurement change rather than a wrong
+comment. The CLI lives in a pinned submodule CI never fetches, so the fixture
+only refreshes by hand: see ``fixtures/README.md`` for the regeneration recipe.
 """
 
 from __future__ import annotations

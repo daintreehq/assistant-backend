@@ -2,8 +2,7 @@
 id: daintree.workflow.prep-branch-for-review
 title: Prepare a branch for review
 summary: Get a read-only review-readiness verdict, then do the real prep — commit, push, open the PR — branching on what the verdict reports.
-whenToUse: Use when the user asks to prepare a branch for review, open/ready a PR, wrap up work on an issue for review, or check whether the current branch is ready to push.
-priority: 185
+whenToUse: Use when the user asks to prepare a branch for review, open or ready a PR, wrap up work on an issue for review, or check whether the current branch is ready to push. Do not use to judge whether an agent's work is actually correct or complete before trusting it (use daintree.orchestration.verify-agent-work), to START work on an issue rather than finish it (use daintree.workflow.start-work-on-issue), to be notified later when the PR merges (use daintree.orchestration.watch-outcome), or to forward a reviewer's findings to an implementer agent (use daintree.agents.relay-review-feedback).
 risk: external
 tags:
   - review
@@ -29,11 +28,13 @@ actual prep (commit → push → open PR) is a SEPARATE, confirmed sequence you 
 good verdict. So call the verdict freely (no confirmation), then do the real work. The
 focus-hint tools above are not a fence — every registry tool is callable this turn.
 
+Procedure:
+
 ## Step 1 — Fix the target
 Call `context.snapshot`, then `worktree.getCurrent`, so you KNOW which worktree/branch
-you are prepping. `prepBranchForReview` takes optional `cwd?`/`projectId?` and otherwise
-targets the active worktree; a later commit/push lands wherever you point it, so be sure
-it's the branch the user means. `worktree.getCurrent` returns `{ worktree: { id, path,
+you are prepping. `prepBranchForReview` targets the active worktree unless you nest a
+`cwd` inside its `arguments` (step 3); a later commit/push lands wherever you point it,
+so be sure it's the branch the user means. `worktree.getCurrent` returns `{ worktree: { id, path,
 branch, prNumber, prUrl, ... } | null }` — if `prNumber` is already set, a PR exists on
 this branch and the job is usually "ready/update it," not "create a new one."
 
@@ -44,11 +45,17 @@ ONLY `arguments` at the top level — nest every query field inside it; a top-le
 rejected outright. (`forge.getPR` is TYPED: `{ prNumber, cwd? }` at the top level. The
 `daintree.call forge.*` actions in step 4 are a different surface: `daintree.call` itself takes
 `{ name, arguments, requestKey? }`, and the forge payload goes flat inside its `arguments`.) Each PR
-carries `head`/`number`/`url`/`reviewDecision?`/`ciStatus?`. If an open PR's head is this
-branch, you are updating, not creating — skip the PR-create in step 5 and just push.
+carries `head`/`number`/`url`. Do NOT branch on a review-decision or CI-status field — no such
+field is guaranteed on these items, and no tool in the registry reads CI or review state at all.
+If an open PR's head is this branch, you are updating, not creating — skip the PR-create in
+step 5 and just push.
 
 ## Step 3 — Get the verdict (free, read-only, NO confirmation)
-Call `workflow.prepBranchForReview` (pass `cwd` only if targeting a non-active worktree).
+`workflow.prepBranchForReview` is a passthrough wrapper like the forge ones in step 2, with one
+extra catch: `arguments` is REQUIRED. Call `workflow.prepBranchForReview({ "arguments": {} })` for
+the active worktree, or `workflow.prepBranchForReview({ "arguments": { "cwd": "<path>" } })` to
+target another one. The top level accepts only `arguments` and `requestKey`, so a top-level `cwd`
+is an unknown key and is rejected outright — and omitting `arguments` fails the required check.
 It returns:
 ```
 { verdict, hasUncommittedChanges, hasMergeConflicts,
@@ -109,8 +116,7 @@ seconds — don't wait to see it). Confirm via a watcher `completed_*` event or
 (state-based and fast — then read the tail to verify, and re-await one that still looks busy).
 Once the agent has fixed the branch, return to step 3 (re-check) → step 4/5.
 
-## Report back
-State the verdict you got, what you committed/pushed, and the PR number + url — or, if
+Report back: state the verdict you got, what you committed/pushed, and the PR number + url — or, if
 blocked, exactly what is blocking and the next action (and, if you spawned a fixer agent,
 its terminalId + watcherId; supervision is durable — the background supervisor keeps watching if the user closes the assistant).
 Never claim "the PR is ready" off `prepBranchForReview` alone: that verdict only means the

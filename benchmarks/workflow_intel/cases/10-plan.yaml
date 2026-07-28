@@ -32,7 +32,7 @@ cases:
         - {name: agentTask__spawnForEdits}
         - {name: terminal__awaitAll}
         - {name: terminal__read}
-      active_skill_ids: [daintree.orchestration.competition, daintree.orchestration.basic]
+      active_skill_ids: [daintree.orchestration.competition, daintree.foundation]
     expect:
       max_nodes: 20
       next_action_grounded: true

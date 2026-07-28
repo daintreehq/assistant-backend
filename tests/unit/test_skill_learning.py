@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -101,7 +102,6 @@ PROPOSAL_CREATE = {
     "title": "Created skill",
     "summary": "A freshly created skill.",
     "whenToUse": "Use when the created workflow recurs.",
-    "priority": 100,
     "risk": "read",
     "tags": ["daintree", "test"],
     "requiredTools": ["context.snapshot"],
@@ -117,7 +117,6 @@ PROPOSAL_IMPROVE = {
     "title": "Target",
     "summary": "An improved target summary.",
     "whenToUse": "Use when improving the target.",
-    "priority": 100,
     "risk": "read",
     "tags": ["daintree", "test"],
     "requiredTools": [],
@@ -228,11 +227,17 @@ def _request(
     state: str | None = None,
     session_id: str = "s",
     startup: dict[str, Any] | None = None,
+    tools: list[str] | None = None,
 ) -> RespondRequest:
+    inp: dict[str, Any] = {"messages": messages or MESSAGES}
+    if tools is not None:
+        inp["tools"] = [
+            {"type": "function", "function": {"name": name, "parameters": {}}} for name in tools
+        ]
     payload: dict[str, Any] = {
         "protocol_version": 2,
         "session": {"id": session_id, "turn_id": "t"},
-        "input": {"messages": messages or MESSAGES},
+        "input": inp,
         "startup": startup or {},
     }
     if state is not None:
@@ -345,7 +350,6 @@ def test_render_markdown_keeps_long_scalars_on_one_line() -> None:
         "title": "Resolve a tied multi-agent vote across a long descriptive title here",
         "summary": long_summary,
         "whenToUse": long_when.strip(),
-        "priority": 100,
         "risk": "read",
         "tags": ["daintree", "test"],
         "requiredTools": [],
@@ -379,7 +383,7 @@ async def test_improve_rewrites_target(tmp_path: Path) -> None:
 async def test_improve_preserves_foundation_flag(tmp_path: Path) -> None:
     # The improver's proposal never carries `foundation`, so re-rendering an improved
     # skill must preserve the target's existing flag — otherwise an apply-mode improve
-    # would silently demote a foundation skill (e.g. daintree.orchestration.basic).
+    # would silently demote a foundation skill (e.g. daintree.foundation).
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, manager, _ = _learner(
         tmp_path, fake, with_target=True, target_text=_TARGET_FOUNDATION
@@ -483,17 +487,16 @@ async def test_gate_without_evidence_does_nothing(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_out_of_range_priority_and_risk_case_normalized(tmp_path: Path) -> None:
-    # Mechanical normalization: a clamped priority and a case-fixed risk must not
-    # discard an otherwise sound proposal.
-    proposal = {**PROPOSAL_CREATE, "priority": 5000, "risk": "Read"}
+async def test_risk_case_normalized(tmp_path: Path) -> None:
+    # Mechanical normalization: a case-mismatched risk token must not discard an
+    # otherwise sound proposal.
+    proposal = {**PROPOSAL_CREATE, "risk": "Read"}
     fake = _provider(GATE_CREATE, proposal)
     learner, manager, _ = _learner(tmp_path, fake)
     outcome = await learner.run(request=_request(), active_ids=[])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.created")
     assert skill is not None
-    assert skill.meta.priority == 1000
     assert skill.meta.risk == "read"
 
 
@@ -1288,3 +1291,436 @@ async def test_inflight_improve_reservation_blocks_overlapping_pass(tmp_path: Pa
     assert len(fake.requests) == 1  # gate only — no double builder spend
     # The reservation belongs to the (simulated) first pass — not consumed here.
     assert ("s", "daintree.test.target") in learner._improves_in_flight
+
+
+# ---- create damping ----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_session_mints_at_most_one_skill(tmp_path: Path) -> None:
+    # Observed failure: two passes over the same workflow minted twin skills ~50s
+    # apart, both gate verdicts asserting "no existing skill covers this" (the first
+    # had not landed yet). Exact-id equality cannot see a differently-NAMED twin, so
+    # a session gets one create, whatever the second one would have been called.
+    second = {**PROPOSAL_CREATE, "skill_id": "daintree.test.twin"}
+    calls = {"build": 0}
+    fake = FakeProvider()
+
+    def _complete(req: Any) -> Any:
+        system = req.messages[0]["content"]
+        if "skill-learning gate" in system:
+            return make_result(content=json.dumps(GATE_CREATE))
+        calls["build"] += 1
+        return make_result(content=json.dumps(PROPOSAL_CREATE if calls["build"] == 1 else second))
+
+    fake.complete_result = _complete
+    learner, manager, write_dir = _learner(tmp_path, fake)
+
+    first = await learner.run(request=_request(), active_ids=[])
+    assert first.created_id == "daintree.test.created"
+    after_first = len(fake.requests)
+
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is False
+    assert len(fake.requests) == after_first + 1  # gate only — no second builder spend
+    assert not (write_dir / "daintree.test.twin.md").exists()
+    assert "daintree.test.twin" not in manager.catalog
+
+
+@pytest.mark.asyncio
+async def test_create_damp_is_per_session(tmp_path: Path) -> None:
+    # The create damp is a per-session budget, not a global one: a DIFFERENT session
+    # may still mint a skill (the catalog it gates against now contains the first).
+    # The second session proposes a DISTINCT id, so the assertion is that a real
+    # second skill lands — not merely that two more model calls were spent.
+    second = {**PROPOSAL_CREATE, "skill_id": "daintree.test.later", "title": "Later skill"}
+    calls = {"build": 0}
+    fake = FakeProvider()
+
+    def _complete(req: Any) -> Any:
+        if "skill-learning gate" in req.messages[0]["content"]:
+            return make_result(content=json.dumps(GATE_CREATE))
+        calls["build"] += 1
+        return make_result(content=json.dumps(PROPOSAL_CREATE if calls["build"] == 1 else second))
+
+    fake.complete_result = _complete
+    learner, manager, write_dir = _learner(tmp_path, fake)
+
+    first = await learner.run(request=_request(), active_ids=[])
+    assert first.created_id == "daintree.test.created"
+    after_first = len(fake.requests)
+
+    outcome = await learner.run(request=_request(session_id="s2"), active_ids=[])
+    assert len(fake.requests) == after_first + 2  # gate + builder ran again
+    assert outcome.changed is True
+    assert outcome.created_id == "daintree.test.later"
+    assert (write_dir / "daintree.test.later.md").is_file()
+    assert "daintree.test.later" in manager.catalog
+    assert "daintree.test.created" in manager.catalog  # the first one survived the reload
+
+
+@pytest.mark.asyncio
+async def test_inflight_create_reservation_is_process_wide(tmp_path: Path) -> None:
+    # The reservation is process-wide, not per-session: while one create is between
+    # its builder call and its write, ANY other session's create is dropped. That is
+    # what serializes creates and closes the duplicate race.
+    #
+    # Driven as two genuinely overlapping `run` calls rather than by flipping the
+    # private flag: the first pass is held INSIDE its builder call until the second
+    # pass has run its whole gate → damp path, which is the interleaving the flag
+    # exists for. The second pass would propose a differently-NAMED skill, so if the
+    # reservation failed to hold, a twin would land on disk.
+    twin = {**PROPOSAL_CREATE, "skill_id": "daintree.test.twin", "title": "Twin skill"}
+    calls = {"build": 0}
+    first_in_builder = asyncio.Event()
+    second_finished = asyncio.Event()
+
+    def _complete(req: Any) -> Any:
+        if "skill-learning gate" in req.messages[0]["content"]:
+            return make_result(content=json.dumps(GATE_CREATE))
+        calls["build"] += 1
+        return make_result(content=json.dumps(PROPOSAL_CREATE if calls["build"] == 1 else twin))
+
+    class OverlappingProvider(FakeProvider):
+        async def complete(self, request: Any) -> Any:
+            is_builder = "skill-learning gate" not in request.messages[0]["content"]
+            if is_builder and not first_in_builder.is_set():
+                first_in_builder.set()
+                await second_finished.wait()  # park pass one between build and write
+            return await super().complete(request)
+
+    fake = OverlappingProvider()
+    fake.complete_result = _complete
+    learner, manager, write_dir = _learner(tmp_path, fake)
+
+    async def second_pass() -> Any:
+        await first_in_builder.wait()
+        try:
+            return await learner.run(request=_request(session_id="other"), active_ids=[])
+        finally:
+            second_finished.set()  # let pass one out of its builder call
+
+    first, second = await asyncio.wait_for(
+        asyncio.gather(
+            learner.run(request=_request(session_id="first"), active_ids=[]),
+            second_pass(),
+        ),
+        timeout=10,
+    )
+
+    assert second.changed is False
+    assert len(fake.requests) == 3  # first: gate + builder; second: gate only
+    assert not (write_dir / "daintree.test.twin.md").exists()
+    assert "daintree.test.twin" not in manager.catalog
+    # The holder's own create still lands, and the reservation is released, not leaked.
+    assert first.created_id == "daintree.test.created"
+    assert (write_dir / "daintree.test.created.md").is_file()
+    assert learner._create_in_flight is False
+
+
+@pytest.mark.asyncio
+async def test_create_reservation_released_after_pass(tmp_path: Path) -> None:
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    learner, _, _ = _learner(tmp_path, fake)
+    await learner.run(request=_request(), active_ids=[])
+    assert learner._create_in_flight is False
+
+
+@pytest.mark.asyncio
+async def test_create_abandoned_when_the_catalog_moved_under_the_gate(tmp_path: Path) -> None:
+    # The in-flight reservation alone does NOT close the duplicate-skill race: it only
+    # covers the window between builder call and write. Two passes can both capture
+    # catalog C0, the first can create + reload to C1 and RELEASE the flag, and the
+    # second — still holding C0 — then finds the flag clear and mints a twin, because
+    # its verdict ("no existing skill covers this") and its collision check both run
+    # against a catalog that no longer exists. This is the shape that produced two real
+    # duplicate pairs, ~50s apart. A revision comparison at reservation time closes it.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    learner, manager, write_dir = _learner(tmp_path, fake)
+
+    original_gate = learner._gate
+
+    async def gate_then_move_the_catalog(*args: object, **kwargs: object) -> object:
+        verdict = await original_gate(*args, **kwargs)  # type: ignore[arg-type]
+        # Simulate the other pass landing its skill and reloading WHILE we gated.
+        (manager.primary_dir / "daintree.test.rival.md").write_text(
+            _TARGET.replace("daintree.test.target", "daintree.test.rival"), encoding="utf-8"
+        )
+        manager.reload_sync()
+        return verdict
+
+    learner._gate = gate_then_move_the_catalog  # type: ignore[method-assign]
+    outcome = await learner.run(request=_request(), active_ids=[])
+
+    assert outcome.changed is False
+    assert len(fake.requests) == 1  # gate only — no builder spend
+    assert not (write_dir / "daintree.test.created.md").exists()
+    assert learner._create_in_flight is False  # reservation never taken, nothing leaked
+
+
+# ---- disk-drift guard --------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_improve_aborts_when_file_changed_on_disk(tmp_path: Path) -> None:
+    # The owner's actual loop: ./dev is running in apply mode and they hand-edit a
+    # skill file. Nothing reloads the catalog except a learning write, so the
+    # in-memory staleness check cannot see that edit — and the improver was working
+    # from the pre-edit body anyway. The write must be abandoned, not applied.
+    fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
+    learner, manager, write_dir = _learner(tmp_path, fake, with_target=True)
+    path = write_dir / "daintree.test.target.md"
+    hand_edited = _TARGET.replace("Original step.", "A hand-edited step.")
+    path.write_text(hand_edited, encoding="utf-8")
+
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is False
+    assert path.read_text(encoding="utf-8") == hand_edited  # the hand edit survived
+    assert not (write_dir / "daintree.test.target.md.tmp").exists()  # temp discarded
+    assert "New guardrail." not in manager.catalog.get("daintree.test.target").body
+
+
+@pytest.mark.asyncio
+async def test_improve_tolerates_cosmetic_yaml_reflow(tmp_path: Path) -> None:
+    # The guard compares PARSED content hashes, never raw bytes: re-ordering or
+    # re-quoting frontmatter changes the file without changing the skill, and must
+    # not be mistaken for a hand edit.
+    fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
+    learner, manager, write_dir = _learner(tmp_path, fake, with_target=True)
+    path = write_dir / "daintree.test.target.md"
+    reflowed = (
+        "---\n"
+        'summary: "The original target summary."\n'
+        "id: daintree.test.target\n"
+        "whenToUse: Use when improving the target.\n"
+        "title: Target\n"
+        "---\n"
+        "Use when: the original condition.\n\nProcedure:\n1. Original step.\n\n"
+        "Report back: original.\n"
+    )
+    path.write_text(reflowed, encoding="utf-8")
+    assert path.read_bytes() != _TARGET.encode()  # different bytes...
+    assert parse_skill(reflowed).content_hash == parse_skill(_TARGET).content_hash  # same skill
+
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is True
+    assert manager.catalog.get("daintree.test.target").summary == "An improved target summary."
+
+
+@pytest.mark.asyncio
+async def test_create_is_not_blocked_by_drift_check(tmp_path: Path) -> None:
+    # The drift check is improve-only — a create has no prior body to protect, and
+    # an existing file at that path is already caught by the id-collision guard.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    learner, _, write_dir = _learner(tmp_path, fake)
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is True
+    assert (write_dir / "daintree.test.created.md").is_file()
+
+
+# ---- body-growth control -----------------------------------------------------
+
+
+_STATED_MAX_RE = re.compile(r"hard max ~(\d+)\s*KB")
+
+
+def test_house_ceiling_matches_the_prompts_stated_max() -> None:
+    # Read the ceiling out of the PROMPTS, not out of a second copy of the constant:
+    # the drift this guards against is prose and code disagreeing, and a test that
+    # never opens build.md / improve.md cannot see that happen. A code ceiling looser
+    # than the number the model was told backs nothing.
+    from daintree_assistant_server.services import skill_learning as sl
+
+    loader = _loader()
+    for name in ("build", "improve"):
+        match = _STATED_MAX_RE.search(loader.skill_learning_prompt(name))
+        assert match is not None, f"{name}.md no longer states a 'hard max ~N KB' body size"
+        stated = int(match.group(1)) * 1024
+        assert stated == sl._HOUSE_MAX_BODY_BYTES, (
+            f"{name}.md tells the model {match.group(1)} KB but the code ceiling is "
+            f"{sl._HOUSE_MAX_BODY_BYTES / 1024:g} KB"
+        )
+
+    # ...and the constant is actually enforced, not merely declared.
+    oversized = "Use when: x.\n\nProcedure:\n1. a.\n2. b.\n3. c.\n" + ("filler. " * 2500)
+    assert len(oversized.encode()) > sl._HOUSE_MAX_BODY_BYTES
+    assert any("size ceiling" in p for p in _house_style_problems(oversized + "\nReport back: y."))
+
+
+@pytest.mark.asyncio
+async def test_improve_rejects_runaway_body_growth(tmp_path: Path) -> None:
+    # Every landed improve to date has been net-additive; one skill grew 4x in five
+    # days. A single improve may not add more than the growth allowance.
+    bloated = {
+        **PROPOSAL_IMPROVE,
+        "body": "Use when: the improved condition.\n\nProcedure:\n1. Improved step.\n"
+        + "".join(f"{i}. Another step that keeps piling on prose.\n" for i in range(2, 200))
+        + "\nReport back: improved.",
+    }
+    fake = _provider(GATE_IMPROVE, bloated)
+    learner, manager, _ = _learner(tmp_path, fake, with_target=True)
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is False
+    assert manager.catalog.get("daintree.test.target").summary == "The original target summary."
+
+
+@pytest.mark.asyncio
+async def test_improve_allows_growth_within_the_allowance(tmp_path: Path) -> None:
+    # A real lesson still fits: the flat slack is generous enough for a new step plus
+    # its guardrail on a small skill.
+    from daintree_assistant_server.services import skill_learning as sl
+
+    target_body = parse_skill(_TARGET).body
+    added = "x" * (sl._IMPROVE_GROWTH_FLAT_BYTES - 200)
+    grown = {
+        **PROPOSAL_IMPROVE,
+        "body": f"Use when: the improved condition.\n\nProcedure:\n1. Improved step.\n"
+        f"2. New guardrail: {added}\n\nReport back: improved.",
+    }
+    assert len(grown["body"].encode()) > len(target_body.encode())
+    assert len(grown["body"].encode()) <= sl._growth_limit(len(target_body.encode()))
+    fake = _provider(GATE_IMPROVE, grown)
+    learner, manager, _ = _learner(tmp_path, fake, with_target=True)
+    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    assert outcome.changed is True
+    assert added in manager.catalog.get("daintree.test.target").body
+
+
+def test_growth_limit_uses_the_larger_of_flat_and_proportional() -> None:
+    from daintree_assistant_server.services import skill_learning as sl
+
+    # Small skill: the flat slack wins (proportional would be a few hundred bytes).
+    assert sl._growth_limit(1_000) == 1_000 + sl._IMPROVE_GROWTH_FLAT_BYTES
+    # Large skill: the proportional slack wins.
+    assert sl._growth_limit(40_000) == int(40_000 * sl._IMPROVE_GROWTH_RATIO)
+
+
+# ---- requiredTools admission -------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_invented_required_tool_is_stripped_not_fatal(tmp_path: Path) -> None:
+    # SkillMeta only checks a tool name's CHARACTERS, so an invented-but-plausible
+    # tool id would otherwise land in catalog metadata the selector reads. Unknown
+    # names are dropped; the skill itself still lands (the lesson is not thrown away).
+    proposal = {
+        **PROPOSAL_CREATE,
+        "requiredTools": ["context.snapshot", "terminal.teleport", "agent__spawn"],
+    }
+    fake = _provider(GATE_CREATE, proposal)
+    learner, manager, _ = _learner(tmp_path, fake)
+    outcome = await learner.run(
+        request=_request(tools=["context__snapshot", "agent__spawn"]), active_ids=[]
+    )
+    assert outcome.changed is True
+    skill = manager.catalog.get("daintree.test.created")
+    assert skill is not None
+    # Wire "__" normalized to the dotted catalog form; the invented one is gone.
+    assert skill.meta.required_tools == ["context.snapshot", "agent.spawn"]
+
+
+@pytest.mark.asyncio
+async def test_required_tool_already_in_catalog_survives(tmp_path: Path) -> None:
+    # The allow-set is (this turn's tools) UNION (every requiredTools name already in
+    # the catalog), so a real tool that simply wasn't offered on the teaching turn is
+    # not stripped out of a skill.
+    proposal = {**PROPOSAL_CREATE, "requiredTools": ["context.snapshot"]}
+    fake = _provider(GATE_CREATE, proposal)
+    primary = _primary(tmp_path)
+    (primary / "daintree.test.tooled.md").write_text(
+        "---\nid: daintree.test.tooled\ntitle: Tooled\nsummary: Has a tool.\n"
+        "whenToUse: Use when tooled.\nrequiredTools:\n  - context.snapshot\n---\n"
+        "Use when: tooled.\n\nProcedure:\n1. Do it.\n\nReport back: done.\n",
+        encoding="utf-8",
+    )
+    manager = CatalogManager(load_catalog(primary), primary_dir=primary)
+    learner = SkillLearner(
+        settings=_settings(tmp_path),
+        provider=fake,
+        prompt_loader=_loader(),
+        catalog_manager=manager,
+    )
+    outcome = await learner.run(request=_request(tools=["terminal__read"]), active_ids=[])
+    assert outcome.changed is True
+    assert manager.catalog.get("daintree.test.created").meta.required_tools == [
+        "context.snapshot"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_required_tools_deduped_after_normalization(tmp_path: Path) -> None:
+    # Two spellings of ONE tool collapse to the same logical name — they must not
+    # both land in the file's requiredTools (SkillMeta dedupes tags, never tools).
+    proposal = {**PROPOSAL_CREATE, "requiredTools": ["agent__spawn", "agent.spawn"]}
+    fake = _provider(GATE_CREATE, proposal)
+    learner, manager, _ = _learner(tmp_path, fake)
+    outcome = await learner.run(request=_request(tools=["agent__spawn"]), active_ids=[])
+    assert outcome.changed is True
+    assert manager.catalog.get("daintree.test.created").meta.required_tools == ["agent.spawn"]
+
+
+@pytest.mark.asyncio
+async def test_no_tools_reported_narrows_to_the_catalog_rather_than_admitting_anything(
+    tmp_path: Path,
+) -> None:
+    # An empty tool list is NOT permission to admit any name. A builder that saw no
+    # tool inventory has no evidence for anything outside the catalog, so an invented
+    # name is stripped — while a name the catalog already uses still survives.
+    proposal = {
+        **PROPOSAL_CREATE,
+        "requiredTools": ["something.unheard-of", "context.snapshot"],
+    }
+    # Put a real tool in the catalog so the surviving half of the contract is testable:
+    # the allow-set is the catalog's declared tools, not "nothing".
+    target_with_tools = _TARGET.replace(
+        "whenToUse: Use when improving the target.\n",
+        "whenToUse: Use when improving the target.\nrequiredTools:\n  - context.snapshot\n",
+    )
+    fake = _provider(GATE_CREATE, proposal)
+    learner, manager, _ = _learner(
+        tmp_path, fake, with_target=True, target_text=target_with_tools
+    )
+    outcome = await learner.run(request=_request(), active_ids=[])
+    assert outcome.changed is True
+    kept = manager.catalog.get("daintree.test.created").meta.required_tools
+    assert "something.unheard-of" not in kept
+    assert kept == ["context.snapshot"]
+
+
+# ---- gate verdict shape ------------------------------------------------------
+
+
+def test_lesson_kind_parses_and_degrades_to_none() -> None:
+    from daintree_assistant_server.contracts.skill_learning import GateVerdict
+
+    assert GateVerdict.model_validate({"lesson_kind": "trigger"}).lesson_kind == "trigger"
+    assert GateVerdict.model_validate({"lesson_kind": "Procedure"}).lesson_kind == "procedure"
+    # An off-enum value must never cost the whole verdict — it is an ADVISORY field.
+    assert GateVerdict.model_validate({"lesson_kind": "both"}).lesson_kind is None
+    assert GateVerdict.model_validate({"lesson_kind": None}).lesson_kind is None
+    assert GateVerdict.model_validate({}).lesson_kind is None
+
+
+@pytest.mark.asyncio
+async def test_lesson_kind_reaches_the_improver(tmp_path: Path) -> None:
+    gate = {**GATE_IMPROVE, "lesson_kind": "trigger"}
+    fake = _provider(gate, PROPOSAL_IMPROVE)
+    learner, _, _ = _learner(tmp_path, fake, with_target=True)
+    await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    improve_calls = [r for r in fake.requests if "skill improver" in r.messages[0]["content"]]
+    assert len(improve_calls) == 1
+    assert "Gate lesson kind: trigger" in improve_calls[0].messages[1]["content"]
+
+
+# ---- product-scope fence -----------------------------------------------------
+
+
+def test_learning_prompts_carry_the_orchestration_scope_fence() -> None:
+    # The only generality constraint the prompts used to carry was PORTABILITY, never
+    # SUBJECT MATTER — so a perfectly portable "how to resolve a rebase conflict"
+    # runbook passed every check. All three prompts must fence on Daintree's job.
+    loader = _loader()
+    for name in ("gate", "build", "improve"):
+        text = loader.skill_learning_prompt(name).lower()
+        assert "spawn" in text and "supervis" in text, name
+        assert "who does the work" in text, name

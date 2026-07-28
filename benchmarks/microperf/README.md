@@ -31,7 +31,7 @@ python -m benchmarks.microperf.bench report results/<run>.json
    `ChatOrchestrator.complete` (non-streaming), built via the production
    `build_container` with the fake provider injected, driven (a) sequentially and
    (b) K-way via `asyncio.gather` at a few levels (8, K, 2K; K from
-   `--concurrency`, default 32). Requests use the captured 72-tool CLI inventory and
+   `--concurrency`, default 32). Requests use the captured CLI tool projection and
    distinct session/turn ids, so every round runs the full selector → assemble →
    respond path: the selector prompt render over the live catalog, the unmemoized
    `base_prompt()` re-read, the ~18k-token tool-schema normalization walk, and

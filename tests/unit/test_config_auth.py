@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from daintree_assistant_server.auth import (
     DEVELOPMENT_PRINCIPAL,
@@ -183,3 +184,15 @@ def test_dump_dir_empty_string_is_not_a_problem_in_production() -> None:
     # An empty value means "unset" — it must not trip the production gate.
     s = _settings(ENVIRONMENT="production", DAINTREE_DUMP_UPSTREAM_DIR="")
     assert s.local_only_problems() == []
+
+
+def test_max_active_skills_rejects_a_cap_below_two() -> None:
+    # Every skill resolves to a domain foundation and the orchestrator admits a
+    # specific plus its foundation as one atomic unit, so a budget of 1 fits no unit
+    # at all and would silently load NOTHING. The floor makes that unsettable.
+    with pytest.raises(ValidationError):
+        _settings(MAX_ACTIVE_SKILLS=1)
+
+
+def test_max_active_skills_accepts_the_floor() -> None:
+    assert _settings(MAX_ACTIVE_SKILLS=2).max_active_skills == 2

@@ -2,8 +2,7 @@
 id: daintree.terminals.rename
 title: Rename terminal tabs
 summary: Give terminals/agents clear tab titles — the fast, direct route (no tool hunting).
-whenToUse: Use whenever the user wants to rename terminals/tabs, retitle agents, or "figure out what each of these terminals is doing and give them a title" — especially when several agents share the same name (e.g. all "Claude") and need to be told apart.
-priority: 90
+whenToUse: Use whenever the user wants to rename terminals/tabs, retitle agents, or "figure out what each of these terminals is doing and give them a title" — especially when several agents share the same name (e.g. all "Claude") and need to be told apart. The deliverable is new TITLES. Do not use when the user wants a report on what the agents are doing rather than a retitle (use daintree.orchestration.supervise-fleet), or a plain list of what terminals exist (use daintree.foundation).
 risk: ui
 tags:
   - daintree
@@ -21,7 +20,7 @@ Use when: the user wants terminals/agents/tabs renamed or titled — e.g. "figur
 
 The tool is terminal.rename({ terminalId, name }). It is always callable by name — DO NOT use tool.search or daintree.listTools to find it, and DO NOT route it through daintree.call. Hunting for it is the slow path; this is the fast one.
 
-Always pass BOTH terminalId AND a non-empty name: omitting name opens an interactive rename dialog instead of renaming, and omitting terminalId targets the focused tab. Be explicit on every call.
+Always pass BOTH terminalId AND a non-empty name: the typed wrapper marks both REQUIRED with additionalProperties:false, so a call missing either is schema-rejected outright — there is no focused-tab default and no interactive-dialog fallback to land in. Be explicit on every call.
 
 Most tool calls in one response are dispatched ONE AFTER ANOTHER (only no-wait terminal.extract/.json batches run concurrently) — and for THIS job the fast path is still FEWER model calls, not a big batch: one question ("title each terminal") spans the whole cohort, so read every terminal in ONE terminal.extract.json over all the ids (a single small-model call), not one extract or summarize per terminal.
 

@@ -80,16 +80,16 @@ Skills are Markdown runbooks that become task-specific operating instructions fo
 | `whenToUse` | yes | the *primary* selector signal (camelCase key → `when_to_use`) |
 | `foundation` | no | `true` marks a domain **foundation** skill; the selector pairs it with the specific workflow skill(s) it picks (default `false`) |
 | `tags` | no | lowercased, deduped |
-| `priority` | no | 0–1000 |
 | `risk` | no | enum: `read local ui terminal project external git system` |
 | `requiredTools` | no | camelCase key → `required_tools` |
 
-**Pipeline:** `loader.py` parses/validates (strict — a malformed skill fails `/readyz`, not a request) → `catalog.py` builds the **immutable** catalog and a deterministic `revision` hash → the selector sees only `Skill.selector_view()`, the public `/skills` endpoint sees only `public_view()`, and **neither ever exposes the body** except via injection into the main prompt for active skills. The main model is explicitly told (in `base.md`) not to emit `skill.find`/`skill.load` — selection is automatic and server-side.
+**Pipeline:** `loader.py` parses/validates (strict — a malformed skill fails `/readyz`, not a request) → `catalog.py` builds the **immutable** catalog and a deterministic `revision` hash → the selector sees only `Skill.selector_view()`, the public `/skills` endpoint sees only `public_view()`, and **neither ever exposes the body** except via injection into the main prompt for active skills. Selection is automatic and server-side: the guarantee that `skill.find`/`skill.load` are never *offered* is enforced at the request boundary by the reserved-tool-names check in `services/validation.py` (`RESERVED_TOOL_NAMES`, which also covers the `skill__find`/`skill__load` wire spellings and the `daintree_internal__` prefix), and the base prompt separately tells the model it does not find, load, or manage skills itself (`main/base/30-skills.md` — it never names the tools).
 
 **To add a skill:**
 1. Create `skills/files/<id>.md` (it is auto-discovered, sorted by id — no registration).
-2. Run `pytest tests/unit/test_skills_loader.py tests/unit/test_catalog.py`.
+2. Run `pytest tests/unit` (~5s, no API calls). A new skill trips more than the loader/catalog tests: `test_prompt_budgets.py` (body size ceilings, no pipe tables, a Report-back line), `test_skill_catalog_hygiene.py` (every `requiredTools` name exists in the CLI tool-registry snapshot at `tests/fixtures/cli_tool_names.txt` — its header has the regeneration recipe against the pinned `cli/` submodule), and `test_skill_learning.py`'s house-style sweep over the packaged catalog. Do **not** try to narrow this with `pytest -k`: the obvious concern-named filter (`-k "catalog or budget or house"`) matches no loader test name or module and silently deselects all 14 of them. Run the directory, or list the files without a filter.
 3. **Run the golden tests** (`pytest tests/golden/`). The prompt snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/skills/`), not the live one, so adding or changing a real skill no longer churns `selector_system.md` / `loaded_skills_*` — only editing a prompt template or the assembler does. A structural smoke test (`test_selector_prompt_renders_real_catalog`) still verifies the real catalog renders through the selector prompt.
+4. **Check routing coverage** (`python -m benchmarks.skill_selection.bench coverage`) — a per-skill case-coverage matrix, offline and free (no API calls). It exits non-zero when a skill has no benchmark case that requires it, so a new skill does not land unrouted and untested.
 
 ## Skill learning (local development only)
 
@@ -116,8 +116,8 @@ A backend-internal harness (`services/skill_learning.py`) that watches completed
 
 All prompt text is **server-owned** and lives in `src/daintree_assistant_server/prompts/` (`.md` = raw bodies, `.md.j2` = Jinja templates), loaded via `prompts/loader.py`:
 
-- `main/base.md` — the permanent assistant system prompt (persona + hard rules). This is the highest-leverage file in the repo.
-- `main/{startup_context,runtime_context,integrations,loaded_skills,turn_footer}.md.j2` — the structured main-prompt layers.
+- `main/base/NN-*.md` — the permanent assistant system prompt (persona + hard rules). It is a **directory of ordered partials**, not a single file: `PromptLoader.base_prompt()` globs `main/base/*.md`, sorts by filename, and joins them with blank lines, so the `NN-` prefix is load-bearing ordering (`00-persona`, `10-hard-rules`, `20-tool-discipline`, `30-skills`, `35-daintree-docs`, `40-communication`, `50-formatting`). Edit the partial that owns the rule; a new section is a new numbered file. **There is no `main/base.md`** — writing one creates a stray file the loader ignores. This directory is the highest-leverage prompt text in the repo.
+- `main/{startup_context,runtime_context,integrations,loaded_skills,response_contract,turn_footer}.md.j2` — the structured main-prompt layers. `response_contract.md.j2` is order-critical: the golden suite asserts it renders as the **final system message**, after the base/integrations/active-skill systems and before the conversation.
 - `selector/system.md.j2` — the skill-selector classifier prompt.
 - `tasks/<task>.md` — utility-task system prompts.
 

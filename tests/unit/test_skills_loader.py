@@ -18,7 +18,6 @@ whenToUse: Use when testing.
 tags:
   - alpha
   - beta
-priority: 50
 risk: read
 requiredTools:
   - git.status
@@ -76,7 +75,16 @@ def test_duplicate_tags_rejected() -> None:
 
 
 def test_unknown_frontmatter_key_rejected() -> None:
-    bad = VALID.replace("priority: 50", "priority: 50\nsecret_field: oops")
+    bad = VALID.replace("risk: read", "risk: read\nsecret_field: oops")
+    with pytest.raises(SkillLoadError):
+        parse_skill(bad, expected_id="test.example")
+
+
+def test_priority_key_rejected() -> None:
+    # `priority` was removed from the schema (nothing read it). extra="forbid" must
+    # now reject it, so a stale skill file fails loudly instead of silently carrying
+    # dead metadata forward.
+    bad = VALID.replace("risk: read", "priority: 50\nrisk: read")
     with pytest.raises(SkillLoadError):
         parse_skill(bad, expected_id="test.example")
 

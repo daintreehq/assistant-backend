@@ -15,11 +15,11 @@ cases:
         content: Done with that. Now let's pick up issue 231 and get an agent on it.
     expect:
       required: [daintree.workflow.start-work-on-issue]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: shift-issue-to-poll
     category: topic-shift
-    active: [daintree.workflow.start-work-on-issue, daintree.orchestration.basic]
+    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
     messages:
       - role: user
         content: Start work on issue 88.
@@ -33,11 +33,16 @@ cases:
           the build to uv, and give me the consensus.
     expect:
       required: [daintree.agents.poll-pinned-agents]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: shift-experiment-to-prep
     category: topic-shift
-    active: [daintree.orchestration.multi-agent, daintree.orchestration.basic]
+    note: >-
+      The original final message also said "close those terminals", which is
+      workspace-cleanup's own trigger — a correct cleanup pick then scored as an extra
+      against a prep-only expectation. The eviction signal ("enough of that experiment")
+      is preserved without the second workflow, so exactly one skill wins.
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
     messages:
       - role: user
         content: Have two agents debate the queue design and relay between them.
@@ -47,11 +52,11 @@ cases:
           approach after three rounds.
       - role: user
         content: >-
-          Enough of that experiment, close those terminals. Is my feature branch
-          ready for a PR? If so, prep it.
+          Enough of that experiment — park it. Is my feature branch ready for a
+          PR? If so, prep it.
     expect:
       required: [daintree.workflow.prep-branch-for-review]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: shift-work-to-chitchat
     category: topic-shift
@@ -79,11 +84,11 @@ cases:
         content: Run a runoff between the top two options with the same agents to break the tie.
     expect:
       required: [daintree.orchestration.runoff-tiebreaker]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: shift-recipe-to-rename
     category: topic-shift
-    active: [daintree.recipe.run-or-create, daintree.orchestration.basic]
+    active: [daintree.recipe.run-or-create, daintree.foundation]
     messages:
       - role: user
         content: Run the fullstack dev recipe.
@@ -95,4 +100,4 @@ cases:
         content: The workspace looks good. Give all these terminals proper names.
     expect:
       required: [daintree.terminals.rename]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]

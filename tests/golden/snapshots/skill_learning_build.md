@@ -7,11 +7,10 @@ Before writing, diagnose the transcript: identify what the assistant did that WO
 Return ONLY a JSON object (no prose, no code fences) with exactly these fields:
 {
   "action": "create_skill",
-  "skill_id": "daintree.<domain>.<workflow>",   // lowercase dotted id, e.g. daintree.git.resolve-rebase
+  "skill_id": "daintree.<domain>.<workflow>",   // lowercase dotted id, e.g. daintree.orchestration.spawn-and-verify-cohort
   "title": "<short action title>",
   "summary": "<one sentence: what this runbook helps the assistant do>",
   "whenToUse": "<the primary trigger, phrased 'Use when ...'>",
-  "priority": 100,                               // 0-1000
   "risk": "read|local|ui|terminal|project|external|git|system",
   "foundation": false,                           // almost always false — see the rule below
   "tags": ["daintree", "..."],
@@ -23,11 +22,11 @@ Return ONLY a JSON object (no prose, no code fences) with exactly these fields:
   "confidence": 0.0
 }
 
-Trigger quality (whenToUse / summary / tags):
-- "whenToUse" is the SELECTOR's primary routing signal: a small classifier chooses skills from catalog metadata alone (id, summary, whenToUse, tags, risk, requiredTools) — it NEVER sees the body. A perfectly-written body behind a vague trigger will simply never load.
+Trigger quality (whenToUse / summary):
+- "whenToUse" is the SELECTOR's primary routing signal: a small classifier chooses skills from FOUR fields per skill and nothing else — id, summary, whenToUse, and the foundation flag. It NEVER sees the body. A perfectly-written body behind a vague trigger will simply never load.
 - Write whenToUse so conversations that need THIS workflow match it and neighboring ones don't: name the concrete user intents it covers ("Use when the user asks to X, Y, or Z"), in the words a user would actually use.
 - When the catalog has adjacent skills the workflow could be confused with, add the catalog's routing style: "Do not use for X (use the <other-skill> skill)". This mutual-exclusion phrasing is how the existing catalog keeps the selector precise.
-- Tags are secondary selector signal — include the domain and the workflow's key nouns/verbs.
+- tags, risk and requiredTools are NOT shown to the classifier — they are catalog metadata for humans and server-side code. Fill them in accurately, but never try to steer routing through them: everything the selector will ever know must be carried by the id, the summary, and whenToUse.
 
 House style for "body" (match the example skills you are given):
 - Start with "Use when: <the trigger condition, in operational language>".
@@ -35,6 +34,11 @@ House style for "body" (match the example skills you are given):
 - Include a "Confirmation:" line only when the procedure mutates state the user would care about (most read-only skills have none).
 - End with "Report back: <exactly what the assistant should report to the user>". An optional short "Notes:" list of edge cases may follow.
 - Keep the body TIGHT — target under ~10 KB, hard max ~16 KB. State each rule ONCE; do not restate a step's guardrail again in a separate anti-patterns list. No pipe tables (the narrow terminal shatters them) — use per-item list lines.
+
+Scope — Daintree orchestrates, it does not engineer (check this FIRST):
+- Daintree is an agent/terminal control plane. Its job is to spawn agents, supervise them, verify their outcomes, relay between them, and report. It never does the engineering itself.
+- So before writing anything, ask who does the work in this runbook. If the steps have the ASSISTANT doing the work by hand — writing product code, fixing a failing test, applying a framework or language technique, debugging an implementation, running a release, resolving merge conflicts — that is craft knowledge, not a Daintree skill. Return no_change.
+- A skill is in scope when its steps decide what to delegate, spawn the right agent for it, supervise and unblock that agent, verify what it produced, and report the outcome. Judge by WHO DOES THE WORK, not by which tools appear: a runbook that delegates every file edit to an agent is in scope even when it also makes single control-plane calls (commit, push, open a PR) around that delegation.
 
 Generality (this is the whole point — the catalog must transfer across projects, users, and agents):
 - Write for ANY project. No repo names, languages, frameworks, file paths, or one-off facts from this workflow — abstract them into the general shape of the task. If the lesson only makes sense for this one repo, it is not a skill; return no_change.

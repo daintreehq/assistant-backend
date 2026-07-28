@@ -295,7 +295,8 @@ def test_selector_system(loader: PromptLoader) -> None:
     catalog = _fixture_catalog()
     rendered = loader.render(
         "selector/system.md.j2",
-        catalog=catalog.selector_metadata(["daintree.example.alpha"]),
+        catalog=catalog.selector_metadata(),
+        active_ids=["daintree.example.alpha"],
         max_active=3,
     )
     assert_golden("selector_system.md", rendered)
@@ -310,7 +311,8 @@ def test_selector_prompt_renders_real_catalog(loader: PromptLoader) -> None:
     assert catalog.skills, "real catalog is empty"
     rendered = loader.render(
         "selector/system.md.j2",
-        catalog=catalog.selector_metadata([]),
+        catalog=catalog.selector_metadata(),
+        active_ids=[],
         max_active=3,
     )
     for skill in catalog.skills:

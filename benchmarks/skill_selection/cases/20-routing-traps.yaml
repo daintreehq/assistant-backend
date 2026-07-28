@@ -2,14 +2,36 @@
 # keywords. Picking the trap skill is a precision failure (extra).
 
 cases:
-  - id: close-terminals-not-rename
+  - id: close-idle-terminals-is-cleanup
     category: routing-trap
-    note: Closing terminals is general orchestration, NOT the rename skill.
+    note: >-
+      Re-pointed against the 23-skill catalog. The rename bait is unchanged, but the
+      answer is no longer the foundation: workspace-cleanup's trigger list is the user's
+      own teardown words ("close these", "tidy up the terminals") and this is a PLURAL
+      close, while the foundation claims only "closing ONE the user named". The
+      keep-the-build exception is the classify-safe/unsafe step of cleanup's own runbook.
     messages:
       - role: user
         content: Close all the idle terminals, but keep the one running the build.
     expect:
-      required: [daintree.orchestration.basic]
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: resume-session-not-foundation
+    category: routing-trap
+    note: >-
+      Moved here from 60-foundation-only.yaml. "Resume the session I closed yesterday" is
+      status-and-resume's own trigger ("to pick up / resume something from an earlier
+      session"), and the foundation now hands it over by name ('"where were we" across
+      sessions is status-and-resume'). The trap is the auto-paired foundation winning by
+      default on a request shaped like a state read — so the failure measured here is a
+      MISS, not an extra.
+    messages:
+      - role: user
+        content: Can we resume the session I closed yesterday afternoon? The parser one.
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
 
   - id: independent-poll-not-multi-agent
     category: routing-trap
@@ -21,7 +43,7 @@ cases:
           discussion between them — then give me the consensus.
     expect:
       required: [daintree.agents.poll-pinned-agents]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: debate-is-multi-agent
     category: routing-trap
@@ -33,7 +55,7 @@ cases:
           invalidation bug — relay the arguments between them until they converge.
     expect:
       required: [daintree.orchestration.multi-agent]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: peer-vote-is-competition
     category: routing-trap
@@ -45,11 +67,13 @@ cases:
           peer-review each other's drafts and vote for the best one.
     expect:
       required: [daintree.orchestration.competition]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: judge-led-interview
     category: routing-trap
-    note: Judge interviews candidates, no codebase verification -> interview skill.
+    note: >-
+      The LIGHT depth of the merged interview skill — a judge questions candidates and
+      names a winner, with no codebase verification.
     messages:
       - role: user
         content: >-
@@ -57,11 +81,16 @@ cases:
           testing strategy and pick a winner.
     expect:
       required: [daintree.orchestration.interview]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: interview-with-verification
     category: routing-trap
-    note: Judge verifies claims against the codebase + narrows to top 2 -> verified-interview.
+    note: >-
+      The DEEP depth of the same skill: the old verified-interview folded into
+      daintree.orchestration.interview, whose whenToUse now claims both depths ("a deep
+      one where the judge verifies candidates' claims against the codebase ... and
+      narrows to a top 2"). Paired with judge-led-interview above, this checks the merge
+      did not strand the deep phrasing.
     messages:
       - role: user
         content: >-
@@ -69,8 +98,8 @@ cases:
           against the codebase, asks challenging follow-ups, narrows to a top 2,
           and then picks the winner.
     expect:
-      required: [daintree.orchestration.verified-interview]
-      optional: [daintree.orchestration.basic]
+      required: [daintree.orchestration.interview]
+      optional: [daintree.foundation]
 
   - id: tie-needs-runoff
     category: routing-trap
@@ -82,7 +111,7 @@ cases:
           Run a tie-breaker round with the same agents.
     expect:
       required: [daintree.orchestration.runoff-tiebreaker]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: single-agent-not-poll
     category: routing-trap
@@ -92,7 +121,7 @@ cases:
         content: Ask nova — just nova — what she thinks about the new queue design.
     expect:
       required: [daintree.agents.ask-and-relay]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: finished-issue-is-prep
     category: routing-trap
@@ -104,7 +133,7 @@ cases:
           reviewers.
     expect:
       required: [daintree.workflow.prep-branch-for-review]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: worktree-with-recipe
     category: routing-trap
@@ -114,4 +143,4 @@ cases:
         content: Create a new worktree with the standard dev recipe.
     expect:
       required: [daintree.recipe.run-or-create]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]

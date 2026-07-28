@@ -35,34 +35,62 @@ class Catalog:
         self._skills: tuple[Skill, ...] = tuple(sorted(by_id.values(), key=lambda s: s.id))
         self.revision = self._compute_revision(self._skills)
         # domain -> foundation id, for auto-pairing a selected specific with its
-        # domain foundation (see ``domain_foundation``). Built over the id-sorted
-        # skills so the tie-break (a domain with two foundations) is deterministic.
+        # nearest foundation (see ``domain_foundation``, which walks up this index).
+        # A domain may declare at most ONE foundation: with two, the loser would not
+        # even resolve to itself — selecting it would admit BOTH foundations and burn
+        # two slots of the active-set budget on one domain's base judgment. There is
+        # no sensible tie-break, so this fails closed like any other malformed skill.
         foundation_by_domain: dict[str, str] = {}
         for skill in self._skills:
-            if skill.meta.foundation:
-                foundation_by_domain.setdefault(self._domain_of(skill.id), skill.id)
+            if not skill.meta.foundation:
+                continue
+            domain = self._domain_of(skill.id)
+            existing = foundation_by_domain.get(domain)
+            if existing is not None:
+                raise SkillLoadError(
+                    f"domain {domain!r} declares two foundation skills "
+                    f"({existing!r} and {skill.id!r}); a domain may declare at most one"
+                )
+            foundation_by_domain[domain] = skill.id
         self._foundation_by_domain = foundation_by_domain
 
     @staticmethod
     def _domain_of(skill_id: str) -> str:
         """The domain key for an id: its namespace minus the final segment.
 
-        ``daintree.orchestration.competition`` and ``daintree.orchestration.basic``
-        share the domain ``daintree.orchestration``. An id with no dot is its own
-        domain (it cannot pair).
+        ``daintree.orchestration.competition`` and ``daintree.orchestration.debate``
+        share the domain ``daintree.orchestration``; ``daintree.foundation`` keys the
+        domain ``daintree``. An id with no dot is its own domain.
         """
         prefix, sep, _ = skill_id.rpartition(".")
         return prefix if sep else skill_id
 
     def domain_foundation(self, skill_id: str) -> str | None:
-        """The foundation skill id for ``skill_id``'s domain, if any.
+        """The nearest foundation skill id above ``skill_id``, if any.
 
         Used to auto-pair a domain's foundation with a selected specific so the
         foundation loads on the SAME turn its specific is selected rather than a
         turn late. Returns the id (possibly ``skill_id`` itself, when it is the
-        foundation) or ``None`` when the domain has no foundation.
+        foundation) or ``None`` when no ancestor namespace has a foundation.
+
+        The lookup walks UP the dotted id namespace, NEAREST-FIRST: the skill's
+        own domain key, then each successively shorter prefix. So a top-level
+        ``daintree.foundation`` (domain key ``daintree``) backs every
+        ``daintree.*`` skill, while a narrower
+        ``daintree.orchestration.<something>`` foundation still wins for ids
+        inside ``daintree.orchestration``. Without the walk, only skills sharing
+        the foundation's immediate domain paired at all — every other namespace
+        loaded with no base judgment layer.
         """
-        return self._foundation_by_domain.get(self._domain_of(skill_id))
+        domain = self._domain_of(skill_id)
+        while True:
+            found = self._foundation_by_domain.get(domain)
+            if found is not None:
+                return found
+            prefix, sep, _ = domain.rpartition(".")
+            if not sep:
+                return None
+            domain = prefix
 
     @staticmethod
     def _compute_revision(skills: Sequence[Skill]) -> str:
@@ -103,9 +131,18 @@ class Catalog:
 
     # ---- projections ----------------------------------------------------
 
-    def selector_metadata(self, active_ids: Iterable[str] = ()) -> list[dict[str, object]]:
-        active = set(active_ids)
-        return [s.selector_view(active=s.id in active) for s in self._skills]
+    def selector_metadata(self) -> list[dict[str, object]]:
+        """Catalog entries for the selector prompt — request-INVARIANT by design.
+
+        Nothing here varies per turn, so the rendered catalog block is byte-stable
+        across every selector call for a given catalog revision. The active set is
+        passed to the template separately and rendered once after this block; when
+        it was an inline per-skill marker, activating an early-sorting skill
+        invalidated most of the prompt on DeepSeek's content-prefix cache (the
+        selector cannot use ``prompt_cache_key`` at all — the provider withholds it
+        whenever ``response_format`` is set, which the selector always sets).
+        """
+        return [s.selector_view() for s in self._skills]
 
     def public_list(self) -> list[dict[str, object]]:
         return [s.public_view() for s in self._skills]

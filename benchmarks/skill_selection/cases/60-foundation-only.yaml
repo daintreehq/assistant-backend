@@ -1,60 +1,92 @@
-# Substantive tasks with NO squarely-matching specific skill: the selector should
-# load the domain foundation ALONE rather than forcing a poor specific match or
-# returning nothing.
+# The foundation is the WHOLE answer: a plain what-exists-right-now read, a single
+# direct control-plane action, or a substantive task no runbook claims. These are the
+# cases that test the foundation for RECALL — everywhere else it is auto-paired
+# downstream by the backend, so on a case whose answer is a specific it belongs in
+# `optional`, never `required` (cases.py enforces that).
+#
+# Re-validated against the 23-skill catalog. The original timer / watcher / grant texts
+# are now watch-outcome's own triggers ("remind me in an hour", "let me know when the
+# build finishes", "pre-authorize an unattended action with a grant"), and the resume
+# text is status-and-resume's ("pick up / resume something from an earlier session"), so
+# demanding the foundation ALONE on those made a correct pick score as an extra. The
+# resume case moved to 20-routing-traps.yaml re-pointed at status-and-resume; the rest
+# were rewritten onto clauses the foundation claims outright and every runbook disclaims.
 
 cases:
-  - id: novel-timer-nudge
+  - id: novel-connection-check
     category: foundation-only
+    note: >-
+      "checking Daintree is connected" is named verbatim in the foundation's whenToUse
+      and nowhere else, and its step 1 pairs daintree.status with exactly this symptom
+      ("worth checking when the workspace reads empty"). Nothing is running, so there is
+      no cohort to sweep and nothing to leave watching.
     messages:
       - role: user
         content: >-
-          Set up a timer that nudges the build terminal with an "any progress?"
-          message every 30 minutes overnight.
+          Nothing I click in Daintree seems to do anything and the workspace is reading
+          empty. Is the connection to it even up?
     expect:
-      required: [daintree.orchestration.basic]
+      required: [daintree.foundation]
 
-  - id: novel-queue-cleanup
+  - id: novel-resolve-one-queue-item
     category: foundation-only
-    messages:
-      - role: user
-        content: Go through the Daintree queue and resolve anything stale or already handled.
-    expect:
-      required: [daintree.orchestration.basic]
-
-  - id: novel-watcher-on-deploy
-    category: foundation-only
-    messages:
-      - role: user
-        content: >-
-          Add a watcher on the deploy terminal that alerts me if anything that
-          looks like an error scrolls past.
-    expect:
-      required: [daintree.orchestration.basic]
-
-  - id: novel-grant-for-agent
-    category: foundation-only
+    note: >-
+      A single direct control-plane action on the attention queue — foundation step 7
+      owns inbox honesty and queue.resolve is one of its tools. Deliberately ONE named
+      item: workspace-cleanup requires teardown of workspace state in the user's own
+      words, and status-and-resume's hygiene clause is about the workflow ledger, not
+      the queue badge. The word "stale" is deliberately absent from the user text —
+      status-and-resume's SUMMARY (which the selector sees alongside whenToUse) reads
+      "close the stale ledger rows nothing else will", so that one word pulled harder
+      lexically than the ledger-vs-badge distinction pushes back.
     messages:
       - role: user
         content: >-
-          Create a grant so the agent in terminal 4 can run git push without
-          asking me every time.
+          That attention item about the parser agent is done with — I dealt with it
+          myself an hour ago. Clear it off the badge for me.
     expect:
-      required: [daintree.orchestration.basic]
+      required: [daintree.foundation]
 
-  - id: novel-resume-session
+  - id: novel-focus-one-terminal
     category: foundation-only
-    messages:
-      - role: user
-        content: Can we resume the session I closed yesterday afternoon? The parser one.
-    expect:
-      required: [daintree.orchestration.basic]
-
-  - id: novel-summarize-terminal
-    category: foundation-only
+    note: >-
+      "reading or focusing ONE terminal" is the foundation's own single-action clause
+      and terminal.focus is UI only. supervise-fleet's navigation clause is "show me the
+      NEXT one" across a cohort, and rename's deliverable is titles — neither is a
+      request to put one named terminal on screen.
     messages:
       - role: user
         content: >-
-          Something went wrong in the worker terminal while I was out — read
-          through it and tell me what happened.
+          Put the deploy terminal up on screen for me — I just want to watch it scroll
+          myself for a minute.
     expect:
-      required: [daintree.orchestration.basic]
+      required: [daintree.foundation]
+
+  - id: novel-branch-state-read
+    category: foundation-only
+    note: >-
+      Plain what-exists read. The foundation's first whenToUse clause names worktrees and
+      branches, and git.getProjectPulse is its tool. Nothing is being readied for review,
+      which is what prep-branch-for-review requires, and no agent is involved.
+    messages:
+      - role: user
+        content: >-
+          Before I start anything — what branch is this worktree sitting on, and have I
+          got uncommitted changes lying around?
+    expect:
+      required: [daintree.foundation]
+
+  - id: novel-read-terminal-output
+    category: foundation-only
+    note: >-
+      Reading ONE terminal and making sense of the tail — the foundation's own clause,
+      with terminal.read and terminal.summarize among its tools. No agent has gone wrong
+      (recover-agent needs a fault), and the earlier "while I was out ... tell me what
+      happened" framing that now lands on status-and-resume is deliberately gone.
+    messages:
+      - role: user
+        content: >-
+          The test run in terminal 2 spat out a wall of output and I can't make sense of
+          it. Read it back and tell me what actually failed.
+    expect:
+      required: [daintree.foundation]

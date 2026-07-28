@@ -70,15 +70,17 @@ def test_skills_list_and_etag(client, auth, app) -> None:
     assert r304.status_code == 304
 
 
-def test_skills_resolve_find(client, auth, fake_provider) -> None:
+def test_skills_resolve_find(client, auth, fake_provider, app) -> None:
     fake_provider.selection_result = selection_result([SKILL_PREP])
     r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
         "protocol_version": 2, "session_id": "s", "action": "find", "query": "prep branch",
     })
     assert r.status_code == 200
     body = r.json()
-    assert [s["id"] for s in body["skills"]["active"]] == [SKILL_PREP]
-    assert len(body["skills"]["prelude"]["tool_executions"]) == 1
+    # `find` runs the selector, so the pick is front-loaded with its domain foundation.
+    foundation = app.state.container.catalog.domain_foundation(SKILL_PREP)
+    assert [s["id"] for s in body["skills"]["active"]] == [SKILL_PREP, foundation]
+    assert len(body["skills"]["prelude"]["tool_executions"]) == len(body["skills"]["newly_loaded"])
     assert body["state"].startswith("dst1.")
 
 
@@ -87,7 +89,14 @@ def test_skills_resolve_load_and_clear(client, auth, app) -> None:
         "protocol_version": 2, "session_id": "s", "action": "load", "skill_ids": [SKILL_PREP],
     })
     body = r.json()
-    assert [s["id"] for s in body["skills"]["active"]] == [SKILL_PREP]
+    active = [s["id"] for s in body["skills"]["active"]]
+    # An explicit load is foundation-closed like the automatic path: this response signs
+    # a state token that later rounds replay verbatim, so an unclosed set here would
+    # strand every following turn without the domain's base judgment.
+    assert active[0] == SKILL_PREP
+    catalog = app.state.container.catalog
+    foundation_id = catalog.domain_foundation(SKILL_PREP)
+    assert foundation_id is not None and foundation_id in active
     state = body["state"]
 
     r2 = client.post("/v1/daintree/skills/resolve", headers=auth, json={

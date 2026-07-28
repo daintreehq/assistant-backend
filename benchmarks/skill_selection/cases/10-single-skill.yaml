@@ -1,5 +1,5 @@
 # Clean single-skill matches: one obviously-right specific skill, no prior active set.
-# The foundation (daintree.orchestration.basic) is optional on these — pairing it in is
+# The foundation (daintree.foundation) is optional on these — pairing it in is
 # the documented default and is fine, but a lean pick of just the specific also passes.
 
 cases:
@@ -11,7 +11,7 @@ cases:
         content: Rename my terminals so I can tell the agents apart.
     expect:
       required: [daintree.terminals.rename]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: rename-figure-out-titles
     category: single-skill
@@ -22,7 +22,7 @@ cases:
           and give them proper titles.
     expect:
       required: [daintree.terminals.rename]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: start-issue-pickup
     category: single-skill
@@ -31,7 +31,7 @@ cases:
         content: Let's start on issue #142 — set up a worktree and get an agent going on it.
     expect:
       required: [daintree.workflow.start-work-on-issue]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: prep-branch-open-pr
     category: single-skill
@@ -41,7 +41,7 @@ cases:
           I think we're done here. Get this branch ready for review and open the PR.
     expect:
       required: [daintree.workflow.prep-branch-for-review]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: recipe-run-workspace
     category: single-skill
@@ -50,7 +50,7 @@ cases:
         content: Load the pr-review recipe in this workspace.
     expect:
       required: [daintree.recipe.run-or-create]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: spawn-agent-fix-tests
     category: single-skill
@@ -59,7 +59,7 @@ cases:
         content: Spawn an agent to fix the failing auth tests in this repo.
     expect:
       required: [daintree.edits.spawn-visible-agent]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: ask-single-agent-relay
     category: single-skill
@@ -70,7 +70,7 @@ cases:
           and tell me what it says.
     expect:
       required: [daintree.agents.ask-and-relay]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: poll-pinned-fleet
     category: single-skill
@@ -81,16 +81,23 @@ cases:
           the session layer? Summarize the consensus.
     expect:
       required: [daintree.agents.poll-pinned-agents]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]
 
   - id: status-overview
     category: single-skill
-    note: State/status questions ARE the foundation skill's own whenToUse.
+    note: >-
+      Re-pointed against the 23-skill catalog: "anything need attention?" is
+      supervise-fleet's own "anything need me?" trigger, and the deliverable is triage of
+      the running agents, not an inventory. The foundation's whenToUse now hands this
+      over by name ("triage of running agents is daintree.orchestration.supervise-fleet")
+      and forbids loading itself instead of a runbook that squarely matches; it stays in
+      optional because the backend pairs it downstream anyway.
     messages:
       - role: user
         content: What's the current state of my terminals and agents? Anything need attention?
     expect:
-      required: [daintree.orchestration.basic]
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
 
   - id: explore-readonly-agent
     category: single-skill
@@ -102,4 +109,4 @@ cases:
           read only, don't change anything yet.
     expect:
       required: [daintree.edits.spawn-visible-agent]
-      optional: [daintree.orchestration.basic]
+      optional: [daintree.foundation]

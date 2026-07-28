@@ -10,10 +10,29 @@ from conftest import meta_of, parse_sse, respond_body
 from fakes import FakeProvider, make_result, make_text_chunks, selection_result
 
 from daintree_assistant_server.errors import upstream_error
+from daintree_assistant_server.services.chat_orchestrator import resolve_active_skills
+from daintree_assistant_server.skills.selector import SelectionDecision
 
 URL = "/v1/daintree/respond"
 SKILL_PREP = "daintree.workflow.prep-branch-for-review"
 SKILL_RENAME = "daintree.terminals.rename"
+
+
+def _paired(app, *ids: str) -> list[str]:
+    """The active set the orchestrator produces for these selector picks.
+
+    A successful selector run admits each pick as a specific+domain-foundation UNIT
+    (``_admit_with_domain_foundations``). Delegated to the real resolver rather than
+    re-implemented here, so these tests survive catalog churn AND can never drift
+    from the admission order the orchestrator actually issues.
+    """
+    container = app.state.container
+    return resolve_active_skills(
+        SelectionDecision(skill_ids=list(ids), ran=True, degraded=False),
+        [],
+        container.catalog,
+        container.settings.max_active_skills,
+    ).active
 
 
 def _main_request(provider: FakeProvider):
@@ -39,10 +58,11 @@ def test_scenario1_new_session_skill_selected(client, auth, fake_provider, app) 
     ))
     assert r.status_code == 200
     meta = meta_of(r.json())
-    assert [s["id"] for s in meta["active_skills"]] == [SKILL_PREP]
-    assert [s["id"] for s in meta["newly_loaded_skills"]] == [SKILL_PREP]
-    assert len(meta["prelude"]["tool_executions"]) == 1
-    assert meta["prelude"]["tool_executions"][0]["display_name"] == "skill.load"
+    assert [s["id"] for s in meta["active_skills"]] == _paired(app, SKILL_PREP)
+    assert [s["id"] for s in meta["newly_loaded_skills"]] == _paired(app, SKILL_PREP)
+    # One synthetic skill.load per newly-loaded skill (the pick + its foundation).
+    assert len(meta["prelude"]["tool_executions"]) == len(meta["newly_loaded_skills"])
+    assert all(t["display_name"] == "skill.load" for t in meta["prelude"]["tool_executions"])
     upstream = _main_request(fake_provider)
     # The CLI sees a skill.load prelude (above), but the model must NOT — skills
     # reach it as plain context, with no synthetic skill__load call to imitate.
@@ -105,7 +125,7 @@ def test_scenario2_no_relevant_skill_no_prelude(client, auth, fake_provider) -> 
     assert meta["prelude"]["tool_executions"] == []
 
 
-def test_scenario3_same_turn_round_does_not_rerun(client, auth, fake_provider) -> None:
+def test_scenario3_same_turn_round_does_not_rerun(client, auth, fake_provider, app) -> None:
     fake_provider.selection_result = selection_result([SKILL_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep branch"}], session_id="s3", turn_id="t1", round=0,
@@ -126,7 +146,7 @@ def test_scenario3_same_turn_round_does_not_rerun(client, auth, fake_provider) -
     meta = meta_of(r2.json())
     assert len(fake_provider.selection_requests) == 0  # selector NOT rerun
     assert meta["selector"]["ran"] is False
-    assert [s["id"] for s in meta["active_skills"]] == [SKILL_PREP]
+    assert [s["id"] for s in meta["active_skills"]] == _paired(app, SKILL_PREP)
     assert meta["newly_loaded_skills"] == []
 
 
@@ -165,22 +185,31 @@ def test_scenario5_interjection_reruns_once(client, auth, fake_provider) -> None
 
 
 def test_scenario6_selector_run_caps_at_three(client, auth, fake_provider, app) -> None:
-    # A single authoritative selector run is capped: 4 returned ids → the first 3 load.
-    ids = sorted(app.state.container.catalog.known_ids)
+    # A single authoritative selector run is capped: 4 returned ids → 3 skills load.
+    # What fills those 3 slots is unit admission — the top-ranked pick arrives with
+    # its domain foundation, and the MARGINAL specific is what the cap costs.
+    catalog = app.state.container.catalog
+    ids = sorted(catalog.known_ids)
     fake_provider.selection_result = selection_result([ids[0], ids[1], ids[2], ids[3]])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "a big multi-workflow task"}], session_id="s6", turn_id="t1",
     ))
     meta = meta_of(r.json())
     active = [s["id"] for s in meta["active_skills"]]
-    assert active == [ids[0], ids[1], ids[2]]
-    assert ids[3] not in active
+    assert len(active) == 3  # the budget is fully spent, never left short
+    assert active[0] == ids[0]  # rank order leads
+    for sid in active:  # …and every loaded skill's domain foundation is loaded too
+        foundation = catalog.domain_foundation(sid)
+        assert foundation is None or foundation in active
 
 
 def test_scenario6b_new_instruction_replaces_prior(client, auth, fake_provider, app) -> None:
     # A successful selector run on a NEW turn is authoritative: it REPLACES the prior
     # active set (topic shift), rather than accumulating additively.
-    ids = sorted(app.state.container.catalog.known_ids)
+    catalog = app.state.container.catalog
+    # Pick two SPECIFICS: a foundation would be re-added by the pairing step, so it
+    # could never be shown as evicted.
+    ids = [sid for sid in sorted(catalog.known_ids) if not catalog.get(sid).meta.foundation]
     fake_provider.selection_result = selection_result([ids[0]])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "task a"}], session_id="s6b", turn_id="t1",
@@ -194,21 +223,21 @@ def test_scenario6b_new_instruction_replaces_prior(client, auth, fake_provider, 
     ))
     meta = meta_of(r2.json())
     active = [s["id"] for s in meta["active_skills"]]
-    assert active == [ids[1]]  # prior ids[0] evicted — authoritative replacement
+    assert active == _paired(app, ids[1])  # prior ids[0] evicted — authoritative replacement
     assert ids[0] not in active
     assert [s["id"] for s in meta["newly_loaded_skills"]] == [ids[1]]
 
 
-def test_scenario7_unknown_and_duplicate_ids(client, auth, fake_provider) -> None:
+def test_scenario7_unknown_and_duplicate_ids(client, auth, fake_provider, app) -> None:
     fake_provider.selection_result = selection_result([SKILL_PREP, "nonexistent", SKILL_PREP])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="s7", turn_id="t1",
     ))
     meta = meta_of(r.json())
-    assert [s["id"] for s in meta["active_skills"]] == [SKILL_PREP]
+    assert [s["id"] for s in meta["active_skills"]] == _paired(app, SKILL_PREP)
 
 
-def test_scenario8_selector_fails_retains_prior(client, auth, fake_provider) -> None:
+def test_scenario8_selector_fails_retains_prior(client, auth, fake_provider, app) -> None:
     fake_provider.selection_result = selection_result([SKILL_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="s8", turn_id="t1",
@@ -223,7 +252,7 @@ def test_scenario8_selector_fails_retains_prior(client, auth, fake_provider) -> 
     meta = meta_of(r2.json())
     assert meta["selector"]["degraded"] is True
     assert "skill_selector_failed_open" in meta["warnings"]
-    assert [s["id"] for s in meta["active_skills"]] == [SKILL_PREP]
+    assert [s["id"] for s in meta["active_skills"]] == _paired(app, SKILL_PREP)
 
 
 def test_scenario9_catalog_revision_change_reruns(client, auth, fake_provider, app) -> None:
@@ -257,7 +286,7 @@ def test_scenario10_replayed_state_other_session(client, auth, fake_provider) ->
     assert meta["active_skills"] == []
 
 
-def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider) -> None:
+def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider, app) -> None:
     fake_provider.selection_result = selection_result([SKILL_PREP])
     fake_provider.stream_chunks = make_text_chunks("hello there")
     body = respond_body(
@@ -274,7 +303,7 @@ def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider) -> 
     assert "delta" in kinds
     assert "status" not in kinds  # no thinking-phase status event: the fake stream emits no reasoning_content
     meta = meta_of(events[0][1])
-    assert [sk["id"] for sk in meta["active_skills"]] == [SKILL_PREP]
+    assert [sk["id"] for sk in meta["active_skills"]] == _paired(app, SKILL_PREP)
     streamed = "".join(d.get("content", "") for e, d in events if e == "delta")
     assert "hello" in streamed
 

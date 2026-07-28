@@ -1,0 +1,119 @@
+"""Catalog hygiene checks that the loader deliberately does NOT enforce.
+
+``SkillMeta`` validates ``requiredTools`` against a character regex only — nothing
+checks a name is a *real* CLI tool, on either side of the wire (the CLI's startup
+validation for skill-declared tool names is gone). Two things make a typo persistent
+rather than inert: the names are rendered into ``workflow_plan`` grounding outlines
+(``task_runner.py``, ``_skill_outlines``), and the skill learner treats every name
+already declared by a packaged skill as an allowed name when it filters a proposal's
+tools (``skill_learning.py``, ``_admissible_tools``) — so one bad name in the catalog
+launders itself into the next generated skill. A deterministic guard has real value.
+
+Severity, honestly: ``requiredTools`` is NOT a capability gate. Nothing dispatches
+off it and nothing filters the offered toolset with it, so a bad name **misinforms a
+prompt** — it does not break a tool call. That is why this lives in a test rather
+than in ``skills/loader.py``: a runtime check against a pinned snapshot would fail
+``/readyz`` the moment the CLI legitimately adds a tool, inverting the repo's
+deliberate fail-open (selection) / fail-closed (malformed skill) split.
+
+Deliberately NOT added here — evaluated and rejected, do not re-propose:
+
+* **A body-level tool-name lint** (scan skill prose for tool names not in the
+  registry). Measured 4/4 false positives on the catalog as it stood: every hit was
+  either a raw MCP action correctly documented as reached *via* ``daintree.call``,
+  or a name inside a NEGATIVE instruction telling the model not to use it. A lint
+  that is wrong every time it fires is worse than no lint.
+* **A duplicate-``requiredTools`` rejector in ``SkillMeta``.** Zero duplicates exist,
+  the harm is a few wasted tokens, and it would convert a harmless condition into a
+  fail-closed load error that blocks ``/readyz``.
+* **An id-shape validator on ``SkillMeta``** (``daintree.<domain>.<name>``). It would
+  immediately redden existing test fixtures whose ids (``a.one``, ``dom.zeta``,
+  ``test.example``) are intentionally short.
+
+Existing coverage this file does not duplicate: size/pipe-table/report-back budgets
+live in ``test_prompt_budgets.py``; the eight house-style body checks live in
+``services/skill_learning.py`` and are swept over the packaged catalog by
+``test_skill_learning.py``.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from daintree_assistant_server.skills.catalog import load_catalog
+
+# Snapshot of the CLI's tool registry. Never read cli/ at runtime: CI does not fetch
+# submodules, so a submodule-reading test would silently no-op or hard-fail there.
+# The file's own header carries the regeneration recipe.
+TOOL_NAMES_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "cli_tool_names.txt"
+
+# The full-schema capture of the SAME registry, which the name list above declares
+# itself to be a pure projection of. Both are committed (no submodule involved), so
+# that claim can be asserted literally instead of approximated by a count.
+TOOL_INVENTORY_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "benchmarks"
+    / "_harness"
+    / "fixtures"
+    / "cli_tool_inventory.json"
+)
+
+# The registry projects an internal dotted name to its OpenAI wire name by replacing
+# every "." with "__" (cli/internal/tools/registry.go, toWireName). Skill frontmatter
+# uses the dotted form, so normalize before comparing.
+_WIRE_SEP = "__"
+
+
+def _wire_name(dotted: str) -> str:
+    return dotted.replace(".", _WIRE_SEP)
+
+
+def _known_tool_names() -> set[str]:
+    lines = TOOL_NAMES_FIXTURE.read_text(encoding="utf-8").splitlines()
+    return {
+        line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")
+    }
+
+
+def _captured_tool_names() -> set[str]:
+    inventory = json.loads(TOOL_INVENTORY_FIXTURE.read_text(encoding="utf-8"))
+    return {entry["function"]["name"] for entry in inventory}
+
+
+def test_tool_name_fixture_is_an_exact_projection_of_the_registry_capture() -> None:
+    # Guard the guard: a truncated or mangled regeneration must fail loudly rather
+    # than making every check below pass vacuously. The fixture header states it IS
+    # the name-only projection of the full-schema capture, so assert exactly that —
+    # a floor ("at least 50 names") silently accepts losing a third of an 85-name
+    # registry, which is the regeneration accident this is here to catch.
+    names = _known_tool_names()
+    captured = _captured_tool_names()
+    # Equality alone still passes vacuously if BOTH files are regenerated from a
+    # truncated capture — and the capture is the fragile end (it is dumped from the
+    # cli/ submodule). Keep a floor on the source so that failure is visible too.
+    assert len(captured) >= 50, f"registry capture looks truncated ({len(captured)} tools)"
+    assert names == captured, (
+        f"{TOOL_NAMES_FIXTURE.name} is out of sync with {TOOL_INVENTORY_FIXTURE.name}: "
+        f"missing {sorted(captured - names)}, unexpected {sorted(names - captured)}. "
+        "Regenerate it from the capture (recipe is in the fixture header)."
+    )
+    assert all(_WIRE_SEP in name for name in names), "fixture holds wire names (family__tool)"
+
+
+def test_required_tools_exist_in_the_cli_registry() -> None:
+    # ONE direction only. Registry tools that no skill declares are the normal state
+    # (a large minority of the registry today) — asserting the reverse would churn on
+    # every CLI addition and every catalog edit.
+    known = _known_tool_names()
+    unknown: list[str] = []
+    for skill in load_catalog().skills:
+        for tool in skill.meta.required_tools:
+            if _wire_name(tool) not in known:
+                unknown.append(f"{skill.id}: {tool}")
+    assert not unknown, (
+        "requiredTools names not found in the CLI tool registry snapshot "
+        f"({TOOL_NAMES_FIXTURE.name}): {unknown}. Either fix the typo in the skill "
+        "frontmatter, or regenerate the snapshot if the CLI added the tool "
+        "(recipe is in the fixture header)."
+    )

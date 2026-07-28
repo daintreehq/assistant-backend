@@ -2,8 +2,7 @@
 id: daintree.agents.relay-review-feedback
 title: Relay review feedback to an implementer
 summary: Forward review output from one running agent to another with user-specified calibration and optional follow-up instructions.
-whenToUse: Use when the user asks you to read one existing reviewer agent's output, review, or notes and point/send another existing implementer agent to it, optionally telling the target how to weigh the source or to report whether the review was useful. Do not use to spawn a new single agent and ask it a question (use the ask-and-relay skill), to poll several agents for independent opinions (use poll-pinned-agents), or to run multi-round collaboration/back-and-forth among agents (use the multi-agent skill).
-priority: 110
+whenToUse: Use when the user asks you to read one existing reviewer agent's output, review, or notes and point/send another existing implementer agent to it, optionally telling the target how to weigh the source or to report whether the review was useful. Do not use to judge whether the reviewed work is actually done or correct (use daintree.orchestration.verify-agent-work), to spawn a new single agent and ask it a question (use the ask-and-relay skill), to poll several agents for independent opinions (use poll-pinned-agents), or to run multi-round collaboration among agents (use the multi-agent skill).
 risk: project
 tags:
   - daintree
@@ -26,7 +25,7 @@ Use when: the user wants you to take review/feedback from one existing agent ter
 
 Procedure:
 1. Identify the source reviewer terminal and target implementer terminal from the user's description. Start with `context.snapshot` to see live terminals, titles, agent ids, focus, and worktree context. Use full terminalIds internally; abbreviated ids are only for user-facing summaries.
-2. If there are multiple similar terminals, resolve ambiguity before sending anything. Use a short `terminal.extract` on the candidate terminals to identify what each is doing. Do not message an irrelevant terminal just because it has the right agent name, is focused, or has a generic title.
+2. If there are multiple similar terminals, resolve ambiguity before sending anything — relaying a review into the wrong agent's live work is the expensive mistake here. Emit ONE short `terminal.extract` PER candidate id (`{"terminalIds":["<one-id>"],"instruction":"What is this terminal working on right now?"}`), all batched in a single turn: no-wait extracts dispatch concurrently, so the whole set costs roughly one call's wait. Do NOT put several candidate ids into one plain-TEXT `terminal.extract` — over multiple terminalIds it MERGES every terminal's tail into ONE answer instead of returning one per terminal, so it cannot tell the candidates apart. Do not message an irrelevant terminal just because it has the right agent name, is focused, or has a generic title.
 3. Read the review from the source terminal. For a quick visible review, use `terminal.extract` for the final verdict/summary and main findings. If the extract is partial, truncated, or only points to a separate artifact/large scrollback, use `terminal.read` and page any returned archived content with `artifact.read` as needed. Do not claim you read the full review when you only saw the visible tail.
 4. Prepare a compact relay message for the target implementer. Include:
    - who produced the review;

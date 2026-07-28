@@ -217,7 +217,7 @@ def _layer_budget(
     tools = load_tool_inventory()
 
     base = loader.base_prompt()
-    integrations = assembler.render_integrations(request.runtime, request.input.tools)
+    integrations = assembler.render_integrations(request.runtime)
     skills_block = assembler.render_loaded_skills(skills)
     contract = assembler.render_response_contract()
     startup_block = assembler.render_startup_context(request.startup)
@@ -265,12 +265,11 @@ def _selector_prompt_cost(loader: PromptLoader) -> dict[str, Any]:
     catalog = load_catalog()
     rendered = loader.render(
         TEMPLATE_SELECTOR_SYSTEM,
-        catalog=catalog.selector_metadata([]),
+        catalog=catalog.selector_metadata(),
+        active_ids=[],
         max_active=3,
     )
-    per_skill = [
-        len(dumps(s.selector_view(active=False)).decode("utf-8")) for s in catalog.skills
-    ]
+    per_skill = [len(dumps(s.selector_view()).decode("utf-8")) for s in catalog.skills]
     return {
         "catalog_skills": len(catalog.skills),
         "selector_prompt_bytes": len(rendered.encode("utf-8")),

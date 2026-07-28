@@ -16,7 +16,7 @@ production produces. This package holds the pieces they all reuse:
 - ``stats``    — percentiles / mean / stdev with no numpy dependency.
 - ``results``  — the per-suite JSON results document writer/loader.
 - ``cases``    — a generic ``cases/*.yaml`` loader.
-- ``fixtures`` — the captured 72-tool CLI inventory + RespondRequest builders.
+- ``fixtures`` — the captured CLI tool projection + RespondRequest builders.
 
 Benchmarks are dev tooling: NOT in the package, the test suite, mypy, or CI
 (``benchmarks`` is outside ``testpaths``/``src``). Nothing here persists server

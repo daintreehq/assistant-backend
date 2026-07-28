@@ -11,6 +11,13 @@
 # arg wins over it. Everything else (DEEPSEEK_API_KEY, PORT, …) is read from .env
 # as usual. In production the server refuses to boot with learning enabled — this
 # is a LOCAL convenience only.
+#
+# Why `apply` is the default and stays the default: apply writes into git-TRACKED
+# skill files, so `git diff` is the review surface and `git checkout --` is the undo
+# — a learned skill is reviewed exactly like any other edit. `propose` writes to a
+# gitignored audit dir instead, where good lessons are never seen and never land.
+# Editing a skill by hand while this is running is safe: an improve re-checks the
+# file on disk immediately before replacing it and abandons the write if it changed.
 set -euo pipefail
 
 # Resolve the repo root (this script's own directory) so ./dev works from anywhere.

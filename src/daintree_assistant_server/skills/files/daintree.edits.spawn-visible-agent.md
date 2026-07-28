@@ -2,8 +2,7 @@
 id: daintree.edits.spawn-visible-agent
 title: Spawn a visible agent for edits or exploration
 summary: How to handle requests that need a visible agent — to change files or to explore read-only.
-whenToUse: Use when the user asks for a direct visible agent to change project files (implement, refactor, fix, add tests, update docs) or to explore/investigate a project read-only, and no more specific workflow applies. Prefer a typed workflow first — start-work-on-issue for a forge issue, prep-branch-for-review for a PR, recipe run-or-create for a workspace recipe, or a poll/competition/interview/multi-agent skill when several agents are involved. This is the fallback single visible-agent path.
-priority: 200
+whenToUse: Use when the user asks for a direct visible agent to change project files (implement, refactor, fix, add tests, update docs) or to explore/investigate a project read-only, and no more specific workflow applies. Prefer a typed workflow first — daintree.workflow.start-work-on-issue for a forge issue, daintree.workflow.prep-branch-for-review for a PR, daintree.recipe.run-or-create for a workspace recipe, daintree.orchestration.fan-out-work when several independent units each need their own agent, or a poll/competition/interview/multi-agent skill when several agents work together. This is the fallback SINGLE visible-agent path; if the agent is already running and has gone wrong use daintree.agents.recover-agent.
 risk: project
 tags:
   - edits
@@ -21,18 +20,13 @@ tags:
 requiredTools:
   - context.snapshot
   - agentTask.spawnForEdits
-  - agentTask.status
-  - agentTask.list
-  - watcher.terminal.create
-  - watcher.cancel
   - terminal.awaitAll
   - terminal.await.async
   - terminal.summarize
   - terminal.extract
   - terminal.read
   - terminal.sendCommand
-  - queue.publish
-  - queue.digest
+  - watcher.cancel
   - queue.resolve
 ---
 Use when: the task needs a single visible agent — either to change files (implement, refactor, fix, tests, docs) or to explore/investigate a project read-only — and no more specific workflow fits. First check for a typed workflow: a forge issue → start-work-on-issue; preparing or opening a PR → prep-branch-for-review; a workspace recipe → recipe run-or-create; several agents polling, competing, or interviewing → the matching orchestration skill. If one of those fits, use it instead; this is the fallback visible-agent path.
@@ -45,7 +39,7 @@ Procedure:
    Pick ONE — never stack two supervisors on the same terminal (no watcher on an agent you await in-turn or async; no awaitAll on a terminal an async operation already watches).
 2. Read only the minimum context needed to scope the task.
 3. Resolve the target worktree before spawning. Check context.snapshot for the worktrees list and the active/current worktree, then apply this rule exactly: if the user named a worktree, branch, path, or id — resolve it to its worktreeId from the snapshot and proceed; if exactly one worktree plausibly matches the request — proceed with that worktreeId; if multiple plausible candidates exist and none was named (or none can be confidently chosen) — STOP, list the candidates, and ask the user which one to use; if no worktree plausibly matches or the worktrees list is unavailable — STOP and ask the user to name the target worktree. Do not silently fall back to the active worktree when the target is ambiguous. Only call agentTask.spawnForEdits once the worktree is resolved.
-4. Use agentTask.spawnForEdits — NEVER a raw agent.launch via daintree.call — with: agentId (a REAL configured Daintree agent — claude, codex, gemini, antigravity, …; a name the user spoke or typed is only a HINT, since voice transcription drops letters like "antigravity"→"antiravity", so do not pass an unverified name through — the wrapper rejects an unknown id with the available roster and a "did you mean" suggestion, and you then re-spawn with the right id, never the typo), mode ("edit" to change files, "explore" for a read-only investigation), title (short task name — becomes the spawned agent's visible name/tab label in Daintree the instant it launches, so keep it distinct when running several in parallel; you know what you're delegating, so name it correctly HERE and never follow the spawn with a terminal.rename — naming at spawn is the whole job), taskPrompt (exact instructions), and context.filePaths when known. Then supervise per the mode you chose in step 1:
+4. Use agentTask.spawnForEdits — NEVER a raw agent.launch via daintree.call — with: agentId (a REAL configured Daintree agent id, resolved against the available-agent registry in your startup context; a name the user spoke or typed is only a HINT, since voice transcription drops letters and a spoken id can arrive subtly misspelled, so do not pass an unverified name through — the wrapper rejects an unknown id with the available roster and a "did you mean" suggestion, and you then re-spawn with the right id, never the typo), mode ("edit" to change files, "explore" for a read-only investigation), title (short task name — becomes the spawned agent's visible name/tab label in Daintree the instant it launches, so keep it distinct when running several in parallel; you know what you're delegating, so name it correctly HERE and never follow the spawn with a terminal.rename — naming at spawn is the whole job), taskPrompt (exact instructions), and context.filePaths when known. Then supervise per the mode you chose in step 1:
    - BACKGROUND (edits / fire-and-forget) — attach a watcher with the FLAT top-level fields `watch: true` and `watchGoal: "..."` (plain top-level scalars; providing `watchGoal` alone also attaches the watcher). Emit them as their own top-level keys — never a dotted/flattened `watcher.create` key (an unknown field the strict decoder rejects). A complete legacy nested `watcher: {"create": true, "goal": "..."}` object is still accepted, but prefer the flat fields.
    - IN-TURN (quick explore you're waiting on) — OMIT `watch`/`watchGoal` entirely; you will block on terminal.awaitAll in step 8 instead. Attaching a watcher here would double-supervise the agent you are already waiting on.
 5. For edit mode the taskPrompt must tell the agent to: make changes only in the selected worktree; run relevant tests if practical; report changed files, tests run, and remaining risks. If the user gave a narrow scope, include it explicitly: do only that scope; do not migrate/refactor/fix adjacent out-of-scope areas just because they are nearby; skip and report optional/out-of-scope work instead of asking unless it blocks the requested task. For explore mode: investigate without touching files and report findings. (The wrapper appends the matching constraints automatically.)

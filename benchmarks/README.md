@@ -34,8 +34,11 @@ python -m benchmarks.dashboard.bench run                        # + live suites 
 Reused by every suite: settings + live-provider bootstrap (`env`), a byte-identical
 call-counting provider decorator (`counting`), the exact httpx wire serialization +
 DeepSeek-cacheable-region model (`wire`), stats, the results-doc writer (`results`),
-a YAML case loader (`cases`), and the captured 72-tool CLI inventory fixture
-(`fixtures/cli_tool_inventory.json`, from `Registry.OpenAITools(nil)`).
+a YAML case loader (`cases`), and the captured CLI tool projection
+(`fixtures/cli_tool_inventory.json`, from `(*tools.Registry).OpenAITools(nil)`).
+That fixture is the real tool-schema region every request-driving suite pays for;
+the CLI is a pinned submodule CI never fetches, so it refreshes only by hand —
+recipe in `_harness/fixtures/README.md`.
 
 ## Conventions for adding a suite
 

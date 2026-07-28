@@ -198,7 +198,20 @@ def _redact_secrets_in_obj(obj: Any) -> Any:
 # calibrated so EVERY packaged skill passes, so the improve path never rejects a
 # faithful edit of an existing skill. build.md / improve.md instruct this same style.
 _HOUSE_MIN_BODY_CHARS = 60
-_HOUSE_MAX_BODY_BYTES = 48 * 1024  # generated-skill ceiling (the loader caps at 256 KB)
+# Generated-skill ceiling (the loader caps at 256 KB). Set to the SAME 16 KB the
+# build/improve prompts state as their own hard max — a code ceiling several times
+# looser than the instruction it is supposed to back is not a ceiling at all.
+_HOUSE_MAX_BODY_BYTES = 16 * 1024
+# Improve-only growth guard. Every landed improve to date has been net-additive or
+# net-zero — never net-negative — so "tighten elsewhere when you add" is an
+# instruction the model does not follow, and one skill tripled in size in five days.
+# An improve may grow a body by at most the LARGER of a flat slack (room for one
+# genuine new step plus its guardrail) and a proportional slack (so a big skill is
+# not held to a fixed byte count); anything past that is a rewrite-by-accretion and
+# is rejected. The ceiling above would not have stopped a single observed edit;
+# this is the half that bites.
+_IMPROVE_GROWTH_FLAT_BYTES = 1536
+_IMPROVE_GROWTH_RATIO = 1.15
 _NUMBERED_STEP_RE = re.compile(r"(?m)^\s*\d+\.\s")
 _MD_HEADER_RE = re.compile(r"(?m)^#{1,6}\s")
 # "use/spawn/prefer/… claude" and friends — the prompts forbid hardcoding a specific
@@ -257,6 +270,28 @@ def _house_style_problems(body: str) -> list[str]:
     return problems
 
 
+def _growth_limit(old_bytes: int) -> int:
+    """The largest body an improve of an ``old_bytes`` skill may produce."""
+    return max(old_bytes + _IMPROVE_GROWTH_FLAT_BYTES, int(old_bytes * _IMPROVE_GROWTH_RATIO))
+
+
+def _normalize_tool_name(name: str) -> str:
+    """Wire form → the dotted logical form the catalog uses (``a__b`` → ``a.b``)."""
+    return name.strip().replace("__", ".")
+
+
+class _DiskDriftError(Exception):
+    """The target skill file changed on disk since the improver read it.
+
+    Raised from the write helper immediately before the atomic replace so the
+    caller can abandon the write instead of clobbering a hand edit.
+    """
+
+    def __init__(self, on_disk_hash: str | None) -> None:
+        super().__init__("skill file changed on disk since this proposal was built")
+        self.on_disk_hash = on_disk_hash
+
+
 def _unified_diff(old: str, new: str, skill_id: str) -> str:
     """A reviewable old→new diff for the audit record (empty old = a create)."""
     return "\n".join(
@@ -278,6 +313,10 @@ class SkillLearner:
     # skill learning is a single-worker LOCAL DEV harness (it can never run in
     # production, where the backend must stay stateless).
     _MAX_COOLDOWN_SESSIONS = 64
+    # Sentinel registry key meaning "this session already minted a new skill". It is
+    # not a legal skill id (``_SAFE_ID_RE`` requires a leading alphanumeric), so it can
+    # never collide with a real per-skill damp entry.
+    _CREATE_SENTINEL = "\x00create"
 
     def __init__(
         self,
@@ -322,6 +361,17 @@ class SkillLearner:
         # (session_id, skill_id) improves currently awaiting their builder call, so
         # two overlapping passes in one session can't double-spend on the same skill.
         self._improves_in_flight: set[tuple[str, str]] = set()
+        # PROCESS-WIDE create reservation. Creates raced in practice: two passes over
+        # the same workflow minted twin skills ~50s apart, each gate correctly stating
+        # "no existing skill covers this" because the first had not landed yet. The
+        # only guard was exact-id equality, which by construction cannot see a
+        # differently-named twin, so creates are serialized instead: while one create
+        # is between its builder call and its write, a second one is dropped and the
+        # next session re-gates against a catalog that now contains the first skill.
+        # (Lexical near-duplicate detection was measured and rejected — the real
+        # duplicate pairs scored BELOW a legitimate sibling pair, so no threshold
+        # separates them.)
+        self._create_in_flight = False
 
     @property
     def enabled(self) -> bool:
@@ -393,20 +443,24 @@ class SkillLearner:
                 "skill_learning_gate",
                 action=verdict.action,
                 lesson_type=verdict.lesson_type,
+                lesson_kind=verdict.lesson_kind,
                 confidence=verdict.confidence,
                 learnable=verdict.learnable,
                 acted=False,
             )
             return LearningOutcome()
 
-        # One improver spend per skill per session: the same completed workflow keeps
-        # re-firing the gate on every later final answer, and each improver re-run
-        # over the same evidence lands a slightly different rewrite. Skip before
-        # spending a builder call. The in-flight reservation additionally stops two
-        # overlapping passes in one session from double-spending on the same skill
-        # while the first is still awaiting its (slow) builder call.
+        # Damping, both directions, BEFORE spending a slow builder call:
+        #  - improve: one improver spend per skill per session. The same completed
+        #    workflow keeps re-firing the gate on every later final answer, and each
+        #    re-run over the same evidence lands a slightly different rewrite. The
+        #    in-flight reservation additionally stops two overlapping passes in one
+        #    session from double-spending on the same skill.
+        #  - create: one new skill per session, and one create in flight process-wide,
+        #    so two passes over the same workflow can't mint twin skills.
         session_id = request.session.id
-        damp_key: tuple[str, str] | None = None
+        improve_key: tuple[str, str] | None = None
+        create_reserved = False
         if verdict.action == "improve_existing_skill":
             target_id = verdict.target_skill_id or ""
             if (
@@ -419,8 +473,39 @@ class SkillLearner:
                     session_id=session_id,
                 )
                 return LearningOutcome()
-            damp_key = (session_id, target_id)
-            self._improves_in_flight.add(damp_key)
+            improve_key = (session_id, target_id)
+            self._improves_in_flight.add(improve_key)
+        elif verdict.action == "create_new_skill":
+            if self._already_landed(session_id, self._CREATE_SENTINEL):
+                logger.info(
+                    "skill_learning_create_damped", reason="session_created", session_id=session_id
+                )
+                return LearningOutcome()
+            if self._create_in_flight:
+                logger.info(
+                    "skill_learning_create_damped", reason="create_in_flight", session_id=session_id
+                )
+                return LearningOutcome()
+            if self.catalog_manager.catalog.revision != catalog.revision:
+                # The catalog moved while our gate was thinking — almost certainly
+                # another pass just minted a skill and reloaded. Our verdict ("no
+                # existing skill covers this") was reached against a catalog that no
+                # longer exists, and acting on it is exactly how twin skills get
+                # created: two gates both see the gap, the first one fills it, the
+                # second one fills it again under a different name. Abandon; the next
+                # completed workflow re-gates against the catalog that now exists.
+                logger.info(
+                    "skill_learning_create_damped",
+                    reason="catalog_moved",
+                    session_id=session_id,
+                    gate_revision=catalog.revision,
+                    live_revision=self.catalog_manager.catalog.revision,
+                )
+                return LearningOutcome()
+            # The three checks above plus this assignment are all synchronous, so no
+            # other pass can interleave between the last check and the reservation.
+            self._create_in_flight = True
+            create_reserved = True
         try:
             return await self._build_and_apply(
                 verdict=verdict,
@@ -430,8 +515,10 @@ class SkillLearner:
                 session_id=session_id,
             )
         finally:
-            if damp_key is not None:
-                self._improves_in_flight.discard(damp_key)
+            if improve_key is not None:
+                self._improves_in_flight.discard(improve_key)
+            if create_reserved:
+                self._create_in_flight = False
 
     async def _build_and_apply(
         self,
@@ -446,6 +533,7 @@ class SkillLearner:
             "skill_learning_gate",
             action=verdict.action,
             target_skill_id=verdict.target_skill_id,
+            lesson_kind=verdict.lesson_kind,
             confidence=verdict.confidence,
             related_skill_ids=verdict.related_skill_ids,
             acted=True,
@@ -483,6 +571,7 @@ class SkillLearner:
             catalog,
             is_create=is_create,
             expected_id=None if old_skill is None else old_skill.id,
+            tools=tools,
         )
         if validated is None:
             return LearningOutcome()
@@ -508,6 +597,10 @@ class SkillLearner:
         # create is marked too, so re-learning the same workflow can't immediately
         # re-improve the skill it just minted.
         self._mark_landed(session_id, skill.id)
+        if is_create:
+            # ...and the session's one create is spent, whatever it was named, so a
+            # second pass over the same workflow cannot mint a differently-named twin.
+            self._mark_landed(session_id, self._CREATE_SENTINEL)
         return await self._apply(
             skill=skill,
             markdown=markdown,
@@ -634,6 +727,9 @@ class SkillLearner:
             f"{related_block}"
             f"Tools available in the workflow: {', '.join(tools) or '(none reported)'}\n\n"
             f"Gate reason: {verdict.reason}\n"
+            # "trigger" vs "procedure" is the only actionable split between a selection
+            # miss and a body gap; the gate may omit it, in which case diagnose it.
+            f"Gate lesson kind: {verdict.lesson_kind or '(unspecified — diagnose it yourself)'}\n"
             f"Gate evidence:\n{self._bullets(verdict.evidence)}\n\n"
             "Completed workflow transcript (evidence only):\n"
             f'"""\n{transcript}\n"""\n\n'
@@ -710,6 +806,7 @@ class SkillLearner:
         *,
         is_create: bool,
         expected_id: str | None = None,
+        tools: Sequence[str] = (),
     ) -> tuple[str, Skill, Path] | None:
         skill_id = proposal.skill_id.strip()
         if not skill_id or not _SAFE_ID_RE.fullmatch(skill_id) or ".." in skill_id:
@@ -749,10 +846,10 @@ class SkillLearner:
                 )
                 return None
 
-        # Mechanical normalization only (no semantic guessing): clamp priority into
-        # the schema's range and normalize the risk token's case, so a trivially
-        # out-of-bounds value doesn't discard an otherwise sound proposal. A WRONG
-        # risk value still fails the loader's enum check below, on purpose.
+        # Mechanical normalization only (no semantic guessing): normalize the risk
+        # token's case and the tool-name form, so a trivially off-form value doesn't
+        # discard an otherwise sound proposal. A WRONG risk value still fails the
+        # loader's enum check below, on purpose.
         meta_fields: dict[str, Any] = {
             "id": skill_id,
             "title": proposal.title,
@@ -778,10 +875,11 @@ class SkillLearner:
             meta_fields["foundation"] = True
         meta_fields.update(
             {
-                "priority": min(1000, max(0, proposal.priority)),
                 "risk": proposal.risk.strip().lower(),
                 "tags": list(proposal.tags),
-                "requiredTools": list(proposal.required_tools),
+                "requiredTools": self._admissible_tools(
+                    proposal.required_tools, catalog, tools, skill_id
+                ),
             }
         )
         markdown = self._render_markdown(meta_fields, proposal.body)
@@ -814,12 +912,74 @@ class SkillLearner:
             )
             return None
 
+        # Body-growth ratchet (improve only). "Tighten elsewhere when you add" is in
+        # both prompts and is not obeyed: every landed improve so far has been
+        # net-additive or net-zero. Cap how much ONE improve may add, so accretion has
+        # to stop somewhere and the attempt stays visible in the log even when blocked.
+        if existing is not None:
+            old_bytes = len(existing.body.encode("utf-8"))
+            new_bytes = len(skill.body.encode("utf-8"))
+            limit = _growth_limit(old_bytes)
+            if new_bytes > limit:
+                logger.warning(
+                    "skill_learning_rejected",
+                    reason="body_growth",
+                    skill_id=skill_id,
+                    old_bytes=old_bytes,
+                    new_bytes=new_bytes,
+                    limit_bytes=limit,
+                )
+                return None
+
         root = self._write_dir.resolve()
         path = (root / f"{skill_id}.md").resolve()
         if os.path.commonpath([str(root), str(path)]) != str(root) or path.parent != root:
             logger.warning("skill_learning_rejected", reason="path_escape", skill_id=skill_id)
             return None
         return markdown, skill, path
+
+    @staticmethod
+    def _admissible_tools(
+        proposed: Sequence[str], catalog: Catalog, turn_tools: Sequence[str], skill_id: str
+    ) -> list[str]:
+        """Drop proposed ``requiredTools`` that name no tool this system has.
+
+        ``SkillMeta`` only checks that a tool name matches a character regex, so a
+        builder that invents a plausible-sounding tool id writes it straight into
+        catalog metadata (which the selector then reads). The admissible set is this
+        turn's real tool list UNION every ``requiredTools`` name already in the
+        catalog — the second half keeps a skill from losing tools that are real but
+        simply weren't offered on the turn that taught the lesson.
+
+        Unknown entries are STRIPPED, never fatal: a bogus tool name is bad metadata,
+        not a bad runbook, and rejecting the whole proposal over it would throw away
+        the lesson.
+
+        A turn that reported NO tools narrows the allow-set to the catalog rather than
+        disabling the check. An empty tool list is not permission to admit anything: it
+        means the builder saw no tool inventory at all, so every name it proposes beyond
+        those already in the catalog is invention by construction.
+
+        Names are compared case-SENSITIVELY on purpose: real tool ids are mixed-case
+        (``agentTask__spawnForEdits``), so lowercasing would invent names that do not
+        exist. Normalization is deduped because two spellings of one tool
+        (``agent__spawn`` and ``agent.spawn``) collapse to the same logical name.
+        """
+        names: list[str] = []
+        for raw in proposed:
+            name = _normalize_tool_name(raw)
+            if name and name not in names:
+                names.append(name)
+        allowed = {_normalize_tool_name(t) for t in turn_tools}
+        for skill in catalog.skills:
+            allowed.update(_normalize_tool_name(t) for t in skill.meta.required_tools)
+        kept = [n for n in names if n in allowed]
+        dropped = [n for n in names if n not in allowed]
+        if dropped:
+            logger.info(
+                "skill_learning_tools_stripped", skill_id=skill_id, dropped=dropped, kept=kept
+            )
+        return kept
 
     # ---- apply ----------------------------------------------------------
 
@@ -892,7 +1052,24 @@ class SkillLearner:
             # and that cancellation propagates into this task. Once the file write
             # has started, disk and the in-memory catalog must not diverge: let the
             # commit finish (it rolls itself back on reload failure), THEN propagate.
-            commit = asyncio.create_task(self._commit(path, markdown, skill.id))
+            # On an improve, the file on disk is also checked against the hash the
+            # improver read — see _commit / _write_skill_file. The in-memory check
+            # above cannot see a HAND edit: nothing reloads the catalog except a
+            # learning write, so the owner editing a skill in their editor while
+            # ./dev runs leaves the in-memory copy stale and identical.
+            # What the destination must look like at write time. A create must land on
+            # NOTHING; an in-place improve must still hash to what the improver read; an
+            # overlay shadow of a packaged skill is legitimately absent, so it too must
+            # land on nothing. `path.exists()` is read here rather than inside the write
+            # so the expectation is fixed before the shielded commit begins.
+            expected_hash = (
+                old_skill.content_hash
+                if not is_create and old_skill is not None and path.exists()
+                else None
+            )
+            commit = asyncio.create_task(
+                self._commit(path, markdown, skill.id, expected_hash=expected_hash)
+            )
             try:
                 new_catalog = await asyncio.shield(commit)
             except asyncio.CancelledError:
@@ -924,14 +1101,34 @@ class SkillLearner:
         )
         return LearningOutcome(changed=True, created_id=skill.id if is_create else None)
 
-    async def _commit(self, path: Path, markdown: str, skill_id: str) -> Catalog | None:
+    async def _commit(
+        self, path: Path, markdown: str, skill_id: str, *, expected_hash: str | None
+    ) -> Catalog | None:
         """Write the skill file and reload the catalog as ONE unit.
 
         Rolls the file back and returns ``None`` if the reload fails, so disk and
         the in-memory catalog always agree. Runs shielded from cancellation — see
         :meth:`_apply`.
+
+        ``expected_hash`` is the destination's required current state (see
+        :meth:`_write_skill_file`): the content hash the improver worked from, or
+        ``None`` when the destination must not exist yet. Either way, a mismatch means
+        the file moved underneath us while the model was generating — and this proposal,
+        built from the pre-edit body, would overwrite that change wholesale. Abandon the
+        write; the lesson is lost for this pass, which is the cheap side of the trade.
         """
-        prior = await asyncio.to_thread(self._write_skill_file, path, markdown, skill_id)
+        try:
+            prior = await asyncio.to_thread(
+                self._write_skill_file, path, markdown, skill_id, expected_hash
+            )
+        except _DiskDriftError as exc:
+            logger.warning(
+                "skill_learning_disk_drift_skipped",
+                skill_id=skill_id,
+                expected_hash=expected_hash,
+                on_disk_hash=exc.on_disk_hash,
+            )
+            return None
         try:
             new_catalog = await self.catalog_manager.reload()
         except Exception as exc:  # noqa: BLE001 - roll the file back, then no-op
@@ -962,9 +1159,40 @@ class SkillLearner:
         return ""
 
     @staticmethod
-    def _write_skill_file(path: Path, markdown: str, skill_id: str) -> bytes | None:
+    def _parsed_hash(path: Path, skill_id: str) -> str | None:
+        """The content hash of the skill currently on disk, or ``None`` if it is
+        missing/unreadable/unparseable.
+
+        Hashing the PARSED skill (frontmatter mapping + normalized body), not the raw
+        bytes, is what makes the drift check usable: a cosmetic YAML reflow or a
+        trailing-newline change is not drift, an actual content edit is.
+        """
+        try:
+            return parse_skill(path.read_text(encoding="utf-8"), expected_id=skill_id).content_hash
+        except (OSError, UnicodeDecodeError, SkillLoadError):
+            return None
+
+    @staticmethod
+    def _write_skill_file(
+        path: Path, markdown: str, skill_id: str, expected_hash: str | None
+    ) -> bytes | None:
         """Atomically write the skill, returning the file's prior bytes (or None if
-        it did not exist) so the caller can roll back if the catalog reload fails."""
+        it did not exist) so the caller can roll back if the catalog reload fails.
+
+        ``expected_hash`` states what the DESTINATION must look like right now, and it
+        is always enforced — there is no unchecked write:
+
+        * a hash — the file must still exist and parse to it (an in-place improve);
+        * ``None`` — the file must NOT exist (a create, or the first overlay shadow of
+          a packaged skill).
+
+        Anything else is drift and abandons the write with :class:`_DiskDriftError`,
+        discarding the temp file. Both directions matter: a file that VANISHED under an
+        improve must not be silently recreated, and a file that APPEARED under a create
+        must not be clobbered — the in-memory catalog cannot see either, because nothing
+        reloads it except a learning write. A destination that no longer parses counts
+        as drift too; the safe move on an unreadable target is never to overwrite it.
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
         prior = path.read_bytes() if path.exists() else None
         # A skill id contains dots, so a ``.tmp`` suffix would confuse filename-based
@@ -973,6 +1201,9 @@ class SkillLearner:
         try:
             tmp.write_text(markdown, encoding="utf-8")
             parse_skill(tmp.read_text(encoding="utf-8"), expected_id=skill_id)
+            on_disk = SkillLearner._parsed_hash(path, skill_id) if prior is not None else None
+            if on_disk != expected_hash:
+                raise _DiskDriftError(on_disk)
             os.replace(tmp, path)
         finally:
             tmp.unlink(missing_ok=True)
@@ -1050,7 +1281,7 @@ class SkillLearner:
         self, catalog: Catalog, preferred_ids: Sequence[str] = (), count: int = 3
     ) -> str:
         # Complete files (frontmatter + body), so the builder calibrates title/
-        # summary/tags/priority/risk against real values, not just body prose.
+        # summary/tags/risk against real values, not just body prose.
         # The gate's related_skill_ids come first — same-domain skills are the
         # best style AND scope anchors — topped up shortest-first (compact,
         # representative) when the gate named fewer than ``count``.
@@ -1089,7 +1320,6 @@ class SkillLearner:
             meta["foundation"] = True
         meta.update(
             {
-                "priority": skill.meta.priority,
                 "risk": skill.meta.risk,
                 "tags": list(skill.meta.tags),
                 "requiredTools": list(skill.meta.required_tools),

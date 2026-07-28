@@ -1,0 +1,111 @@
+# Canonical Daintree CLI tool wire names — a snapshot of the CLI's tool registry.
+#
+# Consumed by tests/unit/test_skill_catalog_hygiene.py to check that every skill's
+# requiredTools entry names a tool that actually exists. It is a SNAPSHOT on purpose:
+# CI does not fetch the cli/ submodule, so a test that read cli/ at runtime would
+# silently no-op there (or hard-fail). Snapshot taken against cli/ @ dceef8c.
+#
+# Format: one wire name per line, sorted, "#" lines are comments. The registry maps
+# an internal dotted name to its OpenAI wire name by replacing EVERY "." with "__"
+# (cli/internal/tools/registry.go, toWireName): fs.read -> fs__read. Skill frontmatter
+# writes requiredTools in the dotted form, so the test normalizes with the same
+# substitution before comparing.
+#
+# REGENERATION. This file is the name-only projection of the full-schema capture at
+# benchmarks/_harness/fixtures/cli_tool_inventory.json. Refresh that one first (its
+# recipe lives in benchmarks/_harness/fixtures/README.md: populate the pinned cli/
+# submodule with `git submodule update --init cli`, build a throwaway main.go inside
+# the module tree that registers every tool family with zero-value Deps and prints
+# `Registry.OpenAITools(nil)`, then delete the throwaway package), then regenerate
+# this file from it, keeping this header:
+#
+#   python -c "import json;print('\n'.join(sorted(t['function']['name'] for t in json.load(open('benchmarks/_harness/fixtures/cli_tool_inventory.json')))))"
+#
+# Regenerate when the CLI adds, removes, or renames a tool. The hygiene test asserts
+# ONE direction only (every declared requiredTools name appears here); registry tools
+# that no skill declares are the normal, expected state.
+agentTask__list
+agentTask__spawnForEdits
+agentTask__status
+agentTask__superviseTerminal
+agent__focusNextAgent
+agent__focusNextWaiting
+agent__focusNextWorking
+agent__focusPreviousAgent
+artifact__read
+async__cancel
+async__list
+audit__export
+context__snapshot
+copyTree__generate
+copyTree__generateAndCopyFile
+copyTree__injectToTerminal
+daintree__call
+daintree__listTools
+daintree__status
+docs__getPage
+docs__getRelatedPages
+docs__search
+forge__getIssue
+forge__getPR
+forge__listIssues
+forge__listPRs
+fs__list
+fs__read
+fs__search
+git__getProjectPulse
+grant__create
+grant__list
+grant__revoke
+memory__forget
+memory__list
+memory__pin
+memory__recall
+memory__save
+memory__unpin
+queue__digest
+queue__publish
+queue__resolve
+recipe__list
+recipe__run
+scratch__create
+scratch__delete
+scratch__drop
+scratch__get
+scratch__set
+skill__run__get
+skill__step__advance
+terminal__arm
+terminal__awaitAll
+terminal__await__async
+terminal__close
+terminal__disarm
+terminal__disarmAll
+terminal__extract
+terminal__extract__async
+terminal__extract__json
+terminal__focus
+terminal__read
+terminal__rename
+terminal__run__async
+terminal__sendCommand
+terminal__summarize
+timer__cancel
+timer__list
+timer__schedule
+tool__search
+user__askMultipleChoice
+watcher__cancel
+watcher__list
+watcher__terminal__create
+watcher__watchPR
+workflow__create
+workflow__focusNextAttention
+workflow__get
+workflow__list
+workflow__prepBranchForReview
+workflow__startWorkOnIssue
+workflow__update
+worktree__createWithRecipe
+worktree__getCurrent
+worktree__list

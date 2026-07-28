@@ -1537,6 +1537,261 @@
  {
   "type": "function",
   "function": {
+   "name": "recipe__list",
+   "description": "List the available Daintree recipes (worktree/operation templates).",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "recipe__run",
+   "description": "Run a Daintree recipe by id. Creates/operates on project state per the recipe.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "recipeId": {
+      "description": "The recipe to run.",
+      "type": "string"
+     },
+     "requestKey": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "recipeId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "worktree__list",
+   "description": "List Daintree worktrees for the current project.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "worktree__getCurrent",
+   "description": "Get the current Daintree worktree context.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "worktree__createWithRecipe",
+   "description": "Create a worktree from a recipe. Arguments are recipe-defined and forwarded verbatim.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "requestKey": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "arguments"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "forge__listIssues",
+   "description": "List forge (GitHub) issues for the project.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "forge__getIssue",
+   "description": "Get a single forge (GitHub) issue.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "forge__listPRs",
+   "description": "List forge (GitHub) pull requests for the project.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "forge__getPR",
+   "description": "Get a single forge (GitHub) pull request by number. PARALLEL: forge.getPR calls batched in ONE reply run concurrently \u2014 to check several PRs, emit one call each in one batch.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "cwd": {
+      "type": "string"
+     },
+     "prNumber": {
+      "description": "The PR number (positive integer).",
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "required": [
+     "prNumber"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "git__getProjectPulse",
+   "description": "Read a worktree's git pulse \u2014 branch state, uncommitted changes, and recent commits \u2014 for the current or a specified worktree.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__startWorkOnIssue",
+   "description": "Start work on an issue in Daintree (spawns a worktree + agent terminal), then attach a supervisor watcher.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "attachWatcher": {
+      "description": "Attach a supervisor watcher to the spawned terminal (default true). Assistant-side only.",
+      "type": "boolean"
+     },
+     "requestKey": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "arguments"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__prepBranchForReview",
+   "description": "Read-only review-readiness check for a branch: inspects the worktree's working tree + detected runners and returns a go/no-go verdict (ready | blocked_uncommitted_changes | blocked_merge_conflicts | blocked_repo_busy | no_runners_detected) plus the uncommitted/conflict flags, staged/unstaged counts, currentBranch, repoState, and detectedRunners. Does NOT commit, push, or open a PR \u2014 do the actual prep with git.* / forge.* once the verdict is 'ready'.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "requestKey": {
+      "type": "string"
+     }
+    },
+    "required": [
+     "arguments"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__focusNextAttention",
+   "description": "Focus the Daintree UI on the next workflow/terminal needing attention.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
    "name": "docs__search",
    "description": "Search Daintree's live documentation to answer a user's how-to or help question (\"how do I\u2026\", \"what is\u2026\", \"how do I configure\u2026\"). Returns ranked doc sections, each with a title, content, and a page PATH (e.g. /docs/worktrees). This is the FIRST tool to reach for when the user asks how to use Daintree \u2014 prefer it over guessing. Cite the pages you use as full URLs by prepending https://daintree.org to the returned path. PARALLEL: docs search/getPage/getRelatedPages calls batched in ONE reply run concurrently \u2014 emit several at once when researching.",
    "parameters": {

@@ -12,10 +12,14 @@ are benchmarked before being promoted into `src`.
 ```bash
 # from the repo root, venv active, DEEPSEEK_API_KEY in .env (or exported)
 python -m benchmarks.skill_selection.bench list          # validate cases, no API calls
+python -m benchmarks.skill_selection.bench coverage      # per-skill coverage matrix, no API calls
 python -m benchmarks.skill_selection.bench run           # baseline (production prompt)
 python -m benchmarks.skill_selection.bench run --variant my-idea
 python -m benchmarks.skill_selection.bench compare results/a.json results/b.json
 ```
+
+Only `run` costs money. `list`, `coverage`, `report`, and `compare` are offline
+and free — they work with `DEEPSEEK_API_KEY=` blanked.
 
 A full default run is `cases x trials` (~55 x 3 = ~165) real selector calls per
 variant — cheap on deepseek-v4-flash, but not free.
@@ -34,7 +38,7 @@ Each case freezes a conversation, the prior active-skill set, optional
       content: Rename my terminals so I can tell the agents apart.
   expect:
     required: [daintree.terminals.rename]        # must ALL be picked (recall)
-    optional: [daintree.orchestration.basic]     # allowed, not demanded
+    optional: [daintree.foundation]     # allowed, not demanded
 ```
 
 Scoring is strict per trial: `missing = required - picked` (recall failure),
@@ -43,10 +47,28 @@ degraded. `required: []` means the selector must **clear** the active set. Every
 is validated against the real catalog at load, so a typo fails immediately.
 
 The `optional` slot exists mainly for the domain foundation
-(`daintree.orchestration.basic`): pairing it with a specific skill is the
+(`daintree.foundation`): pairing it with a specific skill is the
 documented default, but a lean pick of just the specific also passes. Expectations
 encode **product intent** — when a case's ground truth is debatable, the case
 carries a `note` saying why.
+
+### Coverage (`bench coverage`)
+
+A suite that never demands a skill cannot detect the selector missing it. `bench
+coverage` loads the real catalog and the real cases (offline, free) and prints,
+per catalog skill, the number of cases where it is `required` (recall), `optional`
+(allowed), prior-`active` (continuation pressure), and the implicit-negative count
+(cases where picking it would score as an `extra`). It **exits 1 if any catalog
+skill has zero `required` cases**.
+
+Run it whenever the catalog changes — that is the moment a new or renamed skill
+enters with no coverage, and the failure is invisible to `bench run` by
+construction: an untested skill's misses never appear in any `missing` list. Five
+skills sat at zero recall coverage for three weeks before this existed.
+
+It is a bench subcommand, deliberately **not** a pytest test: `benchmarks/` is
+outside `testpaths` on purpose and pulling the case tree into CI would make CI
+depend on the live-benchmark suite.
 
 Categories: `single-skill`, `routing-trap` (neighbor-skill confusion),
 `no-task` (must return empty), `continuation` (keep the in-progress skill),
@@ -72,9 +94,22 @@ picks/latency/tokens/model-stated reason, and the summary block. Latency is
 end-to-end per selector call (render + API + validation + any repair/retry), i.e.
 exactly the first-byte cost `/respond` pays.
 
-## Findings (2026-07-07, deepseek-v4-flash, 55 cases x 3 trials per run)
+## Historical findings — 2026-07-07, **13-skill catalog**, superseded
 
-| run | strict cases | mean | p50 | p90 | completion tok |
+> **These numbers are not evidence about the current selector.** They were
+> measured on **2026-07-07** against a **13-skill catalog** and a selector prompt
+> that has been **rewritten twice since**. The catalog has since been consolidated
+> (skills merged, the foundation renamed to `daintree.foundation`) and the prompt
+> template changed, so neither the accuracy column nor the latency column carries
+> over. The "55/55 strict" headline in particular says nothing about today —
+> when `bench coverage` was first run on 2026-07-28, **5 of the 18 skills** then
+> in the catalog had **zero required cases**, so a clean sweep was partly a
+> measurement of what the suite declined to ask.
+>
+> Kept because the *mechanisms* below generalize and the trade-offs were
+> expensive to learn. Re-run `bench run` before quoting any figure.
+
+| run (2026-07-07, 13-skill catalog, 55 cases x 3 trials) | strict cases | mean | p50 | p90 | completion tok |
 |---|---|---|---|---|---|
 | baseline, pre catalog fix | 54/55 | 1.78s | 1.73s | 2.12s | 83 |
 | **baseline + catalog fix** | **55/55 (x2 runs)** | **1.76-1.80s** | **1.73-1.79s** | **2.03-2.15s** | **83** |
@@ -98,6 +133,25 @@ What moved the needle:
   that. The non-thinking model needs the verbal workspace; rules don't
   substitute for it. `prompts/lean-reason/` is kept as the best latency
   candidate if that trade is ever wanted.
+- **Two-stage lexical retrieval was measured and rejected — do not re-propose it.**
+  The idea (BM25-shortlist the catalog, send only the top-K to the classifier, so
+  the selector prompt stops growing with the catalog) was scored over the exact
+  metadata the selector sees: `recall@3 = 67%`, `recall@5 = 81%`,
+  `recall@10 = 85%`, and it **never reaches 100% short of shipping the full
+  catalog** — so any shortlist silently caps the selector's ceiling below where it
+  already is. The cause is structural, not a tuning problem: routing in this
+  catalog is carried by **negative** clauses ("do not use for X — use the Y
+  skill"), which lexical scoring reads as strong *positive* evidence for exactly
+  the wrong skill. On the `foundation-only` cases the required foundation ranked
+  **dead last**. Anything bag-of-words inherits this, whatever the weighting.
+- **Revisit trigger for shortlisting:** a **measured** `bench run` regression that
+  is **attributable to catalog size** — not a token-budget estimate, not "the
+  catalog feels big". Absent that, the selector prompt growing is a cost, not a
+  defect. And the first lever to reach for would be **deterministic namespace
+  routing** (the dotted id hierarchy the catalog already carries, used the way
+  `Catalog.domain_foundation` already walks it), not lexical scoring — a
+  deterministic filter fails predictably and is auditable, where BM25 fails
+  exactly on the cases the negative clauses were written to fix.
 - Non-thinking baseline latency (p50 ~1.75s, p90 ~2.1s, max <3s over 660 calls)
   is near the floor for this output length; the remaining levers are output
   tokens (accuracy-coupled, see above) or a faster model.
