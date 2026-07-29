@@ -4,14 +4,6 @@ title: Run a Daintree workspace recipe, or create a worktree with one
 summary: List, inspect and run an EXISTING Daintree workspace recipe — or create a worktree with one as its startup recipe — then supervise any LIVE agent it spawns. Nothing here authors or edits a recipe.
 whenToUse: Use when the user asks to list, inspect, load, run or apply an existing Daintree workspace recipe, or to create a worktree with a startup recipe. Also use when they ask to CREATE or edit a recipe — only so you can say plainly that no tool can author one and offer what you can actually do. Do not use to create a worktree for a forge issue, which has its own typed workflow (use daintree.workflow.start-work-on-issue), to launch a single agent with no recipe involved (use daintree.edits.spawn-visible-agent), or to delete a worktree and tear the workspace down (use daintree.orchestration.workspace-cleanup).
 risk: project
-tags:
-  - recipe
-  - worktree
-  - startup
-  - workspace
-  - layout
-  - pr-review
-  - setup
 requiredTools:
   - context.snapshot
   - worktree.getCurrent

@@ -4,14 +4,6 @@ title: Run a runoff tie-breaker for an agent competition
 summary: Break a tie in an agent voting competition by getting new submissions from tied entrants, polling the original cohort, and tallying the runoff accurately.
 whenToUse: Use when an agent competition, poll, or peer-vote ends in a tie and the user asks for a tie-breaking round or runoff using the same cohort. Do not use to start a fresh competition or poll (use the competition or poll skill), and do not spawn new agents unless the user explicitly changes the electorate.
 risk: project
-tags:
-  - daintree
-  - orchestration
-  - tie-breaker
-  - runoff
-  - competition
-  - voting
-  - multi-agent
 requiredTools:
   - context.snapshot
   - scratch.create

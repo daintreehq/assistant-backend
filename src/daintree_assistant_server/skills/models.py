@@ -34,7 +34,13 @@ class SkillMeta(BaseModel):
     # workflow. The selector is told to pair a domain's foundation with the
     # specific workflow skill(s) it selects — see selector/system.md.j2.
     foundation: bool = Field(default=False)
-    tags: list[str] = Field(default_factory=list)
+    # DESCRIPTIVE metadata, NOT policy. Nothing in this server enforces `risk`: it
+    # gates nothing, is not sent to the selector, and never crosses the wire. Real
+    # risk gating is PER-TOOL, in the CLI's confirmation matrix — a skill cannot
+    # authorize anything its tools don't already allow. It is kept because the
+    # skill-learning builder writes it: a human reviewing a generated skill in
+    # `git diff` can see at a glance what tier of mutation the runbook authorizes.
+    # That reviewer signal is the whole value — do not delete it as dead.
     risk: str = "read"
     required_tools: list[str] = Field(default_factory=list, alias="requiredTools")
 
@@ -60,21 +66,6 @@ class SkillMeta(BaseModel):
         if v not in RISK_VALUES:
             raise ValueError(f"risk {v!r} not in {sorted(RISK_VALUES)}")
         return v
-
-    @field_validator("tags")
-    @classmethod
-    def _check_tags(cls, v: list[str]) -> list[str]:
-        seen: set[str] = set()
-        out: list[str] = []
-        for raw in v:
-            tag = raw.strip().lower()
-            if not tag:
-                raise ValueError("tags must be non-empty strings")
-            if tag in seen:
-                raise ValueError(f"duplicate tag {tag!r}")
-            seen.add(tag)
-            out.append(tag)
-        return out
 
     @field_validator("required_tools")
     @classmethod
@@ -121,10 +112,10 @@ class Skill:
 
         Deliberately narrower than the frontmatter: only the fields the selector
         prompt actually renders AND instructs on. ``title`` restates the summary,
-        and ``tags``/``risk``/``required_tools`` are near-non-discriminative
-        within a single-product catalog with no instruction referencing them —
-        they were pure prompt weight, so they are not shown to the classifier.
-        (They remain in :meth:`public_view` and are still read server-side, e.g.
+        and ``risk``/``required_tools`` are near-non-discriminative within a
+        single-product catalog with no instruction referencing them — they were
+        pure prompt weight, so they are not shown to the classifier. (They remain
+        in :meth:`public_view` and are still read server-side, e.g.
         ``required_tools`` for workflow-plan skill outlines.)
 
         Request-varying state is NOT here: which skills are currently active is
@@ -145,7 +136,6 @@ class Skill:
             "title": self.meta.title,
             "summary": self.meta.summary,
             "when_to_use": self.meta.when_to_use,
-            "tags": list(self.meta.tags),
             "risk": self.meta.risk,
             "required_tools": list(self.meta.required_tools),
         }

@@ -8,9 +8,9 @@ First, diagnose the skill against the transcript:
 Report this diagnosis in what_worked / what_failed — it is stored for human review alongside the change — and let it drive the edit.
 
 Sizing the change:
-- The gate's "lesson kind" tells you which half of the skill to edit: "trigger" = the metadata failed (this skill should have loaded and did not, or loaded when it should not have) → edit whenToUse/summary/tags; "procedure" = the skill loaded but its steps fell short → edit the body. When it is "(unspecified)", diagnose which one it is yourself from the evidence.
+- The gate's "lesson kind" tells you which half of the skill to edit: "trigger" = the metadata failed (this skill should have loaded and did not, or loaded when it should not have) → edit whenToUse/summary; "procedure" = the skill loaded but its steps fell short → edit the body. When it is "(unspecified)", diagnose which one it is yourself from the evidence.
 - Prefer the smallest edit that closes the diagnosed gap: a missing exact tool-argument shape, a known failure mode, a clarification, a bounded retry/exit condition.
-- Selection miss: when the gate's evidence shows this skill SHOULD have loaded for the workflow but was not selected, the highest-value edit is the TRIGGER metadata, not the body. The selector chooses skills from catalog metadata alone (whenToUse is its primary signal, alongside summary and tags) — it never sees the body — so sharpen whenToUse to name the user intents the workflow showed (in the words the user actually used), keep the catalog's routing style ("Do not use for X — use the <other-skill> skill"), and adjust summary/tags to match. Touch the body only if the workflow also exposed a real gap in the steps.
+- Selection miss: when the gate's evidence shows this skill SHOULD have loaded for the workflow but was not selected, the highest-value edit is the TRIGGER metadata, not the body. The selector sees only four fields per skill — id, summary, whenToUse, and the foundation flag (whenToUse is its primary signal) — and NEVER the body, so sharpen whenToUse to name the user intents the workflow showed (in the words the user actually used), keep the catalog's routing style ("Do not use for X — use the <other-skill> skill"), and adjust the summary to match. Touch the body only if the workflow also exposed a real gap in the steps.
 - A larger restructuring — up to a full rewrite of the body — is justified ONLY when the diagnosis shows the skill's current structure itself caused the failure (steps in the wrong order, a procedure the assistant consistently misreads, guidance buried where it gets skipped). Never rewrite merely to rephrase what already worked.
 
 Return ONLY a JSON object (no prose, no code fences):
@@ -22,7 +22,6 @@ Return ONLY a JSON object (no prose, no code fences):
   "whenToUse": "<keep or refine>",
   "risk": "read|local|ui|terminal|project|external|git|system",  // carry the given skill's value over unless the procedure's risk actually changed
   "foundation": <keep the given skill's value>,  // true only if it already is one — see the rule
-  "tags": ["daintree", "..."],                   // start from the given skill's tags; change one only when you diagnosed it as a routing problem
   "requiredTools": ["..."],                      // the tools the improved body actually calls: carry the rest over, add new ones, drop any the body no longer uses
   "body": "<the FULL improved body — not a diff>",
   "change_summary": ["<each concrete change, one line>"],

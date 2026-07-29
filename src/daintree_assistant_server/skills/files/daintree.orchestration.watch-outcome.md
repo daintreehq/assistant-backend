@@ -3,15 +3,6 @@ id: daintree.orchestration.watch-outcome
 title: Watch an outcome unattended
 summary: Set up supervision that outlives the turn — a terminal watcher, an async verdict, a PR watch, or a timer — and pre-authorize with a narrow grant when the wake must act.
 whenToUse: Use when the user wants to be woken later, not waited on now — "run this overnight and wake me", "let me know when the build finishes", "ping me when the PR merges", "remind me in an hour", "keep an eye on it while I'm out" — or any request to leave something watching after this turn. Also to pre-authorize an unattended action with a grant, and to list, cancel or revoke watchers, timers, async waits and grants you left. Do not use to cancel ONE named watcher (daintree.foundation), a one-off check of an agent that already finished (daintree.orchestration.verify-agent-work), triage of what is running now (daintree.orchestration.supervise-fleet), what happened while you were away (daintree.orchestration.status-and-resume), or wholesale teardown (daintree.orchestration.workspace-cleanup). Daintree cannot read CI, checks or reviews — that needs an agent (daintree.edits.spawn-visible-agent).
-tags:
-  - daintree
-  - watcher
-  - unattended
-  - overnight
-  - timer
-  - grant
-  - alert
-  - supervision
 risk: system
 requiredTools:
   - context.snapshot

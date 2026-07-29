@@ -4,16 +4,6 @@ title: Relay review feedback to an implementer
 summary: Forward review output from one running agent to another with user-specified calibration and optional follow-up instructions.
 whenToUse: Use when the user asks you to read one existing reviewer agent's output, review, or notes and point/send another existing implementer agent to it, optionally telling the target how to weigh the source or to report whether the review was useful. Do not use to judge whether the reviewed work is actually done or correct (use daintree.orchestration.verify-agent-work), to spawn a new single agent and ask it a question (use the ask-and-relay skill), to poll several agents for independent opinions (use poll-pinned-agents), or to run multi-round collaboration among agents (use the multi-agent skill).
 risk: project
-tags:
-  - daintree
-  - agents
-  - review
-  - feedback
-  - relay
-  - implementer
-  - terminal
-  - sendcommand
-  - calibration
 requiredTools:
   - context.snapshot
   - terminal.extract

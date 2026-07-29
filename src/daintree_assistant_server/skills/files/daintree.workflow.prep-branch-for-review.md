@@ -4,15 +4,6 @@ title: Prepare a branch for review
 summary: Get a read-only review-readiness verdict, then do the real prep — commit, push, open the PR — branching on what the verdict reports.
 whenToUse: Use when the user asks to prepare a branch for review, open or ready a PR, wrap up work on an issue for review, or check whether the current branch is ready to push. Do not use to judge whether an agent's work is actually correct or complete before trusting it (use daintree.orchestration.verify-agent-work), to START work on an issue rather than finish it (use daintree.workflow.start-work-on-issue), to be notified later when the PR merges (use daintree.orchestration.watch-outcome), or to forward a reviewer's findings to an implementer agent (use daintree.agents.relay-review-feedback).
 risk: external
-tags:
-  - review
-  - pr
-  - branch
-  - forge
-  - workflow
-  - prep
-  - github
-  - gitlab
 requiredTools:
   - context.snapshot
   - worktree.getCurrent

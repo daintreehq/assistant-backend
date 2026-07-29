@@ -51,7 +51,7 @@ class GateVerdict(BaseModel):
     target_skill_id: str | None = None
     lesson_type: LessonType = "none"
     # Optional, improve-only hint: "trigger" = the skill existed but was not selected
-    # (edit whenToUse/summary/tags), "procedure" = the skill loaded but its steps fell
+    # (edit whenToUse/summary), "procedure" = the skill loaded but its steps fell
     # short (edit the body). Advisory context for the improver, never a gate on writing.
     lesson_kind: LessonKind | None = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -103,7 +103,6 @@ class SkillProposal(BaseModel):
     # DEMOTE an existing foundation, and only lets it PROMOTE (turn on where off) when
     # SKILL_LEARNING_ALLOW_FOUNDATION_CREATE is set — otherwise it is dropped and logged.
     foundation: bool = False
-    tags: list[str] = Field(default_factory=list)
     required_tools: list[str] = Field(
         default_factory=list,
         validation_alias=AliasChoices("required_tools", "requiredTools"),

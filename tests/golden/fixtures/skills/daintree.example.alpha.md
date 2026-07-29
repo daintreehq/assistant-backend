@@ -4,9 +4,6 @@ title: Example Alpha Workflow
 summary: A representative fixture skill used to pin golden prompt rendering.
 whenToUse: Use for the golden fixture workflow when exercising prompt assembly in tests.
 foundation: true
-tags:
-  - fixture
-  - golden
 risk: read
 requiredTools:
   - context.snapshot

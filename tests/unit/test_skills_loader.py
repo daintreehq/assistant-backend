@@ -15,9 +15,6 @@ id: test.example
 title: Example
 summary: A test skill.
 whenToUse: Use when testing.
-tags:
-  - alpha
-  - beta
 risk: read
 requiredTools:
   - git.status
@@ -35,7 +32,6 @@ def test_parse_valid_skill() -> None:
     assert skill.id == "test.example"
     assert skill.title == "Example"
     assert skill.when_to_use == "Use when testing."
-    assert skill.meta.tags == ["alpha", "beta"]
     assert skill.risk == "read"
     assert skill.body.startswith("# Procedure")
     assert skill.content_hash.startswith("sha256:")
@@ -68,8 +64,12 @@ def test_invalid_risk_rejected() -> None:
         parse_skill(bad, expected_id="test.example")
 
 
-def test_duplicate_tags_rejected() -> None:
-    bad = VALID.replace("  - beta", "  - alpha")
+def test_tags_key_rejected() -> None:
+    # `tags` was removed from the schema for the same reason as `priority`: once
+    # selector_view() narrowed to {id, summary, when_to_use, foundation} nothing read
+    # it. extra="forbid" must now reject it, so a stale skill file fails loudly at
+    # load (a /readyz failure) instead of silently carrying dead metadata forward.
+    bad = VALID.replace("risk: read", "tags:\n  - alpha\nrisk: read")
     with pytest.raises(SkillLoadError):
         parse_skill(bad, expected_id="test.example")
 

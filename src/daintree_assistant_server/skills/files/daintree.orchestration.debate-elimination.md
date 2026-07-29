@@ -4,18 +4,6 @@ title: Run agent debate with elimination vote
 summary: Facilitate a multi-agent debate, collect final positions, run a peer vote to eliminate the weakest position, and report the tally.
 whenToUse: Use when the user asks several agents to debate a topic and then eliminate, vote off, remove, or identify the weakest agent/position after the debate, including when the elimination request arrives mid-debate. Do not use for a collaborative debate that ends in one synthesized answer with no vote-off (use the multi-agent skill), an open-ended visible conversation among agents with no elimination vote (use the conversation skill), a one-shot independent scored contest or best-entry vote (use the competition skill), a simple fleet poll with no debate (use poll-pinned-agents), or a runoff after a tied vote (use runoff-tiebreaker).
 risk: project
-tags:
-  - daintree
-  - orchestration
-  - agents
-  - debate
-  - elimination
-  - vote
-  - weakest
-  - tally
-  - multi-agent
-  - sendcommand
-  - terminal
 requiredTools:
   - context.snapshot
   - agentTask.spawnForEdits

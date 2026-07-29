@@ -65,14 +65,14 @@ def _cmd_list(args: argparse.Namespace) -> int:
 
 
 def _cmd_coverage(args: argparse.Namespace) -> int:
-    """Per-skill case-coverage matrix. Exits 1 on a recall gap."""
+    """Per-skill case-coverage matrix. Exits 1 on a recall gap or a routing gap."""
     from daintree_assistant_server.skills.catalog import load_catalog
 
     catalog = load_catalog()
     rows = print_coverage(catalog, load_cases(catalog))
     # `rows and` matters: an empty catalog makes `all(...)` vacuously true, which
     # would turn the gate into a silent pass in exactly the situation it exists for.
-    return 0 if rows and all(r.has_recall_coverage for r in rows) else 1
+    return 0 if rows and all(r.gate_ok for r in rows) else 1
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
@@ -108,8 +108,8 @@ def main(argv: list[str] | None = None) -> int:
 
     cov = sub.add_parser(
         "coverage",
-        help="per-skill case-coverage matrix; exit 1 if any skill has no required case "
-        "(no API calls)",
+        help="per-skill case-coverage matrix; exit 1 if any skill has no required case, or "
+        "declares confusable neighbours with no routing trap (no API calls)",
     )
     cov.set_defaults(func=_cmd_coverage)
 

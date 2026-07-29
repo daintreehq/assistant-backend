@@ -21,8 +21,9 @@ python -m benchmarks.skill_selection.bench compare results/a.json results/b.json
 Only `run` costs money. `list`, `coverage`, `report`, and `compare` are offline
 and free — they work with `DEEPSEEK_API_KEY=` blanked.
 
-A full default run is `cases x trials` (~55 x 3 = ~165) real selector calls per
-variant — cheap on deepseek-v4-flash, but not free.
+A full default run is `cases x trials` (currently ~95 x 3 = ~285) real selector
+calls per variant — cheap on deepseek-v4-flash, but not free. Run `bench list` for
+the current count.
 
 ## Cases (`cases/*.yaml`)
 
@@ -54,17 +55,54 @@ carries a `note` saying why.
 
 ### Coverage (`bench coverage`)
 
-A suite that never demands a skill cannot detect the selector missing it. `bench
-coverage` loads the real catalog and the real cases (offline, free) and prints,
-per catalog skill, the number of cases where it is `required` (recall), `optional`
-(allowed), prior-`active` (continuation pressure), and the implicit-negative count
-(cases where picking it would score as an `extra`). It **exits 1 if any catalog
-skill has zero `required` cases**.
+`bench coverage` loads the real catalog and the real cases (offline, free) and
+prints a per-skill matrix: `nbr` (declared confusable neighbours), `trap`,
+`req` (recall), `alone` (sole required id), `opt` (allowed), `act` (prior-active
+continuation pressure), and `neg` (cases where picking it would score as an
+`extra`). It **exits 1** on either half of a two-part gate.
+
+**1. Recall — is the skill reachable?** A suite that never demands a skill cannot
+detect the selector missing it, so every skill needs at least one case with it in
+`expect.required`. A `[foundation]` is gated on `alone` instead: the backend pairs
+a foundation with a selected specific *downstream* of the classifier, so a case
+whose answer is a specific must list it in `optional` (`cases.py` rejects the
+mixed shape), and the only case that tests a foundation for recall is one where
+it is the whole answer.
+
+**2. Traps — is it reached for the right reasons?** Recall alone is a weak gate.
+Routing quality in this catalog does not live in the positive clause of a
+`whenToUse`; it lives in the carve-outs after it — "do not use for X, use
+`daintree.<other>`". Each carve-out is a **claim** that a specific confusion
+exists and that the catalog text resolves it, and an untested carve-out is an
+unverified claim: a suite can be 100% green on recall while every one of those
+claims is false, because a case whose bait matches only the positive clause is
+passed by a selector that has never once distinguished the neighbours.
+
+So `trap` counts, for skill S, the cases in category `routing-trap` where S is in
+`expect.required` **and** at least one of S's declared neighbours is in neither
+`required` nor `optional` — i.e. the case actively asserts that neighbour must not
+be picked. A skill with `nbr > 0` and `trap == 0` fails. A skill that declares no
+neighbours claims no confusion and **owes no trap** — the gate must not pressure
+anyone into padding the suite with a manufactured one.
+
+Neighbours are parsed out of the `whenToUse` text by scanning it for other catalog
+ids on a token boundary. A carve-out that names its neighbour in **shorthand**
+("use the competition skill") is invisible to that parse and its skill reads as
+owing nothing — the fix is to write the fully-qualified id in the catalog, not to
+loosen the gate.
 
 Run it whenever the catalog changes — that is the moment a new or renamed skill
-enters with no coverage, and the failure is invisible to `bench run` by
-construction: an untested skill's misses never appear in any `missing` list. Five
-skills sat at zero recall coverage for three weeks before this existed.
+enters with no coverage, or a freshly-added carve-out enters untested, and both
+failures are invisible to `bench run` by construction: an untested skill's misses
+never appear in any `missing` list. Five skills sat at zero recall coverage for
+three weeks before this existed.
+
+When it reports a gap, the new case has to be **earned**: ground truth decidable
+from the routing text on disk (quote the deciding clause in the case `note`), and
+user text that reads like a real person rather than the skill's own trigger
+phrases echoed back — an echo measures keyword overlap, not routing. If no clause
+on disk decides the case, the carve-out itself is unverifiable; fix the catalog
+text rather than inventing a case to turn the number green.
 
 It is a bench subcommand, deliberately **not** a pytest test: `benchmarks/` is
 outside `testpaths` on purpose and pulling the case tree into CI would make CI

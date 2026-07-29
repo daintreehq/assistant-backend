@@ -4,13 +4,6 @@ title: Rename terminal tabs
 summary: Give terminals/agents clear tab titles — the fast, direct route (no tool hunting).
 whenToUse: Use whenever the user wants to rename terminals/tabs, retitle agents, or "figure out what each of these terminals is doing and give them a title" — especially when several agents share the same name (e.g. all "Claude") and need to be told apart. The deliverable is new TITLES. Do not use when the user wants a report on what the agents are doing rather than a retitle (use daintree.orchestration.supervise-fleet), or a plain list of what terminals exist (use daintree.foundation).
 risk: ui
-tags:
-  - daintree
-  - terminal
-  - rename
-  - title
-  - tab
-  - agent
 requiredTools:
   - context.snapshot
   - terminal.extract.json

@@ -2,21 +2,8 @@
 id: daintree.edits.spawn-visible-agent
 title: Spawn a visible agent for edits or exploration
 summary: How to handle requests that need a visible agent — to change files or to explore read-only.
-whenToUse: Use when the user asks for a direct visible agent to change project files (implement, refactor, fix, add tests, update docs) or to explore/investigate a project read-only, and no more specific workflow applies. Prefer a typed workflow first — daintree.workflow.start-work-on-issue for a forge issue, daintree.workflow.prep-branch-for-review for a PR, daintree.recipe.run-or-create for a workspace recipe, daintree.orchestration.fan-out-work when several independent units each need their own agent, or a poll/competition/interview/multi-agent skill when several agents work together. This is the fallback SINGLE visible-agent path; if the agent is already running and has gone wrong use daintree.agents.recover-agent.
+whenToUse: Use when the user asks for a direct visible agent to change project files (implement, refactor, fix, add tests, update docs) or to explore/investigate a project read-only, and no more specific workflow applies. Prefer a typed workflow first — daintree.workflow.start-work-on-issue for a forge issue, daintree.workflow.prep-branch-for-review for a PR, daintree.recipe.run-or-create for a workspace recipe, daintree.orchestration.fan-out-work when several independent units each need their own agent, or a poll/competition/interview/multi-agent skill when several agents work together. This is the fallback SINGLE visible-agent path; if the agent is already running and has gone wrong use daintree.agents.recover-agent. If all the user wants is ONE read-only question answered and relayed back — the deliverable is the agent's answer, not work landing — use daintree.agents.ask-and-relay instead.
 risk: project
-tags:
-  - edits
-  - agent
-  - worktree
-  - supervision
-  - implement
-  - fix
-  - refactor
-  - test
-  - explore
-  - investigate
-  - spawn
-  - launch
 requiredTools:
   - context.snapshot
   - agentTask.spawnForEdits

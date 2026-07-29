@@ -79,9 +79,10 @@ Skills are Markdown runbooks that become task-specific operating instructions fo
 | `summary` | yes | selector signal |
 | `whenToUse` | yes | the *primary* selector signal (camelCase key → `when_to_use`) |
 | `foundation` | no | `true` marks a domain **foundation** skill; the selector pairs it with the specific workflow skill(s) it picks (default `false`) |
-| `tags` | no | lowercased, deduped |
-| `risk` | no | enum: `read local ui terminal project external git system` |
+| `risk` | no | enum: `read local ui terminal project external git system` — **descriptive, not policy** (see below) |
 | `requiredTools` | no | camelCase key → `required_tools` |
+
+`risk` enforces nothing. It gates no code path, is not shown to the selector, and never crosses the wire; real risk gating is **per-tool**, in the CLI's confirmation matrix. It is kept because the skill-learning builder writes it, so a human reviewing a generated skill in `git diff` can see at a glance what tier of mutation the runbook authorizes. There is no `tags` key and no `priority` key — both were deleted once `selector_view()` narrowed to `{id, summary, when_to_use, foundation}` and left them with no consumer.
 
 **Pipeline:** `loader.py` parses/validates (strict — a malformed skill fails `/readyz`, not a request) → `catalog.py` builds the **immutable** catalog and a deterministic `revision` hash → the selector sees only `Skill.selector_view()`, the public `/skills` endpoint sees only `public_view()`, and **neither ever exposes the body** except via injection into the main prompt for active skills. Selection is automatic and server-side: the guarantee that `skill.find`/`skill.load` are never *offered* is enforced at the request boundary by the reserved-tool-names check in `services/validation.py` (`RESERVED_TOOL_NAMES`, which also covers the `skill__find`/`skill__load` wire spellings and the `daintree_internal__` prefix), and the base prompt separately tells the model it does not find, load, or manage skills itself (`main/base/30-skills.md` — it never names the tools).
 

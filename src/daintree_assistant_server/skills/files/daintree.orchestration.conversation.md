@@ -4,20 +4,6 @@ title: Facilitate a live agent conversation
 summary: Relay a live back-and-forth conversation among two or more agents, giving each the floor in turn and catching it up on what the others said since it last spoke while you drive the rounds.
 whenToUse: Use when the user asks you to facilitate, host, relay, moderate, or keep going a live back-and-forth conversation between TWO OR MORE agents — “get them talking,” “let them talk to each other,” “facilitate a conversation,” “have a group chat/roundtable/panel discussion,” “have the three of them hash it out,” or “see where it goes.” Participant count is just a parameter of this skill. Do not use for a one-shot question to one agent (use ask-and-relay), an independent poll with no cross-talk (use poll-pinned-agents), a judged interview that names a winner (use interview), a scored competition or vote (use competition), a post-tie runoff (use runoff-tiebreaker), a debate that ends by voting a position off (use debate-elimination), or several agents collaborating toward ONE synthesized answer or convergence rather than an open-ended visible dialogue (use multi-agent).
 risk: project
-tags:
-  - daintree
-  - orchestration
-  - agents
-  - conversation
-  - chat
-  - group
-  - roundtable
-  - panel
-  - discussion
-  - facilitate
-  - relay
-  - sendcommand
-  - terminal
 requiredTools:
   - context.snapshot
   - agentTask.spawnForEdits

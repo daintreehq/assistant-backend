@@ -876,7 +876,6 @@ class SkillLearner:
         meta_fields.update(
             {
                 "risk": proposal.risk.strip().lower(),
-                "tags": list(proposal.tags),
                 "requiredTools": self._admissible_tools(
                     proposal.required_tools, catalog, tools, skill_id
                 ),
@@ -1281,7 +1280,7 @@ class SkillLearner:
         self, catalog: Catalog, preferred_ids: Sequence[str] = (), count: int = 3
     ) -> str:
         # Complete files (frontmatter + body), so the builder calibrates title/
-        # summary/tags/risk against real values, not just body prose.
+        # summary/risk against real values, not just body prose.
         # The gate's related_skill_ids come first — same-domain skills are the
         # best style AND scope anchors — topped up shortest-first (compact,
         # representative) when the gate named fewer than ``count``.
@@ -1321,7 +1320,6 @@ class SkillLearner:
         meta.update(
             {
                 "risk": skill.meta.risk,
-                "tags": list(skill.meta.tags),
                 "requiredTools": list(skill.meta.required_tools),
             }
         )
@@ -1339,8 +1337,8 @@ class SkillLearner:
             # whenToUse, title) on a single line instead of folding them at yaml.dump's
             # 80-column default. Folding is only cosmetic — YAML rejoins a wrapped plain
             # scalar into one string on load — but single-line values match the
-            # hand-authored skills and keep git diffs clean. Block sequences (tags,
-            # requiredTools) stay one-item-per-line regardless (default_flow_style=False).
+            # hand-authored skills and keep git diffs clean. Block sequences
+            # (requiredTools) stay one-item-per-line regardless (default_flow_style=False).
             width=1_000_000_000,
         )
         return f"---\n{yaml_text}---\n{body.strip()}\n"

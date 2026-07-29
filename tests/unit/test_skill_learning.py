@@ -103,7 +103,6 @@ PROPOSAL_CREATE = {
     "summary": "A freshly created skill.",
     "whenToUse": "Use when the created workflow recurs.",
     "risk": "read",
-    "tags": ["daintree", "test"],
     "requiredTools": ["context.snapshot"],
     "body": "Use when: the created workflow recurs.\n\nProcedure:\n1. Step one.\n2. Step two.\n\n"
     "Report back: what was done.",
@@ -118,7 +117,6 @@ PROPOSAL_IMPROVE = {
     "summary": "An improved target summary.",
     "whenToUse": "Use when improving the target.",
     "risk": "read",
-    "tags": ["daintree", "test"],
     "requiredTools": [],
     "body": "Use when: the improved condition.\n\nProcedure:\n1. Improved step.\n2. New guardrail.\n\n"
     "Report back: improved.",
@@ -351,7 +349,6 @@ def test_render_markdown_keeps_long_scalars_on_one_line() -> None:
         "summary": long_summary,
         "whenToUse": long_when.strip(),
         "risk": "read",
-        "tags": ["daintree", "test"],
         "requiredTools": [],
     }
     body = "Use when: demonstrating.\n\nProcedure:\n1. Show it.\n\nReport back: shown."
@@ -1650,7 +1647,8 @@ async def test_required_tool_already_in_catalog_survives(tmp_path: Path) -> None
 @pytest.mark.asyncio
 async def test_required_tools_deduped_after_normalization(tmp_path: Path) -> None:
     # Two spellings of ONE tool collapse to the same logical name — they must not
-    # both land in the file's requiredTools (SkillMeta dedupes tags, never tools).
+    # both land in the file's requiredTools (SkillMeta never dedupes tool names, so
+    # the dedupe has to happen in _admissible_tools).
     proposal = {**PROPOSAL_CREATE, "requiredTools": ["agent__spawn", "agent.spawn"]}
     fake = _provider(GATE_CREATE, proposal)
     learner, manager, _ = _learner(tmp_path, fake)

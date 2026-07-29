@@ -4,17 +4,6 @@ title: Answer a waiting agent
 summary: Answer a waiting agent’s prompt — one agent, or a whole cohort asking at once — with the exact protocol reply, wait for them to continue, and report the requested results.
 whenToUse: Use when one or more already-running visible agents/terminals are waiting on a QUESTION and the user wants them answered — "the agent is asking something, tell it yes", "it's blocked on a prompt", "three of them are waiting on questions, unblock them", "answer the waiting agents and report the result". Includes the fan-out case where several ask at once (terminal.awaitAll returns an askingQuestion array, or the roster shows waitingReason "question"). Do not use when the agent is asking nothing but is hung, silent, or behind a bad terminal id (daintree.agents.recover-agent), for a whole-fleet sweep where answering is only one of several actions (daintree.orchestration.supervise-fleet), to spawn a new agent to ask a question (daintree.agents.ask-and-relay or daintree.edits.spawn-visible-agent), or to poll agents for opinions, votes, or verdicts (daintree.agents.poll-pinned-agents).
 risk: terminal
-tags:
-  - daintree
-  - agent
-  - terminal
-  - waiting
-  - question
-  - answer
-  - cohort
-  - send-command
-  - extract
-  - result
 requiredTools:
   - context.snapshot
   - terminal.extract

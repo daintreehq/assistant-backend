@@ -144,3 +144,48 @@ cases:
     expect:
       required: [daintree.recipe.run-or-create]
       optional: [daintree.foundation]
+
+  - id: label-tabs-not-fleet-report
+    category: routing-trap
+    note: >-
+      Covers daintree.terminals.rename's carve-out against supervise-fleet, which had no
+      trap. The bait is real: inspecting what every agent is on is supervise-fleet's own
+      sweep ("how's everyone doing?", "catch me up on the agents"). The deciding clause is
+      rename's "The deliverable is new TITLES. Do not use when the user wants a report on
+      what the agents are doing rather than a retitle (use
+      daintree.orchestration.supervise-fleet)" — here the inspection is only the means and
+      the labels are the deliverable ("Not a rundown"). supervise-fleet agrees from its own
+      side ("or for retitling tabs (daintree.terminals.rename)"), so picking it is an extra.
+      Worded around "label" rather than rename/retitle/title so this measures routing, not
+      keyword overlap with the whenToUse.
+    messages:
+      - role: user
+        content: >-
+          Third time today I've typed into the wrong terminal. Can you go along the
+          row, work out what each one is on, and stick a short label on it? Not a
+          rundown — I just want to read it off the tabs.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.foundation]
+
+  - id: no-ticket-change-not-issue-workflow
+    category: routing-trap
+    note: >-
+      Covers daintree.edits.spawn-visible-agent's carve-outs, which had no trap at all. The
+      bait is forge-workflow shaped — a backlog grievance about a known defect, the kind of
+      thing that usually arrives as a ticket — but the deciding clause is
+      start-work-on-issue's own "Do not use ... for a change with no forge issue behind it
+      (use daintree.edits.spawn-visible-agent)", and the user says outright that nothing was
+      ever filed. One unit of work, so fan-out-work's "signal is PLURALITY plus
+      INDEPENDENCE" does not fire either; the deliverable is a code change landing, not an
+      answer relayed back. Every declared neighbour is left out of required AND optional, so
+      the case asserts the whole carve-out list rather than one clause of it.
+    messages:
+      - role: user
+        content: >-
+          This one never made it onto the board and I'm not going to file it now —
+          the uploader retries three times back to back and hammers the API when the
+          CDN blips. Put an agent on adding proper backoff.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]

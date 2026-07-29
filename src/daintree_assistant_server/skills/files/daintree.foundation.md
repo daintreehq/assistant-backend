@@ -5,14 +5,6 @@ summary: The base judgment under every Daintree workflow — read state before a
 whenToUse: 'Use for a plain what-exists-right-now read of Daintree state — which terminals, agents, worktrees, branches, queues, timers or watchers exist — and for a single direct control-plane action: reading or focusing ONE terminal, closing ONE the user named, cancelling ONE watcher or async wait, checking Daintree is connected. It is also the DOMAIN FOUNDATION for every daintree.* skill: co-load it with whatever runbook you pick, and load it ALONE only when no runbook squarely matches. Never load it INSTEAD of one that does: triage of running agents is daintree.orchestration.supervise-fleet, "where were we" across sessions is status-and-resume, tearing several things down is workspace-cleanup, leaving something watching past this turn is watch-outcome, retitling tabs is daintree.terminals.rename; spawning, relaying, competitions, interviews, branch prep and issue work all have their own skill.'
 foundation: true
 risk: terminal
-tags:
-  - daintree
-  - foundation
-  - orchestration
-  - state
-  - terminals
-  - agents
-  - supervision
 requiredTools:
   - context.snapshot
   - daintree.status

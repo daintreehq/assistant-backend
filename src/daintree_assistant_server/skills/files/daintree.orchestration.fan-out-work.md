@@ -3,17 +3,6 @@ id: daintree.orchestration.fan-out-work
 title: Fan out disjoint work across parallel agents
 summary: Put one agent on each of several INDEPENDENT units of work — a batch of forge issues, or one goal split into disjoint file-scoped sub-tasks — then supervise the whole fleet in the background.
 whenToUse: Use when the user wants several agents each working their OWN separate piece of work at once — take these issues and put an agent on each, an agent per ticket, work the whole batch in parallel, parallelise this across worktrees, knock out the backlog. The signal is PLURALITY plus INDEPENDENCE — many units, no shared deliverable. Do not use for ONE issue (daintree.workflow.start-work-on-issue) or ONE agent (daintree.edits.spawn-visible-agent); for several agents on the SAME problem converging on one answer (daintree.orchestration.multi-agent) or producing rival solutions to be scored (daintree.orchestration.competition); for opinions rather than work (daintree.agents.poll-pinned-agents); for a fleet that ALREADY exists (daintree.orchestration.supervise-fleet, daintree.orchestration.status-and-resume); or for rescuing one stuck agent (daintree.agents.recover-agent).
-tags:
-  - daintree
-  - orchestration
-  - fan-out
-  - parallel
-  - batch
-  - issues
-  - worktree
-  - decompose
-  - spawn
-  - fleet
 risk: project
 requiredTools:
   - context.snapshot

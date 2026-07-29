@@ -13,7 +13,6 @@ Return ONLY a JSON object (no prose, no code fences) with exactly these fields:
   "whenToUse": "<the primary trigger, phrased 'Use when ...'>",
   "risk": "read|local|ui|terminal|project|external|git|system",
   "foundation": false,                           // almost always false — see the rule below
-  "tags": ["daintree", "..."],
   "requiredTools": ["<tool ids seen in the workflow or already used by similar skills>"],
   "body": "<the runbook markdown — see house style below>",
   "change_summary": ["<one line: what this skill teaches>"],
@@ -26,7 +25,7 @@ Trigger quality (whenToUse / summary):
 - "whenToUse" is the SELECTOR's primary routing signal: a small classifier chooses skills from FOUR fields per skill and nothing else — id, summary, whenToUse, and the foundation flag. It NEVER sees the body. A perfectly-written body behind a vague trigger will simply never load.
 - Write whenToUse so conversations that need THIS workflow match it and neighboring ones don't: name the concrete user intents it covers ("Use when the user asks to X, Y, or Z"), in the words a user would actually use.
 - When the catalog has adjacent skills the workflow could be confused with, add the catalog's routing style: "Do not use for X (use the <other-skill> skill)". This mutual-exclusion phrasing is how the existing catalog keeps the selector precise.
-- tags, risk and requiredTools are NOT shown to the classifier — they are catalog metadata for humans and server-side code. Fill them in accurately, but never try to steer routing through them: everything the selector will ever know must be carried by the id, the summary, and whenToUse.
+- risk and requiredTools are NOT shown to the classifier — they are catalog metadata for humans and server-side code. Fill them in accurately, but never try to steer routing through them: everything the selector will ever know must be carried by the id, the summary, and whenToUse. `risk` in particular enforces nothing at runtime (tool-level confirmation does that); it is a review signal, so set it to the highest tier of mutation the body actually authorizes.
 
 House style for "body" (match the example skills you are given):
 - Start with "Use when: <the trigger condition, in operational language>".
