@@ -99,7 +99,17 @@ resource "google_cloud_run_v2_service" "service" {
       }
     }
 
-    timeout = "900s"
+    # Sized against the app's own budget so an upstream stall usually surfaces as the
+    # server's error envelope rather than a bare platform 504. Per attempt the phases
+    # are connect 10s + pool 10s + write 30s + read MAIN_TIMEOUT_SECONDS (840s), and
+    # MAX_UPSTREAM_RETRIES=1 means two attempts:
+    #     2 x (10 + 10 + 30 + 840) = 1780s, plus selector time and retry backoff.
+    # 1780s already leaves almost no headroom under 1800s, and httpx's read timeout is
+    # per-INACTIVITY-GAP rather than total wall time, so a slowly trickling upstream
+    # still has no finite application-level bound — this raises the ceiling, it does not
+    # guarantee the envelope. A real guarantee needs an app-level total deadline set
+    # below this value. Keep the two coupled; Cloud Run's own ceiling is 3600s.
+    timeout = "1800s"
   }
 }
 

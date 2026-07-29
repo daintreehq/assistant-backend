@@ -433,6 +433,35 @@ async def test_reconcile_unparseable_snapshot_fails_open(
 
 
 @pytest.mark.asyncio
+async def test_reconcile_patch_internal_cycle_rejected_without_a_snapshot(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    # A cycle among the patch's OWN add_nodes/add_edges needs no existing graph to
+    # detect, so the acyclic check runs even when the snapshot is unreadable. Only
+    # _check_references stays gated (it would false-reject a legitimate reference
+    # into a graph we simply could not parse).
+    bad = reconcile_payload(
+        patch={
+            "add_nodes": [
+                {"id": "n_a", "title": "A", "kind": "tool_call"},
+                {"id": "n_b", "title": "B", "kind": "tool_call", "depends_on": ["n_a"]},
+            ],
+            "add_edges": [{"source": "n_b", "target": "n_a"}],
+            "node_updates": [],
+        },
+        next_action=None,
+    )
+    fake_provider.complete_result = make_result(content=json.dumps(bad))
+    with pytest.raises(DaintreeError) as exc:
+        await _run(
+            task_runner,
+            "workflow_reconcile",
+            reconcile_input(workflow={"id": "wf_1", "nodes": "corrupt"}),
+        )
+    assert exc.value.code == "task_output_invalid"
+
+
+@pytest.mark.asyncio
 async def test_reconcile_requires_reason(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(

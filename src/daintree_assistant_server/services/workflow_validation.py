@@ -220,9 +220,12 @@ def validate_reconcile(
                     f"cannot move to {update.status!r}"
                 )
         _check_references(patch.add_nodes, patch.add_edges, known)
-        _check_acyclic(
-            _combined_dependencies(patch.add_nodes, patch.add_edges, existing_deps)
-        )
+
+    # A cycle among the patch's OWN add_nodes/add_edges needs no existing graph to
+    # detect, so this check runs unconditionally — unlike _check_references, which
+    # WOULD false-reject a legitimate reference into a snapshot we simply could not
+    # read. `existing_deps` is empty in that case, so only patch-internal edges count.
+    _check_acyclic(_combined_dependencies(patch.add_nodes, patch.add_edges, existing_deps))
 
     next_action, warnings = _ground_tool_names(
         nodes=patch.add_nodes,

@@ -26,15 +26,8 @@ dependencies = [
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "jinja2>=3.1.0",
-    "python-jose[cryptography]>=3.3.0",
-    "cryptography>=42.0.0",
     "structlog>=24.1.0",
-    "opentelemetry-api>=1.22.0",
-    "opentelemetry-sdk>=1.22.0",
-    "opentelemetry-instrumentation-asgi>=0.43b0",
-    "opentelemetry-exporter-otlp>=1.22.0",
     "pyyaml>=6.0.0",
-    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]
@@ -46,7 +39,6 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.8.0",
     "types-pyyaml>=6.0.0",
-    "types-redis>=4.6.0",
 ]
 
 [tool.setuptools.packages.find]

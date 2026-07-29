@@ -37,7 +37,14 @@ from .base import (
     ProviderToolCallResult,
     ProviderUsage,
 )
-from .sse import ChunkShapeError, iter_sse_data, parse_chunk
+from .sse import (
+    ChunkShapeError,
+    SseProtocolError,
+    iter_sse_data,
+    iter_sse_lines,
+    parse_chunk,
+    validate_message_shape,
+)
 
 logger = get_logger("daintree.deepseek")
 
@@ -97,7 +104,9 @@ class DeepSeekStream(ProviderStream):
         self._ctx = stream_ctx
         self._response = response
         self._model = model
-        self._events = iter_sse_data(response.aiter_lines())
+        # Bytes, not aiter_lines: see iter_sse_lines — aiter_lines would also split
+        # on U+0085/U+2028/U+2029, which are legal unescaped inside JSON content.
+        self._events = iter_sse_data(iter_sse_lines(response.aiter_bytes()))
         self._closed = False
         self._done = False
         self._saw_done = False
@@ -126,6 +135,12 @@ class DeepSeekStream(ProviderStream):
             raise upstream_error(
                 "The upstream model stream was interrupted.", retryable=True
             ) from exc
+        except SseProtocolError as exc:
+            self._done = True
+            # Framing violation (oversized line, invalid UTF-8). Surface it as an
+            # upstream error like every other malformed-stream case — letting it
+            # escape raw would render an internal-error envelope instead of a 502.
+            raise upstream_error("Malformed SSE stream from upstream.") from exc
 
         try:
             chunk = parse_chunk(data)
@@ -294,7 +309,13 @@ class DeepSeekProvider:
         if status >= 500:
             # Transient upstream fault — retry while no model output is exposed.
             return upstream_error(retryable=True)
-        # A 4xx means the upstream rejected OUR request as malformed: permanent
+        # An auth/billing rejection says nothing about the CLIENT's request — it is
+        # about OUR upstream account. Forwarding that prose leaks provider account and
+        # quota detail to any Daintree-key holder, so keep it to the log (the
+        # upstream_http_error entry already carries the full body).
+        if status in (401, 402, 403):
+            return upstream_error("The upstream provider rejected this server's credentials.")
+        # Any other 4xx means the upstream rejected OUR request as malformed: permanent
         # (never retried) and almost always a server-side bug in what we sent. Carry
         # the upstream's own reason through so the failure is diagnosable instead of
         # an opaque "status 400" — the CLI and logs then name the offending field.
@@ -302,12 +323,18 @@ class DeepSeekProvider:
         return upstream_error(f"Upstream rejected the request (HTTP {status}).{suffix}")
 
     def _build_result(self, data: dict[str, Any]) -> ProviderChatResult:
-        choices = data.get("choices") or []
-        # Structural guard mirroring the stream path: consumers index straight
-        # into choices[0]["message"], so a non-list / non-dict shape must fail as
-        # an upstream error here, not as an AttributeError later.
-        if not isinstance(choices, list) or not all(isinstance(c, dict) for c in choices):
-            raise upstream_error("Upstream returned a malformed completion response.")
+        # `or []` only for a genuinely absent key — a present-but-wrong `choices`
+        # (e.g. `{}` or `""`) must fail the guard rather than be coerced to empty.
+        raw_choices = data.get("choices")
+        choices = [] if raw_choices is None else raw_choices
+        # Structural guard mirroring the STREAM path exactly (shared validator), so the
+        # same malformed upstream produces the same 502 on both paths. Consumers index
+        # straight into choices[0]["message"] and read content/tool_calls off it, so a
+        # bad shape here would otherwise surface as an AttributeError 500.
+        try:
+            validate_message_shape(choices, data.get("usage"))
+        except ChunkShapeError as exc:
+            raise upstream_error("Upstream returned a malformed completion response.") from exc
         finish = choices[0].get("finish_reason") if choices else None
         return ProviderChatResult(
             id=data.get("id", ""),

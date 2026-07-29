@@ -22,6 +22,7 @@ import time
 from collections.abc import Callable, Iterable
 
 from ..errors import request_too_large
+from ..text_utils import utf8_len
 from .models import StatePayload, StateVerification
 
 TOKEN_VERSION = 1
@@ -116,7 +117,7 @@ class StateCodec:
     def verify(self, token: str | None, *, session_id: str | None) -> StateVerification:
         if not token:
             return StateVerification(valid=False, payload=None, reason=None)
-        if len(token.encode("utf-8")) > MAX_TOKEN_BYTES:
+        if utf8_len(token) > MAX_TOKEN_BYTES:
             raise request_too_large(
                 "Skill-state token exceeds the size limit.", param="daintree.state"
             )
@@ -125,6 +126,12 @@ class StateCodec:
         if len(parts) != 3 or parts[0] != TOKEN_PREFIX:
             return StateVerification(valid=False, payload=None, reason=REASON_INVALID)
         _, body, signature = parts
+        # Both segments are base64url — pure ASCII by construction. Rejecting anything
+        # else here keeps every downstream operation total: `.encode("utf-8")` on the
+        # signature raises UnicodeEncodeError for an unpaired surrogate, which would be
+        # a 500 for what must simply be an ignored token.
+        if not body.isascii() or not signature.isascii():
+            return StateVerification(valid=False, payload=None, reason=REASON_INVALID)
 
         try:
             payload_bytes = _b64url_decode(body)
@@ -139,8 +146,12 @@ class StateCodec:
         if key is None:
             return StateVerification(valid=False, payload=None, reason=REASON_INVALID)
 
+        # Compare BYTES: hmac.compare_digest raises TypeError on str operands holding
+        # non-ASCII, and the signature here is attacker-controlled — a token carrying
+        # one non-ASCII byte would 500 instead of being ignored as invalid, which the
+        # API contract and CLAUDE.md both promise it is.
         expected = self._signature(key, body)
-        if not hmac.compare_digest(expected, signature):
+        if not hmac.compare_digest(expected.encode("utf-8"), signature.encode("utf-8")):
             return StateVerification(valid=False, payload=None, reason=REASON_INVALID)
 
         try:

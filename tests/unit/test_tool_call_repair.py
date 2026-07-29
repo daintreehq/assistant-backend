@@ -308,3 +308,41 @@ def test_repair_exception_fails_open(monkeypatch) -> None:
     repaired, notes = mod.repair_tool_call_arguments("terminal__extract", args, _index())
     assert repaired is args
     assert notes == []
+
+
+def test_union_typed_property_does_not_crash_or_mis_repair() -> None:
+    """A union ``"type"`` is a list, and ``list in frozenset`` raises TypeError.
+
+    Before the guard, one union-typed property aborted the whole call's repair.
+    The guard must not swing the other way either: ``_value_satisfiable`` cannot
+    prove a value fits a union, so the rename is REFUSED rather than applied
+    invalidly (which is what a bare ``continue`` would have allowed).
+    """
+    schema = {
+        "type": "object",
+        "properties": {
+            "terminalIds": {"type": ["array", "null"], "items": {"type": "string"}}
+        },
+    }
+    repaired, notes = repair_arguments(schema, {"terminalId": 42})
+    assert repaired == {"terminalId": 42}  # untouched, not a bogus rename
+    assert notes == []
+
+
+def test_union_typed_property_does_not_block_other_repairs() -> None:
+    schema = {
+        "type": "object",
+        "properties": {
+            "maybe": {"type": ["string", "null"]},
+            "terminalIds": {"type": "array", "items": {"type": "string"}},
+        },
+    }
+    repaired, notes = repair_arguments(schema, {"maybe": "x", "terminalId": "t-1"})
+    assert repaired["terminalIds"] == ["t-1"]
+    assert any("renamed" in n for n in notes)
+
+
+def test_property_without_a_type_is_still_unconstrained() -> None:
+    schema = {"type": "object", "properties": {"payload": {}}}
+    repaired, _ = repair_arguments(schema, {"payload": {"anything": True}})
+    assert repaired == {"payload": {"anything": True}}

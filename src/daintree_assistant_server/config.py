@@ -57,7 +57,13 @@ class Settings(BaseSettings):
     )
 
     # ---- Environment ----------------------------------------------------
-    environment: str = Field(default="development", alias="ENVIRONMENT")
+    # A CLOSED set on purpose. Every hardening gate below keys on this value, so a
+    # free-form string meant a typo ("prod", "Production", "staging") silently skipped
+    # weak-secret checks, the local-only-feature gate, and the API-key requirement —
+    # i.e. it failed OPEN, in the one direction that matters.
+    environment: Literal["development", "test", "staging", "production"] = Field(
+        default="development", alias="ENVIRONMENT"
+    )
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     build_sha: str = Field(default="", alias="BUILD_SHA")
 
@@ -183,9 +189,9 @@ class Settings(BaseSettings):
     # Floored at 2 deliberately: every skill resolves to a domain foundation, and the
     # orchestrator admits a specific and its foundation as one atomic unit. A budget of 1
     # can never fit that unit, so a cap of 1 would silently load NOTHING rather than
-    # loading less.
+    # loading less. This subsumes the earlier ge=0 guard against a cap of 0 admitting one
+    # id anyway; max_meta_header_bytes was pruned on main as dead.
     max_active_skills: int = Field(default=3, ge=2, alias="MAX_ACTIVE_SKILLS")
-    max_meta_header_bytes: int = Field(default=6 * 1024, alias="MAX_META_HEADER_BYTES")
 
     # ---- Timeouts (seconds) --------------------------------------------
     # The selector gates the turn's first byte, so this bound is a latency budget,
@@ -302,14 +308,14 @@ class Settings(BaseSettings):
     cap_workflow_state_bytes: int = Field(
         default=16 * 1024, alias="CAP_WORKFLOW_STATE_BYTES"
     )
-    cap_client_metadata: int = Field(default=2 * 1024, alias="CAP_CLIENT_METADATA")
     cap_message_text_part: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT_PART")
     cap_message_text: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT")
 
-    # ---- CLI-provided integrations (MCP servers + tool index) -----------
+    # ---- CLI-provided integrations (MCP servers) ------------------------
+    # NOT a tool index: client tool schemas already ride the function-calling
+    # interface, so listing them again would only duplicate them.
     cap_mcp_servers: int = Field(default=32, alias="CAP_MCP_SERVERS")
     cap_mcp_block_bytes: int = Field(default=64 * 1024, alias="CAP_MCP_BLOCK_BYTES")
-    cap_tool_index_desc: int = Field(default=256, alias="CAP_TOOL_INDEX_DESC")
 
     # ---- Skill learning (LOCAL DEVELOPMENT ONLY) ------------------------
     # A backend-internal harness that watches completed local workflows and, when
@@ -382,15 +388,22 @@ class Settings(BaseSettings):
         default=24000, alias="SKILL_BUILD_MAX_OUTPUT_TOKENS"
     )
 
-    # ---- Tracing --------------------------------------------------------
-    otel_exporter_otlp_endpoint: str = Field(default="", alias="OTEL_EXPORTER_OTLP_ENDPOINT")
-
     # ---- Derived helpers ------------------------------------------------
 
     @property
     def skill_learning_enabled(self) -> bool:
         """True when skill learning runs at all (``propose`` or ``apply``)."""
         return self.skill_learning_mode != "off"
+
+    @property
+    def is_hardened(self) -> bool:
+        """True where production hardening applies: auth required, no local-only
+        features, weak secrets rejected, internal detail withheld from responses.
+
+        The single place that decides "is this a real deployment?", so the checks
+        below, ``auth.authenticate`` and ``/readyz`` cannot drift apart.
+        """
+        return self.environment in ("production", "staging")
 
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty."""
@@ -415,11 +428,11 @@ class Settings(BaseSettings):
         silent fail-open the first time learning tries to run.
         """
         problems: list[str] = []
-        if self.environment == "production" and self.skill_learning_enabled:
+        if self.is_hardened and self.skill_learning_enabled:
             problems.append("SKILL_LEARNING_MODE must be 'off' in production")
         if self.skill_learning_enabled and not self.openai_api_key.get_secret_value():
             problems.append("OPENAI_API_KEY is required when skill learning is enabled")
-        if self.environment == "production" and self.dump_upstream_dir:
+        if self.is_hardened and self.dump_upstream_dir:
             problems.append(
                 "DAINTREE_DUMP_UPSTREAM_DIR must be unset in production "
                 "(prompt dumping is development-only)"
@@ -434,7 +447,7 @@ class Settings(BaseSettings):
         with forgeable state tokens. In development they are allowed (tests use
         short keys).
         """
-        if self.environment != "production":
+        if not self.is_hardened:
             return []
         problems: list[str] = []
         if len(self.daintree_api_key.get_secret_value()) < 16:

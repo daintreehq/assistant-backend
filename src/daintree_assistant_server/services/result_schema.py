@@ -22,6 +22,7 @@ from typing import Any
 
 from ..config import Settings
 from ..errors import invalid_request, request_too_large
+from ..text_utils import utf8_len
 
 _ALLOWED_KEYS = frozenset(
     {
@@ -89,7 +90,7 @@ _SCHEMA_HINT = (
 def validate_result_schema(schema: Any, settings: Settings) -> None:
     """Reject a malformed/oversized/instruction-bearing ``result_schema``."""
     serialized = json.dumps(schema, separators=(",", ":"), default=str)
-    if len(serialized.encode("utf-8")) > settings.max_result_schema_bytes:
+    if utf8_len(serialized) > settings.max_result_schema_bytes:
         raise request_too_large("result_schema exceeds the size limit.", param="result_schema")
     _walk(schema, settings=settings, param="result_schema", depth=0, counter=[0])
 
@@ -195,7 +196,7 @@ def _walk(node: Any, *, settings: Settings, param: str, depth: int, counter: lis
 
 
 def _bound_string(value: Any, *, settings: Settings, param: str) -> None:
-    if isinstance(value, str) and len(value.encode("utf-8")) > settings.max_result_schema_string:
+    if isinstance(value, str) and utf8_len(value) > settings.max_result_schema_string:
         raise request_too_large("A string in result_schema exceeds the size limit.", param=param)
 
 

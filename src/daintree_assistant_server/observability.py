@@ -49,10 +49,6 @@ def new_task_run_id() -> str:
     return _sortable_id("taskrun")
 
 
-def new_completion_id() -> str:
-    return _sortable_id("chatcmpl")
-
-
 _configured = False
 
 

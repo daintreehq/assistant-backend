@@ -497,9 +497,9 @@ async def test_stream_transport_interruption_is_retryable() -> None:
             return False
 
     class _Resp:
-        async def aiter_lines(self):  # noqa: ANN202 - test stub
+        async def aiter_bytes(self):  # noqa: ANN202 - test stub
             raise httpx.ReadError("connection dropped")
-            yield ""  # pragma: no cover - makes this an async generator
+            yield b""  # pragma: no cover - makes this an async generator
 
     stream = DeepSeekStream(_Ctx(), _Resp(), _MODEL)
     with pytest.raises(DaintreeError) as exc:

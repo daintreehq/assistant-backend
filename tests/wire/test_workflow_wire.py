@@ -7,6 +7,10 @@ DTOs. These tests pin the fixtures to the exact bytes the server produces
 (``model_dump()`` — no aliases, no ``exclude_none``, every field always present)
 so drift on either side fails a test instead of failing in production.
 
+The CLI-side copies live at ``internal/backend/testdata/workflow/`` and are read
+by ``internal/backend/workflowwire_test.go``. They must stay byte-identical to
+these — when a shape below changes, update BOTH.
+
 See ``fixtures/workflow/README.md`` for which wire layer each file represents.
 """
 

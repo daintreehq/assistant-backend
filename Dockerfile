@@ -21,11 +21,16 @@ RUN pip install . -c requirements.lock
 # ---- Runtime: minimal, non-root -------------------------------------------
 FROM python:3.12-slim AS runtime
 
+# Stamped at build time so /version reports a real commit instead of an empty
+# string: `docker build --build-arg BUILD_SHA=$(git rev-parse HEAD) .`
+ARG BUILD_SHA=""
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
     HOST=0.0.0.0 \
-    PORT=8080
+    PORT=8080 \
+    BUILD_SHA=${BUILD_SHA}
 
 RUN useradd --create-home --uid 10001 daintree
 

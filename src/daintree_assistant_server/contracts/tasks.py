@@ -1,8 +1,9 @@
 """Wire models for the named utility-task API (section 11).
 
 Clients send task *data*; the server owns the prompt, model, schema, and
-output mode. Each task has a typed input model and a typed output model so
-both directions are validated.
+output mode. Every task has a typed INPUT model. Most have a typed output model
+too, but the text / memory-distill / extract-JSON tasks are normalized by hand-
+written parsers in ``services/task_runner.py`` instead.
 """
 
 from __future__ import annotations
@@ -23,7 +24,11 @@ class TaskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task: str = Field(min_length=1, max_length=128)
-    request_id: str | None = Field(default=None, max_length=256)
+    # Echoed into a response HEADER, so constrain it to header-safe characters here.
+    # A non-latin-1 value would otherwise raise UnicodeEncodeError inside JSONResponse
+    # AFTER the upstream call has run and been billed — a 500 for a request that should
+    # have been rejected (as a 400) before any spend.
+    request_id: str | None = Field(default=None, max_length=256, pattern=r"^[A-Za-z0-9._:-]+$")
     input: dict[str, Any] = Field(default_factory=dict)
     # Only consumed by terminal_extract_json.
     result_schema: dict[str, Any] | None = None
@@ -142,15 +147,6 @@ class SkillStepConsistencyInput(BaseModel):
 # --------------------------------------------------------------------------
 
 
-class DistilledFact(BaseModel):
-    fact: str = Field(max_length=400)
-    kind: Literal["semantic", "episodic"] = "semantic"
-
-
-class MemoryDistillOutput(BaseModel):
-    facts: list[DistilledFact] = Field(default_factory=list)
-
-
 class CheckpointOutput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -191,14 +187,6 @@ class JudgeOutput(BaseModel):
     reason: str = ""
     confidence: float = Field(ge=0, le=1)
     matched: bool = False
-
-
-class TextOutput(BaseModel):
-    text: str = ""
-
-
-class ExtractJsonOutput(BaseModel):
-    result: Any = None
 
 
 class ExtractionVerdictOutput(BaseModel):

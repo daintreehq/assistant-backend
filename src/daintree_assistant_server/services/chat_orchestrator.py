@@ -103,6 +103,11 @@ def _filter_dedup_cap(
         if sid in seen or sid not in catalog:
             continue
         seen.add(sid)
+        # Check the cap BEFORE admitting — appending first and breaking after would
+        # always let one id through, even at max_active == 0. Unknown and duplicate
+        # ids are filtered ABOVE this check so they never consume capacity, and a
+        # refused id is RECORDED rather than breaking the scan, so the structured log
+        # reports everything the cap actually cost instead of just the first casualty.
         if len(active) >= max_active:
             dropped.append(sid)
             continue

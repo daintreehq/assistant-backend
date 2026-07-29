@@ -125,7 +125,7 @@ All prompt text is **server-owned** and lives in `src/daintree_assistant_server/
 **Two things that are easy to get wrong:**
 
 - **Assembly order is load-bearing — and role choice IS position on DeepSeek.** DeepSeek serializes [ALL system messages, in array order] → [tools] → [non-system conversation], so a volatile system message ANYWHERE in the array lands before the ~18k-token tool schemas and busts their cache (measured 2026-07-08: 36% hit on byte-identical turns → 99% after the fix). `PromptAssembler.build_main_request` therefore orders stable systems (base → integrations → active skills → response contract), then a stable **user-role** startup block, the append-only visible `input.messages`, and ONE trailing **user-role** "[Injected context …]" block carrying per-request runtime + turn state. Only the final tail re-encodes each round. Startup is required even when empty, stays outside the visible transcript, and is never sent to selector/learning calls. A skill-set change (selector topic shift) re-encodes tools + conversation — rare and accepted. Don't reorder casually, and never add a volatile system message. All client-provided local context is treated as untrusted: sanitized and byte-capped (`text_utils.py`, the `cap_*` settings in `config.py`); exact agent ids are JSON-quoted and rows are admitted whole.
-- **Prompt bytes are behavior.** On a meaningful prompt change, regenerate golden snapshots (below) — that diff is the reviewable record. Do **not** bump version strings: `MAIN_PROMPT_VERSION`/`SELECTOR_PROMPT_VERSION` are fixed family labels (`"main"`/`"selector"`), not per-edit versions (see "Versioning" below).
+- **Prompt bytes are behavior.** On a meaningful prompt change, regenerate golden snapshots (below) — that diff is the reviewable record. Do **not** bump version strings: `MAIN_PROMPT_VERSION` is a fixed family label (`"main"`), not a per-edit version (see "Versioning" below).
 
 ## Versioning (pre-release)
 
@@ -154,9 +154,9 @@ What this means concretely:
 - **Skills** have **no `version` field** — frontmatter carries `id`/`title`/`summary`/etc.
   only. Change busting rides on the skill content hash (which feeds `catalog_revision`), not
   a hand-bumped number.
-- **Prompt-family labels** (`MAIN_PROMPT_VERSION` / `SELECTOR_PROMPT_VERSION` in
-  `prompts/loader.py`) are fixed names — `"main"` and `"selector"` — surfaced as
-  `prompt_version`. They identify *which* prompt, not a revision; leave them alone.
+- **The prompt-family label** (`MAIN_PROMPT_VERSION` in `prompts/loader.py`) is a fixed
+  name — `"main"` — surfaced as `prompt_version`. It identifies *which* prompt, not a
+  revision; leave it alone.
 - **Task identifiers are unversioned** — `terminal_summarize`, not `terminal_summarize.v1`,
   with matching `tasks/<task>.md` prompt files. A task id names *which* task, never a
   revision of it; a task's behavior changes by editing its prompt/profile in place (CLI

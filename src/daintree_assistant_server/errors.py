@@ -118,16 +118,6 @@ def reserved_tool_name(name: str, param: str) -> DaintreeError:
     )
 
 
-def unsupported_parameter(name: str, message: str | None = None) -> DaintreeError:
-    return DaintreeError(
-        status_code=400,
-        message=message or f"Parameter {name!r} is not supported.",
-        type=TYPE_INVALID_REQUEST,
-        code="unsupported_parameter",
-        param=name,
-    )
-
-
 def invalid_request(
     message: str, *, param: str | None = None, code: str | None = None
 ) -> DaintreeError:
@@ -147,16 +137,6 @@ def request_too_large(message: str, *, param: str | None = None) -> DaintreeErro
         type=TYPE_INVALID_REQUEST,
         code="request_too_large",
         param=param,
-    )
-
-
-def model_not_found(model: str) -> DaintreeError:
-    return DaintreeError(
-        status_code=404,
-        message=f"Model {model!r} does not exist.",
-        type=TYPE_INVALID_REQUEST,
-        code="model_not_found",
-        param="model",
     )
 
 
@@ -196,15 +176,6 @@ def upstream_error(
         type=TYPE_API,
         code="upstream_error",
         retryable=retryable,
-    )
-
-
-def metadata_too_large() -> DaintreeError:
-    return DaintreeError(
-        status_code=500,
-        message="Daintree response metadata exceeds the header size limit.",
-        type=TYPE_API,
-        code="daintree_metadata_too_large",
     )
 
 

@@ -79,8 +79,16 @@ class OpenAIProvider:
 
     # ---- helpers --------------------------------------------------------
 
-    def _timeout(self, request: ProviderChatRequest) -> float:
-        return request.timeout if request.timeout is not None else self._default_timeout
+    def _timeout(self, request: ProviderChatRequest) -> httpx.Timeout:
+        """Per-phase timeouts, never one budget for all of them.
+
+        Returning a bare float makes the SDK expand it to ``httpx.Timeout(seconds)``
+        for connect/read/write/pool alike — so a blackholed SYN would hold a
+        fire-and-forget learner task open for the whole read budget. This is the same
+        collapse ``deepseek.py`` documents itself as preventing.
+        """
+        seconds = request.timeout if request.timeout is not None else self._default_timeout
+        return httpx.Timeout(connect=10.0, read=seconds, write=30.0, pool=10.0)
 
     def _build_params(self, request: ProviderChatRequest) -> dict[str, Any]:
         params: dict[str, Any] = {

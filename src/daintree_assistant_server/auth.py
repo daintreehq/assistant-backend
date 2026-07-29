@@ -54,7 +54,7 @@ def authenticate(authorization: str | None, settings: Settings) -> Principal:
     """
     expected = settings.daintree_api_key.get_secret_value()
     if not expected:
-        if settings.environment != "production":
+        if not settings.is_hardened:
             return DEVELOPMENT_PRINCIPAL
         raise invalid_api_key()  # never allow unauthenticated access in production
     token = _extract_bearer(authorization)

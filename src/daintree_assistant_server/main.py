@@ -305,7 +305,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         problems = list(settings.local_only_problems())
         if injected is None:
             secret_problems = settings.missing_secrets() + settings.weak_secrets()
-            if settings.environment != "production":
+            if not settings.is_hardened:
                 # Local dev: a missing inbound API key just enables unauthenticated
                 # access; it must not block the server from booting.
                 secret_problems = [p for p in secret_problems if p != "DAINTREE_API_KEY"]
