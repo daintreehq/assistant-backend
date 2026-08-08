@@ -247,3 +247,25 @@ cases:
     expect:
       required: [daintree.orchestration.watch-outcome]
       optional: [daintree.foundation]
+
+  - id: copytree-file-for-agents-not-fan-out
+    category: routing-trap
+    note: >-
+      Covers curate-copytree-bundle's carve-out against fan-out-work. The bait is the
+      mention of agents, fan-out-work's home turf — but nothing is being launched or
+      injected into a terminal; the deliverable is ONE curated context file for later.
+      The deciding clause is curate-copytree-bundle's "Do not use for injecting
+      workspace context into an agent's terminal during a fan-out — that is
+      daintree.orchestration.fan-out-work", and fan-out-work's own signal (PLURALITY
+      plus INDEPENDENCE of work units) does not fire on a file-packaging request, so
+      fan-out-work is left out of required AND optional.
+    messages:
+      - role: user
+        content: >-
+          I'm splitting the terrain renderer across three agents later. Before
+          that, make one code-context file containing the renderer, its
+          configuration, and its tests; stop after creating the file and leave
+          every agent untouched.
+    expect:
+      required: [daintree.context.curate-copytree-bundle]
+      optional: [daintree.foundation]

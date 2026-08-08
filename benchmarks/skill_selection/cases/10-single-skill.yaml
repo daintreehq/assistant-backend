@@ -153,3 +153,16 @@ cases:
     expect:
       required: [daintree.workflow.follow-up-on-issue]
       optional: [daintree.foundation]
+
+  - id: copytree-curate-bundle-clipboard
+    category: single-skill
+    note: The canonical natural-language curated-bundle request, clipboard-bound.
+    messages:
+      - role: user
+        content: >-
+          Create a bundle of everything relevant to landscape generation,
+          including its supporting files and tests, and put the finished file
+          on my clipboard.
+    expect:
+      required: [daintree.context.curate-copytree-bundle]
+      optional: [daintree.foundation]
