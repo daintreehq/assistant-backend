@@ -71,6 +71,14 @@ _ERROR_DETAIL_CAP = 400
 # logs carry no bearer keys).
 _REDACTED = "[REDACTED]"
 
+# A credential must be printable ASCII with no spaces to be a legal header value.
+# An allowlist rather than a blocklist of the bad characters: blocklisting misses
+# DEL (0x7f, which h11 happily accepts) and anything above 0x7f, where a non-latin-1
+# character instead explodes inside httpx's encoder. Real OpenRouter keys are
+# `sk-or-v1-` plus hex, so nothing legitimate is near this boundary.
+_HEADER_SAFE_MIN = 0x21
+_HEADER_SAFE_MAX = 0x7E
+
 # Cap on the logged serving-endpoint name ("CoreWeave", "Baidu", …).
 _ENDPOINT_NAME_CAP = 64
 
@@ -447,7 +455,7 @@ class OpenRouterProvider:
         """
         key = request_api_key if request_api_key is not None else self._default_api_key
         plain = key.get_secret_value()
-        if not plain or plain.strip() != plain or any(c.isspace() or ord(c) < 32 for c in plain):
+        if not plain or not all(_HEADER_SAFE_MIN <= ord(c) <= _HEADER_SAFE_MAX for c in plain):
             raise upstream_error("The upstream credential is empty or malformed.")
         return key
 

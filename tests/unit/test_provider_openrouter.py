@@ -782,21 +782,45 @@ async def test_empty_per_request_api_key_does_not_fall_back_to_the_default() -> 
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("bad", ["", " ", "sk-or-v1-trailing ", "sk-or-v1-x\n", "sk or v1"])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        " ",
+        "sk-or-v1-trailing ",
+        "sk-or-v1-x\n",
+        "sk or v1",
+        "sk-or-v1-del\x7f",  # h11 ACCEPTS DEL, so a blocklist of controls misses it
+        "sk-or-v1-nonlatin\U0001f600",  # would raise inside httpx's latin-1 encoder
+    ],
+)
 async def test_header_unsafe_credentials_are_rejected_without_echoing_the_value(
     bad: str,
 ) -> None:
-    # h11 rejects a header value that is empty, whitespace-padded, or carries a
-    # control character — and its LocalProtocolError embeds the WHOLE value
-    # ("Illegal header value b'Bearer sk-…'"), which httpcore logs at DEBUG. So a
-    # malformed credential must be caught here, before httpx sees it, and the error
-    # must not carry any part of the value.
+    # h11 rejects an empty or whitespace-padded header value, and its
+    # LocalProtocolError embeds the WHOLE value ("Illegal header value b'Bearer
+    # sk-…'"), which httpcore logs at DEBUG. So a malformed credential must be
+    # caught here, before httpx sees it, and the error must carry none of it.
     seen: dict = {}
     provider = _provider(_auth_capture(seen))
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req(api_key=SecretStr(bad)))
     assert not seen  # never reached the transport
-    assert bad.strip() == "" or bad.strip() not in exc.value.message
+    # The distinctive stem is what must not appear; every case above shares it or
+    # is pure whitespace, so this is a real assertion rather than a tautology.
+    assert "sk-or-v1" not in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_realistic_credential_is_not_falsely_rejected() -> None:
+    # The guard's real risk is over-rejection: a false positive breaks live traffic.
+    # A full-length `sk-or-v1-` + 64 hex key must sail straight through.
+    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    await provider.complete(_req(api_key=SecretStr(key)))
+    assert seen["auth"] == f"Bearer {key}"
     await provider.aclose()
 
 
