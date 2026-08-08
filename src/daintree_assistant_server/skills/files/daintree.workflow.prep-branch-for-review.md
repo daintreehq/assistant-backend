@@ -10,6 +10,10 @@ requiredTools:
   - forge.listPRs
   - forge.getPR
   - workflow.prepBranchForReview
+  - agentTask.spawnForEdits
+  - terminal.awaitAll
+  - terminal.extract
+  - terminal.sendCommand
   - daintree.call
 ---
 Use when: the user wants to ready the current branch for review / open a PR.
@@ -91,24 +95,29 @@ the push already updated it. To flip a draft to ready, `daintree.call forge.mark
 
 ## Checks and conflicts — run the check yourself, spawn only for edits
 Running a detected runner is a CALL, not a delegation — do NOT spawn an agent merely to
-execute the suite. `project.runCheck` has no typed wrapper, so it goes through the escape
-hatch: `daintree.call project.runCheck { projectId, runnerId, cwd }`. Take `runnerId` from
-`daintree.call project.detectRunners` (or step 3's `detectedRunners`) — never invent one.
-Pass `cwd` explicitly for the worktree you are prepping: it defaults to the project root, so
-omitting it silently checks the WRONG tree. `passed`/`exitCode` are the authoritative verdict
-(it really spawns the runner), the output tail is diagnostic only, and `command` is what
-actually ran — `runCheck` re-detects inside the `cwd` you passed, so it can differ from what
-was detected at the root. On `no_runners_detected` there is nothing to run; say verification
-is thin rather than implying the suite passed.
+execute a check. `project.runCheck` has no typed wrapper, so it goes through the escape
+hatch:
+`daintree.call {"name":"project.runCheck","arguments":{"projectId":"…","runnerId":"…","cwd":"<worktree path>"}}`.
+Take `runnerId` from step 3's `detectedRunners` — never invent one, and confirm what an
+unfamiliar id runs: detection surfaces every runnable script, not just checks, and pointing
+this at a long-lived server blocks until the timeout. Pass `cwd` explicitly for the worktree
+you are prepping: it defaults to the project root, so omitting it silently checks the WRONG
+tree. A failing command comes back as a FAILED CHECK, not an error, so read `passed` rather
+than trusting that the call succeeded; the output tail is diagnostic only, and `command` is
+what actually ran — `runCheck` re-detects inside the `cwd` you passed, so it can differ from
+what the root advertised. On `no_runners_detected` there is nothing to run; say verification
+is thin rather than implying anything passed.
 
 Edit work is different — you NEVER edit files. If the verdict is `blocked_merge_conflicts`,
 or a check failed and the user wants it green before review, spawn a visible agent with
 `agentTask.spawnForEdits` mode:"edit" and supervise it in exactly ONE mode, never both:
 BACKGROUND (spawn WITH `watch: true` + `watchGoal`, then END your turn and react on the
 watcher's `completed_*` event), or IN-TURN (spawn with NO watcher, then `terminal.awaitAll`,
-read the tail once, relay with `terminal.sendCommand`). Confirm the finish the foundation's
-way — never off a bare `waiting`. Once the branch is fixed, return to step 3 → 4/5, and
-re-run the check above rather than taking the agent's word for it.
+read the tail once with `terminal.extract`, relay with `terminal.sendCommand`). Finish is
+never a bare `waiting` (an agent shows waiting before it starts, when paused, and when
+backgrounded) and never a transient `completed` (it bounces back within seconds). Once the
+branch is fixed, return to step 3 → 4/5, and re-run the check above rather than taking the
+agent's word for it.
 
 Report back: state the verdict you got, any check you ran (its `command`, `passed`, `exitCode`),
 what you committed/pushed, and the PR number + url — or, if
