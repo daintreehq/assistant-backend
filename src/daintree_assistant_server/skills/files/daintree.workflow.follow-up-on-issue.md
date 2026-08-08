@@ -20,9 +20,9 @@ or wants it commented on and closed.
 
 CI, review decisions and issue threads ARE readable — that changed, and older habits
 assume otherwise. `forge.getCIStatus` returns a check roll-up, `forge.getPR` carries
-`ciStatus` and `reviewDecision`, and `forge.listIssueComments` reads a thread back. You no
-longer need an agent to answer "is it green". What an agent is still for is DETAIL the
-roll-up does not carry: job logs, failure output, the actual diff of a review.
+`reviewDecision`, and `forge.listIssueComments` reads a thread back. You no longer need an
+agent to answer "is it green". What an agent is still for is DETAIL none of them carry:
+check names, job logs, failure output, the text of a review left on the PR.
 
 Procedure:
 
@@ -104,9 +104,10 @@ Be precise about what you can and cannot get, because the gap is where confident
 answers come from:
 - The forge gives you the review DECISION, the CI roll-up STATE and its counts, and issue
   comment BODIES.
-- It does NOT give you check names, check output, job logs, or the bodies of PR review
-  comments. No action returns those. A `failure` roll-up says THAT checks failed, never
-  which or why.
+- It does NOT give you check names, check output, job logs, or the bodies of reviews and
+  inline review comments already left on a PR. No READ action returns any of those (the
+  review-WRITE actions echo back the body you just posted, which is not the same thing).
+  A `failure` roll-up says THAT checks failed, never which or why.
 
 So when the user wants the cause, or the actual text of a review left on the PR, that is
 an agent's job: spawn one with `agentTask.spawnForEdits` `mode:"explore"`, picking a
@@ -129,8 +130,9 @@ sitting in a reviewer AGENT's terminal is a different job — that is
 daintree.agents.relay-review-feedback.
 
 ## Step 6 — Comment and close (the writes — confirmed)
-Forge writes have no typed wrapper; each goes through the escape hatch, and each is an
-external-risk mutation the user confirms. Only close on the user's explicit ask: a green
+Forge writes have no typed wrapper; each goes through the escape hatch, so each is an
+externally visible forge mutation invoked through the system-risk `daintree.call` — always
+confirmed, and one call at a time. Only close on the user's explicit ask: a green
 CI and an approval are evidence, not authority, and neither is permission to close
 anything.
 

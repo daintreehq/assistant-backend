@@ -218,8 +218,8 @@ cases:
       that skill's source is a reviewer AGENT's terminal, and here the user says the notes
       are on the forge and nobody has fetched them. Getting them is follow-up-on-issue's
       job — it owns the forge side of the loop: read the PR's review decision, then, since
-      no forge action returns PR review comment BODIES, escalate to an explore agent for the
-      text before relaying. "Don't leave a watcher" also excludes watch-outcome, and nothing
+      no forge READ action returns the bodies of reviews left on a PR, escalate to an
+      explore agent for the text before relaying. "Don't leave a watcher" also excludes watch-outcome, and nothing
       is being committed or pushed.
     messages:
       - role: user
