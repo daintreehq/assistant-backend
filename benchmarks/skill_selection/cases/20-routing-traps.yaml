@@ -189,3 +189,59 @@ cases:
     expect:
       required: [daintree.edits.spawn-visible-agent]
       optional: [daintree.foundation]
+
+  - id: choose-next-ticket-is-not-starting-it
+    category: routing-trap
+    note: >-
+      Trap coverage for daintree.workflow.find-issue-work against its whole carve-out list.
+      Every surface signal points at start-work-on-issue ("pick up", a ticket, worktrees) and
+      the cross-check against in-flight work baits status-and-resume, while "a few" baits
+      fan-out-work's plurality signal. The deciding clause is find-issue-work's own boundary:
+      the deliverable is the choice, and the user forbids launching. start-work-on-issue,
+      fan-out-work, status-and-resume and follow-up-on-issue are all left out of required AND
+      optional, so the case asserts the carve-out list rather than one clause of it.
+    messages:
+      - role: user
+        content: >-
+          Before I pick up the next parser ticket, check a few candidates against the
+          worktrees and open PRs so I don't start something that's already underway.
+          Tell me which one is safe to take — don't spin anything up.
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: review-is-on-the-forge-not-in-a-terminal
+    category: routing-trap
+    note: >-
+      Trap coverage for daintree.workflow.follow-up-on-issue. The request is worded as a
+      relay to a running implementer, which is relay-review-feedback's exact trigger — but
+      that skill's source is a reviewer AGENT's terminal, and here the user says the notes
+      are on the forge and nobody has fetched them. So the feedback has to be READ off the
+      PR first, which is follow-up-on-issue's job. "Don't leave a watcher" also excludes
+      watch-outcome, and nothing is being committed or pushed.
+    messages:
+      - role: user
+        content: >-
+          The reviewer left their comments on PR 412 itself — we never had an agent
+          look at it. Read what's actually blocking it and pass the concrete asks to
+          the agent still working in terminal 6. Don't leave a watcher on it.
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: wake-me-on-merge-is-not-a-status-read
+    category: routing-trap
+    note: >-
+      The reverse boundary, now that watch-outcome names follow-up-on-issue by id. A PR
+      number plus review/CI vocabulary baits the one-off forge read, but the user explicitly
+      does NOT want a reading now — they want to be woken on a later state transition, which
+      is watch-outcome's own trigger and exactly what watcher.watchPR can observe.
+      follow-up-on-issue is excluded from required and optional.
+    messages:
+      - role: user
+        content: >-
+          Don't go poking at PR 412's checks now — I'm heading out. Just keep an eye
+          on it and ping me if it merges or gets closed.
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]

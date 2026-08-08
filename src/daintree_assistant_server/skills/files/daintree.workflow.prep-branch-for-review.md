@@ -2,7 +2,7 @@
 id: daintree.workflow.prep-branch-for-review
 title: Prepare a branch for review
 summary: Get a read-only review-readiness verdict, then do the real prep — commit, push, open the PR — branching on what the verdict reports.
-whenToUse: Use when the user asks to prepare a branch for review, open or ready a PR, wrap up work on an issue for review, or check whether the current branch is ready to push. Do not use to judge whether an agent's work is actually correct or complete before trusting it (use daintree.orchestration.verify-agent-work), to START work on an issue rather than finish it (use daintree.workflow.start-work-on-issue), to be notified later when the PR merges (use daintree.orchestration.watch-outcome), or to forward a reviewer's findings to an implementer agent (use daintree.agents.relay-review-feedback).
+whenToUse: Use when the user asks to prepare a branch for review, open or ready a PR, wrap up work on an issue for review, or check whether the current branch is ready to push. Do not use to judge whether an agent's work is actually correct or complete before trusting it (use daintree.orchestration.verify-agent-work), to START work on an issue rather than finish it (use daintree.workflow.start-work-on-issue), to be notified later when the PR merges (use daintree.orchestration.watch-outcome), to read an EXISTING PR's CI or review state or to comment on and close its issue (use daintree.workflow.follow-up-on-issue), or to forward a reviewer's findings to an implementer agent (use daintree.agents.relay-review-feedback).
 risk: external
 requiredTools:
   - context.snapshot
@@ -41,11 +41,12 @@ ONLY `arguments` at the top level — nest every query field inside it; a top-le
 rejected outright. (`forge.getPR` is TYPED: `{ prNumber, cwd? }` at the top level. The
 `daintree.call forge.*` actions in step 4 are a different surface: `daintree.call` itself takes
 `{ name, arguments, requestKey? }`, and the forge payload goes flat inside its `arguments`.) Each PR
-carries `headRef`/`number`/`url` — the branch field is `headRef`, not `head`, so match on that
-or the duplicate guard never fires. Do NOT branch on `ciStatus` or `reviewDecision` read off a
-`listPRs` ITEM — neither field is guaranteed on a bulk item. Once you have the number, typed
-`forge.getPR({ prNumber, cwd? })` returns `reviewDecision` for real, but never `ciStatus`: the
-CI verdict comes from `daintree.call({ name: "forge.getCIStatus", arguments: { prNumber } })`.
+carries `number`/`url`/`headRef` — the source branch field is `headRef`, not `head`, so match
+on that or the duplicate guard never fires. Do NOT branch on a review-decision or CI-status
+field from a LIST item — neither is guaranteed on a bulk item; these summary rows are for
+duplicate detection, and a field missing here says nothing. (CI and review state ARE readable,
+just not from this call: `reviewDecision` comes from typed `forge.getPR` and the CI verdict
+from `forge.getCIStatus`, both a focused read on ONE PR — daintree.workflow.follow-up-on-issue.)
 If an open PR's `headRef` is this branch, you are updating, not creating — skip the PR-create
 in step 5 and just push.
 

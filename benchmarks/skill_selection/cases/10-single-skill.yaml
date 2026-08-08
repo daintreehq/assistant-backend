@@ -110,3 +110,46 @@ cases:
     expect:
       required: [daintree.edits.spawn-visible-agent]
       optional: [daintree.foundation]
+
+  - id: find-unclaimed-backlog-work
+    category: single-skill
+    note: >-
+      Recall for daintree.workflow.find-issue-work. The deliverable is a SHORTLIST — the
+      user says outright not to start anything — which is the skill's own boundary
+      ("The deliverable is a shortlist or one chosen issue, NOT a launched agent").
+    messages:
+      - role: user
+        content: >-
+          I've got a couple of hours. Dig through the tracker and find me two or three
+          open bugs nobody's assigned to and that aren't flagged for human review.
+          Just the list for now — don't set anything up yet.
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: is-that-pr-green
+    category: single-skill
+    note: >-
+      Recall for daintree.workflow.follow-up-on-issue — the plainest form of its trigger
+      ("is that PR green?", "what's blocking it?"). A one-off read now, no watcher.
+    messages:
+      - role: user
+        content: Did the checks pass on PR 412? And has anyone reviewed it yet?
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: comment-and-close-shipped-issue
+    category: single-skill
+    note: >-
+      The write half of follow-up-on-issue: closeout comment plus close, which no other
+      skill in the catalog teaches. Explicitly not branch prep — nothing to commit, push
+      or open.
+    messages:
+      - role: user
+        content: >-
+          Issue 284 shipped last week but the ticket's still open. Leave a note on it
+          saying what landed and then close it out.
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]

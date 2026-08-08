@@ -2,13 +2,11 @@
 id: daintree.orchestration.watch-outcome
 title: Watch an outcome unattended
 summary: Set up supervision that outlives the turn — a terminal watcher, an async verdict, a PR watch, or a timer — and pre-authorize with a narrow grant when the wake must act.
-whenToUse: Use when the user wants to be woken later, not waited on now — "run this overnight and wake me", "let me know when the build finishes", "ping me when the PR merges", "remind me in an hour", "keep an eye on it while I'm out" — or any request to leave something watching after this turn. Also to pre-authorize an unattended action with a grant, and to list, cancel or revoke watchers, timers, async waits and grants you left. Do not use to cancel ONE named watcher (daintree.foundation), a one-off check of an agent that already finished (daintree.orchestration.verify-agent-work), triage of what is running now (daintree.orchestration.supervise-fleet), what happened while you were away (daintree.orchestration.status-and-resume), or wholesale teardown (daintree.orchestration.workspace-cleanup).
+whenToUse: Use when the user wants to be woken later, not waited on now — "run this overnight and wake me", "let me know when the build finishes", "ping me when the PR merges", "remind me in an hour", "keep an eye on it while I'm out" — or any request to leave something watching after this turn. Also to pre-authorize an unattended action with a grant, and to list, cancel or revoke watchers, timers, async waits and grants you left. Do not use to cancel ONE named watcher (daintree.foundation), a one-off check of an agent that already finished (daintree.orchestration.verify-agent-work), triage of what is running now (daintree.orchestration.supervise-fleet), what happened while you were away (daintree.orchestration.status-and-resume), or wholesale teardown (daintree.orchestration.workspace-cleanup). `watcher.watchPR` sees only a PR's open/merged/draft/closed state, so a one-off read of CI, checks, reviews or an issue thread is not a watch at all (use daintree.workflow.follow-up-on-issue).
 risk: system
 requiredTools:
   - context.snapshot
   - agentTask.spawnForEdits
-  - daintree.call
-  - forge.getPR
   - watcher.terminal.create
   - watcher.watchPR
   - watcher.list
@@ -89,12 +87,10 @@ THE KEY TRAP: to stop when an AGENT finishes its turn, do NOT use a bare `stopWh
 
 `terminal.extract.async`'s `wait` takes this same DSL MINUS `modelJudge` (watcher-only), plus the `{}` shorthand for a genuine finish on ONE terminal.
 
-## The PR-watch boundary
+## What the PR watcher cannot watch
 
-`watcher.watchPR` sees the pull request's state and nothing else: `open` / `merged` / `draft` / `closed`. The WatchCondition DSL above only inspects terminal state and tails, so there is no native "wake me when CI goes green" condition anywhere — never promise one off a PR watch.
+`watcher.watchPR` sees the pull request's state and nothing else: `open` / `merged` / `draft` / `closed`. It does NOT wake on CI runs, check results, job logs, or review comments, so never promise an alert "when CI goes green" off a PR watch — the watch would sit through a red build and a changes-requested review without a word, then fire only on the merge.
 
-Reading CI right NOW is a different question, and it IS answerable. Typed `forge.getPR {"prNumber":<int>}` returns `reviewDecision` and no `ciStatus`, so the CI verdict comes from `daintree.call {"name":"forge.getCIStatus","arguments":{"prNumber":<int>}}`, which is aggregate only — `ciStatus` may be NULL, there is no per-check list, the counts cover REQUIRED checks only, and the value is provider-cached and can lag about a minute. `daintree.call {"name":"forge.listIssueComments","arguments":{"issueNumber":<int>}}` pages an issue thread oldest-first; it does not reach inline or formal PR review comments, and nothing reads job logs.
-
-Those are one-shot reads, and step 3 is why they cannot become supervision: `daintree.call` can never be granted, so no unattended wake can use the escape hatch. So unattended "wake me when CI goes green" is NOT supportable — offer the honest alternatives instead: read it once now, leave a `timer.schedule` reminder to re-read it together later, or spawn an agent that runs the check locally and watch THAT terminal with (a) or (b) — which supervises a local command, not the provider's CI.
+That is a limit of this WATCHER, not of Daintree. CI roll-ups, review decisions and issue threads are all readable on demand — one-off, in a turn — with the follow-up-on-issue skill (daintree.workflow.follow-up-on-issue). So when the user wants a CI verdict NOW, read it there rather than leaving a watcher that cannot see it. What still needs an agent in a terminal is the DETAIL no forge read carries: job logs and failure output. To be woken on that, spawn the agent with the spawn-visible-agent skill and watch that TERMINAL with (a) or (b) — the terminal is the observable thing, not the PR.
 
 Report back: the mechanism you chose and why, every id you left running (watcher, timer, async handle, grant, plus the terminals or PR under watch), the condition that will wake you, when the watch and grant expire, and anything that must wait for the user — naming any mutation you could not pre-authorize.

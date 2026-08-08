@@ -2,7 +2,7 @@
 id: daintree.workflow.start-work-on-issue
 title: Start work on a forge issue
 summary: How to pick a forge issue and start work on it through workflow.startWorkOnIssue, which spawns the agent and auto-attaches a BACKGROUND supervisor watcher.
-whenToUse: Use when the user asks to start work on ONE forge issue — pick up a ticket, begin an issue, set up a worktree/branch for it and put an agent on it. Do not use for SEVERAL issues at once, an agent per ticket, or working a batch in parallel (use daintree.orchestration.fan-out-work); to finish work and open a PR (use daintree.workflow.prep-branch-for-review); for a change with no forge issue behind it (use daintree.edits.spawn-visible-agent); to create a worktree from a workspace recipe rather than an issue (use daintree.recipe.run-or-create); or to pick up / resume work already in flight from an earlier session (use daintree.orchestration.status-and-resume).
+whenToUse: Use when the user asks to start work on ONE forge issue they have already settled on — pick up a ticket, begin an issue, set up a worktree/branch for it and put an agent on it. Do not use when the issue is NOT yet chosen and the job is searching or triaging the backlog for a candidate (use daintree.workflow.find-issue-work); for SEVERAL issues at once, an agent per ticket, or working a batch in parallel (use daintree.orchestration.fan-out-work); to finish work and open a PR (use daintree.workflow.prep-branch-for-review); to check CI, a review decision or the issue thread on work already underway (use daintree.workflow.follow-up-on-issue); for a change with no forge issue behind it (use daintree.edits.spawn-visible-agent); to create a worktree from a workspace recipe rather than an issue (use daintree.recipe.run-or-create); or to pick up / resume work already in flight from an earlier session (use daintree.orchestration.status-and-resume).
 risk: external
 requiredTools:
   - context.snapshot
@@ -37,9 +37,12 @@ Procedure:
    duplicate worktree for an issue already in flight. If the project or target worktree
    is ambiguous, resolve it before mutating.
 
-2. Identify the issue. If the user named a number, go straight to step 3. Otherwise
-   list candidates with `forge.listIssues({ arguments: { state: "open" } })` -> `{ items: Issue[],
-   nextCursor, hasMore }` and confirm WHICH one with the user. `forge.listIssues`,
+2. Identify the issue. If the user named a number, go straight to step 3. If the user
+   omitted it, list candidates with `forge.listIssues({ arguments: { state: "open" } })` ->
+   `{ items: Issue[], nextCursor, hasMore }` and confirm WHICH one with the user — but a
+   real "find me something to work on" is a triage job with its own runbook, filtering
+   and dedupe (daintree.workflow.find-issue-work); come back here once one is picked.
+   `forge.listIssues`,
    `forge.listPRs`, and `forge.getIssue` are passthrough wrappers that accept ONLY
    `arguments` at the top level — nest every query field inside it; a top-level
    `state`/`issueNumber` is rejected outright. (`forge.getPR` is the exception: it is TYPED

@@ -34,7 +34,7 @@ Guardrails:
 - You are the conductor, not a participant. Never answer the judge's questions yourself, never add your own assessment of a candidate, and never override the verdict — the judge decides. If its verdict looks wrong, report that as an observation rather than substituting your own.
 - A summary is a lossy paraphrase: when a summarized verdict conflicts with the visible terminal text, trust the terminal text and re-read it.
 - Condense when relaying; never paste raw scrollback into another agent's input.
-- "Verification" means the judge agent reading and searching the project itself — that alone is not CI, runner or forge evidence. If the brief needs those, gather them BEFORE the round and relay them to the judge as given facts; never ask the judge to fetch them. Job logs and inline or formal PR review comments remain unreadable to every tool here, so never promise the judge those.
+- "Verification" means the judge agent reading and searching the project itself — that alone is not CI, runner or forge evidence. Nothing in this runbook fetches forge state: if the brief needs it, read it BEFORE the round (daintree.workflow.follow-up-on-issue) and relay it to the judge as a given fact; never ask the judge to fetch it. Job logs, check output and the bodies of reviews left on a PR are unreadable to every tool here, so never promise the judge those.
 
 Confirmation: needed only to close terminals, or to run an interview that requires file changes.
 
