@@ -52,16 +52,19 @@ pass() { PASS=$((PASS + 1)); printf '  \033[32mPASS\033[0m  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  \033[31mFAIL\033[0m  %s\n' "$1"; [ -n "${2:-}" ] && printf '        %s\n' "$2"; }
 head_() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 
-# Prints the HTTP status code; writes the body to $BODY.
+# Prints the HTTP status code and leaves the response body in $BODY.
+#
+# The body goes through a file rather than being assigned to BODY directly:
+# callers use `code="$(req ...)"`, and command substitution runs in a subshell,
+# so any variable this function set would be discarded on return. The file
+# survives; BODY is then reloaded in the caller's own shell.
 BODY=""
+BODY_FILE="$(mktemp)"
+trap 'rm -f "$BODY_FILE"' EXIT
 req() {
-  local out code
-  out="$(mktemp)"
-  code="$(curl -sS -o "$out" -w '%{http_code}' --max-time "${TIMEOUT:-30}" "$@" 2>/dev/null)"
-  BODY="$(cat "$out")"
-  rm -f "$out"
-  printf '%s' "$code"
+  curl -sS -o "$BODY_FILE" -w '%{http_code}' --max-time "${TIMEOUT:-30}" "$@" 2>/dev/null
 }
+load_body() { BODY="$(cat "$BODY_FILE" 2>/dev/null)"; }
 
 jq_field() { printf '%s' "$1" | python3 -c "import json,sys
 try: print(json.load(sys.stdin).get('$2',''))
@@ -72,14 +75,16 @@ echo "Target: $URL"
 # --------------------------------------------------------------------------
 head_ "Public endpoints (no authentication required)"
 
-code="$(req "$URL/healthz")"
-if [ "$code" = "200" ] && [ "$(jq_field "$BODY" status)" = "ok" ]; then
-  pass "/healthz is alive"
-else
-  fail "/healthz returned $code" "$BODY"
-fi
+# /healthz is deliberately NOT checked here. Google's frontend reserves that
+# path and answers it itself with an HTML 404 — the request never reaches the
+# container (a /healthz response carries no `server: Google Frontend` header,
+# unlike every route that does reach the app). The endpoint still exists and
+# still works for Cloud Run's own liveness probe, which talks to the container
+# directly and bypasses the frontend. Externally, /readyz is the check to use,
+# and it is strictly stronger anyway: it proves the app is up AND correctly
+# configured, where /healthz only proves the event loop is turning.
 
-code="$(req "$URL/readyz")"
+code="$(req "$URL/readyz")"; load_body
 if [ "$code" = "200" ] && [ "$(jq_field "$BODY" status)" = "ready" ]; then
   pass "/readyz is ready ($(jq_field "$BODY" skills) skills, catalog $(jq_field "$BODY" catalog_revision))"
 else
@@ -90,7 +95,7 @@ else
   echo "        gcloud run services logs read $SERVICE --region=$REGION --project=$PROJECT --limit=50"
 fi
 
-code="$(req "$URL/version")"
+code="$(req "$URL/version")"; load_body
 if [ "$code" = "200" ]; then
   pass "/version: $(jq_field "$BODY" server_version) build $(jq_field "$BODY" build_sha)"
 else
@@ -100,14 +105,14 @@ fi
 # --------------------------------------------------------------------------
 head_ "Authentication gate"
 
-code="$(req "$URL/v1/daintree/capabilities")"
+code="$(req "$URL/v1/daintree/capabilities")"; load_body
 if [ "$code" = "401" ]; then
   pass "an unauthenticated request is rejected with 401"
 else
   fail "expected 401 without a bearer token, got $code" "$BODY"
 fi
 
-code="$(req -H 'Authorization: Bearer' "$URL/v1/daintree/capabilities")"
+code="$(req -H 'Authorization: Bearer' "$URL/v1/daintree/capabilities")"; load_body
 if [ "$code" = "401" ]; then
   pass "a malformed bearer header is rejected with 401"
 else
@@ -124,18 +129,17 @@ else
 
   head_ "Authenticated routes (metadata only — no upstream model call, no cost)"
 
-  code="$(req "${AUTH[@]}" "$URL/v1/daintree/capabilities")"
+  code="$(req "${AUTH[@]}" "$URL/v1/daintree/capabilities")"; load_body
   if [ "$code" = "200" ]; then
     pass "/v1/daintree/capabilities"
   else
     fail "/v1/daintree/capabilities returned $code" "$BODY"
   fi
 
-  code="$(req "${AUTH[@]}" "$URL/v1/daintree/skills")"
+  code="$(req "${AUTH[@]}" "$URL/v1/daintree/skills")"; load_body
   if [ "$code" = "200" ]; then
     n="$(printf '%s' "$BODY" | python3 -c "import json,sys
-d=json.load(sys.stdin)
-print(len(d.get('skills', d if isinstance(d, list) else [])))" 2>/dev/null)"
+print(len(json.load(sys.stdin).get('data', [])))" 2>/dev/null)"
     pass "/v1/daintree/skills lists ${n:-?} skills (catalog metadata only, never bodies)"
   else
     fail "/v1/daintree/skills returned $code" "$BODY"
@@ -145,14 +149,14 @@ print(len(d.get('skills', d if isinstance(d, list) else [])))" 2>/dev/null)"
     head_ "Real model turns (these spend money on your key)"
 
     read -r -d '' PAYLOAD <<'JSON'
-{"protocol_version":1,
+{"protocol_version":2,
  "session":{"id":"smoke-test","turn_id":"turn-1"},
  "startup":{},
  "input":{"messages":[{"role":"user","content":"Reply with exactly: OK"}]}}
 JSON
 
     TIMEOUT=180 code="$(req "${AUTH[@]}" -X POST "$URL/v1/daintree/respond" \
-      -H 'content-type: application/json' -d "$PAYLOAD")"
+      -H 'content-type: application/json' -d "$PAYLOAD")"; load_body
     if [ "$code" = "200" ]; then
       reply="$(printf '%s' "$BODY" | python3 -c "import json,sys
 d=json.load(sys.stdin)
@@ -176,7 +180,7 @@ print(','.join(s.get('id','') for s in (d.get('skills') or {}).get('active', [])
     TIMEOUT=180
     curl -sS --max-time 180 "${AUTH[@]}" -X POST "$URL/v1/daintree/respond" \
       -H 'content-type: application/json' \
-      -d '{"protocol_version":1,"session":{"id":"smoke-test","turn_id":"turn-2"},"startup":{},"generation":{"stream":true},"input":{"messages":[{"role":"user","content":"Reply with exactly: OK"}]}}' \
+      -d '{"protocol_version":2,"session":{"id":"smoke-test","turn_id":"turn-2"},"startup":{},"generation":{"stream":true},"input":{"messages":[{"role":"user","content":"Reply with exactly: OK"}]}}' \
       > "$stream_out" 2>/dev/null
     first_event="$(grep -m1 '^event:' "$stream_out" | sed 's/^event: *//')"
     if [ "$first_event" = "meta" ] && grep -q '^event: *done' "$stream_out"; then

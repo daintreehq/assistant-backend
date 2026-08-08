@@ -46,16 +46,19 @@ OpenRouter key** — the server has none, and that key pays for the turn:
 ```bash
 URL=$(terraform output -raw service_uri)
 CALLER_API_KEY=sk-or-v1-...
-curl -s "$URL/healthz"                                   # {"status":"ok"}
+# Not /healthz: Google's frontend reserves that path and answers it itself, so
+# the request never reaches the container. /readyz is the stronger check anyway.
 curl -s "$URL/readyz"                                    # {"status":"ready", ...}
 curl -s -o /dev/null -w '%{http_code}' "$URL/v1/daintree/capabilities"   # 401 (no auth)
 curl -s -H "Authorization: Bearer $CALLER_API_KEY" "$URL/v1/daintree/capabilities"
 curl -s -H "Authorization: Bearer $CALLER_API_KEY" -X POST "$URL/v1/daintree/respond" \
   -H 'content-type: application/json' \
-  -d '{"protocol_version":1,"session":{"id":"s","turn_id":"t"},
+  -d '{"protocol_version":2,"session":{"id":"s","turn_id":"t"},"startup":{},
        "input":{"messages":[{"role":"user","content":"hello"}]}}'
 # streaming: add "generation":{"stream":true} and watch for `event: meta` then `event: delta`/`event: done`.
 ```
+
+`infra/gcp/smoke.sh` runs all of the above against a live deployment.
 
 This is **not** the production-domain deployment — call it staging.
 

@@ -125,20 +125,24 @@ steps:
         fi
         URL="$$(cat /workspace/rc_url)"
 
+        # Note /healthz is NOT used here. Google's frontend reserves that path
+        # and serves its own HTML 404 for it, so the request never reaches the
+        # container and `curl -fsS` would fail every release. The endpoint is
+        # still fine for Cloud Run's own liveness probe, which talks to the
+        # container directly. /readyz is the right external gate regardless: it
+        # proves the app is up AND correctly configured.
+
         # gcloud run deploy already waited for the revision to report Ready, so
         # this retry is for network flakiness rather than slow startup.
         for attempt in 1 2 3 4 5; do
-          if curl -fsS --max-time 20 "$$URL/healthz" >/dev/null 2>&1; then
+          if curl -fsS --max-time 20 "$$URL/readyz" >/dev/null 2>&1; then
             break
           fi
-          echo "healthz not answering yet (attempt $$attempt/5)"
+          echo "readyz not answering yet (attempt $$attempt/5)"
           sleep 5
         done
 
-        echo "--- /healthz ---"
-        curl -fsS --max-time 20 "$$URL/healthz"; echo
-
-        # The real gate. 503 here fails the build and the candidate never gets
+        # The real gate. A 503 fails the build and the candidate never gets
         # traffic; the reason is deliberately withheld from the response in a
         # hardened environment, so read the Cloud Run logs for the detail.
         echo "--- /readyz ---"
