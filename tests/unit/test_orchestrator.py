@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import itertools
 import json
 from collections.abc import Callable, Sequence
@@ -634,11 +635,14 @@ async def test_speculation_starts_during_selector_and_exact_match_reuses_once(
     assert events[-1].startswith("event: done\n")
     assert _streamed_content(events) == "speculative winner "
     assert len(assembled) == 1  # no duplicate 100+ KiB assembly/deep comparison
-    # The orchestrator wraps the assembled request once with the caller's key
-    # (dataclasses.replace — a shallow copy), so the guarantee is that the
-    # SAME assembled payload objects are reused, credentialed, not re-built.
-    assert fake_provider.stream_requests[0].messages is assembled[0].messages
-    assert fake_provider.stream_requests[0].api_key is TEST_API_KEY
+    # The orchestrator wraps the assembled request exactly once with the caller's
+    # key (dataclasses.replace — a shallow copy): the sent request must be that
+    # credentialed copy field-for-field, and the expensive payload objects must be
+    # the SAME objects the assembler built (shallow reuse, not a rebuild).
+    sent = fake_provider.stream_requests[0]
+    assert sent == dataclasses.replace(assembled[0], api_key=TEST_API_KEY)
+    assert sent.messages is assembled[0].messages
+    assert sent.api_key is TEST_API_KEY
     assert len(fake_provider.stream_requests) == 1  # winner consumed exactly once
     assert streams[0].closed is True
     assert orchestrator._skill_speculations_in_flight == 0

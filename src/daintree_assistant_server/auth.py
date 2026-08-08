@@ -41,6 +41,11 @@ class Principal:
 
 CALLER_SCOPES = frozenset({"chat", "tasks", "skills:read", "skills:write"})
 
+# Generous ceiling on the bearer token. Real keys are well under 200 bytes
+# (OpenRouter today, subscription keys later); the cap only stops an absurd
+# header from being scanned, copied into a SecretStr, and forwarded upstream.
+MAX_TOKEN_LENGTH = 4096
+
 
 def _extract_bearer(authorization: str | None) -> str | None:
     if not authorization:
@@ -61,6 +66,8 @@ def _structurally_valid(token: str) -> bool:
     key's issuer is not our business (today an OpenRouter key, later a
     subscription key), only that it can ride an HTTP header safely.
     """
+    if len(token) > MAX_TOKEN_LENGTH:
+        return False
     return all(0x21 <= ord(ch) <= 0x7E for ch in token)
 
 

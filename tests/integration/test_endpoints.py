@@ -229,33 +229,40 @@ def test_authed_routes_reject_missing_and_malformed_bearer(client) -> None:
         )
         assert r.status_code == 401
         assert client.get("/v1/daintree/skills", headers=headers).status_code == 401
+        r = client.post(
+            "/v1/daintree/skills/resolve",
+            headers=headers,
+            json={"action": "clear", "session_id": "s"},
+        )
+        assert r.status_code == 401
     # Probes and version never require a key (Cloud Run probes them).
     assert client.get("/healthz").status_code == 200
     assert client.get("/readyz").status_code == 200
     assert client.get("/version").status_code == 200
 
 
-def test_caller_key_reaches_every_upstream_call(client, fake_provider) -> None:
-    """The bearer token IS the upstream credential: the selector call and the main
-    call of a turn, and a utility-task call, must all carry exactly the caller's
-    key — never a server-side default (the provider has none)."""
+def test_caller_key_reaches_selector_and_main_calls(client, fake_provider) -> None:
+    """The bearer token IS the upstream credential: BOTH the selector call and the
+    main call of a turn must carry exactly the caller's key — never a server-side
+    default (the provider has none)."""
     from conftest import respond_body
 
-    caller = {"Authorization": "Bearer sk-or-v1-caller-abc"}
-    fake_provider.selector_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([SKILL_PREP])
     fake_provider.complete_result = make_result(content="done")
     r = client.post(
         "/v1/daintree/respond",
-        headers=caller,
+        headers={"Authorization": "Bearer sk-or-v1-caller-abc"},
         json=respond_body([{"role": "user", "content": "prep my branch"}]),
     )
     assert r.status_code == 200
-    assert fake_provider.requests, "no provider calls recorded"
-    for req in fake_provider.requests:
+    assert len(fake_provider.selection_requests) == 1, "selector call not recorded"
+    assert fake_provider.requests, "main call not recorded"
+    for req in [*fake_provider.selection_requests, *fake_provider.requests]:
         assert req.api_key is not None
         assert req.api_key.get_secret_value() == "sk-or-v1-caller-abc"
 
-    fake_provider.requests.clear()
+
+def test_caller_key_reaches_task_calls(client, fake_provider) -> None:
     fake_provider.complete_result = make_result(
         content=json.dumps({"reason": "ok", "confidence": 0.9, "matched": True})
     )
@@ -271,9 +278,26 @@ def test_caller_key_reaches_every_upstream_call(client, fake_provider) -> None:
         assert req.api_key.get_secret_value() == "sk-or-v1-task-key"
 
 
-def test_streaming_turn_carries_the_caller_key(client, fake_provider) -> None:
-    from conftest import respond_body
+def test_task_upstream_rejection_maps_to_502_not_401(client, fake_provider) -> None:
+    """A structurally valid key the UPSTREAM rejects is a 502 upstream_error —
+    distinguishable from our 401 invalid_api_key, so the CLI can tell 'fix your
+    header' from 'fix your account'."""
+    from daintree_assistant_server.errors import upstream_error
 
+    fake_provider.complete_error = upstream_error("The upstream provider rejected the supplied credentials.")
+    r = client.post(
+        "/v1/daintree/tasks",
+        headers={"Authorization": "Bearer sk-or-v1-plausible-but-rejected"},
+        json={"task": "terminal_judge", "input": {"question": "q"}},
+    )
+    assert r.status_code == 502
+    assert r.json()["error"]["code"] == "upstream_error"
+
+
+def test_streaming_turn_carries_the_caller_key(client, fake_provider) -> None:
+    from conftest import parse_sse, respond_body
+
+    fake_provider.selection_result = selection_result([])
     body = respond_body([{"role": "user", "content": "hi"}], generation={"stream": True})
     with client.stream(
         "POST",
@@ -282,9 +306,11 @@ def test_streaming_turn_carries_the_caller_key(client, fake_provider) -> None:
         json=body,
     ) as s:
         assert s.status_code == 200
-        s.read()
+        events = parse_sse(s.read().decode())
+    assert events[-1][0] == "done"
+    assert len(fake_provider.selection_requests) == 1
     assert fake_provider.stream_requests
-    for req in fake_provider.stream_requests:
+    for req in [*fake_provider.selection_requests, *fake_provider.stream_requests]:
         assert req.api_key is not None
         assert req.api_key.get_secret_value() == "sk-or-v1-stream-key"
 

@@ -1021,6 +1021,27 @@ async def test_concurrent_calls_do_not_cross_credentials() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status", [401, 402, 403])
+async def test_upstream_auth_rejection_maps_to_502_upstream_error(status: int) -> None:
+    # The caller's own key was rejected/underfunded upstream: a permanent 502
+    # upstream_error, distinct from our 401 invalid_api_key at the door, and the
+    # response text must not echo upstream account prose or the key itself.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status, json={"error": {"message": f"account problem for {_CALL_KEY}"}}
+        )
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
+    assert exc.value.status_code == 502
+    assert exc.value.code == "upstream_error"
+    assert _CALL_KEY not in exc.value.message
+    assert "rejected the supplied credentials" in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
 async def test_no_default_and_no_per_call_key_fails_cleanly() -> None:
     # The server constructs its provider with NO default credential; a call that
     # arrives without a per-call key is a propagation bug and must fail loudly

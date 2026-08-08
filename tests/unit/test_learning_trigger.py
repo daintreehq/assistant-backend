@@ -117,6 +117,9 @@ async def test_fires_on_a_completed_turn(learning_orchestrator, respond_request)
     # the request's own message list stops one turn short of it.
     assert [m.role for m in call["trailing"]] == ["assistant"]
     assert call["trailing"][0].content == "here is the answer"
+    # The caller's credential was captured BY VALUE into the detached task — the
+    # request/Principal is out of scope by the time learning runs.
+    assert call["api_key"].get_secret_value() == "test-caller-key"
 
 
 @pytest.mark.asyncio

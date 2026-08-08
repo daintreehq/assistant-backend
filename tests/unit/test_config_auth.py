@@ -29,14 +29,46 @@ def test_missing_secrets_empty_when_present() -> None:
 
 def test_ready_without_any_api_key_env_vars() -> None:
     # A deployment with zero key material beyond the signing key is complete —
-    # in development AND in production shape.
+    # in development AND in production shape. OPENROUTER_API_KEY is pinned empty
+    # so a developer's exported key can't quietly satisfy the premise.
     for env in ("development", "production"):
         s = _settings(
             ENVIRONMENT=env,
+            OPENROUTER_API_KEY="",
             STATE_SIGNING_KEY_CURRENT="y" * 48,
             STATE_SALT="a-real-random-salt-value",
         )
+        assert not s.openrouter_api_key.get_secret_value()
         assert s.missing_secrets() == []
+
+
+def test_server_provider_is_built_without_a_default_credential() -> None:
+    # THE production wiring guarantee: even with a key in the environment, the
+    # serving provider must be keyless — every call carries the caller's key, and
+    # a propagation bug fails loudly instead of billing this shared account.
+    from daintree_assistant_server.main import _build_provider
+
+    s = _settings(OPENROUTER_API_KEY="must-not-be-used")
+    provider = _build_provider(s)
+    assert provider._default_api_key is None  # noqa: SLF001
+
+
+def test_production_requires_the_real_openrouter_origin() -> None:
+    # Caller keys ride every request to this origin; a hardened deployment must
+    # not be able to point them anywhere else (or downgrade to plain http).
+    base = {
+        "ENVIRONMENT": "production",
+        "STATE_SIGNING_KEY_CURRENT": "y" * 48,
+        "STATE_SALT": "a-real-random-salt-value",
+    }
+    for bad in ("http://openrouter.ai/api/v1", "https://openrouter.ai.evil.example/api/v1"):
+        s = _settings(OPENROUTER_BASE_URL=bad, **base)
+        assert any("OPENROUTER_BASE_URL" in p for p in s.weak_secrets())
+    ok = _settings(OPENROUTER_BASE_URL="https://openrouter.ai/api/v1", **base)
+    assert ok.weak_secrets() == []
+    # Development stays free to point at proxies/mocks.
+    dev = _settings(OPENROUTER_BASE_URL="http://127.0.0.1:9999/v1")
+    assert dev.weak_secrets() == []
 
 
 def test_weak_secrets_allowed_in_development() -> None:
@@ -103,6 +135,15 @@ def test_authenticate_rejects_missing_or_malformed(header: str | None) -> None:
     with pytest.raises(DaintreeError) as exc:
         authenticate(header)
     assert exc.value.status_code == 401
+    assert exc.value.code == "invalid_api_key"
+
+
+def test_authenticate_rejects_an_absurdly_long_token() -> None:
+    from daintree_assistant_server.auth import MAX_TOKEN_LENGTH
+
+    assert authenticate(f"Bearer {'k' * MAX_TOKEN_LENGTH}").api_key  # at the cap: fine
+    with pytest.raises(DaintreeError) as exc:
+        authenticate(f"Bearer {'k' * (MAX_TOKEN_LENGTH + 1)}")
     assert exc.value.code == "invalid_api_key"
 
 

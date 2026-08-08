@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -418,11 +419,13 @@ class Settings(BaseSettings):
 
     @property
     def is_hardened(self) -> bool:
-        """True where production hardening applies: auth required, no local-only
-        features, weak secrets rejected, internal detail withheld from responses.
+        """True where production hardening applies: no local-only features, weak
+        secrets rejected, the upstream origin pinned, internal detail withheld
+        from responses. (Authentication is NOT environment-dependent: every
+        request needs a caller key everywhere — see auth.py.)
 
         The single place that decides "is this a real deployment?", so the checks
-        below, ``auth.authenticate`` and ``/readyz`` cannot drift apart.
+        below and ``/readyz`` cannot drift apart.
         """
         return self.environment in ("production", "staging")
 
@@ -471,6 +474,18 @@ class Settings(BaseSettings):
         if not self.is_hardened:
             return []
         problems: list[str] = []
+        # The upstream base URL now receives CALLER credential material on every
+        # request (each turn's bearer key rides the Authorization header to this
+        # origin). A hardened deployment with a typo'd, plain-http, or foreign
+        # host would silently disclose every caller key while staying green, so
+        # production pins the real OpenRouter origin. Development stays free to
+        # point at proxies/mocks.
+        parsed = urlsplit(self.openrouter_base_url)
+        if parsed.scheme != "https" or parsed.hostname != "openrouter.ai":
+            problems.append(
+                "OPENROUTER_BASE_URL must be the https://openrouter.ai origin in production "
+                "(caller API keys are sent to it)"
+            )
         if len(self.state_signing_key_current.get_secret_value()) < 32:
             problems.append("STATE_SIGNING_KEY_CURRENT is too short (<32 chars)")
         if self.state_salt.get_secret_value() == DEFAULT_STATE_SALT:
