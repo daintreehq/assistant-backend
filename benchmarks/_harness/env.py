@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import SecretStr
 
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.providers.base import ProviderChatRequest
@@ -55,14 +56,18 @@ def build_settings(
     return settings
 
 
-def require_api_key(settings: Settings) -> str:
-    key = settings.openrouter_api_key.get_secret_value()
-    if not key:
+def require_api_key(settings: Settings) -> SecretStr:
+    """Validate the key is present and return it still wrapped.
+
+    Returned as a SecretStr so the plaintext is never carried around by a caller;
+    the provider unwraps it only where the Authorization header is built.
+    """
+    if not settings.openrouter_api_key.get_secret_value():
         raise EnvError(
             "OPENROUTER_API_KEY is not set — export it or point --env-file at a .env "
             "that has it (live suites make real, paid calls)."
         )
-    return key
+    return settings.openrouter_api_key
 
 
 def build_provider_body(
@@ -73,7 +78,7 @@ def build_provider_body(
     measured over production's wire bytes, not a hand-rebuilt dict."""
     provider = OpenRouterProvider(
         None,  # type: ignore[arg-type]  # _build_body never touches the client
-        api_key="",
+        api_key=SecretStr(""),  # no network: _build_body never builds a header
         base_url=settings.openrouter_base_url,
     )
     return provider._build_body(request, stream=stream)

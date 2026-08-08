@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import httpx
 import pytest
+import structlog.testing
+from pydantic import SecretStr
 
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
@@ -11,6 +13,11 @@ from daintree_assistant_server.providers.openrouter import OpenRouterProvider
 
 _BASE = "https://openrouter.ai/api/v1"
 _MODEL = "deepseek/deepseek-v4-flash-0731"
+# The provider's constructor default (fallback) key, and a distinct per-call key.
+# They must differ so a dropped per-call credential is detectable rather than
+# accidentally matching the fallback.
+_DEFAULT_KEY = "key"
+_CALL_KEY = "sk-or-v1-per-call-credential"
 
 SSE_OK = (
     'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek/deepseek-v4-flash-0731",'
@@ -26,7 +33,8 @@ SSE_OK = (
 
 def _provider(handler, **kwargs) -> OpenRouterProvider:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return OpenRouterProvider(client, api_key="key", base_url=_BASE, **kwargs)
+    kwargs.setdefault("api_key", SecretStr(_DEFAULT_KEY))
+    return OpenRouterProvider(client, base_url=_BASE, **kwargs)
 
 
 def _capture(captured: dict):
@@ -668,11 +676,18 @@ async def test_dump_dir_writes_request_bodies(tmp_path) -> None:
 
     dump_dir = tmp_path / "dumps"
     provider = _provider(_capture({}), dump_dir=str(dump_dir))
-    await provider.complete(_req())
+    await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
     files = list(dump_dir.glob("*.json"))
     assert len(files) == 1
-    body = _json.loads(files[0].read_text(encoding="utf-8"))
+    text = files[0].read_text(encoding="utf-8")
+    body = _json.loads(text)
     assert body["model"] == _MODEL
+    # The credential is caller material and the dump writes full request bodies to
+    # disk, so it must not appear there — neither as a body field nor anywhere in
+    # the raw text. `_build_body` allowlists wire fields by hand; this test is what
+    # stops a future switch to asdict()/vars() from silently leaking the key.
+    assert "api_key" not in body
+    assert _CALL_KEY not in text
     await provider.aclose()
 
 
@@ -684,6 +699,189 @@ async def test_no_dump_without_dump_dir(tmp_path, monkeypatch: pytest.MonkeyPatc
     provider = _provider(_capture({}))
     await provider.complete(_req())
     assert not (tmp_path / "env-dumps").exists()
+    await provider.aclose()
+
+
+# ---- per-request credential ------------------------------------------------
+
+
+def _auth_capture(seen: dict):
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers["authorization"]
+        return httpx.Response(
+            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
+        )
+
+    return handler
+
+
+@pytest.mark.asyncio
+async def test_per_request_api_key_overrides_default() -> None:
+    # The credential travels with the call: one shared provider serves the selector,
+    # orchestrator, task runner and learner, so the key cannot live on the instance.
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
+    assert seen["auth"] == f"Bearer {_CALL_KEY}"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_api_key_none_uses_default() -> None:
+    # None means "use the provider's configured default" — the environment key.
+    # This is what every consumer does today, and why nothing observable changed.
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    await provider.complete(_req(api_key=None))
+    assert seen["auth"] == f"Bearer {_DEFAULT_KEY}"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_empty_per_request_api_key_does_not_fall_back_to_the_default() -> None:
+    # An explicitly supplied empty credential is a CALLER error and must reach
+    # upstream as invalid. Falling back would spend this server's OpenRouter
+    # account on a request whose owner failed to authenticate.
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    await provider.complete(_req(api_key=SecretStr("")))
+    assert seen["auth"] == "Bearer "
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_stream_uses_per_request_api_key() -> None:
+    # open_stream builds its own headers; a forgotten argument there would send the
+    # server's key on every streaming turn while the non-streaming path looked fine.
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers["authorization"]
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=SSE_OK)
+
+    provider = _provider(handler)
+    stream = await provider.open_stream(_req(stream=True, api_key=SecretStr(_CALL_KEY)))
+    assert seen["auth"] == f"Bearer {_CALL_KEY}"
+    await stream.aclose()
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_structured_tool_call_forwards_per_request_api_key() -> None:
+    # structured_tool_call rebuilds an internal sub-request field by field; a
+    # dropped api_key there would silently use the default on every forced
+    # tool-call path. The sentinels differ so the omission is detectable.
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers["authorization"]
+        return httpx.Response(
+            200,
+            json={
+                "id": "x",
+                "created": 0,
+                "model": "m",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "c1",
+                                    "type": "function",
+                                    "function": {"name": "pick", "arguments": '{"a":1}'},
+                                }
+                            ],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+                "usage": {},
+            },
+        )
+
+    provider = _provider(handler)
+    result = await provider.structured_tool_call(
+        _req(api_key=SecretStr(_CALL_KEY)),
+        function_name="pick",
+        function_schema={"type": "object", "properties": {"a": {"type": "integer"}}},
+    )
+    assert result.name == "pick"
+    assert seen["auth"] == f"Bearer {_CALL_KEY}"
+    await provider.aclose()
+
+
+def test_provider_chat_request_repr_omits_api_key() -> None:
+    # A plain dataclass reprs every field by default, and a request object can end
+    # up in a traceback or a debug line. repr=False keeps the credential out.
+    request = _req(api_key=SecretStr(_CALL_KEY))
+    text = repr(request)
+    assert _CALL_KEY not in text
+    assert "api_key" not in text
+
+
+@pytest.mark.asyncio
+async def test_complete_redacts_api_key_echoed_by_upstream() -> None:
+    # The one path by which a caller's key could escape: the upstream reflects it
+    # in an error body, and that text goes BOTH to the structured log and into the
+    # client error envelope. Redaction runs on the whole body before parsing and
+    # before the length cap, so no usable prefix survives.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400, json={"error": {"message": f"invalid key {_CALL_KEY} for this account"}}
+        )
+
+    provider = _provider(handler)
+    with structlog.testing.capture_logs() as logs, pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
+    assert _CALL_KEY not in exc.value.message
+    assert "[REDACTED]" in exc.value.message
+    # The reason itself must survive redaction — this stays a usable diagnostic.
+    assert "for this account" in exc.value.message
+    assert not any(_CALL_KEY in str(entry) for entry in logs)
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_stream_redacts_api_key_echoed_by_upstream() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text=f"rejected credential {_CALL_KEY}")
+
+    provider = _provider(handler)
+    with structlog.testing.capture_logs() as logs, pytest.raises(DaintreeError) as exc:
+        await provider.open_stream(_req(stream=True, api_key=SecretStr(_CALL_KEY)))
+    assert _CALL_KEY not in exc.value.message
+    assert not any(_CALL_KEY in str(entry) for entry in logs)
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_default_api_key_is_also_redacted_from_upstream_errors() -> None:
+    # observability.py's rule is "no bearer keys" — not "no CALLER bearer keys".
+    # Redacting the EFFECTIVE key covers the fallback case for free.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text=f"bad key {_DEFAULT_KEY}!")
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert "[REDACTED]" in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_empty_credential_does_not_mangle_the_upstream_reason() -> None:
+    # str.replace("") splices the placeholder between every character; an empty
+    # credential must be skipped so the diagnostic stays readable.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": "temperature too high"}})
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req(api_key=SecretStr("")))
+    assert "temperature too high" in exc.value.message
+    assert "[REDACTED]" not in exc.value.message
     await provider.aclose()
 
 
@@ -706,7 +904,9 @@ async def test_per_request_timeout_overrides_read_only() -> None:
         transport=httpx.MockTransport(handler),
         timeout=httpx.Timeout(connect=10.0, read=840.0, write=30.0, pool=10.0),
     )
-    provider = OpenRouterProvider(client, api_key="key", base_url=_BASE, default_timeout=840.0)
+    provider = OpenRouterProvider(
+        client, api_key=SecretStr(_DEFAULT_KEY), base_url=_BASE, default_timeout=840.0
+    )
     await provider.complete(_req(timeout=25.0))
     assert captured["timeout"] == {"connect": 10.0, "read": 25.0, "write": 30.0, "pool": 10.0}
     await provider.aclose()

@@ -37,6 +37,7 @@ import time
 from typing import Any
 
 import httpx
+from pydantic import SecretStr
 
 from ..errors import DaintreeError, upstream_error, upstream_rate_limited, upstream_timeout
 from ..observability import get_logger
@@ -64,6 +65,11 @@ _CHAT_PATH = "/chat/completions"
 # provider's reason ("temperature must be between 0.0 and 2.0", a schema complaint)
 # without dumping an unbounded payload into logs or the client error message.
 _ERROR_DETAIL_CAP = 400
+
+# Stands in for a credential the upstream echoed back inside an error body, so the
+# key never reaches a log line or a client error envelope (see observability.py:
+# logs carry no bearer keys).
+_REDACTED = "[REDACTED]"
 
 # Cap on the logged serving-endpoint name ("CoreWeave", "Baidu", …).
 _ENDPOINT_NAME_CAP = 64
@@ -140,13 +146,22 @@ _PROVIDER_ROUTING_STRUCTURED: dict[str, Any] = {
 }
 
 
-def _extract_upstream_error(body: bytes | str | None) -> str | None:
+def _extract_upstream_error(
+    body: bytes | str | None, *, secret: SecretStr | None = None
+) -> str | None:
     """Pull a short human-readable reason out of an upstream error body.
 
     OpenRouter returns ``{"error": {"message": "...", ...}}`` on a 4xx/5xx. That
     message is the single most useful diagnostic for a malformed request, so we
     surface it rather than discard it. Best-effort: any parse failure falls back to
     the raw (capped) text, and an empty body yields ``None``.
+
+    ``secret`` is the credential this call used, scrubbed from the text if the
+    upstream echoed it back. That reflection is the one way a caller's key could
+    escape: this return value goes BOTH to the structured log and — for a non-auth
+    4xx — into the client-facing error envelope via :meth:`_map_http_error`.
+    Scrubbing happens on the whole raw body before parsing or capping, because
+    capping first can slice a key in half and leave a usable prefix behind.
     """
     if not body:
         return None
@@ -154,6 +169,12 @@ def _extract_upstream_error(body: bytes | str | None) -> str | None:
     raw = raw.strip()
     if not raw:
         return None
+    if secret is not None:
+        plain = secret.get_secret_value()
+        # An empty secret must not be "replaced": str.replace("") splices the
+        # placeholder between every character and destroys the diagnostic.
+        if plain:
+            raw = raw.replace(plain, _REDACTED)
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
@@ -344,14 +365,17 @@ class OpenRouterProvider:
         self,
         client: httpx.AsyncClient,
         *,
-        api_key: str,
+        api_key: SecretStr,
         base_url: str = "https://openrouter.ai/api/v1",
         default_timeout: float = 60.0,
         send_reasoning: bool = True,
         dump_dir: str | None = None,
     ) -> None:
         self._client = client
-        self._api_key = api_key
+        # The FALLBACK credential only: a request carrying its own ``api_key``
+        # overrides it. Held as a SecretStr and unwrapped solely where a header or
+        # a redaction pattern is built, never stored as plaintext on the instance.
+        self._default_api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._default_timeout = default_timeout
         self._send_reasoning = send_reasoning
@@ -382,9 +406,27 @@ class OpenRouterProvider:
     def _url(self) -> str:
         return f"{self._base_url}{_CHAT_PATH}"
 
-    def _headers(self, *, stream: bool) -> dict[str, str]:
+    def _resolve_key(self, request_api_key: SecretStr | None) -> SecretStr:
+        """The credential for one call: the request's own, else the default.
+
+        Deliberately an ``is not None`` test rather than truthiness. An empty
+        credential supplied explicitly by a caller is a caller error and must reach
+        upstream as invalid — silently falling back would spend THIS server's
+        OpenRouter account on a request whose owner failed to authenticate.
+
+        Single source of truth for the fallback, because two paths need the same
+        answer: the ``Authorization`` header and the redaction of an echoed key out
+        of upstream error text. If they ever disagreed, the redaction would miss.
+        """
+        return request_api_key if request_api_key is not None else self._default_api_key
+
+    def _headers(self, *, stream: bool, api_key: SecretStr) -> dict[str, str]:
+        # A fresh dict per call. The shared client's own headers are never mutated:
+        # the connection pool keys on host/port/protocol, not header contents, so a
+        # per-call Authorization reuses pooled connections safely and concurrent
+        # calls carrying different keys cannot bleed into one another.
         return {
-            "Authorization": f"Bearer {self._api_key}",
+            "Authorization": f"Bearer {api_key.get_secret_value()}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream" if stream else "application/json",
             "HTTP-Referer": _REFERER,
@@ -515,11 +557,12 @@ class OpenRouterProvider:
 
     async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:
         body = self._build_body(request, stream=False)
+        api_key = self._resolve_key(request.api_key)
         try:
             resp = await self._client.post(
                 self._url,
                 json=body,
-                headers=self._headers(stream=False),
+                headers=self._headers(stream=False, api_key=api_key),
                 timeout=self._timeout(request),
             )
         except httpx.TimeoutException as exc:
@@ -527,7 +570,7 @@ class OpenRouterProvider:
         except httpx.TransportError as exc:
             raise upstream_error("Could not reach the upstream provider.", retryable=True) from exc
         if resp.status_code >= 400:
-            detail = _extract_upstream_error(resp.content)
+            detail = _extract_upstream_error(resp.content, secret=api_key)
             logger.warning(
                 "upstream_http_error",
                 phase="complete",
@@ -572,6 +615,10 @@ class OpenRouterProvider:
             thinking_disabled=True,
             reasoning_effort=None,
             timeout=request.timeout,
+            # Must be forwarded explicitly: this sub-request is rebuilt field by
+            # field, so an omission here would silently spend the SERVER's default
+            # credential on every forced-tool-call path instead of the caller's.
+            api_key=request.api_key,
         )
         result = await self.complete(sub)
         calls = result.tool_calls
@@ -596,11 +643,12 @@ class OpenRouterProvider:
 
     async def open_stream(self, request: ProviderChatRequest) -> ProviderStream:
         body = self._build_body(request, stream=True)
+        api_key = self._resolve_key(request.api_key)
         ctx = self._client.stream(
             "POST",
             self._url,
             json=body,
-            headers=self._headers(stream=True),
+            headers=self._headers(stream=True, api_key=api_key),
             timeout=self._timeout(request),
         )
         try:
@@ -616,7 +664,7 @@ class OpenRouterProvider:
                 # must not mask the mapped status error (e.g. a retryable 5xx). When
                 # it IS readable, keep its reason — it's the whole diagnostic.
                 with contextlib.suppress(httpx.HTTPError):
-                    detail = _extract_upstream_error(await response.aread())
+                    detail = _extract_upstream_error(await response.aread(), secret=api_key)
             finally:
                 await ctx.__aexit__(None, None, None)
             logger.warning(
