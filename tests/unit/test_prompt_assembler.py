@@ -347,7 +347,6 @@ def test_runtime_renders_typed_worktree(assembler: PromptAssembler) -> None:
 
 def test_agent_roster_omits_whole_over_budget_rows_without_truncating_ids() -> None:
     settings = Settings(
-        DAINTREE_API_KEY="k",
         OPENROUTER_API_KEY="d",
         STATE_SIGNING_KEY_CURRENT="s",
         CAP_STARTUP_AGENT_BYTES=200,
@@ -485,7 +484,7 @@ def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> No
     # to the upstream model, not to the posture, and this test is what stops flipping
     # INTERACTIVE_THINKING_ENABLED back on from silently reintroducing the 400.
     settings = Settings(
-        DAINTREE_API_KEY="k", OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
+        OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
     )
     assembler = PromptAssembler(prompt_loader, settings)
     tools = [{"type": "function", "function": {"name": "git__status", "description": "d"}}]

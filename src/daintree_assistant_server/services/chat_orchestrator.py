@@ -15,8 +15,10 @@ import json
 import time
 from collections import deque
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
+
+from pydantic import SecretStr
 
 from .. import PROTOCOL_VERSION
 from ..config import PUBLIC_MODEL_ID, Settings
@@ -285,6 +287,10 @@ class _PreparedTurn:
     meta: _RespondMeta
     active_ids: list[str]
     speculation: _SpeculativeStream | None
+    # The caller's upstream credential (already attached to provider_request);
+    # carried separately so the post-stream learning dispatch can capture it by
+    # value without re-narrowing the request's optional field.
+    api_key: SecretStr
 
 
 class _PrepOwnedStream:
@@ -787,6 +793,7 @@ class ChatOrchestrator:
         request: RespondRequest,
         *,
         upstream_model: str,
+        api_key: SecretStr,
         request_id: str | None = None,
     ) -> RespondOutcome:
         request_id = request_id or new_request_id()
@@ -803,7 +810,12 @@ class ChatOrchestrator:
             # response handshake. A prep failure becomes a terminal SSE ``error``
             # event on the stream — never an HTTP error, never a silent hang.
             prep_task = asyncio.create_task(
-                self._prepare(request, upstream_model=upstream_model, request_id=request_id)
+                self._prepare(
+                    request,
+                    upstream_model=upstream_model,
+                    request_id=request_id,
+                    api_key=api_key,
+                )
             )
             # If the stream is never consumed (client vanished before the body was
             # iterated), retrieve the exception so it can't surface as an orphaned
@@ -828,7 +840,7 @@ class ChatOrchestrator:
             )
 
         prepared = await self._prepare(
-            request, upstream_model=upstream_model, request_id=request_id
+            request, upstream_model=upstream_model, request_id=request_id, api_key=api_key
         )
         result = await self._complete_with_retry(prepared.provider_request)
         # finish_reason is a second, independent signal: treat a continuation round as
@@ -843,6 +855,7 @@ class ChatOrchestrator:
             active_ids=prepared.active_ids,
             assistant_text=result.text,
             had_tool_calls=had_tool_calls,
+            api_key=api_key,
         )
         return RespondOutcome(headers=headers, streaming=False, body=body)
 
@@ -852,6 +865,7 @@ class ChatOrchestrator:
         *,
         upstream_model: str,
         request_id: str,
+        api_key: SecretStr,
     ) -> _PreparedTurn:
         session_id = request.session.id
         t_start = time.perf_counter()
@@ -965,10 +979,17 @@ class ChatOrchestrator:
                         speculative_active_ids
                     )
                     speculative_render_ids = render_order_ids(speculative_skills)
-                    speculative_request = self.assembler.build_main_request(
-                        request=request,
-                        skills=speculative_skills,
-                        upstream_model=upstream_model,
+                    # The assembler stays credential-free (it builds PROMPT bytes);
+                    # the caller's key is attached here, as on every construction
+                    # path — an omission would fail the call, since the provider
+                    # holds no default credential.
+                    speculative_request = replace(
+                        self.assembler.build_main_request(
+                            request=request,
+                            skills=speculative_skills,
+                            upstream_model=upstream_model,
+                        ),
+                        api_key=api_key,
                     )
                     speculation = _SpeculativeStream(
                         request=speculative_request,
@@ -992,6 +1013,7 @@ class ChatOrchestrator:
                 decision = await self.selector.select(
                     request.input.messages,
                     prior_active_ids,
+                    api_key=api_key,
                     turn_context=self._selector_turn_context(request),
                     available_tools=self._available_tool_names(request),
                 )
@@ -1069,16 +1091,22 @@ class ChatOrchestrator:
                     )
                     speculation_outcome = "discarded"
                     speculation = None
-                    provider_request = self.assembler.build_main_request(
+                    provider_request = replace(
+                        self.assembler.build_main_request(
+                            request=request,
+                            skills=skills,
+                            upstream_model=upstream_model,
+                        ),
+                        api_key=api_key,
+                    )
+            else:
+                provider_request = replace(
+                    self.assembler.build_main_request(
                         request=request,
                         skills=skills,
                         upstream_model=upstream_model,
-                    )
-            else:
-                provider_request = self.assembler.build_main_request(
-                    request=request,
-                    skills=skills,
-                    upstream_model=upstream_model,
+                    ),
+                    api_key=api_key,
                 )
 
             meta = self._build_meta(
@@ -1135,6 +1163,7 @@ class ChatOrchestrator:
             meta=meta,
             active_ids=active_ids,
             speculation=speculation,
+            api_key=api_key,
         )
 
     # ---- output linting (non-stream backstop; observability) ------------
@@ -1199,6 +1228,7 @@ class ChatOrchestrator:
         active_ids: list[str],
         assistant_text: str,
         had_tool_calls: bool,
+        api_key: SecretStr,
     ) -> None:
         """Fire skill learning on the just-completed workflow, off the response path.
 
@@ -1218,8 +1248,12 @@ class ChatOrchestrator:
         if had_tool_calls or not assistant_text.strip():
             return
         trailing = [ChatMessage(role="assistant", content=assistant_text)]
+        # The caller's credential is captured BY VALUE into the task's arguments:
+        # by the time the fire-and-forget pass runs, the HTTP request (and its
+        # Principal) is gone, so nothing ambient (contextvars included) would
+        # still hold it.
         task = asyncio.create_task(
-            self._run_learner_background(request, list(active_ids), trailing)
+            self._run_learner_background(request, list(active_ids), trailing, api_key)
         )
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
@@ -1229,6 +1263,7 @@ class ChatOrchestrator:
         request: RespondRequest,
         active_ids: list[str],
         trailing: list[ChatMessage],
+        api_key: SecretStr,
     ) -> None:
         """Guarded wrapper so a background learning pass can never surface an
         exception to the (already-detached) task — ``learner.run`` is fail-open,
@@ -1236,7 +1271,10 @@ class ChatOrchestrator:
         assert self.learner is not None  # guarded by the caller
         try:
             await self.learner.run(
-                request=request, active_ids=active_ids, trailing_messages=trailing
+                request=request,
+                active_ids=active_ids,
+                trailing_messages=trailing,
+                api_key=api_key,
             )
         except Exception as exc:  # noqa: BLE001 - detached task must swallow everything
             logger.warning("skill_learning_background_failed", error=str(exc))
@@ -1277,6 +1315,7 @@ class ChatOrchestrator:
         action: str,
         session_id: str | None,
         state_token: str | None,
+        api_key: SecretStr,
         turn_id: str | None = None,
         instruction_revision: int = 0,
         query: str | None = None,
@@ -1311,7 +1350,9 @@ class ChatOrchestrator:
         elif action == "find":
             run_selector = True
             conversation = [ChatMessage(role="user", content=query or "")]
-            decision = await self.selector.select(conversation, prior_active_ids)
+            decision = await self.selector.select(
+                conversation, prior_active_ids, api_key=api_key
+            )
             warnings.extend(decision.warnings)
             # A find re-selects: the selector result is authoritative, same as a turn.
             found = resolve_active_skills(
@@ -1581,6 +1622,7 @@ class ChatOrchestrator:
             request=request,
             active_ids=prepared.active_ids,
             speculative_stream=prepared.speculation,
+            api_key=prepared.api_key,
         )
         try:
             async for event in body:
@@ -1604,6 +1646,7 @@ class ChatOrchestrator:
         meta: _RespondMeta,
         request: RespondRequest,
         active_ids: list[str],
+        api_key: SecretStr,
         speculative_stream: _SpeculativeStream | None = None,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
@@ -1776,6 +1819,7 @@ class ChatOrchestrator:
                 active_ids=active_ids,
                 assistant_text="".join(content_parts),
                 had_tool_calls=saw_tool_calls or finish_reason == "tool_calls",
+                api_key=api_key,
             )
 
     @staticmethod

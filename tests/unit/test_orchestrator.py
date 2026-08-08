@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import itertools
 import json
 from collections.abc import Callable, Sequence
@@ -10,6 +11,7 @@ from typing import Any
 
 import pytest
 from fakes import FakeProvider, FakeStream, make_text_chunks, selection_result
+from pydantic import SecretStr
 
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import upstream_error
@@ -28,6 +30,8 @@ from daintree_assistant_server.services.prompt_assembler import (
 from daintree_assistant_server.skills.catalog import Catalog
 from daintree_assistant_server.skills.loader import parse_skill
 from daintree_assistant_server.skills.selector import SelectionDecision
+
+TEST_API_KEY = SecretStr("test-caller-key")
 
 
 def _assert_foundation_closed(catalog, active: list[str]) -> None:
@@ -464,7 +468,7 @@ async def test_stream_meta_is_yielded_before_upstream_open(
         }
     )
 
-    outcome = await orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+    outcome = await orchestrator.complete(request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY)
     assert outcome.stream is not None
     assert fake_provider.stream_requests == []
 
@@ -611,7 +615,7 @@ async def test_speculation_starts_during_selector_and_exact_match_reuses_once(
     monkeypatch.setattr(orchestrator.assembler, "build_main_request", tracked_build)
 
     pending = asyncio.create_task(
-        orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY)
     )
     await started.wait()
     await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
@@ -631,7 +635,14 @@ async def test_speculation_starts_during_selector_and_exact_match_reuses_once(
     assert events[-1].startswith("event: done\n")
     assert _streamed_content(events) == "speculative winner "
     assert len(assembled) == 1  # no duplicate 100+ KiB assembly/deep comparison
-    assert fake_provider.stream_requests[0] is assembled[0]
+    # The orchestrator wraps the assembled request exactly once with the caller's
+    # key (dataclasses.replace — a shallow copy): the sent request must be that
+    # credentialed copy field-for-field, and the expensive payload objects must be
+    # the SAME objects the assembler built (shallow reuse, not a rebuild).
+    sent = fake_provider.stream_requests[0]
+    assert sent == dataclasses.replace(assembled[0], api_key=TEST_API_KEY)
+    assert sent.messages is assembled[0].messages
+    assert sent.api_key is TEST_API_KEY
     assert len(fake_provider.stream_requests) == 1  # winner consumed exactly once
     assert streams[0].closed is True
     assert orchestrator._skill_speculations_in_flight == 0
@@ -672,7 +683,7 @@ async def test_foundation_reordering_still_reuses_the_speculative_stream(
     # Prior turn listed the foundation FIRST; this turn lists it last.
     request = _stream_request_with_state(orchestrator, [foundation, specific])
     pending = asyncio.create_task(
-        orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY)
     )
     await started.wait()
     await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
@@ -703,7 +714,7 @@ async def test_degraded_selector_reuses_speculative_prior_stream(
     )
     request = _stream_request_with_state(orchestrator, [skill_id])
     pending = asyncio.create_task(
-        orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY)
     )
     await started.wait()
     await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
@@ -759,7 +770,7 @@ async def test_changed_selection_discards_private_stream_and_opens_canonical(
     pending = asyncio.create_task(
         orchestrator.complete(
             _stream_request_with_state(orchestrator, prior),
-            upstream_model="deepseek-v4-flash",
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
         )
     )
     await started.wait()
@@ -818,7 +829,7 @@ async def test_unusable_state_speculates_on_the_empty_set_and_wins(
     )
 
     pending = asyncio.create_task(
-        orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY)
     )
     await started.wait()
     # The speculative stream opens WHILE the selector is still gated — that overlap
@@ -867,7 +878,7 @@ async def test_cold_speculation_is_discarded_when_the_selector_picks_skills(
     pending = asyncio.create_task(
         orchestrator.complete(
             _stream_request_with_state(orchestrator, []),
-            upstream_model="deepseek-v4-flash",
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
         )
     )
     await started.wait()
@@ -901,7 +912,7 @@ async def test_continuation_round_with_active_skill_does_not_speculate(
         raise AssertionError("selector must not run on a continuation round")
 
     monkeypatch.setattr(orchestrator.selector, "select", unexpected_select)
-    outcome = await orchestrator.complete(request, upstream_model="deepseek-v4-flash")
+    outcome = await orchestrator.complete(request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY)
     assert outcome.stream is not None
     first = await anext(outcome.stream)
     assert first.startswith("event: meta\n")
@@ -942,7 +953,7 @@ async def test_private_midstream_failure_falls_back_to_fresh_canonical_stream(
     pending = asyncio.create_task(
         orchestrator.complete(
             _stream_request_with_state(orchestrator, [skill_id]),
-            upstream_model="deepseek-v4-flash",
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
         )
     )
     await started.wait()
@@ -988,7 +999,7 @@ async def test_exhausted_speculative_open_does_not_get_second_retry_budget(
     pending = asyncio.create_task(
         orchestrator.complete(
             _stream_request_with_state(orchestrator, [skill_id]),
-            upstream_model="deepseek-v4-flash",
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
         )
     )
     await started.wait()
@@ -1037,7 +1048,7 @@ async def test_oversized_private_event_respects_byte_cap_and_falls_back(
     pending = asyncio.create_task(
         orchestrator.complete(
             _stream_request_with_state(orchestrator, [skill_id]),
-            upstream_model="deepseek-v4-flash",
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
         )
     )
     await started.wait()
@@ -1082,7 +1093,7 @@ async def test_uniterated_winner_expires_closes_and_late_consumer_falls_back(
     pending = asyncio.create_task(
         orchestrator.complete(
             _stream_request_with_state(orchestrator, [skill_id]),
-            upstream_model="deepseek-v4-flash",
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
         )
     )
     await started.wait()
@@ -1121,7 +1132,7 @@ async def test_mismatch_cancels_producer_blocked_on_chunk_backpressure(
     pending = asyncio.create_task(
         orchestrator.complete(
             _stream_request_with_state(orchestrator, [ids[0]]),
-            upstream_model="deepseek-v4-flash",
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
         )
     )
     await started.wait()
@@ -1167,7 +1178,7 @@ async def test_cleanup_timeout_keeps_capacity_until_resistant_producer_finishes(
     pending = asyncio.create_task(
         orchestrator.complete(
             _stream_request_with_state(orchestrator, [ids[0]]),
-            upstream_model="deepseek-v4-flash",
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
         )
     )
     await started.wait()
@@ -1203,7 +1214,7 @@ async def test_cancellation_inside_claim_still_closes_provisional_owner(
     fake_provider.stream_factory = lambda _request: upstream
     outcome = await orchestrator.complete(
         _stream_request_with_state(orchestrator, [skill_id]),
-        upstream_model="deepseek-v4-flash",
+        upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
     claim_started = asyncio.Event()
@@ -1254,7 +1265,7 @@ async def test_respond_log_reports_the_ids_the_cap_dropped(
 
     monkeypatch.setattr(orchestrator_module, "logger", _Recorder())
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     await _drain(outcome.stream)
@@ -1405,7 +1416,7 @@ async def test_streaming_complete_returns_before_selection_finishes(
     )
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.streaming and outcome.stream is not None
     assert outcome.headers["X-Request-Id"]
@@ -1432,7 +1443,7 @@ async def test_heartbeat_comments_flow_while_selection_is_quiet(
     )
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     # With the selector gated, the first thing on the wire is a comment heartbeat,
@@ -1460,7 +1471,7 @@ async def test_prep_failure_streams_terminal_error_event(
     monkeypatch.setattr(orchestrator.assembler, "build_main_request", boom)
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
@@ -1483,7 +1494,7 @@ async def test_unexpected_prep_exception_streams_internal_error(
     monkeypatch.setattr(orchestrator.assembler, "build_main_request", boom)
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
@@ -1503,7 +1514,7 @@ async def test_unexpected_midstream_exception_emits_terminal_error(
     )
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
@@ -1536,7 +1547,7 @@ async def test_disconnect_during_prep_cancels_selection(
     monkeypatch.setattr(orchestrator.selector, "select", select)
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     pull = asyncio.create_task(anext(outcome.stream))
@@ -1568,7 +1579,7 @@ async def test_aclose_before_first_poll_cancels_prep(
     monkeypatch.setattr(orchestrator.selector, "select", select)
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     await started.wait()
@@ -1597,7 +1608,7 @@ async def test_aclose_before_first_poll_discards_completed_speculation(
     )
     outcome = await orchestrator.complete(
         _stream_request_with_state(orchestrator, [ids[0]]),
-        upstream_model="deepseek-v4-flash",
+        upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
     await started.wait()
@@ -1627,7 +1638,7 @@ async def test_provider_close_failure_after_done_emits_nothing_extra(
         make_text_chunks("fine")
     )
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash"
+        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]

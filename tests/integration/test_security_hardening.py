@@ -20,8 +20,6 @@ _AUTH = {"Authorization": "Bearer test-api-key"}
 def _client(**overrides: Any) -> TestClient:
     """A ready TestClient with a fake provider and overridable settings."""
     settings = Settings(
-        DAINTREE_API_KEY="test-api-key",
-        OPENROUTER_API_KEY="d",
         STATE_SIGNING_KEY_CURRENT="s",
         **overrides,
     )

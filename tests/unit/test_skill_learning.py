@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from fakes import FakeProvider, make_result, make_text_chunks
+from pydantic import SecretStr
 
 from daintree_assistant_server.config import (
     OPENROUTER_MODEL,
@@ -138,6 +139,8 @@ PROPOSAL_IMPROVE = {
     "confidence": 0.88,
 }
 
+TEST_API_KEY = SecretStr("test-caller-key")
+
 MESSAGES = [
     {"role": "user", "content": "Run the multi-agent workflow across three agents."},
     {"role": "assistant", "content": "Done, but one agent was mishandled."},
@@ -172,7 +175,6 @@ def _settings(
     if context_tokens is not None:
         extra["SKILL_LEARNING_CONTEXT_TOKENS"] = context_tokens
     return Settings(
-        DAINTREE_API_KEY="k",
         OPENROUTER_API_KEY="fw",
         STATE_SIGNING_KEY_CURRENT="s",
         RETRY_BACKOFF_BASE_SECONDS=0.0,
@@ -266,7 +268,7 @@ def _request(
 async def test_create_writes_and_reloads(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, manager, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     assert outcome.created_id == "daintree.test.created"
     assert (write_dir / "daintree.test.created.md").is_file()
@@ -277,7 +279,7 @@ async def test_create_writes_and_reloads(tmp_path: Path) -> None:
 async def test_create_overlay_dir(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, manager, write_dir = _learner(tmp_path, fake, overlay=True)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     # Written to the overlay dir, and the packaged source is untouched.
     assert (write_dir / "daintree.test.created.md").is_file()
@@ -295,7 +297,7 @@ async def test_create_uses_stronger_builder_model_with_reasoning(tmp_path: Path)
     assert SKILL_BUILDER_MODEL == "openai/gpt-5.6-sol"
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake)
-    await learner.run(request=_request(), active_ids=[])
+    await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
 
     gate_reqs = [r for r in fake.requests if r.model == OPENROUTER_MODEL]
     build_reqs = [r for r in fake.requests if r.model == SKILL_BUILDER_MODEL]
@@ -310,7 +312,7 @@ async def test_improve_uses_stronger_improver_model_with_reasoning(tmp_path: Pat
     assert SKILL_IMPROVER_MODEL == "openai/gpt-5.6-sol"
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
 
     improve_reqs = [r for r in fake.requests if r.model == SKILL_IMPROVER_MODEL]
     assert improve_reqs and all(r.thinking_disabled is False for r in improve_reqs)
@@ -326,7 +328,7 @@ async def test_gate_and_builder_share_one_provider_and_differ_by_model(
     # adapter creeping back in would break this.
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
 
     assert outcome.changed is True
     assert [r.model for r in fake.requests] == [OPENROUTER_MODEL, SKILL_BUILDER_MODEL]
@@ -340,7 +342,7 @@ async def test_builder_sends_no_temperature(tmp_path: Path) -> None:
     # than degrading. The gate (small model) is unaffected and keeps its 0.0.
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake)
-    await learner.run(request=_request(), active_ids=[])
+    await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
 
     build_reqs = [r for r in fake.requests if r.model == SKILL_BUILDER_MODEL]
     assert build_reqs and all(r.temperature is None for r in build_reqs)
@@ -383,7 +385,7 @@ def test_render_markdown_keeps_long_scalars_on_one_line() -> None:
 async def test_improve_rewrites_target(tmp_path: Path) -> None:
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, manager, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     assert outcome.created_id is None  # improve is not a new load
     skill = manager.catalog.get("daintree.test.target")
@@ -401,7 +403,7 @@ async def test_improve_preserves_foundation_flag(tmp_path: Path) -> None:
     learner, manager, _ = _learner(
         tmp_path, fake, with_target=True, target_text=_TARGET_FOUNDATION
     )
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.target")
     assert skill is not None
@@ -421,7 +423,7 @@ async def test_improve_preserves_omitted_frontmatter(tmp_path: Path) -> None:
     learner, manager, _ = _learner(
         tmp_path, fake, with_target=True, target_text=_TARGET_RICH_META
     )
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.target")
     assert skill is not None
@@ -442,7 +444,7 @@ async def test_improve_applies_explicitly_set_frontmatter(tmp_path: Path) -> Non
     learner, manager, _ = _learner(
         tmp_path, fake, with_target=True, target_text=_TARGET_RICH_META
     )
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.target")
     assert skill is not None
@@ -457,7 +459,7 @@ async def test_create_foundation_suppressed_without_optin(tmp_path: Path) -> Non
     proposal = {**PROPOSAL_CREATE, "foundation": True}
     fake = _provider(GATE_CREATE, proposal)
     learner, manager, _ = _learner(tmp_path, fake, allow_foundation=False)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.created")
     assert skill is not None
@@ -469,7 +471,7 @@ async def test_create_foundation_allowed_with_optin(tmp_path: Path) -> None:
     proposal = {**PROPOSAL_CREATE, "foundation": True}
     fake = _provider(GATE_CREATE, proposal)
     learner, manager, _ = _learner(tmp_path, fake, allow_foundation=True)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.created")
     assert skill is not None
@@ -483,7 +485,7 @@ async def test_audit_records_suppressed_foundation_request(tmp_path: Path) -> No
     proposal = {**PROPOSAL_CREATE, "foundation": True}
     fake = _provider(GATE_CREATE, proposal)
     learner, _, _ = _learner(tmp_path, fake, allow_foundation=False)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     audits = list((tmp_path / "audit").glob("daintree.test.created.*.json"))
     assert len(audits) == 1
@@ -499,7 +501,7 @@ async def test_improve_cannot_promote_specific_without_optin(tmp_path: Path) -> 
     proposal = {**PROPOSAL_IMPROVE, "foundation": True}
     fake = _provider(GATE_IMPROVE, proposal)
     learner, manager, _ = _learner(tmp_path, fake, with_target=True, allow_foundation=False)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.target")
     assert skill is not None and skill.meta.foundation is False
@@ -510,7 +512,7 @@ async def test_improve_promotes_specific_with_optin(tmp_path: Path) -> None:
     proposal = {**PROPOSAL_IMPROVE, "foundation": True}
     fake = _provider(GATE_IMPROVE, proposal)
     learner, manager, _ = _learner(tmp_path, fake, with_target=True, allow_foundation=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.target")
     assert skill is not None and skill.meta.foundation is True
@@ -521,7 +523,7 @@ async def test_gate_none_does_nothing(tmp_path: Path) -> None:
     fake = _provider(GATE_NONE, PROPOSAL_CREATE)
     learner, manager, write_dir = _learner(tmp_path, fake)
     before = manager.catalog.revision
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
     assert manager.catalog.revision == before
@@ -534,7 +536,7 @@ async def test_gate_without_evidence_does_nothing(tmp_path: Path) -> None:
     gate = {**GATE_CREATE, "evidence": []}
     fake = _provider(gate, PROPOSAL_CREATE)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
     assert len(fake.requests) == 1  # gate only — no builder call
@@ -547,7 +549,7 @@ async def test_risk_case_normalized(tmp_path: Path) -> None:
     proposal = {**PROPOSAL_CREATE, "risk": "Read"}
     fake = _provider(GATE_CREATE, proposal)
     learner, manager, _ = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     skill = manager.catalog.get("daintree.test.created")
     assert skill is not None
@@ -559,7 +561,7 @@ async def test_low_confidence_gate_does_nothing(tmp_path: Path) -> None:
     gate = {**GATE_CREATE, "confidence": 0.5}
     fake = _provider(gate, PROPOSAL_CREATE)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
 
@@ -569,7 +571,7 @@ async def test_non_general_lesson_does_nothing(tmp_path: Path) -> None:
     gate = {**GATE_CREATE, "lesson_type": "project_specific"}
     fake = _provider(gate, PROPOSAL_CREATE)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
 
@@ -578,7 +580,7 @@ async def test_non_general_lesson_does_nothing(tmp_path: Path) -> None:
 async def test_propose_mode_writes_json_not_skill(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, manager, write_dir = _learner(tmp_path, fake, mode="propose")
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
     assert "daintree.test.created" not in manager.catalog
@@ -591,7 +593,7 @@ async def test_invalid_proposal_rejected(tmp_path: Path) -> None:
     bad = {**PROPOSAL_CREATE, "body": ""}  # empty body fails the skill loader
     fake = _provider(GATE_CREATE, bad)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
 
@@ -601,7 +603,7 @@ async def test_bad_new_id_rejected(tmp_path: Path) -> None:
     bad = {**PROPOSAL_CREATE, "skill_id": "not-house-style"}
     fake = _provider(GATE_CREATE, bad)
     learner, _, _ = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
 
 
@@ -614,7 +616,7 @@ async def test_secret_in_body_rejected(tmp_path: Path) -> None:
     }
     fake = _provider(GATE_CREATE, leaky)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
 
@@ -630,7 +632,7 @@ async def test_non_house_style_body_rejected(tmp_path: Path) -> None:
     }
     fake = _provider(GATE_CREATE, off_style)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
 
@@ -646,7 +648,7 @@ async def test_hardcoded_agent_body_rejected(tmp_path: Path) -> None:
     }
     fake = _provider(GATE_CREATE, hardcoded)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
 
@@ -660,7 +662,7 @@ async def test_audit_redacts_secretlike_evidence(tmp_path: Path) -> None:
     proposal = {**PROPOSAL_IMPROVE, "what_worked": [f"reused the key {secret}"]}
     fake = _provider(GATE_IMPROVE, proposal)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     audits = list((tmp_path / "audit").glob("daintree.test.target.*.json"))
     assert len(audits) == 1
@@ -719,6 +721,7 @@ async def test_gate_transcript_includes_trailing_final_answer(tmp_path: Path) ->
     learner, _, _ = _learner(tmp_path, fake)
     final = "FINAL-ANSWER-SENTINEL-9c3f"
     await learner.run(
+        api_key=TEST_API_KEY,
         request=_request(),
         active_ids=[],
         trailing_messages=[ChatMessage(role="assistant", content=final)],
@@ -744,6 +747,7 @@ async def test_gate_transcript_excludes_structured_startup_context(tmp_path: Pat
     fake.complete_result = _complete
     learner, _, _ = _learner(tmp_path, fake)
     await learner.run(
+        api_key=TEST_API_KEY,
         request=_request(
             messages=[*MESSAGES, {"role": "user", "content": "VISIBLE-LEARNING-EVIDENCE"}],
             startup={
@@ -767,7 +771,7 @@ async def test_create_id_collision_rejected(tmp_path: Path) -> None:
     collide = {**PROPOSAL_CREATE, "skill_id": "daintree.test.example"}
     fake = _provider(GATE_CREATE, collide)
     learner, manager, _ = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert manager.catalog.get("daintree.test.example").summary == "An example skill for tests."
 
@@ -779,7 +783,7 @@ async def test_improve_wrong_target_rejected(tmp_path: Path) -> None:
     proposal = {**PROPOSAL_IMPROVE, "skill_id": "daintree.test.example"}
     fake = _provider(GATE_IMPROVE, proposal)
     learner, manager, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is False
     assert manager.catalog.get("daintree.test.target").summary == "The original target summary."
     assert manager.catalog.get("daintree.test.example").summary == "An example skill for tests."
@@ -791,7 +795,7 @@ async def test_create_with_update_action_rejected(tmp_path: Path) -> None:
     proposal = {**PROPOSAL_CREATE, "action": "update_skill"}
     fake = _provider(GATE_CREATE, proposal)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
 
@@ -800,7 +804,7 @@ async def test_create_with_update_action_rejected(tmp_path: Path) -> None:
 async def test_no_change_proposal_does_nothing(tmp_path: Path) -> None:
     fake = _provider(GATE_IMPROVE, {"action": "no_change", "skill_id": "daintree.test.target"})
     learner, manager, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is False
     assert manager.catalog.get("daintree.test.target").summary == "The original target summary."
 
@@ -816,7 +820,7 @@ async def test_audit_records_diff_and_analysis(tmp_path: Path) -> None:
     }
     fake = _provider(GATE_IMPROVE, proposal)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     audits = list((tmp_path / "audit").glob("daintree.test.target.*.json"))
     assert len(audits) == 1
@@ -843,7 +847,7 @@ async def test_cancel_during_commit_keeps_disk_and_catalog_in_sync(tmp_path: Pat
         return await real_reload()
 
     manager.reload = slow_reload  # type: ignore[method-assign]
-    task = asyncio.create_task(learner.run(request=_request(), active_ids=[]))
+    task = asyncio.create_task(learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[]))
     await started.wait()
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -866,7 +870,7 @@ async def test_reload_failure_rolls_back_file(tmp_path: Path) -> None:
         raise RuntimeError("disk went away")
 
     manager.reload = broken_reload  # type: ignore[method-assign]
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
     assert manager.catalog.revision == before
@@ -878,10 +882,10 @@ async def test_identical_improve_applies_once_then_skips(tmp_path: Path) -> None
     # byte-identical improve must not re-apply forever.
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, manager, _ = _learner(tmp_path, fake, with_target=True)
-    first = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    first = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert first.changed is True
     revision = manager.catalog.revision
-    second = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    second = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert second.changed is False
     assert manager.catalog.revision == revision
 
@@ -910,7 +914,7 @@ async def test_gate_related_skills_become_builder_examples(tmp_path: Path) -> No
     gate = {**GATE_CREATE, "related_skill_ids": ["daintree.test.target"]}
     fake = _provider(gate, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     build_calls = [r for r in fake.requests if "skill builder" in r.messages[0]["content"]]
     assert len(build_calls) == 1
@@ -928,7 +932,7 @@ async def test_gate_related_skills_shown_to_improver(tmp_path: Path) -> None:
     gate = {**GATE_IMPROVE, "related_skill_ids": ["daintree.test.example"]}
     fake = _provider(gate, PROPOSAL_IMPROVE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     improve_calls = [r for r in fake.requests if "skill improver" in r.messages[0]["content"]]
     assert len(improve_calls) == 1
@@ -963,7 +967,7 @@ def test_transcript_keeps_long_messages_and_tool_results(tmp_path: Path) -> None
 async def test_disabled_when_mode_off_never_calls_provider(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake, mode="off")
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert fake.requests == []
 
@@ -974,7 +978,7 @@ async def test_ineligible_short_conversation_skips_gate(tmp_path: Path) -> None:
     learner, _, _ = _learner(tmp_path, fake)
     # No assistant message → not eligible → gate never runs.
     req = _request([{"role": "user", "content": "hi"}])
-    outcome = await learner.run(request=req, active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=req, active_ids=[])
     assert outcome.changed is False
     assert fake.requests == []
 
@@ -985,7 +989,7 @@ async def test_provider_error_fails_open(tmp_path: Path) -> None:
     fake.complete_error = upstream_error("boom", retryable=False)
     learner, _, write_dir = _learner(tmp_path, fake)
     # Must not raise; the turn proceeds untouched.
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert not (write_dir / "daintree.test.created.md").exists()
 
@@ -1061,7 +1065,7 @@ async def test_learns_after_completed_turn(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     orch, manager, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL)
+    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
     assert outcome.body is not None
     # The main completion returned its normal reply straight away...
     assert outcome.body["message"]["content"] == "ok"
@@ -1109,7 +1113,7 @@ async def test_learner_skipped_when_turn_ends_in_tool_calls(tmp_path: Path) -> N
     fake.complete_result = _complete
     orch, _, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL)
+    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
     assert outcome.body is not None
     await orch.drain_background_tasks()  # nothing was spawned; a no-op
 
@@ -1134,7 +1138,7 @@ async def test_learns_after_streamed_completion(tmp_path: Path) -> None:
             "generation": {"stream": True},
         }
     )
-    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL)
+    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
     assert outcome.stream is not None
     async for _event in outcome.stream:  # drain the SSE stream to completion
         pass
@@ -1187,7 +1191,7 @@ async def test_learner_skipped_when_streamed_turn_ends_in_tool_calls(tmp_path: P
             "generation": {"stream": True},
         }
     )
-    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL)
+    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
     assert outcome.stream is not None
     async for _event in outcome.stream:
         pass
@@ -1254,10 +1258,10 @@ async def test_drain_background_tasks_cancels_after_timeout(tmp_path: Path) -> N
 async def test_improve_lands_once_per_session(tmp_path: Path) -> None:
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    first = await learner.run(request=_request(), active_ids=[])
+    first = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert first.changed is True
     after_first = len(fake.requests)  # gate + improver
-    second = await learner.run(request=_request(), active_ids=[])
+    second = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert second.changed is False
     # The damp skips BEFORE the improver call: only the gate ran the second time.
     assert len(fake.requests) == after_first + 1
@@ -1269,12 +1273,12 @@ async def test_improve_lands_once_per_session(tmp_path: Path) -> None:
 async def test_improve_damp_is_per_session(tmp_path: Path) -> None:
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    await learner.run(request=_request(), active_ids=[])
+    await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     after_first = len(fake.requests)
     # A different session is entitled to its own change for the same skill: the
     # improver runs again (gate + builder), even though the identical render then
     # lands nothing new.
-    outcome = await learner.run(request=_request(session_id="s2"), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(session_id="s2"), active_ids=[])
     assert len(fake.requests) == after_first + 2
     assert outcome.changed is False  # identical to the already-applied improvement
 
@@ -1300,10 +1304,10 @@ async def test_create_marks_new_skill_for_session_damp(tmp_path: Path) -> None:
 
     fake.complete_result = _complete
     learner, _, _ = _learner(tmp_path, fake)
-    first = await learner.run(request=_request(), active_ids=[])
+    first = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert first.created_id == "daintree.test.created"
     after_first = len(fake.requests)
-    second = await learner.run(request=_request(), active_ids=[])
+    second = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert second.changed is False
     assert len(fake.requests) == after_first + 1  # gate only
 
@@ -1327,10 +1331,10 @@ async def test_no_change_verdict_consumes_session_damp(tmp_path: Path) -> None:
     no_change = {"action": "no_change", "skill_id": "daintree.test.target", "confidence": 0}
     fake = _provider(GATE_IMPROVE, no_change)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    first = await learner.run(request=_request(), active_ids=[])
+    first = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert first.changed is False
     after_first = len(fake.requests)  # gate + improver
-    await learner.run(request=_request(), active_ids=[])
+    await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert len(fake.requests) == after_first + 1  # gate only — improver not re-spent
 
 
@@ -1340,7 +1344,7 @@ async def test_inflight_improve_reservation_blocks_overlapping_pass(tmp_path: Pa
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
     # Simulate a concurrent pass parked inside its builder call for the same skill.
     learner._improves_in_flight.add(("s", "daintree.test.target"))
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert len(fake.requests) == 1  # gate only — no double builder spend
     # The reservation belongs to the (simulated) first pass — not consumed here.
@@ -1370,11 +1374,11 @@ async def test_session_mints_at_most_one_skill(tmp_path: Path) -> None:
     fake.complete_result = _complete
     learner, manager, write_dir = _learner(tmp_path, fake)
 
-    first = await learner.run(request=_request(), active_ids=[])
+    first = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert first.created_id == "daintree.test.created"
     after_first = len(fake.requests)
 
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is False
     assert len(fake.requests) == after_first + 1  # gate only — no second builder spend
     assert not (write_dir / "daintree.test.twin.md").exists()
@@ -1400,11 +1404,11 @@ async def test_create_damp_is_per_session(tmp_path: Path) -> None:
     fake.complete_result = _complete
     learner, manager, write_dir = _learner(tmp_path, fake)
 
-    first = await learner.run(request=_request(), active_ids=[])
+    first = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert first.created_id == "daintree.test.created"
     after_first = len(fake.requests)
 
-    outcome = await learner.run(request=_request(session_id="s2"), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(session_id="s2"), active_ids=[])
     assert len(fake.requests) == after_first + 2  # gate + builder ran again
     assert outcome.changed is True
     assert outcome.created_id == "daintree.test.later"
@@ -1450,13 +1454,13 @@ async def test_inflight_create_reservation_is_process_wide(tmp_path: Path) -> No
     async def second_pass() -> Any:
         await first_in_builder.wait()
         try:
-            return await learner.run(request=_request(session_id="other"), active_ids=[])
+            return await learner.run(api_key=TEST_API_KEY, request=_request(session_id="other"), active_ids=[])
         finally:
             second_finished.set()  # let pass one out of its builder call
 
     first, second = await asyncio.wait_for(
         asyncio.gather(
-            learner.run(request=_request(session_id="first"), active_ids=[]),
+            learner.run(api_key=TEST_API_KEY, request=_request(session_id="first"), active_ids=[]),
             second_pass(),
         ),
         timeout=10,
@@ -1476,7 +1480,7 @@ async def test_inflight_create_reservation_is_process_wide(tmp_path: Path) -> No
 async def test_create_reservation_released_after_pass(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake)
-    await learner.run(request=_request(), active_ids=[])
+    await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert learner._create_in_flight is False
 
 
@@ -1504,7 +1508,7 @@ async def test_create_abandoned_when_the_catalog_moved_under_the_gate(tmp_path: 
         return verdict
 
     learner._gate = gate_then_move_the_catalog  # type: ignore[method-assign]
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
 
     assert outcome.changed is False
     assert len(fake.requests) == 1  # gate only — no builder spend
@@ -1527,7 +1531,7 @@ async def test_improve_aborts_when_file_changed_on_disk(tmp_path: Path) -> None:
     hand_edited = _TARGET.replace("Original step.", "A hand-edited step.")
     path.write_text(hand_edited, encoding="utf-8")
 
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is False
     assert path.read_text(encoding="utf-8") == hand_edited  # the hand edit survived
     assert not (write_dir / "daintree.test.target.md.tmp").exists()  # temp discarded
@@ -1556,7 +1560,7 @@ async def test_improve_tolerates_cosmetic_yaml_reflow(tmp_path: Path) -> None:
     assert path.read_bytes() != _TARGET.encode()  # different bytes...
     assert parse_skill(reflowed).content_hash == parse_skill(_TARGET).content_hash  # same skill
 
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     assert manager.catalog.get("daintree.test.target").summary == "An improved target summary."
 
@@ -1567,7 +1571,7 @@ async def test_create_is_not_blocked_by_drift_check(tmp_path: Path) -> None:
     # an existing file at that path is already caught by the id-collision guard.
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, write_dir = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     assert (write_dir / "daintree.test.created.md").is_file()
 
@@ -1613,7 +1617,7 @@ async def test_improve_rejects_runaway_body_growth(tmp_path: Path) -> None:
     }
     fake = _provider(GATE_IMPROVE, bloated)
     learner, manager, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is False
     assert manager.catalog.get("daintree.test.target").summary == "The original target summary."
 
@@ -1635,7 +1639,7 @@ async def test_improve_allows_growth_within_the_allowance(tmp_path: Path) -> Non
     assert len(grown["body"].encode()) <= sl._growth_limit(len(target_body.encode()))
     fake = _provider(GATE_IMPROVE, grown)
     learner, manager, _ = _learner(tmp_path, fake, with_target=True)
-    outcome = await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     assert outcome.changed is True
     assert added in manager.catalog.get("daintree.test.target").body
 
@@ -1664,6 +1668,7 @@ async def test_invented_required_tool_is_stripped_not_fatal(tmp_path: Path) -> N
     fake = _provider(GATE_CREATE, proposal)
     learner, manager, _ = _learner(tmp_path, fake)
     outcome = await learner.run(
+        api_key=TEST_API_KEY,
         request=_request(tools=["context__snapshot", "agent__spawn"]), active_ids=[]
     )
     assert outcome.changed is True
@@ -1694,7 +1699,7 @@ async def test_required_tool_already_in_catalog_survives(tmp_path: Path) -> None
         prompt_loader=_loader(),
         catalog_manager=manager,
     )
-    outcome = await learner.run(request=_request(tools=["terminal__read"]), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(tools=["terminal__read"]), active_ids=[])
     assert outcome.changed is True
     assert manager.catalog.get("daintree.test.created").meta.required_tools == [
         "context.snapshot"
@@ -1709,7 +1714,7 @@ async def test_required_tools_deduped_after_normalization(tmp_path: Path) -> Non
     proposal = {**PROPOSAL_CREATE, "requiredTools": ["agent__spawn", "agent.spawn"]}
     fake = _provider(GATE_CREATE, proposal)
     learner, manager, _ = _learner(tmp_path, fake)
-    outcome = await learner.run(request=_request(tools=["agent__spawn"]), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(tools=["agent__spawn"]), active_ids=[])
     assert outcome.changed is True
     assert manager.catalog.get("daintree.test.created").meta.required_tools == ["agent.spawn"]
 
@@ -1735,7 +1740,7 @@ async def test_no_tools_reported_narrows_to_the_catalog_rather_than_admitting_an
     learner, manager, _ = _learner(
         tmp_path, fake, with_target=True, target_text=target_with_tools
     )
-    outcome = await learner.run(request=_request(), active_ids=[])
+    outcome = await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=[])
     assert outcome.changed is True
     kept = manager.catalog.get("daintree.test.created").meta.required_tools
     assert "something.unheard-of" not in kept
@@ -1761,7 +1766,7 @@ async def test_lesson_kind_reaches_the_improver(tmp_path: Path) -> None:
     gate = {**GATE_IMPROVE, "lesson_kind": "trigger"}
     fake = _provider(gate, PROPOSAL_IMPROVE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
-    await learner.run(request=_request(), active_ids=["daintree.test.target"])
+    await learner.run(api_key=TEST_API_KEY, request=_request(), active_ids=["daintree.test.target"])
     improve_calls = [r for r in fake.requests if "skill improver" in r.messages[0]["content"]]
     assert len(improve_calls) == 1
     assert "Gate lesson kind: trigger" in improve_calls[0].messages[1]["content"]

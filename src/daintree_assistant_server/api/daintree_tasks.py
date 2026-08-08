@@ -17,11 +17,11 @@ router = APIRouter()
 async def run_task(
     body: TaskRequest,
     request: Request,
-    _principal: Principal = Depends(require_auth),
+    principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
 ) -> JSONResponse:
     reject_forbidden_prompt_keys(body.input, param="input")
     container = request.app.state.container
-    result = await container.task_runner.run(body)
+    result = await container.task_runner.run(body, api_key=principal.api_key)
     headers = {"X-Request-Id": body.request_id} if body.request_id else {}
     return JSONResponse(content=result.model_dump(), headers=headers)

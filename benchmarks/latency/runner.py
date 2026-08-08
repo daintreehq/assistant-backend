@@ -47,6 +47,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from pydantic import SecretStr
+
 from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
 from daintree_assistant_server.contracts.openai import ChatMessage
 from daintree_assistant_server.contracts.tasks import TaskRequest
@@ -54,7 +56,7 @@ from daintree_assistant_server.main import build_container
 
 from .._harness.cases import CaseError, load_yaml_cases
 from .._harness.counting import CountingProvider
-from .._harness.env import build_settings, make_upstream_provider
+from .._harness.env import build_settings, caller_api_key, make_upstream_provider
 from .._harness.fixtures import build_respond_request
 from .._harness.stats import latency_summary, percentile
 
@@ -132,7 +134,9 @@ def _delta_has_content(payload: dict[str, Any]) -> bool:
 # ---------------------------------------------------------------------------
 
 
-async def _prime_state(container: Any, scenario: dict[str, Any]) -> str | None:
+async def _prime_state(
+    container: Any, scenario: dict[str, Any], api_key: SecretStr
+) -> str | None:
     """Run a throwaway first turn to mint a valid state token for a continuation.
 
     A continuation case is only meaningful against state the server itself signed
@@ -145,14 +149,20 @@ async def _prime_state(container: Any, scenario: dict[str, Any]) -> str | None:
         turn_id=_PRIMED_TURN_ID,
         stream=False,
     )
-    outcome = await container.orchestrator.complete(request, upstream_model=OPENROUTER_MODEL)
+    outcome = await container.orchestrator.complete(
+        request, upstream_model=OPENROUTER_MODEL, api_key=api_key
+    )
     body = outcome.body or {}
     state = body.get("state")
     return state if isinstance(state, str) else None
 
 
 async def _run_turn_trial(
-    container: Any, scenario: dict[str, Any], state: str | None, turn_id: str
+    container: Any,
+    scenario: dict[str, Any],
+    state: str | None,
+    turn_id: str,
+    api_key: SecretStr,
 ) -> dict[str, Any]:
     stream = bool(scenario.get("stream", True))
     # A genuine tool-continuation ROUND reuses the turn's id — that is precisely what
@@ -172,7 +182,9 @@ async def _run_turn_trial(
         request = request.model_copy(update={"state": state})
 
     t0 = time.perf_counter()
-    outcome = await container.orchestrator.complete(request, upstream_model=OPENROUTER_MODEL)
+    outcome = await container.orchestrator.complete(
+        request, upstream_model=OPENROUTER_MODEL, api_key=api_key
+    )
 
     if not stream:
         total = time.perf_counter() - t0
@@ -234,13 +246,13 @@ async def _run_turn_trial(
 
 
 async def _run_task_trial(
-    container: Any, counter: CountingProvider, scenario: dict[str, Any]
+    container: Any, counter: CountingProvider, scenario: dict[str, Any], api_key: SecretStr
 ) -> dict[str, Any]:
     counter.reset()
     # The case files say `data:` for readability; the wire field is `input`.
     request = TaskRequest.model_validate({"task": scenario["task"], "input": scenario["data"]})
     t0 = time.perf_counter()
-    result = await container.task_runner.run(request)
+    result = await container.task_runner.run(request, api_key=api_key)
     total = time.perf_counter() - t0
     first = counter.first_result
     return {
@@ -255,14 +267,14 @@ async def _run_task_trial(
 
 
 async def _run_selector_trial(
-    container: Any, counter: CountingProvider, scenario: dict[str, Any]
+    container: Any, counter: CountingProvider, scenario: dict[str, Any], api_key: SecretStr
 ) -> dict[str, Any]:
     counter.reset()
     conversation = [
         ChatMessage(role=m["role"], content=m["content"]) for m in scenario["messages"]
     ]
     t0 = time.perf_counter()
-    decision = await container.selector.select(conversation, active_ids=[])
+    decision = await container.selector.select(conversation, active_ids=[], api_key=api_key)
     total = time.perf_counter() - t0
     first = counter.first_result
     return {
@@ -363,6 +375,7 @@ async def run_async(
     # stream all resolve to the counting decorator — it delegates byte-identically,
     # so the model sees exactly the production request either way.
     container = build_container(settings, counter)
+    api_key = caller_api_key(settings)
 
     results: list[dict[str, Any]] = []
     try:
@@ -370,7 +383,7 @@ async def run_async(
             kind = scenario["kind"]
             state: str | None = None
             if kind == "turn" and scenario.get("prime"):
-                state = await _prime_state(container, scenario)
+                state = await _prime_state(container, scenario, api_key)
 
             trial_rows: list[dict[str, Any]] = []
             total_runs = trials + (1 if warmup else 0)
@@ -378,12 +391,12 @@ async def run_async(
                 try:
                     if kind == "turn":
                         row = await _run_turn_trial(
-                            container, scenario, state, turn_id=f"t{i}"
+                            container, scenario, state, turn_id=f"t{i}", api_key=api_key
                         )
                     elif kind == "task":
-                        row = await _run_task_trial(container, counter, scenario)
+                        row = await _run_task_trial(container, counter, scenario, api_key)
                     else:
-                        row = await _run_selector_trial(container, counter, scenario)
+                        row = await _run_selector_trial(container, counter, scenario, api_key)
                 except Exception as exc:  # noqa: BLE001 — a failed trial is data
                     row = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
                 # The first run pays TLS + connection setup on a fresh client; it is

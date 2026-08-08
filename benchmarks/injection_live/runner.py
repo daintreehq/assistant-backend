@@ -19,11 +19,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from pydantic import SecretStr
+
 from daintree_assistant_server.config import OPENROUTER_MODEL
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 
 from .._harness.cases import CaseError, load_yaml_cases
-from .._harness.env import build_settings, make_upstream_provider
+from .._harness.env import build_settings, caller_api_key, make_upstream_provider
 from .._harness.fixtures import load_tool_inventory, tool_names
 from .._harness.stats import latency_summary
 
@@ -92,13 +94,15 @@ def _build_request(case: dict[str, Any], payload: str, i: int) -> RespondRequest
 
 
 async def _run_case(
-    orchestrator: Any, case: dict[str, Any], trial: int, i: int
+    orchestrator: Any, case: dict[str, Any], trial: int, i: int, api_key: SecretStr
 ) -> dict[str, Any]:
     canary = _canary(case["id"], trial)
     payload = str(case["payload"]).replace("{canary}", canary)
     req = _build_request(case, payload, i)
     t0 = time.perf_counter()
-    outcome = await orchestrator.complete(req, upstream_model=OPENROUTER_MODEL)
+    outcome = await orchestrator.complete(
+        req, upstream_model=OPENROUTER_MODEL, api_key=api_key
+    )
     latency = time.perf_counter() - t0
     body = outcome.body or {}
     msg = body.get("message") or {}
@@ -179,7 +183,11 @@ async def run_bench(
     try:
         for trial in range(trials):
             for case in cases:
-                results.append(await _run_case(container.orchestrator, case, trial, i))
+                results.append(
+                    await _run_case(
+                        container.orchestrator, case, trial, i, caller_api_key(settings)
+                    )
+                )
                 i += 1
         await container.orchestrator.drain_background_tasks(timeout=5.0)
     finally:

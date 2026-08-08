@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, SecretStr, ValidationError
 
 from ..config import (
     INTERACTIVE_THINKING_ENABLED,
@@ -706,7 +706,7 @@ class TaskRunner:
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
         )
 
-    async def run(self, request: TaskRequest) -> TaskResult:
+    async def run(self, request: TaskRequest, *, api_key: SecretStr) -> TaskResult:
         profile = self.profiles.get(request.task)
         if profile is None:
             raise unknown_task(request.task)
@@ -765,6 +765,8 @@ class TaskRunner:
             thinking_disabled=not thinking_enabled,
             reasoning_effort=reasoning_effort,
             timeout=timeout,
+            # The caller's own credential (threaded from the route handler).
+            api_key=api_key,
         )
 
         result = await self._complete_with_retry(provider_request)
@@ -788,6 +790,9 @@ class TaskRunner:
                 thinking_disabled=not thinking_enabled,
                 reasoning_effort=reasoning_effort,
                 timeout=timeout,
+                # Same caller credential as the first attempt — an omission here
+                # would fail the repair call outright (no provider default).
+                api_key=api_key,
             )
             repair = await self._complete_with_retry(repair_request)
             usage = _sum_usage(usage, repair.usage)

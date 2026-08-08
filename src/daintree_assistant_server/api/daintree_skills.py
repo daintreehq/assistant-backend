@@ -54,7 +54,7 @@ class ResolveRequest(BaseModel):
 async def resolve_skills(
     body: ResolveRequest,
     request: Request,
-    _principal: Principal = Depends(require_auth),
+    principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
 ) -> JSONResponse:
     check_protocol_header(request)
@@ -70,6 +70,8 @@ async def resolve_skills(
         action=body.action,
         session_id=body.session_id,
         state_token=body.state,
+        # A 'find' runs the selector — an upstream call on the caller's key.
+        api_key=principal.api_key,
         turn_id=body.turn_id,
         instruction_revision=body.instruction_revision,
         query=body.query,

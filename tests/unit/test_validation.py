@@ -12,12 +12,12 @@ from daintree_assistant_server.services.validation import validate_respond_reque
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(DAINTREE_API_KEY="k", OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+    return Settings(OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
 
 
 def _settings(**overrides: object) -> Settings:
     base: dict[str, object] = {
-        "DAINTREE_API_KEY": "k", "OPENROUTER_API_KEY": "d", "STATE_SIGNING_KEY_CURRENT": "s",
+        "OPENROUTER_API_KEY": "d", "STATE_SIGNING_KEY_CURRENT": "s",
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]

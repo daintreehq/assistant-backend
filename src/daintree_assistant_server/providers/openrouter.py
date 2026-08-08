@@ -442,7 +442,7 @@ class OpenRouterProvider:
         self,
         client: httpx.AsyncClient,
         *,
-        api_key: SecretStr,
+        api_key: SecretStr | None = None,
         base_url: str = "https://openrouter.ai/api/v1",
         default_timeout: float = 60.0,
         send_reasoning: bool = True,
@@ -450,8 +450,11 @@ class OpenRouterProvider:
     ) -> None:
         self._client = client
         # The FALLBACK credential only: a request carrying its own ``api_key``
-        # overrides it. Held as a SecretStr and unwrapped solely where a header or
-        # a redaction pattern is built, never stored as plaintext on the instance.
+        # overrides it. The SERVER passes None here (it holds no upstream key —
+        # every call carries the caller's own); standalone tooling (benchmarks,
+        # live tests) may pass a default. Held as a SecretStr and unwrapped solely
+        # where a header or a redaction pattern is built, never stored as
+        # plaintext on the instance.
         self._default_api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._default_timeout = default_timeout
@@ -506,6 +509,12 @@ class OpenRouterProvider:
         one, and the message deliberately carries no part of the value.
         """
         key = request_api_key if request_api_key is not None else self._default_api_key
+        if key is None:
+            # No per-call credential and no configured default. On the serving
+            # path this is a propagation bug (auth guarantees every request
+            # carries a key): fail loudly here rather than ever spending a
+            # shared account.
+            raise upstream_error("No upstream credential was supplied for this call.")
         plain = key.get_secret_value()
         if not plain or not all(_HEADER_SAFE_MIN <= ord(c) <= _HEADER_SAFE_MAX for c in plain):
             raise upstream_error("The upstream credential is empty or malformed.")
@@ -596,12 +605,14 @@ class OpenRouterProvider:
         if status >= 500:
             # Transient upstream fault — retry while no model output is exposed.
             return upstream_error(retryable=True)
-        # An auth/billing rejection says nothing about the CLIENT's request — it is
-        # about OUR upstream account. Forwarding that prose leaks provider account and
-        # quota detail to any Daintree-key holder, so keep it to the log (the
-        # upstream_http_error entry already carries the full body).
+        # An auth/billing rejection concerns the CALLER's upstream account (their
+        # own key rode this request), not the shape of their request. The 502
+        # upstream_error code keeps it distinguishable from our own 401
+        # invalid_api_key (missing/malformed at our door); upstream prose stays in
+        # the log (the upstream_http_error entry already carries the full body)
+        # rather than the response, so account/quota detail is never echoed.
         if status in (401, 402, 403):
-            return upstream_error("The upstream provider rejected this server's credentials.")
+            return upstream_error("The upstream provider rejected the supplied credentials.")
         # OpenRouter-specific: 404 on a chat completion is routing, not a bad URL —
         # no endpoint satisfied `_PROVIDER_ROUTING` (privacy filter plus
         # require_parameters can empty the pool for an unusual parameter mix). Name

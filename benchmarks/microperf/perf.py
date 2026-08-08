@@ -50,7 +50,7 @@ from daintree_assistant_server.providers.base import (
 from daintree_assistant_server.skills.catalog import load_catalog
 from daintree_assistant_server.state.codec import StateCodec
 
-from .._harness.env import build_settings
+from .._harness.env import BENCH_CALLER_KEY, build_settings
 from .._harness.fixtures import build_respond_request
 from .._harness.stats import latency_summary, percentile
 
@@ -361,7 +361,9 @@ async def measure_concurrency(
 
     async def one(request: RespondRequest, t_submit: float) -> float:
         nonlocal warning_count
-        outcome = await orchestrator.complete(request, upstream_model=OPENROUTER_MODEL)
+        outcome = await orchestrator.complete(
+            request, upstream_model=OPENROUTER_MODEL, api_key=BENCH_CALLER_KEY
+        )
         elapsed = time.perf_counter() - t_submit
         warning_count += len((outcome.body or {}).get("warnings") or [])
         return elapsed

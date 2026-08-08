@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 from fakes import FakeProvider, make_result
+from pydantic import SecretStr
 
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
@@ -67,8 +68,10 @@ def plan_payload(**over: Any) -> dict[str, Any]:
     return base
 
 
+TEST_API_KEY = SecretStr("test-caller-key")
+
 async def _run(runner: TaskRunner, task: str, inp: dict[str, Any]) -> dict[str, Any]:
-    result = await runner.run(TaskRequest(task=task, input=inp))
+    result = await runner.run(TaskRequest(task=task, input=inp), api_key=TEST_API_KEY)
     return result.output
 
 
@@ -252,7 +255,7 @@ async def test_plan_unknown_skill_id_ignored(
 @pytest.mark.asyncio
 async def test_plan_requires_goal(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
-        await task_runner.run(TaskRequest(task="workflow_plan", input={}))
+        await task_runner.run(TaskRequest(task="workflow_plan", input={}), api_key=TEST_API_KEY)
     assert exc.value.status_code == 400
 
 
@@ -465,7 +468,8 @@ async def test_reconcile_patch_internal_cycle_rejected_without_a_snapshot(
 async def test_reconcile_requires_reason(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(
-            TaskRequest(task="workflow_reconcile", input={"workflow": workflow_snapshot()})
+            TaskRequest(task="workflow_reconcile", input={"workflow": workflow_snapshot()}),
+            api_key=TEST_API_KEY,
         )
     assert exc.value.status_code == 400
 

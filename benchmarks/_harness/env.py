@@ -56,6 +56,25 @@ def build_settings(
     return settings
 
 
+# Service entry points (orchestrator.complete, task_runner.run, selector.select)
+# now require a per-call caller key — the serving path holds no default. Fake-
+# provider suites pass this fixed sentinel (never sent anywhere); live suites
+# pass the real key via ``caller_api_key``.
+BENCH_CALLER_KEY = SecretStr("benchmark-caller-key-not-a-secret")
+
+
+def caller_api_key(settings: Settings) -> SecretStr:
+    """The per-call credential for service-level benchmark calls.
+
+    The real ``OPENROUTER_API_KEY`` when the environment has one (live suites),
+    else the bench sentinel (deterministic suites, whose fake providers never
+    build a header from it).
+    """
+    if settings.openrouter_api_key.get_secret_value():
+        return settings.openrouter_api_key
+    return BENCH_CALLER_KEY
+
+
 def require_api_key(settings: Settings) -> SecretStr:
     """Validate the key is present and return it still wrapped.
 

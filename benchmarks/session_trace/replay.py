@@ -102,7 +102,12 @@ class SpyLearner:
         self.runs: list[dict[str, Any]] = []
 
     async def run(
-        self, *, request: Any, active_ids: list[str], trailing_messages: Any  # noqa: ARG002
+        self,
+        *,
+        request: Any,  # noqa: ARG002
+        active_ids: list[str],
+        api_key: Any,  # noqa: ARG002
+        trailing_messages: Any,  # noqa: ARG002
     ) -> None:
         # Signature must match the real SkillLearner.run; only the fire is recorded.
         self.runs.append({"active_ids": list(active_ids)})

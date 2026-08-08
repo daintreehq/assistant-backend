@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import SecretStr
 
 from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
 from daintree_assistant_server.prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
@@ -93,12 +94,14 @@ async def _run_trial(
     case: BenchCase,
     trial: int,
     semaphore: asyncio.Semaphore,
+    api_key: SecretStr,
 ) -> TrialResult:
     async with semaphore:
         started = time.perf_counter()
         decision = await selector.select(
             case.messages,
             list(case.active),
+            api_key=api_key,
             turn_context=case.turn_context,
             available_tools=case.available_tools or None,
         )
@@ -152,7 +155,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     started_at = datetime.now(UTC)
     semaphore = asyncio.Semaphore(config.concurrency)
     jobs = [
-        _run_trial(selector, case, trial, semaphore)
+        _run_trial(selector, case, trial, semaphore, settings.openrouter_api_key)
         for trial in range(config.trials)
         for case in cases
     ]

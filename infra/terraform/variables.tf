@@ -55,7 +55,7 @@ variable "ingress" {
   default     = "INGRESS_TRAFFIC_ALL"
 }
 
-# For a staging URL reachable with just the app bearer key, grant allUsers the
+# For a staging URL reachable with just the caller's bearer key, grant allUsers the
 # run.invoker role (the app's auth, not Google IAM, is the gate). Set false once
 # the service sits behind the load balancer / IAP.
 variable "allow_unauthenticated" {
@@ -71,13 +71,16 @@ variable "environment" {
 }
 
 # Secret Manager secret IDs (values are managed out-of-band, never in TF state).
+# State-signing material ONLY: the deployment holds no API key of either kind.
+# Every request's bearer token is the caller's own key — it authenticates the
+# request AND funds that turn's upstream calls — so there is no inbound key to
+# compare against and no upstream key to mount (the serving provider is built
+# with api_key=None; OPENROUTER_API_KEY is benchmark/live-test tooling only).
 # STATE_SALT must be a real (non-default) value or production readiness fails.
 variable "secret_ids" {
   description = "Map of env var name -> Secret Manager secret id."
   type        = map(string)
   default = {
-    DAINTREE_API_KEY          = "daintree-api-key"
-    OPENROUTER_API_KEY        = "openrouter-api-key"
     STATE_SIGNING_KEY_CURRENT = "state-signing-key-current"
     STATE_SALT                = "state-salt"
   }

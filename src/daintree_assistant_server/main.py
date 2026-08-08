@@ -171,11 +171,13 @@ def _build_provider(settings: Settings) -> ChatProvider:
     )
     return OpenRouterProvider(
         client,
-        # The FALLBACK credential: a request carrying its own api_key overrides it.
-        # Handed over as the SecretStr Settings already holds, so the plaintext is
-        # never carried around; the provider unwraps it only to build a header or to
-        # scrub an echoed key out of upstream error text.
-        api_key=settings.openrouter_api_key,
+        # NO default credential — the server holds no upstream key. Every provider
+        # call must carry the caller's own key (their bearer token, threaded as
+        # ProviderChatRequest.api_key); a call that arrives without one fails
+        # loudly in _resolve_key instead of quietly billing a shared account.
+        # Standalone tooling (benchmarks, live tests) may still construct a
+        # provider WITH a default; the serving path deliberately does not.
+        api_key=None,
         base_url=settings.openrouter_base_url,
         default_timeout=settings.main_timeout_seconds,
         # send_reasoning stays at its True default: a reasoning model thinks when
@@ -274,12 +276,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         # production; checked always, even with an injected provider.
         problems = list(settings.local_only_problems())
         if injected is None:
-            secret_problems = settings.missing_secrets() + settings.weak_secrets()
-            if not settings.is_hardened:
-                # Local dev: a missing inbound API key just enables unauthenticated
-                # access; it must not block the server from booting.
-                secret_problems = [p for p in secret_problems if p != "DAINTREE_API_KEY"]
-            problems.extend(secret_problems)
+            problems.extend(settings.missing_secrets() + settings.weak_secrets())
         if problems:
             raise RuntimeError(f"configuration problems: {', '.join(problems)}")
         container = build_container(settings, injected)

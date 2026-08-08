@@ -82,24 +82,25 @@ file the Docker build installs against for reproducibility).
 
 ### Required configuration
 
-Set these (see `.env.example` for the full list):
+Set this (see `.env.example` for the full list):
 
 ```bash
-export DAINTREE_API_KEY=...               # public bearer key (dev)
-export OPENROUTER_API_KEY=...             # upstream provider key (all models)
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
 ```
 
-Missing required secrets do not crash the process — they fail **readiness**
-(`/readyz` returns 503) so liveness stays green.
+The server holds **no API keys**. Every request carries the caller's own key as its
+bearer token (for early testers, their OpenRouter key), and that same key funds the
+turn's upstream calls — there is no unauthenticated mode in any environment.
+`OPENROUTER_API_KEY` remains only as a benchmark/live-test convenience; the serving
+path never reads it. Missing required secrets do not crash the process — they fail
+**readiness** (`/readyz` returns 503) so liveness stays green.
 
 ### Run locally
 
 ```bash
-# Copy the env scaffold and add your OpenRouter key; it binds HOST/PORT from .env
-# (default 127.0.0.1:8473). In development, leaving DAINTREE_API_KEY unset means
-# unauthenticated access.
-cp .env.example .env   # then edit OPENROUTER_API_KEY (+ PORT if you like)
+# Copy the env scaffold; it binds HOST/PORT from .env (default 127.0.0.1:8473).
+# Requests authenticate with YOUR OpenRouter key as the bearer token.
+cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT (+ PORT if you like)
 python -m daintree_assistant_server
 ```
 

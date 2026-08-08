@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -87,8 +88,9 @@ class Settings(BaseSettings):
     # ---- Environment ----------------------------------------------------
     # A CLOSED set on purpose. Every hardening gate below keys on this value, so a
     # free-form string meant a typo ("prod", "Production", "staging") silently skipped
-    # weak-secret checks, the local-only-feature gate, and the API-key requirement —
-    # i.e. it failed OPEN, in the one direction that matters.
+    # weak-secret checks and the local-only-feature gate — i.e. it failed OPEN, in
+    # the one direction that matters. (Authentication itself no longer varies by
+    # environment: every request needs a caller key everywhere — see auth.py.)
     environment: Literal["development", "test", "staging", "production"] = Field(
         default="development", alias="ENVIRONMENT"
     )
@@ -109,6 +111,12 @@ class Settings(BaseSettings):
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
     )
+    # Benchmark / live-test tooling ONLY. The serving path holds no upstream
+    # credential at all: every request's provider calls use the caller's own key
+    # (their bearer token — see auth.py), and main.py builds the server provider
+    # with api_key=None so a propagation bug fails loudly instead of quietly
+    # billing a shared account. Standalone tooling (benchmarks/, tests/live)
+    # still constructs providers directly from this value.
     openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
 
     # ---- Thinking headroom -----------------------------------------------
@@ -162,9 +170,6 @@ class Settings(BaseSettings):
     # A final assistant message larger than this many characters is flagged as an
     # oversized dump (the recitation failure mode). Observability only.
     main_output_warn_chars: int = Field(default=8000, ge=1, alias="MAIN_OUTPUT_WARN_CHARS")
-
-    # ---- Authentication -------------------------------------------------
-    daintree_api_key: SecretStr = Field(default=SecretStr(""), alias="DAINTREE_API_KEY")
 
     # ---- State signing --------------------------------------------------
     state_signing_key_current: SecretStr = Field(
@@ -414,21 +419,25 @@ class Settings(BaseSettings):
 
     @property
     def is_hardened(self) -> bool:
-        """True where production hardening applies: auth required, no local-only
-        features, weak secrets rejected, internal detail withheld from responses.
+        """True where production hardening applies: no local-only features, weak
+        secrets rejected, the upstream origin pinned, internal detail withheld
+        from responses. (Authentication is NOT environment-dependent: every
+        request needs a caller key everywhere — see auth.py.)
 
         The single place that decides "is this a real deployment?", so the checks
-        below, ``auth.authenticate`` and ``/readyz`` cannot drift apart.
+        below and ``/readyz`` cannot drift apart.
         """
         return self.environment in ("production", "staging")
 
     def missing_secrets(self) -> list[str]:
-        """Return env var names of required secrets that are empty."""
+        """Return env var names of required secrets that are empty.
+
+        Only server-owned material is required. Neither upstream nor inbound API
+        keys appear here: every request supplies its own caller key, which is
+        both the auth credential and the upstream credential, so there is
+        nothing key-related for the server to validate at startup.
+        """
         missing: list[str] = []
-        if not self.openrouter_api_key.get_secret_value():
-            missing.append("OPENROUTER_API_KEY")
-        if not self.daintree_api_key.get_secret_value():
-            missing.append("DAINTREE_API_KEY")
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
         return missing
@@ -465,8 +474,31 @@ class Settings(BaseSettings):
         if not self.is_hardened:
             return []
         problems: list[str] = []
-        if len(self.daintree_api_key.get_secret_value()) < 16:
-            problems.append("DAINTREE_API_KEY is too short (<16 chars)")
+        # The upstream base URL now receives CALLER credential material on every
+        # request (each turn's bearer key rides the Authorization header to this
+        # origin). A hardened deployment with a typo'd, plain-http, or foreign
+        # host would silently disclose every caller key while staying green, so
+        # production pins the real OpenRouter origin. Development stays free to
+        # point at proxies/mocks.
+        try:
+            parsed = urlsplit(self.openrouter_base_url)
+            origin_ok = (
+                parsed.scheme == "https"
+                and parsed.hostname == "openrouter.ai"
+                # Default port only: a non-443 port is a different origin, and a
+                # malformed one should fail readiness, not the first request.
+                and parsed.port in (None, 443)
+                # No userinfo — `https://x@openrouter.ai` still reaches OpenRouter,
+                # but credentials do not belong in this URL in any form.
+                and parsed.username is None
+            )
+        except ValueError:  # e.g. a non-numeric port
+            origin_ok = False
+        if not origin_ok:
+            problems.append(
+                "OPENROUTER_BASE_URL must be the https://openrouter.ai origin in production "
+                "(caller API keys are sent to it)"
+            )
         if len(self.state_signing_key_current.get_secret_value()) < 32:
             problems.append("STATE_SIGNING_KEY_CURRENT is too short (<32 chars)")
         if self.state_salt.get_secret_value() == DEFAULT_STATE_SALT:

@@ -40,10 +40,11 @@ case "$SKILL_LEARNING_MODE" in
   *) echo "✗ Unknown mode '$SKILL_LEARNING_MODE' (use: off | propose | apply)" >&2; exit 2 ;;
 esac
 
-# Friendly heads-up: without a key the server still boots, but /readyz stays 503.
-if [[ ! -f "$ROOT/.env" && -z "${DEEPSEEK_API_KEY:-}" ]]; then
-  echo "⚠  No .env and no DEEPSEEK_API_KEY — server will boot but /readyz will be 503." >&2
-  echo "   Run:  cp .env.example .env   then set DEEPSEEK_API_KEY." >&2
+# Friendly heads-up: without a signing key the server still boots, but /readyz
+# stays 503. (No API keys are needed: requests carry the caller's own key.)
+if [[ ! -f "$ROOT/.env" && -z "${STATE_SIGNING_KEY_CURRENT:-}" ]]; then
+  echo "⚠  No .env and no STATE_SIGNING_KEY_CURRENT — server will boot but /readyz will be 503." >&2
+  echo "   Run:  cp .env.example .env   then set STATE_SIGNING_KEY_CURRENT." >&2
 fi
 
 # Human-readable structured logs in dev so per-round timing lines (`respond`,

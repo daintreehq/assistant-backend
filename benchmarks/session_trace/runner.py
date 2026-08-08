@@ -25,7 +25,7 @@ from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.skills.catalog import load_catalog
 
 from .._harness.cases import CaseError, load_yaml_cases
-from .._harness.env import build_settings
+from .._harness.env import BENCH_CALLER_KEY, build_settings
 from .._harness.fixtures import load_tool_inventory, tool_names
 from . import replay as R
 
@@ -106,7 +106,9 @@ async def _run_trace(orchestrator: Any, spy: R.SpyLearner, provider: R.ReplayPro
         runs_before = len(spy.runs)
         sel_before, main_before = provider.selector_calls, provider.main_calls
         req = _request(list(messages), state, session_id, turn["turn_id"])
-        outcome = await orchestrator.complete(req, upstream_model=OPENROUTER_MODEL)
+        outcome = await orchestrator.complete(
+            req, upstream_model=OPENROUTER_MODEL, api_key=BENCH_CALLER_KEY
+        )
         body = outcome.body or {}
         sel_delta = provider.selector_calls - sel_before
         main_delta = provider.main_calls - main_before
