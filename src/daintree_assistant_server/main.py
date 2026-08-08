@@ -172,8 +172,9 @@ def _build_provider(settings: Settings) -> ChatProvider:
     return OpenRouterProvider(
         client,
         # The FALLBACK credential: a request carrying its own api_key overrides it.
-        # Handed over as the SecretStr Settings already holds — the provider unwraps
-        # it only where a header is built.
+        # Handed over as the SecretStr Settings already holds, so the plaintext is
+        # never carried around; the provider unwraps it only to build a header or to
+        # scrub an echoed key out of upstream error text.
         api_key=settings.openrouter_api_key,
         base_url=settings.openrouter_base_url,
         default_timeout=settings.main_timeout_seconds,

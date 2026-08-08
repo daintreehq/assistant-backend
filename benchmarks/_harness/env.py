@@ -60,7 +60,8 @@ def require_api_key(settings: Settings) -> SecretStr:
     """Validate the key is present and return it still wrapped.
 
     Returned as a SecretStr so the plaintext is never carried around by a caller;
-    the provider unwraps it only where the Authorization header is built.
+    the provider unwraps it only to build a header or to scrub an echoed key out of
+    upstream error text.
     """
     if not settings.openrouter_api_key.get_secret_value():
         raise EnvError(

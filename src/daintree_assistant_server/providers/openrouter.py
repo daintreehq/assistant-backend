@@ -160,8 +160,17 @@ def _extract_upstream_error(
     upstream echoed it back. That reflection is the one way a caller's key could
     escape: this return value goes BOTH to the structured log and — for a non-auth
     4xx — into the client-facing error envelope via :meth:`_map_http_error`.
-    Scrubbing happens on the whole raw body before parsing or capping, because
-    capping first can slice a key in half and leave a usable prefix behind.
+
+    Order matters twice, and both orderings are deliberate:
+
+    * Scrub AFTER extraction, not on the raw body. JSON can encode an ordinary
+      key as ``\\u0073\\u006b…``, which no literal match on the undecoded bytes
+      would find but ``json.loads`` faithfully turns back into the plaintext.
+      Scrubbing the decoded diagnostic catches every encoding of the same secret.
+      (It also keeps the parse honest: replacing inside the raw document could
+      make it invalid JSON and silently demote a structured error to raw text.)
+    * Scrub BEFORE capping. Capping first can slice a key in half and leave a
+      usable prefix behind.
     """
     if not body:
         return None
@@ -169,23 +178,32 @@ def _extract_upstream_error(
     raw = raw.strip()
     if not raw:
         return None
+    detail = _upstream_error_detail(raw)
     if secret is not None:
         plain = secret.get_secret_value()
         # An empty secret must not be "replaced": str.replace("") splices the
         # placeholder between every character and destroys the diagnostic.
         if plain:
-            raw = raw.replace(plain, _REDACTED)
+            detail = detail.replace(plain, _REDACTED)
+    return detail[:_ERROR_DETAIL_CAP]
+
+
+def _upstream_error_detail(raw: str) -> str:
+    """The best available reason in ``raw``, uncapped and unredacted.
+
+    Split out so redaction and capping apply once, to whichever branch won.
+    """
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return raw[:_ERROR_DETAIL_CAP]
+        return raw
     err = data.get("error") if isinstance(data, dict) else None
     if isinstance(err, dict):
         msg = err.get("message") or err.get("code") or err.get("type")
-        return str(msg)[:_ERROR_DETAIL_CAP] if msg else raw[:_ERROR_DETAIL_CAP]
+        return str(msg) if msg else raw
     if isinstance(err, str) and err:
-        return err[:_ERROR_DETAIL_CAP]
-    return raw[:_ERROR_DETAIL_CAP]
+        return err
+    return raw
 
 
 def _endpoint_name(payload: dict[str, Any]) -> str | None:
@@ -417,8 +435,21 @@ class OpenRouterProvider:
         Single source of truth for the fallback, because two paths need the same
         answer: the ``Authorization`` header and the redaction of an echoed key out
         of upstream error text. If they ever disagreed, the redaction would miss.
+
+        A credential that cannot become a header value is rejected HERE rather than
+        handed to httpx. h11 refuses an empty, whitespace-padded, or control-char
+        value with ``LocalProtocolError`` — and that exception embeds the offending
+        header value verbatim ("Illegal header value b'Bearer sk-…'"), which
+        httpcore logs at DEBUG before this adapter ever sees it. So the permissive
+        path leaks the key into logs, exactly what this must not do. Failing fast
+        also turns a confusing retryable transport error into an honest permanent
+        one, and the message deliberately carries no part of the value.
         """
-        return request_api_key if request_api_key is not None else self._default_api_key
+        key = request_api_key if request_api_key is not None else self._default_api_key
+        plain = key.get_secret_value()
+        if not plain or plain.strip() != plain or any(c.isspace() or ord(c) < 32 for c in plain):
+            raise upstream_error("The upstream credential is empty or malformed.")
+        return key
 
     def _headers(self, *, stream: bool, api_key: SecretStr) -> dict[str, str]:
         # A fresh dict per call. The shared client's own headers are never mutated:
