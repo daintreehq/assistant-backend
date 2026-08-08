@@ -48,7 +48,7 @@ reads emitted in ONE reply run concurrently.
 forge.getPR({"prNumber": <int>})
 ```
 
-It returns `state`, `isDraft`, `merged`, `baseRef`, `headRef`, and may carry `mergeable`,
+It returns `state`, `isDraft`, `merged`, `baseRef`, `headRef`, and may carry
 `commentCount` and — the field to read here — `reviewDecision`: `APPROVED`,
 `CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or `null`. A `null` is a real answer meaning
 reviews are not gated, and reads as approved; only an ABSENT key means "not reported". The

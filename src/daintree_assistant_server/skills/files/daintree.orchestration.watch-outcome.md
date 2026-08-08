@@ -32,7 +32,7 @@ Procedure:
 1. Fix the target, then pick ONE mechanism. Resolve the full terminal ids or PR number live this turn: a watcher built on a stale id waits forever on nothing and never wakes you.
    - (a) A terminal outcome needing goal-based classification ("wake me when it's green", "alert me if it breaks") → `watcher.terminal.create`, step 2.
    - (b) A pass/fail verdict on a terminal without blocking the turn → `terminal.extract.async {"terminalIds":["terminal-…"],"instruction":"report the final test summary","verdictInstruction":"did the suite pass with zero failures?","dedupeKey":"nightly-suite"}`. The result publishes to the attention queue with severity set by the verdict; `dedupeKey` collapses repeats. Add `wait:{}` for a SINGLE agent terminal (the confirmed-finish shorthand); omit `wait` to read once now.
-   - (c) A PR reaching a terminal state → `watcher.watchPR {"prNumber":123,"title":"…"}` (optional `cwd`, `stopAfterMs`) — read "The PR-watch boundary" before promising anything about it.
+   - (c) A PR reaching a terminal state → `watcher.watchPR {"prNumber":123,"title":"…"}` (optional `cwd`, `stopAfterMs`) — read "What the PR watcher cannot watch" before promising anything about it.
    - (d) A nudge with no terminal to observe → `timer.schedule`, step 4.
    Spawning the agent right now? The cheapest supervisor is the spawn itself: `agentTask.spawnForEdits` with flat `watch:true` + `watchGoal:"…"` and an `acceptanceCriteria` contract. Its supervisor already confirms completion — add no second watcher.
 
@@ -89,7 +89,7 @@ THE KEY TRAP: to stop when an AGENT finishes its turn, do NOT use a bare `stopWh
 
 ## What the PR watcher cannot watch
 
-`watcher.watchPR` sees the pull request's state and nothing else: `open` / `merged` / `draft` / `closed`. It does NOT wake on CI runs, check results, job logs, or review comments, so never promise an alert "when CI goes green" off a PR watch — the watch would sit through a red build and a changes-requested review without a word, then fire only on the merge.
+`watcher.watchPR` sees the pull request's state and nothing else: `open` / `merged` / `draft` / `closed`. It does NOT wake on CI runs, check results, job logs, or review decisions, so never promise an alert "when CI goes green" off a PR watch — it never tells you WHAT changed: a push or a review surfaces only as a coarse "PR has new activity" ping, never as CI or review detail, and a red build on its own surfaces nothing at all.
 
 That is a limit of this WATCHER, not of Daintree. CI roll-ups, review decisions and issue threads are all readable on demand — one-off, in a turn — with the follow-up-on-issue skill (daintree.workflow.follow-up-on-issue). So when the user wants a CI verdict NOW, read it there rather than leaving a watcher that cannot see it. What still needs an agent in a terminal is the DETAIL no forge read carries: job logs and failure output. To be woken on that, spawn the agent with the spawn-visible-agent skill and watch that TERMINAL with (a) or (b) — the terminal is the observable thing, not the PR.
 
