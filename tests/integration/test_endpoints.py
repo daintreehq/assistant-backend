@@ -39,7 +39,11 @@ def test_capabilities(client, auth) -> None:
     assert body["respond"]["system_messages_accepted"] is False
     assert body["respond"]["max_active_skills"] == 3
     assert body["respond"]["stream_events"] == ["meta", "status", "delta", "done", "error"]
-    assert body["respond"]["thinking_enabled"] is True  # hardcoded posture, not config
+    # Hardcoded posture, not config. Asserted as a literal rather than against the
+    # constant on purpose: this field is a wire contract the CLI gates its thinking UI
+    # on, so the test must fail — and force the CLI to be updated in lockstep — when
+    # the posture moves, not silently track it.
+    assert body["respond"]["thinking_enabled"] is False
     assert body["respond"]["multimodal_images"]["remote_urls"] is False
     # Exact set, not a count: the ids are a frozen wire contract the Go CLI hardcodes
     # (internal/backend/tasks.go + workflowtasks.go). A count-only assertion passed

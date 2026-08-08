@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from daintree_assistant_server.config import Settings
+from daintree_assistant_server.config import INTERACTIVE_THINKING_ENABLED, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.contracts.extensions import (
     AgentRosterSnapshot,
@@ -387,11 +387,11 @@ def test_main_request_params(assembler: PromptAssembler) -> None:
     pr = assembler.build_main_request(
         request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    # Thinking is hardcoded ON for the main call (posture lives with the model ids
-    # in config.py); with no forced tool_choice it runs with reasoning, and effort
-    # stays at "high" — DeepSeek's floor (there is no lower thinking level than "high").
-    assert pr.thinking_disabled is False
-    assert pr.reasoning_effort == "high"
+    # Thinking is hardcoded OFF for the main call (posture lives with the model ids
+    # in config.py). Off is the only step below "high" on this model — the effort
+    # tiers collapse, so "low" is not an available middle ground.
+    assert pr.thinking_disabled is True
+    assert pr.reasoning_effort is None
     assert pr.stream is True
     assert pr.include_usage is True
     assert pr.temperature == 0.5
@@ -478,8 +478,12 @@ def test_reasoning_content_absent_when_not_supplied(assembler: PromptAssembler) 
 
 def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> None:
     # DeepSeek 400s on thinking + forced tool_choice; the assembler must degrade to
-    # non-thinking rather than fail the turn. This is the ONLY thing that turns main
-    # thinking off — the posture itself is hardcoded, not configurable.
+    # non-thinking rather than fail the turn.
+    #
+    # The main posture is currently non-thinking anyway, so this guard is redundant in
+    # production TODAY. It is asserted independently on purpose: the constraint belongs
+    # to the upstream model, not to the posture, and this test is what stops flipping
+    # INTERACTIVE_THINKING_ENABLED back on from silently reintroducing the 400.
     settings = Settings(
         DAINTREE_API_KEY="k", OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
     )
@@ -492,12 +496,12 @@ def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> No
         )
         assert pr.thinking_disabled is True, f"thinking must be off for tool_choice={choice!r}"
         assert pr.reasoning_effort is None
-    # A non-forced choice ("auto") leaves thinking on.
+    # A non-forced choice ("auto") is left to the posture, which is currently off.
     pr_auto = assembler.build_main_request(
         request=_req(tools=tools, tool_choice="auto"),
         skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    assert pr_auto.thinking_disabled is False
+    assert pr_auto.thinking_disabled is not INTERACTIVE_THINKING_ENABLED
 
 
 def test_tool_schema_tuple_items_normalized_to_prefix_items(

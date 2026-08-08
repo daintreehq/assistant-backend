@@ -668,7 +668,8 @@ class SkillLearner:
             "Return the JSON verdict now."
         )
         # The gate stays on the small model (cheap triage) and runs thinking-high —
-        # hardcoded posture (see OPENROUTER_REASONING_EFFORT in config.py): its verdict is
+        # hardcoded posture (see INTERACTIVE_THINKING_ENABLED in config.py — learning
+        # is the surface that still thinks, since it runs after the response): its verdict is
         # json_object, which is compatible with thinking. Add reasoning headroom on
         # top of the small verdict cap, since max_tokens is shared with CoT.
         gate_max_tokens = (

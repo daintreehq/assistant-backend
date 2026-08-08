@@ -4,9 +4,10 @@ Before the main-model call, a dedicated small-model request classifies the
 conversation against the catalog and returns up to ``max_active_skills`` skill
 IDs as a JSON object (``response_format`` = ``json_object``). This call sits
 directly on the turn's first-byte path (selector → assemble → main TTFB), so it
-is hardcoded NON-thinking — the one exception to the server's thinking-high
-posture (a product decision, not config; see ``OPENROUTER_REASONING_EFFORT`` in
-``config.py``). The selector prompt asks for a reason-first key order
+is hardcoded NON-thinking (a product decision, not config; see
+``INTERACTIVE_THINKING_ENABLED`` in ``config.py``, which now takes the whole
+interactive surface the same way — the selector simply got here first). The
+selector prompt asks for a reason-first key order
 (``task_type``/``reason`` before ``skill_ids``) so the model still works through
 the decision inline before committing, which benchmarked at the same selection
 quality as thinking-high at a fraction of the latency. Output is validated and
@@ -337,10 +338,12 @@ class Selector:
         return await self._run(messages)
 
     def _build_request(self, messages: list[dict[str, Any]]) -> ProviderChatRequest:
-        # HARDCODED non-thinking (the one exception to the server's thinking-high
-        # posture — see OPENROUTER_REASONING_EFFORT in config.py): this call gates the
-        # turn's first byte, and the prompt's reason-first key order is the inline
-        # reasoning step instead. json_object output, never a forced tool_choice.
+        # HARDCODED non-thinking (see INTERACTIVE_THINKING_ENABLED in config.py):
+        # this call gates the turn's first byte, and the prompt's reason-first key
+        # order is the inline reasoning step instead. Deliberately its OWN hardcode
+        # rather than a read of the shared flag — the selector's argument is about
+        # first-byte latency specifically and holds regardless of the main posture.
+        # json_object output, never a forced tool_choice.
         return ProviderChatRequest(
             model=OPENROUTER_MODEL,
             messages=messages,

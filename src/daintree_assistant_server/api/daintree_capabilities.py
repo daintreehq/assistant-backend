@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
-from ..config import PUBLIC_MODEL_ID
+from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
 from .deps import require_ready
 
 router = APIRouter()
@@ -28,11 +28,13 @@ async def capabilities(
             "model": PUBLIC_MODEL_ID,
             "streaming": True,
             "stream_events": ["meta", "status", "delta", "done", "error"],
-            # The main call's thinking posture is hardcoded ON (a product decision,
-            # like the model ids): responses may carry reasoning_content and the
-            # stream may emit a status:{phase:"thinking"} event. A per-request
-            # forced tool_choice still disables thinking for that turn.
-            "thinking_enabled": True,
+            # The main call's thinking posture is hardcoded OFF (a product decision,
+            # like the model ids — see INTERACTIVE_THINKING_ENABLED in config.py), so
+            # responses do not carry reasoning_content and the stream emits no
+            # status:{phase:"thinking"} event. Read from the constant rather than
+            # restated as a literal: this field is what the CLI gates its thinking UI
+            # on, and a hand-maintained copy would drift the moment the posture moves.
+            "thinking_enabled": INTERACTIVE_THINKING_ENABLED,
             "multimodal_images": {
                 "data_urls": True,
                 "remote_urls": settings.allow_remote_image_urls,

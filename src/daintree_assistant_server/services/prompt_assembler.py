@@ -21,7 +21,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
-from ..config import OPENROUTER_REASONING_EFFORT, Settings
+from ..config import INTERACTIVE_THINKING_ENABLED, OPENROUTER_REASONING_EFFORT, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import (
     AgentSnapshot,
@@ -724,12 +724,18 @@ class PromptAssembler:
         if gen.response_format == "json_object":
             response_format = {"type": "json_object"}
 
-        # Thinking is hardcoded ON for the main call (posture lives with the model
-        # ids in config.py; the selector is the one non-thinking exception). Force
-        # it off here only when the request pins a tool_choice: DeepSeek 400s on
-        # thinking + forced tool_choice, so degrade to non-thinking rather than
-        # gamble the turn on which OpenRouter endpoint enforces it.
-        thinking_enabled = not self._is_forced_tool_choice(request.input.tool_choice)
+        # Thinking is hardcoded OFF for the main call (posture lives with the model
+        # ids in config.py — this workload routes requests onto skill runbooks and
+        # emits tool calls, which reasoning did not measurably improve while costing
+        # seconds of first-byte latency).
+        #
+        # The forced-tool_choice guard stays AND-ed in rather than replaced: it is an
+        # independent upstream constraint (DeepSeek 400s on thinking + forced
+        # tool_choice), so keeping it here means flipping the posture back on cannot
+        # silently reintroduce that failure.
+        thinking_enabled = INTERACTIVE_THINKING_ENABLED and not self._is_forced_tool_choice(
+            request.input.tool_choice
+        )
 
         # max_tokens policy: fill the default when the client omits one, then clamp to a
         # hard ceiling either way so a degenerate turn (the observed prompt-recitation
@@ -751,9 +757,9 @@ class PromptAssembler:
             stop=gen.stop,
             stream=gen.stream,
             include_usage=gen.stream,
-            # Hardcoded ON (only a client-pinned forced tool_choice degrades it off,
-            # above). When enabled, reasoning_content round-trips through the wire
-            # contract so tool-call turns can replay it. Thinking ignores temperature/top_p.
+            # Hardcoded OFF (see above). If the posture is flipped back on,
+            # reasoning_content round-trips through the wire contract so tool-call
+            # turns can replay it. Thinking ignores temperature/top_p.
             thinking_disabled=not thinking_enabled,
             reasoning_effort=OPENROUTER_REASONING_EFFORT if thinking_enabled else None,
             timeout=self.settings.main_timeout_seconds,

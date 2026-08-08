@@ -34,18 +34,40 @@ SKILL_IMPROVER_MODEL = "openai/gpt-5.6-sol"
 PUBLIC_MODEL_ID = "daintree-assistant"
 
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
-# There is one optimum and the server ships it: every main-model call runs
-# thinking-high EXCEPT (a) the skill selector — it gates the turn's first byte,
-# and thinking there benchmarked strictly worse (median ~4-5s with a 13-20s
-# timeout-retry tail vs a consistent 1.2-2.6s non-thinking) for no selection-
-# quality gain once its prompt asked for reason-first JSON (task_type/reason as
-# working notes BEFORE skill_ids) — and (b) a main call whose client pinned a
-# forced tool_choice, which DeepSeek rejects under thinking, so that request
-# degrades to non-thinking at runtime. "high" is DeepSeek's lightest tier
-# (low/medium silently map up to it; the only step below is off). The
-# skill-learning builder/improver on GPT-5.6 Sol likewise pin "high" — its xhigh
-# top tier is excluded on purpose: high already covers the "write a whole
-# skill" task, and learning runs only in local dev.
+# There is one optimum and the server ships it.
+#
+# THE INTERACTIVE SURFACE IS NON-THINKING. The main completion, every utility
+# task, and the skill selector all run with reasoning explicitly disabled. This
+# workload does not need it: the main model's job is to route a short request
+# onto a skill runbook and emit tool calls, and the utility tasks are bounded
+# extractions and classifications against text the client already gathered. A
+# measured greeting turn (2026-08-08, turn_2c1bbc09) spent 366 reasoning tokens
+# and ~3.5s of a 11.5s wall-clock thinking about "Hello!".
+#
+# There is NO middle setting to retreat to. DeepSeek V4 Flash collapses the
+# effort tiers: measured over 5 samples each on a fixed prompt, "low" and "high"
+# produced statistically identical chain-of-thought (mean 662 vs 656 reasoning
+# tokens, fully overlapping ranges). "low" buys nothing, so the only real step
+# below "high" is off — which is what this posture takes.
+#
+# Two constraints outlive the posture and stay enforced independently, so that
+# flipping the flag back on cannot reintroduce a known failure:
+#   * A main call whose client pinned a forced tool_choice must stay non-thinking
+#     regardless — DeepSeek 400s on thinking + forced tool_choice.
+#   * The selector is separately hardcoded off (skills/selector.py): it gates the
+#     turn's first byte, and thinking there benchmarked strictly worse (median
+#     ~4-5s with a 13-20s timeout-retry tail vs a consistent 1.2-2.6s) for no
+#     selection-quality gain once its prompt asked for reason-first JSON.
+#
+# SKILL LEARNING STILL THINKS. It is local-dev-only and runs fire-and-forget
+# AFTER the response is sent, so its latency never reaches a user, and "read a
+# whole transcript and write a skill" is the one genuinely hard task here. The
+# gate runs thinking-high on the small model; the builder/improver on GPT-5.6 Sol
+# likewise pin "high" — its xhigh top tier is excluded on purpose, high already
+# covers the task.
+INTERACTIVE_THINKING_ENABLED = False
+# The effort sent whenever this server DOES think on the small model. With the
+# posture above that is the skill-learning gate only.
 OPENROUTER_REASONING_EFFORT = "high"
 SKILL_LEARNING_REASONING_EFFORT = "high"
 
@@ -90,22 +112,26 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
 
     # ---- Thinking headroom -----------------------------------------------
-    # The thinking POSTURE itself is hardcoded (see OPENROUTER_REASONING_EFFORT at
-    # the top of this module): main/utility/gate think-high, the selector is
-    # non-thinking, and only a client-pinned forced tool_choice degrades the main
-    # call off at runtime. reasoning_content round-trips through the wire contract
-    # so a tool-call turn can replay the chain-of-thought that produced its calls
-    # (the provider adapter renames it to OpenRouter's `reasoning` on the way out),
-    # which the assembler preserves. Thinking mode ignores temperature/top_p.
+    # The thinking POSTURE itself is hardcoded (see INTERACTIVE_THINKING_ENABLED at
+    # the top of this module): main/utility/selector are non-thinking, only the
+    # skill-learning gate and builder/improver still think. reasoning_content
+    # round-trips through the wire contract so a tool-call turn can replay the
+    # chain-of-thought that produced its calls (the provider adapter renames it to
+    # OpenRouter's `reasoning` on the way out), which the assembler preserves —
+    # that path stays live because the posture is a flag, not a deletion. Thinking
+    # mode ignores temperature/top_p.
     #
-    # Because max_tokens is SHARED by reasoning + visible output, the
-    # small-output thinking calls (utility tasks, skill-learning gate) add this
-    # headroom to their tight output caps so the chain-of-thought can't starve the
-    # answer into a finish_reason=length truncation. The main /respond call does
-    # NOT use this: it runs on a single flat budget (MAIN_DEFAULT_MAX_TOKENS ==
-    # MAIN_MAX_TOKENS_CEILING, already sized for reasoning + output and clamped
-    # for runaway containment), and a client MAY request its own main max_tokens —
-    # so headroom there would fight the ceiling rather than help.
+    # Because max_tokens is SHARED by reasoning + visible output, a small-output
+    # THINKING call adds this headroom to its tight output cap so the
+    # chain-of-thought can't starve the answer into a finish_reason=length
+    # truncation. Under the current posture the skill-learning gate is the only
+    # such call; utility tasks add it only if thinking is switched back on, since
+    # a non-thinking task would otherwise be handed 4k tokens of slack it can
+    # spend on VISIBLE output, silently overrunning its profile's cap. The main
+    # /respond call never uses this: it runs on a single flat budget
+    # (MAIN_DEFAULT_MAX_TOKENS == MAIN_MAX_TOKENS_CEILING, clamped for runaway
+    # containment), and a client MAY request its own main max_tokens — so headroom
+    # there would fight the ceiling rather than help.
     thinking_headroom_tokens: int = Field(
         default=4000, ge=0, alias="THINKING_HEADROOM_TOKENS"
     )
@@ -203,9 +229,12 @@ class Settings(BaseSettings):
     )
 
     # ---- Selector -------------------------------------------------------
-    # The selector is HARDCODED non-thinking (see OPENROUTER_REASONING_EFFORT at the
-    # top of this module for the rationale); its prompt's reason-first JSON key
-    # order is the inline reasoning step.
+    # The selector is HARDCODED non-thinking (see INTERACTIVE_THINKING_ENABLED at
+    # the top of this module); its prompt's reason-first JSON key order is the
+    # inline reasoning step. It reached this posture first, on its own first-byte
+    # latency argument, and keeps its own hardcode rather than reading the shared
+    # flag — flipping the interactive posture back on must not silently drag the
+    # selector with it.
     selector_context_tokens: int = Field(default=64000, alias="SELECTOR_CONTEXT_TOKENS")
     # Sized with wide margin over the observed 120-190-token completions: the
     # reason-first key order puts skill_ids LAST in the JSON, so a length
@@ -330,7 +359,8 @@ class Settings(BaseSettings):
     # The builder/improver reasoning tier (GPT-5.6 Sol) and the gate's thinking-high
     # posture (small model, json_object verdict) are hardcoded — see
     # SKILL_LEARNING_REASONING_EFFORT / OPENROUTER_REASONING_EFFORT at the top of
-    # this module.
+    # this module. Learning is the one surface that still thinks: it runs
+    # fire-and-forget after the response, so its latency never reaches a user.
     # Gate verdicts below this confidence never write.
     skill_learning_min_confidence: float = Field(
         default=0.75, ge=0.0, le=1.0, alias="SKILL_LEARNING_MIN_CONFIDENCE"

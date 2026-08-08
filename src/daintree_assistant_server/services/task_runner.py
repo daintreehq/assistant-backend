@@ -15,7 +15,12 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from ..config import OPENROUTER_MODEL, OPENROUTER_REASONING_EFFORT, Settings
+from ..config import (
+    INTERACTIVE_THINKING_ENABLED,
+    OPENROUTER_MODEL,
+    OPENROUTER_REASONING_EFFORT,
+    Settings,
+)
 from ..contracts.tasks import (
     CheckpointInput,
     CheckpointOutput,
@@ -736,20 +741,28 @@ class TaskRunner:
             {"role": "user", "content": user},
         ]
         response_format = {"type": "json_object"} if profile.output_mode == "json" else None
-        # Utility tasks run thinking-high — hardcoded posture (see
-        # OPENROUTER_REASONING_EFFORT in config.py). json_object (and plain text) are
-        # both compatible with thinking on this model — no utility task uses a forced
-        # tool call. The profile cap sizes the visible output; reasoning headroom is
-        # added on top, since max_tokens is shared with the CoT.
-        reasoning_effort = OPENROUTER_REASONING_EFFORT
-        max_tokens = profile.max_output_tokens + self.settings.thinking_headroom_tokens
+        # Utility tasks run NON-THINKING — hardcoded posture (see
+        # INTERACTIVE_THINKING_ENABLED in config.py). These are bounded extractions
+        # and classifications over text the client already gathered, which is not
+        # work a chain-of-thought improved enough to pay for its latency.
+        #
+        # The headroom is conditional on the posture, not unconditional: max_tokens
+        # is shared by reasoning + visible output, so a THINKING task needs the slack
+        # to keep its CoT from starving the answer into a finish_reason=length
+        # truncation — but handing that same slack to a NON-thinking task just raises
+        # its visible-output ceiling above the cap its profile deliberately set.
+        thinking_enabled = INTERACTIVE_THINKING_ENABLED
+        reasoning_effort = OPENROUTER_REASONING_EFFORT if thinking_enabled else None
+        max_tokens = profile.max_output_tokens + (
+            self.settings.thinking_headroom_tokens if thinking_enabled else 0
+        )
         provider_request = ProviderChatRequest(
             model=model,
             messages=messages,
             temperature=profile.temperature,
             max_tokens=max_tokens,
             response_format=response_format,
-            thinking_disabled=False,
+            thinking_disabled=not thinking_enabled,
             reasoning_effort=reasoning_effort,
             timeout=timeout,
         )
@@ -772,7 +785,7 @@ class TaskRunner:
                 temperature=profile.temperature,
                 max_tokens=max_tokens,
                 response_format=response_format,
-                thinking_disabled=False,
+                thinking_disabled=not thinking_enabled,
                 reasoning_effort=reasoning_effort,
                 timeout=timeout,
             )

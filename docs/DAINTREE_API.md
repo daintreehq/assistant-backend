@@ -363,26 +363,44 @@ A reasoning model thinks when the field is absent, so the explicit directive is 
 non-thinking calls (above all the selector) actually non-thinking.
 
 The thinking posture is **hardcoded — a product decision like the model ids, not
-configuration**. The main `/respond` call, the utility tasks, and the skill-learning gate run
-**thinking-high** (`high` is DeepSeek's lightest tier; `low`/`medium` silently map up to it).
-The **selector is the one exception**: it gates the turn's first byte, so it is hardcoded
-**non-thinking** and its prompt instead asks for a reason-first JSON key order
-(`task_type`/`reason` written before `skill_ids`) as the inline reasoning step — benchmarked
-at equal selection quality and a fraction of the latency. Because a forced `tool_choice` is
-the one thing incompatible with thinking on DeepSeek, the selector was moved off its forced
-`select_skills` call onto `response_format` json_object (json_object output and non-forced
-tool calling are both compatible with thinking). DeepSeek accepts only `high`/`max` and silently remaps `low`/`medium` up to
-`high` — so `high` is the lightest thinking available, the only lower setting being thinking
-off. Since `max_tokens` is shared by reasoning + visible output, the small-output
-calls (selector, utility tasks, gate) add `THINKING_HEADROOM_TOKENS` to their tight
-caps so the chain-of-thought can't starve the answer into a length truncation; the main
-`/respond` call instead runs on its own flat budget (`MAIN_DEFAULT_MAX_TOKENS` ==
-`MAIN_MAX_TOKENS_CEILING`, already sized for reasoning + output). Thinking is still forced off
-for any request that pins a `tool_choice` (thinking + a forced tool choice is rejected by the
-model; which endpoint enforces it is not worth betting a turn on). When enabled, the model
-returns its chain-of-thought as `reasoning_content`; the client stores it on the assistant turn
-and replays it verbatim on any turn that performed tool calls, so the model can continue that
-reasoning. Thinking mode ignores `temperature`/`top_p`/penalties.
+configuration**. **The whole interactive surface is non-thinking**: the main `/respond` call,
+every utility task, and the selector all send `{"enabled": false}`. This workload does not
+need a chain-of-thought — the main model routes a request onto a skill runbook and emits tool
+calls, and the utility tasks are bounded extractions and classifications over text the client
+already gathered — while reasoning cost seconds of first-byte latency (a measured greeting
+turn spent 366 reasoning tokens and ~3.5s of an 11.5s wall-clock).
+
+There is **no middle tier to retreat to**. DeepSeek accepts only `high`/`max` and silently
+remaps `low`/`medium` up to `high`; measured over 5 samples each on a fixed prompt, `low` and
+`high` produced statistically identical chain-of-thought (mean 662 vs 656 reasoning tokens).
+So the only real step below `high` is off, which is the posture taken. The selector reached
+this position first, on its own first-byte argument, and its prompt asks for a reason-first
+JSON key order (`task_type`/`reason` written before `skill_ids`) as an inline reasoning step —
+benchmarked at equal selection quality and a fraction of the latency. (Because a forced
+`tool_choice` is incompatible with thinking on DeepSeek, the selector was also moved off its
+forced `select_skills` call onto `response_format` json_object.)
+
+**Skill learning still thinks**: its gate runs thinking-high on the small model and its
+builder/improver run `high` on GPT-5.6 Sol. It is local-dev-only and runs fire-and-forget
+*after* the response is sent, so its latency never reaches a user, and writing a whole skill
+from a transcript is the one genuinely hard task here.
+
+`/respond` advertises the posture as `respond.thinking_enabled` on `/v1/daintree/capabilities`
+(currently `false`), which is what a client should gate any thinking UI on. Because
+`max_tokens` is shared by reasoning + visible output, a small-output **thinking** call adds
+`THINKING_HEADROOM_TOKENS` to its tight cap so the chain-of-thought can't starve the answer
+into a length truncation — under the current posture the skill-learning gate is the only such
+call, and a non-thinking utility task deliberately does *not* get that slack (it would raise
+the visible-output ceiling above the cap its profile set). The main `/respond` call instead
+runs on its own flat budget (`MAIN_DEFAULT_MAX_TOKENS` == `MAIN_MAX_TOKENS_CEILING`).
+
+Thinking is independently forced off for any request that pins a `tool_choice` (thinking + a
+forced tool choice is rejected by the model; which endpoint enforces it is not worth betting a
+turn on) — that guard is enforced separately from the posture, so it holds if the posture ever
+flips back. When thinking is enabled, the model returns its chain-of-thought as
+`reasoning_content`; the client stores it on the assistant turn and replays it verbatim on any
+turn that performed tool calls, so the model can continue that reasoning. That round-trip stays
+in the contract. Thinking mode ignores `temperature`/`top_p`/penalties.
 
 ## Errors
 
