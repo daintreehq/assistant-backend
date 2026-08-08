@@ -71,11 +71,22 @@ _ERROR_DETAIL_CAP = 400
 # logs carry no bearer keys).
 _REDACTED = "[REDACTED]"
 
+# Replaces the diagnostic entirely when the credential is still recoverable from
+# it after scrubbing — a doubly encoded echo. Deliberately says nothing about the
+# key beyond the fact that the upstream sent it back.
+_CREDENTIAL_ECHOED = "Upstream rejected the credential and echoed it back; detail withheld."
+
+# How many escape-decoding passes the leak check looks through. Two covers the
+# doubly encoded case; the bound just stops a crafted body from spinning here.
+_ESCAPE_DECODE_PASSES = 3
+
 # A credential must be printable ASCII with no spaces to be a legal header value.
 # An allowlist rather than a blocklist of the bad characters: blocklisting misses
-# DEL (0x7f, which h11 happily accepts) and anything above 0x7f, where a non-latin-1
-# character instead explodes inside httpx's encoder. Real OpenRouter keys are
-# `sk-or-v1-` plus hex, so nothing legitimate is near this boundary.
+# DEL (0x7f, which h11 happily accepts) and everything above 0x7f, which instead
+# explodes inside httpx's header encoder (it encodes str values as ASCII). Real
+# OpenRouter keys are `sk-or-v1-` plus hex, so nothing legitimate is near this
+# boundary. Keeping the credential ASCII is also what makes the escape-decoding
+# leak check in `_still_reveals` sound.
 _HEADER_SAFE_MIN = 0x21
 _HEADER_SAFE_MAX = 0x7E
 
@@ -174,11 +185,18 @@ def _extract_upstream_error(
     * Scrub AFTER extraction, not on the raw body. JSON can encode an ordinary
       key as ``\\u0073\\u006b…``, which no literal match on the undecoded bytes
       would find but ``json.loads`` faithfully turns back into the plaintext.
-      Scrubbing the decoded diagnostic catches every encoding of the same secret.
-      (It also keeps the parse honest: replacing inside the raw document could
-      make it invalid JSON and silently demote a structured error to raw text.)
+      ``_upstream_error_detail`` therefore hands back decoded text on every
+      branch. (It also keeps the parse honest: replacing inside the raw document
+      could make it invalid JSON and silently demote a structured error to raw
+      text.)
     * Scrub BEFORE capping. Capping first can slice a key in half and leave a
       usable prefix behind.
+
+    A literal scrub still cannot promise to catch *every* encoding — a doubly
+    encoded body hides the key from one decode pass. So the scrub is backed by a
+    check rather than trusted: if the credential is still recoverable from the
+    result, the diagnostic is dropped wholesale. Losing a rare error message is
+    the right trade against leaking a key.
     """
     if not body:
         return None
@@ -193,13 +211,20 @@ def _extract_upstream_error(
         # placeholder between every character and destroys the diagnostic.
         if plain:
             detail = detail.replace(plain, _REDACTED)
+            if _still_reveals(detail, plain):
+                return _CREDENTIAL_ECHOED
     return detail[:_ERROR_DETAIL_CAP]
 
 
 def _upstream_error_detail(raw: str) -> str:
     """The best available reason in ``raw``, uncapped and unredacted.
 
-    Split out so redaction and capping apply once, to whichever branch won.
+    Split out so redaction and capping apply once, to whichever branch won. Every
+    branch returns DECODED text: the fallbacks re-serialize the parsed document
+    rather than echoing ``raw``, so a ``\\uXXXX``-escaped credential becomes the
+    literal characters an exact match can find. Only a body that is not JSON at
+    all is returned verbatim — there, escapes denote nothing and nothing decodes
+    them.
     """
     try:
         data = json.loads(raw)
@@ -208,10 +233,36 @@ def _upstream_error_detail(raw: str) -> str:
     err = data.get("error") if isinstance(data, dict) else None
     if isinstance(err, dict):
         msg = err.get("message") or err.get("code") or err.get("type")
-        return str(msg) if msg else raw
-    if isinstance(err, str) and err:
+        if msg:
+            return str(msg)
+    elif isinstance(err, str) and err:
         return err
-    return raw
+    # No single reason to quote: hand back the whole document, decoded.
+    return json.dumps(data, ensure_ascii=False)
+
+
+def _still_reveals(text: str, plain: str) -> bool:
+    """Whether ``plain`` is recoverable from ``text`` by decoding escapes.
+
+    The backstop for a doubly encoded echo, where one decode pass leaves the key
+    hidden from an exact match but a second restores it. Bounded passes, and the
+    credential is guaranteed ASCII by :meth:`OpenRouterProvider._resolve_key`, so
+    the latin-1-based ``unicode_escape`` view is sound for this comparison.
+    """
+    if plain in text:
+        return True
+    probe = text
+    for _ in range(_ESCAPE_DECODE_PASSES):
+        try:
+            decoded = probe.encode("latin-1", "backslashreplace").decode("unicode_escape")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            return False
+        if decoded == probe:
+            return False
+        if plain in decoded:
+            return True
+        probe = decoded
+    return False
 
 
 def _endpoint_name(payload: dict[str, Any]) -> str | None:
@@ -435,10 +486,11 @@ class OpenRouterProvider:
     def _resolve_key(self, request_api_key: SecretStr | None) -> SecretStr:
         """The credential for one call: the request's own, else the default.
 
-        Deliberately an ``is not None`` test rather than truthiness. An empty
-        credential supplied explicitly by a caller is a caller error and must reach
-        upstream as invalid — silently falling back would spend THIS server's
-        OpenRouter account on a request whose owner failed to authenticate.
+        Deliberately an ``is not None`` test rather than truthiness. A credential
+        supplied explicitly by a caller is never silently replaced by the server's
+        own — even when it is empty or malformed, which is rejected below rather
+        than papered over. Falling back would spend THIS server's OpenRouter
+        account on a request whose owner failed to authenticate.
 
         Single source of truth for the fallback, because two paths need the same
         answer: the ``Authorization`` header and the redaction of an echoed key out

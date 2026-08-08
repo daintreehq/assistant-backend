@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json as _json
 
 import httpx
 import pytest
@@ -1060,6 +1061,49 @@ def test_credential_is_redacted_before_the_length_cap() -> None:
     # No usable prefix of the key survives. A cap-first implementation would leave
     # _CALL_KEY[:14] here, which this catches.
     assert _CALL_KEY[:12] not in detail
+
+
+def _escape_first(text: str) -> str:
+    """``text`` with only its first character JSON-escaped — the minimal evasion."""
+    return f"\\u{ord(text[0]):04x}" + text[1:]
+
+
+@pytest.mark.parametrize(
+    ("label", "body"),
+    [
+        # Every branch that has no single message to quote used to echo the RAW
+        # (still-encoded) body, so an escaped key slipped past the exact match and
+        # any reader who parsed the detail got it back.
+        ("error is a list", '{{"error":["bad {esc}"]}}'),
+        ("top level not an object", '["bad {esc}"]'),
+        ("error dict with no message", '{{"error":{{"detail":"bad {esc}"}}}}'),
+        ("not json at all", "{{plain text bad {esc}"),
+    ],
+)
+def test_escaped_credential_is_not_recoverable_from_any_fallback_branch(
+    label: str, body: str
+) -> None:
+    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    raw = body.format(esc=_escape_first(key))
+    assert key not in raw  # precondition: no literal match for a scrub to find
+    detail = _extract_upstream_error(raw.encode(), secret=SecretStr(key))
+    assert detail is not None
+    assert key not in detail
+    # And not recoverable by decoding the escapes either, which is the whole point.
+    assert key not in detail.encode("latin-1", "backslashreplace").decode("unicode_escape")
+
+
+def test_double_encoded_credential_drops_the_diagnostic_entirely() -> None:
+    # Two encoding layers defeat any single-pass scrub. Rather than emit something
+    # a reader could decode, the detail is withheld — losing a rare message beats
+    # leaking a key.
+    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    inner = _json.dumps({"k": _escape_first(key)})
+    raw = _json.dumps({"error": {"message": inner}})
+    detail = _extract_upstream_error(raw.encode(), secret=SecretStr(key))
+    assert detail is not None
+    assert key not in detail
+    assert key not in detail.encode("latin-1", "backslashreplace").decode("unicode_escape")
 
 
 def test_all_occurrences_of_the_credential_are_redacted() -> None:
