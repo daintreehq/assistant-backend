@@ -757,6 +757,8 @@ class TaskRunner:
         result = await self._complete_with_retry(provider_request)
         usage = result.usage
         finish = result.finish_reason or "stop"
+        endpoint = result.endpoint
+        calls = 1
 
         try:
             output = profile.parse_output(result.text, request)
@@ -777,6 +779,8 @@ class TaskRunner:
             repair = await self._complete_with_retry(repair_request)
             usage = _sum_usage(usage, repair.usage)
             finish = repair.finish_reason or "stop"
+            endpoint = repair.endpoint or endpoint
+            calls += 1
             try:
                 output = profile.parse_output(repair.text, request)
             except (TaskParseError, ValidationError) as exc:
@@ -787,7 +791,13 @@ class TaskRunner:
                 hint = _EXTRACT_EMPTY_HINT if profile.id == _SCHEMA_TASK and not truncated else ""
                 raise _task_output_invalid(profile.id, hint) from exc
 
-        logger.info("task_run", task=profile.id, finish_reason=finish)
+        # `endpoint`/`calls` for the same reason the selector logs them: a JSON task
+        # routes in the tail-bounded structured pool, and a slow one is only
+        # attributable if the log says which endpoint answered and whether the
+        # parse-repair round-trip doubled the work.
+        logger.info(
+            "task_run", task=profile.id, finish_reason=finish, endpoint=endpoint, calls=calls
+        )
 
         return TaskResult(
             id=new_task_run_id(),

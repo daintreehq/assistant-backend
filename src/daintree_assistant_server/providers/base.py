@@ -70,6 +70,13 @@ class ProviderChatResult:
     choices: list[dict[str, Any]]
     usage: ProviderUsage
     finish_reason: str | None = None
+    # Which upstream endpoint actually served this call, when the provider reports
+    # one (a router like OpenRouter fronts many hosts for the same weights, and
+    # they differ by more than 10x in latency). Observability ONLY: nothing branches
+    # on it, and ``None`` simply means "not reported" — a single-host provider never
+    # sets it. It exists because a slow turn is otherwise undiagnosable: the log
+    # says the call took 10s but not which of ~24 endpoints was responsible.
+    endpoint: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -94,6 +101,7 @@ class ProviderToolCallResult:
     name: str
     arguments_json: str
     usage: ProviderUsage
+    endpoint: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -113,6 +121,8 @@ class ProviderStream(abc.ABC):
     """
 
     usage: ProviderUsage | None = None
+    # Set once the first chunk naming it arrives; see ProviderChatResult.endpoint.
+    endpoint: str | None = None
 
     @abc.abstractmethod
     async def prefetch_first_event(self) -> dict[str, Any] | None:

@@ -72,6 +72,13 @@ class SelectionDecision:
     task_type: str | None = None
     reason: str | None = None
     usage: ProviderUsage | None = None
+    # Diagnostics for the turn's first-byte path, logged by the orchestrator and
+    # never sent to the client. ``endpoint`` is the upstream host that served the
+    # classification (see ProviderChatResult.endpoint); ``calls`` is 1, or 2 when
+    # the output failed to parse and the repair round-trip ran — which silently
+    # doubles selector latency and is otherwise invisible in the timing.
+    endpoint: str | None = None
+    calls: int = 0
     warnings: list[str] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
@@ -84,9 +91,22 @@ class SelectionDecision:
 
     @classmethod
     def degraded_open(
-        cls, warnings: list[str], usage: ProviderUsage | None = None
+        cls,
+        warnings: list[str],
+        usage: ProviderUsage | None = None,
+        *,
+        endpoint: str | None = None,
+        calls: int = 0,
     ) -> SelectionDecision:
-        return cls(skill_ids=[], ran=True, degraded=True, usage=usage, warnings=list(warnings))
+        return cls(
+            skill_ids=[],
+            ran=True,
+            degraded=True,
+            usage=usage,
+            endpoint=endpoint,
+            calls=calls,
+            warnings=list(warnings),
+        )
 
 
 def sanitize_for_selector(
@@ -341,6 +361,8 @@ class Selector:
             return SelectionDecision.degraded_open(["skill_selector_failed_open"])
 
         usage: ProviderUsage | None = result.usage
+        endpoint = result.endpoint
+        calls = 1
         parsed = parse_select_args(result.text, self.catalog, self.settings.max_active_skills)
 
         if parsed is None:
@@ -350,14 +372,20 @@ class Selector:
             try:
                 repair = await self._call_once(repair_request)
             except DaintreeError:
-                return SelectionDecision.degraded_open(["skill_selector_failed_open"], usage=usage)
+                return SelectionDecision.degraded_open(
+                    ["skill_selector_failed_open"], usage=usage, endpoint=endpoint, calls=calls
+                )
+            calls += 1
             usage = _sum_usage(usage, repair.usage)
+            # The repair may land on a different endpoint than the first attempt;
+            # the one that produced the ANSWER is the useful attribution.
+            endpoint = repair.endpoint or endpoint
             parsed = parse_select_args(
                 repair.text, self.catalog, self.settings.max_active_skills
             )
             if parsed is None:
                 return SelectionDecision.degraded_open(
-                    ["skill_selector_failed_open"], usage=usage
+                    ["skill_selector_failed_open"], usage=usage, endpoint=endpoint, calls=calls
                 )
 
         ids, confidence, task_type, reason = parsed
@@ -369,6 +397,8 @@ class Selector:
             task_type=task_type,
             reason=reason,
             usage=usage,
+            endpoint=endpoint,
+            calls=calls,
             warnings=[],
         )
 

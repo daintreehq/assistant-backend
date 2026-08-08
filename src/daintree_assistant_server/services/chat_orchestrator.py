@@ -393,6 +393,7 @@ class _SpeculativeStream(ProviderStream):
         self._started_at = time.perf_counter()
         self.open_ms: int | None = None
         self.usage: ProviderUsage | None = None
+        self.endpoint: str | None = None
         self._expiry_task: asyncio.Task[None] | None = None
         self._producer_task = asyncio.create_task(
             self._produce(), name=f"skill-speculation:{request_id}"
@@ -462,6 +463,10 @@ class _SpeculativeStream(ProviderStream):
             upstream, first_event = await self._open_stream(self._request)
             self._upstream_opened = True
             self.open_ms = round((time.perf_counter() - self._started_at) * 1000)
+            # Mirror the serving endpoint out as soon as the open completes: the
+            # claim path logs it, and waiting for the `finally` (where usage is
+            # published) would always be too late for that line.
+            self.endpoint = upstream.endpoint
             if first_event is not None and not await self._put(first_event):
                 return
             async for chunk in upstream:
@@ -481,6 +486,7 @@ class _SpeculativeStream(ProviderStream):
         finally:
             if upstream is not None:
                 self.usage = upstream.usage
+                self.endpoint = upstream.endpoint or self.endpoint
                 try:
                     async with asyncio.timeout(_SPECULATION_CLOSE_TIMEOUT_SECONDS):
                         await upstream.aclose()
@@ -1079,6 +1085,13 @@ class ChatOrchestrator:
             dropped_over_cap=resolution.dropped_over_cap,
             warnings=warnings,
             selector_ms=selector_ms,
+            # Which upstream endpoint served the classification, and whether the
+            # parse-repair round-trip ran. `selector_ms` alone cannot distinguish a
+            # slow endpoint from a silent second call, and the JSON-capable pool
+            # spans a >10x latency tail — so a slow first byte is only actionable
+            # with these two alongside it.
+            selector_endpoint=decision.endpoint,
+            selector_calls=decision.calls,
             skill_speculation=speculation_outcome,
             skill_speculation_stats=speculation_stats,
             pre_upstream_ms=round((time.perf_counter() - t_start) * 1000),
@@ -1637,6 +1650,10 @@ class ChatOrchestrator:
                     else round((time.perf_counter() - t_open) * 1000)
                 ),
                 post_meta_first_event_ms=round((time.perf_counter() - t_open) * 1000),
+                # The endpoint serving the main generation. Read after the first
+                # event because that is the earliest chunk that names it; still
+                # `None` if the stream ended before yielding one.
+                upstream_endpoint=opened_stream.endpoint,
                 speculative_prefetched_chunks=(
                     speculative_stream.stats()["prefetched_chunks"]
                     if speculative_stream is not None and used_speculation

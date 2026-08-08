@@ -173,6 +173,66 @@ async def test_provider_routing_policy_sent_on_every_request() -> None:
 
 
 @pytest.mark.asyncio
+async def test_structured_calls_route_under_the_tail_bounded_policy() -> None:
+    # `require_parameters` excludes the fastest endpoint from every response_format
+    # call (it does not implement the parameter), so a structured call always lands
+    # in a slower pool whose throughput leaders have >10s latency tails. The bound
+    # deprioritizes those. Without it a selector call — on the turn's first-byte
+    # path — was measured at 10.75s.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(response_format={"type": "json_object"}))
+    routing = captured["body"]["provider"]
+    assert routing["preferred_max_latency"] == {"p90": 2.0, "p99": 5.0}
+    # The privacy floor and the rest of the policy still apply unchanged.
+    assert routing["data_collection"] == "deny"
+    assert routing["sort"] == "throughput"
+    assert routing["require_parameters"] is True
+    assert routing["allow_fallbacks"] is True
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_plain_chat_is_not_tail_bounded() -> None:
+    # A chat turn reaches the fastest endpoint directly and is dominated by
+    # generation, not first-byte: bounding it there would only shrink the pool.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req())
+    assert "preferred_max_latency" not in captured["body"]["provider"]
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_serving_endpoint_is_captured_for_logging() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "x",
+                "created": 0,
+                "model": "m",
+                "choices": [],
+                "usage": {},
+                "provider": "CoreWeave",
+            },
+        )
+
+    provider = _provider(handler)
+    result = await provider.complete(_req())
+    assert result.endpoint == "CoreWeave"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_missing_serving_endpoint_is_none_not_an_error() -> None:
+    provider = _provider(_capture({}))
+    result = await provider.complete(_req())
+    assert result.endpoint is None
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
 async def test_provider_routing_policy_sent_on_streams_too() -> None:
     captured: dict = {}
 

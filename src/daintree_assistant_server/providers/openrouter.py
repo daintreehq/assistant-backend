@@ -65,6 +65,9 @@ _CHAT_PATH = "/chat/completions"
 # without dumping an unbounded payload into logs or the client error message.
 _ERROR_DETAIL_CAP = 400
 
+# Cap on the logged serving-endpoint name ("CoreWeave", "Baidu", …).
+_ENDPOINT_NAME_CAP = 64
+
 # Attribution headers. OpenRouter uses them for its public model/app rankings;
 # they carry no auth weight and are safe to send on every call.
 _REFERER = "https://daintree.dev"
@@ -105,6 +108,37 @@ _PROVIDER_ROUTING: dict[str, Any] = {
     "allow_fallbacks": True,
 }
 
+# Routing for STRUCTURED calls — anything carrying ``response_format`` (the skill
+# selector, the utility tasks, the skill-learning gate). Same policy plus a tail
+# bound, because these calls have the opposite cost shape to a chat turn.
+#
+# WHY A SEPARATE POLICY. ``require_parameters`` drops every endpoint that does not
+# implement ``response_format``, and for this model that includes the fastest one
+# (CoreWeave — measured p50 361ms TTFT, 101 tok/s, and the endpoint a plain chat
+# turn actually lands on). Pinning it here is not an option: CoreWeave plus
+# ``response_format`` is a hard ``404 No endpoints found``. So a structured call is
+# always routed within a DIFFERENT, slower pool, and ``sort: "throughput"`` then
+# ranks that pool by tokens/second — the wrong axis entirely for a call that emits
+# a ~40-token JSON object. It elected endpoints whose medians are fine and whose
+# TAILS are catastrophic: wafer p90 5.4s / p99 12.6s, parasail p99 13.9s, novita
+# p99 5.4s. That is not theoretical — a selector call on the turn's first-byte path
+# was measured at 10.75s, three quarters of a 14.4s time-to-first-token.
+#
+# ``preferred_max_latency`` DEPRIORITIZES (never excludes) endpoints whose measured
+# TTFT percentiles exceed the bound, so it cannot empty the pool the way a filter
+# could — the tail-happy endpoints stay reachable, they just stop winning. The
+# numbers are set to clear the observed tail cluster while leaving several
+# endpoints qualifying, not to name a favourite. Measured over 10 selector-shaped
+# calls: TTFT median 1222ms -> 635ms, worst 1811ms -> 920ms.
+#
+# Throughput stays the sort key underneath: among endpoints that answer promptly we
+# still want the fastest generator, which matters for the longer utility tasks
+# (terminal summarize/extract) that share this policy with the tiny selector call.
+_PROVIDER_ROUTING_STRUCTURED: dict[str, Any] = {
+    **_PROVIDER_ROUTING,
+    "preferred_max_latency": {"p90": 2.0, "p99": 5.0},
+}
+
 
 def _extract_upstream_error(body: bytes | str | None) -> str | None:
     """Pull a short human-readable reason out of an upstream error body.
@@ -131,6 +165,17 @@ def _extract_upstream_error(body: bytes | str | None) -> str | None:
     if isinstance(err, str) and err:
         return err[:_ERROR_DETAIL_CAP]
     return raw[:_ERROR_DETAIL_CAP]
+
+
+def _endpoint_name(payload: dict[str, Any]) -> str | None:
+    """The serving endpoint OpenRouter names on a response/chunk (``provider``).
+
+    Best-effort and metadata-only: a non-string value is discarded rather than
+    coerced, since this is only ever logged. Capped because it is upstream-supplied
+    text landing in our logs.
+    """
+    name = payload.get("provider")
+    return name[:_ENDPOINT_NAME_CAP] if isinstance(name, str) and name else None
 
 
 def _rewrite_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -210,6 +255,7 @@ class OpenRouterStream(ProviderStream):
         self._done = False
         self._saw_done = False
         self.usage: ProviderUsage | None = None
+        self.endpoint: str | None = None
 
     async def _read_one(self) -> dict[str, Any] | None:
         if self._done:
@@ -264,6 +310,10 @@ class OpenRouterStream(ProviderStream):
             raise map_stream_error(chunk["error"])
         if chunk.get("usage"):
             self.usage = ProviderUsage.from_wire(chunk["usage"])
+        # Every chunk repeats it; keep the first non-empty one so the value is
+        # already available when the caller logs the stream-open timing.
+        if self.endpoint is None:
+            self.endpoint = _endpoint_name(chunk)
         _normalize_choices(chunk.get("choices"), "delta")
         return chunk
 
@@ -374,7 +424,14 @@ class OpenRouterProvider:
                     body["reasoning"] = {"effort": request.reasoning_effort}
                 else:
                     body["reasoning"] = {"enabled": True}
-        body["provider"] = _PROVIDER_ROUTING
+        # Structured calls route under the tail-bounded policy: `response_format`
+        # is exactly the signal that this call sits in the slower JSON-capable pool
+        # and cares about time-to-first-token, not tokens/second.
+        body["provider"] = (
+            _PROVIDER_ROUTING_STRUCTURED
+            if request.response_format is not None
+            else _PROVIDER_ROUTING
+        )
         if stream:
             body["stream"] = True
             if request.include_usage:
@@ -450,6 +507,7 @@ class OpenRouterProvider:
             choices=choices,
             usage=ProviderUsage.from_wire(data.get("usage")),
             finish_reason=finish,
+            endpoint=_endpoint_name(data),
             raw=data,
         )
 
@@ -521,13 +579,18 @@ class OpenRouterProvider:
             # No tool call: surface empty args so the caller's validation path
             # can attempt repair rather than crashing.
             return ProviderToolCallResult(
-                name=function_name, arguments_json="", usage=result.usage, raw=result.raw
+                name=function_name,
+                arguments_json="",
+                usage=result.usage,
+                endpoint=result.endpoint,
+                raw=result.raw,
             )
         fn = calls[0].get("function", {}) or {}
         return ProviderToolCallResult(
             name=fn.get("name", ""),
             arguments_json=fn.get("arguments", "") or "",
             usage=result.usage,
+            endpoint=result.endpoint,
             raw=result.raw,
         )
 
