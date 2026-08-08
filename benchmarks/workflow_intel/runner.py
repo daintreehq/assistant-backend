@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from daintree_assistant_server.config import OPENROUTER_MODEL
 from daintree_assistant_server.contracts.tasks import TaskRequest
@@ -36,7 +36,7 @@ from daintree_assistant_server.services.task_runner import build_profiles
 
 from .._harness.cases import CaseError, load_yaml_cases
 from .._harness.counting import CountingProvider
-from .._harness.env import build_settings, make_upstream_provider
+from .._harness.env import build_settings, caller_api_key, make_upstream_provider
 from .._harness.stats import latency_summary
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
@@ -103,14 +103,16 @@ def _score_resume(output: dict[str, Any], expect: dict[str, Any]) -> dict[str, A
 
 
 async def _run_case(
-    runner: Any, provider: CountingProvider, case: dict[str, Any]
+    runner: Any, provider: CountingProvider, case: dict[str, Any], api_key: SecretStr
 ) -> dict[str, Any]:
     provider.reset()
     started = time.perf_counter()
     error: str | None = None
     output: dict[str, Any] = {}
     try:
-        result = await runner.run(TaskRequest(task=case["task"], input=case["input"]))
+        result = await runner.run(
+            TaskRequest(task=case["task"], input=case["input"]), api_key=api_key
+        )
         output = result.output
     except DaintreeError as exc:
         error = f"{exc.code}: {exc.message}"
@@ -195,7 +197,9 @@ async def run_bench(
     try:
         for _ in range(trials):
             for case in cases:
-                results.append(await _run_case(runner, provider, case))
+                results.append(
+                    await _run_case(runner, provider, case, caller_api_key(settings))
+                )
     finally:
         await inner.aclose()
     finished_at = datetime.now(UTC)

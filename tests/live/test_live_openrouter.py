@@ -37,16 +37,19 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def live_client():
+    # The server holds NO upstream credential (OPENROUTER_API_KEY unset): every
+    # request carries the real key as its bearer token, exactly as production
+    # callers do — which also proves the caller-key threading end to end.
     settings = Settings(
         ENVIRONMENT="development",
-        DAINTREE_API_KEY="",  # unauthenticated dev access
-        OPENROUTER_API_KEY=os.environ["OPENROUTER_API_KEY"],
+        OPENROUTER_API_KEY="",
         STATE_SIGNING_KEY_CURRENT="live-test-signing-key",
         STATE_SALT="live-test-salt",
     )
     app = create_app(settings=settings)  # real provider (no fake injected)
     with TestClient(app) as client:
         assert app.state.ready is True
+        client.headers["Authorization"] = f"Bearer {os.environ['OPENROUTER_API_KEY']}"
         yield client
 
 

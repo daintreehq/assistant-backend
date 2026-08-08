@@ -22,7 +22,7 @@ router = APIRouter()
 async def respond(
     body: RespondRequest,
     request: Request,
-    _principal: Principal = Depends(require_auth),
+    principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
 ) -> JSONResponse | StreamingResponse:
     settings = request.app.state.settings
@@ -36,6 +36,8 @@ async def respond(
     outcome = await container.orchestrator.complete(
         body,
         upstream_model=upstream_model,
+        # The caller's own key funds every upstream call this turn makes.
+        api_key=principal.api_key,
         # The middleware-resolved id, so logs, X-Request-Id, and SSE meta all agree.
         request_id=getattr(request.state, "request_id", None),
     )

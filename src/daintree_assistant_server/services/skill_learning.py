@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import SecretStr
 
 from ..config import (
     OPENROUTER_MODEL,
@@ -407,6 +408,7 @@ class SkillLearner:
         *,
         request: RespondRequest,
         active_ids: list[str],
+        api_key: SecretStr,
         trailing_messages: Sequence[ChatMessage] = (),
     ) -> LearningOutcome:
         """Attempt to learn from the completed workflow. Never raises.
@@ -415,6 +417,11 @@ class SkillLearner:
         transcript is built. The post-completion trigger passes the just-generated
         final assistant answer here, so learning sees the workflow it actually
         finished — the request's own message list stops one turn short of it.
+
+        ``api_key`` is the triggering caller's credential, captured BY VALUE by
+        the orchestrator before this fire-and-forget pass was dispatched — the
+        request (and its Principal) is out of scope by the time learning runs, so
+        the value must ride the call, never ambient state.
         """
         if not self.enabled:
             return LearningOutcome()
@@ -422,7 +429,7 @@ class SkillLearner:
         if not self._eligible(messages):
             return LearningOutcome()
         try:
-            return await self._run(request, active_ids, messages)
+            return await self._run(request, active_ids, messages, api_key)
         except Exception as exc:  # noqa: BLE001 - learning must never break /respond
             logger.warning("skill_learning_failed", error=str(exc))
             return LearningOutcome()
@@ -454,13 +461,17 @@ class SkillLearner:
             self._session_landed.popitem(last=False)
 
     async def _run(
-        self, request: RespondRequest, active_ids: list[str], messages: Sequence[ChatMessage]
+        self,
+        request: RespondRequest,
+        active_ids: list[str],
+        messages: Sequence[ChatMessage],
+        api_key: SecretStr,
     ) -> LearningOutcome:
         catalog = self.catalog_manager.catalog
         transcript = self._transcript(messages)
         tools = [t.function.name for t in (request.input.tools or [])]
 
-        verdict = await self._gate(transcript, catalog, active_ids, tools)
+        verdict = await self._gate(transcript, catalog, active_ids, tools, api_key)
         if not self._verdict_actionable(verdict, catalog):
             logger.info(
                 "skill_learning_gate",
@@ -536,6 +547,7 @@ class SkillLearner:
                 transcript=transcript,
                 tools=tools,
                 session_id=session_id,
+                api_key=api_key,
             )
         finally:
             if improve_key is not None:
@@ -551,6 +563,7 @@ class SkillLearner:
         transcript: str,
         tools: list[str],
         session_id: str,
+        api_key: SecretStr,
     ) -> LearningOutcome:
         logger.info(
             "skill_learning_gate",
@@ -573,10 +586,12 @@ class SkillLearner:
             model=SKILL_BUILDER_MODEL if is_create else SKILL_IMPROVER_MODEL,
         )
         if is_create:
-            proposal = await self._build_create(transcript, catalog, verdict, tools)
+            proposal = await self._build_create(transcript, catalog, verdict, tools, api_key)
         else:
             assert old_skill is not None  # guarded by _verdict_actionable
-            proposal = await self._build_improve(old_skill, transcript, verdict, tools, catalog)
+            proposal = await self._build_improve(
+                old_skill, transcript, verdict, tools, catalog, api_key
+            )
 
         if proposal.action == "no_change":
             # The improver examined this skill against this session's evidence and
@@ -654,7 +669,12 @@ class SkillLearner:
         return False
 
     async def _gate(
-        self, transcript: str, catalog: Catalog, active_ids: list[str], tools: list[str]
+        self,
+        transcript: str,
+        catalog: Catalog,
+        active_ids: list[str],
+        tools: list[str],
+        api_key: SecretStr,
     ) -> GateVerdict:
         system = self.prompts.skill_learning_prompt("gate")
         user = (
@@ -684,11 +704,17 @@ class SkillLearner:
             temperature=0.0,
             thinking_disabled=False,
             reasoning_effort=OPENROUTER_REASONING_EFFORT,
+            api_key=api_key,
         )
         return GateVerdict.model_validate(_clamp_confidence(data))
 
     async def _build_create(
-        self, transcript: str, catalog: Catalog, verdict: GateVerdict, tools: list[str]
+        self,
+        transcript: str,
+        catalog: Catalog,
+        verdict: GateVerdict,
+        tools: list[str],
+        api_key: SecretStr,
     ) -> SkillProposal:
         system = self.prompts.skill_learning_prompt("build")
         user = (
@@ -717,6 +743,7 @@ class SkillLearner:
             temperature=None,
             thinking_disabled=False,
             reasoning_effort=SKILL_LEARNING_REASONING_EFFORT,
+            api_key=api_key,
         )
         return SkillProposal.model_validate(_clamp_confidence(data))
 
@@ -727,6 +754,7 @@ class SkillLearner:
         verdict: GateVerdict,
         tools: list[str],
         catalog: Catalog,
+        api_key: SecretStr,
     ) -> SkillProposal:
         system = self.prompts.skill_learning_prompt("improve")
         current = self._render_markdown(self._meta_dict(target), target.body)
@@ -774,6 +802,7 @@ class SkillLearner:
             temperature=None,
             thinking_disabled=False,
             reasoning_effort=SKILL_LEARNING_REASONING_EFFORT,
+            api_key=api_key,
         )
         return SkillProposal.model_validate(_clamp_confidence(data))
 
@@ -787,6 +816,7 @@ class SkillLearner:
         temperature: float | None,
         thinking_disabled: bool,
         reasoning_effort: str | None,
+        api_key: SecretStr,
     ) -> dict[str, Any]:
         messages = [
             {"role": "system", "content": system},
@@ -803,6 +833,9 @@ class SkillLearner:
                 thinking_disabled=thinking_disabled,
                 reasoning_effort=reasoning_effort,
                 timeout=self.settings.skill_learning_timeout_seconds,
+                # The captured caller credential — both the first attempt and the
+                # JSON-repair retry ride it; the provider holds no default.
+                api_key=api_key,
             )
 
         result = await self._complete_with_retry(_request(messages))

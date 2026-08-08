@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from pydantic import SecretStr
 
 from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
 from daintree_assistant_server.contracts.tasks import TaskRequest
@@ -113,6 +114,7 @@ async def _run_trial(
     case: TaskCase,
     trial: int,
     semaphore: asyncio.Semaphore,
+    api_key: SecretStr,
 ) -> TrialResult:
     async with semaphore:
         started = time.perf_counter()
@@ -121,7 +123,9 @@ async def _run_trial(
         prompt_tokens: int | None = None
         completion_tokens: int | None = None
         try:
-            result = await runner.run(TaskRequest(task=case.task, input=case.input))
+            result = await runner.run(
+                TaskRequest(task=case.task, input=case.input), api_key=api_key
+            )
             output = result.output
             prompt_tokens = result.usage.prompt_tokens
             completion_tokens = result.usage.completion_tokens
@@ -173,7 +177,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     started_at = datetime.now(UTC)
     semaphore = asyncio.Semaphore(config.concurrency)
     jobs = [
-        _run_trial(runner, case, trial, semaphore)
+        _run_trial(runner, case, trial, semaphore, settings.openrouter_api_key)
         for trial in range(config.trials)
         for case in cases
     ]

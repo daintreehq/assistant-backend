@@ -6,6 +6,7 @@ import json
 
 import pytest
 from fakes import FakeProvider, make_result, selection_result
+from pydantic import SecretStr
 
 from daintree_assistant_server.contracts.openai import ChatMessage
 from daintree_assistant_server.skills.selector import (
@@ -14,6 +15,8 @@ from daintree_assistant_server.skills.selector import (
     parse_select_args,
     sanitize_for_selector,
 )
+
+TEST_API_KEY = SecretStr("test-caller-key")
 
 
 def _msgs(*texts: str) -> list[ChatMessage]:
@@ -166,7 +169,7 @@ def test_build_user_message_includes_available_tools() -> None:
 async def test_selector_selects_known_skill(selector: Selector, fake_provider: FakeProvider, catalog) -> None:
     target = sorted(catalog.known_ids)[0]
     fake_provider.complete_result = selection_result([target])
-    decision = await selector.select(_msgs("do the task"), [])
+    decision = await selector.select(_msgs("do the task"), [], api_key=TEST_API_KEY)
     assert decision.ran is True
     assert decision.degraded is False
     assert decision.skill_ids == [target]
@@ -180,7 +183,7 @@ async def test_selector_uses_json_mode_and_is_hardcoded_non_thinking(
     # prompt's reason-first key order is the inline reasoning step — no env toggle
     # exists) on a flat output cap, asking for json_object with no forced tool_choice.
     fake_provider.complete_result = selection_result([sorted(catalog.known_ids)[0]])
-    await selector.select(_msgs("do the task"), [])
+    await selector.select(_msgs("do the task"), [], api_key=TEST_API_KEY)
     req = fake_provider.requests[-1]
     assert req.response_format == {"type": "json_object"}
     assert req.tool_choice is None
@@ -200,7 +203,7 @@ async def test_selector_parses_content_ignoring_reasoning(
         content=json.dumps({"skill_ids": [target], "confidence": 0.9, "task_type": "t"}),
         reasoning_content="Let me think... this is prose, not JSON, and must be ignored.",
     )
-    decision = await selector.select(_msgs("do the task"), [])
+    decision = await selector.select(_msgs("do the task"), [], api_key=TEST_API_KEY)
     assert decision.degraded is False
     assert decision.skill_ids == [target]
 
@@ -212,7 +215,7 @@ async def test_selector_repairs_then_succeeds(selector: Selector, fake_provider:
         make_result(content="garbage"),
         selection_result([target]),
     ]
-    decision = await selector.select(_msgs("task"), [])
+    decision = await selector.select(_msgs("task"), [], api_key=TEST_API_KEY)
     assert decision.skill_ids == [target]
     assert len(fake_provider.requests) == 2
 
@@ -223,7 +226,7 @@ async def test_selector_degrades_after_repeated_malformed(selector: Selector, fa
         make_result(content="bad"),
         make_result(content="worse"),
     ]
-    decision = await selector.select(_msgs("task"), [])
+    decision = await selector.select(_msgs("task"), [], api_key=TEST_API_KEY)
     assert decision.degraded is True
     assert "skill_selector_failed_open" in decision.warnings
 
@@ -233,7 +236,7 @@ async def test_selector_degrades_on_upstream_error(selector: Selector, fake_prov
     from daintree_assistant_server.errors import upstream_error
 
     fake_provider.complete_error = upstream_error("boom")
-    decision = await selector.select(_msgs("task"), [])
+    decision = await selector.select(_msgs("task"), [], api_key=TEST_API_KEY)
     assert decision.degraded is True
 
 
@@ -253,7 +256,7 @@ async def test_selector_retries_transient_then_succeeds(
         return selection_result([target])
 
     fake_provider.complete_result = complete
-    decision = await selector.select(_msgs("task"), [])
+    decision = await selector.select(_msgs("task"), [], api_key=TEST_API_KEY)
     assert decision.degraded is False
     assert decision.skill_ids == [target]
     assert calls[0] == 2  # retried the transient failure
@@ -272,7 +275,7 @@ async def test_selector_exhausts_retries_then_fails_open(
         raise upstream_timeout()  # transient every time
 
     fake_provider.complete_result = complete
-    decision = await selector.select(_msgs("task"), [])
+    decision = await selector.select(_msgs("task"), [], api_key=TEST_API_KEY)
     assert decision.degraded is True
     assert "skill_selector_failed_open" in decision.warnings
     # The selector caps itself at ONE retry (not MAX_UPSTREAM_RETRIES): it gates

@@ -40,7 +40,6 @@ def _isolate_from_dotenv() -> Iterator[None]:
 @pytest.fixture
 def settings(tmp_path: Any) -> Settings:
     return Settings(
-        DAINTREE_API_KEY=API_KEY,
         OPENROUTER_API_KEY="test-deepseek-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         STATE_SIGNING_KID="k1",

@@ -1020,6 +1020,43 @@ async def test_concurrent_calls_do_not_cross_credentials() -> None:
     await provider.aclose()
 
 
+@pytest.mark.asyncio
+async def test_no_default_and_no_per_call_key_fails_cleanly() -> None:
+    # The server constructs its provider with NO default credential; a call that
+    # arrives without a per-call key is a propagation bug and must fail loudly
+    # BEFORE any HTTP request — never fall back to some ambient account.
+    reached = {"http": False}
+
+    def handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover
+        reached["http"] = True
+        return httpx.Response(200, json={})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = OpenRouterProvider(client, base_url=_BASE)  # api_key omitted → None
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert exc.value.code == "upstream_error"
+    assert reached["http"] is False
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_keyless_provider_still_honors_a_per_call_key() -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["auth"] = request.headers["Authorization"]
+        return httpx.Response(
+            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
+        )
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = OpenRouterProvider(client, base_url=_BASE)  # no default credential
+    await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
+    assert captured["auth"] == f"Bearer {_CALL_KEY}"
+    await provider.aclose()
+
+
 def test_empty_secret_does_not_mangle_the_upstream_reason() -> None:
     # str.replace("") splices the placeholder between every character. A request
     # can no longer carry an empty credential this far (_resolve_key rejects it),

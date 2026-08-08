@@ -52,7 +52,7 @@ def _fixture_catalog() -> Catalog:
 
 
 def _settings() -> Settings:
-    return Settings(DAINTREE_API_KEY="k", OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+    return Settings(OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
 
 
 def _startup_payload() -> dict[str, object]:

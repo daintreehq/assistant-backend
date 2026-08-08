@@ -29,7 +29,7 @@ from typing import Any
 from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 
-from .._harness.env import make_upstream_provider
+from .._harness.env import caller_api_key, make_upstream_provider
 from .._harness.fixtures import build_respond_request
 from .._harness.stats import latency_summary
 
@@ -113,7 +113,9 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
                 turn_id=f"turn-{i}",
             )
             t0 = time.perf_counter()
-            outcome = await container.orchestrator.complete(req, upstream_model=OPENROUTER_MODEL)
+            outcome = await container.orchestrator.complete(
+                req, upstream_model=OPENROUTER_MODEL, api_key=caller_api_key(settings)
+            )
             assert outcome.stream is not None
             async for _chunk in outcome.stream:
                 first_byte.append(time.perf_counter() - t0)

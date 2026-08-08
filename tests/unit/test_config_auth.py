@@ -5,35 +5,38 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from daintree_assistant_server.auth import (
-    DEVELOPMENT_PRINCIPAL,
-    authenticate,
-)
+from daintree_assistant_server.auth import authenticate
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.errors import DaintreeError
 
 
 def _settings(**overrides: object) -> Settings:
-    base = {
-        "DAINTREE_API_KEY": "secret",
-        "OPENROUTER_API_KEY": "dk",
-        "STATE_SIGNING_KEY_CURRENT": "sk",
-    }
+    base = {"STATE_SIGNING_KEY_CURRENT": "sk"}
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
 
 
-def test_missing_secrets_reports_each() -> None:
-    s = Settings(DAINTREE_API_KEY="", OPENROUTER_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
-    assert set(s.missing_secrets()) == {
-        "OPENROUTER_API_KEY",
-        "DAINTREE_API_KEY",
-        "STATE_SIGNING_KEY_CURRENT",
-    }
+def test_missing_secrets_reports_signing_key_only() -> None:
+    # No API key is required at startup: every request supplies the caller's own,
+    # which is both the auth credential and the upstream credential.
+    s = Settings(OPENROUTER_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
+    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT"]
 
 
 def test_missing_secrets_empty_when_present() -> None:
     assert _settings().missing_secrets() == []
+
+
+def test_ready_without_any_api_key_env_vars() -> None:
+    # A deployment with zero key material beyond the signing key is complete —
+    # in development AND in production shape.
+    for env in ("development", "production"):
+        s = _settings(
+            ENVIRONMENT=env,
+            STATE_SIGNING_KEY_CURRENT="y" * 48,
+            STATE_SALT="a-real-random-salt-value",
+        )
+        assert s.missing_secrets() == []
 
 
 def test_weak_secrets_allowed_in_development() -> None:
@@ -45,14 +48,14 @@ def test_weak_secrets_flagged_in_production() -> None:
     s = _settings(ENVIRONMENT="production")  # short keys + default salt
     problems = s.weak_secrets()
     assert any("STATE_SALT" in p for p in problems)
-    assert any("DAINTREE_API_KEY" in p for p in problems)
     assert any("STATE_SIGNING_KEY_CURRENT" in p for p in problems)
+    # The shared inbound API key is gone; nothing key-related is gated here.
+    assert not any("API_KEY" in p for p in problems)
 
 
 def test_strong_production_secrets_pass() -> None:
     s = _settings(
         ENVIRONMENT="production",
-        DAINTREE_API_KEY="x" * 24,
         STATE_SIGNING_KEY_CURRENT="y" * 48,
         STATE_SALT="a-real-random-salt-value",
     )
@@ -62,7 +65,6 @@ def test_strong_production_secrets_pass() -> None:
 def test_production_previous_key_must_pair_with_kid() -> None:
     s = _settings(
         ENVIRONMENT="production",
-        DAINTREE_API_KEY="x" * 24,
         STATE_SIGNING_KEY_CURRENT="y" * 48,
         STATE_SALT="a-real-random-salt-value",
         STATE_SIGNING_KEY_PREVIOUS="z" * 48,  # no kid → inconsistent
@@ -71,51 +73,55 @@ def test_production_previous_key_must_pair_with_kid() -> None:
 
 
 def test_secret_not_in_repr() -> None:
-    s = _settings()
-    assert "secret" not in repr(s)
+    s = _settings(OPENROUTER_API_KEY="dk")
     assert "dk" not in repr(s)
 
 
-def test_authenticate_valid() -> None:
-    principal = authenticate("Bearer secret", _settings())
-    assert principal is DEVELOPMENT_PRINCIPAL
+def test_authenticate_returns_the_caller_key() -> None:
+    principal = authenticate("Bearer sk-or-v1-abc123")
     assert principal.has_scope("chat")
+    assert principal.api_key.get_secret_value() == "sk-or-v1-abc123"
+
+
+def test_authenticate_accepts_any_wellformed_token() -> None:
+    # Structural admission only: the server no longer knows a shared secret, so
+    # any header-safe token is accepted here and judged by the upstream instead.
+    principal = authenticate("Bearer some-future-subscription-key")
+    assert principal.api_key.get_secret_value() == "some-future-subscription-key"
+
+
+def test_authenticate_key_not_in_repr() -> None:
+    principal = authenticate("Bearer sk-or-v1-secret-material")
+    assert "sk-or-v1-secret-material" not in repr(principal)
 
 
 @pytest.mark.parametrize(
     "header",
-    [None, "", "secret", "Token secret", "Bearer", "Bearer wrong", "Bearer SECRET"],
+    [None, "", "secret", "Token secret", "Bearer", "Bearer  ", "Bearer bad key", "Bearer k\x7f"],
 )
-def test_authenticate_rejects(header: str | None) -> None:
+def test_authenticate_rejects_missing_or_malformed(header: str | None) -> None:
     with pytest.raises(DaintreeError) as exc:
-        authenticate(header, _settings())
+        authenticate(header)
     assert exc.value.status_code == 401
     assert exc.value.code == "invalid_api_key"
 
 
-def test_authenticate_case_insensitive_scheme() -> None:
-    # "bearer" scheme keyword is case-insensitive; the token itself is not.
-    assert authenticate("bearer secret", _settings()) is DEVELOPMENT_PRINCIPAL
-
-
-def test_authenticate_dev_no_key_allows_unauthenticated() -> None:
-    # No key configured in development → unauthenticated access (any/no header).
-    s = Settings(
-        ENVIRONMENT="development", DAINTREE_API_KEY="", OPENROUTER_API_KEY="dk",
-        STATE_SIGNING_KEY_CURRENT="sk",
-    )
-    assert authenticate(None, s) is DEVELOPMENT_PRINCIPAL
-    assert authenticate("Bearer anything", s) is DEVELOPMENT_PRINCIPAL
-
-
-def test_authenticate_prod_no_key_rejects() -> None:
-    # Production never allows unauthenticated access, even with no key configured.
-    s = Settings(
-        ENVIRONMENT="production", DAINTREE_API_KEY="", OPENROUTER_API_KEY="dk",
-        STATE_SIGNING_KEY_CURRENT="sk",
-    )
+def test_authenticate_rejects_non_ascii_token() -> None:
     with pytest.raises(DaintreeError) as exc:
-        authenticate(None, s)
+        authenticate("Bearer sk-or-v1-café")
+    assert exc.value.code == "invalid_api_key"
+
+
+def test_authenticate_case_insensitive_scheme() -> None:
+    # "bearer" scheme keyword is case-insensitive; the token itself is kept verbatim.
+    assert authenticate("bearer MiXeD-case").api_key.get_secret_value() == "MiXeD-case"
+
+
+def test_authenticate_never_allows_unauthenticated() -> None:
+    # The old dev shortcut is gone: no environment serves without a caller key
+    # (without one there would be no upstream credential to run the turn with).
+    with pytest.raises(DaintreeError) as exc:
+        authenticate(None)
     assert exc.value.code == "invalid_api_key"
 
 

@@ -21,6 +21,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from pydantic import SecretStr
+
 from ..config import OPENROUTER_MODEL, Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
@@ -310,6 +312,7 @@ class Selector:
         conversation: list[ChatMessage],
         active_ids: list[str],
         *,
+        api_key: SecretStr,
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
     ) -> SelectionDecision:
@@ -335,9 +338,11 @@ class Selector:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
-        return await self._run(messages)
+        return await self._run(messages, api_key)
 
-    def _build_request(self, messages: list[dict[str, Any]]) -> ProviderChatRequest:
+    def _build_request(
+        self, messages: list[dict[str, Any]], api_key: SecretStr
+    ) -> ProviderChatRequest:
         # HARDCODED non-thinking (see INTERACTIVE_THINKING_ENABLED in config.py):
         # this call gates the turn's first byte, and the prompt's reason-first key
         # order is the inline reasoning step instead. Deliberately its OWN hardcode
@@ -353,10 +358,15 @@ class Selector:
             thinking_disabled=True,
             reasoning_effort=None,
             timeout=self.settings.selector_timeout_seconds,
+            # The caller's own credential; the provider has no default to fall
+            # back to, so omitting this would fail the call, not bill anyone.
+            api_key=api_key,
         )
 
-    async def _run(self, messages: list[dict[str, Any]]) -> SelectionDecision:
-        request = self._build_request(messages)
+    async def _run(
+        self, messages: list[dict[str, Any]], api_key: SecretStr
+    ) -> SelectionDecision:
+        request = self._build_request(messages, api_key)
 
         try:
             result = await self._call_once(request)
@@ -370,7 +380,7 @@ class Selector:
 
         if parsed is None:
             repair_request = self._build_request(
-                [*messages, {"role": "user", "content": _REPAIR_INSTRUCTION}]
+                [*messages, {"role": "user", "content": _REPAIR_INSTRUCTION}], api_key
             )
             try:
                 repair = await self._call_once(repair_request)

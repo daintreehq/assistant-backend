@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 from conftest import respond_body
 from fakes import FakeProvider
+from pydantic import SecretStr
 
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.contracts.openai import ChatMessage
@@ -38,12 +39,14 @@ class RecordingLearner:
         *,
         request: Any,
         active_ids: list[str],
+        api_key: SecretStr,
         trailing_messages: tuple[ChatMessage, ...] = (),
     ) -> LearningOutcome:
         self.calls.append(
             {
                 "request": request,
                 "active_ids": active_ids,
+                "api_key": api_key,
                 "trailing": list(trailing_messages),
             }
         )
@@ -94,6 +97,7 @@ def _fire(orch: ChatOrchestrator, request: Any, **kw: Any) -> None:
         "active_ids": ["daintree.test.alpha"],
         "assistant_text": "here is the answer",
         "had_tool_calls": False,
+        "api_key": SecretStr("test-caller-key"),
     }
     defaults.update(kw)
     orch._maybe_learn_after_turn(**defaults)
@@ -177,7 +181,9 @@ async def test_a_raising_learner_never_escapes(learning_orchestrator, respond_re
     """
     learner = RecordingLearner(boom=True)
     orch = learning_orchestrator(learner)
-    await orch._run_learner_background(respond_request, ["daintree.test.alpha"], [])
+    await orch._run_learner_background(
+        respond_request, ["daintree.test.alpha"], [], SecretStr("test-caller-key")
+    )
     assert len(learner.calls) == 1
 
 

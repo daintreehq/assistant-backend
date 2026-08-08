@@ -87,8 +87,9 @@ class Settings(BaseSettings):
     # ---- Environment ----------------------------------------------------
     # A CLOSED set on purpose. Every hardening gate below keys on this value, so a
     # free-form string meant a typo ("prod", "Production", "staging") silently skipped
-    # weak-secret checks, the local-only-feature gate, and the API-key requirement —
-    # i.e. it failed OPEN, in the one direction that matters.
+    # weak-secret checks and the local-only-feature gate — i.e. it failed OPEN, in
+    # the one direction that matters. (Authentication itself no longer varies by
+    # environment: every request needs a caller key everywhere — see auth.py.)
     environment: Literal["development", "test", "staging", "production"] = Field(
         default="development", alias="ENVIRONMENT"
     )
@@ -109,6 +110,12 @@ class Settings(BaseSettings):
     openrouter_base_url: str = Field(
         default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
     )
+    # Benchmark / live-test tooling ONLY. The serving path holds no upstream
+    # credential at all: every request's provider calls use the caller's own key
+    # (their bearer token — see auth.py), and main.py builds the server provider
+    # with api_key=None so a propagation bug fails loudly instead of quietly
+    # billing a shared account. Standalone tooling (benchmarks/, tests/live)
+    # still constructs providers directly from this value.
     openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
 
     # ---- Thinking headroom -----------------------------------------------
@@ -162,9 +169,6 @@ class Settings(BaseSettings):
     # A final assistant message larger than this many characters is flagged as an
     # oversized dump (the recitation failure mode). Observability only.
     main_output_warn_chars: int = Field(default=8000, ge=1, alias="MAIN_OUTPUT_WARN_CHARS")
-
-    # ---- Authentication -------------------------------------------------
-    daintree_api_key: SecretStr = Field(default=SecretStr(""), alias="DAINTREE_API_KEY")
 
     # ---- State signing --------------------------------------------------
     state_signing_key_current: SecretStr = Field(
@@ -423,12 +427,14 @@ class Settings(BaseSettings):
         return self.environment in ("production", "staging")
 
     def missing_secrets(self) -> list[str]:
-        """Return env var names of required secrets that are empty."""
+        """Return env var names of required secrets that are empty.
+
+        Only server-owned material is required. Neither upstream nor inbound API
+        keys appear here: every request supplies its own caller key, which is
+        both the auth credential and the upstream credential, so there is
+        nothing key-related for the server to validate at startup.
+        """
         missing: list[str] = []
-        if not self.openrouter_api_key.get_secret_value():
-            missing.append("OPENROUTER_API_KEY")
-        if not self.daintree_api_key.get_secret_value():
-            missing.append("DAINTREE_API_KEY")
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
         return missing
@@ -465,8 +471,6 @@ class Settings(BaseSettings):
         if not self.is_hardened:
             return []
         problems: list[str] = []
-        if len(self.daintree_api_key.get_secret_value()) < 16:
-            problems.append("DAINTREE_API_KEY is too short (<16 chars)")
         if len(self.state_signing_key_current.get_secret_value()) < 32:
             problems.append("STATE_SIGNING_KEY_CURRENT is too short (<32 chars)")
         if self.state_salt.get_secret_value() == DEFAULT_STATE_SALT:

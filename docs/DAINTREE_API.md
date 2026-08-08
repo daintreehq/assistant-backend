@@ -29,14 +29,24 @@ or train on data). That is invisible to clients.
 
 ## Authentication
 
-A single fixed bearer key (development phase):
+Every request carries the caller's own API key as the bearer token; that same key is
+the upstream (OpenRouter) credential funding the turn's model calls. For early testers
+the key IS their OpenRouter key (`sk-or-v1-…`); later it becomes a subscription key the
+backend maps to a credential server-side, with no wire change.
 
 ```
-Authorization: Bearer <DAINTREE_API_KEY>
+Authorization: Bearer <caller API key>
 ```
 
-`/healthz`, `/readyz`, and `/version` are unauthenticated. (A full user/account system
-will replace the fixed key later; the wire contract does not change when it does.)
+The server holds no shared inbound secret and no upstream credential of its own, and
+performs only structural validation (present, header-safe ASCII) — a missing or
+malformed key is `401 invalid_api_key`, while a well-formed key the upstream then
+rejects surfaces as `502 upstream_error`. The two codes are deliberately distinct so
+the CLI can tell "fix your header" from "fix your account". There is no unauthenticated
+mode in any environment.
+
+`/healthz`, `/readyz`, and `/version` are unauthenticated (Cloud Run probes them; they
+carry no user data).
 
 ## Protocol negotiation
 

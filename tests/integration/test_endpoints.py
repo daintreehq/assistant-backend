@@ -205,6 +205,90 @@ def test_workflow_resume_digest_task_endpoint(client, auth, fake_provider) -> No
     assert body["output"]["ranked"][0]["headline"] == "Ready to verify"
 
 
+def test_authed_routes_reject_missing_and_malformed_bearer(client) -> None:
+    """The caller-key auth matrix: every authed route 401s with a distinct
+    invalid_api_key code (so the CLI can tell 'fix your header' from an upstream
+    502 upstream_error), while probes stay open."""
+    from conftest import respond_body
+
+    for headers in ({}, {"Authorization": "Token x"}, {"Authorization": "Bearer bad key"}):
+        r = client.get("/v1/daintree/capabilities", headers=headers)
+        assert r.status_code == 401
+        assert r.json()["error"]["code"] == "invalid_api_key"
+        assert r.headers.get("www-authenticate") == "Bearer"
+        r = client.post(
+            "/v1/daintree/respond",
+            headers=headers,
+            json=respond_body([{"role": "user", "content": "hi"}]),
+        )
+        assert r.status_code == 401
+        r = client.post(
+            "/v1/daintree/tasks",
+            headers=headers,
+            json={"task": "terminal_judge", "input": {"question": "q"}},
+        )
+        assert r.status_code == 401
+        assert client.get("/v1/daintree/skills", headers=headers).status_code == 401
+    # Probes and version never require a key (Cloud Run probes them).
+    assert client.get("/healthz").status_code == 200
+    assert client.get("/readyz").status_code == 200
+    assert client.get("/version").status_code == 200
+
+
+def test_caller_key_reaches_every_upstream_call(client, fake_provider) -> None:
+    """The bearer token IS the upstream credential: the selector call and the main
+    call of a turn, and a utility-task call, must all carry exactly the caller's
+    key — never a server-side default (the provider has none)."""
+    from conftest import respond_body
+
+    caller = {"Authorization": "Bearer sk-or-v1-caller-abc"}
+    fake_provider.selector_result = selection_result([SKILL_PREP])
+    fake_provider.complete_result = make_result(content="done")
+    r = client.post(
+        "/v1/daintree/respond",
+        headers=caller,
+        json=respond_body([{"role": "user", "content": "prep my branch"}]),
+    )
+    assert r.status_code == 200
+    assert fake_provider.requests, "no provider calls recorded"
+    for req in fake_provider.requests:
+        assert req.api_key is not None
+        assert req.api_key.get_secret_value() == "sk-or-v1-caller-abc"
+
+    fake_provider.requests.clear()
+    fake_provider.complete_result = make_result(
+        content=json.dumps({"reason": "ok", "confidence": 0.9, "matched": True})
+    )
+    r = client.post(
+        "/v1/daintree/tasks",
+        headers={"Authorization": "Bearer sk-or-v1-task-key"},
+        json={"task": "terminal_judge", "input": {"question": "q"}},
+    )
+    assert r.status_code == 200
+    assert fake_provider.requests
+    for req in fake_provider.requests:
+        assert req.api_key is not None
+        assert req.api_key.get_secret_value() == "sk-or-v1-task-key"
+
+
+def test_streaming_turn_carries_the_caller_key(client, fake_provider) -> None:
+    from conftest import respond_body
+
+    body = respond_body([{"role": "user", "content": "hi"}], generation={"stream": True})
+    with client.stream(
+        "POST",
+        "/v1/daintree/respond",
+        headers={"Authorization": "Bearer sk-or-v1-stream-key"},
+        json=body,
+    ) as s:
+        assert s.status_code == 200
+        s.read()
+    assert fake_provider.stream_requests
+    for req in fake_provider.stream_requests:
+        assert req.api_key is not None
+        assert req.api_key.get_secret_value() == "sk-or-v1-stream-key"
+
+
 def test_tasks_unknown_404(client, auth) -> None:
     r = client.post("/v1/daintree/tasks", headers=auth, json={"task": "nope", "input": {}})
     assert r.status_code == 404
@@ -222,38 +306,53 @@ def test_oversized_body_413(client, auth) -> None:
     assert r.status_code == 413
 
 
-def test_dev_boots_and_serves_unauthenticated_without_api_key() -> None:
-    """Local dev with no DAINTREE_API_KEY: boots ready and serves unauthenticated."""
+def test_dev_boots_ready_without_any_api_key_but_still_requires_auth() -> None:
+    """No key env vars at all: the server boots ready (nothing to validate), but
+    every authed route still demands a caller key — the dev unauthenticated
+    shortcut is gone (without a caller key there is no upstream credential)."""
     from fastapi.testclient import TestClient
 
     from daintree_assistant_server.config import Settings
     from daintree_assistant_server.main import create_app
 
     settings = Settings(
-        ENVIRONMENT="development", DAINTREE_API_KEY="", OPENROUTER_API_KEY="d",
+        ENVIRONMENT="development", OPENROUTER_API_KEY="",
         STATE_SIGNING_KEY_CURRENT="sk", STATE_SALT="x",
     )
     app = create_app(settings=settings)  # real lifespan (no injected provider)
     with TestClient(app) as client:
         assert app.state.ready is True
-        # No Authorization header → allowed in development.
-        assert client.get("/v1/daintree/capabilities").status_code == 200
+        # No Authorization header → 401 even in development.
+        r = client.get("/v1/daintree/capabilities")
+        assert r.status_code == 401
+        assert r.json()["error"]["code"] == "invalid_api_key"
+        # A caller-supplied key (any well-formed bearer) is accepted.
+        ok = client.get(
+            "/v1/daintree/capabilities",
+            headers={"Authorization": "Bearer sk-or-v1-caller"},
+        )
+        assert ok.status_code == 200
 
 
-def test_prod_not_ready_without_api_key() -> None:
+def test_prod_boots_ready_without_upstream_key_env() -> None:
+    """Production readiness no longer requires any API-key env var: the caller
+    funds each request, so only server-owned state material is validated."""
     from fastapi.testclient import TestClient
 
     from daintree_assistant_server.config import Settings
     from daintree_assistant_server.main import create_app
 
     settings = Settings(
-        ENVIRONMENT="production", DAINTREE_API_KEY="", OPENROUTER_API_KEY="d" * 32,
+        ENVIRONMENT="production", OPENROUTER_API_KEY="",
         STATE_SIGNING_KEY_CURRENT="s" * 48, STATE_SALT="a-real-salt-value",
     )
     app = create_app(settings=settings)
     with TestClient(app) as client:
-        assert app.state.ready is False
-        assert client.get("/readyz").status_code == 503
+        assert app.state.ready is True
+        assert client.get("/readyz").status_code == 200
+        # Probes stay unauthenticated; authed routes still reject a missing key.
+        assert client.get("/healthz").status_code == 200
+        assert client.get("/v1/daintree/capabilities").status_code == 401
 
 
 def test_prod_not_ready_when_skill_learning_enabled(fake_provider) -> None:
@@ -266,8 +365,6 @@ def test_prod_not_ready_when_skill_learning_enabled(fake_provider) -> None:
 
     settings = Settings(
         ENVIRONMENT="production",
-        DAINTREE_API_KEY="x" * 24,
-        OPENROUTER_API_KEY="d" * 32,
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",
         SKILL_LEARNING_MODE="apply",
@@ -287,8 +384,6 @@ def test_not_ready_returns_503(fake_provider) -> None:
     from daintree_assistant_server.main import create_app
 
     broken = Settings(
-        DAINTREE_API_KEY="test-api-key",
-        OPENROUTER_API_KEY="d",
         STATE_SIGNING_KEY_CURRENT="",  # makes build_container raise -> not ready
     )
     app = create_app(settings=broken, provider=fake_provider)
