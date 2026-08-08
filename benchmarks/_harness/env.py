@@ -19,6 +19,16 @@ from daintree_assistant_server.providers.openrouter import OpenRouterProvider
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# CI has no ``.env`` and no state-key secrets, but the deterministic suites that go
+# through ``build_container`` (microperf, session_trace) need a signing key or
+# ``StateCodec`` raises "current signing key must be non-empty" and the whole
+# dashboard step fails. The suites that hardcode their own bench key (prompt_cost,
+# safety) were passing for exactly this reason. Token SHAPE is what those suites
+# measure, never token secrecy, so a fixed literal is correct here — it also keeps
+# runs reproducible. Never a fallback in production config: ``Settings`` still
+# defaults this to empty, and a missing key still fails ``/readyz``.
+_BENCH_STATE_SIGNING_KEY = "benchmark-state-signing-key-not-a-secret"
+
 
 class EnvError(Exception):
     """A benchmark environment problem (missing key, unreadable .env)."""
@@ -27,11 +37,22 @@ class EnvError(Exception):
 def build_settings(
     env_file: str | None = None, **overrides: Any
 ) -> Settings:
-    """Load immutable settings from ``.env`` (repo root by default)."""
+    """Load immutable settings from ``.env`` (repo root by default).
+
+    Falls back to a non-secret bench signing key when the environment supplies
+    none, so a fresh clone or CI runner can run the deterministic suites without
+    a ``.env``. A real key from the environment or an explicit override wins.
+    """
     if env_file is None:
         default = ROOT / ".env"
         env_file = str(default) if default.is_file() else None
-    return Settings(_env_file=env_file, **overrides)
+    settings = Settings(_env_file=env_file, **overrides)
+    if not settings.state_signing_key_current.get_secret_value():
+        settings = Settings(
+            _env_file=env_file,
+            **{"STATE_SIGNING_KEY_CURRENT": _BENCH_STATE_SIGNING_KEY, **overrides},
+        )
+    return settings
 
 
 def require_api_key(settings: Settings) -> str:

@@ -32,8 +32,10 @@ must not run); bump it for a new instruction. `main` is `{tool_calls: [name]}` (
 continuation) or `{final: "text"}` (turn complete). Skill ids and tool names are
 validated against the real catalog / tool inventory at load.
 
-## Baseline (2026-07-10)
+## Baseline (2026-08-08)
 
 3 traces / 6 turns, all green: cadence 1.0, active-set 1.0, learn-trigger 1.0,
 state continuity 1.0, selector_run_rate 0.83 (the one continuation round correctly
-skips the selector).
+skips the selector). Expected active sets include the domain foundation
+(`daintree.foundation`) auto-paired with each selected specific on authoritative
+selector runs — unit admission per `_admit_with_domain_foundations`.

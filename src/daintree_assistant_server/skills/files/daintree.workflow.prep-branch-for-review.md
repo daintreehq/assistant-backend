@@ -8,7 +8,12 @@ requiredTools:
   - context.snapshot
   - worktree.getCurrent
   - forge.listPRs
+  - forge.getPR
   - workflow.prepBranchForReview
+  - agentTask.spawnForEdits
+  - terminal.awaitAll
+  - terminal.extract
+  - terminal.sendCommand
   - daintree.call
 ---
 Use when: the user wants to ready the current branch for review / open a PR.
@@ -36,10 +41,13 @@ ONLY `arguments` at the top level — nest every query field inside it; a top-le
 rejected outright. (`forge.getPR` is TYPED: `{ prNumber, cwd? }` at the top level. The
 `daintree.call forge.*` actions in step 4 are a different surface: `daintree.call` itself takes
 `{ name, arguments, requestKey? }`, and the forge payload goes flat inside its `arguments`.) Each PR
-carries `head`/`number`/`url`. Do NOT branch on a review-decision or CI-status field — no such
-field is guaranteed on these items, and no tool in the registry reads CI or review state at all.
-If an open PR's head is this branch, you are updating, not creating — skip the PR-create in
-step 5 and just push.
+carries `headRef`/`number`/`url` — the branch field is `headRef`, not `head`, so match on that
+or the duplicate guard never fires. Do NOT branch on `ciStatus` or `reviewDecision` read off a
+`listPRs` ITEM — neither field is guaranteed on a bulk item. Once you have the number, typed
+`forge.getPR({ prNumber, cwd? })` returns `reviewDecision` for real, but never `ciStatus`: the
+CI verdict comes from `daintree.call({ name: "forge.getCIStatus", arguments: { prNumber } })`.
+If an open PR's `headRef` is this branch, you are updating, not creating — skip the PR-create
+in step 5 and just push.
 
 ## Step 3 — Get the verdict (free, read-only, NO confirmation)
 `workflow.prepBranchForReview` is a passthrough wrapper like the forge ones in step 2, with one
@@ -58,7 +66,7 @@ It returns:
 - `blocked_uncommitted_changes` — there is work to commit (`stagedCount` /
   `unstagedCount` > 0). Commit + push it (step 4), then re-check or proceed.
 - `blocked_merge_conflicts` — the branch has conflicts. This is real file work, and you
-  NEVER edit files — see "Conflicts / runner failures" below.
+  NEVER edit files — see "Checks and conflicts" below.
 - `blocked_repo_busy` — a git operation is in flight. Wait briefly and re-run step 3; do
   not push into a busy repo.
 - `no_runners_detected` — no test/lint runner was found. Not fatal — proceed, but tell
@@ -88,26 +96,34 @@ most forge writes return void — so capture `number`/`url` now rather than re-l
 Confirmed (external risk). If step 2 found an existing open PR on this head, skip create;
 the push already updated it. To flip a draft to ready, `daintree.call forge.markPRReadyForReview`.
 
-## Conflicts / runner failures — spawn and supervise, don't self-fix
-`prepBranchForReview` is a READ — it cannot fix anything. If the verdict is
-`blocked_merge_conflicts`, or a detected runner failed and the user wants it green before
-review, that is edit work: spawn a visible agent with `agentTask.spawnForEdits`
-mode:"edit" and supervise it. Pick ONE supervision mode, never both:
-- BACKGROUND (fire-and-forget): spawn WITH a watcher (`watch: true`, `watchGoal: "...resolve
-  the conflicts / fix the failing checks, then I'll prep the PR"`), then END your turn.
-  React on the watcher's `completed_*` event.
-- IN-TURN (you drive it now): spawn with NO watcher, then `terminal.awaitAll({
-  terminalIds: [...] })` -> `{ allFinished, perTerminal: [{ terminalId, status }] }`
-  (status ∈ finished | failed | question | working), read its output with one
-  `terminal.extract` / `terminal.summarize`, and relay with `terminal.sendCommand`.
-Finish is NEVER a bare `waiting` (an agent shows waiting before it starts, when paused,
-or when backgrounded) and NEVER a transient `completed` (it bounces to waiting/working in
-seconds — don't wait to see it). Confirm via a watcher `completed_*` event or
-`terminal.extract wait:{}` (each runs a small-model tail check), or `terminal.awaitAll`
-(state-based and fast — then read the tail to verify, and re-await one that still looks busy).
-Once the agent has fixed the branch, return to step 3 (re-check) → step 4/5.
+## Checks and conflicts — run the check yourself, spawn only for edits
+Running a detected runner is a CALL, not a delegation — do NOT spawn an agent merely to
+execute a check. `project.runCheck` has no typed wrapper, so it goes through the escape
+hatch:
+`daintree.call {"name":"project.runCheck","arguments":{"projectId":"…","runnerId":"…","cwd":"<worktree path>"}}`.
+Take `runnerId` from step 3's `detectedRunners` — never invent one, and confirm what an
+unfamiliar id runs: detection surfaces every runnable script, not just checks, and pointing
+this at a long-lived server blocks until the timeout. Pass `cwd` explicitly for the worktree
+you are prepping: it defaults to the project root, so omitting it silently checks the WRONG
+tree. A failing command comes back as a FAILED CHECK, not an error, so read `passed` rather
+than trusting that the call succeeded; the output tail is diagnostic only, and `command` is
+what actually ran — `runCheck` re-detects inside the `cwd` you passed, so it can differ from
+what the root advertised. On `no_runners_detected` there is nothing to run; say verification
+is thin rather than implying anything passed.
 
-Report back: state the verdict you got, what you committed/pushed, and the PR number + url — or, if
+Edit work is different — you NEVER edit files. If the verdict is `blocked_merge_conflicts`,
+or a check failed and the user wants it green before review, spawn a visible agent with
+`agentTask.spawnForEdits` mode:"edit" and supervise it in exactly ONE mode, never both:
+BACKGROUND (spawn WITH `watch: true` + `watchGoal`, then END your turn and react on the
+watcher's `completed_*` event), or IN-TURN (spawn with NO watcher, then `terminal.awaitAll`,
+read the tail once with `terminal.extract`, relay with `terminal.sendCommand`). Finish is
+never a bare `waiting` (an agent shows waiting before it starts, when paused, and when
+backgrounded) and never a transient `completed` (it bounces back within seconds). Once the
+branch is fixed, return to step 3 → 4/5, and re-run the check above rather than taking the
+agent's word for it.
+
+Report back: state the verdict you got, any check you ran (its `command`, `passed`, `exitCode`),
+what you committed/pushed, and the PR number + url — or, if
 blocked, exactly what is blocking and the next action (and, if you spawned a fixer agent,
 its terminalId + watcherId; supervision is durable — the background supervisor keeps watching if the user closes the assistant).
 Never claim "the PR is ready" off `prepBranchForReview` alone: that verdict only means the

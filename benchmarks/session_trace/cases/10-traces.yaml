@@ -18,15 +18,25 @@ cases:
   - id: single-skill-two-rounds
     session_id: s-rename
     turns:
+      # An authoritative selection admits specific+foundation UNITS: the top-level
+      # daintree.foundation is auto-paired with every daintree.* specific on the
+      # same turn (_admit_with_domain_foundations), and a continuation round then
+      # reuses that already-closed set verbatim.
       - turn_id: t1
         user: "Rename my terminals so I can tell the agents apart."
         selector_pick: [daintree.terminals.rename]
         main: {tool_calls: [terminal__read]}
-        expect: {selector_ran: true, active: [daintree.terminals.rename], learn: false}
+        expect:
+          selector_ran: true
+          active: [daintree.terminals.rename, daintree.foundation]
+          learn: false
       - turn_id: t1                       # SAME turn_id → continuation, selector must NOT run
         tool_result: "term-1: build agent\nterm-2: test agent"
         main: {final: "Renamed both terminals to match their agents."}
-        expect: {selector_ran: false, active: [daintree.terminals.rename], learn: true}
+        expect:
+          selector_ran: false
+          active: [daintree.terminals.rename, daintree.foundation]
+          learn: true
 
   - id: topic-shift-replaces-active
     session_id: s-shift
@@ -35,7 +45,10 @@ cases:
         user: "Rename my terminals."
         selector_pick: [daintree.terminals.rename]
         main: {final: "Done."}
-        expect: {selector_ran: true, active: [daintree.terminals.rename], learn: true}
+        expect:
+          selector_ran: true
+          active: [daintree.terminals.rename, daintree.foundation]
+          learn: true
       - turn_id: t2                        # new instruction → selector runs, replaces the set
         user: "Now run a competition between three agents on this task."
         selector_pick: [daintree.orchestration.competition, daintree.foundation]
@@ -52,7 +65,10 @@ cases:
         user: "Prep this branch for review."
         selector_pick: [daintree.workflow.prep-branch-for-review]
         main: {final: "Branch prepared."}
-        expect: {selector_ran: true, active: [daintree.workflow.prep-branch-for-review], learn: true}
+        expect:
+          selector_ran: true
+          active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+          learn: true
       - turn_id: t2                        # a chit-chat turn with no real task → selector clears
         user: "Thanks, that's all for now."
         selector_pick: []
