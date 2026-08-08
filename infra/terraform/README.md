@@ -9,7 +9,7 @@ Create the Secret Manager secrets referenced by `var.secret_ids` (values managed
 out-of-band; never in Terraform state):
 
 ```bash
-for s in daintree-api-key openrouter-api-key state-signing-key-current state-salt; do
+for s in state-signing-key-current state-salt; do
   gcloud secrets create "$s" --replication-policy=automatic 2>/dev/null || true
 done
 # add a version to each, e.g.:
@@ -17,8 +17,13 @@ printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add state-signin
 printf '%s' "$(openssl rand -hex 16)" | gcloud secrets versions add state-salt --data-file=-
 ```
 
+State-signing material is the only secret the deployment mounts — there is **no
+server-side API key**. Each request's bearer token is the caller's own key, which
+both authenticates the request and funds its upstream calls.
+
 `STATE_SALT` must be a real (non-default) value — production readiness fails
-otherwise (see `Settings.weak_secrets`).
+otherwise (see `Settings.weak_secrets`), as does an `OPENROUTER_BASE_URL` that is
+not the `https://openrouter.ai` origin (caller keys are forwarded to it).
 
 Build and push the image to Artifact Registry, then pass it as `var.image` (by
 immutable digest).
@@ -26,7 +31,7 @@ immutable digest).
 ## Staging (default)
 
 `ingress = "INGRESS_TRAFFIC_ALL"` and `allow_unauthenticated = true`: the direct
-`https://<service>-<hash>-<region>.run.app` URL is reachable, and the app's
+`https://<service>-<hash>-<region>.run.app` URL is reachable, and the caller's
 bearer key is the gate.
 
 ```bash
@@ -35,15 +40,17 @@ terraform apply \
   -var image=REGION-docker.pkg.dev/PROJECT/REPO/daintree-assistant@sha256:...
 ```
 
-Smoke test against the `service_uri` output:
+Smoke test against the `service_uri` output. The bearer token is **your own
+OpenRouter key** — the server has none, and that key pays for the turn:
 
 ```bash
 URL=$(terraform output -raw service_uri)
+CALLER_API_KEY=sk-or-v1-...
 curl -s "$URL/healthz"                                   # {"status":"ok"}
 curl -s "$URL/readyz"                                    # {"status":"ready", ...}
 curl -s -o /dev/null -w '%{http_code}' "$URL/v1/daintree/capabilities"   # 401 (no auth)
-curl -s -H "Authorization: Bearer $DAINTREE_API_KEY" "$URL/v1/daintree/capabilities"
-curl -s -H "Authorization: Bearer $DAINTREE_API_KEY" -X POST "$URL/v1/daintree/respond" \
+curl -s -H "Authorization: Bearer $CALLER_API_KEY" "$URL/v1/daintree/capabilities"
+curl -s -H "Authorization: Bearer $CALLER_API_KEY" -X POST "$URL/v1/daintree/respond" \
   -H 'content-type: application/json' \
   -d '{"protocol_version":1,"session":{"id":"s","turn_id":"t"},
        "input":{"messages":[{"role":"user","content":"hello"}]}}'
