@@ -174,9 +174,19 @@ This is the part that makes it a release rather than a push.
 URL=$(gcloud run services describe daintree-assistant --region=us-central1 \
   --project=daintree-research --format='value(status.url)')
 
-curl -fsS "$URL/healthz"    # {"status":"ok"}
+curl -fsS "$URL/health"     # {"status":"ok"}
 curl -fsS "$URL/readyz"     # {"status":"ready","catalog_revision":"...","skills":N}
 curl -fsS "$URL/version"    # build_sha must equal $RELEASE_SHA
+```
+
+Use `/health`, never `/healthz`: Google's frontend reserves the `/healthz` path
+on Cloud Run and answers it with its own 404, so it is unreachable from outside
+the container no matter how healthy the service is. Or just run the script that
+already knows all of this:
+
+```bash
+./infra/gcp/smoke.sh                                    # free checks only
+OPENROUTER_API_KEY=sk-or-v1-... ./infra/gcp/smoke.sh --full   # + two real turns
 ```
 
 `build_sha` disagreeing with `RELEASE_SHA` means traffic is still on an older
