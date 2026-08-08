@@ -41,10 +41,13 @@ ONLY `arguments` at the top level — nest every query field inside it; a top-le
 rejected outright. (`forge.getPR` is TYPED: `{ prNumber, cwd? }` at the top level. The
 `daintree.call forge.*` actions in step 4 are a different surface: `daintree.call` itself takes
 `{ name, arguments, requestKey? }`, and the forge payload goes flat inside its `arguments`.) Each PR
-carries `head`/`number`/`url`. Do NOT branch on `ciStatus` or `reviewDecision` read off a
-`listPRs` ITEM — the bulk item schema guarantees neither. Once you have the number, typed
-`forge.getPR({ prNumber, cwd? })` returns both for real. If an open PR's head is this branch,
-you are updating, not creating — skip the PR-create in step 5 and just push.
+carries `headRef`/`number`/`url` — the branch field is `headRef`, not `head`, so match on that
+or the duplicate guard never fires. Do NOT branch on `ciStatus` or `reviewDecision` read off a
+`listPRs` ITEM — neither field is guaranteed on a bulk item. Once you have the number, typed
+`forge.getPR({ prNumber, cwd? })` returns `reviewDecision` for real, but never `ciStatus`: the
+CI verdict comes from `daintree.call({ name: "forge.getCIStatus", arguments: { prNumber } })`.
+If an open PR's `headRef` is this branch, you are updating, not creating — skip the PR-create
+in step 5 and just push.
 
 ## Step 3 — Get the verdict (free, read-only, NO confirmation)
 `workflow.prepBranchForReview` is a passthrough wrapper like the forge ones in step 2, with one
