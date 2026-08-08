@@ -788,12 +788,20 @@ async def test_changed_selection_discards_private_stream_and_opens_canonical(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("state_kind", ["empty", "stale", "invalid"])
-async def test_empty_invalid_and_stale_state_never_speculates(
+async def test_unusable_state_speculates_on_the_empty_set_and_wins(
     state_kind: str,
     orchestrator: ChatOrchestrator,
     fake_provider: FakeProvider,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """A cold turn guesses "no skills" and races the selector with it.
+
+    Empty / stale / invalid state all supply no usable prior set, so the guess is the
+    empty set — which is the single most likely selector answer on an opening message.
+    When the selector agrees, the already-open stream is kept and the turn's first byte
+    never waits on the upstream open at all. This is the first-turn latency path; the
+    old behavior was to sit serial and open only after selection.
+    """
     skill_id = sorted(orchestrator.catalog.known_ids)[0]
     if state_kind == "empty":
         request = _stream_request_with_state(orchestrator, [])
@@ -813,15 +821,66 @@ async def test_empty_invalid_and_stale_state_never_speculates(
         orchestrator.complete(request, upstream_model="deepseek-v4-flash")
     )
     await started.wait()
-    await asyncio.sleep(0)
-    assert fake_provider.stream_requests == []
+    # The speculative stream opens WHILE the selector is still gated — that overlap
+    # is the entire point, so assert it before releasing rather than after.
+    await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
     release.set()
     outcome = await pending
     assert outcome.stream is not None
-    first = await anext(outcome.stream)
-    assert first.startswith("event: meta\n")
-    assert fake_provider.stream_requests == []
-    await outcome.stream.aclose()
+    events = await _drain(outcome.stream)
+    assert events[0].startswith("event: meta\n")
+    # Still ONE upstream open: the guess was exact, so nothing was re-opened.
+    assert len(fake_provider.stream_requests) == 1
+    meta = json.loads(events[0].split("data: ", 1)[1])
+    assert meta["skills"]["active"] == []
+
+
+@pytest.mark.asyncio
+async def test_cold_speculation_is_discarded_when_the_selector_picks_skills(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other half of the cold-turn trade: a wrong guess costs one discarded open.
+
+    The empty guess loses whenever an opening message genuinely routes to a skill. The
+    turn must still be CORRECT — the canonical request is rebuilt with the selected
+    skills and the speculative output never reaches the client — it just costs a
+    thrown-away prefill. Pinning it here keeps that cost visible and bounded to one
+    extra open rather than silently growing.
+    """
+    ids = sorted(orchestrator.catalog.known_ids)
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=[ids[0]], ran=True, degraded=False),
+    )
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        label = "private loser" if not streams else "canonical winner"
+        stream = FakeStream(make_text_chunks(label))
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, []),
+            upstream_model="deepseek-v4-flash",
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: len(streams) == 1)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+
+    assert len(fake_provider.stream_requests) == 2  # loser + canonical
+    assert streams[0].closed is True
+    assert _streamed_content(events) == "canonical winner "
+    assert "private loser" not in "".join(events)
 
 
 @pytest.mark.asyncio

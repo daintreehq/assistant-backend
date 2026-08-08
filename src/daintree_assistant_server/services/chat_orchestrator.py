@@ -885,11 +885,27 @@ class ChatOrchestrator:
             instruction_revision=request.session.instruction_revision,
         )
 
-        # Speculation is intentionally narrower than "has prior ids": the token
-        # must be verified against this session AND describe the exact catalog
-        # snapshot used to assemble the private request. Empty, invalid, expired,
-        # cross-session, and catalog-stale state all retain the serial first-turn
-        # behavior. Non-streaming responses are unchanged.
+        # Speculation opens the main stream against a GUESS at what the selector is
+        # about to return, in parallel with the selector call, and keeps it only if
+        # the guess proves exact. It is what decouples the turn's first byte from
+        # selection latency: measured, a winning speculation drops the post-meta
+        # first-event time to ~0ms, so the turn's TTFT becomes the selector's
+        # latency alone rather than selector + upstream open + prefill.
+        #
+        # THE GUESS. With usable state, the prior active set is the guess (a
+        # continuation almost always keeps its skills). With NO usable state — a
+        # cold first turn — the guess is the EMPTY set, because "no skills" is both
+        # the single most likely selector answer and the only one available without
+        # running the selector first. That covers the shape a user judges the
+        # product by: the opening message of a session.
+        #
+        # THE TRADE, STATED PLAINLY. A wrong guess costs one discarded upstream
+        # open. A cold turn that does select skills therefore pays for a prefill it
+        # throws away — bounded by the concurrency cap, and cheap in practice
+        # because the discarded prompt's cacheable prefix (base prompt + the ~18k
+        # token tool region) is exactly the prefix the real request then reuses, so
+        # the waste is the uncached tail plus a handful of generated tokens, not a
+        # whole second call. Latency is bought with tokens here, deliberately.
         speculation: _SpeculativeStream | None = None
         speculative_request: ProviderChatRequest | None = None
         speculative_active_ids: list[str] = []
@@ -898,6 +914,9 @@ class ChatOrchestrator:
         speculative_render_ids: list[str] = []
         speculation_slot = False
         speculation_outcome = "non_streaming"
+        # Which guess was made, so a discard rate in the logs is attributable to the
+        # cold empty-set guess or to a prior set that went stale.
+        speculation_basis = "none"
         speculation_stats: dict[str, Any] | None = None
 
         def release_speculation_slot() -> None:
@@ -908,54 +927,63 @@ class ChatOrchestrator:
 
         if request.generation.stream:
             if not run_selector:
+                # Nothing to race: the active set is already known, so the caller
+                # opens the real request directly.
                 speculation_outcome = "selector_not_run"
-            elif not verification.valid or verification.payload is None:
-                speculation_outcome = "unverified_state"
-            elif verification.payload.catalog_revision != catalog_at_start.revision:
-                speculation_outcome = "stale_catalog"
+            elif self.settings.skill_speculation_max_concurrency == 0:
+                speculation_outcome = "disabled"
+            elif (
+                self._skill_speculations_in_flight
+                >= self.settings.skill_speculation_max_concurrency
+            ):
+                speculation_outcome = "capacity"
             else:
-                speculative_active_ids, _ = _filter_dedup_cap(
-                    prior_active_ids,
-                    catalog_at_start,
-                    self.settings.max_active_skills,
+                # A token only supplies the guess when it verifies against THIS
+                # session AND names the catalog snapshot being assembled against.
+                # Otherwise its ids may describe skills that no longer resolve the
+                # same way, and the empty guess is the safer one.
+                state_usable = (
+                    verification.valid
+                    and verification.payload is not None
+                    and verification.payload.catalog_revision == catalog_at_start.revision
                 )
-                if not speculative_active_ids:
-                    speculation_outcome = "no_active_skills"
-                elif self.settings.skill_speculation_max_concurrency == 0:
-                    speculation_outcome = "disabled"
-                elif (
-                    self._skill_speculations_in_flight
-                    >= self.settings.skill_speculation_max_concurrency
-                ):
-                    speculation_outcome = "capacity"
+                if state_usable:
+                    speculative_active_ids, _ = _filter_dedup_cap(
+                        prior_active_ids,
+                        catalog_at_start,
+                        self.settings.max_active_skills,
+                    )
+                    speculation_basis = "prior_set" if speculative_active_ids else "empty_prior"
                 else:
-                    speculation_slot = True
-                    self._skill_speculations_in_flight += 1
-                    speculation_outcome = "eligible"
-                    try:
-                        speculative_skills = catalog_at_start.get_many(
-                            speculative_active_ids
-                        )
-                        speculative_render_ids = render_order_ids(speculative_skills)
-                        speculative_request = self.assembler.build_main_request(
-                            request=request,
-                            skills=speculative_skills,
-                            upstream_model=upstream_model,
-                        )
-                        speculation = _SpeculativeStream(
-                            request=speculative_request,
-                            open_stream=self._open_stream_with_retry,
-                            max_chunks=self.settings.skill_speculation_buffer_chunks,
-                            max_bytes=self.settings.skill_speculation_buffer_bytes,
-                            claim_timeout_seconds=(
-                                self.settings.skill_speculation_claim_timeout_seconds
-                            ),
-                            request_id=request_id,
-                            release_slot=release_speculation_slot,
-                        )
-                    except BaseException:
-                        release_speculation_slot()
-                        raise
+                    speculative_active_ids = []
+                    speculation_basis = "cold_empty"
+                speculation_slot = True
+                self._skill_speculations_in_flight += 1
+                speculation_outcome = "eligible"
+                try:
+                    speculative_skills = catalog_at_start.get_many(
+                        speculative_active_ids
+                    )
+                    speculative_render_ids = render_order_ids(speculative_skills)
+                    speculative_request = self.assembler.build_main_request(
+                        request=request,
+                        skills=speculative_skills,
+                        upstream_model=upstream_model,
+                    )
+                    speculation = _SpeculativeStream(
+                        request=speculative_request,
+                        open_stream=self._open_stream_with_retry,
+                        max_chunks=self.settings.skill_speculation_buffer_chunks,
+                        max_bytes=self.settings.skill_speculation_buffer_bytes,
+                        claim_timeout_seconds=(
+                            self.settings.skill_speculation_claim_timeout_seconds
+                        ),
+                        request_id=request_id,
+                        release_slot=release_speculation_slot,
+                    )
+                except BaseException:
+                    release_speculation_slot()
+                    raise
 
         selector_ms = 0
         if run_selector:
@@ -1093,6 +1121,11 @@ class ChatOrchestrator:
             selector_endpoint=decision.endpoint,
             selector_calls=decision.calls,
             skill_speculation=speculation_outcome,
+            # Which guess was made. `reused` vs `discarded` alone cannot say whether
+            # a discard rate comes from the cold empty-set guess (expected on turns
+            # that do select skills) or from a prior set going stale (a cadence
+            # problem worth chasing).
+            skill_speculation_basis=speculation_basis,
             skill_speculation_stats=speculation_stats,
             pre_upstream_ms=round((time.perf_counter() - t_start) * 1000),
         )

@@ -137,12 +137,15 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
+    # No prompt_cache_key: the OpenRouter migration dropped that setting (no endpoint
+    # for this model advertises the parameter, and sending an unadvertised one can
+    # empty the eligible-endpoint pool under require_parameters). This suite predates
+    # that move and still passed the removed `deepseek_send_prompt_cache_key`.
     provider = OpenRouterProvider(
         client,
         api_key=settings.openrouter_api_key.get_secret_value(),
         base_url=settings.openrouter_base_url,
         default_timeout=settings.selector_timeout_seconds,
-        send_prompt_cache_key=settings.deepseek_send_prompt_cache_key,
     )
     selector = Selector(provider, loader, manager, settings)
 

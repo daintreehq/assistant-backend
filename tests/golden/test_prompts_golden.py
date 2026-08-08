@@ -311,6 +311,26 @@ def test_selector_system(loader: PromptLoader) -> None:
     assert_golden("selector_system.md", rendered)
 
 
+def test_selector_system_cold(loader: PromptLoader) -> None:
+    """The no-active-skills render — a genuinely DIFFERENT prompt, not a trivial case.
+
+    The reason budget is conditional on ``active_ids``: with nothing loaded there is no
+    keep-vs-evict judgement to work through, so the prompt asks for a terser reason and
+    the selector emits fewer tokens on the path that gates a cold turn's first byte.
+    The warm snapshot above renders the 300-character branch and would stay green
+    through any change to the cold one, so this is the only byte-level coverage the
+    cold branch has — and it is the branch every opening message takes.
+    """
+    catalog = _fixture_catalog()
+    rendered = loader.render(
+        "selector/system.md.j2",
+        catalog=catalog.selector_metadata(),
+        active_ids=[],
+        max_active=3,
+    )
+    assert_golden("selector_system_cold.md", rendered)
+
+
 def test_selector_prompt_renders_real_catalog(loader: PromptLoader) -> None:
     # Not a byte snapshot (the live catalog evolves) — a structural guard that the
     # selector template renders the REAL catalog without error and lists every
