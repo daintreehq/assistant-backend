@@ -1065,7 +1065,7 @@ async def test_learns_after_completed_turn(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     orch, manager, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL)
+    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
     assert outcome.body is not None
     # The main completion returned its normal reply straight away...
     assert outcome.body["message"]["content"] == "ok"
@@ -1113,7 +1113,7 @@ async def test_learner_skipped_when_turn_ends_in_tool_calls(tmp_path: Path) -> N
     fake.complete_result = _complete
     orch, _, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL)
+    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
     assert outcome.body is not None
     await orch.drain_background_tasks()  # nothing was spawned; a no-op
 
@@ -1138,7 +1138,7 @@ async def test_learns_after_streamed_completion(tmp_path: Path) -> None:
             "generation": {"stream": True},
         }
     )
-    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL)
+    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
     assert outcome.stream is not None
     async for _event in outcome.stream:  # drain the SSE stream to completion
         pass
@@ -1191,7 +1191,7 @@ async def test_learner_skipped_when_streamed_turn_ends_in_tool_calls(tmp_path: P
             "generation": {"stream": True},
         }
     )
-    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL)
+    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
     assert outcome.stream is not None
     async for _event in outcome.stream:
         pass

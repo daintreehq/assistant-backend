@@ -468,7 +468,8 @@ async def test_reconcile_patch_internal_cycle_rejected_without_a_snapshot(
 async def test_reconcile_requires_reason(task_runner: TaskRunner) -> None:
     with pytest.raises(DaintreeError) as exc:
         await task_runner.run(
-            TaskRequest(task="workflow_reconcile", input={"workflow": workflow_snapshot()})
+            TaskRequest(task="workflow_reconcile", input={"workflow": workflow_snapshot()}),
+            api_key=TEST_API_KEY,
         )
     assert exc.value.status_code == 400
 
