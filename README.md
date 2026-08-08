@@ -201,16 +201,49 @@ main stream, so useful output can follow immediately after `meta`.
 
 ## Deployment
 
-A multi-stage `Dockerfile` produces a minimal non-root image listening on
-`$PORT`. `infra/terraform/` is **staging-first**: the defaults expose the direct
-Cloud Run URL (`INGRESS_TRAFFIC_ALL`, app bearer auth as the gate) for smoke
-testing, with the production external load balancer / managed cert / DNS / Cloud
-Armor edge documented as a deferred step. Secrets come from Secret Manager and
-are never committed to Terraform state. See `infra/terraform/README.md` for the
-staging and production paths and a curl smoke-test script.
+The service runs on Cloud Run in `us-central1`, and **every push to `main`
+deploys it**. Nothing is built on a developer machine — there is no local Docker
+step in the release path.
 
-In production (`ENVIRONMENT=production`) the service fails readiness if a secret
-is weak or default (e.g. the default `STATE_SALT`, a short signing key).
+```
+push to main → Cloud Build trigger `deploy-main` → cloudbuild.yaml
+   build the image (BUILD_SHA = commit sha)
+   push to Artifact Registry
+   deploy a no-traffic revision behind the `rc` tag
+   smoke-test it: /healthz, /readyz, and /version == the released commit
+   promote to 100%
+```
+
+A revision that cannot answer `/readyz` never takes traffic, which is what turns
+a bad secret, a malformed prompt template, or an unparseable skill file into a
+red build instead of an outage. The commit SHA is the only version this system
+has (see CLAUDE.md, "Versioning"): it tags the image, is baked in as
+`BUILD_SHA`, and is what `/version` reports back.
+
+One-time GCP setup — Artifact Registry, the two Secret Manager secrets, the
+runtime and build service accounts, the GitHub connection, the trigger, and the
+custom domain mapping — lives in `infra/gcp/bootstrap.sh`. It is idempotent, so
+re-running it is how you finish setup rather than something to avoid:
+
+```bash
+./infra/gcp/bootstrap.sh
+```
+
+`.claude/skills/release` drives an actual release: it gates on GitHub CI being
+green, merges to `main`, pushes, watches the build, and verifies that the live
+`/version` reports the commit it just shipped.
+
+The only secrets the deployment mounts are state-signing material
+(`STATE_SIGNING_KEY_CURRENT`, `STATE_SALT`) — there is **no server-side model
+API key**. Each request's bearer token is the caller's own OpenRouter key, which
+both authenticates the request and funds its upstream calls. In production
+(`ENVIRONMENT=production`) the service fails readiness if a secret is weak or
+default (the packaged `STATE_SALT`, a signing key under 32 characters), or if
+`OPENROUTER_BASE_URL` is not the real `https://openrouter.ai` origin.
+
+`infra/terraform/` remains a Terraform description of the same topology plus the
+deferred external-load-balancer edge; `infra/gcp/bootstrap.sh` is what actually
+built the running deployment.
 
 ## License
 

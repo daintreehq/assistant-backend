@@ -1,0 +1,176 @@
+# Continuous deployment for the Daintree Assistant Server.
+#
+# Fired by the `deploy-main` Cloud Build trigger on every push to `main`; the
+# trigger, service accounts, secrets, and registry are created by
+# infra/gcp/bootstrap.sh. Nothing here is built on a developer machine — this is
+# what "release" means in this repo, and .claude/skills/release drives it.
+#
+# The commit SHA is the only version this system has (see CLAUDE.md, "Versioning"):
+# it tags the image, is baked into the container as BUILD_SHA, and is what
+# `/version` reports back. That round trip is how a release is confirmed — the
+# smoke step below refuses to promote a revision whose /version disagrees with
+# the commit that triggered the build.
+#
+# Rollout is two-phase on purpose. A new revision is deployed with NO traffic
+# behind the `rc` tag and smoke-tested on its own URL; only a revision that
+# answers /readyz gets promoted to 100%. Readiness covers the failures that are
+# invisible at build time — a missing or weak secret, a malformed prompt
+# template, an unparseable skill file — so those turn into a red build instead
+# of a broken production service.
+
+substitutions:
+  _SERVICE: daintree-assistant
+  _REGION: us-central1
+  _AR_REPO: daintree
+  _RUNTIME_SA: daintree-assistant-run
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+# The image build is a full `pip install` of the pinned runtime deps, so the
+# 10-minute default is too tight to be safe.
+timeout: 1800s
+
+steps:
+  # ---- Build ---------------------------------------------------------------
+  # BUILD_SHA is a Dockerfile ARG that becomes a runtime ENV, so /version reports
+  # a real commit rather than an empty string.
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg=BUILD_SHA=$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$COMMIT_SHA
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:latest
+      - .
+
+  # Pushed explicitly rather than via the top-level `images:` key, which only
+  # runs after every step and would leave the deploy below with no image.
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}
+
+  # ---- Deploy the release candidate ---------------------------------------
+  - id: deploy-rc
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$COMMIT_SHA"
+
+        # --set-* rather than --update-*: the deployed configuration is exactly
+        # what this file says. A flag removed here is removed from the service
+        # on the next release instead of lingering invisibly from an old one.
+        #
+        # min-instances=1 keeps one warm instance so a turn never pays Python
+        # startup + prompt/catalog load. timeout=1800 is sized against the app's
+        # own upstream budget (see infra/terraform/main.tf for the arithmetic).
+        FLAGS=(
+          --image="$$IMAGE"
+          --region="${_REGION}"
+          --service-account="${_RUNTIME_SA}@$PROJECT_ID.iam.gserviceaccount.com"
+          --port=8080
+          --cpu=1
+          --memory=1Gi
+          --cpu-boost
+          --concurrency=8
+          --min-instances=1
+          --max-instances=10
+          --timeout=1800
+          --ingress=all
+          --set-env-vars=ENVIRONMENT=production,LOG_LEVEL=INFO,STATE_SIGNING_KID=state-prod
+          --set-secrets=STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest
+          --labels=commit-sha=$SHORT_SHA
+          --quiet
+        )
+
+        if gcloud run services describe "${_SERVICE}" --region="${_REGION}" >/dev/null 2>&1; then
+          echo "Deploying $COMMIT_SHA as a no-traffic 'rc' revision."
+          gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}" --no-traffic --tag=rc
+          gcloud run services describe "${_SERVICE}" --region="${_REGION}" --format=json \
+            | python3 -c 'import json,sys; print(next(t["url"] for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="rc"))' \
+            > /workspace/rc_url
+          echo "Release candidate URL: $$(cat /workspace/rc_url)"
+        else
+          # First ever deploy: Cloud Run rejects --no-traffic when there is no
+          # prior revision to keep serving, and the service is still IAM-private
+          # until bootstrap.sh grants allUsers invoker — so an unauthenticated
+          # smoke curl would get a platform 403 rather than an app response.
+          # Create it, take traffic directly, and let bootstrap.sh finish up.
+          echo "No existing service — creating ${_SERVICE} and routing traffic to it."
+          gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}"
+          : > /workspace/skip_smoke
+        fi
+
+  # ---- Smoke-test the candidate before it can take traffic -----------------
+  - id: smoke
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        if [ -f /workspace/skip_smoke ]; then
+          echo "First deploy: no public invoker binding yet, skipping the smoke test."
+          echo "Run infra/gcp/bootstrap.sh again to grant it, then re-release."
+          exit 0
+        fi
+        URL="$$(cat /workspace/rc_url)"
+
+        # gcloud run deploy already waited for the revision to report Ready, so
+        # this retry is for network flakiness rather than slow startup.
+        for attempt in 1 2 3 4 5; do
+          if curl -fsS --max-time 20 "$$URL/healthz" >/dev/null 2>&1; then
+            break
+          fi
+          echo "healthz not answering yet (attempt $$attempt/5)"
+          sleep 5
+        done
+
+        echo "--- /healthz ---"
+        curl -fsS --max-time 20 "$$URL/healthz"; echo
+
+        # The real gate. 503 here fails the build and the candidate never gets
+        # traffic; the reason is deliberately withheld from the response in a
+        # hardened environment, so read the Cloud Run logs for the detail.
+        echo "--- /readyz ---"
+        curl -fsS --max-time 30 "$$URL/readyz"; echo
+
+        # Proves the running container is built from the commit that triggered
+        # this build, rather than a cached or mis-tagged image.
+        echo "--- /version ---"
+        curl -fsS --max-time 20 "$$URL/version"; echo
+        BUILT="$$(curl -fsS --max-time 20 "$$URL/version" \
+          | python3 -c 'import json,sys; print(json.load(sys.stdin).get("build_sha",""))')"
+        if [ "$$BUILT" != "$COMMIT_SHA" ]; then
+          echo "ERROR: serving build_sha=$$BUILT but this build is $COMMIT_SHA"
+          exit 1
+        fi
+        echo "Candidate is ready and serving $COMMIT_SHA."
+
+  # ---- Promote to 100% -----------------------------------------------------
+  - id: promote
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        if [ -f /workspace/skip_smoke ]; then
+          echo "First deploy already carries all traffic."
+          exit 0
+        fi
+        # Drops the rc tag in the same call so tags do not accumulate one per
+        # release; the previous revision stays available for rollback.
+        gcloud run services update-traffic "${_SERVICE}" \
+          --region="${_REGION}" --to-latest --remove-tags=rc --quiet
+        echo "Promoted $COMMIT_SHA to 100% of traffic."
