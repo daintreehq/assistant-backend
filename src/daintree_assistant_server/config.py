@@ -480,8 +480,21 @@ class Settings(BaseSettings):
         # host would silently disclose every caller key while staying green, so
         # production pins the real OpenRouter origin. Development stays free to
         # point at proxies/mocks.
-        parsed = urlsplit(self.openrouter_base_url)
-        if parsed.scheme != "https" or parsed.hostname != "openrouter.ai":
+        try:
+            parsed = urlsplit(self.openrouter_base_url)
+            origin_ok = (
+                parsed.scheme == "https"
+                and parsed.hostname == "openrouter.ai"
+                # Default port only: a non-443 port is a different origin, and a
+                # malformed one should fail readiness, not the first request.
+                and parsed.port in (None, 443)
+                # No userinfo — `https://x@openrouter.ai` still reaches OpenRouter,
+                # but credentials do not belong in this URL in any form.
+                and parsed.username is None
+            )
+        except ValueError:  # e.g. a non-numeric port
+            origin_ok = False
+        if not origin_ok:
             problems.append(
                 "OPENROUTER_BASE_URL must be the https://openrouter.ai origin in production "
                 "(caller API keys are sent to it)"

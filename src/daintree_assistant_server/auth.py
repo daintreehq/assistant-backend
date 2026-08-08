@@ -50,6 +50,10 @@ MAX_TOKEN_LENGTH = 4096
 def _extract_bearer(authorization: str | None) -> str | None:
     if not authorization:
         return None
+    # Bound the RAW header before any scanning/stripping, so a whitespace-padded
+    # monster can't hide a short token behind an expensive normalization pass.
+    if len(authorization) > MAX_TOKEN_LENGTH + len("Bearer "):
+        return None
     parts = authorization.split(" ", 1)
     if len(parts) != 2 or parts[0].lower() != "bearer":
         return None
@@ -62,9 +66,10 @@ def _structurally_valid(token: str) -> bool:
 
     The same shape ``OpenRouterProvider._resolve_key`` enforces before building
     an Authorization header, applied at our door so garbage 401s here instead of
-    surfacing as an upstream 502. Deliberately NO prefix or length check: the
-    key's issuer is not our business (today an OpenRouter key, later a
-    subscription key), only that it can ride an HTTP header safely.
+    surfacing as an upstream 502. Deliberately NO prefix check: the key's issuer
+    is not our business (today an OpenRouter key, later a subscription key),
+    only that it can ride an HTTP header safely — plus a generous length cap
+    (``MAX_TOKEN_LENGTH``) so absurd input is refused rather than forwarded.
     """
     if len(token) > MAX_TOKEN_LENGTH:
         return False

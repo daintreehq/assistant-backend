@@ -61,11 +61,23 @@ def test_production_requires_the_real_openrouter_origin() -> None:
         "STATE_SIGNING_KEY_CURRENT": "y" * 48,
         "STATE_SALT": "a-real-random-salt-value",
     }
-    for bad in ("http://openrouter.ai/api/v1", "https://openrouter.ai.evil.example/api/v1"):
+    for bad in (
+        "http://openrouter.ai/api/v1",
+        "https://openrouter.ai.evil.example/api/v1",
+        "https://openrouter.ai@evil.example/api/v1",
+        "https://user@openrouter.ai/api/v1",  # userinfo never belongs here
+        "https://openrouter.ai:444/api/v1",  # non-default port = different origin
+        "https://openrouter.ai:bogus/api/v1",  # malformed port fails readiness, not requests
+    ):
         s = _settings(OPENROUTER_BASE_URL=bad, **base)
-        assert any("OPENROUTER_BASE_URL" in p for p in s.weak_secrets())
-    ok = _settings(OPENROUTER_BASE_URL="https://openrouter.ai/api/v1", **base)
-    assert ok.weak_secrets() == []
+        assert any("OPENROUTER_BASE_URL" in p for p in s.weak_secrets()), bad
+    for ok_url in (
+        "https://openrouter.ai/api/v1",
+        "https://OPENROUTER.AI/api/v1",  # hostname compares case-insensitively
+        "https://openrouter.ai:443/api/v1",  # explicit default port
+    ):
+        ok = _settings(OPENROUTER_BASE_URL=ok_url, **base)
+        assert ok.weak_secrets() == [], ok_url
     # Development stays free to point at proxies/mocks.
     dev = _settings(OPENROUTER_BASE_URL="http://127.0.0.1:9999/v1")
     assert dev.weak_secrets() == []
