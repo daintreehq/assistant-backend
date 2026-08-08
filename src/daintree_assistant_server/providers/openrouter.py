@@ -37,6 +37,7 @@ import time
 from typing import Any
 
 import httpx
+from pydantic import SecretStr
 
 from ..errors import DaintreeError, upstream_error, upstream_rate_limited, upstream_timeout
 from ..observability import get_logger
@@ -64,6 +65,30 @@ _CHAT_PATH = "/chat/completions"
 # provider's reason ("temperature must be between 0.0 and 2.0", a schema complaint)
 # without dumping an unbounded payload into logs or the client error message.
 _ERROR_DETAIL_CAP = 400
+
+# Stands in for a credential the upstream echoed back inside an error body, so the
+# key never reaches a log line or a client error envelope (see observability.py:
+# logs carry no bearer keys).
+_REDACTED = "[REDACTED]"
+
+# Replaces the diagnostic entirely when the credential is still recoverable from
+# it after scrubbing — a doubly encoded echo. Deliberately says nothing about the
+# key beyond the fact that the upstream sent it back.
+_CREDENTIAL_ECHOED = "Upstream rejected the credential and echoed it back; detail withheld."
+
+# How many escape-decoding passes the leak check looks through. Two covers the
+# doubly encoded case; the bound just stops a crafted body from spinning here.
+_ESCAPE_DECODE_PASSES = 3
+
+# A credential must be printable ASCII with no spaces to be a legal header value.
+# An allowlist rather than a blocklist of the bad characters: blocklisting misses
+# DEL (0x7f, which h11 happily accepts) and everything above 0x7f, which instead
+# explodes inside httpx's header encoder (it encodes str values as ASCII). Real
+# OpenRouter keys are `sk-or-v1-` plus hex, so nothing legitimate is near this
+# boundary. Keeping the credential ASCII is also what makes the escape-decoding
+# leak check in `_still_reveals` sound.
+_HEADER_SAFE_MIN = 0x21
+_HEADER_SAFE_MAX = 0x7E
 
 # Cap on the logged serving-endpoint name ("CoreWeave", "Baidu", …).
 _ENDPOINT_NAME_CAP = 64
@@ -140,13 +165,38 @@ _PROVIDER_ROUTING_STRUCTURED: dict[str, Any] = {
 }
 
 
-def _extract_upstream_error(body: bytes | str | None) -> str | None:
+def _extract_upstream_error(
+    body: bytes | str | None, *, secret: SecretStr | None = None
+) -> str | None:
     """Pull a short human-readable reason out of an upstream error body.
 
     OpenRouter returns ``{"error": {"message": "...", ...}}`` on a 4xx/5xx. That
     message is the single most useful diagnostic for a malformed request, so we
     surface it rather than discard it. Best-effort: any parse failure falls back to
     the raw (capped) text, and an empty body yields ``None``.
+
+    ``secret`` is the credential this call used, scrubbed from the text if the
+    upstream echoed it back. That reflection is the one way a caller's key could
+    escape: this return value goes BOTH to the structured log and — for a non-auth
+    4xx — into the client-facing error envelope via :meth:`_map_http_error`.
+
+    Order matters twice, and both orderings are deliberate:
+
+    * Scrub AFTER extraction, not on the raw body. JSON can encode an ordinary
+      key as ``\\u0073\\u006b…``, which no literal match on the undecoded bytes
+      would find but ``json.loads`` faithfully turns back into the plaintext.
+      ``_upstream_error_detail`` therefore hands back decoded text on every
+      branch. (It also keeps the parse honest: replacing inside the raw document
+      could make it invalid JSON and silently demote a structured error to raw
+      text.)
+    * Scrub BEFORE capping. Capping first can slice a key in half and leave a
+      usable prefix behind.
+
+    A literal scrub still cannot promise to catch *every* encoding — a doubly
+    encoded body hides the key from one decode pass. So the scrub is backed by a
+    check rather than trusted: if the credential is still recoverable from the
+    result, the diagnostic is dropped wholesale. Losing a rare error message is
+    the right trade against leaking a key.
     """
     if not body:
         return None
@@ -154,17 +204,65 @@ def _extract_upstream_error(body: bytes | str | None) -> str | None:
     raw = raw.strip()
     if not raw:
         return None
+    detail = _upstream_error_detail(raw)
+    if secret is not None:
+        plain = secret.get_secret_value()
+        # An empty secret must not be "replaced": str.replace("") splices the
+        # placeholder between every character and destroys the diagnostic.
+        if plain:
+            detail = detail.replace(plain, _REDACTED)
+            if _still_reveals(detail, plain):
+                return _CREDENTIAL_ECHOED
+    return detail[:_ERROR_DETAIL_CAP]
+
+
+def _upstream_error_detail(raw: str) -> str:
+    """The best available reason in ``raw``, uncapped and unredacted.
+
+    Split out so redaction and capping apply once, to whichever branch won. Every
+    branch returns DECODED text: the fallbacks re-serialize the parsed document
+    rather than echoing ``raw``, so a ``\\uXXXX``-escaped credential becomes the
+    literal characters an exact match can find. Only a body that is not JSON at
+    all is returned verbatim — there, escapes denote nothing and nothing decodes
+    them.
+    """
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        return raw[:_ERROR_DETAIL_CAP]
+        return raw
     err = data.get("error") if isinstance(data, dict) else None
     if isinstance(err, dict):
         msg = err.get("message") or err.get("code") or err.get("type")
-        return str(msg)[:_ERROR_DETAIL_CAP] if msg else raw[:_ERROR_DETAIL_CAP]
-    if isinstance(err, str) and err:
-        return err[:_ERROR_DETAIL_CAP]
-    return raw[:_ERROR_DETAIL_CAP]
+        if msg:
+            return str(msg)
+    elif isinstance(err, str) and err:
+        return err
+    # No single reason to quote: hand back the whole document, decoded.
+    return json.dumps(data, ensure_ascii=False)
+
+
+def _still_reveals(text: str, plain: str) -> bool:
+    """Whether ``plain`` is recoverable from ``text`` by decoding escapes.
+
+    The backstop for a doubly encoded echo, where one decode pass leaves the key
+    hidden from an exact match but a second restores it. Bounded passes, and the
+    credential is guaranteed ASCII by :meth:`OpenRouterProvider._resolve_key`, so
+    the latin-1-based ``unicode_escape`` view is sound for this comparison.
+    """
+    if plain in text:
+        return True
+    probe = text
+    for _ in range(_ESCAPE_DECODE_PASSES):
+        try:
+            decoded = probe.encode("latin-1", "backslashreplace").decode("unicode_escape")
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            return False
+        if decoded == probe:
+            return False
+        if plain in decoded:
+            return True
+        probe = decoded
+    return False
 
 
 def _endpoint_name(payload: dict[str, Any]) -> str | None:
@@ -344,14 +442,17 @@ class OpenRouterProvider:
         self,
         client: httpx.AsyncClient,
         *,
-        api_key: str,
+        api_key: SecretStr,
         base_url: str = "https://openrouter.ai/api/v1",
         default_timeout: float = 60.0,
         send_reasoning: bool = True,
         dump_dir: str | None = None,
     ) -> None:
         self._client = client
-        self._api_key = api_key
+        # The FALLBACK credential only: a request carrying its own ``api_key``
+        # overrides it. Held as a SecretStr and unwrapped solely where a header or
+        # a redaction pattern is built, never stored as plaintext on the instance.
+        self._default_api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._default_timeout = default_timeout
         self._send_reasoning = send_reasoning
@@ -382,9 +483,41 @@ class OpenRouterProvider:
     def _url(self) -> str:
         return f"{self._base_url}{_CHAT_PATH}"
 
-    def _headers(self, *, stream: bool) -> dict[str, str]:
+    def _resolve_key(self, request_api_key: SecretStr | None) -> SecretStr:
+        """The credential for one call: the request's own, else the default.
+
+        Deliberately an ``is not None`` test rather than truthiness. A credential
+        supplied explicitly by a caller is never silently replaced by the server's
+        own — even when it is empty or malformed, which is rejected below rather
+        than papered over. Falling back would spend THIS server's OpenRouter
+        account on a request whose owner failed to authenticate.
+
+        Single source of truth for the fallback, because two paths need the same
+        answer: the ``Authorization`` header and the redaction of an echoed key out
+        of upstream error text. If they ever disagreed, the redaction would miss.
+
+        A credential that cannot become a header value is rejected HERE rather than
+        handed to httpx. h11 refuses an empty, whitespace-padded, or control-char
+        value with ``LocalProtocolError`` — and that exception embeds the offending
+        header value verbatim ("Illegal header value b'Bearer sk-…'"), which
+        httpcore logs at DEBUG before this adapter ever sees it. So the permissive
+        path leaks the key into logs, exactly what this must not do. Failing fast
+        also turns a confusing retryable transport error into an honest permanent
+        one, and the message deliberately carries no part of the value.
+        """
+        key = request_api_key if request_api_key is not None else self._default_api_key
+        plain = key.get_secret_value()
+        if not plain or not all(_HEADER_SAFE_MIN <= ord(c) <= _HEADER_SAFE_MAX for c in plain):
+            raise upstream_error("The upstream credential is empty or malformed.")
+        return key
+
+    def _headers(self, *, stream: bool, api_key: SecretStr) -> dict[str, str]:
+        # A fresh dict per call. The shared client's own headers are never mutated:
+        # the connection pool keys on host/port/protocol, not header contents, so a
+        # per-call Authorization reuses pooled connections safely and concurrent
+        # calls carrying different keys cannot bleed into one another.
         return {
-            "Authorization": f"Bearer {self._api_key}",
+            "Authorization": f"Bearer {api_key.get_secret_value()}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream" if stream else "application/json",
             "HTTP-Referer": _REFERER,
@@ -515,11 +648,12 @@ class OpenRouterProvider:
 
     async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:
         body = self._build_body(request, stream=False)
+        api_key = self._resolve_key(request.api_key)
         try:
             resp = await self._client.post(
                 self._url,
                 json=body,
-                headers=self._headers(stream=False),
+                headers=self._headers(stream=False, api_key=api_key),
                 timeout=self._timeout(request),
             )
         except httpx.TimeoutException as exc:
@@ -527,7 +661,7 @@ class OpenRouterProvider:
         except httpx.TransportError as exc:
             raise upstream_error("Could not reach the upstream provider.", retryable=True) from exc
         if resp.status_code >= 400:
-            detail = _extract_upstream_error(resp.content)
+            detail = _extract_upstream_error(resp.content, secret=api_key)
             logger.warning(
                 "upstream_http_error",
                 phase="complete",
@@ -572,6 +706,10 @@ class OpenRouterProvider:
             thinking_disabled=True,
             reasoning_effort=None,
             timeout=request.timeout,
+            # Must be forwarded explicitly: this sub-request is rebuilt field by
+            # field, so an omission here would silently spend the SERVER's default
+            # credential on every forced-tool-call path instead of the caller's.
+            api_key=request.api_key,
         )
         result = await self.complete(sub)
         calls = result.tool_calls
@@ -596,11 +734,12 @@ class OpenRouterProvider:
 
     async def open_stream(self, request: ProviderChatRequest) -> ProviderStream:
         body = self._build_body(request, stream=True)
+        api_key = self._resolve_key(request.api_key)
         ctx = self._client.stream(
             "POST",
             self._url,
             json=body,
-            headers=self._headers(stream=True),
+            headers=self._headers(stream=True, api_key=api_key),
             timeout=self._timeout(request),
         )
         try:
@@ -616,7 +755,7 @@ class OpenRouterProvider:
                 # must not mask the mapped status error (e.g. a retryable 5xx). When
                 # it IS readable, keep its reason — it's the whole diagnostic.
                 with contextlib.suppress(httpx.HTTPError):
-                    detail = _extract_upstream_error(await response.aread())
+                    detail = _extract_upstream_error(await response.aread(), secret=api_key)
             finally:
                 await ctx.__aexit__(None, None, None)
             logger.warning(

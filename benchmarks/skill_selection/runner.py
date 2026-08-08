@@ -143,7 +143,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     # that move and still passed the removed `deepseek_send_prompt_cache_key`.
     provider = OpenRouterProvider(
         client,
-        api_key=settings.openrouter_api_key.get_secret_value(),
+        api_key=settings.openrouter_api_key,
         base_url=settings.openrouter_base_url,
         default_timeout=settings.selector_timeout_seconds,
     )

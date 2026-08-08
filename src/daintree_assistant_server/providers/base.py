@@ -12,6 +12,8 @@ import abc
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
+from pydantic import SecretStr
+
 
 @dataclass(frozen=True)
 class ProviderUsage:
@@ -58,6 +60,16 @@ class ProviderChatRequest:
     # max. ``None`` lets the endpoint default apply.
     reasoning_effort: str | None = None
     timeout: float | None = None
+    # The upstream credential for THIS call. ``None`` means "use the provider's
+    # configured default" (the environment key), which is what every consumer
+    # does today. It rides the request rather than the provider instance because
+    # the credential is becoming caller material: one shared provider serves the
+    # selector, orchestrator, task runner, and learner, so a per-process key
+    # cannot represent "this turn's key". ``repr=False`` keeps it out of the
+    # dataclass repr — belt and braces alongside SecretStr's own masking, since
+    # this is a plain dataclass that coerces nothing and untyped callers
+    # (benchmarks) could put a bare string here without mypy objecting.
+    api_key: SecretStr | None = field(default=None, repr=False)
 
 
 @dataclass

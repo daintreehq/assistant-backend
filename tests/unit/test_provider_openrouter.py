@@ -2,15 +2,32 @@
 
 from __future__ import annotations
 
+import asyncio
+import json as _json
+
 import httpx
 import pytest
+import structlog.testing
+from pydantic import SecretStr
 
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
-from daintree_assistant_server.providers.openrouter import OpenRouterProvider
+from daintree_assistant_server.providers.openrouter import (
+    _ERROR_DETAIL_CAP,
+    _REDACTED,
+    OpenRouterProvider,
+    _extract_upstream_error,
+)
+from daintree_assistant_server.providers.retry import retry_upstream
 
 _BASE = "https://openrouter.ai/api/v1"
 _MODEL = "deepseek/deepseek-v4-flash-0731"
+# The provider's constructor default (fallback) key, and a distinct per-call key.
+# They must differ so a dropped per-call credential is detectable rather than
+# accidentally matching the fallback. Both are long, distinctive sentinels so a
+# test can assert the literal value is ABSENT without matching incidental prose.
+_DEFAULT_KEY = "sk-or-v1-default-credential"
+_CALL_KEY = "sk-or-v1-per-call-credential"
 
 SSE_OK = (
     'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek/deepseek-v4-flash-0731",'
@@ -26,7 +43,8 @@ SSE_OK = (
 
 def _provider(handler, **kwargs) -> OpenRouterProvider:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return OpenRouterProvider(client, api_key="key", base_url=_BASE, **kwargs)
+    kwargs.setdefault("api_key", SecretStr(_DEFAULT_KEY))
+    return OpenRouterProvider(client, base_url=_BASE, **kwargs)
 
 
 def _capture(captured: dict):
@@ -61,7 +79,7 @@ async def test_url_and_auth() -> None:
 @pytest.mark.asyncio
 async def test_complete_success() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.headers["authorization"] == "Bearer key"
+        assert request.headers["authorization"] == f"Bearer {_DEFAULT_KEY}"
         return httpx.Response(
             200,
             json={
@@ -668,11 +686,38 @@ async def test_dump_dir_writes_request_bodies(tmp_path) -> None:
 
     dump_dir = tmp_path / "dumps"
     provider = _provider(_capture({}), dump_dir=str(dump_dir))
-    await provider.complete(_req())
+    await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
     files = list(dump_dir.glob("*.json"))
     assert len(files) == 1
-    body = _json.loads(files[0].read_text(encoding="utf-8"))
+    text = files[0].read_text(encoding="utf-8")
+    body = _json.loads(text)
     assert body["model"] == _MODEL
+    # The credential is caller material and the dump writes full request bodies to
+    # disk, so it must not appear there — neither as a body field nor anywhere in
+    # the raw text. `_build_body` allowlists wire fields by hand; this test is what
+    # stops a future switch to asdict()/vars() from silently leaking the key.
+    assert "api_key" not in body
+    assert '"api_key"' not in text  # not nested anywhere either, under any parent
+    assert _CALL_KEY not in text
+    assert _DEFAULT_KEY not in text
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_stream_dump_also_excludes_the_credential(tmp_path) -> None:
+    # open_stream dumps through the same _build_body, but via its own branch (it
+    # adds stream/stream_options), so cover it rather than assume symmetry.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=SSE_OK)
+
+    dump_dir = tmp_path / "stream-dumps"
+    provider = _provider(handler, dump_dir=str(dump_dir))
+    stream = await provider.open_stream(_req(stream=True, api_key=SecretStr(_CALL_KEY)))
+    text = next(iter(dump_dir.glob("*.json"))).read_text(encoding="utf-8")
+    assert '"stream": true' in text.lower()  # the stream branch really ran
+    assert '"api_key"' not in text
+    assert _CALL_KEY not in text
+    await stream.aclose()
     await provider.aclose()
 
 
@@ -685,6 +730,387 @@ async def test_no_dump_without_dump_dir(tmp_path, monkeypatch: pytest.MonkeyPatc
     await provider.complete(_req())
     assert not (tmp_path / "env-dumps").exists()
     await provider.aclose()
+
+
+# ---- per-request credential ------------------------------------------------
+
+
+def _auth_capture(seen: dict):
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers["authorization"]
+        return httpx.Response(
+            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
+        )
+
+    return handler
+
+
+@pytest.mark.asyncio
+async def test_per_request_api_key_overrides_default() -> None:
+    # The credential travels with the call: one shared provider serves the selector,
+    # orchestrator, task runner and learner, so the key cannot live on the instance.
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
+    assert seen["auth"] == f"Bearer {_CALL_KEY}"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_api_key_none_uses_default() -> None:
+    # None means "use the provider's configured default" — the environment key.
+    # This is what every consumer does today, and why nothing observable changed.
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    await provider.complete(_req(api_key=None))
+    assert seen["auth"] == f"Bearer {_DEFAULT_KEY}"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_empty_per_request_api_key_does_not_fall_back_to_the_default() -> None:
+    # An explicitly supplied empty credential is a CALLER error. It must NOT fall
+    # back — that would spend this server's OpenRouter account on a request whose
+    # owner failed to authenticate — and it must fail before any request goes out.
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req(api_key=SecretStr("")))
+    assert exc.value.retryable is False  # a bad credential is permanent, not transient
+    assert not seen  # no request was sent at all — it did not silently use the default
+    assert _DEFAULT_KEY not in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        " ",
+        "sk-or-v1-trailing ",
+        "sk-or-v1-x\n",
+        "sk or v1",
+        "sk-or-v1-del\x7f",  # h11 ACCEPTS DEL, so a blocklist of controls misses it
+        "sk-or-v1-nonlatin\U0001f600",  # would raise inside httpx's latin-1 encoder
+    ],
+)
+async def test_header_unsafe_credentials_are_rejected_without_echoing_the_value(
+    bad: str,
+) -> None:
+    # h11 rejects an empty or whitespace-padded header value, and its
+    # LocalProtocolError embeds the WHOLE value ("Illegal header value b'Bearer
+    # sk-…'"), which httpcore logs at DEBUG. So a malformed credential must be
+    # caught here, before httpx sees it, and the error must carry none of it.
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req(api_key=SecretStr(bad)))
+    assert not seen  # never reached the transport
+    # The distinctive stem is what must not appear; every case above shares it or
+    # is pure whitespace, so this is a real assertion rather than a tautology.
+    assert "sk-or-v1" not in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_realistic_credential_is_not_falsely_rejected() -> None:
+    # The guard's real risk is over-rejection: a false positive breaks live traffic.
+    # A full-length `sk-or-v1-` + 64 hex key must sail straight through.
+    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    seen: dict = {}
+    provider = _provider(_auth_capture(seen))
+    await provider.complete(_req(api_key=SecretStr(key)))
+    assert seen["auth"] == f"Bearer {key}"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_stream_uses_per_request_api_key() -> None:
+    # open_stream builds its own headers; a forgotten argument there would send the
+    # server's key on every streaming turn while the non-streaming path looked fine.
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers["authorization"]
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=SSE_OK)
+
+    provider = _provider(handler)
+    stream = await provider.open_stream(_req(stream=True, api_key=SecretStr(_CALL_KEY)))
+    assert seen["auth"] == f"Bearer {_CALL_KEY}"
+    await stream.aclose()
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_structured_tool_call_forwards_per_request_api_key() -> None:
+    # structured_tool_call rebuilds an internal sub-request field by field; a
+    # dropped api_key there would silently use the default on every forced
+    # tool-call path. The sentinels differ so the omission is detectable.
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["auth"] = request.headers["authorization"]
+        return httpx.Response(
+            200,
+            json={
+                "id": "x",
+                "created": 0,
+                "model": "m",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "c1",
+                                    "type": "function",
+                                    "function": {"name": "pick", "arguments": '{"a":1}'},
+                                }
+                            ],
+                        },
+                        "finish_reason": "tool_calls",
+                    }
+                ],
+                "usage": {},
+            },
+        )
+
+    provider = _provider(handler)
+    result = await provider.structured_tool_call(
+        _req(api_key=SecretStr(_CALL_KEY)),
+        function_name="pick",
+        function_schema={"type": "object", "properties": {"a": {"type": "integer"}}},
+    )
+    assert result.name == "pick"
+    assert seen["auth"] == f"Bearer {_CALL_KEY}"
+    await provider.aclose()
+
+
+def test_provider_chat_request_repr_omits_api_key() -> None:
+    # A plain dataclass reprs every field by default, and a request object can end
+    # up in a traceback or a debug line. repr=False keeps the credential out.
+    request = _req(api_key=SecretStr(_CALL_KEY))
+    text = repr(request)
+    assert _CALL_KEY not in text
+    assert "api_key" not in text
+
+
+@pytest.mark.asyncio
+async def test_complete_redacts_api_key_echoed_by_upstream() -> None:
+    # The one path by which a caller's key could escape: the upstream reflects it
+    # in an error body, and that text goes BOTH to the structured log and into the
+    # client error envelope. Redaction runs on the DECODED diagnostic and before
+    # the length cap, so neither a JSON escape nor a truncation can smuggle it out.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            400, json={"error": {"message": f"invalid key {_CALL_KEY} for this account"}}
+        )
+
+    provider = _provider(handler)
+    with structlog.testing.capture_logs() as logs, pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
+    assert _CALL_KEY not in exc.value.message
+    assert _REDACTED in exc.value.message
+    # The reason itself must survive redaction — this stays a usable diagnostic.
+    assert "for this account" in exc.value.message
+    # Assert the log POSITIVELY, so an empty capture cannot pass this vacuously.
+    events = [e for e in logs if e.get("event") == "upstream_http_error"]
+    assert len(events) == 1
+    assert _CALL_KEY not in str(events[0])
+    assert _REDACTED in str(events[0]["detail"])
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_stream_redacts_api_key_echoed_by_upstream() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text=f"rejected credential {_CALL_KEY} here")
+
+    provider = _provider(handler)
+    with structlog.testing.capture_logs() as logs, pytest.raises(DaintreeError) as exc:
+        await provider.open_stream(_req(stream=True, api_key=SecretStr(_CALL_KEY)))
+    assert _CALL_KEY not in exc.value.message
+    # Redacted, not merely discarded — the surrounding reason must still be there.
+    assert _REDACTED in exc.value.message
+    assert "rejected credential" in exc.value.message
+    events = [e for e in logs if e.get("event") == "upstream_http_error"]
+    assert len(events) == 1
+    assert events[0]["phase"] == "stream_open"
+    assert _CALL_KEY not in str(events[0])
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_default_api_key_is_also_redacted_from_upstream_errors() -> None:
+    # observability.py's rule is "no bearer keys" — not "no CALLER bearer keys".
+    # Redacting the EFFECTIVE key covers the fallback case for free.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, text=f"bad key {_DEFAULT_KEY} here")
+
+    provider = _provider(handler)
+    with structlog.testing.capture_logs() as logs, pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert _DEFAULT_KEY not in exc.value.message
+    assert _REDACTED in exc.value.message
+    events = [e for e in logs if e.get("event") == "upstream_http_error"]
+    assert len(events) == 1
+    assert _DEFAULT_KEY not in str(events[0])
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_retried_call_reuses_the_per_request_credential() -> None:
+    # retry_upstream wraps an opaque closure, so today the same request object —
+    # and its key — is reused. This locks that in: a future refactor that rebuilt
+    # the request per attempt could silently fall back to the server default on
+    # attempt two, which no other test would notice.
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers["authorization"])
+        if len(seen) == 1:
+            return httpx.Response(503, json={"error": {"message": "transient"}})
+        return httpx.Response(
+            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
+        )
+
+    provider = _provider(handler)
+    request = _req(api_key=SecretStr(_CALL_KEY))
+    await retry_upstream(
+        lambda: provider.complete(request), retries=1, backoff_base_seconds=0.0
+    )
+    assert seen == [f"Bearer {_CALL_KEY}"] * 2
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_calls_do_not_cross_credentials() -> None:
+    # The issue requires the httpx client and its pool stay SHARED, with only the
+    # header varying. A refactor that mutated client.headers instead would bleed
+    # one caller's key into another's in-flight request.
+    import json as _json
+
+    started = asyncio.Event()
+    seen: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        model = _json.loads(request.content)["model"]
+        seen[model] = request.headers["authorization"]
+        # Hold the first call open until the second is in flight, so the two
+        # genuinely overlap on the shared client rather than serializing.
+        if model == "model-a":
+            started.set()
+            await asyncio.sleep(0.05)
+        else:
+            await started.wait()
+        return httpx.Response(
+            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
+        )
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    provider = OpenRouterProvider(client, api_key=SecretStr(_DEFAULT_KEY), base_url=_BASE)
+    await asyncio.gather(
+        provider.complete(_req(model="model-a", api_key=SecretStr("sk-or-v1-caller-a"))),
+        provider.complete(_req(model="model-b", api_key=SecretStr("sk-or-v1-caller-b"))),
+    )
+    assert seen["model-a"] == "Bearer sk-or-v1-caller-a"
+    assert seen["model-b"] == "Bearer sk-or-v1-caller-b"
+    await provider.aclose()
+
+
+def test_empty_secret_does_not_mangle_the_upstream_reason() -> None:
+    # str.replace("") splices the placeholder between every character. A request
+    # can no longer carry an empty credential this far (_resolve_key rejects it),
+    # so this guards the helper directly — it stays defensive for any future caller.
+    body = b'{"error": {"message": "temperature too high"}}'
+    assert _extract_upstream_error(body, secret=SecretStr("")) == "temperature too high"
+
+
+def test_json_escaped_credential_is_still_redacted() -> None:
+    # JSON may encode an ordinary key as \\u0073\\u006b…: the undecoded body then
+    # contains no literal match, but json.loads faithfully restores the plaintext.
+    # Redacting the DECODED diagnostic is what closes that bypass.
+    escaped = "".join(f"\\u{ord(c):04x}" for c in _CALL_KEY)
+    body = f'{{"error": {{"message": "invalid {escaped} for account"}}}}'.encode()
+    # Precondition: the bypass premise holds — no literal key in the raw bytes.
+    assert _CALL_KEY not in body.decode()
+    detail = _extract_upstream_error(body, secret=SecretStr(_CALL_KEY))
+    assert detail is not None
+    assert _CALL_KEY not in detail
+    assert _REDACTED in detail
+    assert "for account" in detail  # the diagnostic still survives
+
+
+def test_credential_is_redacted_before_the_length_cap() -> None:
+    # Capping first would slice the key and leave a usable prefix behind, so the
+    # order is load-bearing. Position the key to STRADDLE the cap boundary: it must
+    # start before the cap (so a prefix would survive a cap-first implementation)
+    # and end after it (so the trailing bytes get cut).
+    start = _ERROR_DETAIL_CAP - len(_CALL_KEY) // 2
+    prefix = "upstream said "
+    raw = prefix + "x" * (start - len(prefix)) + _CALL_KEY + " rejected"
+    # Precondition: the key genuinely spans the boundary in the UNREDACTED text.
+    assert start < _ERROR_DETAIL_CAP < start + len(_CALL_KEY)
+
+    detail = _extract_upstream_error(raw.encode(), secret=SecretStr(_CALL_KEY))
+    assert detail is not None
+    assert _REDACTED in detail
+    assert len(detail) <= _ERROR_DETAIL_CAP
+    # No usable prefix of the key survives. A cap-first implementation would leave
+    # _CALL_KEY[:14] here, which this catches.
+    assert _CALL_KEY[:12] not in detail
+
+
+def _escape_first(text: str) -> str:
+    """``text`` with only its first character JSON-escaped — the minimal evasion."""
+    return f"\\u{ord(text[0]):04x}" + text[1:]
+
+
+@pytest.mark.parametrize(
+    ("label", "body"),
+    [
+        # Every branch that has no single message to quote used to echo the RAW
+        # (still-encoded) body, so an escaped key slipped past the exact match and
+        # any reader who parsed the detail got it back.
+        ("error is a list", '{{"error":["bad {esc}"]}}'),
+        ("top level not an object", '["bad {esc}"]'),
+        ("error dict with no message", '{{"error":{{"detail":"bad {esc}"}}}}'),
+        ("not json at all", "{{plain text bad {esc}"),
+    ],
+)
+def test_escaped_credential_is_not_recoverable_from_any_fallback_branch(
+    label: str, body: str
+) -> None:
+    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    raw = body.format(esc=_escape_first(key))
+    assert key not in raw  # precondition: no literal match for a scrub to find
+    detail = _extract_upstream_error(raw.encode(), secret=SecretStr(key))
+    assert detail is not None
+    assert key not in detail
+    # And not recoverable by decoding the escapes either, which is the whole point.
+    assert key not in detail.encode("latin-1", "backslashreplace").decode("unicode_escape")
+
+
+def test_double_encoded_credential_drops_the_diagnostic_entirely() -> None:
+    # Two encoding layers defeat any single-pass scrub. Rather than emit something
+    # a reader could decode, the detail is withheld — losing a rare message beats
+    # leaking a key.
+    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    inner = _json.dumps({"k": _escape_first(key)})
+    raw = _json.dumps({"error": {"message": inner}})
+    detail = _extract_upstream_error(raw.encode(), secret=SecretStr(key))
+    assert detail is not None
+    assert key not in detail
+    assert key not in detail.encode("latin-1", "backslashreplace").decode("unicode_escape")
+
+
+def test_all_occurrences_of_the_credential_are_redacted() -> None:
+    body = f'{{"error": {{"message": "{_CALL_KEY} and again {_CALL_KEY}"}}}}'.encode()
+    detail = _extract_upstream_error(body, secret=SecretStr(_CALL_KEY))
+    assert detail is not None
+    assert _CALL_KEY not in detail
 
 
 # ---- structured timeouts ---------------------------------------------------
@@ -706,7 +1132,9 @@ async def test_per_request_timeout_overrides_read_only() -> None:
         transport=httpx.MockTransport(handler),
         timeout=httpx.Timeout(connect=10.0, read=840.0, write=30.0, pool=10.0),
     )
-    provider = OpenRouterProvider(client, api_key="key", base_url=_BASE, default_timeout=840.0)
+    provider = OpenRouterProvider(
+        client, api_key=SecretStr(_DEFAULT_KEY), base_url=_BASE, default_timeout=840.0
+    )
     await provider.complete(_req(timeout=25.0))
     assert captured["timeout"] == {"connect": 10.0, "read": 25.0, "write": 30.0, "pool": 10.0}
     await provider.aclose()

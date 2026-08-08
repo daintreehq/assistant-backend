@@ -22,6 +22,7 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import create_app
@@ -156,7 +157,9 @@ def test_live_skill_builder_model_is_routable(live_client) -> None:
         client = _httpx.AsyncClient(
             timeout=_httpx.Timeout(connect=10.0, read=180.0, write=30.0, pool=10.0)
         )
-        provider = OpenRouterProvider(client, api_key=os.environ["OPENROUTER_API_KEY"])
+        provider = OpenRouterProvider(
+            client, api_key=SecretStr(os.environ["OPENROUTER_API_KEY"])
+        )
         try:
             result = await provider.complete(ProviderChatRequest(
                 model=SKILL_BUILDER_MODEL,

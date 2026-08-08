@@ -163,7 +163,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     )
     provider = OpenRouterProvider(
         client,
-        api_key=settings.openrouter_api_key.get_secret_value(),
+        api_key=settings.openrouter_api_key,
         base_url=settings.openrouter_base_url,
         default_timeout=settings.utility_timeout_seconds,
         send_prompt_cache_key=settings.deepseek_send_prompt_cache_key,
