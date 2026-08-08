@@ -262,9 +262,10 @@ cases:
     messages:
       - role: user
         content: >-
-          Package the terrain renderer, its configuration, and its tests into one
-          code-context file I can hand to a few agents later. Don't launch or
-          message anyone yet.
+          I'm splitting the terrain renderer across three agents later. Before
+          that, make one code-context file containing the renderer, its
+          configuration, and its tests; stop after creating the file and leave
+          every agent untouched.
     expect:
       required: [daintree.context.curate-copytree-bundle]
       optional: [daintree.foundation]
