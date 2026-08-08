@@ -12,8 +12,8 @@
 # the commit that triggered the build.
 #
 # Rollout is two-phase on purpose. A new revision is deployed with NO traffic
-# behind the `rc` tag and smoke-tested on its own URL; only a revision that
-# answers /readyz gets promoted to 100%. Readiness covers the failures that are
+# behind the `candidate` tag and smoke-tested on its own URL; only a revision
+# that answers /readyz gets promoted to 100%. Readiness covers failures that are
 # invisible at build time — a missing or weak secret, a malformed prompt
 # template, an unparseable skill file — so those turn into a red build instead
 # of a broken production service.
@@ -92,10 +92,12 @@ steps:
         )
 
         if gcloud run services describe "${_SERVICE}" --region="${_REGION}" >/dev/null 2>&1; then
-          echo "Deploying $COMMIT_SHA as a no-traffic 'rc' revision."
-          gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}" --no-traffic --tag=rc
+          # The tag must be at least 3 characters and a valid DNS label —
+          # Cloud Run rejects a 2-character tag like "rc" outright.
+          echo "Deploying $COMMIT_SHA as a no-traffic 'candidate' revision."
+          gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}" --no-traffic --tag=candidate
           gcloud run services describe "${_SERVICE}" --region="${_REGION}" --format=json \
-            | python3 -c 'import json,sys; print(next(t["url"] for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="rc"))' \
+            | python3 -c 'import json,sys; print(next(t["url"] for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="candidate"))' \
             > /workspace/rc_url
           echo "Release candidate URL: $$(cat /workspace/rc_url)"
         else
@@ -176,5 +178,5 @@ steps:
         # Drops the rc tag in the same call so tags do not accumulate one per
         # release; the previous revision stays available for rollback.
         gcloud run services update-traffic "${_SERVICE}" \
-          --region="${_REGION}" --to-latest --remove-tags=rc --quiet
+          --region="${_REGION}" --to-latest --remove-tags=candidate --quiet
         echo "Promoted $COMMIT_SHA to 100% of traffic."
