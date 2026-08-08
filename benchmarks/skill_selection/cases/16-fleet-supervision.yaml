@@ -82,7 +82,8 @@ cases:
     category: single-skill
     note: >-
       A terminal watcher left armed overnight. Deliberately a terminal, not CI —
-      watch-outcome's last clause says Daintree cannot read CI/checks/reviews.
+      watch-outcome owns durable supervision of a terminal tail, and this case
+      does not depend on reading forge CI state.
     messages:
       - role: user
         content: >-
