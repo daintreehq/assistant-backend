@@ -2,7 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # develop is included because a release merges it into main and every push to
+    # main deploys (see cloudbuild.yaml). Without a run on develop there would be
+    # no green signal to gate the release on, and the deploy would race CI.
+    branches: [main, develop]
   pull_request:
     branches: [main]
 

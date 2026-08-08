@@ -233,6 +233,18 @@ re-running it is how you finish setup rather than something to avoid:
 green, merges to `main`, pushes, watches the build, and verifies that the live
 `/version` reports the commit it just shipped.
 
+`infra/gcp/smoke.sh` checks a deployed instance. By default it exercises only
+the free surface — `/healthz`, `/readyz`, `/version`, and the 401 auth gate.
+Export `OPENROUTER_API_KEY` to add the authenticated metadata routes, and pass
+`--full` to send two real model turns (streaming and non-streaming), which spend
+money on that key:
+
+```bash
+./infra/gcp/smoke.sh
+OPENROUTER_API_KEY=sk-or-v1-... ./infra/gcp/smoke.sh --full
+./infra/gcp/smoke.sh --url https://assistant.daintree.org
+```
+
 The only secrets the deployment mounts are state-signing material
 (`STATE_SIGNING_KEY_CURRENT`, `STATE_SALT`) — there is **no server-side model
 API key**. Each request's bearer token is the caller's own OpenRouter key, which
