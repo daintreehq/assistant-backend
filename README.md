@@ -12,7 +12,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 `error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** DeepSeek (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-v4-flash` for the main/selector/utility calls and the skill-learning gate; the local skill-learning builder/improver run on OpenAI `gpt-5.5` (a second provider)
+- **Upstream:** OpenRouter (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek/deepseek-v4-flash-0731` for the main/selector/utility calls and the skill-learning gate, routed to the fastest endpoint that neither stores nor trains on request data; the local skill-learning builder/improver name a stronger model (`openai/gpt-5.6-sol`) on the same provider and the same key
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Key invariants
@@ -45,7 +45,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 src/daintree_assistant_server/
   api/            # FastAPI routers (chat, models, capabilities, skills, tasks, health)
   contracts/      # Pydantic wire models (OpenAI subset, extension, tasks, errors)
-  providers/      # ChatProvider protocol + DeepSeek adapter + SSE parser
+  providers/      # ChatProvider protocol + OpenRouter adapter + SSE parser
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader (incl. skill_learning/)
   skills/         # Skill models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed skill-state token codec
@@ -69,10 +69,11 @@ mypy src/
 # Regenerate prompt golden snapshots after an intentional change
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
-# Live provider-contract tests (skipped by default; make real DeepSeek calls).
+# Live provider-contract tests (skipped by default; make real OpenRouter calls).
 # Pins the things mocks can't see — e.g. that the selector's non-thinking
-# json_object call succeeds upstream and doesn't degrade open.
-RUN_LIVE_DEEPSEEK=1 DEEPSEEK_API_KEY=sk-... pytest tests/live -q
+# json_object call succeeds upstream and doesn't degrade open, and that the
+# endpoint-routing policy matches an endpoint for every parameter mix we send.
+RUN_LIVE_OPENROUTER=1 OPENROUTER_API_KEY=sk-or-v1-... pytest tests/live -q
 ```
 
 CI (`.github/workflows/ci.yml`) runs ruff + `mypy --strict` + pytest on every
@@ -85,7 +86,7 @@ Set these (see `.env.example` for the full list):
 
 ```bash
 export DAINTREE_API_KEY=...               # public bearer key (dev)
-export DEEPSEEK_API_KEY=...               # upstream provider key
+export OPENROUTER_API_KEY=...             # upstream provider key (all models)
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
 ```
 
@@ -95,10 +96,10 @@ Missing required secrets do not crash the process — they fail **readiness**
 ### Run locally
 
 ```bash
-# Copy the env scaffold and add your DeepSeek key; it binds HOST/PORT from .env
+# Copy the env scaffold and add your OpenRouter key; it binds HOST/PORT from .env
 # (default 127.0.0.1:8473). In development, leaving DAINTREE_API_KEY unset means
 # unauthenticated access.
-cp .env.example .env   # then edit DEEPSEEK_API_KEY (+ PORT if you like)
+cp .env.example .env   # then edit OPENROUTER_API_KEY (+ PORT if you like)
 python -m daintree_assistant_server
 ```
 
@@ -121,12 +122,12 @@ pointing your CLI at the same server — nothing about the wire protocol changes
 
 **How it works (fire-and-forget, after a turn completes with a final answer):**
 
-1. A cheap **gate** (`deepseek-v4-flash`) reads the just-completed workflow and
+1. A cheap **gate** (`deepseek/deepseek-v4-flash-0731`) reads the just-completed workflow and
    decides: nothing to learn / improve an existing skill / create a new one. Strong
    triggers are you signalling a problem ("what happened here?", "this shouldn't
    have happened") or the assistant visibly struggling; a cleanly completed,
    repeatable workflow can also justify a *new* skill.
-2. If warranted, **OpenAI `gpt-5.5`** (high reasoning) first diagnoses the workflow — what
+2. If warranted, **`openai/gpt-5.6-sol`** (high reasoning) first diagnoses the workflow — what
    the assistant (and the current skill, if improving) did that worked and where it failed —
    then writes the new skill or the improved one. The diagnosis is kept in the audit
    record so you can review *why* each change landed.
@@ -136,17 +137,17 @@ pointing your CLI at the same server — nothing about the wire protocol changes
    skill is **never** folded into the turn it learned from (that answer is already
    sent) — it becomes live for the **next** relevant turn's selection.
 
-**Enable it locally.** The builder/improver run on OpenAI `gpt-5.5`, so this mode
-needs an `OPENAI_API_KEY` (readiness fails without one when learning is enabled).
-The fastest way is to prefix the run command — no `.env` edit needed (a real env
-var wins over `.env` anyway):
+**Enable it locally.** The builder/improver reach their stronger model over the same
+OpenRouter key as everything else, so this mode needs no extra credential. The
+fastest way is to prefix the run command — no `.env` edit needed (a real env var
+wins over `.env` anyway):
 
 ```bash
-OPENAI_API_KEY=sk-... SKILL_LEARNING_MODE=apply python -m daintree_assistant_server
+SKILL_LEARNING_MODE=apply python -m daintree_assistant_server
 ```
 
-That is the everything-on-defaults mode: the gate (`deepseek-v4-flash`) runs after
-each completed turn, the GPT-5.5 builder writes/improves a skill when warranted,
+That is the everything-on-defaults mode: the gate (`deepseek/deepseek-v4-flash-0731`)
+runs after each completed turn, the GPT-5.6 Sol builder writes/improves a skill when warranted,
 changes land in the real `skills/files/` (so they show up in `git diff`), and the
 catalog reloads live. Point your CLI at the server as usual and just work. For a
 safe dry run that never touches the skill files, swap `apply` for `propose`.

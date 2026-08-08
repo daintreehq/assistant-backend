@@ -56,7 +56,7 @@ async def test_utility_task_runs_thinking_high_with_headroom(
     req = fake_provider.requests[-1]
     assert req.thinking_disabled is False
     assert req.reasoning_effort == "high"
-    assert req.max_tokens > settings.deepseek_thinking_headroom_tokens
+    assert req.max_tokens > settings.thinking_headroom_tokens
 
 
 @pytest.mark.asyncio
@@ -308,7 +308,7 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
     result = await task_runner.run(TaskRequest(task="terminal_summarize", input={"tail": "x"}))
     assert result.prompt_version == "terminal_summarize"
     assert result.usage.total_tokens >= 0
-    assert result.model == "deepseek-v4-flash"
+    assert result.model == "deepseek/deepseek-v4-flash-0731"
 
 
 # The task ids are a FROZEN WIRE CONTRACT shared with the Go CLI, which hardcodes

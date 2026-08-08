@@ -5,9 +5,11 @@ OpenAI-compatible. There is exactly one client (the Daintree Assistant CLI), whi
 the server fully controls, so the wire contract is purpose-built rather than
 shaped around a third-party schema.
 
-The upstream provider is DeepSeek — its OpenAI-compatible wire shape is spoken
-*internally*, behind a provider abstraction; the main model is `deepseek-v4-flash`.
-That is invisible to clients.
+The upstream provider is OpenRouter — its OpenAI-compatible wire shape is spoken
+*internally*, behind a provider abstraction; the main model is
+`deepseek/deepseek-v4-flash-0731`, and OpenRouter selects which of the endpoints
+serving it answers (throughput-sorted, filtered to endpoints that do not collect
+or train on data). That is invisible to clients.
 
 ## Principles
 
@@ -161,10 +163,12 @@ Notes:
   that there is no current worktree.
 - `tools`/`tool_calls` use the standard `{id, type, function:{name, arguments}}` shape.
   `tool_choice` is flattened to `{ "name": … }` for the named case.
-- `reasoning_content` (assistant turns only) carries DeepSeek thinking-mode chain-of-thought.
+- `reasoning_content` (assistant turns only) carries thinking-mode chain-of-thought.
   It appears in the response only when thinking is enabled; on a turn that performed tool calls it
-  MUST be echoed back verbatim on later requests or DeepSeek 400s (it is ignored otherwise). Omit
-  it entirely when thinking is off. See Prompt assembly & caching.
+  SHOULD be echoed back verbatim on later requests so the model can continue the reasoning that
+  produced those calls (it is ignored on turns that did not). Omit it entirely when thinking is
+  off. The server renames it to OpenRouter's `reasoning` at the provider boundary; the Daintree
+  wire name never changes. See Prompt assembly & caching.
 - Tool definitions are bounded (total bytes, schema depth, property count, string sizes);
   `function.parameters` must be a JSON object whose root `type`, when present, is `object`.
 - `generation.response_format` `"text"` is the default output mode — sending it is equivalent
@@ -315,8 +319,8 @@ cover degraded lifecycle paths without logging request content.
 
 ## Prompt assembly & caching
 
-DeepSeek serializes the prompt as **[all system messages, in array order] →
-[tools] → [non-system conversation]** — a system message anywhere in the array
+The DeepSeek chat template serializes the prompt as **[all system messages, in
+array order] → [tools] → [non-system conversation]** — a system message anywhere in the array
 lands in the leading system region, before the ~18k-token tool schemas
 (measured 2026-07-08: volatile system-role runtime context after the
 conversation cut byte-identical turns to a 36% cache hit; 99% after this
@@ -340,12 +344,23 @@ worktrees) is treated as untrusted data. Prose fields collapse whitespace; multi
 blocks. Agent ids are the exception to prose normalization: the assembler preserves their
 exact value, JSON-quotes it, and admits or omits each complete row under the roster budget.
 
-The main request is sent with `prompt_cache_key` ("daintree-main") by default
-(`DEEPSEEK_SEND_PROMPT_CACHE_KEY`; suppressed in JSON mode). Reasoning is controlled by a
-top-level `thinking` object, sent explicitly on every call: `{"type": "disabled"}` turns
-thinking off, `{"type": "enabled"}` (optionally with a `reasoning_effort` tier) turns it on.
-DeepSeek defaults thinking ON when the field is absent, so the explicit directive is what
-keeps non-thinking calls (above all the selector) actually non-thinking.
+No `prompt_cache_key` is sent: no endpoint for this model advertises the parameter, and the
+routing policy's `require_parameters` filter would find no eligible endpoint for a request
+carrying one. Prefix caching is implicit at whichever endpoint serves the request.
+
+Every request also carries a top-level `provider` block — OpenRouter's endpoint-selection
+policy, hardcoded like the model ids: `sort: "throughput"` (fastest tokens/sec wins, price
+second), `data_collection: "deny"` (only endpoints that neither store nor train on request
+data), `require_parameters: true` (drop endpoints that would silently ignore something we
+sent — this is what routes a json_object call away from an otherwise-faster endpoint with no
+`response_format` support), and `allow_fallbacks: true` (the next-fastest compliant endpoint
+covers an outage). A policy that matches nothing returns 404, surfaced as an explicit
+routing-failure message rather than a generic bad-request.
+
+Reasoning is controlled by OpenRouter's unified `reasoning` object, sent explicitly on every
+call: `{"enabled": false}` turns thinking off, `{"effort": "<tier>"}` turns it on at a tier.
+A reasoning model thinks when the field is absent, so the explicit directive is what keeps
+non-thinking calls (above all the selector) actually non-thinking.
 
 The thinking posture is **hardcoded — a product decision like the model ids, not
 configuration**. The main `/respond` call, the utility tasks, and the skill-learning gate run
@@ -358,14 +373,16 @@ the one thing incompatible with thinking on DeepSeek, the selector was moved off
 `select_skills` call onto `response_format` json_object (json_object output and non-forced
 tool calling are both compatible with thinking). DeepSeek accepts only `high`/`max` and silently remaps `low`/`medium` up to
 `high` — so `high` is the lightest thinking available, the only lower setting being thinking
-off. Since DeepSeek's `max_tokens` is shared by reasoning + visible output, the small-output
-calls (selector, utility tasks, gate) add `DEEPSEEK_THINKING_HEADROOM_TOKENS` to their tight
+off. Since `max_tokens` is shared by reasoning + visible output, the small-output
+calls (selector, utility tasks, gate) add `THINKING_HEADROOM_TOKENS` to their tight
 caps so the chain-of-thought can't starve the answer into a length truncation; the main
 `/respond` call instead runs on its own flat budget (`MAIN_DEFAULT_MAX_TOKENS` ==
 `MAIN_MAX_TOKENS_CEILING`, already sized for reasoning + output). Thinking is still forced off
-for any request that pins a `tool_choice` (thinking + a forced tool choice is rejected upstream). When enabled, the model returns its chain-of-thought as `reasoning_content`; the
-client stores it on the assistant turn and replays it verbatim on any turn that performed tool
-calls (a hard DeepSeek requirement). Thinking mode ignores `temperature`/`top_p`/penalties.
+for any request that pins a `tool_choice` (thinking + a forced tool choice is rejected by the
+model; which endpoint enforces it is not worth betting a turn on). When enabled, the model
+returns its chain-of-thought as `reasoning_content`; the client stores it on the assistant turn
+and replays it verbatim on any turn that performed tool calls, so the model can continue that
+reasoning. Thinking mode ignores `temperature`/`top_p`/penalties.
 
 ## Errors
 

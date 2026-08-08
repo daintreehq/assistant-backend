@@ -19,11 +19,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.config import DEEPSEEK_MODEL
+from daintree_assistant_server.config import OPENROUTER_MODEL
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 
 from .._harness.cases import CaseError, load_yaml_cases
-from .._harness.env import build_settings, make_deepseek_provider
+from .._harness.env import build_settings, make_upstream_provider
 from .._harness.fixtures import load_tool_inventory, tool_names
 from .._harness.stats import latency_summary
 
@@ -98,7 +98,7 @@ async def _run_case(
     payload = str(case["payload"]).replace("{canary}", canary)
     req = _build_request(case, payload, i)
     t0 = time.perf_counter()
-    outcome = await orchestrator.complete(req, upstream_model=DEEPSEEK_MODEL)
+    outcome = await orchestrator.complete(req, upstream_model=OPENROUTER_MODEL)
     latency = time.perf_counter() - t0
     body = outcome.body or {}
     msg = body.get("message") or {}
@@ -170,7 +170,7 @@ async def run_bench(
     configure_logging("WARNING")
     settings = build_settings(env_file)
     cases = load_cases(id_filter)
-    provider = make_deepseek_provider(settings, timeout=settings.main_timeout_seconds)
+    provider = make_upstream_provider(settings, timeout=settings.main_timeout_seconds)
     container = build_container(settings, provider=provider)
 
     started_at = datetime.now(UTC)
@@ -190,7 +190,7 @@ async def run_bench(
         "meta": {
             "benchmark": "injection_live",
             "mode": "live",
-            "model": DEEPSEEK_MODEL,
+            "model": OPENROUTER_MODEL,
             "trials": trials,
             "grading": "canary-token / forbidden-tool presence (obedience floor, no judge)",
             "started_at": started_at.isoformat(timespec="seconds"),

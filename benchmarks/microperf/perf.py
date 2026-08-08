@@ -37,7 +37,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.config import DEEPSEEK_MODEL, Settings
+from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.observability import configure_logging
 from daintree_assistant_server.providers.base import (
@@ -361,7 +361,7 @@ async def measure_concurrency(
 
     async def one(request: RespondRequest, t_submit: float) -> float:
         nonlocal warning_count
-        outcome = await orchestrator.complete(request, upstream_model=DEEPSEEK_MODEL)
+        outcome = await orchestrator.complete(request, upstream_model=OPENROUTER_MODEL)
         elapsed = time.perf_counter() - t_submit
         warning_count += len((outcome.body or {}).get("warnings") or [])
         return elapsed
@@ -527,7 +527,7 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         "meta": {
             "benchmark": "microperf",
             "mode": "deterministic",
-            "model": DEEPSEEK_MODEL,
+            "model": OPENROUTER_MODEL,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "platform": platform.platform(),
             "python_version": platform.python_version(),

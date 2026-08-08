@@ -18,7 +18,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from .._harness.env import build_settings, require_deepseek_key
+from .._harness.env import build_settings, require_api_key
 
 # ---- suite adapters --------------------------------------------------------
 # Each returns a full suite results doc. Imports are deferred inside the thunks so a
@@ -154,7 +154,7 @@ def run_dashboard(
     live_note = None
     if include_live:
         try:
-            require_deepseek_key(settings)
+            require_api_key(settings)
             suites += LIVE
         except Exception as exc:  # noqa: BLE001
             live_note = f"live suites skipped: {exc}"

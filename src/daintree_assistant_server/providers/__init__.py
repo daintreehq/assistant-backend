@@ -1,1 +1,1 @@
-"""Provider abstraction and the DeepSeek adapter."""
+"""Provider abstraction and the OpenRouter adapter."""

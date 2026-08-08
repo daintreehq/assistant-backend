@@ -17,18 +17,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Hardcoded model identities — a product decision, not deployment config. The
 # main completion, the skill selector, the utility tasks, and the skill-learning
-# gate all run on the small model (DEEPSEEK_MODEL). The skill-learning builder and
-# improver run on OpenAI's GPT-5.5 reasoning model — a harder "write a whole skill"
-# generation task, deliberately on a stronger, separate provider (see the OpenAI
-# settings below and providers/openai.py). PUBLIC_MODEL_ID is the alias returned to
-# clients. Only the provider API keys (and base URLs) come from the environment.
-DEEPSEEK_MODEL = "deepseek-v4-flash"
-SKILL_BUILDER_MODEL = "gpt-5.5"
-SKILL_IMPROVER_MODEL = "gpt-5.5"
+# gate all run on the small model (OPENROUTER_MODEL) — DeepSeek V4 Flash, reached
+# through OpenRouter rather than DeepSeek directly, so the fastest compliant
+# endpoint serving those weights answers each call (see providers/openrouter.py).
+# The date-pinned slug is deliberate: the floating alias would silently re-point
+# at a differently-tuned revision, and every prompt and benchmark here is
+# calibrated against this one. The skill-learning builder and improver run on a
+# deliberately STRONGER model — GPT-5.6 Sol — for the harder "write a whole
+# skill" generation task; routing everything through OpenRouter is what makes
+# that a one-line model swap on the same provider and the same key, instead of a
+# second SDK and a second credential. PUBLIC_MODEL_ID is the alias returned to
+# clients. Only the provider API key (and base URL) comes from the environment.
+OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731"
+SKILL_BUILDER_MODEL = "openai/gpt-5.6-sol"
+SKILL_IMPROVER_MODEL = "openai/gpt-5.6-sol"
 PUBLIC_MODEL_ID = "daintree-assistant"
 
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
-# There is one optimum and the server ships it: every DeepSeek call runs
+# There is one optimum and the server ships it: every main-model call runs
 # thinking-high EXCEPT (a) the skill selector — it gates the turn's first byte,
 # and thinking there benchmarked strictly worse (median ~4-5s with a 13-20s
 # timeout-retry tail vs a consistent 1.2-2.6s non-thinking) for no selection-
@@ -37,10 +43,10 @@ PUBLIC_MODEL_ID = "daintree-assistant"
 # forced tool_choice, which DeepSeek rejects under thinking, so that request
 # degrades to non-thinking at runtime. "high" is DeepSeek's lightest tier
 # (low/medium silently map up to it; the only step below is off). The
-# skill-learning builder/improver on GPT-5.5 likewise pin "high" — its xhigh
+# skill-learning builder/improver on GPT-5.6 Sol likewise pin "high" — its xhigh
 # top tier is excluded on purpose: high already covers the "write a whole
 # skill" task, and learning runs only in local dev.
-DEEPSEEK_REASONING_EFFORT = "high"
+OPENROUTER_REASONING_EFFORT = "high"
 SKILL_LEARNING_REASONING_EFFORT = "high"
 
 # The development default salt; rejected in production by weak_secrets().
@@ -73,46 +79,26 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", alias="HOST")
     port: int = Field(default=8080, alias="PORT")
 
-    # ---- Upstream provider (DeepSeek, OpenAI-compatible) ---------------
-    # Models are hardcoded (see the constants above); only the key and base URL
+    # ---- Upstream provider (OpenRouter, OpenAI-compatible) ---------------
+    # Models are hardcoded (see the constants above) and so is the endpoint-
+    # selection policy (throughput-sorted, no-data-collection — see
+    # ``_PROVIDER_ROUTING`` in providers/openrouter.py); only the key and base URL
     # come from the environment.
-    deepseek_base_url: str = Field(default="https://api.deepseek.com", alias="DEEPSEEK_BASE_URL")
-    deepseek_api_key: SecretStr = Field(default=SecretStr(""), alias="DEEPSEEK_API_KEY")
-
-    # DeepSeek V4 specifics, confirmed against the live endpoint:
-    #  - thinking must be DISABLED for any forced tool_choice to work
-    #    ("Thinking mode does not support this tool_choice"); the field is accepted.
-    #  - prompt_cache_key is accepted and improves prefix-cache routing.
-    # Defaults ON; flip off only for a provider/model that rejects the field. (The
-    # provider's explicit per-call thinking directive is NOT configurable — DeepSeek
-    # defaults reasoning ON when the field is absent, and the explicit disable is
-    # what keeps the non-thinking selector actually non-thinking.)
-    deepseek_send_prompt_cache_key: bool = Field(
-        default=True, alias="DEEPSEEK_SEND_PROMPT_CACHE_KEY"
+    openrouter_base_url: str = Field(
+        default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
     )
+    openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
 
-    # ---- Skill-learning provider (OpenAI, GPT-5.5) ----------------------
-    # The skill-learning builder/improver run on OpenAI's GPT-5.5 reasoning model
-    # (SKILL_BUILDER_MODEL/SKILL_IMPROVER_MODEL above), NOT DeepSeek — a deliberately
-    # stronger, separate provider for the hard "write a whole skill" generation task.
-    # Only needed when skill learning is enabled (local dev); the key is then REQUIRED
-    # at readiness (see local_only_problems). GPT-5.5 is a reasoning model: the OpenAI
-    # adapter sends `reasoning_effort` + `max_completion_tokens` and omits temperature
-    # (the model rejects any non-default value) — see providers/openai.py.
-    openai_base_url: str = Field(
-        default="https://api.openai.com/v1", alias="OPENAI_BASE_URL"
-    )
-    openai_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENAI_API_KEY")
-
-    # ---- DeepSeek thinking headroom --------------------------------------
-    # The thinking POSTURE itself is hardcoded (see DEEPSEEK_REASONING_EFFORT at
+    # ---- Thinking headroom -----------------------------------------------
+    # The thinking POSTURE itself is hardcoded (see OPENROUTER_REASONING_EFFORT at
     # the top of this module): main/utility/gate think-high, the selector is
     # non-thinking, and only a client-pinned forced tool_choice degrades the main
     # call off at runtime. reasoning_content round-trips through the wire contract
-    # (an assistant tool-call turn that omits it 400s on DeepSeek), which the
-    # assembler preserves. Thinking mode ignores temperature/top_p.
+    # so a tool-call turn can replay the chain-of-thought that produced its calls
+    # (the provider adapter renames it to OpenRouter's `reasoning` on the way out),
+    # which the assembler preserves. Thinking mode ignores temperature/top_p.
     #
-    # Because DeepSeek's max_tokens is SHARED by reasoning + visible output, the
+    # Because max_tokens is SHARED by reasoning + visible output, the
     # small-output thinking calls (utility tasks, skill-learning gate) add this
     # headroom to their tight output caps so the chain-of-thought can't starve the
     # answer into a finish_reason=length truncation. The main /respond call does
@@ -120,8 +106,8 @@ class Settings(BaseSettings):
     # MAIN_MAX_TOKENS_CEILING, already sized for reasoning + output and clamped
     # for runaway containment), and a client MAY request its own main max_tokens —
     # so headroom there would fight the ceiling rather than help.
-    deepseek_thinking_headroom_tokens: int = Field(
-        default=4000, ge=0, alias="DEEPSEEK_THINKING_HEADROOM_TOKENS"
+    thinking_headroom_tokens: int = Field(
+        default=4000, ge=0, alias="THINKING_HEADROOM_TOKENS"
     )
 
     # ---- Main-model output shape ---------------------------------------
@@ -206,7 +192,7 @@ class Settings(BaseSettings):
     main_timeout_seconds: float = Field(default=840.0, alias="MAIN_TIMEOUT_SECONDS")
     # Default budget for utility tasks. Deliberately NOT tightened to the
     # aspirational 25s: every profile runs thinking-high with a ~4k-token
-    # reasoning+output budget over inputs up to 120k chars, and DeepSeek can emit
+    # reasoning+output budget over inputs up to 120k chars, and the model can emit
     # no bytes at all while thinking — a 25s read cap risks repeatable timeouts.
     # Revisit only from measured latency distributions. The heavyweight
     # transcript/graph tasks also carry an explicit 60s on their TaskProfile so a
@@ -217,7 +203,7 @@ class Settings(BaseSettings):
     )
 
     # ---- Selector -------------------------------------------------------
-    # The selector is HARDCODED non-thinking (see DEEPSEEK_REASONING_EFFORT at the
+    # The selector is HARDCODED non-thinking (see OPENROUTER_REASONING_EFFORT at the
     # top of this module for the rationale); its prompt's reason-first JSON key
     # order is the inline reasoning step.
     selector_context_tokens: int = Field(default=64000, alias="SELECTOR_CONTEXT_TOKENS")
@@ -325,9 +311,9 @@ class Settings(BaseSettings):
     # as a normal dynamic skill load. It MUST be off in production: an enabled mode
     # fails readiness there (see local_only_problems). Modes:
     #   off     — disabled (default)
-    #   propose — run the gate (DeepSeek) + OpenAI GPT-5.5 builder/improver and write the
-    #             proposed skill markdown + an audit JSON under the audit dir's proposals/,
-    #             but never touch the real skill files or the catalog
+    #   propose — run the gate (small model) + the gpt-5.6-sol builder/improver and write
+    #             the proposed skill markdown + an audit JSON under the audit dir's
+    #             proposals/, but never touch the real skill files or the catalog
     #   apply   — also write/rewrite the skill file and reload the catalog in place
     skill_learning_mode: Literal["off", "propose", "apply"] = Field(
         default="off", alias="SKILL_LEARNING_MODE"
@@ -341,9 +327,9 @@ class Settings(BaseSettings):
     skill_learning_audit_dir: str = Field(
         default=".daintree/skill-learning", alias="SKILL_LEARNING_AUDIT_DIR"
     )
-    # The builder/improver reasoning tier (GPT-5.5) and the gate's thinking-high
-    # posture (DeepSeek, json_object verdict) are hardcoded — see
-    # SKILL_LEARNING_REASONING_EFFORT / DEEPSEEK_REASONING_EFFORT at the top of
+    # The builder/improver reasoning tier (GPT-5.6 Sol) and the gate's thinking-high
+    # posture (small model, json_object verdict) are hardcoded — see
+    # SKILL_LEARNING_REASONING_EFFORT / OPENROUTER_REASONING_EFFORT at the top of
     # this module.
     # Gate verdicts below this confidence never write.
     skill_learning_min_confidence: float = Field(
@@ -379,9 +365,10 @@ class Settings(BaseSettings):
     )
     # Must cover the improver's REQUIRED output — the complete replacement body
     # (the largest packaged skill is ~24 KB ≈ 6k tokens before JSON escaping) plus
-    # the diagnosis fields plus the builder's reasoning tokens. On GPT-5.5 this maps
-    # to `max_completion_tokens`, which bounds reasoning AND visible output together,
-    # so high-effort reasoning eats into this budget. Too small and the JSON
+    # the diagnosis fields plus the builder's reasoning tokens. It bounds reasoning
+    # AND visible output together (OpenRouter maps it to `max_completion_tokens` for
+    # endpoints that need that spelling), so high-effort reasoning eats into this
+    # budget. Too small and the JSON
     # truncates: the parse fails, the repair retry truncates identically, and the
     # improve path can never land.
     skill_build_max_output_tokens: int = Field(
@@ -408,8 +395,8 @@ class Settings(BaseSettings):
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty."""
         missing: list[str] = []
-        if not self.deepseek_api_key.get_secret_value():
-            missing.append("DEEPSEEK_API_KEY")
+        if not self.openrouter_api_key.get_secret_value():
+            missing.append("OPENROUTER_API_KEY")
         if not self.daintree_api_key.get_secret_value():
             missing.append("DAINTREE_API_KEY")
         if not self.state_signing_key_current.get_secret_value():
@@ -423,15 +410,13 @@ class Settings(BaseSettings):
         These join ``missing_secrets()`` / ``weak_secrets()`` in readiness gating,
         so a production (or Cloud Run) deploy that leaves skill learning enabled
         fails ``/readyz`` rather than mutating the catalog from model output at
-        runtime. Empty in development *unless* skill learning is enabled without the
-        OpenAI key its builder/improver need — that surfaces here rather than as a
-        silent fail-open the first time learning tries to run.
+        runtime. Empty in development: the builder/improver run on the SAME
+        OpenRouter key as everything else, so enabling learning needs no extra
+        credential of its own.
         """
         problems: list[str] = []
         if self.is_hardened and self.skill_learning_enabled:
             problems.append("SKILL_LEARNING_MODE must be 'off' in production")
-        if self.skill_learning_enabled and not self.openai_api_key.get_secret_value():
-            problems.append("OPENAI_API_KEY is required when skill learning is enabled")
         if self.is_hardened and self.dump_upstream_dir:
             problems.append(
                 "DAINTREE_DUMP_UPSTREAM_DIR must be unset in production "

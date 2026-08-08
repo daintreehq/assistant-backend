@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from .._harness.env import EnvError, build_settings, require_deepseek_key
+from .._harness.env import EnvError, build_settings, require_api_key
 from .._harness.results import load_doc, save_doc
 from .deterministic import run_deterministic
 
@@ -61,7 +61,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         "deterministic": run_deterministic(settings),
     }
     if args.live:
-        require_deepseek_key(settings)  # fail fast before any work
+        require_api_key(settings)  # fail fast before any work
         from .live import run_live
 
         doc["live"] = asyncio.run(run_live(settings, trials=args.trials))
@@ -87,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run the cost/cache benchmark")
     run.add_argument("--live", action="store_true", help="add live cache/TTFB (paid)")
     run.add_argument("--trials", type=int, default=3, help="live latency trials (default 3)")
-    run.add_argument("--env-file", help="path to a .env with DEEPSEEK_API_KEY")
+    run.add_argument("--env-file", help="path to a .env with OPENROUTER_API_KEY")
     run.add_argument("--out", help="explicit output JSON path")
     run.add_argument("--no-save", action="store_true")
     run.set_defaults(func=_cmd_run)

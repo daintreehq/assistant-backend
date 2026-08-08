@@ -1,4 +1,4 @@
-"""DeepSeek provider adapter tests using a mock HTTP transport."""
+"""OpenRouter provider adapter tests using a mock HTTP transport."""
 
 from __future__ import annotations
 
@@ -7,26 +7,26 @@ import pytest
 
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
-from daintree_assistant_server.providers.deepseek import DeepSeekProvider
+from daintree_assistant_server.providers.openrouter import OpenRouterProvider
 
-_BASE = "https://api.deepseek.com"
-_MODEL = "deepseek-v4-flash"
+_BASE = "https://openrouter.ai/api/v1"
+_MODEL = "deepseek/deepseek-v4-flash-0731"
 
 SSE_OK = (
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-flash",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek/deepseek-v4-flash-0731",'
     '"choices":[{"index":0,"delta":{"role":"assistant","content":"Hel"}}]}\n\n'
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-flash",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek/deepseek-v4-flash-0731",'
     '"choices":[{"index":0,"delta":{"content":"lo"}}]}\n\n'
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek-v4-flash",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek/deepseek-v4-flash-0731",'
     '"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],'
     '"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n'
     "data: [DONE]\n\n"
 )
 
 
-def _provider(handler, **kwargs) -> DeepSeekProvider:
+def _provider(handler, **kwargs) -> OpenRouterProvider:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    return DeepSeekProvider(client, api_key="key", base_url=_BASE, **kwargs)
+    return OpenRouterProvider(client, api_key="key", base_url=_BASE, **kwargs)
 
 
 def _capture(captured: dict):
@@ -67,7 +67,7 @@ async def test_complete_success() -> None:
             json={
                 "id": "abc",
                 "created": 10,
-                "model": "deepseek-v4-flash",
+                "model": "deepseek/deepseek-v4-flash-0731",
                 "choices": [
                     {"index": 0, "message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}
                 ],
@@ -84,98 +84,262 @@ async def test_complete_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_thinking_disabled_sent_by_default() -> None:
-    # thinking_disabled=True (the default) sends an EXPLICIT disable directive —
-    # DeepSeek defaults reasoning ON when the field is absent, so this is what keeps
+async def test_reasoning_disabled_sent_by_default() -> None:
+    # thinking_disabled=True (the default) sends an EXPLICIT disable directive — a
+    # reasoning model reasons when the field is absent, so this is what keeps
     # non-thinking calls (the latency-critical selector above all) actually
     # non-thinking, and what keeps any client-forced tool_choice from 400ing.
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.complete(_req())
-    assert captured["body"]["thinking"] == {"type": "disabled"}
+    assert captured["body"]["reasoning"] == {"enabled": False}
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_thinking_not_sent_when_disabled_flag_off() -> None:
-    # send_thinking=False means the provider/model doesn't understand the field at
-    # all: send neither the directive nor the effort.
+async def test_reasoning_not_sent_when_flag_off() -> None:
+    # send_reasoning=False means the model has no reasoning mode at all: send
+    # neither the directive nor the effort.
     captured: dict = {}
-    provider = _provider(_capture(captured), send_thinking=False)
+    provider = _provider(_capture(captured), send_reasoning=False)
     await provider.complete(_req())
-    assert "thinking" not in captured["body"]
+    assert "reasoning" not in captured["body"]
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_thinking_enabled_sends_effort() -> None:
+async def test_reasoning_enabled_sends_effort() -> None:
+    # OpenRouter's unified object carries the tier; `effort` and `max_tokens` are
+    # mutually exclusive there, so a tiered request must not also emit a bare
+    # enable or a flat reasoning_effort field.
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.complete(_req(thinking_disabled=False, reasoning_effort="max"))
-    assert captured["body"]["thinking"] == {"type": "enabled"}
-    assert captured["body"]["reasoning_effort"] == "max"
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_thinking_enabled_omits_effort_when_unset() -> None:
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req(thinking_disabled=False))
-    assert captured["body"]["thinking"] == {"type": "enabled"}
+    assert captured["body"]["reasoning"] == {"effort": "max"}
     assert "reasoning_effort" not in captured["body"]
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_disabled_thinking_never_sends_effort() -> None:
+async def test_reasoning_enabled_omits_effort_when_unset() -> None:
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(thinking_disabled=False))
+    assert captured["body"]["reasoning"] == {"enabled": True}
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_disabled_reasoning_never_sends_effort() -> None:
     # reasoning_effort is meaningless without thinking; it must not leak into a
     # non-thinking request even if a caller set it.
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.complete(_req(thinking_disabled=True, reasoning_effort="high"))
-    assert captured["body"]["thinking"] == {"type": "disabled"}
-    assert "reasoning_effort" not in captured["body"]
+    assert captured["body"]["reasoning"] == {"enabled": False}
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_thinking_params_omitted_when_flag_off() -> None:
-    # send_thinking=False: even a thinking-enabled request sends neither field.
+async def test_reasoning_params_omitted_when_flag_off() -> None:
+    # send_reasoning=False: even a thinking-enabled request sends neither field.
     captured: dict = {}
-    provider = _provider(_capture(captured), send_thinking=False)
+    provider = _provider(_capture(captured), send_reasoning=False)
     await provider.complete(_req(thinking_disabled=False, reasoning_effort="max"))
-    assert "thinking" not in captured["body"]
+    assert "reasoning" not in captured["body"]
     assert "reasoning_effort" not in captured["body"]
     await provider.aclose()
 
 
+# ---- endpoint-selection policy --------------------------------------------
+
+
 @pytest.mark.asyncio
-async def test_prompt_cache_key_sent_by_default_when_not_json_mode() -> None:
+async def test_provider_routing_policy_sent_on_every_request() -> None:
+    # OpenRouter picks WHICH endpoint answers, so this block is not decoration: it
+    # is the throughput-first / no-data-collection product decision. A request that
+    # silently omitted it would route on price to any endpoint, including ones that
+    # train on prompts.
     captured: dict = {}
     provider = _provider(_capture(captured))
-    await provider.complete(_req(prompt_cache_key="daintree-main"))
-    assert captured["body"]["prompt_cache_key"] == "daintree-main"
+    await provider.complete(_req())
+    assert captured["body"]["provider"] == {
+        "sort": "throughput",
+        "data_collection": "deny",
+        "require_parameters": True,
+        "allow_fallbacks": True,
+    }
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_prompt_cache_key_not_sent_when_flag_off() -> None:
+async def test_provider_routing_policy_sent_on_streams_too() -> None:
     captured: dict = {}
-    provider = _provider(_capture(captured), send_prompt_cache_key=False)
-    await provider.complete(_req(prompt_cache_key="daintree-main"))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        import json as _json
+
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=SSE_OK)
+
+    provider = _provider(handler)
+    stream = await provider.open_stream(_req(stream=True))
+    assert captured["body"]["provider"]["sort"] == "throughput"
+    assert captured["body"]["provider"]["data_collection"] == "deny"
+    await stream.aclose()
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_attribution_headers_sent() -> None:
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["referer"] = request.headers.get("http-referer")
+        seen["title"] = request.headers.get("x-title")
+        return httpx.Response(
+            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
+        )
+
+    provider = _provider(handler)
+    await provider.complete(_req())
+    assert seen["referer"] and seen["title"]
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_no_prompt_cache_key_is_sent() -> None:
+    # No endpoint for this model advertises prompt_cache_key, and with
+    # require_parameters on, sending an unadvertised parameter can empty the
+    # eligible pool — i.e. a hard routing failure, not a lost optimisation.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req())
     assert "prompt_cache_key" not in captured["body"]
     await provider.aclose()
 
 
+# ---- reasoning field rename (OpenRouter `reasoning` <-> wire reasoning_content)
+
+
 @pytest.mark.asyncio
-async def test_prompt_cache_key_suppressed_in_json_mode() -> None:
+async def test_outbound_reasoning_content_is_renamed() -> None:
+    # The Daintree contract and the CLI speak reasoning_content; OpenRouter speaks
+    # `reasoning`. An unrecognised field would be dropped silently, losing the
+    # replayed chain-of-thought rather than erroring, so assert the rename.
     captured: dict = {}
-    provider = _provider(_capture(captured), send_prompt_cache_key=True)
+    provider = _provider(_capture(captured))
     await provider.complete(
-        _req(prompt_cache_key="daintree-main", response_format={"type": "json_object"})
+        _req(
+            messages=[
+                {"role": "user", "content": "hi"},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "reasoning_content": "step one",
+                    "tool_calls": [{"id": "c", "type": "function", "function": {"name": "f"}}],
+                },
+            ]
+        )
     )
-    assert "prompt_cache_key" not in captured["body"]
+    assistant = captured["body"]["messages"][1]
+    assert assistant["reasoning"] == "step one"
+    assert "reasoning_content" not in assistant
+    # Untouched messages are passed through unchanged.
+    assert captured["body"]["messages"][0] == {"role": "user", "content": "hi"}
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_inbound_reasoning_is_renamed_on_complete() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "x",
+                "created": 0,
+                "model": "m",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "answer",
+                            "reasoning": "because",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {},
+            },
+        )
+
+    provider = _provider(handler)
+    result = await provider.complete(_req())
+    assert result.message["reasoning_content"] == "because"
+    assert "reasoning" not in result.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_inbound_reasoning_is_renamed_on_stream() -> None:
+    sse = (
+        'data: {"id":"x","choices":[{"index":0,"delta":{"reasoning":"thinking..."}}]}\n\n'
+        "data: [DONE]\n\n"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=sse)
+
+    provider = _provider(handler)
+    stream = await provider.open_stream(_req(stream=True))
+    first = await stream.prefetch_first_event()
+    assert first["choices"][0]["delta"]["reasoning_content"] == "thinking..."
+    assert "reasoning" not in first["choices"][0]["delta"]
+    await stream.aclose()
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_non_string_inbound_reasoning_is_dropped_not_renamed() -> None:
+    # The shape validators guarantee reasoning_content is a string when present and
+    # this rename runs outside their reach, so a structured/encrypted value must be
+    # dropped rather than smuggled through under the wire name.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "x",
+                "created": 0,
+                "model": "m",
+                "choices": [
+                    {"index": 0, "message": {"role": "assistant", "reasoning": {"blob": 1}}}
+                ],
+                "usage": {},
+            },
+        )
+
+    provider = _provider(handler)
+    result = await provider.complete(_req())
+    assert "reasoning" not in result.message
+    assert "reasoning_content" not in result.message
+    await provider.aclose()
+
+
+# ---- 404 routing failure ---------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_404_reads_as_a_routing_failure_not_a_bad_request() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": {"message": "No allowed providers"}})
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert exc.value.status_code == 502
+    assert exc.value.retryable is False
+    assert "provider-routing policy" in exc.value.message
     await provider.aclose()
 
 
@@ -482,7 +646,7 @@ async def test_per_request_timeout_overrides_read_only() -> None:
         transport=httpx.MockTransport(handler),
         timeout=httpx.Timeout(connect=10.0, read=840.0, write=30.0, pool=10.0),
     )
-    provider = DeepSeekProvider(client, api_key="key", base_url=_BASE, default_timeout=840.0)
+    provider = OpenRouterProvider(client, api_key="key", base_url=_BASE, default_timeout=840.0)
     await provider.complete(_req(timeout=25.0))
     assert captured["timeout"] == {"connect": 10.0, "read": 25.0, "write": 30.0, "pool": 10.0}
     await provider.aclose()
@@ -490,7 +654,7 @@ async def test_per_request_timeout_overrides_read_only() -> None:
 
 @pytest.mark.asyncio
 async def test_stream_transport_interruption_is_retryable() -> None:
-    from daintree_assistant_server.providers.deepseek import DeepSeekStream
+    from daintree_assistant_server.providers.openrouter import OpenRouterStream
 
     class _Ctx:
         async def __aexit__(self, *_a: object) -> bool:
@@ -501,7 +665,7 @@ async def test_stream_transport_interruption_is_retryable() -> None:
             raise httpx.ReadError("connection dropped")
             yield b""  # pragma: no cover - makes this an async generator
 
-    stream = DeepSeekStream(_Ctx(), _Resp(), _MODEL)
+    stream = OpenRouterStream(_Ctx(), _Resp(), _MODEL)
     with pytest.raises(DaintreeError) as exc:
         await stream.prefetch_first_event()
     assert exc.value.code == "upstream_error"
@@ -517,7 +681,7 @@ async def test_structured_tool_call() -> None:
         body = _json.loads(request.content)
         assert body["tool_choice"]["function"]["name"] == "select_skills"
         # A forced tool call must go non-thinking.
-        assert body["thinking"] == {"type": "disabled"}
+        assert body["reasoning"] == {"enabled": False}
         return httpx.Response(
             200,
             json={
@@ -551,8 +715,9 @@ async def test_structured_tool_call() -> None:
 @pytest.mark.asyncio
 async def test_structured_tool_call_forces_non_thinking() -> None:
     # Even if the caller enabled thinking, a forced tool call MUST go non-thinking
-    # (thinking disabled) — otherwise DeepSeek 400s the forced tool_choice
-    # ("Thinking mode does not support this tool_choice").
+    # — otherwise DeepSeek 400s the forced tool_choice ("Thinking mode does not
+    # support this tool_choice"), and which OpenRouter endpoint enforces that is
+    # not ours to bet on.
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.structured_tool_call(
@@ -560,6 +725,6 @@ async def test_structured_tool_call_forces_non_thinking() -> None:
         function_name="select_skills",
         function_schema={"type": "object"},
     )
-    assert captured["body"]["thinking"] == {"type": "disabled"}
+    assert captured["body"]["reasoning"] == {"enabled": False}
     assert "reasoning_effort" not in captured["body"]
     await provider.aclose()

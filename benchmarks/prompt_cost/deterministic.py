@@ -1,7 +1,7 @@
 """Deterministic cost/cache flagship — the free, CI-able scoreboard.
 
 Measures, over the REAL ``PromptAssembler.build_main_request`` and the EXACT bytes
-``DeepSeekProvider`` would POST, the numbers the whole cost/latency story turns on:
+``OpenRouterProvider`` would POST, the numbers the whole cost/latency story turns on:
 
 1. **Cacheable-prefix stability per transition type.** DeepSeek's server-side
    prefix cache reuses the leading, byte-identical portion of a request. The
@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from daintree_assistant_server.config import DEEPSEEK_MODEL, Settings
+from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.prompts.loader import (
     TEMPLATE_SELECTOR_SYSTEM,
@@ -72,7 +72,7 @@ def _body_for(
     skills: list[Skill],
 ) -> dict[str, Any]:
     pr = assembler.build_main_request(
-        request=request, skills=skills, upstream_model=DEEPSEEK_MODEL
+        request=request, skills=skills, upstream_model=OPENROUTER_MODEL
     )
     return build_provider_body(pr, settings)
 
@@ -348,7 +348,7 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "deterministic",
-            "model": DEEPSEEK_MODEL,
+            "model": OPENROUTER_MODEL,
             "catalog_revision": catalog.revision,
             "tool_inventory_count": len(load_tool_inventory()),
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),

@@ -5,7 +5,7 @@ conversation against the catalog and returns up to ``max_active_skills`` skill
 IDs as a JSON object (``response_format`` = ``json_object``). This call sits
 directly on the turn's first-byte path (selector → assemble → main TTFB), so it
 is hardcoded NON-thinking — the one exception to the server's thinking-high
-posture (a product decision, not config; see ``DEEPSEEK_REASONING_EFFORT`` in
+posture (a product decision, not config; see ``OPENROUTER_REASONING_EFFORT`` in
 ``config.py``). The selector prompt asks for a reason-first key order
 (``task_type``/``reason`` before ``skill_ids``) so the model still works through
 the decision inline before committing, which benchmarked at the same selection
@@ -20,7 +20,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import OPENROUTER_MODEL, Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
 from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
@@ -297,7 +297,7 @@ class Selector:
         # after it, as a single trailing line. Keeping per-turn state out of the
         # id-sorted loop is the selector's only prompt-cache lever: this call
         # always sets response_format, and the provider withholds prompt_cache_key
-        # whenever it does, so DeepSeek can only match a shared content prefix —
+        # whenever it does, so the upstream can only match a shared content prefix —
         # which an inline "(currently active)" marker on an early-sorting skill
         # used to break for most of the prompt on every turn.
         system = self.prompt_loader.render(
@@ -318,11 +318,11 @@ class Selector:
 
     def _build_request(self, messages: list[dict[str, Any]]) -> ProviderChatRequest:
         # HARDCODED non-thinking (the one exception to the server's thinking-high
-        # posture — see DEEPSEEK_REASONING_EFFORT in config.py): this call gates the
+        # posture — see OPENROUTER_REASONING_EFFORT in config.py): this call gates the
         # turn's first byte, and the prompt's reason-first key order is the inline
         # reasoning step instead. json_object output, never a forced tool_choice.
         return ProviderChatRequest(
-            model=DEEPSEEK_MODEL,
+            model=OPENROUTER_MODEL,
             messages=messages,
             temperature=0.0,
             max_tokens=self.settings.selector_max_output_tokens,

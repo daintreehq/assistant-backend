@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 
-from ..config import DEEPSEEK_MODEL, Settings
+from ..config import OPENROUTER_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.openai import (
     ChatMessage,
@@ -34,7 +34,7 @@ FORBIDDEN_ROLES = frozenset({"system", "developer"})
 RESERVED_TOOL_NAMES = frozenset({"skill.find", "skill.load", "skill__find", "skill__load"})
 RESERVED_TOOL_PREFIX = "daintree_internal__"
 
-# OpenAI/DeepSeek function names are limited to 64 characters.
+# OpenAI-wire function names are limited to 64 characters.
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 # Fields that would smuggle in a free-form system prompt or message stream at the
@@ -304,7 +304,7 @@ def _validate_startup(req: RespondRequest, settings: Settings) -> None:
 
 
 def _validate_generation(req: RespondRequest) -> None:
-    """DeepSeek rejects JSON mode combined with function calling, so fail fast with
+    """The model rejects JSON mode combined with function calling, so fail fast with
     a clear 400 instead of a confusing upstream 502 (and a wasted upstream call).
     ("text" is the default output mode and is simply not forwarded — see the
     assembler — so only "json_object" conflicts with tools.)"""
@@ -324,4 +324,4 @@ def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
     _validate_content(req.input.messages, settings)
     _validate_startup(req, settings)
     _validate_generation(req)
-    return DEEPSEEK_MODEL
+    return OPENROUTER_MODEL

@@ -5,13 +5,13 @@ runner, selector, provider, validators) and treats only the prompt directory /
 a fixture corpus as an injectable seam — a measured number is exactly what
 production produces. This package holds the pieces they all reuse:
 
-- ``env``      — settings + live DeepSeek provider bootstrap (reads ``.env``).
+- ``env``      — settings + live OpenRouter provider bootstrap (reads ``.env``).
 - ``counting`` — a transparent provider decorator that counts model calls and
   captures the FIRST response, so a repaired-then-parsed result is no longer
   byte-indistinguishable from a clean first-try one (the production classes sum
   usage across attempts and expose no ``repaired`` flag).
 - ``wire``     — the EXACT httpx wire serialization of an assembled request, plus
-  the DeepSeek-cacheable-region reconstruction and longest-common-prefix maths
+  the cacheable-region reconstruction and longest-common-prefix maths
   the flagship cost/cache benchmark is built on.
 - ``stats``    — percentiles / mean / stdev with no numpy dependency.
 - ``results``  — the per-suite JSON results document writer/loader.
@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from .cases import CaseError, load_yaml_cases
 from .counting import CountingProvider
-from .env import EnvError, build_settings, has_openai_key, make_deepseek_provider
+from .env import EnvError, build_settings, make_upstream_provider
 from .results import load_doc, results_dir, save_doc
 from .stats import mean, percentile, pstdev
 from .wire import (
@@ -44,13 +44,11 @@ __all__ = [
     "build_settings",
     "cacheable_region_bytes",
     "common_prefix_len",
-    "has_openai_key",
     "layer_segments",
     "load_doc",
     "load_yaml_cases",
-    "make_deepseek_provider",
+    "make_upstream_provider",
     "mean",
-    "make_deepseek_provider",
     "percentile",
     "pstdev",
     "results_dir",

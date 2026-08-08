@@ -15,7 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from ..config import DEEPSEEK_MODEL, DEEPSEEK_REASONING_EFFORT, Settings
+from ..config import OPENROUTER_MODEL, OPENROUTER_REASONING_EFFORT, Settings
 from ..contracts.tasks import (
     CheckpointInput,
     CheckpointOutput,
@@ -728,7 +728,7 @@ class TaskRunner:
 
         system = self.prompts.task_system_prompt(profile.id)
         user = profile.build_user(input_obj, request)
-        model = DEEPSEEK_MODEL
+        model = OPENROUTER_MODEL
         timeout = profile.timeout_seconds or self.settings.utility_timeout_seconds
 
         messages = [
@@ -737,12 +737,12 @@ class TaskRunner:
         ]
         response_format = {"type": "json_object"} if profile.output_mode == "json" else None
         # Utility tasks run thinking-high — hardcoded posture (see
-        # DEEPSEEK_REASONING_EFFORT in config.py). json_object (and plain text) are
-        # both compatible with thinking on DeepSeek — no utility task uses a forced
+        # OPENROUTER_REASONING_EFFORT in config.py). json_object (and plain text) are
+        # both compatible with thinking on this model — no utility task uses a forced
         # tool call. The profile cap sizes the visible output; reasoning headroom is
-        # added on top, since DeepSeek's max_tokens is shared with the CoT.
-        reasoning_effort = DEEPSEEK_REASONING_EFFORT
-        max_tokens = profile.max_output_tokens + self.settings.deepseek_thinking_headroom_tokens
+        # added on top, since max_tokens is shared with the CoT.
+        reasoning_effort = OPENROUTER_REASONING_EFFORT
+        max_tokens = profile.max_output_tokens + self.settings.thinking_headroom_tokens
         provider_request = ProviderChatRequest(
             model=model,
             messages=messages,

@@ -12,14 +12,14 @@ skill is live for the next relevant turn.
 Four separated concerns, each its own backend-only model call — the user-facing
 assistant is never told any of this exists:
 
-  gate     (DeepSeek small model) decides none / improve / create; never writes
-  build    (OpenAI GPT-5.5)       writes a new skill from a repeatable workflow
-  improve  (OpenAI GPT-5.5)       edits one existing skill from workflow evidence
+  gate     (the small main model) decides none / improve / create; never writes
+  build    (GPT-5.6 Sol)          writes a new skill from a repeatable workflow
+  improve  (GPT-5.6 Sol)          edits one existing skill from workflow evidence
   validate (deterministic)        the real skill loader is the gate to disk
 
-The gate runs on the DeepSeek chat provider (the small model), while build/improve
-run on a separate OpenAI provider (GPT-5.5) — a deliberately stronger model for the
-hard "write a whole skill" generation task. Both providers are injected.
+The gate runs on the small main model; build/improve name a deliberately stronger
+model for the hard "write a whole skill" generation task. Both reach it over the
+same injected OpenRouter provider — the split is a model id, not a second client.
 
 Every failure fails OPEN: any exception is swallowed and the turn proceeds
 untouched. Learning must never break a user's response.
@@ -42,8 +42,8 @@ from typing import Any
 import yaml
 
 from ..config import (
-    DEEPSEEK_MODEL,
-    DEEPSEEK_REASONING_EFFORT,
+    OPENROUTER_MODEL,
+    OPENROUTER_REASONING_EFFORT,
     SKILL_BUILDER_MODEL,
     SKILL_IMPROVER_MODEL,
     SKILL_LEARNING_REASONING_EFFORT,
@@ -85,7 +85,7 @@ _SECRET_PATTERNS = (
     # Vendor key/token prefixes — specific enough not to fire on ordinary prose.
     re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{16,}"),               # Anthropic
     re.compile(r"\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{16,}"),  # OpenAI project keys
-    re.compile(r"\bsk-[A-Za-z0-9]{16,}"),                      # OpenAI classic / DeepSeek
+    re.compile(r"\bsk-[A-Za-z0-9]{16,}"),                      # OpenAI classic / OpenRouter
     re.compile(r"\bsk_(?:live|test)_[A-Za-z0-9]{16,}"),        # Stripe
     re.compile(r"\bfw_[A-Za-z0-9]{20,}"),                      # Fireworks
     re.compile(r"\bAKIA[0-9A-Z]{12,}"),                        # AWS access key id
@@ -350,14 +350,12 @@ class SkillLearner:
         provider: ChatProvider,
         prompt_loader: PromptLoader,
         catalog_manager: CatalogManager,
-        builder_provider: ChatProvider | None = None,
     ) -> None:
         self.settings = settings
+        # One provider for every learning call. The gate and the builder/improver
+        # differ by MODEL (OPENROUTER_MODEL vs SKILL_BUILDER_MODEL), not by client:
+        # OpenRouter fronts both, so there is no second adapter to wire.
         self.provider = provider
-        # The gate runs on ``provider`` (DeepSeek small model); build/improve run on
-        # ``builder_provider`` (OpenAI GPT-5.5). Default to ``provider`` so a caller
-        # that injects a single provider (e.g. a test fake) still exercises both paths.
-        self.builder_provider = builder_provider if builder_provider is not None else provider
         self.prompts = prompt_loader
         self.catalog_manager = catalog_manager
         self.mode = settings.skill_learning_mode
@@ -669,22 +667,22 @@ class SkillLearner:
             f'"""\n{transcript}\n"""\n\n'
             "Return the JSON verdict now."
         )
-        # The gate stays on DeepSeek (cheap triage) and runs thinking-high — hardcoded
-        # posture (see DEEPSEEK_REASONING_EFFORT in config.py): its verdict is
+        # The gate stays on the small model (cheap triage) and runs thinking-high —
+        # hardcoded posture (see OPENROUTER_REASONING_EFFORT in config.py): its verdict is
         # json_object, which is compatible with thinking. Add reasoning headroom on
         # top of the small verdict cap, since max_tokens is shared with CoT.
         gate_max_tokens = (
             self.settings.skill_gate_max_output_tokens
-            + self.settings.deepseek_thinking_headroom_tokens
+            + self.settings.thinking_headroom_tokens
         )
         data = await self._complete_json(
-            model=DEEPSEEK_MODEL,
+            model=OPENROUTER_MODEL,
             system=system,
             user=user,
             max_tokens=gate_max_tokens,
             temperature=0.0,
             thinking_disabled=False,
-            reasoning_effort=DEEPSEEK_REASONING_EFFORT,
+            reasoning_effort=OPENROUTER_REASONING_EFFORT,
         )
         return GateVerdict.model_validate(_clamp_confidence(data))
 
@@ -711,10 +709,13 @@ class SkillLearner:
             system=system,
             user=user,
             max_tokens=self.settings.skill_build_max_output_tokens,
-            temperature=0.2,
+            # No temperature: the builder model is a reasoning model that accepts only
+            # its default, and OpenRouter's require_parameters would find NO eligible
+            # endpoint for a request carrying one. Determinism rides on the prompt and
+            # JSON mode instead.
+            temperature=None,
             thinking_disabled=False,
             reasoning_effort=SKILL_LEARNING_REASONING_EFFORT,
-            provider=self.builder_provider,
         )
         return SkillProposal.model_validate(_clamp_confidence(data))
 
@@ -765,10 +766,13 @@ class SkillLearner:
             system=system,
             user=user,
             max_tokens=self.settings.skill_build_max_output_tokens,
-            temperature=0.2,
+            # No temperature: the builder model is a reasoning model that accepts only
+            # its default, and OpenRouter's require_parameters would find NO eligible
+            # endpoint for a request carrying one. Determinism rides on the prompt and
+            # JSON mode instead.
+            temperature=None,
             thinking_disabled=False,
             reasoning_effort=SKILL_LEARNING_REASONING_EFFORT,
-            provider=self.builder_provider,
         )
         return SkillProposal.model_validate(_clamp_confidence(data))
 
@@ -779,14 +783,10 @@ class SkillLearner:
         system: str,
         user: str,
         max_tokens: int,
-        temperature: float,
+        temperature: float | None,
         thinking_disabled: bool,
         reasoning_effort: str | None,
-        provider: ChatProvider | None = None,
     ) -> dict[str, Any]:
-        # ``provider`` picks which model call this is: the gate omits it (DeepSeek small
-        # model), build/improve pass ``self.builder_provider`` (OpenAI GPT-5.5).
-        target = provider or self.provider
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -804,20 +804,17 @@ class SkillLearner:
                 timeout=self.settings.skill_learning_timeout_seconds,
             )
 
-        result = await self._complete_with_retry(_request(messages), target)
+        result = await self._complete_with_retry(_request(messages))
         try:
             return _loads_lenient(result.text)
         except (json.JSONDecodeError, ValueError):
             repair_msgs = [*messages, {"role": "user", "content": _REPAIR}]
-            repair = await self._complete_with_retry(_request(repair_msgs), target)
+            repair = await self._complete_with_retry(_request(repair_msgs))
             return _loads_lenient(repair.text)
 
-    async def _complete_with_retry(
-        self, request: ProviderChatRequest, provider: ChatProvider | None = None
-    ) -> Any:
-        target = provider or self.provider
+    async def _complete_with_retry(self, request: ProviderChatRequest) -> Any:
         return await retry_upstream(
-            lambda: target.complete(request),
+            lambda: self.provider.complete(request),
             retries=self.settings.max_upstream_retries,
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
         )

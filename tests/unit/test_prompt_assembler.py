@@ -75,7 +75,7 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
         turn={"goal": "g"},
     )
     pr = assembler.build_main_request(
-        request=req, skills=[skill], upstream_model="deepseek-v4-flash",
+        request=req, skills=[skill], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     msgs = pr.messages
     # Cache-critical layout (DeepSeek groups ALL system messages before tools +
@@ -119,7 +119,7 @@ def test_skill_bodies_precede_conversation(assembler: PromptAssembler, catalog) 
     skill = catalog.skills[0]
     pr = assembler.build_main_request(
         request=_req(messages=[{"role": "user", "content": "go"}]),
-        skills=[skill], upstream_model="deepseek-v4-flash",
+        skills=[skill], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     # Skill bodies are system-role and therefore MUST sit before the conversation
     # (DeepSeek serializes all system messages first regardless of array order —
@@ -137,7 +137,7 @@ def test_no_injected_tail_without_runtime_or_turn(assembler: PromptAssembler) ->
     # neither runtime nor turn must not synthesize a volatile tail after it.
     pr = assembler.build_main_request(
         request=_req(messages=[{"role": "user", "content": "go"}]),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert pr.messages[-1]["content"] == "go"
     assert not any((m.get("content") or "").startswith("[Injected context") for m in pr.messages)
@@ -146,7 +146,7 @@ def test_no_injected_tail_without_runtime_or_turn(assembler: PromptAssembler) ->
 def test_no_skill_block_when_set_is_empty(assembler: PromptAssembler) -> None:
     pr = assembler.build_main_request(
         request=_req(messages=[{"role": "user", "content": "go"}]),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     # Empty active set emits no loaded-skills system message (no rendered skill body).
     assert not any("## Skill 1:" in (m.get("content") or "") for m in pr.messages)
@@ -267,7 +267,7 @@ def test_integrations_never_lists_client_tools(assembler: PromptAssembler) -> No
     # request with tools but no MCP servers gets no integrations message at all.
     req = _req(tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}])
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert not any(
         m["role"] == "system" and "# Integrations" in m["content"] for m in pr.messages
@@ -278,7 +278,7 @@ def test_integrations_never_lists_client_tools(assembler: PromptAssembler) -> No
             tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}],
             runtime={"mcp_servers": [{"name": "daintree"}]},
         ),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     integrations = next(
         m["content"]
@@ -300,14 +300,14 @@ def test_integrations_neutralizes_instruction_injection(assembler: PromptAssembl
 def test_integrations_message_inserted_only_when_present(assembler: PromptAssembler) -> None:
     with_int = assembler.build_main_request(
         request=_req(runtime={"mcp_servers": [{"name": "daintree"}]}),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert any(
         m["role"] == "system" and "# Integrations" in m["content"] for m in with_int.messages
     )
     without = assembler.build_main_request(
         request=_req(),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert not any(
         m["role"] == "system" and "# Integrations" in m["content"] for m in without.messages
@@ -348,7 +348,7 @@ def test_runtime_renders_typed_worktree(assembler: PromptAssembler) -> None:
 def test_agent_roster_omits_whole_over_budget_rows_without_truncating_ids() -> None:
     settings = Settings(
         DAINTREE_API_KEY="k",
-        DEEPSEEK_API_KEY="d",
+        OPENROUTER_API_KEY="d",
         STATE_SIGNING_KEY_CURRENT="s",
         CAP_STARTUP_AGENT_BYTES=200,
     )
@@ -375,7 +375,7 @@ def test_agent_roster_omits_whole_over_budget_rows_without_truncating_ids() -> N
 def test_tool_projection(assembler: PromptAssembler) -> None:
     req = _req(tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}])
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert pr.tools is not None
     assert pr.tools[0]["function"]["name"] == "git__status"
@@ -385,33 +385,29 @@ def test_tool_projection(assembler: PromptAssembler) -> None:
 def test_main_request_params(assembler: PromptAssembler) -> None:
     req = _req(generation={"stream": True, "temperature": 0.5})
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     # Thinking is hardcoded ON for the main call (posture lives with the model ids
     # in config.py); with no forced tool_choice it runs with reasoning, and effort
     # stays at "high" — DeepSeek's floor (there is no lower thinking level than "high").
     assert pr.thinking_disabled is False
     assert pr.reasoning_effort == "high"
-    assert pr.prompt_cache_key == "daintree-main"
     assert pr.stream is True
     assert pr.include_usage is True
     assert pr.temperature == 0.5
 
 
 def test_text_response_format_never_forwarded(assembler: PromptAssembler) -> None:
-    # "text" is the upstream default and DeepSeek 400s on any response_format
-    # combined with tools — the assembler drops it entirely. Dropping it also
-    # keeps the request eligible for prompt_cache_key (the provider withholds
-    # the cache key whenever response_format is set).
+    # "text" is the upstream default and the model 400s on any response_format
+    # combined with tools — the assembler drops it entirely.
     req = _req(
         tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}],
         generation={"response_format": "text"},
     )
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert pr.response_format is None
-    assert pr.prompt_cache_key == "daintree-main"
 
 
 def test_json_object_response_format_forwarded_without_tools(
@@ -419,7 +415,7 @@ def test_json_object_response_format_forwarded_without_tools(
 ) -> None:
     req = _req(generation={"response_format": "json_object"})
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert pr.response_format == {"type": "json_object"}
 
@@ -441,7 +437,7 @@ def test_reasoning_content_replayed_verbatim_for_tool_turn(assembler: PromptAsse
         {"role": "tool", "content": "ok", "tool_call_id": "c1"},
     ])
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assistant_wire = next(m for m in pr.messages if m["role"] == "assistant")
     assert assistant_wire["reasoning_content"] == "Need today's date first."
@@ -461,7 +457,7 @@ def test_reasoning_content_dropped_for_final_answer_turn(assembler: PromptAssemb
         {"role": "user", "content": "thanks"},
     ])
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assistant_wire = next(m for m in pr.messages if m["role"] == "assistant")
     assert "reasoning_content" not in assistant_wire
@@ -474,7 +470,7 @@ def test_reasoning_content_absent_when_not_supplied(assembler: PromptAssembler) 
         {"role": "assistant", "content": "hello"},
     ])
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash",
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assistant_wire = next(m for m in pr.messages if m["role"] == "assistant")
     assert "reasoning_content" not in assistant_wire
@@ -485,21 +481,21 @@ def test_forced_tool_choice_disables_thinking(prompt_loader: PromptLoader) -> No
     # non-thinking rather than fail the turn. This is the ONLY thing that turns main
     # thinking off — the posture itself is hardcoded, not configurable.
     settings = Settings(
-        DAINTREE_API_KEY="k", DEEPSEEK_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
+        DAINTREE_API_KEY="k", OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s",
     )
     assembler = PromptAssembler(prompt_loader, settings)
     tools = [{"type": "function", "function": {"name": "git__status", "description": "d"}}]
     for choice in ("required", {"name": "git__status"}):
         pr = assembler.build_main_request(
             request=_req(tools=tools, tool_choice=choice),
-            skills=[], upstream_model="deepseek-v4-flash",
+            skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
         )
         assert pr.thinking_disabled is True, f"thinking must be off for tool_choice={choice!r}"
         assert pr.reasoning_effort is None
     # A non-forced choice ("auto") leaves thinking on.
     pr_auto = assembler.build_main_request(
         request=_req(tools=tools, tool_choice="auto"),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert pr_auto.thinking_disabled is False
 
@@ -530,7 +526,7 @@ def test_tool_schema_tuple_items_normalized_to_prefix_items(
     }
     pr = assembler.build_main_request(
         request=_req(tools=[tool], tool_choice="auto"),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     params = pr.tools[0]["function"]["parameters"]
     rng = params["properties"]["range"]
@@ -557,7 +553,7 @@ def test_tool_schema_tuple_items_normalized_when_nested(assembler: PromptAssembl
     }
     pr = assembler.build_main_request(
         request=_req(tools=[tool], tool_choice="auto"),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     tdef = pr.tools[0]["function"]["parameters"]["$defs"]["T"]
     assert tdef["prefixItems"] == [{"type": "string"}]
@@ -569,7 +565,7 @@ def test_tool_schema_without_tuple_items_is_unchanged(assembler: PromptAssembler
     tool = {"type": "function", "function": {"name": "z", "description": "", "parameters": schema}}
     pr = assembler.build_main_request(
         request=_req(tools=[tool], tool_choice="auto"),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert pr.tools[0]["function"]["parameters"] == schema
 
@@ -578,7 +574,7 @@ def _project(assembler: PromptAssembler, schema: dict) -> dict:
     tool = {"type": "function", "function": {"name": "t", "description": "", "parameters": schema}}
     pr = assembler.build_main_request(
         request=_req(tools=[tool], tool_choice="auto"),
-        skills=[], upstream_model="deepseek-v4-flash",
+        skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     return pr.tools[0]["function"]["parameters"]
 
@@ -739,7 +735,7 @@ def test_image_part_survives_to_the_wire(assembler: PromptAssembler) -> None:
         ]
     )
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash"
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731"
     )
     parts = next(m["content"] for m in pr.messages if isinstance(m.get("content"), list))
     assert parts[0] == {"type": "text", "text": "what is this?"}
@@ -761,7 +757,7 @@ def test_image_part_without_detail_omits_the_key(assembler: PromptAssembler) -> 
         ]
     )
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash"
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731"
     )
     parts = next(m["content"] for m in pr.messages if isinstance(m.get("content"), list))
     assert parts[0]["image_url"] == {"url": "data:image/png;base64,BBBB"}
@@ -773,7 +769,7 @@ def test_oversized_text_part_is_capped_not_dropped(
     long_text = "x" * (settings.cap_message_text_part + 500)
     req = _req(messages=[{"role": "user", "content": [{"type": "text", "text": long_text}]}])
     pr = assembler.build_main_request(
-        request=req, skills=[], upstream_model="deepseek-v4-flash"
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731"
     )
     parts = next(m["content"] for m in pr.messages if isinstance(m.get("content"), list))
     assert parts[0]["type"] == "text"

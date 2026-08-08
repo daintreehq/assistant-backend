@@ -1,20 +1,30 @@
-"""The DeepSeek provider adapter (OpenAI-compatible wire format).
+"""The OpenRouter provider adapter (OpenAI-compatible wire format).
 
-Translates the normalized :class:`ProviderChatRequest` to DeepSeek's
+Translates the normalized :class:`ProviderChatRequest` to OpenRouter's
 ``/chat/completions`` API and maps upstream failures to Daintree errors. A
 single process-wide ``httpx.AsyncClient`` is injected; a client is never built
 per request.
 
-DeepSeek speaks the OpenAI wire shape, so most of this mirrors any
-OpenAI-compatible adapter. The one provider-specific detail is reasoning control:
-DeepSeek uses a ``thinking`` object (``{"type": "disabled"}`` /
-``{"type": "enabled"}``) plus an optional ``reasoning_effort`` tier, NOT a flat
-``reasoning_effort`` field. Thinking must be DISABLED for ANY forced tool_choice
-("Thinking mode does not support this tool_choice") — json_object output and
-non-forced (auto/none) tool calling are both fine with thinking on — and DeepSeek
-defaults thinking ON when the field is absent, so the directive is sent explicitly
-on every call. ``send_thinking=False`` drops it entirely for a provider/model that
-does not understand the field. See ``_build_body``.
+OpenRouter is a router, not a model host: it fronts ~24 independent endpoints
+serving the same DeepSeek V4 Flash weights, and the ``provider`` block on every
+request is what decides which one answers (see ``_PROVIDER_ROUTING``). Three
+OpenRouter-specific details separate this from a direct-to-DeepSeek adapter:
+
+* **Reasoning control** is OpenRouter's unified ``reasoning`` object
+  (``{"enabled": false}`` / ``{"effort": "high"}``), NOT DeepSeek's native
+  ``thinking`` object — OpenRouter translates it to whatever the winning endpoint
+  speaks. It is sent explicitly on every call because a reasoning model's default
+  is ON, and the explicit disable is what keeps the non-thinking selector
+  non-thinking. ``send_reasoning=False`` drops it for a model that has no
+  reasoning mode at all.
+* **Chain-of-thought is called ``reasoning``** on the OpenRouter wire, while the
+  Daintree contract (and the CLI) speak ``reasoning_content``. The rename is
+  confined to this adapter — outbound in ``_rewrite_messages``, inbound in
+  ``_normalize_choices`` — so nothing above the provider boundary knows.
+* **No ``prompt_cache_key``**: no endpoint for this model advertises it, and with
+  ``require_parameters`` on, sending an unadvertised parameter can empty the
+  eligible-endpoint pool. Prefix caching is implicit at whichever endpoint serves
+  the request.
 """
 
 from __future__ import annotations
@@ -46,7 +56,7 @@ from .sse import (
     validate_message_shape,
 )
 
-logger = get_logger("daintree.deepseek")
+logger = get_logger("daintree.openrouter")
 
 _CHAT_PATH = "/chat/completions"
 
@@ -55,11 +65,51 @@ _CHAT_PATH = "/chat/completions"
 # without dumping an unbounded payload into logs or the client error message.
 _ERROR_DETAIL_CAP = 400
 
+# Attribution headers. OpenRouter uses them for its public model/app rankings;
+# they carry no auth weight and are safe to send on every call.
+_REFERER = "https://daintree.dev"
+_APP_TITLE = "Daintree Assistant"
+
+# Endpoint-selection policy, sent on EVERY request. Hardcoded like the model ids
+# and the thinking posture (config.py): there is one optimum and the server ships
+# it. Two product decisions are encoded here.
+#
+# THROUGHPUT FIRST. ``sort: "throughput"`` ranks the eligible endpoints by
+# measured tokens/second and takes the fastest — explicitly at the cost of price,
+# and it disables OpenRouter's default price-weighted load balancing. This is the
+# right trade for an interactive assistant: the turn's wall-clock is dominated by
+# generation, and this model is cheap enough that a 40% price delta is noise next
+# to a 2x speed one. Selection is automatic and re-evaluated per request, so a
+# newly-faster endpoint is picked up with no code change.
+#
+# PRIVACY FLOOR. ``data_collection: "deny"`` restricts routing to endpoints that
+# do not store or train on request data — the pool is filtered FIRST, then sorted,
+# so throughput never buys its speed with user prompts. (The stricter
+# ``"zdr": True`` — zero on-disk retention, not merely no training — is a
+# one-key escalation here if it is ever wanted; it narrows the pool further, so
+# it is off until measured.)
+#
+# ``require_parameters`` drops endpoints that would silently ignore something we
+# sent. It matters most for the json_object calls (selector, utility tasks):
+# several otherwise-fast endpoints for this model do not implement
+# ``response_format``, and without this they would answer with unconstrained prose
+# that fails our parse. Per-request, so a plain chat turn still reaches them.
+#
+# ``allow_fallbacks`` keeps the next-fastest compliant endpoint available when the
+# winner is down. With filters this strict, turning it off would make any single
+# outage a hard 404/503 ("No allowed providers are available").
+_PROVIDER_ROUTING: dict[str, Any] = {
+    "sort": "throughput",
+    "data_collection": "deny",
+    "require_parameters": True,
+    "allow_fallbacks": True,
+}
+
 
 def _extract_upstream_error(body: bytes | str | None) -> str | None:
     """Pull a short human-readable reason out of an upstream error body.
 
-    DeepSeek returns ``{"error": {"message": "...", ...}}`` on a 4xx/5xx. That
+    OpenRouter returns ``{"error": {"message": "...", ...}}`` on a 4xx/5xx. That
     message is the single most useful diagnostic for a malformed request, so we
     surface it rather than discard it. Best-effort: any parse failure falls back to
     the raw (capped) text, and an empty body yields ``None``.
@@ -83,6 +133,55 @@ def _extract_upstream_error(body: bytes | str | None) -> str | None:
     return raw[:_ERROR_DETAIL_CAP]
 
 
+def _rewrite_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rename outbound ``reasoning_content`` to OpenRouter's ``reasoning``.
+
+    The assembler replays an assistant tool-call turn's chain-of-thought so the
+    model can continue the reasoning that produced those calls. OpenRouter's
+    normalized name for it is ``reasoning`` (it re-encodes it into whatever the
+    winning endpoint speaks); an unrecognized ``reasoning_content`` would simply be
+    dropped, silently losing the context rather than erroring. Copy-on-write: only
+    the messages that actually carry the field are rebuilt, so the byte-stable
+    prefix the prompt cache depends on is untouched everywhere else.
+    """
+    out: list[dict[str, Any]] = []
+    for msg in messages:
+        cot = msg.get("reasoning_content")
+        if cot is None:
+            out.append(msg)
+            continue
+        rewritten = {k: v for k, v in msg.items() if k != "reasoning_content"}
+        rewritten["reasoning"] = cot
+        out.append(rewritten)
+    return out
+
+
+def _normalize_choices(choices: Any, key: str) -> None:
+    """Rename inbound ``reasoning`` back to ``reasoning_content``, in place.
+
+    ``key`` is ``"message"`` (non-streaming) or ``"delta"`` (streaming). Everything
+    above the provider boundary — the orchestrator, the SSE contract, the CLI —
+    speaks ``reasoning_content``, so the OpenRouter spelling stops here. A
+    non-string value is dropped rather than renamed: the shape validators
+    guarantee ``reasoning_content`` is a string when present, and this runs
+    outside their reach.
+    """
+    if not isinstance(choices, list):
+        return
+    for choice in choices:
+        if not isinstance(choice, dict):
+            continue
+        part = choice.get(key)
+        if not isinstance(part, dict) or "reasoning" not in part:
+            continue
+        value = part.pop("reasoning")
+        # reasoning_details (the structured/encrypted variant) is deliberately not
+        # consumed: the plaintext field is the documented equivalent for replay,
+        # and it is the one the Daintree contract already carries.
+        if isinstance(value, str) and part.get("reasoning_content") is None:
+            part["reasoning_content"] = value
+
+
 def _looks_rate_limited(err: dict[str, Any]) -> bool:
     blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
     return any(
@@ -97,8 +196,8 @@ def map_stream_error(err: dict[str, Any]) -> DaintreeError:
     return upstream_error("The upstream model stream reported an error.")
 
 
-class DeepSeekStream(ProviderStream):
-    """An open DeepSeek SSE stream yielding OpenAI-shaped chunk dicts."""
+class OpenRouterStream(ProviderStream):
+    """An open OpenRouter SSE stream yielding OpenAI-shaped chunk dicts."""
 
     def __init__(self, stream_ctx: Any, response: httpx.Response, model: str) -> None:
         self._ctx = stream_ctx
@@ -165,12 +264,13 @@ class DeepSeekStream(ProviderStream):
             raise map_stream_error(chunk["error"])
         if chunk.get("usage"):
             self.usage = ProviderUsage.from_wire(chunk["usage"])
+        _normalize_choices(chunk.get("choices"), "delta")
         return chunk
 
     async def prefetch_first_event(self) -> dict[str, Any] | None:
         return await self._read_one()
 
-    def __aiter__(self) -> DeepSeekStream:
+    def __aiter__(self) -> OpenRouterStream:
         return self
 
     async def __anext__(self) -> dict[str, Any]:
@@ -187,26 +287,24 @@ class DeepSeekStream(ProviderStream):
             await self._ctx.__aexit__(None, None, None)
 
 
-class DeepSeekProvider:
-    """A :class:`ChatProvider` backed by the DeepSeek hosted API."""
+class OpenRouterProvider:
+    """A :class:`ChatProvider` backed by the OpenRouter hosted API."""
 
     def __init__(
         self,
         client: httpx.AsyncClient,
         *,
         api_key: str,
-        base_url: str = "https://api.deepseek.com",
+        base_url: str = "https://openrouter.ai/api/v1",
         default_timeout: float = 60.0,
-        send_prompt_cache_key: bool = True,
-        send_thinking: bool = True,
+        send_reasoning: bool = True,
         dump_dir: str | None = None,
     ) -> None:
         self._client = client
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._default_timeout = default_timeout
-        self._send_prompt_cache_key = send_prompt_cache_key
-        self._send_thinking = send_thinking
+        self._send_reasoning = send_reasoning
         # Dev-only diagnostic (Settings.dump_upstream_dir, gated out of production
         # by readiness): when set, every upstream request body is written there as
         # numbered pretty-printed JSON. This is THE tool for prompt-cache forensics
@@ -239,12 +337,14 @@ class DeepSeekProvider:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream" if stream else "application/json",
+            "HTTP-Referer": _REFERER,
+            "X-Title": _APP_TITLE,
         }
 
     def _build_body(self, request: ProviderChatRequest, *, stream: bool) -> dict[str, Any]:
         body: dict[str, Any] = {
             "model": request.model,
-            "messages": request.messages,
+            "messages": _rewrite_messages(request.messages),
         }
         if request.tools:
             body["tools"] = request.tools
@@ -258,26 +358,23 @@ class DeepSeekProvider:
             body["response_format"] = request.response_format
         if request.stop:
             body["stop"] = request.stop
-        if self._send_thinking:
+        if self._send_reasoning:
             if request.thinking_disabled:
-                # An explicit disable is mandatory: DeepSeek defaults thinking ON when
-                # the field is absent, which would 400 any forced tool_choice call.
-                body["thinking"] = {"type": "disabled"}
+                # An explicit disable is mandatory: a reasoning model reasons by
+                # default when the field is absent, and the non-thinking selector's
+                # whole latency argument depends on it actually being off.
+                body["reasoning"] = {"enabled": False}
             else:
-                # Thinking mode: the model emits a chain-of-thought (returned via
-                # reasoning_content) before the answer. reasoning_effort tunes the
-                # depth; DeepSeek remaps low/medium -> high and xhigh -> max. When it
-                # is unset we omit the tier and let the provider default apply.
-                body["thinking"] = {"type": "enabled"}
+                # Reasoning mode: the model emits a chain-of-thought (returned as
+                # `reasoning`, renamed to reasoning_content on the way back out)
+                # before the answer. `effort` tunes the depth; with no tier we send
+                # a bare enable and let the endpoint's default apply. `effort` and
+                # `max_tokens` are mutually exclusive here — only `effort` is used.
                 if request.reasoning_effort:
-                    body["reasoning_effort"] = request.reasoning_effort
-        # prompt cache key is only valid for plain chat/stream (not json mode).
-        if (
-            self._send_prompt_cache_key
-            and request.prompt_cache_key
-            and request.response_format is None
-        ):
-            body["prompt_cache_key"] = request.prompt_cache_key
+                    body["reasoning"] = {"effort": request.reasoning_effort}
+                else:
+                    body["reasoning"] = {"enabled": True}
+        body["provider"] = _PROVIDER_ROUTING
         if stream:
             body["stream"] = True
             if request.include_usage:
@@ -315,6 +412,15 @@ class DeepSeekProvider:
         # upstream_http_error entry already carries the full body).
         if status in (401, 402, 403):
             return upstream_error("The upstream provider rejected this server's credentials.")
+        # OpenRouter-specific: 404 on a chat completion is routing, not a bad URL —
+        # no endpoint satisfied `_PROVIDER_ROUTING` (privacy filter plus
+        # require_parameters can empty the pool for an unusual parameter mix). Name
+        # it, because the generic "rejected the request" reads as a malformed body
+        # and sends the reader hunting in entirely the wrong place.
+        if status == 404:
+            return upstream_error(
+                "No upstream endpoint matched this server's provider-routing policy."
+            )
         # Any other 4xx means the upstream rejected OUR request as malformed: permanent
         # (never retried) and almost always a server-side bug in what we sent. Carry
         # the upstream's own reason through so the failure is diagnosable instead of
@@ -327,6 +433,7 @@ class DeepSeekProvider:
         # (e.g. `{}` or `""`) must fail the guard rather than be coerced to empty.
         raw_choices = data.get("choices")
         choices = [] if raw_choices is None else raw_choices
+        _normalize_choices(choices, "message")
         # Structural guard mirroring the STREAM path exactly (shared validator), so the
         # same malformed upstream produces the same 502 on both paths. Consumers index
         # straight into choices[0]["message"] and read content/tool_calls off it, so a
@@ -399,10 +506,11 @@ class DeepSeekProvider:
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             stream=False,
-            # A forced tool_choice is incompatible with thinking on DeepSeek
-            # ("Thinking mode does not support this tool_choice") — pin it
-            # non-thinking regardless of what the caller requested, so a forced call
-            # can never 400 on a thinking directive.
+            # DeepSeek rejects a forced tool_choice under thinking ("Thinking mode
+            # does not support this tool_choice"). OpenRouter may route around the
+            # endpoint that enforces it, but the constraint is the model's, not the
+            # router's, so pin the call non-thinking regardless of what the caller
+            # requested rather than gamble the turn on which endpoint answers.
             thinking_disabled=True,
             reasoning_effort=None,
             timeout=request.timeout,
@@ -456,7 +564,7 @@ class DeepSeekProvider:
                 detail=detail,
             )
             raise self._map_http_error(response.status_code, response.headers, detail)
-        return DeepSeekStream(ctx, response, request.model)
+        return OpenRouterStream(ctx, response, request.model)
 
     async def aclose(self) -> None:
         await self._client.aclose()

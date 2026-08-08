@@ -1,7 +1,8 @@
 """Assemble the cache-aware upstream main-model request.
 
-DeepSeek serializes every system message before tools and non-system messages, so only
-stable content may use the system role. The effective order is:
+The DeepSeek chat template serializes every system message before tools and non-system
+messages (unchanged by routing through OpenRouter — it is the model's template, not the
+API's), so only stable content may use the system role. The effective order is:
 
 1. base → integrations → active skill bodies → response contract (stable system region)
 2. tool schemas
@@ -20,7 +21,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
-from ..config import DEEPSEEK_REASONING_EFFORT, Settings
+from ..config import OPENROUTER_REASONING_EFFORT, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import (
     AgentSnapshot,
@@ -520,10 +521,12 @@ class PromptAssembler:
         if msg.tool_calls:
             wire["tool_calls"] = [self._tool_call_to_wire(tc) for tc in msg.tool_calls]
         # Replay the model's prior chain-of-thought verbatim, but ONLY on assistant
-        # turns that performed tool calls — DeepSeek REQUIRES it there (else a 400)
-        # and ignores it everywhere else. On a completed final-answer turn (no
-        # tool_calls) replaying it is pure prompt cost, so it is dropped. When
-        # forwarded it is the model's own output, never transformed.
+        # turns that performed tool calls — that is where it earns its tokens, letting
+        # the model continue the reasoning that produced those calls instead of
+        # re-deriving it. On a completed final-answer turn (no tool_calls) replaying it
+        # is pure prompt cost, so it is dropped. When forwarded it is the model's own
+        # output, never transformed; the provider adapter renames the field to
+        # OpenRouter's `reasoning` on the way out.
         if msg.role == "assistant" and msg.tool_calls and msg.reasoning_content is not None:
             wire["reasoning_content"] = msg.reasoning_content
         return wire
@@ -551,13 +554,13 @@ class PromptAssembler:
 
     @staticmethod
     def _normalize_tool_schema(schema: Any) -> Any:
-        """Rewrite a client tool's JSON Schema into the draft 2020-12 shape DeepSeek
-        validates against.
+        """Rewrite a client tool's JSON Schema into the draft 2020-12 shape the
+        upstream validates against.
 
         Client tools are authored by the CLI and may target an OLDER JSON Schema draft
         (draft-07 and earlier), where an array-valued ``items`` means tuple validation.
         Draft 2020-12 forbids that — tuple item schemas must live under ``prefixItems``
-        — and DeepSeek rejects the ENTIRE request with a 400 if any one tool schema
+        — and the upstream rejects the ENTIRE request with a 400 if any one tool schema
         uses the legacy form, sinking the whole turn (an opaque 502 to the user). So a
         single legacy tool must not be able to break generation: convert array ``items``
         to ``prefixItems`` (folding draft-07 ``additionalItems`` into 2020-12 ``items``)
@@ -622,7 +625,8 @@ class PromptAssembler:
     def _is_forced_tool_choice(tool_choice: Any) -> bool:
         """A forced tool_choice ("required" or a named tool) is incompatible with
         DeepSeek thinking mode — the same constraint that keeps the selector
-        non-thinking. "auto"/"none"/absent are fine."""
+        non-thinking. It is the model's constraint, not the router's, so it holds
+        however OpenRouter routes the call. "auto"/"none"/absent are fine."""
         if isinstance(tool_choice, RespondToolChoice):
             return True
         return bool(tool_choice == "required")
@@ -636,18 +640,20 @@ class PromptAssembler:
         skills: list[Skill],
         upstream_model: str,
     ) -> ProviderChatRequest:
-        """Assemble the upstream request so DeepSeek's prefix cache covers the base
+        """Assemble the upstream request so the upstream prefix cache covers the base
         prompt, the integration surface, the skill bodies, the tool schemas, and the
         append-only conversation.
 
-        CACHE-CRITICAL LAYOUT (measured 2026-07-08, latency benchmark): DeepSeek
-        serializes the prompt as [ALL system messages, in array order] → [tools] →
-        [non-system conversation]. A system message ANYWHERE in the array therefore
-        lands in the leading system region, BEFORE the ~18k-token tool schemas and
-        the conversation. The old layout put the volatile runtime/turn context after
-        the conversation as system messages — DeepSeek hoisted them into the system
-        region, so every new session (and any mid-turn roster change) re-encoded
-        tools + conversation: ~36% cache hit on identical back-to-back turns. The
+        CACHE-CRITICAL LAYOUT (measured 2026-07-08, latency benchmark, against
+        DeepSeek directly; the template is the model's, so it survives the move to
+        OpenRouter): the prompt serializes as [ALL system messages, in array order] →
+        [tools] → [non-system conversation]. A system message ANYWHERE in the array
+        therefore lands in the leading system region, BEFORE the ~18k-token tool
+        schemas and the conversation. The old layout put the volatile runtime/turn
+        context after the conversation as system messages — the template hoisted them
+        into the system region, so every new session (and any mid-turn roster change)
+        re-encoded tools + conversation: ~36% cache hit on identical back-to-back
+        turns. The
         rule that follows: ONLY stable content may use role "system"; per-request
         variable context must ride a NON-system role at the very end, where it costs
         exactly its own tokens.
@@ -671,14 +677,14 @@ class PromptAssembler:
         if skills:
             messages.append({"role": "system", "content": self.render_loaded_skills(skills)})
         # 4. response contract: static output-shape rules → part of the stable
-        #    system prefix. (DeepSeek serialized it before the conversation even
+        #    system prefix. (It serialized before the conversation even
         #    when the array placed it last, so this costs no "nearness to
         #    generation" that ever actually existed.)
         contract = self.render_response_contract()
         if contract.strip():
             messages.append({"role": "system", "content": contract})
         # 5. session-stable project/agent/instruction data. It is a user-role
-        #    data row so DeepSeek leaves it after tools, but it sits before the
+        #    data row so the template leaves it after tools, but it sits before the
         #    append-only conversation and is structurally absent from selector /
         #    learner inputs.
         startup = self.render_startup_context(request.startup)
@@ -711,9 +717,8 @@ class PromptAssembler:
             messages.append({"role": "user", "content": framed})
 
         # "text" is the upstream default, so forwarding it is a no-op — except that
-        # DeepSeek rejects ANY response_format alongside tools ("You cannot specify
-        # response format and function call at the same time") and the provider
-        # withholds prompt_cache_key when response_format is set. Only "json_object"
+        # the model rejects ANY response_format alongside tools ("You cannot specify
+        # response format and function call at the same time"). Only "json_object"
         # changes behavior, and validation rejects that in combination with tools.
         response_format = None
         if gen.response_format == "json_object":
@@ -723,7 +728,7 @@ class PromptAssembler:
         # ids in config.py; the selector is the one non-thinking exception). Force
         # it off here only when the request pins a tool_choice: DeepSeek 400s on
         # thinking + forced tool_choice, so degrade to non-thinking rather than
-        # fail the turn.
+        # gamble the turn on which OpenRouter endpoint enforces it.
         thinking_enabled = not self._is_forced_tool_choice(request.input.tool_choice)
 
         # max_tokens policy: fill the default when the client omits one, then clamp to a
@@ -750,7 +755,6 @@ class PromptAssembler:
             # above). When enabled, reasoning_content round-trips through the wire
             # contract so tool-call turns can replay it. Thinking ignores temperature/top_p.
             thinking_disabled=not thinking_enabled,
-            reasoning_effort=DEEPSEEK_REASONING_EFFORT if thinking_enabled else None,
-            prompt_cache_key=PROMPT_CACHE_KEY,
+            reasoning_effort=OPENROUTER_REASONING_EFFORT if thinking_enabled else None,
             timeout=self.settings.main_timeout_seconds,
         )

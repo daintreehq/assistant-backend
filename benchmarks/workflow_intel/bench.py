@@ -65,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run against live DeepSeek")
     run.add_argument("--trials", type=int, default=1, help="trials per case (default 1)")
     run.add_argument("--filter", help="substring filter on case id/category")
-    run.add_argument("--env-file", help="path to a .env with DEEPSEEK_API_KEY")
+    run.add_argument("--env-file", help="path to a .env with OPENROUTER_API_KEY")
     run.add_argument("--out", help="explicit output JSON path")
     run.add_argument("--no-save", action="store_true")
     run.set_defaults(func=_cmd_run)

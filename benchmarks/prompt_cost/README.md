@@ -2,7 +2,7 @@
 
 The deterministic scoreboard for the whole cost/latency story, plus a live
 cross-check. Drives the REAL `PromptAssembler.build_main_request` and the EXACT
-bytes `DeepSeekProvider` would POST.
+bytes `OpenRouterProvider` would POST.
 
 ```bash
 python -m benchmarks.prompt_cost.bench run              # deterministic (free, CI-able)

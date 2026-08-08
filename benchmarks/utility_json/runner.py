@@ -26,14 +26,14 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from daintree_assistant_server.config import DEEPSEEK_MODEL
+from daintree_assistant_server.config import OPENROUTER_MODEL
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.task_runner import build_profiles
 
 from .._harness.cases import CaseError, load_yaml_cases
 from .._harness.counting import CountingProvider
-from .._harness.env import build_settings, make_deepseek_provider
+from .._harness.env import build_settings, make_upstream_provider
 from .._harness.stats import latency_summary
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
@@ -161,7 +161,7 @@ async def run_bench(
     configure_logging("WARNING")
     settings = build_settings(env_file)
     cases = load_cases(id_filter)
-    inner = make_deepseek_provider(settings, timeout=settings.utility_timeout_seconds)
+    inner = make_upstream_provider(settings, timeout=settings.utility_timeout_seconds)
     provider = CountingProvider(inner)
     container = build_container(settings, provider=provider)
     runner = container.task_runner
@@ -180,7 +180,7 @@ async def run_bench(
         "meta": {
             "benchmark": "utility_json",
             "mode": "live",
-            "model": DEEPSEEK_MODEL,
+            "model": OPENROUTER_MODEL,
             "trials": trials,
             "started_at": started_at.isoformat(timespec="seconds"),
             "finished_at": finished_at.isoformat(timespec="seconds"),

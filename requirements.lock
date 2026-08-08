@@ -20,7 +20,6 @@ jiter==0.16.0
 librt==0.11.0
 MarkupSafe==3.0.3
 mypy==2.1.0
-openai==2.44.0
 pathspec==1.1.1
 pydantic-settings==2.14.2
 pydantic==2.13.4

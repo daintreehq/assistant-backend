@@ -12,7 +12,7 @@ import pytest
 from fakes import FakeProvider, make_result, make_text_chunks
 
 from daintree_assistant_server.config import (
-    DEEPSEEK_MODEL,
+    OPENROUTER_MODEL,
     SKILL_BUILDER_MODEL,
     SKILL_IMPROVER_MODEL,
     Settings,
@@ -173,7 +173,7 @@ def _settings(
         extra["SKILL_LEARNING_CONTEXT_TOKENS"] = context_tokens
     return Settings(
         DAINTREE_API_KEY="k",
-        DEEPSEEK_API_KEY="fw",
+        OPENROUTER_API_KEY="fw",
         STATE_SIGNING_KEY_CURRENT="s",
         RETRY_BACKOFF_BASE_SECONDS=0.0,
         SKILL_LEARNING_MODE=mode,
@@ -286,18 +286,18 @@ async def test_create_overlay_dir(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_uses_gpt55_builder_model_with_reasoning(tmp_path: Path) -> None:
+async def test_create_uses_stronger_builder_model_with_reasoning(tmp_path: Path) -> None:
     # Regression guard for the model split (see config.py): the gate runs on the
-    # DeepSeek small model (thinking-high by default now), while the builder runs on
-    # GPT-5.5 WITH reasoning at the configured effort. The fake records every request,
-    # so a silent regression back to the small model (or reasoning off) for the builder
-    # is caught.
-    assert SKILL_BUILDER_MODEL == "gpt-5.5"
+    # small main model (thinking-high by default now), while the builder runs on the
+    # stronger reasoning model at the configured effort. The fake records every
+    # request, so a silent regression back to the small model (or reasoning off) for
+    # the builder is caught.
+    assert SKILL_BUILDER_MODEL == "openai/gpt-5.6-sol"
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake)
     await learner.run(request=_request(), active_ids=[])
 
-    gate_reqs = [r for r in fake.requests if r.model == DEEPSEEK_MODEL]
+    gate_reqs = [r for r in fake.requests if r.model == OPENROUTER_MODEL]
     build_reqs = [r for r in fake.requests if r.model == SKILL_BUILDER_MODEL]
     assert gate_reqs and all(r.thinking_disabled is False for r in gate_reqs)
     assert all(r.reasoning_effort == "high" for r in gate_reqs)
@@ -306,8 +306,8 @@ async def test_create_uses_gpt55_builder_model_with_reasoning(tmp_path: Path) ->
 
 
 @pytest.mark.asyncio
-async def test_improve_uses_gpt55_improver_model_with_reasoning(tmp_path: Path) -> None:
-    assert SKILL_IMPROVER_MODEL == "gpt-5.5"
+async def test_improve_uses_stronger_improver_model_with_reasoning(tmp_path: Path) -> None:
+    assert SKILL_IMPROVER_MODEL == "openai/gpt-5.6-sol"
     fake = _provider(GATE_IMPROVE, PROPOSAL_IMPROVE)
     learner, _, _ = _learner(tmp_path, fake, with_target=True)
     await learner.run(request=_request(), active_ids=["daintree.test.target"])
@@ -318,32 +318,34 @@ async def test_improve_uses_gpt55_improver_model_with_reasoning(tmp_path: Path) 
 
 
 @pytest.mark.asyncio
-async def test_gate_and_builder_use_separate_providers(tmp_path: Path) -> None:
-    # The gate runs on `provider` (DeepSeek small model); build/improve run on the
-    # distinct `builder_provider` (OpenAI GPT-5.5). Wire two fakes and assert the
-    # gate call lands on one and the builder call on the other.
-    gate_fake = FakeProvider()
-    gate_fake.complete_result = lambda _req: make_result(content=json.dumps(GATE_CREATE))
-    builder_fake = FakeProvider()
-    builder_fake.complete_result = lambda _req: make_result(content=json.dumps(PROPOSAL_CREATE))
-
-    primary = _primary(tmp_path)
-    settings = _settings(tmp_path)
-    manager = CatalogManager(load_catalog(primary), primary_dir=primary)
-    learner = SkillLearner(
-        settings=settings,
-        provider=gate_fake,
-        prompt_loader=_loader(),
-        catalog_manager=manager,
-        builder_provider=builder_fake,
-    )
+async def test_gate_and_builder_share_one_provider_and_differ_by_model(
+    tmp_path: Path,
+) -> None:
+    # Both tiers reach OpenRouter over the SAME client; the only thing that differs
+    # is the model each names. Assert one provider sees both, in order — a second
+    # adapter creeping back in would break this.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    learner, _, _ = _learner(tmp_path, fake)
     outcome = await learner.run(request=_request(), active_ids=[])
 
     assert outcome.changed is True
-    assert [r.model for r in gate_fake.requests] == [DEEPSEEK_MODEL]
-    assert builder_fake.requests and all(
-        r.model == SKILL_BUILDER_MODEL for r in builder_fake.requests
-    )
+    assert [r.model for r in fake.requests] == [OPENROUTER_MODEL, SKILL_BUILDER_MODEL]
+
+
+@pytest.mark.asyncio
+async def test_builder_sends_no_temperature(tmp_path: Path) -> None:
+    # The builder model accepts only its default temperature, and it does not
+    # advertise the parameter at all — with OpenRouter's require_parameters on, a
+    # request carrying one matches NO endpoint and hard-fails the routing rather
+    # than degrading. The gate (small model) is unaffected and keeps its 0.0.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    learner, _, _ = _learner(tmp_path, fake)
+    await learner.run(request=_request(), active_ids=[])
+
+    build_reqs = [r for r in fake.requests if r.model == SKILL_BUILDER_MODEL]
+    assert build_reqs and all(r.temperature is None for r in build_reqs)
+    gate_reqs = [r for r in fake.requests if r.model == OPENROUTER_MODEL]
+    assert gate_reqs and all(r.temperature == 0.0 for r in gate_reqs)
 
 
 def test_render_markdown_keeps_long_scalars_on_one_line() -> None:
@@ -1059,7 +1061,7 @@ async def test_learns_after_completed_turn(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     orch, manager, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    outcome = await orch.complete(_request(), upstream_model=DEEPSEEK_MODEL)
+    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL)
     assert outcome.body is not None
     # The main completion returned its normal reply straight away...
     assert outcome.body["message"]["content"] == "ok"
@@ -1107,7 +1109,7 @@ async def test_learner_skipped_when_turn_ends_in_tool_calls(tmp_path: Path) -> N
     fake.complete_result = _complete
     orch, _, primary = _orchestrator_with_learner(tmp_path, fake)
 
-    outcome = await orch.complete(_request(), upstream_model=DEEPSEEK_MODEL)
+    outcome = await orch.complete(_request(), upstream_model=OPENROUTER_MODEL)
     assert outcome.body is not None
     await orch.drain_background_tasks()  # nothing was spawned; a no-op
 
@@ -1132,7 +1134,7 @@ async def test_learns_after_streamed_completion(tmp_path: Path) -> None:
             "generation": {"stream": True},
         }
     )
-    outcome = await orch.complete(req, upstream_model=DEEPSEEK_MODEL)
+    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL)
     assert outcome.stream is not None
     async for _event in outcome.stream:  # drain the SSE stream to completion
         pass
@@ -1185,7 +1187,7 @@ async def test_learner_skipped_when_streamed_turn_ends_in_tool_calls(tmp_path: P
             "generation": {"stream": True},
         }
     )
-    outcome = await orch.complete(req, upstream_model=DEEPSEEK_MODEL)
+    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL)
     assert outcome.stream is not None
     async for _event in outcome.stream:
         pass

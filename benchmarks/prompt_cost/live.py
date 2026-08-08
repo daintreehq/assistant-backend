@@ -26,10 +26,10 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from daintree_assistant_server.config import DEEPSEEK_MODEL, Settings
+from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 
-from .._harness.env import make_deepseek_provider
+from .._harness.env import make_upstream_provider
 from .._harness.fixtures import build_respond_request
 from .._harness.stats import latency_summary
 
@@ -49,7 +49,7 @@ async def _prompt_request(
     if json_mode:
         gen = req.generation.model_copy(update={"response_format": "json_object"})
         req = req.model_copy(update={"generation": gen})
-    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=DEEPSEEK_MODEL)
+    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=OPENROUTER_MODEL)
     pr.max_tokens = 8  # bound completion cost; prompt tokens are the measurement
     pr.stream = stream
     pr.include_usage = stream
@@ -100,7 +100,7 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
     the selector cost attributed separately."""
     from daintree_assistant_server.main import build_container
 
-    provider = make_deepseek_provider(settings, timeout=settings.main_timeout_seconds)
+    provider = make_upstream_provider(settings, timeout=settings.main_timeout_seconds)
     container = build_container(settings, provider=provider)
     first_byte: list[float] = []
     try:
@@ -113,7 +113,7 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
                 turn_id=f"turn-{i}",
             )
             t0 = time.perf_counter()
-            outcome = await container.orchestrator.complete(req, upstream_model=DEEPSEEK_MODEL)
+            outcome = await container.orchestrator.complete(req, upstream_model=OPENROUTER_MODEL)
             assert outcome.stream is not None
             async for _chunk in outcome.stream:
                 first_byte.append(time.perf_counter() - t0)
@@ -133,7 +133,7 @@ async def run_live(settings: Settings, *, trials: int = 3) -> dict[str, Any]:
     from daintree_assistant_server.observability import configure_logging
 
     configure_logging("WARNING")  # keep the benchmark's stdout to the report only
-    provider = make_deepseek_provider(settings, timeout=settings.main_timeout_seconds)
+    provider = make_upstream_provider(settings, timeout=settings.main_timeout_seconds)
     warm_cases: list[dict[str, Any]] = []
     try:
         warm_cases.append(await _warm_pair(
@@ -153,7 +153,7 @@ async def run_live(settings: Settings, *, trials: int = 3) -> dict[str, Any]:
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "live",
-            "model": DEEPSEEK_MODEL,
+            "model": OPENROUTER_MODEL,
             "trials": trials,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },
