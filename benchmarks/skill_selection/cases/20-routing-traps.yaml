@@ -216,9 +216,11 @@ cases:
       Trap coverage for daintree.workflow.follow-up-on-issue. The request is worded as a
       relay to a running implementer, which is relay-review-feedback's exact trigger — but
       that skill's source is a reviewer AGENT's terminal, and here the user says the notes
-      are on the forge and nobody has fetched them. So the feedback has to be READ off the
-      PR first, which is follow-up-on-issue's job. "Don't leave a watcher" also excludes
-      watch-outcome, and nothing is being committed or pushed.
+      are on the forge and nobody has fetched them. Getting them is follow-up-on-issue's
+      job — it owns the forge side of the loop: read the PR's review decision, then, since
+      no forge action returns PR review comment BODIES, escalate to an explore agent for the
+      text before relaying. "Don't leave a watcher" also excludes watch-outcome, and nothing
+      is being committed or pushed.
     messages:
       - role: user
         content: >-

@@ -11,6 +11,7 @@ requiredTools:
   - forge.listPRs
   - daintree.call
   - agentTask.spawnForEdits
+  - terminal.awaitAll
   - terminal.summarize
   - terminal.sendCommand
 ---
@@ -28,41 +29,53 @@ Procedure:
 ## Step 1 — Fix which issue and which PR
 Read the injected worktree/ledger rows (else `context.snapshot`) — a row carries
 `issueNumber`, `prNumber` and `prUrl` together, which is the cheapest way to tie the two.
-Otherwise `forge.getIssue({"arguments": {"issueNumber": <int>}})` returns `linkedPR:
-{ number, state, url, ciStatus? }`. If neither ties them and the user named only one,
+Otherwise `forge.getIssue({"arguments": {"issueNumber": <int>}})` MAY carry `linkedPR:
+{ number, state, url, ciStatus? }` — the key is optional, and its absence means no linked
+PR was reported, not that none exists. If neither ties them and the user named only one,
 ask rather than guessing — reporting on the wrong PR is worse than a clarifying question.
-`forge.listPRs({"arguments": {"state": "open"}})` lists open PRs with `head`/`number`/`url`
-if you must match on branch. (`forge.listPRs` accepts no `search` key at all; it is
-rejected outright.)
+`forge.listPRs({"arguments": {"state": "open"}})` lists open PRs carrying `number`, `url`
+and `headRef` (the source branch — the field is `headRef`, not `head`) if you must match on
+branch. (`forge.listPRs` accepts no `search` key at all; it is rejected outright.)
 
-## Step 2 — Read the state (free, read-only, NO confirmation)
-Batch these — forge reads emitted in ONE reply run concurrently.
+## Step 2 — Read the review decision, then the CI verdict
+Two different calls, and they are not interchangeable.
 
 `forge.getPR` is the TYPED exception on this surface: its args go at the TOP level, not
-nested in `arguments`.
+nested in `arguments`. It is a free read needing no confirmation, and several typed forge
+reads emitted in ONE reply run concurrently.
 
 ```
 forge.getPR({"prNumber": <int>})
 ```
 
-It returns `state`, `isDraft`, `merged`, `mergeable`, `baseRef`, `headRef`,
-`commentCount`, plus the two fields worth reading here:
-- `reviewDecision` — `APPROVED`, `CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or `null`. A
-  `null` is a real answer meaning reviews are not gated, and reads as approved. Only an
-  ABSENT key means "not reported".
-- `ciStatus` — the roll-up head-commit state as a string.
+It returns `state`, `isDraft`, `merged`, `baseRef`, `headRef`, and may carry `mergeable`,
+`commentCount` and — the field to read here — `reviewDecision`: `APPROVED`,
+`CHANGES_REQUESTED`, `REVIEW_REQUIRED`, or `null`. A `null` is a real answer meaning
+reviews are not gated, and reads as approved; only an ABSENT key means "not reported". The
+whole result is nullable — a PR that does not exist comes back empty rather than failing,
+so treat empty as absence, not as an error.
 
-For the counted breakdown, go through the escape hatch:
+Do NOT read CI off this call. `ciStatus` is declared on the PR shape but a provider need
+not populate it on a single-PR fetch, and the common one does not — it is absent here, and
+absent is not `success`. The CI verdict has its own action, reached through the escape
+hatch:
 
 ```
 daintree.call({"name": "forge.getCIStatus", "arguments": {"prNumber": <int>}})
 ```
 
+`daintree.call` is the highest-risk tool there is — system tier, ALWAYS confirmed, and it
+does not batch with the typed reads above (it runs on its own). So this is one deliberate
+confirmed call, not part of a free parallel sweep: read the PR first, and only reach for
+the CI roll-up when the CI answer is actually what the user asked for.
+
 -> `{ "ciStatus": { "state", "total", "passed", "failed", "pending",
 "requiredChecksPassing"? } | null }`. Read `state` for the answer — it is one of
 `success`, `failure`, `pending`, `neutral`, `unknown`. `neutral` means no required checks
 are configured, and `unknown` means the provider reported states that do not map; neither
-is a pass. Three traps, all of which produce a confidently wrong "it's green":
+is a pass. The counts are COUNTS — this roll-up carries no check NAMES, so it can tell you
+three checks failed but never which ones. Three traps, all of which produce a confidently
+wrong "it's green":
 - The counts cover REQUIRED checks only, and a `total` of 0 also appears when the
   required-check list could not be read in full. Zero total is never evidence that
   nothing gates the merge.
@@ -86,22 +99,33 @@ answer with total confidence. An empty page genuinely means nobody has commented
 missing issue or a provider that cannot read threads FAILS instead, so silence here is
 never ambiguous.
 
-## Step 4 — Escalate to an agent only for detail the forge does not carry
-A `failure` roll-up says THAT checks failed, never WHY — no forge read returns job logs
-or failure output. When the user needs the cause, that is an agent's job: spawn one with
-`agentTask.spawnForEdits` `mode:"explore"`, picking a best-fit id from the agent registry
-in your startup context (never an invented or user-transcribed name). Pick ONE supervision
-mode — drive it in-turn and read the result with `terminal.summarize`, or attach a watcher
-and end the turn, never both. Report the roll-up you already have while it works rather
-than making the user wait for both.
+## Step 4 — Know exactly where the forge stops, and escalate for the rest
+Be precise about what you can and cannot get, because the gap is where confident wrong
+answers come from:
+- The forge gives you the review DECISION, the CI roll-up STATE and its counts, and issue
+  comment BODIES.
+- It does NOT give you check names, check output, job logs, or the bodies of PR review
+  comments. No action returns those. A `failure` roll-up says THAT checks failed, never
+  which or why.
+
+So when the user wants the cause, or the actual text of a review left on the PR, that is
+an agent's job: spawn one with `agentTask.spawnForEdits` `mode:"explore"`, picking a
+best-fit id from the agent registry in your startup context (never an invented or
+user-transcribed name). Pick ONE supervision mode — either drive it in-turn, waiting with
+`terminal.awaitAll({"terminalIds": ["<id>"]})` before reading it with `terminal.summarize`
+(a snapshot read with no wait of its own, so reading first just captures an empty pane),
+or attach a watcher and end the turn. Never both. Report the roll-up you already have
+while it works rather than making the user wait for everything.
 
 ## Step 5 — Relay blockers to whoever is still working
-If an implementer agent is still running on this issue, send it the ACTIONABLE content —
-the failing check names, the reviewer's specific asks — with `terminal.sendCommand`
-({"terminalId": "<full id>", "command": "..."}). A bare `CHANGES_REQUESTED` is a state,
-not feedback: relaying it alone tells the agent nothing it can act on, so read the thread
-or the failing checks first and pass the substance. Feedback already sitting in a
-reviewer AGENT's terminal is a different job — that is
+If an implementer agent is still running on this issue, send it the ACTIONABLE content
+with `terminal.sendCommand` ({"terminalId": "<full id>", "command": "..."}). A bare
+`CHANGES_REQUESTED` is a state, not feedback: relaying it alone tells the agent nothing it
+can act on. Send what you actually hold — the review decision plus the specific asks from
+the issue thread, or the failure counts — and be explicit that the detail is not yours to
+give when it isn't. If the substance lives in PR review bodies or check output, get it via
+step 4 FIRST and relay that; do not dress up a roll-up as feedback. Feedback already
+sitting in a reviewer AGENT's terminal is a different job — that is
 daintree.agents.relay-review-feedback.
 
 ## Step 6 — Comment and close (the writes — confirmed)

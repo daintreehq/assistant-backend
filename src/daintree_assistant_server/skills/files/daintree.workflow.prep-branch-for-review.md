@@ -41,14 +41,15 @@ ONLY `arguments` at the top level — nest every query field inside it; a top-le
 rejected outright. (`forge.getPR` is TYPED: `{ prNumber, cwd? }` at the top level. The
 `daintree.call forge.*` actions in step 4 are a different surface: `daintree.call` itself takes
 `{ name, arguments, requestKey? }`, and the forge payload goes flat inside its `arguments`.) Each PR
-carries `number`/`url`/`headRef` — the source branch field is `headRef`, not `head`, so match
-on that or the duplicate guard never fires. Do NOT branch on a review-decision or CI-status
-field from a LIST item — neither is guaranteed on a bulk item; these summary rows are for
-duplicate detection, and a field missing here says nothing. (CI and review state ARE readable,
-just not from this call: `reviewDecision` comes from typed `forge.getPR` and the CI verdict
-from `forge.getCIStatus`, both a focused read on ONE PR — daintree.workflow.follow-up-on-issue.)
-If an open PR's `headRef` is this branch, you are updating, not creating — skip the PR-create
-in step 5 and just push.
+carries `number`/`url`/`headRef` — the source branch is `headRef`, NOT `head`, so a match on
+`head` finds nothing and you open a duplicate PR. (`head` IS the right key when you CREATE
+one in step 5; it is an argument there, not a result field.) Do NOT branch on a
+review-decision or CI-status field from a LIST item — neither is guaranteed on a bulk item;
+these summary rows are for duplicate detection, and a field missing here says nothing. (CI and
+review state ARE readable, just not from this call: `reviewDecision` comes from typed
+`forge.getPR` and the CI verdict from `forge.getCIStatus`, both a focused read on ONE PR —
+daintree.workflow.follow-up-on-issue.) If an open PR's `headRef` is this branch, you are
+updating, not creating — skip the PR-create in step 5 and just push.
 
 ## Step 3 — Get the verdict (free, read-only, NO confirmation)
 `workflow.prepBranchForReview` is a passthrough wrapper like the forge ones in step 2, with one

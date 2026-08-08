@@ -33,30 +33,40 @@ all. Reach for `workflow.list({"status":"active"})` (flat args, NOT nested in
 — that set is what turns a raw search result into a shortlist worth reading, and it means
 you never propose an issue the user already has a worktree open on.
 
-## Step 2 — Write the query, and put it in `search`
+## Step 2 — Put the STRUCTURED filters in real keys, the rest in `search`
 `forge.listIssues` is a passthrough wrapper accepting ONLY `arguments` at the top level;
-nest every field inside it. The accepted keys are exactly: `search`, `state`
-(`open`|`closed`|`all`, default open), `perPage` (1-100, default 20), `sort`
-(`created`|`updated`), `direction` (`asc`|`desc`), `cursor`, `view`, `bypassCache`, `cwd`.
-Anything else errors.
+nest every field inside it. The query keys are `search`, `state` (`open`|`closed`|`all`,
+default open), `perPage` (1-100, default 20), `sort` (`created`|`updated`), `direction`
+(`asc`|`desc`), `cursor`, `view` (`summary`|`full`), `bypassCache` — plus the optional
+location selectors `worktreeId` / `worktreePath` / `cwd` when you must target a repo other
+than the active one. Anything outside that set errors.
 
 ```
 forge.listIssues({
   "arguments": {
-    "search": "is:open is:issue no:assignee -label:human-review sort:updated-desc",
+    "state": "open",
+    "sort": "updated",
+    "direction": "desc",
+    "search": "no:assignee -label:human-review",
     "perPage": 30
   }
 })
 ```
 
-`search` is a raw provider query fragment, NOT a plain-text filter — it is appended after
-the generated repo/type/state qualifiers and routes through the provider's search API.
-The dialect is the forge's own, and typically supports:
+Express state and ordering through `state`/`sort`/`direction`, NOT inside `search`. The
+provider builds a prefix — repo, issue type, state, sort — and appends your `search` after
+it, so `is:open` or `sort:updated-desc` in the search string duplicates or fights what was
+already generated. It also matters for budget: the whole query is capped (256 characters on
+the common provider) and your fragment is TRUNCATED to whatever the prefix leaves, so
+wasted qualifiers silently cost you the end of your own filter.
+
+`search` is a raw provider query fragment, NOT a plain-text filter, and it routes through
+the provider's search API. The dialect is the forge's own, and typically supports:
 - `no:assignee`, `no:label`, `no:milestone` — the "nobody has claimed this" signals.
 - `-label:X` to exclude; quote multi-word values, `-label:"human review"`.
 - `label:X`, `assignee:@me`, `involves:@me`, `author:@me`.
 - `created:>YYYY-MM-DD`, `updated:<YYYY-MM-DD`, ranges `updated:A..B`.
-- `sort:updated-desc`, and explicit `OR` / `AND` / parentheses for anything compound.
+- explicit `OR` / `AND` / parentheses for anything compound.
 
 Two gotchas worth remembering: `-no:assignee` is INVALID — negation does not compose with
 `no:`, so use `assignee:*` when you want "has any assignee". And search routes through an
@@ -73,7 +83,8 @@ The result is `{ items, nextCursor, hasMore }`. To continue, pass the PREVIOUS r
 because it would alias page one's cache while asking the provider for an invalid cursor).
 
 ```
-forge.listIssues({"arguments": {"search": "<same query>", "cursor": "<nextCursor>"}})
+forge.listIssues({"arguments": {"state": "open", "search": "<same fragment>",
+                                "cursor": "<nextCursor>"}})
 ```
 
 Items default to a SUMMARY projection — bodies and raw provider payloads are dropped to
@@ -83,18 +94,22 @@ step 4 over pulling full bodies for a whole page.
 
 ## Step 4 — Ground the finalists, and screen out what is taken
 `forge.getIssue({"arguments": {"issueNumber": <int>}})` returns the issue with `title`,
-`body`, `labels[]`, `assignees[]`, `commentCount`, and — the field that answers "is
-someone already on this" — `linkedPR: { number, state, url, ciStatus? }`. Batch these:
-several forge reads emitted in ONE reply run concurrently, so fetch every finalist at
-once rather than one per turn.
+`body` and `state`, and may carry `labels[]`, `assignees[]`, `commentCount`, and — the
+field that answers "is someone already on this" — `linkedPR: { number, state, url,
+ciStatus? }`. Batch these: several typed forge reads emitted in ONE reply run
+concurrently, so fetch every finalist at once rather than one per turn. The result is
+nullable; an issue that does not exist comes back empty rather than failing.
 
 Screen a candidate OUT when: its number is in the step-1 in-flight set; `assignees[]` is
-non-empty; or `linkedPR` exists and is still open. A closed or merged `linkedPR` is the
-opposite signal — the work may be done and the issue merely left open, which is worth
-reporting rather than proposing as new work. If you need to match by branch instead,
-`forge.listPRs({"arguments": {"state": "open"}})` lists PRs (`head`, `number`, `url`) —
-but do not treat a similar TITLE as proof anything is underway; say "possibly in flight"
-and let the user decide.
+present and non-empty; or `linkedPR` is present and still open. Treat an ABSENT
+`assignees` or `linkedPR` key as unknown rather than as proof of "nobody's on it" — the
+keys are optional, so absence is silence, not a green light. A closed or merged `linkedPR`
+is the opposite signal — the work may be done and the issue merely left open, which is
+worth reporting rather than proposing as new work. If you need to match by branch instead,
+`forge.listPRs({"arguments": {"state": "open"}})` lists PRs carrying `number`, `url` and
+`headRef` (the source branch — the field is `headRef`, not `head`); but do not treat a
+similar TITLE as proof anything is underway. Say "possibly in flight" and let the user
+decide.
 
 ## Step 5 — Shortlist and stop
 Present a SMALL ranked shortlist against whatever the user actually asked for (size,
