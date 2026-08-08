@@ -69,9 +69,20 @@ steps:
         # what this file says. A flag removed here is removed from the service
         # on the next release instead of lingering invisibly from an old one.
         #
-        # min-instances=1 keeps one warm instance so a turn never pays Python
-        # startup + prompt/catalog load. timeout=1800 is sized against the app's
-        # own upstream budget (see infra/terraform/main.tf for the arithmetic).
+        # DEVELOPMENT POSTURE: min-instances=0 lets the service scale to zero, so
+        # it costs nothing while idle. The trade is a cold start on the first
+        # request after a quiet spell — Python startup plus prompt and catalog
+        # load — which --cpu-boost softens. Going to production means raising
+        # min-instances to 1 or 2 so a turn never pays that, and revisiting cpu
+        # and memory at the same time.
+        #
+        # Memory stays at 1Gi rather than dropping to 512Mi: with scale-to-zero
+        # the idle saving is nil and memory is only billed while serving, so
+        # trimming it buys pennies in exchange for an OOM risk on a process that
+        # holds the prompt templates and all 26 skill bodies in memory.
+        #
+        # timeout=1800 is sized against the app's own upstream budget (see
+        # infra/terraform/main.tf for the arithmetic).
         FLAGS=(
           --image="$$IMAGE"
           --region="${_REGION}"
@@ -81,7 +92,7 @@ steps:
           --memory=1Gi
           --cpu-boost
           --concurrency=8
-          --min-instances=1
+          --min-instances=0
           --max-instances=10
           --timeout=1800
           --ingress=all

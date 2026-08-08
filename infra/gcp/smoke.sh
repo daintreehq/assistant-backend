@@ -75,14 +75,18 @@ echo "Target: $URL"
 # --------------------------------------------------------------------------
 head_ "Public endpoints (no authentication required)"
 
-# /healthz is deliberately NOT checked here. Google's frontend reserves that
-# path and answers it itself with an HTML 404 — the request never reaches the
-# container (a /healthz response carries no `server: Google Frontend` header,
-# unlike every route that does reach the app). The endpoint still exists and
-# still works for Cloud Run's own liveness probe, which talks to the container
-# directly and bypasses the frontend. Externally, /readyz is the check to use,
-# and it is strictly stronger anyway: it proves the app is up AND correctly
-# configured, where /healthz only proves the event loop is turning.
+# /health, not /healthz. Google's frontend reserves the /healthz path and
+# answers it itself with an HTML 404 — the request never reaches the container
+# (its response carries no `server: Google Frontend` header, unlike every route
+# that does reach the app). /healthz still serves Cloud Run's own liveness
+# probe, which connects to the container directly; /health is the alias that is
+# reachable from outside.
+code="$(req "$URL/health")"; load_body
+if [ "$code" = "200" ] && [ "$(jq_field "$BODY" status)" = "ok" ]; then
+  pass "/health is alive"
+else
+  fail "/health returned $code" "$BODY"
+fi
 
 code="$(req "$URL/readyz")"; load_body
 if [ "$code" = "200" ] && [ "$(jq_field "$BODY" status)" = "ready" ]; then

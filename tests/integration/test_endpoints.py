@@ -16,6 +16,18 @@ def test_healthz(client) -> None:
     assert r.json() == {"status": "ok"}
 
 
+def test_health_alias(client) -> None:
+    """/health must stay live: it is the only externally reachable liveness path.
+
+    Google's frontend reserves /healthz on Cloud Run and answers it itself, so
+    that path never reaches this process from outside the container. Deleting
+    this alias would leave external uptime monitoring with nothing to probe.
+    """
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
 def test_readyz(client, app) -> None:
     r = client.get("/readyz")
     assert r.status_code == 200
