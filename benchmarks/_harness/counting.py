@@ -86,5 +86,12 @@ class CountingProvider:
         self._account(result.usage)
         return result
 
+    async def verify_key(self, api_key: Any = None) -> dict[str, Any]:
+        # Delegated like every other protocol method — this wrapper observes, it
+        # never answers on the inner provider's behalf. Uncounted: key verification
+        # is not a model call and has no place in the token/latency totals.
+        result: dict[str, Any] = await self._inner.verify_key(api_key)
+        return result
+
     async def aclose(self) -> None:
         await self._inner.aclose()

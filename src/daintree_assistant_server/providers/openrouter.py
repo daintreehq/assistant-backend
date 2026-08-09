@@ -39,7 +39,13 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from ..errors import DaintreeError, upstream_error, upstream_rate_limited, upstream_timeout
+from ..errors import (
+    DaintreeError,
+    invalid_api_key,
+    upstream_error,
+    upstream_rate_limited,
+    upstream_timeout,
+)
 from ..observability import get_logger
 from .base import (
     ProviderChatRequest,
@@ -97,6 +103,11 @@ _ENDPOINT_NAME_CAP = 64
 # they carry no auth weight and are safe to send on every call.
 _REFERER = "https://daintree.dev"
 _APP_TITLE = "Daintree Assistant"
+
+# Read budget for the key-verification probe. Hardcoded, not a setting: it is a
+# single tokenless introspection GET behind a sign-in spinner, so it has nothing in
+# common with the main model's budget and there is no deployment that wants it long.
+_VERIFY_TIMEOUT_SECONDS = 10.0
 
 # Endpoint-selection policy, sent on EVERY request. Hardcoded like the model ids
 # and the thinking posture (config.py): there is one optimum and the server ships
@@ -519,6 +530,93 @@ class OpenRouterProvider:
         if not plain or not all(_HEADER_SAFE_MIN <= ord(c) <= _HEADER_SAFE_MAX for c in plain):
             raise upstream_error("The upstream credential is empty or malformed.")
         return key
+
+    async def verify_key(self, api_key: SecretStr | None = None) -> dict[str, Any]:
+        """Ask the provider whether a caller's key is actually usable.
+
+        This is the ONLY honest answer to "is my key valid?". Our own auth is
+        structural (see auth.py) — a well-formed string that no provider has ever
+        issued passes it — so without this probe the first real turn is where a bad
+        key surfaces, long after the user thought they had signed in.
+
+        ``GET /key`` is the right probe: it is the provider's own key-introspection
+        endpoint, costs no tokens, and answers for the credential rather than for a
+        model. Returns the provider's key record on success.
+
+        Raises ``invalid_api_key`` when the provider rejects the credential (a 401/403
+        — a definite "this key is not usable"), and ``upstream_error`` when the probe
+        could not be completed at all. The distinction matters: the first is a verdict
+        the caller must act on, the second means we simply do not know.
+        """
+        key = self._resolve_key(api_key)
+        url = f"{self._base_url}/key"
+        try:
+            response = await self._client.get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {key.get_secret_value()}",
+                    "Accept": "application/json",
+                    "HTTP-Referer": _REFERER,
+                    "X-Title": _APP_TITLE,
+                },
+                timeout=self._verify_timeout(),
+            )
+        except httpx.TimeoutException as exc:
+            raise upstream_timeout("Verifying the key with the provider timed out.") from exc
+        except httpx.HTTPError as exc:
+            raise upstream_error("Could not reach the provider to verify the key.") from exc
+
+        if response.status_code in (401, 403):
+            raise invalid_api_key("The provider rejected this API key.")
+        if response.status_code != 200:
+            # EXACTLY 200 or we do not have an answer. Note the deliberate `!= 200`
+            # rather than `>= 400`: the client does not follow redirects, so a 3xx
+            # arrives here as-is, and a body-shaped 302 would otherwise read as a
+            # successful verification. Everything that is not the documented success
+            # is OUR inability to get an answer, not a verdict on the key — never
+            # report an unknown as "invalid". Reuse the codes the chat path already
+            # maps so a rate limit or an upstream timeout stays itself.
+            raise self._map_verify_error(response)
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise upstream_error("The provider returned an unreadable key record.") from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
+            # A 200 whose body is not a key record answers nothing. Degrading it to an
+            # empty record would surface as `valid: true` — the exact false positive
+            # this endpoint exists to prevent — so it is an error, not a default.
+            raise upstream_error("The provider returned no key record.")
+        data: dict[str, Any] = payload["data"]
+        return data
+
+    def _verify_timeout(self) -> httpx.Timeout:
+        """A short read budget for the sign-in probe, structured like ``_timeout``.
+
+        The probe must NOT inherit ``_default_timeout`` (the 14-minute main-model
+        budget): a user is watching a sign-in spinner, and a stalled provider would
+        otherwise pin a request — and a Cloud Run concurrency slot — for the whole of
+        it, on an endpoint any header-safe token can reach. A bare float would also
+        collapse the client's connect/write/pool components, which ``_timeout``
+        documents at length; only READ is narrowed here.
+        """
+        base = self._client.timeout
+        return httpx.Timeout(
+            connect=base.connect, read=_VERIFY_TIMEOUT_SECONDS, write=base.write, pool=base.pool
+        )
+
+    def _map_verify_error(self, response: httpx.Response) -> DaintreeError:
+        """Non-200 on the probe, mapped like the chat path — minus its 404 prose.
+
+        ``_map_http_error`` is not reused wholesale because its 404 branch names
+        `_PROVIDER_ROUTING`, which is chat-completion-specific and would send a reader
+        hunting through endpoint-selection policy over a plain introspection call.
+        """
+        status = response.status_code
+        if status == 429:
+            return upstream_rate_limited(retry_after=response.headers.get("retry-after"))
+        if status in (408, 504):
+            return upstream_timeout("Verifying the key with the provider timed out.")
+        return upstream_error(f"The provider could not verify the key (HTTP {status}).")
 
     def _headers(self, *, stream: bool, api_key: SecretStr) -> dict[str, str]:
         # A fresh dict per call. The shared client's own headers are never mutated:

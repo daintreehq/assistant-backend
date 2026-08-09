@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json as _json
+from typing import Any
 
 import httpx
 import pytest
@@ -1274,3 +1275,219 @@ async def test_structured_tool_call_forces_non_thinking() -> None:
     assert captured["body"]["reasoning"] == {"enabled": False}
     assert "reasoning_effort" not in captured["body"]
     await provider.aclose()
+
+
+# --- key verification (sign-in probe) ---------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_verify_key_returns_the_providers_key_record() -> None:
+    """The probe reads GET /key — the provider's own introspection, costing no tokens."""
+    captured: dict[str, Any] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["url"] = str(request.url)
+        captured["auth"] = request.headers.get("Authorization")
+        captured["body"] = request.content
+        return httpx.Response(200, json={"data": {"label": "sk-key", "limit_remaining": 3.5}})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        record = await provider.verify_key(SecretStr("sk-or-v1-caller"))
+
+    assert record == {"label": "sk-key", "limit_remaining": 3.5}
+    # The METHOD is the point, not just the path: a POST to /key would be a
+    # different (and not tokenless) operation, so pin it.
+    assert captured["method"] == "GET"
+    assert captured["url"] == "https://openrouter.test/api/v1/key"
+    assert captured["body"] == b""
+    assert captured["auth"] == "Bearer sk-or-v1-caller"
+
+
+@pytest.mark.asyncio
+async def test_verify_key_maps_a_provider_401_to_invalid_api_key() -> None:
+    """A 401/403 is a VERDICT on the key and must be distinguishable from a failure."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"error": {"message": "no"}})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr("sk-or-v1-bad"))
+
+    assert exc.value.code == "invalid_api_key"
+
+
+@pytest.mark.asyncio
+async def test_verify_key_maps_other_failures_to_upstream_error() -> None:
+    """A 500 means we could not get an answer — never report that as an invalid key."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="boom")
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+
+    assert exc.value.code == "upstream_error"
+
+
+@pytest.mark.asyncio
+async def test_verify_key_never_leaks_the_key_in_an_error() -> None:
+    """The upstream ECHOES the key back; none of it may reach the client envelope.
+
+    A body that never contained the secret would let a completely unsafe passthrough
+    pass this test, so the failure body quotes the credential verbatim — which is what
+    a real provider error does when it complains about the key it was given.
+    """
+    secret = "sk-or-v1-supersecret"  # noqa: S105 - test credential, not a real key
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text=f"upstream blew up on {secret}")
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr(secret))
+
+    # Both the human message and the serialized wire envelope — the message alone
+    # would miss a leak that rode a structured field out to the client.
+    assert "supersecret" not in str(exc.value)
+    assert "supersecret" not in exc.value.envelope().model_dump_json()
+
+
+@pytest.mark.asyncio
+async def test_verify_key_rejects_a_redirect_instead_of_reading_it_as_valid() -> None:
+    """A 3xx is not an answer.
+
+    The client does not follow redirects, so a redirect arrives here as-is. A status
+    check of ``>= 400`` would wave this through and — because the body is shaped like
+    a key record — report a bad key as VALID. Exactly 200 or we do not know.
+    """
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            302, json={"data": {"label": "not really"}}, headers={"Location": "/elsewhere"}
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+
+    assert exc.value.code == "upstream_error"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"data": None},
+        {"data": "nope"},
+        {"data": ["nope"]},
+        {"error": {"message": "temporarily unavailable"}},
+        [{"data": {}}],
+        None,
+    ],
+    ids=["empty", "null-data", "string-data", "list-data", "error-envelope", "list", "null"],
+)
+@pytest.mark.asyncio
+async def test_verify_key_rejects_a_200_that_is_not_a_key_record(payload: Any) -> None:
+    """A 200 whose body is not a key record answers nothing — and must not read as valid.
+
+    Degrading these to an empty record is the dangerous failure: the endpoint reports
+    any returned dict as ``valid: true``, so a 200-with-an-error-envelope would tell a
+    user their bad key was accepted. That is the precise false positive this whole
+    endpoint exists to prevent.
+    """
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+
+    assert exc.value.code == "upstream_error"
+
+
+@pytest.mark.asyncio
+async def test_verify_key_keeps_a_rate_limit_as_a_rate_limit() -> None:
+    """429 is retryable and carries Retry-After; flattening it to 502 loses both."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, headers={"Retry-After": "30"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+
+    assert exc.value.code == "upstream_rate_limited"
+    assert exc.value.headers == {"Retry-After": "30"}
+
+
+@pytest.mark.asyncio
+async def test_verify_key_maps_a_transport_timeout_to_upstream_timeout() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("too slow")
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+
+    assert exc.value.code == "upstream_timeout"
+
+
+@pytest.mark.asyncio
+async def test_verify_key_maps_a_transport_error_to_upstream_error() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("no route")
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+
+    assert exc.value.code == "upstream_error"
+
+
+@pytest.mark.asyncio
+async def test_verify_key_does_not_inherit_the_main_model_timeout() -> None:
+    """The probe sits behind a sign-in spinner; the 14-minute model budget is not it.
+
+    A bare float would also collapse connect/write/pool onto the same value — the trap
+    ``_timeout`` documents — so assert the structure survived, not just the read bound.
+    """
+    captured: dict[str, Any] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured["timeout"] = request.extensions.get("timeout")
+        return httpx.Response(200, json={"data": {"label": "k"}})
+
+    transport = httpx.MockTransport(handler)
+    base = httpx.Timeout(connect=5.0, read=840.0, write=15.0, pool=5.0)
+    async with httpx.AsyncClient(transport=transport, timeout=base) as client:
+        provider = OpenRouterProvider(
+            client, base_url="https://openrouter.test/api/v1", default_timeout=840.0
+        )
+        await provider.verify_key(SecretStr("sk-or-v1-caller"))
+
+    assert captured["timeout"]["read"] == 10.0
+    assert captured["timeout"]["connect"] == 5.0
+    assert captured["timeout"]["write"] == 15.0
+    assert captured["timeout"]["pool"] == 5.0

@@ -48,6 +48,45 @@ mode in any environment.
 `/healthz`, `/readyz`, and `/version` are unauthenticated (Cloud Run probes them; they
 carry no user data).
 
+### POST /v1/daintree/auth/verify
+
+Because validation is structural, a well-formed key that no provider ever issued
+authenticates fine and is only discovered on the caller's first real turn. This endpoint
+closes that gap at sign-in by asking the provider directly. It is a tokenless
+introspection call (not a model call), takes **no request body**, and requires the
+bearer header like every other authed route.
+
+`POST /v1/daintree/auth/verify` with no body →
+
+```json
+{ "valid": true, "detail": "The provider accepted this API key.",
+  "label": "my-key", "limit": 20, "usage": 4.5, "limit_remaining": 15.5,
+  "is_free_tier": false }
+```
+
+`valid` means **the provider recognises this credential** — not that it can fund a turn.
+A recognised but exhausted key is `valid: true` with `limit_remaining: 0`; deciding how
+to warn about that is the CLI's call. Every field after `detail` is optional: each is
+echoed only when the provider supplies it with the expected type. `label` is
+upstream-controlled text — it is stripped of control characters, bounded to 120
+characters, and dropped entirely if it contains (or is contained by) the bearer, since
+some providers default a key's label to the key itself.
+
+A rejected key is a **200 with `valid: false`**, deliberately *not* the `502
+upstream_error` the section above describes for the serving path. A rejection is a
+successful answer to the question this endpoint asks, and our own `401` would be wrong
+twice over: the request authenticated fine at our door, and `401` conventionally tells a
+client to re-send the same credential — the useless retry loop this endpoint exists to
+prevent.
+
+Not knowing is never reported as a verdict. Anything other than a provider verdict
+propagates as the usual error envelope: `429 upstream_rate_limited` (with `Retry-After`),
+`504 upstream_timeout`, `502 upstream_error` (unreachable, a non-200, or a 200 whose body
+is not a key record), `401 invalid_api_key` for a missing/malformed bearer at our own
+door, and `503` before readiness. The probe carries a short 10s read budget rather than
+the main-model timeout. Being a sign-in bootstrap call, it does not require or check
+`X-Daintree-Protocol`.
+
 ## Protocol negotiation
 
 Every request carries `protocol_version` (currently `2`). The supported range is also
@@ -449,6 +488,7 @@ top-level SSE `retry_after` field; other terminal stream errors omit the field.
 |---|---|---|---|
 | `POST` | `/v1/daintree/respond` | yes | Generation (native, + first-class skills) |
 | `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task profiles, catalog revision |
+| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: is the bearer actually usable upstream? (no body; tokenless) |
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual `find` / `load` / `clear`; returns the same `skills` block + `state` |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks (server-owned prompts; no client task prompt) |

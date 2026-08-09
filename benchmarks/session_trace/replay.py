@@ -88,6 +88,11 @@ class ReplayProvider:
     ) -> ProviderToolCallResult:
         raise NotImplementedError
 
+    async def verify_key(self, api_key: Any = None) -> dict[str, Any]:
+        # Part of ``ChatProvider``, so it exists; a replayed session never signs in,
+        # so scripting a key record would be inventing a fixture nothing reads.
+        raise NotImplementedError
+
     async def aclose(self) -> None:
         return None
 

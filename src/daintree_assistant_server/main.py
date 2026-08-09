@@ -20,6 +20,7 @@ from fastapi import FastAPI, Request
 
 from . import __version__
 from .api import (
+    daintree_auth,
     daintree_capabilities,
     daintree_respond,
     daintree_skills,
@@ -344,6 +345,7 @@ def create_app(
     app.include_router(health.router)
     app.include_router(daintree_respond.router)
     app.include_router(daintree_capabilities.router)
+    app.include_router(daintree_auth.router)
     app.include_router(daintree_skills.router)
     app.include_router(daintree_tasks.router)
 

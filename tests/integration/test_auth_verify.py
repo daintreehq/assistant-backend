@@ -1,0 +1,136 @@
+"""Integration tests for POST /v1/daintree/auth/verify.
+
+This endpoint exists to close a specific gap: our own authentication is structural, so
+a well-formed string no provider ever issued passes it and every other endpoint answers
+200. Without an upstream probe, a wrong key is discovered on the caller's first real
+turn. The tests below pin the three outcomes a sign-in flow has to tell apart —
+accepted, definitely rejected, and could-not-check.
+"""
+
+from __future__ import annotations
+
+from daintree_assistant_server.errors import invalid_api_key, upstream_error, upstream_timeout
+
+
+def test_verify_accepts_a_good_key(client, auth, fake_provider) -> None:
+    fake_provider.verify_key_result = {"label": "my-key", "limit_remaining": 12.5, "is_free_tier": False}
+
+    r = client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valid"] is True
+    # The label is how a user confirms they pasted the key they MEANT to, not merely
+    # one that happens to work.
+    assert body["label"] == "my-key"
+    assert body["limit_remaining"] == 12.5
+    assert body["is_free_tier"] is False
+
+
+def test_verify_forwards_the_callers_own_key(client, auth, fake_provider) -> None:
+    """The probe must use the CALLER's credential, never a server-held one.
+
+    The server holds no upstream key at all; verifying with anything other than the
+    caller's would answer a question nobody asked.
+    """
+    client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert len(fake_provider.verify_key_calls) == 1
+    forwarded = fake_provider.verify_key_calls[0]
+    assert forwarded is not None
+    assert forwarded.get_secret_value() == auth["Authorization"].removeprefix("Bearer ")
+
+
+def test_verify_reports_a_rejected_key_as_a_200_verdict(client, auth, fake_provider) -> None:
+    """A rejection is a successful ANSWER, not a failed request.
+
+    Returning our own 401 here would be wrong twice over: this request authenticated
+    fine at our door, and a 401 conventionally tells a client to re-send credentials —
+    which is exactly the useless retry loop this endpoint exists to prevent.
+    """
+    fake_provider.verify_key_error = invalid_api_key("The provider rejected this API key.")
+
+    r = client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valid"] is False
+    assert "rejected" in body["detail"].lower()
+
+
+def test_verify_propagates_an_unreachable_provider_as_502(client, auth, fake_provider) -> None:
+    """"Could not check" must NEVER be reported as "invalid".
+
+    Collapsing the two would send a user hunting for a credential problem they do not
+    have, every time the provider has a blip.
+    """
+    fake_provider.verify_key_error = upstream_error("Could not reach the provider to verify the key.")
+
+    r = client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert r.status_code == 502
+    assert r.json()["error"]["code"] == "upstream_error"
+
+
+def test_verify_requires_authentication(client) -> None:
+    r = client.post("/v1/daintree/auth/verify")
+
+    assert r.status_code == 401
+    assert r.json()["error"]["code"] == "invalid_api_key"
+
+
+def test_verify_never_echoes_the_key(client, auth, fake_provider) -> None:
+    """The response is shown to a user and may be logged; it must not carry the key.
+
+    The label is set to the BEARER ITSELF, which is the realistic leak: some providers
+    default a key's label to the key (or a prefix of it). A benign placeholder label
+    would let a completely unsafe passthrough pass this test.
+    """
+    token = auth["Authorization"].removeprefix("Bearer ")
+    fake_provider.verify_key_result = {"label": token}
+
+    r = client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert token not in r.text
+    assert "label" not in r.json()
+
+
+def test_verify_drops_a_label_that_is_a_prefix_of_the_key(client, auth, fake_provider) -> None:
+    """A truncated key is still key material and must not be echoed."""
+    token = auth["Authorization"].removeprefix("Bearer ")
+    fake_provider.verify_key_result = {"label": token[: len(token) // 2]}
+
+    r = client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert "label" not in r.json()
+
+
+def test_verify_sanitizes_and_bounds_a_hostile_label(client, auth, fake_provider) -> None:
+    """The label reaches a terminal, so control characters and unbounded length are out."""
+    fake_provider.verify_key_result = {"label": "\x1b[31mred\x07" + "x" * 500}
+
+    body = client.post("/v1/daintree/auth/verify", headers=auth).json()
+
+    assert "\x1b" not in body["label"]
+    assert "\x07" not in body["label"]
+    assert len(body["label"]) <= 120
+
+
+def test_verify_reports_a_timeout_as_504(client, auth, fake_provider) -> None:
+    """A timed-out probe is "could not check", distinct from both valid and invalid."""
+    fake_provider.verify_key_error = upstream_timeout("Verifying the key timed out.")
+
+    r = client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert r.status_code == 504
+    assert r.json()["error"]["code"] == "upstream_timeout"
+
+
+def test_verify_passes_through_an_exhausted_key_with_its_limit(client, auth, fake_provider) -> None:
+    """Zero remaining credit is still `valid` here; the CLI decides how to warn."""
+    fake_provider.verify_key_result = {"label": "spent", "limit_remaining": 0}
+
+    body = client.post("/v1/daintree/auth/verify", headers=auth).json()
+
+    assert body["valid"] is True
+    assert body["limit_remaining"] == 0

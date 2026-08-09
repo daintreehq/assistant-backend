@@ -247,6 +247,12 @@ def test_authed_routes_reject_missing_and_malformed_bearer(client) -> None:
             json={"action": "clear", "session_id": "s"},
         )
         assert r.status_code == 401
+        # The sign-in probe is authed like everything else. It answers a question
+        # ABOUT a key, which makes it the one route where "no key" could plausibly
+        # have been allowed through to be judged upstream — it is not. A malformed
+        # bearer is our own structural 401, decided at the door, and must never
+        # reach the provider as a verification request.
+        assert client.post("/v1/daintree/auth/verify", headers=headers).status_code == 401
     # Probes and version never require a key (Cloud Run probes them).
     assert client.get("/healthz").status_code == 200
     assert client.get("/readyz").status_code == 200

@@ -183,6 +183,21 @@ class FakeProvider:
         self.stream_error: Exception | None = None
         self.stream_factory: Callable[[ProviderChatRequest], ProviderStream] | None = None
         self.last_stream: FakeStream | None = None
+        self.verify_key_calls: list[Any] = []
+        self.verify_key_error: Exception | None = None
+        self.verify_key_result: dict[str, Any] = {"label": "test-key", "limit_remaining": 4.25}
+
+    async def verify_key(self, api_key: Any = None) -> dict[str, Any]:
+        """Stand-in for the provider's key-introspection probe.
+
+        ``verify_key_error`` lets a test drive the two outcomes that matter and must
+        stay distinguishable: a definite rejection (``invalid_api_key``) versus an
+        unreachable provider (``upstream_error``).
+        """
+        self.verify_key_calls.append(api_key)
+        if self.verify_key_error is not None:
+            raise self.verify_key_error
+        return self.verify_key_result
 
     async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:
         # Route a selector-shaped call (json_object output) to the selection slot when

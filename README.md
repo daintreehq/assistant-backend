@@ -186,6 +186,7 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
 |---|---|---|---|
 | `POST` | `/v1/daintree/respond` | yes | Native generation (+ first-class `skills` block; stream or JSON) |
 | `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task profiles, catalog revision |
+| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: is the bearer usable upstream? (no body; costs no tokens) |
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual find / load / clear |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks |

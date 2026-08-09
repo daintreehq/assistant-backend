@@ -172,4 +172,14 @@ class ChatProvider(Protocol):
         function_schema: dict[str, Any],
     ) -> ProviderToolCallResult: ...
 
+    async def verify_key(self, api_key: SecretStr | None = None) -> dict[str, Any]:
+        """Ask the provider whether a credential is usable, spending no tokens.
+
+        Part of the protocol because sign-in needs an answer our structural auth
+        cannot give — see api/daintree_auth.py. Implementations raise
+        ``invalid_api_key`` for a definite rejection and ``upstream_error`` when the
+        probe could not be completed, so "unusable" and "unknown" stay distinct.
+        """
+        ...
+
     async def aclose(self) -> None: ...
