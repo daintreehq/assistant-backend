@@ -121,14 +121,14 @@ _ACTION_PARTICIPLE = (
 # worktree\n- clean\n- no pending changes") answered its own opener, and without this
 # the content is swallowed into the clause and the reply reads as a dangling promise.
 # A negated character class is not governed by ``DOTALL``, so it has to be written out.
-_CLAUSE_BODY = r"(?:[^.!?:;—\n]|[.:](?=(?-i:[a-z0-9/])))*"
+_CLAUSE_BODY = r"(?:[^.!?:;—–―\n]|[.:](?=(?-i:[a-z0-9/])))*"
 
 # The participle path's stricter body: a comma as well. An opener names its own
 # subject, so it can carry a comma and stay one announcement ("Let me read them, one
 # read per terminal, batched." is a real production failure). A subject-less clause
 # cannot: a comma there almost always joins a participial phrase to a main clause
 # ("Looking at the logs, I found a stale cache entry."), which is a delivered answer.
-_PARTICIPLE_BODY = r"(?:[^.!?:;—,\n]|[.:](?=(?-i:[a-z0-9/])))*"
+_PARTICIPLE_BODY = r"(?:[^.!?:;—–―,\n]|[.:](?=(?-i:[a-z0-9/])))*"
 
 # What sits between the start of a clause and its verb: an optional leading
 # connective (so "…, then let me read the votes." still reads as one announcement)
@@ -162,14 +162,19 @@ _ANNOUNCE_RE = re.compile(
 # fragment ("Checking complete."), and a noun modifier ("Polling interval unchanged.")
 # — all of them completed answers that must never be re-rolled.
 #
-# Requiring a determiner, or a dotted/slashed name (a tool name or a path — the most
-# realistic object in this product), is what separates the announcement from all
-# three: an object phrase is exactly what a status fragment and a noun modifier lack,
-# and it forces a prepositionless direct object, which most gerund subjects lack too
+# Requiring a determiner, or a dotted name (a tool name or a path — the most realistic
+# object in this product), is what separates the announcement from all three: an
+# object phrase is exactly what a status fragment and a noun modifier lack, and it
+# forces a prepositionless direct object, which most gerund subjects lack too
 # ("Fetching from cache avoids the timeout.", "Querying by slug returns 404.").
+#
+# The dotted alternative must start with a letter and contain a DOT, which is what
+# keeps a measurement or a status pair from passing as a tool name: "3.5x" is not
+# letter-initial, and "on/off", "and/or", "I/O" and "passes/fails" carry no dot. It
+# also consumes the whole token, so a name never fragments across the group boundary.
 _OBJECT = (
     r"(?:the|a|an|this|that|these|those|its|our|my|your|their|his|her)\s+"
-    r"|\w+[./]\w"
+    r"|[a-z_][\w./-]*\.[\w./-]*\w"
 )
 
 # The subject-less variant. Tried separately from ``_ANNOUNCE_RE`` rather than folded
@@ -226,11 +231,16 @@ _BOUNDARY_RE = re.compile(r"(?<=[.!;:,—])\s")
 _SENTENCE_START_RE = re.compile(r"(?<=[.!])\s")
 
 # …but not every period ends a sentence. An enumerator or an abbreviation mints a
-# start that no writer intended ("Costs: 1. Reading from disk.", "…e.g. Reading from
-# cache."), and admitting it hands the participle path a fragment torn out of a
-# delivered answer.
+# start that no writer intended ("Costs: 1. Reading from disk.", "…e.g. Reading the
+# cache.", "The generated file is docs/1. Reading notes.md."), and admitting it hands
+# the participle path a fragment torn out of a delivered answer. A slash counts as a
+# left edge for the enumerator, because a path segment ends in one.
+#
+# A single LETTER is deliberately not here: "Use plan A. Reading the logs now." ends a
+# real sentence, and suppressing it would cost a genuine dead round to catch a list
+# enumerator the object requirement already rejects.
 _FALSE_SENTENCE_END_RE = re.compile(
-    r"(?:^|\s)(?:\d+|[a-z]|e\.g|i\.e|etc|vs|cf|approx|no|fig|al|dr|mr|ms)\.$",
+    r"(?:^|[\s/])(?:\d+|e\.g|i\.e|etc|vs|cf|approx|no|fig|al|dr|mr|ms)\.$",
     re.IGNORECASE,
 )
 
@@ -295,12 +305,19 @@ _CONTRAST_RE = re.compile(
 # contractions, since ``\bis\b`` does not match inside "isn't".
 _FINITE_VERB_RE = re.compile(
     r"\b(?:is|are|was|were|be|been|takes?|took|will|would|can|could|should"
-    r"|has|have|had|does|did|seems?|seemed|looks?|looked|means?|meant"
-    r"|gives?|gave|costs?|cost|requires?|required|needs?|needed"
-    r"|found|made|got|gave|came|went|ran|saw|kept|left|held|brought|built|became)\b"
+    r"|may|might|must|has|have|had|does|did|seems?|seemed|looks?|looked"
+    r"|means?|meant|gives?|gave|costs?|cost|requires?|required|needs?|needed"
+    # The irregular past forms, which no suffix rule can reach.
+    r"|found|made|got|came|went|ran|saw|kept|left|held|brought|built|became"
+    r"|broke|lost|grew|won|sold|told|felt|drew|threw|began|chose|drove|fell"
+    r"|flew|forgot|knew|led|paid|rose|spent|stood|wrote|sent|shut|hit)\b"
     r"|\w+n['’]t\b",
     re.IGNORECASE,
 )
+
+# A SECOND action participle means two gerunds were coordinated into a subject
+# ("Checking the config and reading the file help."), which is a description.
+_SECOND_PARTICIPLE_RE = re.compile(rf"\b{_ACTION_PARTICIPLE}\b", re.IGNORECASE)
 
 # The second is a suffix rule, because the vocabulary a second predicate can draw on
 # is open-ended — "reveals", "returns", "succeeds", "reproduces", "preserves" — and no
@@ -308,12 +325,16 @@ _FINITE_VERB_RE = re.compile(
 # ends in "-s" or "-ed".
 #
 # A plural head noun is inflected too ("Checking the logs."), so the suffix alone
-# cannot decide. Position does: the object's head noun CLOSES the phrase, while a
-# second predicate has something after it and an adverb before it.
+# cannot decide. POSITION does: the object's head noun sits immediately after the
+# determiner and closes the phrase. An inflected word anywhere else is a predicate,
+# and "the service succeeds" is a sentence while "the logs" is a noun phrase.
 _INFLECTED_RE = re.compile(r"\w+(?:s|ed)", re.IGNORECASE)
 # A dot joins a word only when another word follows it, so a dotted tool name stays
 # one token while the sentence's own full stop is left off the last one.
 _WORD_RE = re.compile(r"[\w'’/-]+(?:\.[\w'’/-]+)*")
+# …but a compound hides its inflection from a whole-token test, so each part of
+# "hard-failed", "passed/failed" and "load.failed" is weighed on its own.
+_COMPOUND_SPLIT_RE = re.compile(r"[-/.]")
 
 # Adverbs that may trail the object without making the clause a statement. Anything
 # else after an inflected word means that word was a verb, not the head noun.
@@ -375,20 +396,27 @@ def _is_bare_participle(clause: str) -> bool:
     if match is None:
         return False
     tail = clause[match.end("head") :]
-    if _FINITE_VERB_RE.search(tail):
+    if _FINITE_VERB_RE.search(tail) or _SECOND_PARTICIPLE_RE.search(tail):
         return False
     words = _WORD_RE.findall(tail)
     for index, word in enumerate(words):
-        if not _INFLECTED_RE.fullmatch(word):
+        if not _is_inflected(word):
             continue
-        # An inflected word is the object's own head noun only when it closes the
-        # phrase. An adverb in front of it, or any non-adverb behind it, means the
-        # clause kept going — so the word was a verb and this is a description.
-        if index and words[index - 1].lower() in _TRAILING_ADVERBS:
-            return False
-        if any(w.lower() not in _TRAILING_ADVERBS for w in words[index + 1 :]):
+        # The object's head noun sits immediately after the determiner and closes the
+        # phrase. An inflected word later in the tail, or one with anything but an
+        # adverb behind it, is a predicate — so this is a description, not a promise.
+        if index or any(w.lower() not in _TRAILING_ADVERBS for w in words[1:]):
             return False
     return True
+
+
+def _is_inflected(word: str) -> bool:
+    """Whether any part of the word carries a verb's or a plural's inflection."""
+    return any(
+        _INFLECTED_RE.fullmatch(part)
+        for part in _COMPOUND_SPLIT_RE.split(word)
+        if part
+    )
 
 
 def _announcement_clause(normalized: str) -> str | None:

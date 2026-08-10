@@ -317,6 +317,9 @@ def test_idiom_carve_out_does_not_over_reach(text: str) -> None:
         # precedes them, and they are the likeliest object this product has.
         "Votes are in. Reading terminal.awaitAll output.",
         "Opening src/app.py now.",
+        "Reading TODO.md now.",
+        # A real sentence may end in a one-letter token; that still starts the next.
+        "Use plan A. Reading the logs now.",
         # A plural head noun is inflected like a verb, but it CLOSES the phrase.
         "Checking the logs.",
         "Reading the votes now.",
@@ -350,10 +353,36 @@ def test_detects_bare_participle_status_lines(text: str) -> None:
         "Retrieving a missing row returns None.",
         "Editing that field preserves whitespace.",
         "Looking at the trace explains the timeout.",
-        # An adverb in front of the inflected word gives the verb away, even when the
-        # word closes the sentence.
+        # An inflected word is the object's head noun only immediately after the
+        # determiner. One word further along it is a predicate, however the sentence
+        # ends — "the service succeeds" is a sentence, "the logs" is a noun phrase.
+        "Checking the service succeeds.",
+        "Checking the service succeeds now.",
+        "Opening the file failed.",
+        "Opening the file failed again.",
         "Creating the client now succeeds.",
         "Loading the config now works.",
+        # A compound hides its inflection from a whole-token test.
+        "Loading the plugin hard-failed.",
+        "Checking the config passed/failed.",
+        "Reading the file load.failed.",
+        # An irregular past or a modal carries no inflection at all, so the suffix
+        # rule cannot see it and the closed list has to.
+        "Opening the file broke lint.",
+        "Opening the file lost data.",
+        "Running the benchmark grew the cache.",
+        "Deleting the branch may help.",
+        "Deleting the branch might help.",
+        "Deleting the branch must wait.",
+        # Two gerunds coordinated into one subject.
+        "Checking the config and reading the file help.",
+        # A measurement or a status pair is not a tool name: the dotted object has to
+        # start with a letter and carry a dot.
+        "Reading 3.5x.",
+        "Polling on/off.",
+        "Checking passes/fails.",
+        # An en dash delivers content exactly as an em dash does.
+        "Checking the worktree – clean.",
         # A gerund subject usually reaches its complement through a preposition, and
         # requiring a direct object is what rejects the whole class.
         "Fetching from cache avoids the timeout.",
@@ -382,9 +411,11 @@ def test_detects_bare_participle_status_lines(text: str) -> None:
         "The latency comes from I/O; reading each file sequentially.",
         "Looking at the logs, I found a stale cache entry.",
         # A period after an enumerator or an abbreviation does not end a sentence, so
-        # it must not mint a start for the participle path either.
+        # it must not mint a start for the participle path either. A path segment ends
+        # in a slash, which is why that counts as a left edge for the enumerator.
         "Costs: 1. Reading from disk.",
         "Disk I/O is the bottleneck, e.g. Reading the cache.",
+        "The generated file is docs/1. Reading notes.md.",
         # An em dash delivers the result inline exactly as a colon does.
         "Checking the worktree — clean.",
         "Reading the closest match — it contains the fix.",
@@ -434,6 +465,14 @@ def test_participle_vetoes_do_not_leak_onto_opener_clauses() -> None:
         "Reading from the audit log.",
         "Search returned three matches, now reading the closest match.",
         "The build is done; reading the log.",
+        # An inflected word one slot past the determiner cannot be told from a
+        # predicate, so the adjective-plus-plural object goes with it.
+        "Reading the failing tests.",
+        # A slashed name with no dot is indistinguishable from a status pair.
+        "Opening src/tests output.",
+        # The opener path pays for the bare "when"/"if" deferral the same way.
+        "Let me check when CI failed.",
+        "Let me check if it exists.",
     ],
 )
 def test_narrowed_participle_path_tolerates_these_false_negatives(text: str) -> None:
