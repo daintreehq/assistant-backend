@@ -1646,3 +1646,141 @@ async def test_provider_close_failure_after_done_emits_nothing_extra(
     assert events[-1].startswith("event: done\n")
     assert sum(1 for e in events if e.startswith("event: done\n")) == 1
     assert not any(e.startswith("event: error\n") for e in events)
+
+
+# ---- bare tool intent: discard invariants (#25) -----------------------------
+
+_DEAD_ROUND = "All five votes are in. Let me read them, one read per terminal, batched."
+_INTENT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "terminal__extract",
+        "parameters": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["terminalIds"],
+            "properties": {"terminalIds": {"type": "array", "items": {"type": "string"}}},
+        },
+    },
+}
+
+
+def _intent_stream_request(session_id: str = "bi-session") -> RespondRequest:
+    """A streaming turn that offers a tool — the only shape the gate arms for."""
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": session_id, "turn_id": "turn-1"},
+            "input": {
+                "messages": [{"role": "user", "content": "read the votes"}],
+                "tools": [_INTENT_TOOL],
+            },
+            "startup": {},
+            "generation": {"stream": True},
+        }
+    )
+
+
+def _nudged(request: object) -> bool:
+    return any(
+        "previous draft was discarded" in (m.get("content") or "")
+        for m in request.messages  # type: ignore[attr-defined]
+    )
+
+
+@pytest.mark.asyncio
+async def test_stream_discarded_draft_never_reaches_skill_learning(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Learning must see the workflow that actually happened, not the dead draft.
+
+    Feeding it the discarded announcement would teach a skill from a round that
+    performed nothing — the exact behavior this repair exists to erase.
+    """
+    seen: list[str] = []
+    monkeypatch.setattr(
+        orchestrator,
+        "_maybe_learn_after_turn",
+        lambda **kwargs: seen.append(kwargs["assistant_text"]),
+    )
+    fake_provider.stream_chunks = lambda request: (  # type: ignore[assignment]
+        make_text_chunks("Read five votes; here is the tally.")
+        if _nudged(request)
+        else make_text_chunks(_DEAD_ROUND)
+    )
+    outcome = await orchestrator.complete(
+        _intent_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+    )
+    assert outcome.stream is not None
+    await _drain(outcome.stream)
+    assert seen == ["Read five votes; here is the tally. "]
+    assert _DEAD_ROUND not in "".join(seen)
+
+
+@pytest.mark.asyncio
+async def test_stream_discarded_attempt_is_closed_before_the_reroll_opens(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The discarded producer must not be left to the outer teardown.
+
+    A speculative first attempt holds an overlap slot until it closes, so the
+    replacement open would otherwise queue behind capacity nobody still needs.
+    """
+    streams: list[FakeStream] = []
+    # Recorded, never asserted, INSIDE the factory: an AssertionError raised there
+    # is not a DaintreeError, so it unwinds into _stream_with_heartbeat's broad
+    # handler and becomes an SSE `error` event instead of failing the test.
+    opens: list[tuple[bool, list[bool]]] = []
+
+    def stream_factory(request: object) -> FakeStream:
+        nudged = _nudged(request)
+        opens.append((nudged, [s.closed for s in streams]))
+        stream = FakeStream(make_text_chunks("Tallied." if nudged else _DEAD_ROUND))
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    outcome = await orchestrator.complete(
+        _intent_stream_request("bi-close"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+    assert not any(e.startswith("event: error\n") for e in events)
+    assert [nudged for nudged, _ in opens] == [False, True]
+    # The re-roll opened only after the draft it replaces had already been closed.
+    assert opens[0][1] == []
+    assert opens[1][1] == [True]
+    assert all(s.closed for s in streams)
+
+
+@pytest.mark.asyncio
+async def test_stream_bare_intent_holds_content_until_the_reply_ends(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """No byte of a discardable draft may go out before the discard decision.
+
+    This is the invariant the whole gate exists for: once a content delta is on
+    the wire it cannot be unsent, so a round still eligible for discard must have
+    emitted none.
+    """
+    emitted: list[str] = []
+    fake_provider.stream_chunks = lambda request: (  # type: ignore[assignment]
+        make_text_chunks("Tallied.") if _nudged(request) else make_text_chunks(_DEAD_ROUND)
+    )
+    outcome = await orchestrator.complete(
+        _intent_stream_request("bi-hold"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    async for event in outcome.stream:  # type: ignore[attr-defined]
+        emitted.append(event)
+        # Before the second stream opens, the only public events are meta/heartbeat.
+        if len(fake_provider.stream_requests) < 2:
+            assert not event.startswith("event: delta\n")
+    content = _streamed_content(emitted)
+    assert content.strip() == "Tallied."

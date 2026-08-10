@@ -51,6 +51,7 @@ from ..skills.load_events import SkillLoadExecution
 from ..skills.selector import SelectionDecision, Selector
 from ..state.codec import StateCodec
 from ..text_utils import sanitize_line
+from .bare_intent import could_still_be_bare_intent, is_bare_tool_intent
 from .output_policy import lint_output, repair_tables
 from .prompt_assembler import PromptAssembler, render_order_ids
 from .skill_learning import SkillLearner
@@ -64,6 +65,21 @@ from .tool_call_repair import (
 logger = get_logger("daintree.respond")
 
 _SPECULATION_CLOSE_TIMEOUT_SECONDS = 2.0
+
+# Sent as the sole addition to a re-rolled round whose first draft announced an
+# action and emitted no tool call (issue #25). Phrased to correct the behavior
+# without restating the dead sentence, and to leave "no tool needed" available —
+# the right answer to some of these rounds is a direct reply, not a forced call.
+_BARE_INTENT_NUDGE: dict[str, Any] = {
+    "role": "user",
+    "content": (
+        "[System] Your previous draft was discarded: it only announced an action "
+        "and emitted no tool call, so nothing would have run. Redo that reply from "
+        "the conversation above. If the next step needs a tool, emit that tool call "
+        "NOW, in this reply. If it does not, answer directly — either way, do not "
+        "describe an action you are not taking in this same reply."
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -843,6 +859,12 @@ class ChatOrchestrator:
             request, upstream_model=upstream_model, request_id=request_id, api_key=api_key
         )
         result = await self._complete_with_retry(prepared.provider_request)
+        # A round that only announced a tool call it never emitted would end the turn
+        # having performed nothing. Re-roll it once here, before anything is built or
+        # sent, so neither the client nor the transcript ever sees the dead draft.
+        result = await self._repair_bare_intent(
+            prepared.provider_request, result, request_id=request_id
+        )
         # finish_reason is a second, independent signal: treat a continuation round as
         # such even if a malformed upstream drops the tool_calls payload.
         had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
@@ -1662,9 +1684,39 @@ class ChatOrchestrator:
         # All calls flush together at stream end: the client only dispatches tools
         # once the round is complete, so consolidation adds no real latency, and
         # holding everything tolerates providers that interleave call fragments.
-        tool_call_buffer = StreamToolCallBuffer(build_parameter_index(request.input.tools))
+        # Built once and reused: the re-roll rebuilds its buffer from the same index.
+        param_index = build_parameter_index(request.input.tools)
+        tool_call_buffer = StreamToolCallBuffer(param_index)
         stream: ProviderStream | None = None
         used_speculation = False
+        # THE COMMIT GATE (issue #25). A round that announces a tool call and emits
+        # none must not reach the client as a finished turn — but on this path the
+        # decision can only be made once the reply has ENDED, and content deltas are
+        # normally forwarded the instant they arrive. So the first attempt's pure
+        # content is HELD until the reply can no longer be that shape, then released
+        # and forwarded live for the rest of the round.
+        #
+        # What this costs, stated plainly: HTTP/SSE and the `meta` event are
+        # untouched, but the first visible TOKEN of a gated round waits for up to
+        # BARE_INTENT_MAX_CHARS of generation. Anything that rules the shape out —
+        # a tool-call fragment, reasoning, a question mark, passing the bound —
+        # releases the gate immediately, so continuation rounds (the common case,
+        # which open with a tool call) never wait at all. A round with nothing
+        # callable is never gated, because it cannot have dropped an action.
+        #
+        # ``held`` is the gate: a list means armed and holding, ``None`` means this
+        # attempt's content is already public and can never be discarded.
+        tools_callable = self._tools_callable(provider_request)
+        held: list[StreamDelta] | None = None
+        # The re-roll gets exactly one shot and is never itself gated: whatever it
+        # produces is what the user gets, so there is nothing to delay it for.
+        attempt = 0
+        active_request = provider_request
+        carried_usage = ProviderUsage()
+        # The discarded draft, kept only until the re-roll's stream actually opens.
+        # Up to that point nothing of the retry is public, so the first attempt is
+        # still replay-safe and remains the honest fail-open answer.
+        fallback: tuple[list[StreamDelta], str | None, str] | None = None
         try:
             if speculative_stream is not None:
                 # Provisional ownership is installed before ``claim`` awaits its
@@ -1700,83 +1752,195 @@ class ChatOrchestrator:
                 ).model_dump(exclude_none=True),
             )
 
-            t_open = time.perf_counter()
-            if stream is None:
-                opened_stream, first_event = await self._open_stream_with_retry(
-                    provider_request
-                )
-                stream = opened_stream
-            else:
-                opened_stream = stream
-                first_event = await opened_stream.prefetch_first_event()
-            # Phase timing for the round's remaining "dead air": upstream
-            # open-to-first-event. It dominates on cache misses (prefill) and on
-            # thinking-heavy rounds (reasoning precedes the event), but no longer
-            # delays the already-emitted skill metadata.
-            logger.info(
-                "respond_upstream_open",
-                request_id=meta.request_id,
-                speculative=used_speculation,
-                upstream_first_event_ms=(
-                    speculative_stream.open_ms
-                    if (
-                        speculative_stream is not None
-                        and speculative_stream.open_ms is not None
-                    )
-                    else round((time.perf_counter() - t_open) * 1000)
-                ),
-                post_meta_first_event_ms=round((time.perf_counter() - t_open) * 1000),
-                # The endpoint serving the main generation. Read after the first
-                # event because that is the earliest chunk that names it; still
-                # `None` if the stream ended before yielding one.
-                upstream_endpoint=opened_stream.endpoint,
-                speculative_prefetched_chunks=(
-                    speculative_stream.stats()["prefetched_chunks"]
-                    if speculative_stream is not None and used_speculation
-                    else 0
-                ),
-            )
-
-            async def _chunks() -> AsyncIterator[dict[str, Any]]:
-                if first_event is not None:
-                    yield first_event
-                async for chunk in opened_stream:
-                    yield chunk
-
-            async for chunk in _chunks():
-                finish_reason = self._chunk_finish_reason(chunk) or finish_reason
-                delta = self._chunk_to_delta(chunk)
-                if delta is None:
-                    continue
-                if delta.content:
-                    content_parts.append(delta.content)
-                # Announce the thinking phase once, the instant the model's
-                # chain-of-thought starts streaming, so the CLI can show it.
-                if delta.reasoning_content and not thinking_signaled:
-                    thinking_signaled = True
-                    yield self._sse("status", StreamStatus(phase="thinking").model_dump())
-                if delta.tool_calls:
-                    saw_tool_calls = True
-                    ready = tool_call_buffer.add(delta.tool_calls)
-                    if delta.content or delta.reasoning_content:
-                        yield self._sse(
-                            "delta",
-                            StreamDelta(
-                                content=delta.content,
-                                reasoning_content=delta.reasoning_content,
-                            ),
+            while True:
+                t_open = time.perf_counter()
+                if stream is None:
+                    try:
+                        opened_stream, first_event = await self._open_stream_with_retry(
+                            active_request
                         )
-                    if ready:
-                        yield self._sse("delta", StreamDelta(tool_calls=ready))
+                    except DaintreeError as exc:
+                        if fallback is None:
+                            raise
+                        # The re-roll never opened, so nothing of it is public and
+                        # the first attempt is still replay-safe. Fail open to the
+                        # draft we already have rather than costing the user the
+                        # turn over a weak-but-real reply.
+                        self._log_bare_intent(
+                            "failed_open",
+                            request_id=meta.request_id,
+                            stream=True,
+                            code=exc.code,
+                        )
+                        held, finish_reason, restored = fallback
+                        content_parts = [restored]
+                        break
+                    stream = opened_stream
+                else:
+                    opened_stream = stream
+                    first_event = await opened_stream.prefetch_first_event()
+                # Phase timing for the round's remaining "dead air": upstream
+                # open-to-first-event. It dominates on cache misses (prefill) and on
+                # thinking-heavy rounds (reasoning precedes the event), but no longer
+                # delays the already-emitted skill metadata.
+                # The re-roll is never speculative: its request carries the corrective
+                # message, so no speculation opened against the original can serve it.
+                # Attributing attempt 0's speculation stats to it would make the
+                # speculation hit rate read higher than it is.
+                served_by_speculation = used_speculation and attempt == 0
+                logger.info(
+                    "respond_upstream_open",
+                    request_id=meta.request_id,
+                    speculative=served_by_speculation,
+                    # Which semantic attempt this open served: 0 is the round itself,
+                    # 1 the bare-intent re-roll.
+                    semantic_attempt=attempt,
+                    upstream_first_event_ms=(
+                        speculative_stream.open_ms
+                        if (
+                            served_by_speculation
+                            and speculative_stream is not None
+                            and speculative_stream.open_ms is not None
+                        )
+                        else round((time.perf_counter() - t_open) * 1000)
+                    ),
+                    post_meta_first_event_ms=round((time.perf_counter() - t_open) * 1000),
+                    # The endpoint serving the main generation. Read after the first
+                    # event because that is the earliest chunk that names it; still
+                    # `None` if the stream ended before yielding one.
+                    upstream_endpoint=opened_stream.endpoint,
+                    speculative_prefetched_chunks=(
+                        speculative_stream.stats()["prefetched_chunks"]
+                        if speculative_stream is not None and served_by_speculation
+                        else 0
+                    ),
+                )
+
+                if attempt == 0 and tools_callable:
+                    held = []
+
+                async for chunk in self._chunk_iter(opened_stream, first_event):
+                    finish_reason = self._chunk_finish_reason(chunk) or finish_reason
+                    delta = self._chunk_to_delta(chunk)
+                    if delta is None:
+                        continue
+                    if delta.content:
+                        content_parts.append(delta.content)
+                    # Release the gate on anything that rules the failure shape out.
+                    # Reasoning and tool-call fragments are public model output the
+                    # moment they arrive, so an attempt that produces either can no
+                    # longer be discarded; the probe covers length and questions.
+                    # Held content flushes FIRST, preserving the order the model
+                    # generated it in.
+                    if held is not None and (
+                        delta.reasoning_content
+                        or delta.tool_calls
+                        or not could_still_be_bare_intent("".join(content_parts))
+                    ):
+                        for pending in held:
+                            yield self._sse("delta", pending)
+                        held = None
+                    # Announce the thinking phase once, the instant the model's
+                    # chain-of-thought starts streaming, so the CLI can show it.
+                    if delta.reasoning_content and not thinking_signaled:
+                        thinking_signaled = True
+                        yield self._sse("status", StreamStatus(phase="thinking").model_dump())
+                    if delta.tool_calls:
+                        saw_tool_calls = True
+                        ready = tool_call_buffer.add(delta.tool_calls)
+                        if delta.content or delta.reasoning_content:
+                            yield self._sse(
+                                "delta",
+                                StreamDelta(
+                                    content=delta.content,
+                                    reasoning_content=delta.reasoning_content,
+                                ),
+                            )
+                        if ready:
+                            yield self._sse("delta", StreamDelta(tool_calls=ready))
+                        continue
+                    if held is not None:
+                        held.append(delta)
+                        continue
+                    yield self._sse("delta", delta)
+
+                # The reply has ended with its content still private. This is the one
+                # moment the dead round can be caught, and discarding it is free.
+                if held is not None and self._is_bare_intent(
+                    "".join(content_parts),
+                    finish_reason=finish_reason,
+                    saw_tool_calls=saw_tool_calls,
+                    tools_callable=tools_callable,
+                    request_id=meta.request_id,
+                ):
+                    self._log_bare_intent(
+                        "detected",
+                        request_id=meta.request_id,
+                        stream=True,
+                        first_chars=len("".join(content_parts)),
+                    )
+                    carried_usage = self._sum_usage(
+                        carried_usage, opened_stream.usage or ProviderUsage()
+                    )
+                    # Hand off ownership BEFORE tearing anything down: the draft has
+                    # to survive a close failure, or a teardown error would cost the
+                    # user a reply that is complete and in hand.
+                    fallback = (held, finish_reason, "".join(content_parts))
+                    # Close the discarded producer NOW rather than leaving it to the
+                    # outer ``finally``: a speculative stream holds an overlap slot
+                    # until it closes, and the replacement open should not queue
+                    # behind capacity this attempt no longer needs. Best-effort, for
+                    # the same reason the terminal teardown is: a failed close must
+                    # never become the turn's outcome.
+                    #
+                    # ``stream`` keeps pointing at it ACROSS the await and is cleared
+                    # only once the close has actually returned. Clearing first would
+                    # leak the producer if cancellation landed inside ``aclose()``:
+                    # ``_close_quietly`` swallows ordinary failures but not
+                    # ``CancelledError``, and the outer ``finally`` would then have no
+                    # handle left to finish the teardown with. On the normal path the
+                    # close still happens exactly once — ``stream`` is ``None`` by the
+                    # time that ``finally`` runs.
+                    await self._close_quietly(stream, request_id=meta.request_id)
+                    stream = None
+                    attempt += 1
+                    active_request = self._bare_intent_repair_request(provider_request)
+                    finish_reason = None
+                    saw_tool_calls = False
+                    thinking_signaled = False
+                    content_parts = []
+                    tool_call_buffer = StreamToolCallBuffer(param_index)
+                    held = None
                     continue
-                yield self._sse("delta", delta)
+
+                carried_usage = self._sum_usage(
+                    carried_usage, opened_stream.usage or ProviderUsage()
+                )
+                if attempt:
+                    self._log_bare_intent(
+                        "completed",
+                        request_id=meta.request_id,
+                        stream=True,
+                        retry_finish_reason=finish_reason,
+                        retry_chars=len("".join(content_parts)),
+                        outcome=("tool_calls" if saw_tool_calls else "final_text"),
+                    )
+                break
+
+            # One terminal event for the whole round, whichever attempt produced it.
+            # Anything still held belongs to the accepted attempt and goes out now.
+            for pending in held or []:
+                yield self._sse("delta", pending)
+            held = None
             remaining = tool_call_buffer.flush()
             if remaining:
                 yield self._sse("delta", StreamDelta(tool_calls=remaining))
             self._log_tool_call_repairs(tool_call_buffer.repairs, request_id=meta.request_id)
-            usage = self._usage(opened_stream.usage or ProviderUsage())
             yield self._sse(
-                "done", StreamDone(finish_reason=finish_reason, usage=usage).model_dump()
+                "done",
+                StreamDone(
+                    finish_reason=finish_reason, usage=self._usage(carried_usage)
+                ).model_dump(),
             )
             completed = True
         except DaintreeError as exc:
@@ -1798,16 +1962,7 @@ class ChatOrchestrator:
             )
         finally:
             if stream is not None:
-                try:
-                    await stream.aclose()
-                except Exception:
-                    # A terminal event (done/error) may already be on the wire;
-                    # a teardown failure must never surface as a second one.
-                    logger.warning(
-                        "provider_close_failed",
-                        request_id=meta.request_id,
-                        exc_info=True,
-                    )
+                await self._close_quietly(stream, request_id=meta.request_id)
 
         # Learn only from a stream that reached a clean ``done`` (not an error, and
         # not an aborted stream — a client disconnect raises GeneratorExit at a
@@ -1821,6 +1976,16 @@ class ChatOrchestrator:
                 had_tool_calls=saw_tool_calls or finish_reason == "tool_calls",
                 api_key=api_key,
             )
+
+    @staticmethod
+    async def _chunk_iter(
+        stream: ProviderStream, first_event: dict[str, Any] | None
+    ) -> AsyncIterator[dict[str, Any]]:
+        """The stream's chunks, with the already-prefetched first event back in front."""
+        if first_event is not None:
+            yield first_event
+        async for chunk in stream:
+            yield chunk
 
     @staticmethod
     def _chunk_finish_reason(chunk: dict[str, Any]) -> str | None:
@@ -1854,6 +2019,150 @@ class ChatOrchestrator:
         )
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         return f"event: {event}\ndata: {body}\n\n"
+
+    # ---- bare-tool-intent repair ----------------------------------------
+
+    @staticmethod
+    async def _close_quietly(stream: ProviderStream, *, request_id: str) -> None:
+        """Tear a provider stream down without letting the teardown become the answer.
+
+        A terminal event (done/error) may already be on the wire, and a discarded
+        attempt's replacement is still owed to the user — neither can be displaced
+        by a close failure.
+        """
+        try:
+            await stream.aclose()
+        except Exception:
+            logger.warning("provider_close_failed", request_id=request_id, exc_info=True)
+
+    def _is_bare_intent(
+        self,
+        text: str,
+        *,
+        finish_reason: str | None,
+        saw_tool_calls: bool,
+        tools_callable: bool,
+        request_id: str,
+    ) -> bool:
+        """``is_bare_tool_intent``, but a bug in it can never cost the user a turn.
+
+        Same posture as ``_lint_final_output``: this is an optional improvement to a
+        reply that is already generated and already owed, so it fails open rather
+        than propagating. (The streaming gate's ``could_still_be_bare_intent`` probe
+        needs no such guard — it is a length test and a substring test on a ``str``.)
+        """
+        try:
+            return is_bare_tool_intent(
+                text,
+                finish_reason=finish_reason,
+                saw_tool_calls=saw_tool_calls,
+                tools_callable=tools_callable,
+            )
+        except Exception:
+            logger.warning("bare_intent_detector_failed", request_id=request_id, exc_info=True)
+            return False
+
+    @staticmethod
+    def _tools_callable(request: ProviderChatRequest) -> bool:
+        """Could this request have produced a tool call at all?
+
+        A round with nothing callable cannot have dropped an action, so a sentence
+        about acting is at worst awkward prose — never the failure in issue #25.
+        """
+        if not request.tools:
+            return False
+        return request.tool_choice != "none"
+
+    @staticmethod
+    def _bare_intent_repair_request(request: ProviderChatRequest) -> ProviderChatRequest:
+        """The same request plus one corrective instruction.
+
+        The discarded draft is deliberately NOT replayed. Its whole problem is that
+        it is a persuasive in-context example of announcing-then-stopping — feeding
+        it back is what turns one model slip into the self-reinforcing loop the
+        issue describes. The nudge names the failure without demonstrating it.
+
+        ``tool_choice`` is carried over untouched: forcing a call here would
+        over-correct a round whose right answer is a direct reply with no call,
+        which the tool-discipline prompt explicitly protects.
+        """
+        return replace(request, messages=[*request.messages, dict(_BARE_INTENT_NUDGE)])
+
+    @staticmethod
+    def _sum_usage(first: ProviderUsage | None, second: ProviderUsage | None) -> ProviderUsage:
+        """Total tokens across both attempts.
+
+        The caller's own key funded the discarded generation too, so reporting only
+        the accepted attempt would under-bill what the turn actually cost them.
+        ``None`` means "not reported" and stays ``None`` only if neither side had a
+        number, so a provider that omits usage is not silently turned into a zero.
+        """
+
+        def add(a: int | None, b: int | None) -> int | None:
+            if a is None:
+                return b
+            return a if b is None else a + b
+
+        first = first or ProviderUsage()
+        second = second or ProviderUsage()
+        return ProviderUsage(
+            prompt_tokens=add(first.prompt_tokens, second.prompt_tokens),
+            completion_tokens=add(first.completion_tokens, second.completion_tokens),
+            total_tokens=add(first.total_tokens, second.total_tokens),
+            cached_tokens=add(first.cached_tokens, second.cached_tokens),
+        )
+
+    def _log_bare_intent(self, phase: str, *, request_id: str, **fields: Any) -> None:
+        """Structured record of a re-roll. Never logs response content — only its
+        shape — so a transcript can be diagnosed from logs without leaking it."""
+        logger.info("main_bare_intent_retry", phase=phase, request_id=request_id, **fields)
+
+    async def _repair_bare_intent(
+        self, provider_request: ProviderChatRequest, result: Any, *, request_id: str
+    ) -> Any:
+        """One re-roll of a non-streaming round that announced an action and took none.
+
+        Mirrors the selector's repair posture (``skills/selector.py`` ``_run``):
+        detect the bad shape, re-ask ONCE with a corrective message, then accept
+        whatever comes back — there is never a third attempt, and an upstream
+        failure fails open to the reply already in hand. Nothing has reached the
+        client at this point, so discarding the first draft is free.
+        """
+        if not self._is_bare_intent(
+            result.text,
+            finish_reason=result.finish_reason,
+            saw_tool_calls=bool(result.tool_calls),
+            tools_callable=self._tools_callable(provider_request),
+            request_id=request_id,
+        ):
+            return result
+
+        self._log_bare_intent(
+            "detected", request_id=request_id, stream=False, first_chars=len(result.text or "")
+        )
+        try:
+            repaired = await self._complete_with_retry(
+                self._bare_intent_repair_request(provider_request)
+            )
+        except DaintreeError as exc:
+            # Fail open: the first reply is weak, but it is a real reply the user is
+            # already owed. A repair error must never cost them the turn.
+            self._log_bare_intent(
+                "failed_open", request_id=request_id, stream=False, code=exc.code
+            )
+            return result
+
+        repaired.usage = self._sum_usage(result.usage, repaired.usage)
+        self._log_bare_intent(
+            "completed",
+            request_id=request_id,
+            stream=False,
+            retry_finish_reason=repaired.finish_reason,
+            retry_tool_calls=len(repaired.tool_calls or []),
+            retry_chars=len(repaired.text or ""),
+            outcome=("tool_calls" if repaired.tool_calls else "final_text"),
+        )
+        return repaired
 
     # ---- retries (before any model output is emitted) -------------------
 
