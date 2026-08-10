@@ -1684,8 +1684,9 @@ class ChatOrchestrator:
         # All calls flush together at stream end: the client only dispatches tools
         # once the round is complete, so consolidation adds no real latency, and
         # holding everything tolerates providers that interleave call fragments.
-        tool_call_buffer = StreamToolCallBuffer(build_parameter_index(request.input.tools))
+        # Built once and reused: the re-roll rebuilds its buffer from the same index.
         param_index = build_parameter_index(request.input.tools)
+        tool_call_buffer = StreamToolCallBuffer(param_index)
         stream: ProviderStream | None = None
         used_speculation = False
         # THE COMMIT GATE (issue #25). A round that announces a tool call and emits
@@ -1885,14 +1886,23 @@ class ChatOrchestrator:
                     # to survive a close failure, or a teardown error would cost the
                     # user a reply that is complete and in hand.
                     fallback = (held, finish_reason, "".join(content_parts))
-                    discarded, stream = stream, None
                     # Close the discarded producer NOW rather than leaving it to the
                     # outer ``finally``: a speculative stream holds an overlap slot
                     # until it closes, and the replacement open should not queue
                     # behind capacity this attempt no longer needs. Best-effort, for
                     # the same reason the terminal teardown is: a failed close must
                     # never become the turn's outcome.
-                    await self._close_quietly(discarded, request_id=meta.request_id)
+                    #
+                    # ``stream`` keeps pointing at it ACROSS the await and is cleared
+                    # only once the close has actually returned. Clearing first would
+                    # leak the producer if cancellation landed inside ``aclose()``:
+                    # ``_close_quietly`` swallows ordinary failures but not
+                    # ``CancelledError``, and the outer ``finally`` would then have no
+                    # handle left to finish the teardown with. On the normal path the
+                    # close still happens exactly once — ``stream`` is ``None`` by the
+                    # time that ``finally`` runs.
+                    await self._close_quietly(stream, request_id=meta.request_id)
+                    stream = None
                     attempt += 1
                     active_request = self._bare_intent_repair_request(provider_request)
                     finish_reason = None

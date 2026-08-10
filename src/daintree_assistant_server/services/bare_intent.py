@@ -83,13 +83,44 @@ _ACTION = (
 # read the run-on "config.The roster…" as one token instead of a sentence boundary.
 _CLAUSE_BODY = r"(?:[^.!?:;]|[.:](?=(?-i:[a-z0-9/])))*"
 
-# The announcement itself, anchored to the END of the reply — that is what makes it
-# the point of the message rather than an aside inside a real answer. A leading
-# connective is allowed so "…, then let me read the votes." still reads as one.
-_ANNOUNCE_RE = re.compile(
-    rf"(?:(?:then|so|now|next|okay|ok|alright|first)\s+)?"
+# What sits between the start of a clause and its verb: an optional leading
+# connective (so "…, then let me read the votes." still reads as one announcement)
+# and the adverbs the model slips in ("I'll just check…"). Shared by the
+# announcement pattern and the idiom carve-out below so the two cannot drift.
+_LEAD = (
+    r"(?:(?:then|so|now|next|okay|ok|alright|first)\s+)?"
     rf"{_OPENER}\s+(?:now\s+|next\s+|just\s+|quickly\s+)?"
-    rf"{_ACTION}\b{_CLAUSE_BODY}[.!]?\s*$",
+)
+
+# The announcement itself, anchored to the END of the reply — that is what makes it
+# the point of the message rather than an aside inside a real answer.
+_ANNOUNCE_RE = re.compile(
+    rf"{_LEAD}{_ACTION}\b{_CLAUSE_BODY}[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+# Clauses that wear the announcement's shape but promise no tool call. Anchored at
+# BOTH ends and tested against a whole clause rather than searched inside one: the
+# idiom only disqualifies the clause when it IS the clause. "I'll update the docs
+# and call it done." still announces a real update, and a veto that fired on the
+# tail would hide it — there the clause's own verb is "update", so this never
+# matches.
+#
+# Two idioms, both observed as false positives:
+#
+# * performative "call" — "I'm going to call it here." is a sign-off, not a tool
+#   call, and re-rolling it discards a correct final answer. The restriction to
+#   "call it/this/that <word>" is what separates the idiom from the real thing
+#   ("let me call terminal.read"), which never takes those objects.
+# * "check with <someone>" — consulting a human, not a tool. Plain "I'll check the
+#   logs" is unaffected because nothing there follows "check" with "with".
+#
+# Both carve-outs deliberately swallow the rest of the clause, so a real action
+# trailing an idiom ("I'll check with the team and update the ticket") is missed.
+# That is a false negative, the side this module always errs toward.
+_IDIOM_RE = re.compile(
+    rf"{_LEAD}(?:call\s+(?:it|this|that)\s+(?:a\s+)?\w+|check(?:\s+in)?\s+with\b)"
+    rf"{_CLAUSE_BODY}[.!]?\s*$",
     re.IGNORECASE,
 )
 
@@ -133,11 +164,15 @@ def _announcement_clause(normalized: str) -> str | None:
     has two candidate clauses, and only the last one is the actual announcement —
     scoping the deferral test to a leftmost match would let the preamble's
     "tomorrow" veto a genuine dead round.
+
+    An idiom clause is SKIPPED rather than returned, so the scan keeps widening:
+    "I'll read the votes, then I'll call it a day." still surfaces the genuine
+    announcement in the enclosing clause.
     """
     starts = [0, *(m.end() for m in _BOUNDARY_RE.finditer(normalized))]
     for start in reversed(starts):
         clause = normalized[start:]
-        if _ANNOUNCE_RE.match(clause):
+        if _ANNOUNCE_RE.match(clause) and not _IDIOM_RE.match(clause):
             return clause
     return None
 

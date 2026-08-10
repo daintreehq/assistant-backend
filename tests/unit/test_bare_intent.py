@@ -237,6 +237,41 @@ def test_rejects_inline_results_and_deferred_actions(text: str) -> None:
     assert not _detect(text)
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Performative "call": a sign-off, not a tool call. Re-rolling one of these
+        # throws away a correct final answer and bills a second generation for it.
+        "Everything is green. I'm going to call it here.",
+        "The suite is clean. I'll call it a day.",
+        "Both PRs are merged. Let me call it done.",
+        "I'll call this done.",
+        "I'm going to call that done.",
+        # "check with <someone>" consults a human; no tool was dropped.
+        "I'll check with the team.",
+        "Let me check with you before touching the migration.",
+        "I'll check in with the reviewer.",
+    ],
+)
+def test_rejects_performative_and_human_consult_idioms(text: str) -> None:
+    assert not _detect(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # The idiom must not swallow a clause whose OWN verb is a real action.
+        "I'll update the docs and call it done.",
+        "I'll read the votes, then I'll call it a day.",
+        # Plain "check" is untouched: only "check with" is a consultation.
+        "I'll check the logs.",
+        "Let me check the roster before the next batch.",
+    ],
+)
+def test_idiom_carve_out_does_not_over_reach(text: str) -> None:
+    assert _detect(text)
+
+
 def test_conditional_check_is_a_tolerated_false_negative() -> None:
     """"if the" is read as deferral even when it is really a complement.
 
