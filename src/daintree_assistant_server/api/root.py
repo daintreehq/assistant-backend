@@ -12,7 +12,10 @@ router = APIRouter()
 MARKETING_URL = "https://daintree.org/assistant"
 
 
-@router.get("/", include_in_schema=False)
+# HEAD is listed explicitly: a FastAPI APIRoute registers only the methods named
+# here, so a bare @router.get would answer HEAD / with 405. Link previewers and
+# uptime monitors do send HEAD, and a redirect is a better answer than a refusal.
+@router.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 async def root() -> RedirectResponse:
     """Send a browser that reached the API origin to the product page.
 

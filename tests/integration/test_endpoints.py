@@ -35,6 +35,17 @@ def test_root_redirects_to_the_product_page(client) -> None:
     assert r.headers["location"] == "https://daintree.org/assistant"
 
 
+def test_root_redirect_answers_head(client) -> None:
+    """HEAD / must redirect too, not 405.
+
+    A FastAPI route registers only the methods it names, so this needs HEAD listed
+    explicitly alongside GET — link previewers and uptime monitors send it.
+    """
+    r = client.head("/", follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "https://daintree.org/assistant"
+
+
 def test_root_redirect_does_not_capture_api_paths(client) -> None:
     """The redirect must stay scoped to "/" alone.
 
