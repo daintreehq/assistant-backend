@@ -232,6 +232,18 @@ def test_rightmost_announcement_wins() -> None:
         "I'll update you when they finish.",
         "I'll update you when that lands.",
         "I'll update you when done.",
+        "I will update you when we finish.",
+        "I will update you when I know more.",
+        # Enumerating the subject leaves the same hole one subject over, which is why
+        # the conjunction is matched bare.
+        "I will delete the branch when CI passes.",
+        # A conditional MUTATION is the worst possible false positive: the re-roll
+        # nudge would ask the next draft to perform it unconditionally.
+        "I will delete the branch if CI passes.",
+        "I will delete the branch if it passes.",
+        "I will delete the branch if approved.",
+        "I will delete the branch after CI passes.",
+        "I will delete the branch after it passes.",
         # A conditional MUTATION is the worst thing to re-roll: the nudge would ask
         # the next draft to perform it unconditionally.
         "I'll delete the branch if the tests pass.",
@@ -298,11 +310,21 @@ def test_idiom_carve_out_does_not_over_reach(text: str) -> None:
         "Checking the worktree now.",
         # The dropped subject may also be spelled out, and a connective may front it.
         "I'm inspecting the failing test.",
+        "I am polling the queue.",
+        "I’m reading the closest match.",
         "The suite is red. Now reading the first failure.",
-        # A finite verb inside a SUBORDINATE clause says nothing about the participle.
-        "Checking whether the service is healthy.",
-        # Dotted tool names survive the participle path too.
+        # Dotted tool names and paths are objects in their own right — no determiner
+        # precedes them, and they are the likeliest object this product has.
         "Votes are in. Reading terminal.awaitAll output.",
+        "Opening src/app.py now.",
+        # A plural head noun is inflected like a verb, but it CLOSES the phrase.
+        "Checking the logs.",
+        "Reading the votes now.",
+        # Spot checks across the rest of the mirrored verb list.
+        "Deleting the stale branch.",
+        "Spawning the fallback worker.",
+        "Kicking off the release job.",
+        "Looking into the failing migration.",
     ],
 )
 def test_detects_bare_participle_status_lines(text: str) -> None:
@@ -312,15 +334,60 @@ def test_detects_bare_participle_status_lines(text: str) -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        # A finite verb makes the participle DESCRIBE an action rather than promise
-        # one. This is the case test_learning_trigger.py already guards live.
+        # A second predicate makes the participle DESCRIBE an action rather than
+        # promise one. The first case is the one test_learning_trigger.py guards live.
         "Running the suite takes 4 minutes.",
         "Reading the config is slow.",
+        "Reading the config isn't useful.",
         "Checking the roster required a second pass.",
+        "Reading that file is unnecessary.",
+        # The verb a second predicate draws on is an OPEN set, which is why the veto
+        # is a suffix rule and not a list.
+        "Reading the config revealed the bug.",
+        "Checking the logs confirmed a timeout.",
+        "Running the tests succeeded.",
+        "Inspecting the payload reveals the missing field.",
+        "Retrieving a missing row returns None.",
+        "Editing that field preserves whitespace.",
+        "Looking at the trace explains the timeout.",
+        # An adverb in front of the inflected word gives the verb away, even when the
+        # word closes the sentence.
+        "Creating the client now succeeds.",
+        "Loading the config now works.",
+        # A gerund subject usually reaches its complement through a preposition, and
+        # requiring a direct object is what rejects the whole class.
+        "Fetching from cache avoids the timeout.",
+        "Querying by slug returns 404.",
+        "Executing under zsh fails on line 12.",
+        "Spawning two workers reproduces the race.",
+        "Invoking it directly bypasses the guard.",
+        "Reading while idle is harmless.",
+        # A status fragment or a noun modifier has no object phrase at all.
+        "Checking complete.",
+        "Reading complete.",
+        "Running clean.",
+        "Deleting disabled.",
+        "Polling interval unchanged.",
+        "Calling convention unchanged.",
+        "Opening brace unchanged.",
+        "Launching locally works again.",
+        # A conditional or subordinated mutation is the worst thing to re-roll.
+        "Deleting that branch is unsafe.",
+        "Deleting the branch while CI is running is unsafe.",
+        "Deleting the branch, which is protected, is unsafe.",
         # A participle mid-sentence is a reduced clause inside a delivered answer, not
         # a status line — only a SENTENCE start opens the participle path.
         "One cause stands out — reading the stale cache.",
         "The handler crashed, reading a null config.",
+        "The latency comes from I/O; reading each file sequentially.",
+        "Looking at the logs, I found a stale cache entry.",
+        # A period after an enumerator or an abbreviation does not end a sentence, so
+        # it must not mint a start for the participle path either.
+        "Costs: 1. Reading from disk.",
+        "Disk I/O is the bottleneck, e.g. Reading the cache.",
+        # An em dash delivers the result inline exactly as a colon does.
+        "Checking the worktree — clean.",
+        "Reading the closest match — it contains the fix.",
         # The base verb is absent from _ACTION because prose can satisfy it, so its
         # participle stays absent too. "I'll list the three failures." is False.
         "Listing the three failures.",
@@ -333,6 +400,8 @@ def test_detects_bare_participle_status_lines(text: str) -> None:
         "I'm calling it a day.",
         "Checking with the team.",
         "I am checking in with the reviewer.",
+        "Everything is green. Calling it.",
+        "Just checking in.",
         # The participle path inherits the deferral and contrast vetoes.
         "Reading the results tomorrow.",
         "Checking the logs, but the credentials are likely stale.",
@@ -342,14 +411,33 @@ def test_rejects_participles_that_are_not_announcements(text: str) -> None:
     assert not _detect(text)
 
 
-def test_participle_veto_does_not_leak_onto_opener_clauses() -> None:
-    """The finite-verb veto is scoped to the participle path alone.
+def test_participle_vetoes_do_not_leak_onto_opener_clauses() -> None:
+    """The participle vetoes are scoped to the participle path alone.
 
-    "I'll check whether it is ready." carries a finite verb and would be vetoed if the
-    two paths shared one rule; it is governed by the deferral rules only, and its
-    result is unchanged by the participle work.
+    "I'll check the config is valid." carries a finite verb and no object determiner,
+    so it would be rejected twice over if the two paths shared one rule. An opener
+    declares the intent by itself, and this reply's result is unchanged by any of the
+    participle work.
     """
-    assert _detect("I'll check whether it is ready.")
+    assert _detect("I'll check the config is valid.")
+    assert _detect("I'll read them, one read per terminal, batched.")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Narrowing the participle path costs coverage, and this is where. Each of
+        # these is a real dead round the detector now lets through; a missed dead round
+        # costs one wasted turn, while re-rolling a delivered answer costs a correct
+        # reply and a second generation. These are the cheap side on purpose.
+        "Checking whether the service is healthy.",
+        "Reading from the audit log.",
+        "Search returned three matches, now reading the closest match.",
+        "The build is done; reading the log.",
+    ],
+)
+def test_narrowed_participle_path_tolerates_these_false_negatives(text: str) -> None:
+    assert not _detect(text)
 
 
 @pytest.mark.parametrize(
@@ -360,21 +448,29 @@ def test_participle_veto_does_not_leak_onto_opener_clauses() -> None:
         "Let me check the worktree\n- clean\n- no pending changes",
         "Let me check the worktree\n* clean\n+ no pending changes",
         "Let me check the worktree\n1. clean\n2) no pending changes",
+        # Tight markers and Unicode bullets are block content too. Every marker only
+        # ever narrows detection, so recognising more of them is the safe direction.
+        "Let me check the worktree\n-clean\n-dirty",
+        "Let me check the worktree\n1)clean\n2)dirty",
+        "Let me check the worktree\n• clean\n• no pending changes",
+        # …as are the other block shapes an answer arrives in.
+        "Let me check the worktree\n> clean",
+        "Let me check the worktree\n| status | clean |",
+        "Let me check the worktree\n```text\nclean\n```",
+        "Let me check the worktree\n## Result\nclean",
         # A plan being PRESENTED. The ordered marker's own period mints a clause start,
-        # so the list-item skip is what keeps these from reading as dead rounds.
-        "Here's the plan.\n- I'll inspect the current implementation.",
+        # so the block skip is what keeps these from reading as dead rounds.
         "Here's the plan.\n1. I'll inspect the current implementation.",
         "1. I'll inspect the current implementation.",
-        "- Reading the closest match.",
+        "1. Reading the closest match.",
     ],
 )
-def test_rejects_content_delivered_as_a_list(text: str) -> None:
+def test_rejects_content_delivered_as_a_block(text: str) -> None:
     assert not _detect(text)
 
 
-def test_list_awareness_does_not_disturb_plain_wrapping() -> None:
-    """Only a list line keeps its newline; ordinary wrapping still collapses."""
-    assert _detect("Votes are in.\n\nLet me read\nall five now.")
+def test_block_awareness_does_not_disturb_plain_wrapping() -> None:
+    """Only a block line keeps its newline; ordinary wrapping still collapses."""
     assert _detect("Search returned 3 candidates.\nReading the closest\nmatch.")
 
 
