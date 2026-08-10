@@ -310,7 +310,13 @@ _FINITE_VERB_RE = re.compile(
     # The irregular past forms, which no suffix rule can reach.
     r"|found|made|got|came|went|ran|saw|kept|left|held|brought|built|became"
     r"|broke|lost|grew|won|sold|told|felt|drew|threw|began|chose|drove|fell"
-    r"|flew|forgot|knew|led|paid|rose|spent|stood|wrote|sent|shut|hit)\b"
+    r"|flew|forgot|knew|led|paid|rose|spent|stood|wrote|sent|shut|hit"
+    # Zero-inflection irregulars — past tense spelled exactly like the stem, so
+    # neither the suffix rule nor the list above can see them — plus the modals that
+    # list missed. "cannot" is one word, so ``\bcan\b`` never reaches inside it and
+    # the contraction rule below only covers "can't".
+    r"|put|set|let|cut|hurt|split|read|blew|tore|hid|beat|bore|cast|burst"
+    r"|undid|overrode|drank|sank|swept|shall|ought|cannot)\b"
     r"|\w+n['’]t\b",
     re.IGNORECASE,
 )
@@ -318,6 +324,18 @@ _FINITE_VERB_RE = re.compile(
 # A SECOND action participle means two gerunds were coordinated into a subject
 # ("Checking the config and reading the file help."), which is a description.
 _SECOND_PARTICIPLE_RE = re.compile(rf"\b{_ACTION_PARTICIPLE}\b", re.IGNORECASE)
+
+# An appositive noun-phrase fragment DESCRIBES code rather than announcing an action
+# ("Reading the whole file into memory.", "Opening a new client per request."), and a
+# preposition heading a phrase AFTER the object is the reliable tell. Only prepositions
+# that cannot open an announcement's own object are listed — "Looking into the failing
+# migration." spends its preposition inside ``_ACTION_PARTICIPLE``, so it is consumed by
+# the head and never reaches the tail. This closes the observed fragments, not the whole
+# class; the residual is an accepted false positive, on the side this module errs toward.
+_APPOSITIVE_PREP_RE = re.compile(
+    r"\b(?:into|inside|outside|per|without|during|across|beyond|around|via)\b",
+    re.IGNORECASE,
+)
 
 # The second is a suffix rule, because the vocabulary a second predicate can draw on
 # is open-ended — "reveals", "returns", "succeeds", "reproduces", "preserves" — and no
@@ -396,7 +414,11 @@ def _is_bare_participle(clause: str) -> bool:
     if match is None:
         return False
     tail = clause[match.end("head") :]
-    if _FINITE_VERB_RE.search(tail) or _SECOND_PARTICIPLE_RE.search(tail):
+    if (
+        _FINITE_VERB_RE.search(tail)
+        or _SECOND_PARTICIPLE_RE.search(tail)
+        or _APPOSITIVE_PREP_RE.search(tail)
+    ):
         return False
     words = _WORD_RE.findall(tail)
     for index, word in enumerate(words):

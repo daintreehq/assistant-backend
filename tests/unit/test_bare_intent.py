@@ -372,6 +372,24 @@ def test_detects_bare_participle_status_lines(text: str) -> None:
         "Deleting the branch may help.",
         "Deleting the branch might help.",
         "Deleting the branch must wait.",
+        # A zero-inflection irregular past is spelled exactly like its stem, so the
+        # suffix rule cannot see it either and the closed list is the only thing
+        # standing between these and a discarded correct answer.
+        "I reproduced it. Loading the plugin blew up.",
+        "Root cause found. Reading the config set the stale flag.",
+        "Confirmed the regression. Deleting the branch undid the fix.",
+        "Reading the manifest hid the real error.",
+        "Opening the socket burst the send buffer.",
+        "Reading the config let the stale value through.",
+        # "cannot" is one word: \bcan\b never reaches inside it, and the contraction
+        # rule only covers "can't".
+        "The guard is in place. Reading the file cannot fail.",
+        "Deleting the branch shall wait until the release.",
+        # An appositive noun-phrase fragment describes code rather than announcing an
+        # action; a preposition heading a phrase after the object is the tell.
+        "The loader is the bottleneck. Reading the whole file into memory.",
+        "Found the leak in session.py. Opening a new client per request.",
+        "One antipattern stands out. Calling the API inside the retry loop.",
         # Two gerunds coordinated into one subject.
         "Checking the config and reading the file help.",
         # A measurement or a status pair is not a tool name: the dotted object has to
