@@ -46,10 +46,11 @@ Procedure:
    - `format` (xml, json, markdown, tree, ndjson, sarif) and `withLineNumbers` as the user asked.
    - `modified` (working-tree changes) and `changed: "<ref>"` only when the user scoped the bundle to recent work — and only with a ref you have verified, because a bad ref silently drops the git filter, widening the bundle to everything the rest of the selection still allows.
 
-6. Match the shape to the ask: `scopePaths` only for "everything under these directories", named files and evidenced file families on `includePaths`/`filter`. Then call the endpoint chosen in step 1, with the worktree named explicitly. For named files or an evidenced family of files, select them directly and leave `scopePaths` off:
+6. Match the shape to the ask: `scopePaths` only for "everything under these directories", named files and evidenced file families on `includePaths`/`filter`. Then call the endpoint chosen in step 1, passing the worktree id and a run label. `name` labels what the bundle is FOR — it becomes the run's title in the user's copy-tree history and the completion notification. Prefer a clear 2-4 word purpose label ("auth flow context"); the count is advisory, so never pad or truncate to fit. It sits at the TOP LEVEL, a sibling of `worktreeId` and `options`, never inside `options`. Always supply one: blank or whitespace is treated as absent and falls back to a label derived from the selection ("engine.py +7 more"). For named files or an evidenced family of files, select them directly and leave `scopePaths` off:
 
        copyTree.generate({
          "worktreeId": "<resolved id>",
+         "name": "auth flow context",
          "options": { "includePaths": ["src/feature/engine.py", "tests/test_feature*.py"], "maxTotalSize": 400000 }
        })
 
@@ -57,12 +58,13 @@ Procedure:
 
        copyTree.generate({
          "worktreeId": "<resolved id>",
+         "name": "terrain system context",
          "options": { "scopePaths": ["src/worldgen", "src/terrain", "src/world"], "maxTotalSize": 400000 }
        })
 
    Omitting `includePaths` there is deliberate, not an oversight. Only when folder contents must be unioned with exact files elsewhere, put directory globs like `"src/worldgen/**"` beside those exact paths on `includePaths` and leave `scopePaths` off — a scope would AND the outside files away.
 
-   Only when the user explicitly asked for the clipboard, send the same shape to `copyTree.generateAndCopyFile` instead. That call hard-fails without a `worktreeId` — assistant calls get no active-worktree fallback, so name the worktree you curated against. On success the host shows a "Context copied" toast; macOS and Linux put the file itself on the clipboard, Windows its path. Never deliver a bundle twice or switch endpoints after the first call. An empty result delivered no bundle, so the corrected call in step 7 is not a second delivery.
+   Only when the user explicitly asked for the clipboard, send the same shape — including the top-level `name` — to `copyTree.generateAndCopyFile` instead. That call hard-fails without a `worktreeId` — assistant calls get no active-worktree fallback, so pass the id of the worktree you curated against. On success the host shows a "Context copied" toast; macOS and Linux put the file itself on the clipboard, Windows its path. Never deliver a bundle twice or switch endpoints after the first call. An empty result delivered no bundle, so the corrected call in step 7 is not a second delivery.
 
 7. Check the result before reporting. The verdict lives in `stats`. `noFilesMatched` is a valid empty outcome rather than a tool error — never report it undiagnosed, and make at most ONE corrected call, only when the diagnosis names a concrete correction:
    - Read the call you just sent before spending a tool call on anything: a bare directory in `includePaths` or `filter` explains a zero by itself. `noFilesMatched` is a bare boolean naming no failed selector, and the causes coexist — a shape error and an ignored path can both sit in one call, so keep going rather than stopping at the first explanation.
@@ -74,4 +76,4 @@ Procedure:
 
 Confirmation: `copyTree.generateAndCopyFile` is system-tier and always confirms — it replaces whatever the user currently has on their clipboard. Confirm per the active tier before sending it. `copyTree.generate` is read-tier and needs no confirmation.
 
-Report back: the resolved worktree, the settled selection (paths, globs, scopes) and the evidence behind it, the returned filePath, fileCount / outputBytes / estimatedTokens, every budget flag that fired (truncated, truncatedBy, budgetExceeded, noFilesMatched), any requested content you found an ignore rule keeping out and the shortfall that leaves, and whether the bundle landed on the clipboard — never a table.
+Report back: the run label you supplied as `name` (shown in the toolbar's recents dropdown), the resolved worktree, the settled selection (paths, globs, scopes) and the evidence behind it, the returned filePath, fileCount / outputBytes / estimatedTokens, every budget flag that fired (truncated, truncatedBy, budgetExceeded, noFilesMatched), any requested content you found an ignore rule keeping out and the shortfall that leaves, and whether the bundle landed on the clipboard — never a table.
