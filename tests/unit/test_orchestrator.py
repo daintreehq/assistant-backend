@@ -1730,17 +1730,15 @@ async def test_stream_discarded_attempt_is_closed_before_the_reroll_opens(
     replacement open would otherwise queue behind capacity nobody still needs.
     """
     streams: list[FakeStream] = []
-    open_order: list[bool] = []
+    # Recorded, never asserted, INSIDE the factory: an AssertionError raised there
+    # is not a DaintreeError, so it unwinds into _stream_with_heartbeat's broad
+    # handler and becomes an SSE `error` event instead of failing the test.
+    opens: list[tuple[bool, list[bool]]] = []
 
     def stream_factory(request: object) -> FakeStream:
         nudged = _nudged(request)
-        open_order.append(nudged)
-        if nudged:
-            # The first attempt must already be closed by the time this one opens.
-            assert streams[0].closed
-        stream = FakeStream(
-            make_text_chunks("Tallied." if nudged else _DEAD_ROUND)
-        )
+        opens.append((nudged, [s.closed for s in streams]))
+        stream = FakeStream(make_text_chunks("Tallied." if nudged else _DEAD_ROUND))
         streams.append(stream)
         return stream
 
@@ -1750,8 +1748,12 @@ async def test_stream_discarded_attempt_is_closed_before_the_reroll_opens(
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
-    await _drain(outcome.stream)
-    assert open_order == [False, True]
+    events = await _drain(outcome.stream)
+    assert not any(e.startswith("event: error\n") for e in events)
+    assert [nudged for nudged, _ in opens] == [False, True]
+    # The re-roll opened only after the draft it replaces had already been closed.
+    assert opens[0][1] == []
+    assert opens[1][1] == [True]
     assert all(s.closed for s in streams)
 
 

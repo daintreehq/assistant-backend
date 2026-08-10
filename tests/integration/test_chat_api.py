@@ -610,6 +610,10 @@ def test_nonstream_bare_intent_reroll_failure_fails_open(client, auth, fake_prov
     ))
     assert r.status_code == 200
     assert r.json()["message"]["content"] == DEAD_ROUND
+    # Returning the dead round is ALSO what happens with no repair at all, so pin
+    # that a re-roll was genuinely attempted and only then fell back.
+    assert len(fake_provider.requests) == 2
+    assert _was_nudged(fake_provider.requests[1])
 
 
 def test_nonstream_bare_intent_sums_usage_across_both_attempts(
@@ -742,6 +746,10 @@ def test_stream_bare_intent_reroll_open_failure_fails_open(client, auth, fake_pr
     content = "".join(d.get("content", "") for e, d in events if e == "delta")
     assert content.strip() == DEAD_ROUND
     assert next(d for e, d in events if e == "done")["finish_reason"] == "stop"
+    # Delivering the dead round is ALSO what happens with no repair at all, so pin
+    # that the re-roll was genuinely attempted and only then fell back.
+    assert len(fake_provider.stream_requests) == 2
+    assert _was_nudged(fake_provider.stream_requests[1])
 
 
 def test_stream_long_reply_is_released_at_the_gate_bound(client, auth, fake_provider) -> None:
@@ -781,6 +789,200 @@ def test_stream_short_legitimate_reply_survives_the_gate(client, auth, fake_prov
     assert content.strip() == "All five votes are recorded."
     assert len(fake_provider.stream_requests) == 1
     assert [e for e, _ in events][-1] == "done"
+
+
+def test_nonstream_truncated_reply_is_not_rerolled(client, auth, fake_provider) -> None:
+    """``length`` is truncation — a different failure with a different remedy."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = make_result(content=DEAD_ROUND, finish_reason="length")
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi12", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    assert r.status_code == 200
+    assert len(fake_provider.requests) == 1
+
+
+def test_nonstream_reroll_request_matches_the_original_except_the_nudge(
+    client, auth, fake_provider
+) -> None:
+    """The re-roll must not quietly drop tools, the caller's key, or the transcript."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = [
+        make_result(content=DEAD_ROUND, finish_reason="stop"),
+        make_result(content="Done.", finish_reason="stop"),
+    ]
+    client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi13", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    first, retry = fake_provider.requests
+    assert retry.messages[:-1] == first.messages
+    assert retry.messages[-1]["role"] == "user"
+    assert NUDGE_MARKER in retry.messages[-1]["content"]
+    for field in ("model", "tools", "tool_choice", "temperature", "max_tokens",
+                  "response_format", "stream", "thinking_disabled", "timeout", "api_key"):
+        assert getattr(retry, field) == getattr(first, field), field
+
+
+def test_nonstream_usage_summing_tolerates_unreported_fields(
+    client, auth, fake_provider
+) -> None:
+    """``None`` means "not reported" and must not poison the total."""
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = [
+        make_result(
+            content=DEAD_ROUND, finish_reason="stop",
+            usage=ProviderUsage(prompt_tokens=100, completion_tokens=None, cached_tokens=40),
+        ),
+        make_result(
+            content="Done.", finish_reason="stop",
+            usage=ProviderUsage(prompt_tokens=None, completion_tokens=5, total_tokens=None),
+        ),
+    ]
+    usage = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi14", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    )).json()["usage"]
+    assert usage["prompt_tokens"] == 100   # only one side reported it
+    assert usage["completion_tokens"] == 5
+    assert usage["cached_tokens"] == 40
+    assert usage["total_tokens"] == 0      # neither side reported it
+
+
+def test_nonstream_discarded_draft_never_reaches_skill_learning(
+    client, auth, fake_provider, app, monkeypatch
+) -> None:
+    """Learning must see the accepted answer, not the round that did nothing."""
+    seen: list[str] = []
+    monkeypatch.setattr(
+        app.state.container.orchestrator,
+        "_maybe_learn_after_turn",
+        lambda **kwargs: seen.append(kwargs["assistant_text"]),
+    )
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = [
+        make_result(content=DEAD_ROUND, finish_reason="stop"),
+        make_result(content="Read five votes; here is the tally.", finish_reason="stop"),
+    ]
+    client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi15", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    assert seen == ["Read five votes; here is the tally."]
+
+
+def test_stream_reasoning_disarms_the_gate(client, auth, fake_provider) -> None:
+    """Reasoning is public model output, so the attempt can no longer be discarded."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_chunks = [
+        {"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"content": "All five votes are in."},
+                      "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"reasoning_content": "thinking"},
+                      "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"content": " Let me read them now."},
+                      "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}},
+    ]
+    body = respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi16", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    names = [e for e, _ in events]
+    assert len(fake_provider.stream_requests) == 1  # no re-roll once reasoning is public
+    assert "status" in names
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert content == "All five votes are in. Let me read them now."
+    # Content held before the reasoning arrived is released BEFORE the status event,
+    # preserving the order the model generated it in.
+    assert names.index("delta") < names.index("status")
+
+
+def test_stream_retry_failing_after_public_content_is_terminal(
+    client, auth, fake_provider
+) -> None:
+    """Once the re-roll's own content is on the wire it cannot be unsent.
+
+    ``providers/retry.py``'s invariant: a mid-generation failure stays terminal
+    because conversation content has already been delivered. No fabricated ``done``.
+    """
+    from fakes import FakeStream
+
+    streams: list[FakeStream] = []
+
+    def stream_factory(request):
+        if _was_nudged(request):
+            stream = FakeStream(
+                [
+                    {"choices": [{"index": 0, "delta": {"role": "assistant"},
+                                  "finish_reason": None}]},
+                    {"choices": [{"index": 0, "delta": {"content": "Reading now."},
+                                  "finish_reason": None}]},
+                    {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+                ],
+                error_at=2,
+                error=upstream_error("died mid-stream"),
+            )
+        else:
+            stream = FakeStream(make_text_chunks(DEAD_ROUND))
+        streams.append(stream)
+        return stream
+
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_factory = stream_factory
+    body = respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi17", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    names = [e for e, _ in events]
+    assert names[-1] == "error"
+    assert "done" not in names
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert content == "Reading now."      # the accepted attempt's public content
+    assert DEAD_ROUND not in text          # the discarded draft still never appears
+    assert len(streams) == 2 and all(s.closed for s in streams)
+
+
+def test_stream_close_failure_on_discard_does_not_cost_the_turn(
+    client, auth, fake_provider
+) -> None:
+    """A teardown error must never displace a reply that is complete and in hand."""
+    from fakes import FakeStream
+
+    class ExplodingCloseStream(FakeStream):
+        async def aclose(self) -> None:
+            self.closed = True
+            raise RuntimeError("close failed")
+
+    def stream_factory(request):
+        if _was_nudged(request):
+            return FakeStream(_repair_tool_chunks())
+        return ExplodingCloseStream(make_text_chunks(DEAD_ROUND))
+
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_factory = stream_factory
+    body = respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi18", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    names = [e for e, _ in events]
+    assert "error" not in names
+    assert names[-1] == "done"
+    fragments = [c for e, d in events if e == "delta" for c in d.get("tool_calls", [])]
+    assert [f["function"]["name"] for f in fragments] == ["terminal__extract"]
 
 
 def test_request_id_is_unified_across_header_and_meta(client, auth, fake_provider) -> None:

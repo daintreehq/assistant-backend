@@ -55,31 +55,48 @@ _OPENER = (
     r"i['’]?m\s+about\s+to|one\s+moment\s+while\s+i)"
 )
 
-# Verbs that name a tool-shaped action. Conservative on purpose: a synonym outside
-# this list is a false negative, which is the side we choose to err on.
+# Verbs that name a tool-shaped action — one that CANNOT be satisfied by prose in
+# the same reply. Conservative on purpose: a synonym outside this list is a false
+# negative, which is the side we choose to err on. Deliberately excluded are verbs
+# a reply can honour by simply continuing to write ("I'll list them", "I'll write
+# it up", "let me summarize"), because those are not dropped actions.
 _ACTION = (
     r"(?:check|search|run|look|query|call|invoke|execute|fetch|find|inspect|"
-    r"read|open|retrieve|browse|list|test|verify|poll|send|write|edit|update|"
-    r"create|delete|apply|launch|load|fire|pull|grab|start|spawn|kick\s+off)"
+    r"read|open|retrieve|browse|poll|send|edit|update|create|delete|"
+    r"launch|load|fire|pull|spawn|kick\s+off)"
 )
+
+# The clause body: everything from the action verb to the end of the reply. A dot is
+# only a sentence end when whitespace or the string end follows it, so dotted TOOL
+# NAMES and file paths stay inside the clause — "Let me call terminal.read now." is
+# the single most realistic dead round in this product, and a naive [^.!?]* tail
+# stops dead at the dot in ``terminal.read`` and misses it entirely.
+#
+# A colon ends the clause too: "Let me check the arithmetic: 120 + 135 = 255" and
+# "I'll list them here: ..." deliver their result INLINE, so nothing was dropped.
+_CLAUSE_BODY = r"(?:[^.!?:]|[.!?](?!\s|$))*"
 
 # The announcement must OPEN a clause (string start, or just past a sentence/clause
 # boundary) and run to the END of the reply — that is what makes it the point of the
-# message rather than an aside inside a real answer. Nothing sentence-ending may
-# follow the action verb, so "Let me check the docs. Here is what I already know…"
-# is not a match.
+# message rather than an aside inside a real answer. Captured so the deferral test
+# below can be scoped to the announcement itself.
 _BARE_INTENT_RE = re.compile(
-    rf"(?:^|(?<=[.!;:,—])\s)\s*{_OPENER}\s+(?:now\s+|next\s+|just\s+|quickly\s+)?"
-    rf"{_ACTION}\b[^.!?]*[.!]?\s*$",
+    rf"(?:^|(?<=[.!;:,—])\s)\s*({_OPENER}\s+(?:now\s+|next\s+|just\s+|quickly\s+)?"
+    rf"{_ACTION}\b{_CLAUSE_BODY})[.!]?\s*$",
     re.IGNORECASE,
 )
 
-# A tail that defers the action — waiting on the user, on a condition, or on later
-# — is not the failure shape. Such a reply correctly ends the turn.
+# A clause that defers STARTING the action — waiting on the user, on approval, on a
+# condition, or on later — is not the failure shape: such a reply correctly ends the
+# turn with nothing dropped. Matched against the announcement clause ALONE, never the
+# whole reply, so an unrelated "once the build is green" in a preamble cannot veto a
+# genuine trailing intent. Kept narrow at the other end too: "until" and "if the"
+# are excluded because they usually bound or complete an immediate action ("poll
+# until the job completes", "check if the service is healthy") rather than defer it.
 _DEFERRED_RE = re.compile(
-    r"\b(?:after\s+you|once\s+you|once\s+the|when\s+you|when\s+the|unless|until|"
-    r"if\s+you|if\s+the|would\s+you|do\s+you\s+want|let\s+me\s+know|"
-    r"with\s+your\s+permission|your\s+call|later|tomorrow|tonight|"
+    r"\b(?:after\s+\w+|once\s+\w+|when\s+you|when\s+the|when\s+ready|unless|"
+    r"if\s+you|would\s+you|do\s+you\s+want|let\s+me\s+know|pending|"
+    r"with\s+your\s+permission|later|tomorrow|tonight|"
     r"in\s+the\s+meantime|first\s+tell\s+me)\b",
     re.IGNORECASE,
 )
@@ -116,15 +133,19 @@ def is_bare_tool_intent(
     """
     if saw_tool_calls or not tools_callable or finish_reason != "stop":
         return False
-    stripped = (text or "").strip()
-    if not stripped or len(stripped) > BARE_INTENT_MAX_CHARS:
+    raw = text or ""
+    # The bound is measured on the RAW text, exactly as ``could_still_be_bare_intent``
+    # measures it. The two MUST agree: the streaming gate releases on the probe, and
+    # once released the reply is public and this predicate never gets to run. A
+    # stripped measurement here would make the probe an unsound prefix test — a reply
+    # the probe had already let through could still match, and only the non-streaming
+    # path would re-roll it.
+    if not raw.strip() or len(raw) > BARE_INTENT_MAX_CHARS or "?" in raw:
         return False
-    if "?" in stripped:
+    # Collapse the model's own wrapping so a clause boundary reads the same however
+    # it broke the lines.
+    normalized = " ".join(raw.split())
+    match = _BARE_INTENT_RE.search(normalized)
+    if match is None:
         return False
-    # Collapse newlines/runs so a clause boundary reads the same however the model
-    # wrapped it. The length bound above is enforced on the RAW text, so the
-    # streaming buffer stays genuinely bounded.
-    normalized = " ".join(stripped.split())
-    if _DEFERRED_RE.search(normalized):
-        return False
-    return bool(_BARE_INTENT_RE.search(normalized))
+    return not _DEFERRED_RE.search(match.group(1))

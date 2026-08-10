@@ -152,10 +152,74 @@ def test_enforces_the_character_bound() -> None:
     assert _detect("Let me read the results.")
 
 
-def test_bound_is_measured_on_stripped_text() -> None:
-    """Surrounding whitespace must not push a real candidate over the bound."""
-    text = "Let me read the results."
-    assert _detect("\n\n  " + text + "   \n\n" + " " * BARE_INTENT_MAX_CHARS)
+def test_bound_uses_the_same_metric_as_the_streaming_probe() -> None:
+    """The probe must be a SOUND prefix test for this predicate.
+
+    The streaming gate releases on the probe, and once released the reply is public
+    and can never be re-rolled. If the predicate measured a stripped length while
+    the probe measured raw, a reply the probe had already let through could still
+    match here — and only the non-streaming path would repair it.
+    """
+    padded = "\n\n" + "Let me read the results.".ljust(BARE_INTENT_MAX_CHARS, "x")
+    assert len(padded) > BARE_INTENT_MAX_CHARS
+    assert not could_still_be_bare_intent(padded)
+    assert not _detect(padded)
+
+
+@pytest.mark.parametrize("length", [BARE_INTENT_MAX_CHARS, BARE_INTENT_MAX_CHARS + 1])
+def test_probe_and_predicate_agree_at_the_boundary(length: int) -> None:
+    """Neither may admit a reply the other has ruled out."""
+    tail = "Let me read the results."
+    text = "x " * ((length - len(tail)) // 2) + tail
+    text = text[:length] if len(text) > length else text.ljust(length, "y")
+    assert could_still_be_bare_intent(text) == (len(text) <= BARE_INTENT_MAX_CHARS)
+    if not could_still_be_bare_intent(text):
+        assert not _detect(text)
+
+
+# ---- regressions for defects found in review -------------------------------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Dotted TOOL NAMES are this product's convention, so this is the most
+        # realistic dead round there is — and a naive [^.!?]* tail stops at the
+        # dot in "terminal.read" and misses it entirely.
+        "Let me call terminal.read now.",
+        "I'll read terminal.awaitAll output now.",
+        "I'll open src/app.py now.",
+        # "if"/"until" here complete or bound the action; they do not defer it.
+        "I'll check if the service is healthy.",
+        "I'll poll until the job completes.",
+    ],
+)
+def test_detects_dotted_names_paths_and_bounded_actions(text: str) -> None:
+    assert _detect(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A colon delivers the result INLINE — nothing was dropped.
+        "The review found two defects, I'll list them here: stale logging, unsafe cleanup.",
+        "Let me check the arithmetic: 120 + 135 = 255.",
+        # Deferral is not always spelled with a pronoun.
+        "I'll delete the stale branch after approval.",
+        "I'll run the suite once CI recovers.",
+        "I'll apply the patch pending your review.",
+        # Satisfiable by continuing to write, so not a dropped action.
+        "I'll list the three failures.",
+        "I'll write up what I found.",
+    ],
+)
+def test_rejects_inline_results_and_deferred_actions(text: str) -> None:
+    assert not _detect(text)
+
+
+def test_deferral_is_scoped_to_the_announcement_clause() -> None:
+    """An unrelated deferral in the preamble must not veto a genuine dead round."""
+    assert _detect("The rerun is queued for tomorrow. Let me read the current votes.")
 
 
 # ---- the streaming probe ---------------------------------------------------
