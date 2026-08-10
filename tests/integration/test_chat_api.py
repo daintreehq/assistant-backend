@@ -518,6 +518,271 @@ def test_stream_tool_calls_passthrough_without_tools(client, auth, fake_provider
     assert fragments[0]["function"]["arguments"] == '{"terminalId": "terminal-1"}'
 
 
+# ---- bare tool intent: a round that announced a call and emitted none (#25) ----
+
+# Captured verbatim from session ses_659b0fc9: the model said it would read the
+# votes, emitted no call, and ended the turn having done nothing.
+DEAD_ROUND = "All five votes are in. Let me read them, one read per terminal, batched."
+NUDGE_MARKER = "previous draft was discarded"
+
+
+def _repair_tool_chunks() -> list[dict]:
+    """A re-roll that does what the dead round only talked about."""
+    return [
+        {"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {"tool_calls": [
+            {"index": 0, "id": "call_0", "type": "function",
+             "function": {"name": "terminal__extract",
+                          "arguments": '{"terminalIds": ["terminal-1"], "instruction": "vote?"}'}},
+        ]}, "finish_reason": None}]},
+        {"choices": [{"index": 0, "delta": {}, "finish_reason": "tool_calls"}],
+         "usage": {"prompt_tokens": 7, "completion_tokens": 11, "total_tokens": 18}},
+    ]
+
+
+def _was_nudged(request) -> bool:
+    return any(NUDGE_MARKER in (m.get("content") or "") for m in request.messages)
+
+
+def test_nonstream_bare_intent_is_rerolled_before_the_response(
+    client, auth, fake_provider
+) -> None:
+    """The dead draft never reaches the client; the re-roll's calls do."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = [
+        make_result(content=DEAD_ROUND, finish_reason="stop"),
+        make_result(
+            tool_calls=[{
+                "id": "call_0", "type": "function", "index": 0,
+                "function": {"name": "terminal__extract",
+                             "arguments": '{"terminalIds": ["terminal-1"], "instruction": "vote?"}'},
+            }],
+            finish_reason="tool_calls",
+        ),
+    ]
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi1", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    assert r.status_code == 200
+    message = r.json()["message"]
+    assert message["tool_calls"][0]["function"]["name"] == "terminal__extract"
+    assert DEAD_ROUND not in json.dumps(r.json())
+    # Exactly one re-roll, and only IT carries the corrective message — the dead
+    # draft itself is never replayed into the transcript.
+    assert len(fake_provider.requests) == 2
+    assert not _was_nudged(fake_provider.requests[0])
+    assert _was_nudged(fake_provider.requests[1])
+    assert DEAD_ROUND not in json.dumps(fake_provider.requests[1].messages)
+
+
+def test_nonstream_bare_intent_reroll_happens_exactly_once(client, auth, fake_provider) -> None:
+    """A re-roll that repeats the shape is still final — never a third attempt."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = [
+        make_result(content=DEAD_ROUND, finish_reason="stop"),
+        make_result(content="Let me read them now.", finish_reason="stop"),
+    ]
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi2", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    assert r.status_code == 200
+    assert len(fake_provider.requests) == 2
+    assert r.json()["message"]["content"] == "Let me read them now."
+
+
+def test_nonstream_bare_intent_reroll_failure_fails_open(client, auth, fake_provider) -> None:
+    """A weak reply the user is already owed beats losing the turn."""
+    fake_provider.selection_result = selection_result([])
+    calls: list[int] = []
+
+    def complete(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return make_result(content=DEAD_ROUND, finish_reason="stop")
+        raise upstream_error("re-roll unavailable")
+
+    fake_provider.complete_result = complete
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi3", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    assert r.status_code == 200
+    assert r.json()["message"]["content"] == DEAD_ROUND
+
+
+def test_nonstream_bare_intent_sums_usage_across_both_attempts(
+    client, auth, fake_provider
+) -> None:
+    """The caller's key funded the discarded generation too."""
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = [
+        make_result(
+            content=DEAD_ROUND, finish_reason="stop",
+            usage=ProviderUsage(prompt_tokens=100, completion_tokens=20, total_tokens=120),
+        ),
+        make_result(
+            content="Done.", finish_reason="stop",
+            usage=ProviderUsage(prompt_tokens=130, completion_tokens=5, total_tokens=135),
+        ),
+    ]
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi4", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    usage = r.json()["usage"]
+    assert usage["prompt_tokens"] == 230
+    assert usage["completion_tokens"] == 25
+    assert usage["total_tokens"] == 255
+
+
+def test_nonstream_legitimate_short_reply_is_not_rerolled(client, auth, fake_provider) -> None:
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = make_result(
+        content="All five agents finished and their votes are recorded.", finish_reason="stop"
+    )
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "status?"}], session_id="bi5", turn_id="t1",
+        tools=[EXTRACT_TOOL],
+    ))
+    assert r.status_code == 200
+    assert len(fake_provider.requests) == 1
+
+
+def test_nonstream_bare_intent_without_tools_is_not_rerolled(client, auth, fake_provider) -> None:
+    """With nothing callable, the sentence dropped no action."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = make_result(content=DEAD_ROUND, finish_reason="stop")
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi6", turn_id="t1",
+    ))
+    assert r.status_code == 200
+    assert len(fake_provider.requests) == 1
+    assert r.json()["message"]["content"] == DEAD_ROUND
+
+
+def test_stream_bare_intent_reroll_is_invisible_to_the_sse_contract(
+    client, auth, fake_provider
+) -> None:
+    """One meta, one done, no dead text — the CLI cannot tell a re-roll happened."""
+    fake_provider.selection_result = selection_result([])
+
+    def chunks(request):
+        return _repair_tool_chunks() if _was_nudged(request) else make_text_chunks(DEAD_ROUND)
+
+    fake_provider.stream_chunks = chunks
+    body = respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi7", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    names = [e for e, _ in events]
+    assert names.count("meta") == 1
+    assert names.count("done") == 1
+    assert names[-1] == "done"
+    assert "error" not in names
+    # The announcement never reached the client, and the calls it promised did.
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert content == ""
+    assert "Let me read them" not in text
+    fragments = [c for e, d in events if e == "delta" for c in d.get("tool_calls", [])]
+    assert [f["function"]["name"] for f in fragments] == ["terminal__extract"]
+    # Exactly two upstream opens; only the second carries the corrective message.
+    assert len(fake_provider.stream_requests) == 2
+    assert not _was_nudged(fake_provider.stream_requests[0])
+    assert _was_nudged(fake_provider.stream_requests[1])
+
+
+def test_stream_bare_intent_sums_usage_across_both_streams(client, auth, fake_provider) -> None:
+    fake_provider.selection_result = selection_result([])
+
+    def chunks(request):
+        return _repair_tool_chunks() if _was_nudged(request) else make_text_chunks(DEAD_ROUND)
+
+    fake_provider.stream_chunks = chunks
+    body = respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi8", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    done = next(d for e, d in parse_sse(text) if e == "done")
+    # make_text_chunks reports 12/8/20; the repair stream reports 7/11/18.
+    assert done["usage"]["prompt_tokens"] == 19
+    assert done["usage"]["completion_tokens"] == 19
+    assert done["usage"]["total_tokens"] == 38
+    assert done["finish_reason"] == "tool_calls"
+
+
+def test_stream_bare_intent_reroll_open_failure_fails_open(client, auth, fake_provider) -> None:
+    """Nothing of the re-roll is public yet, so the held draft is still deliverable."""
+    fake_provider.selection_result = selection_result([])
+
+    def chunks(request):
+        if _was_nudged(request):
+            raise upstream_error("re-roll unavailable")
+        return make_text_chunks(DEAD_ROUND)
+
+    fake_provider.stream_chunks = chunks
+    body = respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi9", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    names = [e for e, _ in events]
+    assert "error" not in names
+    assert names[-1] == "done"
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert content.strip() == DEAD_ROUND
+    assert next(d for e, d in events if e == "done")["finish_reason"] == "stop"
+
+
+def test_stream_long_reply_is_released_at_the_gate_bound(client, auth, fake_provider) -> None:
+    """A legitimate long answer streams in full, and is never re-rolled."""
+    from daintree_assistant_server.services.bare_intent import BARE_INTENT_MAX_CHARS
+
+    long_answer = "word " * 200
+    assert len(long_answer) > BARE_INTENT_MAX_CHARS
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_chunks = make_text_chunks(long_answer.strip())
+    body = respond_body(
+        [{"role": "user", "content": "explain"}], session_id="bi10", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert content.strip() == long_answer.strip()
+    assert len(fake_provider.stream_requests) == 1
+    # Deltas are forwarded in their original boundaries, not coalesced into one.
+    assert len([1 for e, d in events if e == "delta" and d.get("content")]) > 1
+
+
+def test_stream_short_legitimate_reply_survives_the_gate(client, auth, fake_provider) -> None:
+    """Held content is released at stream end when the shape does not match."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_chunks = make_text_chunks("All five votes are recorded.")
+    body = respond_body(
+        [{"role": "user", "content": "status"}], session_id="bi11", turn_id="t1",
+        generation={"stream": True}, tools=[EXTRACT_TOOL],
+    )
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert content.strip() == "All five votes are recorded."
+    assert len(fake_provider.stream_requests) == 1
+    assert [e for e, _ in events][-1] == "done"
+
+
 def test_request_id_is_unified_across_header_and_meta(client, auth, fake_provider) -> None:
     """One request identity: middleware, response header, and SSE meta agree."""
     fake_provider.selection_result = selection_result([])
