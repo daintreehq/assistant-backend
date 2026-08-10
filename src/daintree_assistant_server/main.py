@@ -26,6 +26,7 @@ from .api import (
     daintree_skills,
     daintree_tasks,
     health,
+    root,
 )
 from .config import Settings, get_settings
 from .errors import register_exception_handlers, request_too_large
@@ -342,6 +343,7 @@ def create_app(
     # Outermost: count body bytes (handles chunked / missing Content-Length).
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_bytes)
 
+    app.include_router(root.router)
     app.include_router(health.router)
     app.include_router(daintree_respond.router)
     app.include_router(daintree_capabilities.router)

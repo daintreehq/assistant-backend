@@ -28,6 +28,25 @@ def test_health_alias(client) -> None:
     assert r.json() == {"status": "ok"}
 
 
+def test_root_redirects_to_the_product_page(client) -> None:
+    """A browser that reaches the API origin gets sent to the product page."""
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "https://daintree.org/assistant"
+
+
+def test_root_redirect_does_not_capture_api_paths(client) -> None:
+    """The redirect must stay scoped to "/" alone.
+
+    The CLI's DefaultBaseURL is this same origin (https://assistant.daintree.org),
+    so widening this to the host — or to any prefix that covers /v1/daintree/ —
+    would answer every real API call with a redirect to a marketing page. An
+    unknown API path must still 404 rather than redirect.
+    """
+    r = client.get("/v1/daintree/does-not-exist", follow_redirects=False)
+    assert r.status_code == 404
+
+
 def test_readyz(client, app) -> None:
     r = client.get("/readyz")
     assert r.status_code == 200
