@@ -105,9 +105,7 @@ def test_rejects_deferred_or_conditional_plans(text: str) -> None:
 
 def test_rejects_an_announcement_followed_by_real_content() -> None:
     """The announcement must be the END of the reply, not an aside."""
-    assert not _detect(
-        "Let me check the config. Meanwhile the roster already shows all five idle."
-    )
+    assert not _detect("Let me check the config. Meanwhile the roster already shows all five idle.")
 
 
 def test_rejects_a_verb_outside_the_conservative_whitelist() -> None:
@@ -514,7 +512,7 @@ def test_block_awareness_does_not_disturb_plain_wrapping() -> None:
 
 
 def test_conditional_check_is_a_tolerated_false_negative() -> None:
-    """"if the" is read as deferral even when it is really a complement.
+    """ "if the" is read as deferral even when it is really a complement.
 
     Keeping it costs this reply a re-roll it arguably deserves; dropping it would
     re-roll "I'll delete the branch if the tests pass", nudging the next draft to

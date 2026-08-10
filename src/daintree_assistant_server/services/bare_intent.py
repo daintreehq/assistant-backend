@@ -412,11 +412,7 @@ def _is_bare_participle(clause: str) -> bool:
 
 def _is_inflected(word: str) -> bool:
     """Whether any part of the word carries a verb's or a plural's inflection."""
-    return any(
-        _INFLECTED_RE.fullmatch(part)
-        for part in _COMPOUND_SPLIT_RE.split(word)
-        if part
-    )
+    return any(_INFLECTED_RE.fullmatch(part) for part in _COMPOUND_SPLIT_RE.split(word) if part)
 
 
 def _announcement_clause(normalized: str) -> str | None:
