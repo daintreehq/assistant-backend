@@ -19,8 +19,12 @@ generation for it, so every rule here narrows rather than widens:
 * only an exact ``stop`` finish (``length`` is truncation, a different failure);
 * only when a tool was actually callable this round;
 * only short replies (a long one is doing real work, whatever it says);
-* only when the trailing clause is an IMMEDIATE first-person action announcement;
-* never a question, and never a deferred or conditional plan.
+* only when the trailing clause is an IMMEDIATE action announcement — first-person
+  ("Let me read them.") or the subject-less status line the prompt itself scripts
+  ("Reading the closest match."), the latter only at a sentence start and only when
+  no finite verb turns it into a description;
+* never a question, and never a deferred or conditional plan;
+* never content the reply already delivered as a list.
 
 Matching the trailing clause rather than the opening is load-bearing. All three
 production failures placed the announcement AFTER a preamble ("You're right, my
@@ -66,6 +70,31 @@ _ACTION = (
     r"launch|load|fire|pull|spawn|kick\s+off)"
 )
 
+# The same verbs in participle form, for the subject-less status line the prompt
+# itself prescribes: ``main/base/40-communication.md`` scripts a continuation round
+# as "Search returned 3 candidates under src/terrain. Reading the closest match."
+# That shape has no first-person opener, so it never reaches ``_ANNOUNCE_RE`` — the
+# most frequent announcement in the system was the one the detector could not see.
+#
+# Spelled out rather than derived from ``_ACTION`` by appending "ing": English stem
+# rules are irregular (run/running, invoke/invoking, poll/polling) and a wrong
+# derivation would silently widen or narrow the pattern. The invariant is instead
+# checkable by eye — every verb in ``_ACTION``, in its participle form, and nothing
+# else. A participle whose base verb is absent above (``listing``, ``writing``,
+# ``summarizing``) stays absent here too: those are satisfiable by continuing to
+# write, so they are not dropped actions in EITHER form, and letting the two lists
+# disagree would re-roll "Listing the three failures." while passing "I'll list the
+# three failures."
+#
+# ``looking`` is the one entry that is not a bare swap: it requires its preposition
+# so the sign-off "Looking good." can never open a match.
+_ACTION_PARTICIPLE = (
+    r"(?:checking|searching|running|looking\s+(?:up|at|into)|querying|calling|"
+    r"invoking|executing|fetching|finding|inspecting|reading|opening|retrieving|"
+    r"browsing|polling|sending|editing|updating|creating|deleting|"
+    r"launching|loading|firing|pulling|spawning|kicking\s+off)"
+)
+
 # The clause body: everything from the action verb to the end of the reply.
 #
 # `.` and `:` are sentence/clause enders EXCEPT when a lowercase letter, digit, or
@@ -81,7 +110,15 @@ _ACTION = (
 # The lookahead is scoped case-SENSITIVE with ``(?-i:…)``: the whole pattern compiles
 # with IGNORECASE, under which a bare ``[a-z0-9/]`` also matches capitals and would
 # read the run-on "config.The roster…" as one token instead of a sentence boundary.
-_CLAUSE_BODY = r"(?:[^.!?:;]|[.:](?=(?-i:[a-z0-9/])))*"
+#
+# ``\n`` ends the clause too. Normalization (see ``_normalize``) collapses the model's
+# own wrapping but KEEPS the newline in front of a list item, and this exclusion is
+# what makes that newline load-bearing: a reply that delivered its content as bullets
+# ("Let me check the worktree\n- clean\n- no pending changes") answered its own
+# opener, and without this the bullets are swallowed into the clause and the reply
+# reads as a dangling promise. A negated character class is not governed by
+# ``DOTALL``, so the exclusion has to be written out.
+_CLAUSE_BODY = r"(?:[^.!?:;\n]|[.:](?=(?-i:[a-z0-9/])))*"
 
 # What sits between the start of a clause and its verb: an optional leading
 # connective (so "…, then let me read the votes." still reads as one announcement)
@@ -92,10 +129,28 @@ _LEAD = (
     rf"{_OPENER}\s+(?:now\s+|next\s+|just\s+|quickly\s+)?"
 )
 
+# The participle line's equivalent lead. Structurally identical to ``_LEAD`` — same
+# connectives, same adverbs — with the opener OPTIONAL and reduced to "I'm"/"I am",
+# because the whole point of this shape is that the subject is dropped. Kept in step
+# with ``_LEAD`` deliberately: the two describe the same sentence position.
+_PARTICIPLE_LEAD = (
+    r"(?:(?:then|so|now|next|okay|ok|alright|first)\s+)?"
+    r"(?:i(?:['’]m|\s+am)\s+)?(?:now\s+|next\s+|just\s+|quickly\s+)?"
+)
+
 # The announcement itself, anchored to the END of the reply — that is what makes it
 # the point of the message rather than an aside inside a real answer.
 _ANNOUNCE_RE = re.compile(
     rf"{_LEAD}{_ACTION}\b{_CLAUSE_BODY}[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+# The subject-less variant. Tried separately from ``_ANNOUNCE_RE`` rather than folded
+# into it as an alternation, because it carries a veto (``_is_bare_participle``) that
+# must NOT apply to opener-led matches: "I'll check whether it is ready." is governed
+# by the deferral rules alone and its behaviour is unchanged by any of this.
+_PARTICIPLE_RE = re.compile(
+    rf"{_PARTICIPLE_LEAD}{_ACTION_PARTICIPLE}\b{_CLAUSE_BODY}[.!]?\s*$",
     re.IGNORECASE,
 )
 
@@ -118,14 +173,36 @@ _ANNOUNCE_RE = re.compile(
 # Both carve-outs deliberately swallow the rest of the clause, so a real action
 # trailing an idiom ("I'll check with the team and update the ticket") is missed.
 # That is a false negative, the side this module always errs toward.
+#
+# Each idiom is spelled in BOTH leads' grammar, because the participle path reaches
+# the same two verbs without an opener: "Calling it done." and "Checking with the
+# team." are the same sign-off and the same human consult, and a veto anchored only
+# on ``_LEAD`` would let them through as fresh false positives.
 _IDIOM_RE = re.compile(
-    rf"{_LEAD}(?:call\s+(?:it|this|that)\s+(?:a\s+)?\w+|check(?:\s+in)?\s+with\b)"
+    rf"(?:{_LEAD}(?:call\s+(?:it|this|that)\s+(?:a\s+)?\w+|check(?:\s+in)?\s+with\b)"
+    rf"|{_PARTICIPLE_LEAD}"
+    rf"(?:calling\s+(?:it|this|that)\s+(?:a\s+)?\w+|checking(?:\s+in)?\s+with\b))"
     rf"{_CLAUSE_BODY}[.!]?\s*$",
     re.IGNORECASE,
 )
 
 # Where a new clause may begin.
 _BOUNDARY_RE = re.compile(r"(?<=[.!;:,—])\s")
+
+# Where a new SENTENCE may begin — a strict subset of the clause boundaries above.
+# The participle path is restricted to these, and that restriction is what keeps it
+# narrow: a participle after a comma, colon, or em dash is far more often a reduced
+# adverbial clause inside a delivered answer ("One cause stands out — reading the
+# stale cache.") than a status line. The prompt prescribes the status line as its own
+# sentence, so requiring one costs no real coverage.
+_SENTENCE_START_RE = re.compile(r"(?<=[.!;])\s")
+
+# A Markdown list item. Two jobs, both about content the reply already DELIVERED:
+# ``_normalize`` keeps the newline in front of such a line, and ``_announcement_clause``
+# refuses to start a clause on one. The second is not redundant — an ordered marker
+# ends in "." and so mints its own ``_BOUNDARY_RE`` start, which would otherwise read
+# "Here's the plan.\n1. I'll inspect the current implementation." as a dead round.
+_LIST_MARKER_RE = re.compile(r"^(?:[-*+]|\d+[.)])(?:\s|$)")
 
 # A clause that defers STARTING the action — waiting on the user, on approval, or on
 # later — is not the failure shape: such a reply correctly ends the turn with nothing
@@ -138,10 +215,15 @@ _BOUNDARY_RE = re.compile(r"(?<=[.!;:,—])\s")
 # absent because it bounds an immediate action ("poll until the job completes"), and
 # "once more"/"after line 120"/"the pending jobs" are carved out because there the
 # word modifies the object rather than deferring the action.
+#
+# What follows "when" is a subject, and the list has to cover the pronouns as well as
+# the determiner: "I'll update you when the run finishes." and "I'll update you when
+# it finishes." are the same promise to report back — a real final answer — and only
+# the second was reaching this veto.
 _DEFERRED_RE = re.compile(
     r"\b(?:after\s+(?:you|we|they|that|approval|review|sign|confirmation|"
     r"the\s+(?:build|tests?|run|deploy|merge|review))|"
-    r"once\s+(?!more\b|again\b)\w+|when\s+you|when\s+the|when\s+ready|unless|"
+    r"once\s+(?!more\b|again\b)\w+|when\s+(?:you|the|it|they|that|ready|done)|unless|"
     r"if\s+the|if\s+you|would\s+you|do\s+you\s+want|let\s+me\s+know|"
     r"pending\s+(?:your|approval|review|confirmation)|"
     r"with\s+your\s+permission|your\s+call\b(?!\s*stack)|"
@@ -156,6 +238,63 @@ _CONTRAST_RE = re.compile(
     re.IGNORECASE,
 )
 
+# A participle carrying a finite verb is a STATEMENT about an action, not a promise to
+# take one: "Running the suite takes 4 minutes." describes. This veto is the price of
+# admitting subject-less clauses at all — without a subject there is nothing else to
+# separate "Reading the closest match." from "Reading the config is slow."
+#
+# Every verb is spelled in its past tense too. A description is as often reported as
+# predicted ("Checking the roster required a second pass."), and a gap here is a false
+# POSITIVE — the expensive direction. Widening this veto only ever narrows the
+# detector, so it is the safe side to be generous on.
+_FINITE_VERB_RE = re.compile(
+    r"\b(?:is|are|was|were|takes?|took|will|would|can|could|should|has|have|had"
+    r"|seems?|seemed|looks?|looked|means?|meant|gives?|gave|costs?|cost"
+    r"|requires?|required|needs?|needed)\b",
+    re.IGNORECASE,
+)
+
+# …except when the finite verb belongs to a SUBORDINATE clause, where it says nothing
+# about the participle: "Checking whether the service is healthy." still announces a
+# check. Only a subordinator standing BEFORE the finite verb can excuse it.
+_SUBORDINATOR_RE = re.compile(
+    r"\b(?:whether|that|which|who|whose|because|while|if|until|since|where|what|how)\b",
+    re.IGNORECASE,
+)
+
+
+def _normalize(raw: str) -> str:
+    """Collapse the model's own line wrapping, but keep list items on their own lines.
+
+    A clause boundary should read the same however the model broke its lines, which is
+    why wrapping collapses to a single space. A Markdown list item is the exception:
+    the newline in front of it is the only thing separating an opener from the content
+    that ANSWERS it, and ``_CLAUSE_BODY`` stops on that newline.
+    """
+    out: list[str] = []
+    for raw_line in raw.splitlines():
+        line = " ".join(raw_line.split())
+        if not line:
+            continue
+        if out:
+            out.append("\n" if _LIST_MARKER_RE.match(line) else " ")
+        out.append(line)
+    return "".join(out)
+
+
+def _starts_in_list_item(normalized: str, start: int) -> bool:
+    """Whether this clause start sits on a delivered list item."""
+    line_start = normalized.rfind("\n", 0, start) + 1
+    return _LIST_MARKER_RE.match(normalized[line_start:]) is not None
+
+
+def _is_bare_participle(clause: str) -> bool:
+    """Whether the clause is a subject-less status line announcing an action."""
+    if not _PARTICIPLE_RE.match(clause):
+        return False
+    finite = _FINITE_VERB_RE.search(clause)
+    return finite is None or _SUBORDINATOR_RE.search(clause, 0, finite.start()) is not None
+
 
 def _announcement_clause(normalized: str) -> str | None:
     """The RIGHTMOST end-anchored announcement clause, if the reply ends in one.
@@ -167,12 +306,24 @@ def _announcement_clause(normalized: str) -> str | None:
 
     An idiom clause is SKIPPED rather than returned, so the scan keeps widening:
     "I'll read the votes, then I'll call it a day." still surfaces the genuine
-    announcement in the enclosing clause.
+    announcement in the enclosing clause. A clause starting on a list item is skipped
+    the same way — it is content the reply delivered, not a promise it left open.
+
+    The subject-less participle line is admitted only at a SENTENCE start, and only
+    once its own finite-verb veto clears. Both restrictions are local to that path:
+    an opener-led clause is judged exactly as it was before.
     """
     starts = [0, *(m.end() for m in _BOUNDARY_RE.finditer(normalized))]
+    sentence_starts = {0, *(m.end() for m in _SENTENCE_START_RE.finditer(normalized))}
     for start in reversed(starts):
+        if _starts_in_list_item(normalized, start):
+            continue
         clause = normalized[start:]
-        if _ANNOUNCE_RE.match(clause) and not _IDIOM_RE.match(clause):
+        if _IDIOM_RE.match(clause):
+            continue
+        if _ANNOUNCE_RE.match(clause):
+            return clause
+        if start in sentence_starts and _is_bare_participle(clause):
             return clause
     return None
 
@@ -217,9 +368,7 @@ def is_bare_tool_intent(
     # path would re-roll it.
     if not raw.strip() or len(raw) > BARE_INTENT_MAX_CHARS or "?" in raw:
         return False
-    # Collapse the model's own wrapping so a clause boundary reads the same however
-    # it broke the lines.
-    normalized = " ".join(raw.split())
+    normalized = _normalize(raw)
     clause = _announcement_clause(normalized)
     if clause is None:
         return False

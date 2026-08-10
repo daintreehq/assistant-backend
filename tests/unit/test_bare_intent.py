@@ -224,6 +224,14 @@ def test_rightmost_announcement_wins() -> None:
         "I'll delete the stale branch after approval.",
         "I'll run the suite once CI recovers.",
         "I'll delete the branch pending your review.",
+        # A promise to report back is a real final answer. Only the determiner reached
+        # the deferral veto, so the pronoun spellings of the SAME promise were being
+        # re-rolled — throwing away a correct reply and billing a second round.
+        "The agent is still running. I'll update you when it finishes.",
+        "I'll update you when the run finishes.",
+        "I'll update you when they finish.",
+        "I'll update you when that lands.",
+        "I'll update you when done.",
         # A conditional MUTATION is the worst thing to re-roll: the nudge would ask
         # the next draft to perform it unconditionally.
         "I'll delete the branch if the tests pass.",
@@ -266,10 +274,108 @@ def test_rejects_performative_and_human_consult_idioms(text: str) -> None:
         # Plain "check" is untouched: only "check with" is a consultation.
         "I'll check the logs.",
         "Let me check the roster before the next batch.",
+        # The same two carve-outs, reached through the participle path.
+        "Calling terminal.read now.",
+        "Checking the roster before the next batch.",
     ],
 )
 def test_idiom_carve_out_does_not_over_reach(text: str) -> None:
     assert _detect(text)
+
+
+# ---- the subject-less status line the prompt prescribes (issue #29) ---------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Verbatim from main/base/40-communication.md, which scripts this exact shape
+        # for continuation rounds — so it is the highest-frequency announcement there
+        # is, and an opener-only pattern was blind to every one of them.
+        "Search returned 3 candidates under src/terrain. Reading the closest match.",
+        # The line on its own: position 0 is a sentence start.
+        "Reading the closest match.",
+        "Checking the worktree now.",
+        # The dropped subject may also be spelled out, and a connective may front it.
+        "I'm inspecting the failing test.",
+        "The suite is red. Now reading the first failure.",
+        # A finite verb inside a SUBORDINATE clause says nothing about the participle.
+        "Checking whether the service is healthy.",
+        # Dotted tool names survive the participle path too.
+        "Votes are in. Reading terminal.awaitAll output.",
+    ],
+)
+def test_detects_bare_participle_status_lines(text: str) -> None:
+    assert _detect(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # A finite verb makes the participle DESCRIBE an action rather than promise
+        # one. This is the case test_learning_trigger.py already guards live.
+        "Running the suite takes 4 minutes.",
+        "Reading the config is slow.",
+        "Checking the roster required a second pass.",
+        # A participle mid-sentence is a reduced clause inside a delivered answer, not
+        # a status line — only a SENTENCE start opens the participle path.
+        "One cause stands out — reading the stale cache.",
+        "The handler crashed, reading a null config.",
+        # The base verb is absent from _ACTION because prose can satisfy it, so its
+        # participle stays absent too. "I'll list the three failures." is False.
+        "Listing the three failures.",
+        "Writing up what I found.",
+        # "looking" without its preposition is a sign-off, not an action.
+        "Looking good.",
+        # The performative and human-consult idioms reach the same verbs without an
+        # opener, so the carve-out has to cover this grammar as well.
+        "Everything is green. Calling it done.",
+        "I'm calling it a day.",
+        "Checking with the team.",
+        "I am checking in with the reviewer.",
+        # The participle path inherits the deferral and contrast vetoes.
+        "Reading the results tomorrow.",
+        "Checking the logs, but the credentials are likely stale.",
+    ],
+)
+def test_rejects_participles_that_are_not_announcements(text: str) -> None:
+    assert not _detect(text)
+
+
+def test_participle_veto_does_not_leak_onto_opener_clauses() -> None:
+    """The finite-verb veto is scoped to the participle path alone.
+
+    "I'll check whether it is ready." carries a finite verb and would be vetoed if the
+    two paths shared one rule; it is governed by the deferral rules only, and its
+    result is unchanged by the participle work.
+    """
+    assert _detect("I'll check whether it is ready.")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # The bullets ARE the content: the reply answered its own opener, so there is
+        # no dangling promise to re-roll.
+        "Let me check the worktree\n- clean\n- no pending changes",
+        "Let me check the worktree\n* clean\n+ no pending changes",
+        "Let me check the worktree\n1. clean\n2) no pending changes",
+        # A plan being PRESENTED. The ordered marker's own period mints a clause start,
+        # so the list-item skip is what keeps these from reading as dead rounds.
+        "Here's the plan.\n- I'll inspect the current implementation.",
+        "Here's the plan.\n1. I'll inspect the current implementation.",
+        "1. I'll inspect the current implementation.",
+        "- Reading the closest match.",
+    ],
+)
+def test_rejects_content_delivered_as_a_list(text: str) -> None:
+    assert not _detect(text)
+
+
+def test_list_awareness_does_not_disturb_plain_wrapping() -> None:
+    """Only a list line keeps its newline; ordinary wrapping still collapses."""
+    assert _detect("Votes are in.\n\nLet me read\nall five now.")
+    assert _detect("Search returned 3 candidates.\nReading the closest\nmatch.")
 
 
 def test_conditional_check_is_a_tolerated_false_negative() -> None:
