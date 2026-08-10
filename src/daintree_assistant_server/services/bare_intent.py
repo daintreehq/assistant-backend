@@ -66,40 +66,80 @@ _ACTION = (
     r"launch|load|fire|pull|spawn|kick\s+off)"
 )
 
-# The clause body: everything from the action verb to the end of the reply. A dot is
-# only a sentence end when whitespace or the string end follows it, so dotted TOOL
-# NAMES and file paths stay inside the clause — "Let me call terminal.read now." is
-# the single most realistic dead round in this product, and a naive [^.!?]* tail
-# stops dead at the dot in ``terminal.read`` and misses it entirely.
+# The clause body: everything from the action verb to the end of the reply.
 #
-# A colon ends the clause too: "Let me check the arithmetic: 120 + 135 = 255" and
-# "I'll list them here: ..." deliver their result INLINE, so nothing was dropped.
-_CLAUSE_BODY = r"(?:[^.!?:]|[.!?](?!\s|$))*"
+# `.` and `:` are sentence/clause enders EXCEPT when a lowercase letter, digit, or
+# slash follows immediately — that is the shape of a dotted tool name, a file path,
+# or a URL, all of which belong INSIDE the clause. "Let me call terminal.read now."
+# is the single most realistic dead round in this product (every tool is named that
+# way), and a naive `[^.!?]*` tail stops dead at the dot in ``terminal.read`` and
+# misses it. The same rule keeps `https://example.com` and `12:30` whole while still
+# ending the clause on ".The" (a run-on sentence boundary) and on "here: ..." or
+# "arithmetic: 120 + 135 = 255", where the result is delivered INLINE and so nothing
+# was actually dropped. `;` `!` `?` always end it.
+#
+# The lookahead is scoped case-SENSITIVE with ``(?-i:…)``: the whole pattern compiles
+# with IGNORECASE, under which a bare ``[a-z0-9/]`` also matches capitals and would
+# read the run-on "config.The roster…" as one token instead of a sentence boundary.
+_CLAUSE_BODY = r"(?:[^.!?:;]|[.:](?=(?-i:[a-z0-9/])))*"
 
-# The announcement must OPEN a clause (string start, or just past a sentence/clause
-# boundary) and run to the END of the reply — that is what makes it the point of the
-# message rather than an aside inside a real answer. Captured so the deferral test
-# below can be scoped to the announcement itself.
-_BARE_INTENT_RE = re.compile(
-    rf"(?:^|(?<=[.!;:,—])\s)\s*({_OPENER}\s+(?:now\s+|next\s+|just\s+|quickly\s+)?"
-    rf"{_ACTION}\b{_CLAUSE_BODY})[.!]?\s*$",
+# The announcement itself, anchored to the END of the reply — that is what makes it
+# the point of the message rather than an aside inside a real answer. A leading
+# connective is allowed so "…, then let me read the votes." still reads as one.
+_ANNOUNCE_RE = re.compile(
+    rf"(?:(?:then|so|now|next|okay|ok|alright|first)\s+)?"
+    rf"{_OPENER}\s+(?:now\s+|next\s+|just\s+|quickly\s+)?"
+    rf"{_ACTION}\b{_CLAUSE_BODY}[.!]?\s*$",
     re.IGNORECASE,
 )
 
-# A clause that defers STARTING the action — waiting on the user, on approval, on a
-# condition, or on later — is not the failure shape: such a reply correctly ends the
-# turn with nothing dropped. Matched against the announcement clause ALONE, never the
-# whole reply, so an unrelated "once the build is green" in a preamble cannot veto a
-# genuine trailing intent. Kept narrow at the other end too: "until" and "if the"
-# are excluded because they usually bound or complete an immediate action ("poll
-# until the job completes", "check if the service is healthy") rather than defer it.
+# Where a new clause may begin.
+_BOUNDARY_RE = re.compile(r"(?<=[.!;:,—])\s")
+
+# A clause that defers STARTING the action — waiting on the user, on approval, or on
+# later — is not the failure shape: such a reply correctly ends the turn with nothing
+# dropped. Tested against the announcement clause ALONE, so an unrelated "tomorrow"
+# in a preamble cannot veto a genuine trailing intent.
+#
+# Both edges are deliberate. "if the"/"would you" stay because dropping them turns a
+# conditional mutation ("I'll delete the branch if the tests pass") into a re-roll
+# that is then nudged to do it NOW — the worst possible false positive. "until" is
+# absent because it bounds an immediate action ("poll until the job completes"), and
+# "once more"/"after line 120"/"the pending jobs" are carved out because there the
+# word modifies the object rather than deferring the action.
 _DEFERRED_RE = re.compile(
-    r"\b(?:after\s+\w+|once\s+\w+|when\s+you|when\s+the|when\s+ready|unless|"
-    r"if\s+you|would\s+you|do\s+you\s+want|let\s+me\s+know|pending|"
-    r"with\s+your\s+permission|later|tomorrow|tonight|"
-    r"in\s+the\s+meantime|first\s+tell\s+me)\b",
+    r"\b(?:after\s+(?:you|we|they|that|approval|review|sign|confirmation|"
+    r"the\s+(?:build|tests?|run|deploy|merge|review))|"
+    r"once\s+(?!more\b|again\b)\w+|when\s+you|when\s+the|when\s+ready|unless|"
+    r"if\s+the|if\s+you|would\s+you|do\s+you\s+want|let\s+me\s+know|"
+    r"pending\s+(?:your|approval|review|confirmation)|"
+    r"with\s+your\s+permission|your\s+call\b(?!\s*stack)|"
+    r"later|tomorrow|tonight|in\s+the\s+meantime|first\s+tell\s+me)\b",
     re.IGNORECASE,
 )
+
+# A contrastive continuation means substantive content follows the announcement, so
+# the announcement is not the whole point of the reply.
+_CONTRAST_RE = re.compile(
+    r"\b(?:but|however|although|though|meanwhile|instead|whereas|that\s+said)\b",
+    re.IGNORECASE,
+)
+
+
+def _announcement_clause(normalized: str) -> str | None:
+    """The RIGHTMOST end-anchored announcement clause, if the reply ends in one.
+
+    Rightmost matters: "I'll run the suite tomorrow, then let me read the votes."
+    has two candidate clauses, and only the last one is the actual announcement —
+    scoping the deferral test to a leftmost match would let the preamble's
+    "tomorrow" veto a genuine dead round.
+    """
+    starts = [0, *(m.end() for m in _BOUNDARY_RE.finditer(normalized))]
+    for start in reversed(starts):
+        clause = normalized[start:]
+        if _ANNOUNCE_RE.match(clause):
+            return clause
+    return None
 
 
 def could_still_be_bare_intent(text: str) -> bool:
@@ -145,7 +185,7 @@ def is_bare_tool_intent(
     # Collapse the model's own wrapping so a clause boundary reads the same however
     # it broke the lines.
     normalized = " ".join(raw.split())
-    match = _BARE_INTENT_RE.search(normalized)
-    if match is None:
+    clause = _announcement_clause(normalized)
+    if clause is None:
         return False
-    return not _DEFERRED_RE.search(match.group(1))
+    return not (_DEFERRED_RE.search(clause) or _CONTRAST_RE.search(clause))

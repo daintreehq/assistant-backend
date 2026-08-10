@@ -189,13 +189,23 @@ def test_probe_and_predicate_agree_at_the_boundary(length: int) -> None:
         "Let me call terminal.read now.",
         "I'll read terminal.awaitAll output now.",
         "I'll open src/app.py now.",
-        # "if"/"until" here complete or bound the action; they do not defer it.
-        "I'll check if the service is healthy.",
+        # A colon inside a URL or a clock time is not a result-introducing colon.
+        "Let me open https://example.com now.",
+        # "until" bounds an immediate action rather than deferring it.
         "I'll poll until the job completes.",
+        # These words modify the OBJECT; they do not defer the action.
+        "I'll run it once more.",
+        "I'll check the pending jobs.",
+        "I'll read the entries after line 120.",
     ],
 )
 def test_detects_dotted_names_paths_and_bounded_actions(text: str) -> None:
     assert _detect(text)
+
+
+def test_rightmost_announcement_wins() -> None:
+    """A deferral in an EARLIER clause must not veto the actual announcement."""
+    assert _detect("I'll run the suite tomorrow, then let me read the votes.")
 
 
 @pytest.mark.parametrize(
@@ -204,10 +214,20 @@ def test_detects_dotted_names_paths_and_bounded_actions(text: str) -> None:
         # A colon delivers the result INLINE — nothing was dropped.
         "The review found two defects, I'll list them here: stale logging, unsafe cleanup.",
         "Let me check the arithmetic: 120 + 135 = 255.",
+        # A semicolon ends the clause: real content follows the announcement.
+        "I'll open src/app.py; the fix is already there.",
+        # A run-on sentence boundary is still a boundary.
+        "Let me check the config.The roster already shows all five idle.",
+        # A contrastive continuation means the announcement is not the whole point.
+        "The config is valid, I'll check the logs, but stale credentials are likely.",
         # Deferral is not always spelled with a pronoun.
         "I'll delete the stale branch after approval.",
         "I'll run the suite once CI recovers.",
-        "I'll apply the patch pending your review.",
+        "I'll delete the branch pending your review.",
+        # A conditional MUTATION is the worst thing to re-roll: the nudge would ask
+        # the next draft to perform it unconditionally.
+        "I'll delete the branch if the tests pass.",
+        "I'll delete the branch—your call.",
         # Satisfiable by continuing to write, so not a dropped action.
         "I'll list the three failures.",
         "I'll write up what I found.",
@@ -215,6 +235,16 @@ def test_detects_dotted_names_paths_and_bounded_actions(text: str) -> None:
 )
 def test_rejects_inline_results_and_deferred_actions(text: str) -> None:
     assert not _detect(text)
+
+
+def test_conditional_check_is_a_tolerated_false_negative() -> None:
+    """"if the" is read as deferral even when it is really a complement.
+
+    Keeping it costs this reply a re-roll it arguably deserves; dropping it would
+    re-roll "I'll delete the branch if the tests pass", nudging the next draft to
+    delete unconditionally. False negatives are the cheap error here.
+    """
+    assert not _detect("I'll check if the service is healthy.")
 
 
 def test_deferral_is_scoped_to_the_announcement_clause() -> None:

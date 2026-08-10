@@ -1782,18 +1782,22 @@ class ChatOrchestrator:
                 # open-to-first-event. It dominates on cache misses (prefill) and on
                 # thinking-heavy rounds (reasoning precedes the event), but no longer
                 # delays the already-emitted skill metadata.
+                # The re-roll is never speculative: its request carries the corrective
+                # message, so no speculation opened against the original can serve it.
+                # Attributing attempt 0's speculation stats to it would make the
+                # speculation hit rate read higher than it is.
+                served_by_speculation = used_speculation and attempt == 0
                 logger.info(
                     "respond_upstream_open",
                     request_id=meta.request_id,
-                    speculative=used_speculation,
+                    speculative=served_by_speculation,
                     # Which semantic attempt this open served: 0 is the round itself,
-                    # 1 the bare-intent re-roll (never speculative — its request
-                    # carries the corrective message, so no speculation matches it).
+                    # 1 the bare-intent re-roll.
                     semantic_attempt=attempt,
                     upstream_first_event_ms=(
                         speculative_stream.open_ms
                         if (
-                            attempt == 0
+                            served_by_speculation
                             and speculative_stream is not None
                             and speculative_stream.open_ms is not None
                         )
@@ -1806,7 +1810,7 @@ class ChatOrchestrator:
                     upstream_endpoint=opened_stream.endpoint,
                     speculative_prefetched_chunks=(
                         speculative_stream.stats()["prefetched_chunks"]
-                        if speculative_stream is not None and used_speculation
+                        if speculative_stream is not None and served_by_speculation
                         else 0
                     ),
                 )
@@ -1861,11 +1865,12 @@ class ChatOrchestrator:
 
                 # The reply has ended with its content still private. This is the one
                 # moment the dead round can be caught, and discarding it is free.
-                if held is not None and is_bare_tool_intent(
+                if held is not None and self._is_bare_intent(
                     "".join(content_parts),
                     finish_reason=finish_reason,
                     saw_tool_calls=saw_tool_calls,
                     tools_callable=tools_callable,
+                    request_id=meta.request_id,
                 ):
                     self._log_bare_intent(
                         "detected",
@@ -1876,13 +1881,18 @@ class ChatOrchestrator:
                     carried_usage = self._sum_usage(
                         carried_usage, opened_stream.usage or ProviderUsage()
                     )
+                    # Hand off ownership BEFORE tearing anything down: the draft has
+                    # to survive a close failure, or a teardown error would cost the
+                    # user a reply that is complete and in hand.
+                    fallback = (held, finish_reason, "".join(content_parts))
+                    discarded, stream = stream, None
                     # Close the discarded producer NOW rather than leaving it to the
                     # outer ``finally``: a speculative stream holds an overlap slot
                     # until it closes, and the replacement open should not queue
-                    # behind capacity this attempt no longer needs.
-                    await stream.aclose()
-                    stream = None
-                    fallback = (held, finish_reason, "".join(content_parts))
+                    # behind capacity this attempt no longer needs. Best-effort, for
+                    # the same reason the terminal teardown is: a failed close must
+                    # never become the turn's outcome.
+                    await self._close_quietly(discarded, request_id=meta.request_id)
                     attempt += 1
                     active_request = self._bare_intent_repair_request(provider_request)
                     finish_reason = None
@@ -1942,16 +1952,7 @@ class ChatOrchestrator:
             )
         finally:
             if stream is not None:
-                try:
-                    await stream.aclose()
-                except Exception:
-                    # A terminal event (done/error) may already be on the wire;
-                    # a teardown failure must never surface as a second one.
-                    logger.warning(
-                        "provider_close_failed",
-                        request_id=meta.request_id,
-                        exc_info=True,
-                    )
+                await self._close_quietly(stream, request_id=meta.request_id)
 
         # Learn only from a stream that reached a clean ``done`` (not an error, and
         # not an aborted stream — a client disconnect raises GeneratorExit at a
@@ -2010,6 +2011,46 @@ class ChatOrchestrator:
         return f"event: {event}\ndata: {body}\n\n"
 
     # ---- bare-tool-intent repair ----------------------------------------
+
+    @staticmethod
+    async def _close_quietly(stream: ProviderStream, *, request_id: str) -> None:
+        """Tear a provider stream down without letting the teardown become the answer.
+
+        A terminal event (done/error) may already be on the wire, and a discarded
+        attempt's replacement is still owed to the user — neither can be displaced
+        by a close failure.
+        """
+        try:
+            await stream.aclose()
+        except Exception:
+            logger.warning("provider_close_failed", request_id=request_id, exc_info=True)
+
+    def _is_bare_intent(
+        self,
+        text: str,
+        *,
+        finish_reason: str | None,
+        saw_tool_calls: bool,
+        tools_callable: bool,
+        request_id: str,
+    ) -> bool:
+        """``is_bare_tool_intent``, but a bug in it can never cost the user a turn.
+
+        Same posture as ``_lint_final_output``: this is an optional improvement to a
+        reply that is already generated and already owed, so it fails open rather
+        than propagating. (The streaming gate's ``could_still_be_bare_intent`` probe
+        needs no such guard — it is a length test and a substring test on a ``str``.)
+        """
+        try:
+            return is_bare_tool_intent(
+                text,
+                finish_reason=finish_reason,
+                saw_tool_calls=saw_tool_calls,
+                tools_callable=tools_callable,
+            )
+        except Exception:
+            logger.warning("bare_intent_detector_failed", request_id=request_id, exc_info=True)
+            return False
 
     @staticmethod
     def _tools_callable(request: ProviderChatRequest) -> bool:
@@ -2077,11 +2118,12 @@ class ChatOrchestrator:
         failure fails open to the reply already in hand. Nothing has reached the
         client at this point, so discarding the first draft is free.
         """
-        if not is_bare_tool_intent(
+        if not self._is_bare_intent(
             result.text,
             finish_reason=result.finish_reason,
             saw_tool_calls=bool(result.tool_calls),
             tools_callable=self._tools_callable(provider_request),
+            request_id=request_id,
         ):
             return result
 

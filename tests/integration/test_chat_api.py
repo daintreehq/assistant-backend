@@ -954,7 +954,7 @@ def test_stream_retry_failing_after_public_content_is_terminal(
 
 
 def test_stream_close_failure_on_discard_does_not_cost_the_turn(
-    client, auth, fake_provider
+    client, auth, fake_provider, app, monkeypatch
 ) -> None:
     """A teardown error must never displace a reply that is complete and in hand."""
     from fakes import FakeStream
@@ -969,6 +969,16 @@ def test_stream_close_failure_on_discard_does_not_cost_the_turn(
             return FakeStream(_repair_tool_chunks())
         return ExplodingCloseStream(make_text_chunks(DEAD_ROUND))
 
+    # Speculation wraps the first attempt in a _SpeculativeStream, whose own discard
+    # already swallows close failures — that would make this test pass without
+    # exercising the discard path's teardown at all. Disable it so the orchestrator
+    # holds the raw provider stream and the failing aclose() is the one under test.
+    orchestrator = app.state.container.orchestrator
+    monkeypatch.setattr(
+        orchestrator,
+        "settings",
+        orchestrator.settings.model_copy(update={"skill_speculation_max_concurrency": 0}),
+    )
     fake_provider.selection_result = selection_result([])
     fake_provider.stream_factory = stream_factory
     body = respond_body(
@@ -983,6 +993,42 @@ def test_stream_close_failure_on_discard_does_not_cost_the_turn(
     assert names[-1] == "done"
     fragments = [c for e, d in events if e == "delta" for c in d.get("tool_calls", [])]
     assert [f["function"]["name"] for f in fragments] == ["terminal__extract"]
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_a_detector_failure_never_costs_the_turn(
+    client, auth, fake_provider, monkeypatch, stream
+) -> None:
+    """The repair is an optional improvement to a reply already owed to the user.
+
+    Same posture as ``_lint_final_output``: a bug in it degrades to "no repair",
+    never to a lost turn.
+    """
+    def explode(*args, **kwargs):
+        raise RuntimeError("detector bug")
+
+    monkeypatch.setattr(
+        "daintree_assistant_server.services.chat_orchestrator.is_bare_tool_intent", explode
+    )
+    fake_provider.selection_result = selection_result([])
+    fake_provider.complete_result = make_result(content=DEAD_ROUND, finish_reason="stop")
+    fake_provider.stream_chunks = make_text_chunks(DEAD_ROUND)
+    body = respond_body(
+        [{"role": "user", "content": "read the votes"}], session_id="bi19", turn_id="t1",
+        generation={"stream": True} if stream else None, tools=[EXTRACT_TOOL],
+    )
+    if not stream:
+        r = client.post(URL, headers=auth, json=body)
+        assert r.status_code == 200
+        assert r.json()["message"]["content"] == DEAD_ROUND
+        return
+    with client.stream("POST", URL, headers=auth, json=body) as s:
+        text = "".join(s.iter_text())
+    events = parse_sse(text)
+    names = [e for e, _ in events]
+    assert "error" not in names and names[-1] == "done"
+    content = "".join(d.get("content", "") for e, d in events if e == "delta")
+    assert content.strip() == DEAD_ROUND
 
 
 def test_request_id_is_unified_across_header_and_meta(client, auth, fake_provider) -> None:
