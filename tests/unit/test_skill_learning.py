@@ -1202,6 +1202,112 @@ async def test_learner_skipped_when_streamed_turn_ends_in_tool_calls(tmp_path: P
     assert not (primary / "daintree.test.created.md").exists()
 
 
+# Verbatim from session ses_659b0fc9 (issue #26): finish_reason "stop", zero tool
+# calls, 20/43/32 completion tokens — each announced a read and emitted no call.
+# The last is scripted by our own prompt (main/base/10-hard-rules.md).
+DEAD_ROUND_REPLIES = [
+    "All five votes are in. Let me read them, one read per terminal, batched.",
+    (
+        "You're right, my previous reply ended with a tool call intent but I only "
+        "emitted the reads in the next sentence without actually calling them. Let "
+        "me read all five votes now, in one batched reply."
+    ),
+    (
+        "I have the live roster, all five agents are waiting at a prompt, meaning "
+        "they finished their votes. Let me read each vote now in one batch."
+    ),
+    "This needs file changes, so I'll spawn a visible agent to do them.",
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reply", DEAD_ROUND_REPLIES)
+async def test_learner_skipped_when_turn_only_announced_an_action(
+    tmp_path: Path, reply: str
+) -> None:
+    # A "dead round" reaches the trigger looking exactly like a final answer — no
+    # tool calls, finish_reason "stop", non-empty text — but it accomplished nothing.
+    # The response path re-rolls it once; the fake answers the re-roll with the same
+    # reply, which is precisely the case this guard exists for: a dead round the
+    # re-roll did not fix must still not be learned from as a completed workflow.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+
+    def _complete(req: Any) -> Any:
+        system = req.messages[0]["content"]
+        if "skill-learning gate" in system:
+            return make_result(content=json.dumps(GATE_CREATE))
+        if "skill builder" in system or "skill improver" in system:
+            return make_result(content=json.dumps(PROPOSAL_CREATE))
+        return make_result(content=reply)
+
+    fake.complete_result = _complete
+    orch, _, primary = _orchestrator_with_learner(tmp_path, fake)
+
+    # Tools MUST be offered: a round with nothing callable cannot have dropped a
+    # call, so the predicate would short-circuit and the test would pass vacuously.
+    outcome = await orch.complete(
+        _request(tools=["terminal.read"]), upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY
+    )
+    assert outcome.body is not None
+    # The reply itself still reaches the client — this guard only gates LEARNING.
+    assert outcome.body["message"]["content"] == reply
+    await orch.drain_background_tasks()
+
+    gate_calls = [r for r in fake.requests if "skill-learning gate" in r.messages[0]["content"]]
+    assert gate_calls == []
+    assert not (primary / "daintree.test.created.md").exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reply", DEAD_ROUND_REPLIES)
+async def test_learner_skipped_when_streamed_turn_only_announced_an_action(
+    tmp_path: Path, reply: str
+) -> None:
+    # The streaming path accumulates its text and funnels through the same trigger,
+    # so a dead round streamed to a clean `done` must be skipped there too.
+    fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
+    fake.stream_chunks = make_text_chunks(reply)
+    orch, _, primary = _orchestrator_with_learner(tmp_path, fake)
+
+    req = RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {
+                "messages": MESSAGES,
+                "tools": [
+                    {"type": "function", "function": {"name": "terminal.read", "parameters": {}}}
+                ],
+            },
+            "startup": {},
+            "generation": {"stream": True},
+        }
+    )
+    outcome = await orch.complete(req, upstream_model=OPENROUTER_MODEL, api_key=TEST_API_KEY)
+    assert outcome.stream is not None
+    events = [event async for event in outcome.stream]  # drain the SSE stream
+    await orch.drain_background_tasks()
+
+    # Self-authenticating: prove the stream actually REACHED a clean `done` carrying
+    # the whole reply, BEFORE asserting the absence of learning. Otherwise this test
+    # would still pass if the stream errored, or accumulated nothing and tripped the
+    # older blank-text guard — passing for a reason that is not this guard.
+    assert not [e for e in events if e.startswith("event: error\n")]
+    assert events[-1].startswith("event: done\n")
+    streamed = "".join(
+        json.loads(e.split("data: ", 1)[1]).get("content", "") or ""
+        for e in events
+        if e.startswith("event: delta\n")
+    )
+    # `make_text_chunks` emits word-wise deltas, so the accumulation carries a
+    # trailing space — which is exactly why the predicate normalizes before matching.
+    assert streamed.strip() == reply
+
+    gate_calls = [r for r in fake.requests if "skill-learning gate" in r.messages[0]["content"]]
+    assert gate_calls == []
+    assert not (primary / "daintree.test.created.md").exists()
+
+
 @pytest.mark.asyncio
 async def test_drain_background_tasks_awaits_pending(tmp_path: Path) -> None:
     # drain with zero tasks is a no-op; with a pending task it awaits to completion

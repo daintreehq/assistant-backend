@@ -877,6 +877,9 @@ class ChatOrchestrator:
             active_ids=prepared.active_ids,
             assistant_text=result.text,
             had_tool_calls=had_tool_calls,
+            finish_reason=result.finish_reason,
+            tools_callable=self._tools_callable(prepared.provider_request),
+            request_id=request_id,
             api_key=api_key,
         )
         return RespondOutcome(headers=headers, streaming=False, body=body)
@@ -1250,6 +1253,9 @@ class ChatOrchestrator:
         active_ids: list[str],
         assistant_text: str,
         had_tool_calls: bool,
+        finish_reason: str | None,
+        tools_callable: bool,
+        request_id: str,
         api_key: SecretStr,
     ) -> None:
         """Fire skill learning on the just-completed workflow, off the response path.
@@ -1261,6 +1267,13 @@ class ChatOrchestrator:
         final answer is the natural completion boundary. The learner reloads the
         catalog in place, so a created/improved skill is live for the next turn.
 
+        A *bare intent* round is the second thing that is not a completion boundary,
+        and the reason this takes the same structural signals ``is_bare_tool_intent``
+        does: a round that only ANNOUNCED an action wears the exact shape of a final
+        answer (no tool calls, ``stop``, non-empty text), so ``had_tool_calls`` cannot
+        see it. The response path already re-rolls such a round once; this catches the
+        ones the re-roll did not fix, which arrive here having accomplished nothing.
+
         Fire-and-forget: a slow (thinking-model) learning pass must never delay or
         block the response the user already has, and the learner fails open
         internally. Invisible to the CLI — no wire fields, no feedback tool.
@@ -1268,6 +1281,29 @@ class ChatOrchestrator:
         if self.learner is None or not self.learner.enabled:
             return
         if had_tool_calls or not assistant_text.strip():
+            return
+        try:
+            bare_intent = is_bare_tool_intent(
+                assistant_text,
+                finish_reason=finish_reason,
+                saw_tool_calls=had_tool_calls,
+                tools_callable=tools_callable,
+            )
+        except Exception:
+            # Same never-propagate posture as ``_is_bare_intent``, opposite fail
+            # direction: on the response path a detector bug must not cost a reply
+            # the user is already owed, but here the cheap side is NOT learning. A
+            # skipped pass costs nothing (learning is opportunistic, and the same
+            # workflow can be learned on a later run), while learning from a dead
+            # round can write a real skill file out of a non-answer.
+            logger.warning(
+                "skill_learning_bare_intent_check_failed", request_id=request_id, exc_info=True
+            )
+            bare_intent = True
+        if bare_intent:
+            # Content-free by design: the skip rate is worth watching, but assistant
+            # text never belongs in a log line.
+            logger.info("skill_learning_skipped_bare_intent", request_id=request_id)
             return
         trailing = [ChatMessage(role="assistant", content=assistant_text)]
         # The caller's credential is captured BY VALUE into the task's arguments:
@@ -1974,6 +2010,9 @@ class ChatOrchestrator:
                 active_ids=active_ids,
                 assistant_text="".join(content_parts),
                 had_tool_calls=saw_tool_calls or finish_reason == "tool_calls",
+                finish_reason=finish_reason,
+                tools_callable=tools_callable,
+                request_id=meta.request_id,
                 api_key=api_key,
             )
 
