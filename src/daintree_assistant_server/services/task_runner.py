@@ -7,6 +7,7 @@ request contains ``messages``, ``system``, ``developer``, or ``system_prompt``.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from collections.abc import Callable
@@ -46,7 +47,12 @@ from ..contracts.tasks import (
     WorkflowResumeDigestInput,
     WorkflowResumeDigestOutput,
 )
-from ..errors import DaintreeError, invalid_request, unknown_task
+from ..errors import (
+    DaintreeError,
+    invalid_request,
+    turn_deadline_exceeded,
+    unknown_task,
+)
 from ..observability import get_logger, new_task_run_id
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
@@ -54,6 +60,7 @@ from ..providers.policy import routing_preference
 from ..providers.retry import retry_upstream
 from ..skills.catalog import CatalogManager
 from ..text_utils import cap_bytes
+from .deadlines import BudgetPolicy, RequestBudget, TurnPhase
 from .result_schema import conforms, validate_result_schema
 from .workflow_validation import (
     WorkflowValidationError,
@@ -66,6 +73,11 @@ _SCHEMA_TASK = "terminal_extract_json"
 logger = get_logger("daintree.tasks")
 
 MAX_DISTILLED_FACTS = 10
+
+# Headroom over a profile's per-call timeout for the whole task: a task makes at
+# most two upstream calls (first attempt plus one JSON repair) and spends a little
+# on backoff and parsing between them.
+_TASK_BUDGET_FACTOR = 2.5
 
 
 class TaskParseError(Exception):
@@ -702,14 +714,74 @@ class TaskRunner:
     def task_ids(self) -> list[str]:
         return sorted(self.profiles)
 
-    async def _complete_with_retry(self, request: ProviderChatRequest) -> Any:
+    async def _complete_with_retry(
+        self, request: ProviderChatRequest, *, budget: RequestBudget | None = None
+    ) -> Any:
         return await retry_upstream(
             lambda: self.provider.complete(request),
             retries=self.settings.max_upstream_retries,
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
+            # A first attempt plus a JSON-repair retry must share one budget, not
+            # get a fresh timeout each — otherwise the profile's stated bound is
+            # not the bound.
+            remaining_seconds=(budget.remaining_total if budget is not None else None),
         )
 
     async def run(self, request: TaskRequest, *, api_key: SecretStr) -> TaskResult:
+        """Run one named utility task under a finite total budget.
+
+        The per-call `httpx` timeout on a profile is an inactivity bound; a task
+        that also repairs its JSON makes two upstream calls, so without a shared
+        wall clock the real worst case is quietly double the profile's number.
+        """
+        # An unknown task is resolved BEFORE the budget: it is a 404 about the
+        # request, not a timeout, and wrapping it in a deadline would only muddy
+        # the error.
+        profile = self.profiles.get(request.task)
+        if profile is None:
+            raise unknown_task(request.task)
+
+        budget = RequestBudget(policy=self._budget_policy(profile))
+        try:
+            async with asyncio.timeout(budget.remaining_total()):
+                return await self._run_inner(request, api_key=api_key, budget=budget)
+        except TimeoutError as exc:
+            logger.warning(
+                "task_deadline_exceeded",
+                task=request.task,
+                elapsed_ms=round(budget.elapsed() * 1000),
+            )
+            raise turn_deadline_exceeded(
+                TurnPhase.TOTAL.value,
+                f"Task {request.task!r} exceeded its total deadline.",
+            ) from exc
+
+    def _budget_policy(self, profile: TaskProfile) -> BudgetPolicy:
+        """A task's total budget, derived from **its own** effective timeout.
+
+        Read from the profile, not from ``utility_timeout_seconds``. The heavy
+        transcript/graph profiles carry an explicit, larger per-call timeout
+        precisely so a future cut to the shared default cannot starve them — and
+        deriving the total budget from that default instead would reintroduce
+        exactly the starvation those explicit values exist to prevent. They are
+        equal today (both 60s), which is what makes this the kind of bug that
+        stays invisible until someone tunes the default.
+
+        A task makes at most two upstream calls (first attempt plus one JSON
+        repair) and spends a little on backoff and parsing between them, hence a
+        headroom factor rather than the raw timeout. The other three phase limits
+        are irrelevant here — a task is not streamed and has no first-visible-
+        output moment — so they are set to the same value and never consulted.
+        """
+        per_call = profile.timeout_seconds or self.settings.utility_timeout_seconds
+        total = per_call * _TASK_BUDGET_FACTOR
+        return BudgetPolicy(
+            preparation=total, first_output=total, stream_idle=total, total=total
+        )
+
+    async def _run_inner(
+        self, request: TaskRequest, *, api_key: SecretStr, budget: RequestBudget
+    ) -> TaskResult:
         profile = self.profiles.get(request.task)
         if profile is None:
             raise unknown_task(request.task)
@@ -780,7 +852,7 @@ class TaskRunner:
             routing=routing,
         )
 
-        result = await self._complete_with_retry(provider_request)
+        result = await self._complete_with_retry(provider_request, budget=budget)
         usage = result.usage
         finish = result.finish_reason or "stop"
         endpoint = result.endpoint
@@ -808,7 +880,7 @@ class TaskRunner:
                 # the original call was routed away from.
                 routing=routing,
             )
-            repair = await self._complete_with_retry(repair_request)
+            repair = await self._complete_with_retry(repair_request, budget=budget)
             usage = _sum_usage(usage, repair.usage)
             finish = repair.finish_reason or "stop"
             endpoint = repair.endpoint or endpoint

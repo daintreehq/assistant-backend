@@ -238,6 +238,71 @@ the SSE path could exclude the deterministic ones too.
 A retry after `meta` adopts that meta's signed `state` token in the next POST, so
 the backend reuses the same selection rather than re-running the selector.
 
+## 5a. Deadlines — a finite end-to-end budget
+
+An `httpx` read timeout is an **inactivity** bound, not a wall-clock one: it
+measures the gap between chunks, so a response that keeps trickling a byte resets
+it forever. Combined with a retry, a stuck turn could approach the Cloud Run
+request ceiling with nothing in the application able to stop it — producing no
+useful error, no phase attribution, and no released capacity.
+
+`services/deadlines.py` adds four limits, because "it took too long" is four
+different bugs:
+
+| Phase | Bounds | Default |
+|---|---|---:|
+| `preparation` | validation, state decode, skill selection — before the model is opened | 25 s |
+| `first_output` | arrival → first visible content or tool call | 30 s |
+| `stream_idle` | longest gap between chunks once generation started | 60 s |
+| `total` | hard wall clock for the whole turn | 300 s |
+
+Five properties worth knowing:
+
+- **`preparation` and `first_output` are absolute**, measured from the start of
+  the turn; only `stream_idle` resets per gap, because a chunk arriving *is* the
+  evidence the stream is alive. An earlier revision recomputed the first-output
+  allowance per chunk, so a reasoning fragment every 29 s renewed a 30 s deadline
+  indefinitely — which is why `RequestBudget.remaining()` now raises rather than
+  serving `stream_idle`.
+- **Every phase is clamped by the total.** A 60 s idle allowance means nothing
+  when 5 s of turn budget remains.
+- **Retry attempts share the budget.** `retry_upstream` takes the remaining time
+  and refuses to start an attempt that cannot finish — without that, N attempts
+  at T seconds each cost N×T, which is exactly how a per-attempt timeout composes
+  into an unbounded turn. It applies to the stream *open* too, not just chunks.
+- **Reasoning fragments do not satisfy `first_output`.** Only visible content or a
+  tool call does; otherwise a model that thinks for two minutes escapes the
+  deadline that exists to measure user-perceived latency.
+- **Timing is monotonic.** A clock adjustment mid-turn cannot extend or collapse
+  a deadline.
+
+The phases do not cleanly mean "before the model was reached": speculation may
+open an upstream stream *during* preparation. `preparation` means "before the
+canonical turn had anything to show", which is what a user experiences.
+
+The failure is `504 turn_deadline_exceeded`, naming the phase. Before headers it
+is an ordinary HTTP error; after the stream has committed a 200 it is a terminal
+SSE `error` event — never a `done`, which would present a truncated answer as a
+complete one. Stream teardown on that path is itself bounded (5 s), because an
+`aclose()` hanging on the same dead upstream would otherwise swallow the terminal
+error and let the request outlive the deadline that just fired.
+
+**Not covered:** detached post-turn skill learning. It runs after the response is
+sent, so it cannot delay a turn, but it has its own timeout rather than a share
+of this budget — and it is local-development-only, failing readiness in staging
+and production.
+
+Utility tasks get the same treatment with a budget derived from their profile
+timeout, because a task that also repairs its JSON makes two upstream calls.
+
+**Known gap:** an abandoned *non-streaming* turn is not cancelled on client
+disconnect. ASGI offers no disconnect callback for a buffered request, and
+polling `request.is_disconnected()` deadlocks against this app's body-buffering
+middleware — the poll delegates to the raw `receive`, which does not report a
+disconnect until the response completes, so the handler waits for the client
+while the client waits for the handler. The total deadline bounds the waste.
+The streaming path has no such gap: `GeneratorExit` closes the upstream stream.
+
 ## 6. Failure mapping
 
 The caller must be able to tell *whose* problem a failure is: their key, their

@@ -312,6 +312,28 @@ def upstream_protocol_error(
     )
 
 
+def turn_deadline_exceeded(phase: str, message: str | None = None) -> DaintreeError:
+    """Daintree's own end-to-end budget ran out — not the upstream's.
+
+    Distinct from ``upstream_timeout`` on purpose. That one means the provider
+    went quiet; this one means the turn as a whole outran the budget this server
+    sets, which is a different diagnosis and often a different fix (a smaller
+    request, or a Daintree bug). ``phase`` says *where* it ran out: preparation
+    means the model was never even reached.
+
+    Retryable, because the usual cause is a transient stall rather than anything
+    about the request — but the client is responsible for not replaying a turn
+    whose visible content has already committed.
+    """
+    return DaintreeError(
+        status_code=504,
+        message=message or f"The turn exceeded its {phase} deadline.",
+        type=TYPE_API,
+        code="turn_deadline_exceeded",
+        retryable=True,
+    )
+
+
 def upstream_error(
     message: str = "The upstream model provider returned an error.",
     *,

@@ -25,6 +25,21 @@ async def respond(
     principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
 ) -> JSONResponse | StreamingResponse:
+    """Run one turn.
+
+    **Cancellation.** The streaming path stops promptly when a client goes away:
+    GeneratorExit unwinds the body generator, whose ``finally`` closes the
+    upstream stream. The non-streaming path has no equivalent signal — ASGI
+    offers no disconnect callback for a buffered request, and polling
+    ``request.is_disconnected()`` deadlocks against this app's body-buffering
+    middleware (the poll delegates to the raw ``receive``, which will not report
+    a disconnect until the response completes, so the handler waits for the
+    client while the client waits for the handler).
+
+    What bounds an abandoned non-streaming turn instead is the request budget
+    (``services/deadlines.py``): it cannot outlive the total deadline, so the
+    worst case is wasted work for that bounded window rather than indefinitely.
+    """
     settings = request.app.state.settings
     container = request.app.state.container
 

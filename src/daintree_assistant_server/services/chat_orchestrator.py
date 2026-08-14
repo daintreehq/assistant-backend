@@ -41,7 +41,7 @@ from ..contracts.extensions import (
     SkillRef,
 )
 from ..contracts.openai import ChatMessage
-from ..errors import DaintreeError, internal_error
+from ..errors import DaintreeError, internal_error, turn_deadline_exceeded
 from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
@@ -53,6 +53,7 @@ from ..skills.selector import SelectionDecision, Selector
 from ..state.codec import StateCodec
 from ..text_utils import sanitize_line
 from .bare_intent import could_still_be_bare_intent, is_bare_tool_intent
+from .deadlines import DeadlineExceeded, RequestBudget, TurnPhase
 from .output_policy import lint_output, repair_tables
 from .prompt_assembler import PromptAssembler, render_order_ids
 from .skill_learning import SkillLearner
@@ -294,6 +295,12 @@ class RespondOutcome:
 # the latency posture (one shipped optimum, no env toggle). Read at call time so
 # tests can shrink it.
 HEARTBEAT_INTERVAL_SECONDS = 8.0
+
+# Grace for tearing down a provider stream. Deliberately short and separate from
+# the turn budget: teardown usually runs in a `finally` on the way out of a
+# deadline failure, so an unbounded close would let cleanup outlive the deadline
+# that fired and swallow the terminal error owed to the client.
+_CLOSE_GRACE_SECONDS = 5.0
 
 
 @dataclass
@@ -708,6 +715,25 @@ class _SpeculativeStream(ProviderStream):
         }
 
 
+def _carries_output(chunk: dict[str, Any] | None) -> bool:
+    """Whether a chunk is the thing a user is waiting for.
+
+    Visible content or a tool call ends the "is it broken?" interval. Reasoning
+    fragments deliberately do NOT: they are internal, the client does not render
+    them as an answer, and counting them would let a model that thinks for two
+    minutes escape the first-output deadline entirely.
+    """
+    if not chunk:
+        return False
+    choices = chunk.get("choices") or []
+    if not choices or not isinstance(choices[0], dict):
+        return False
+    delta = choices[0].get("delta") or {}
+    if not isinstance(delta, dict):
+        return False
+    return bool(delta.get("content")) or bool(delta.get("tool_calls"))
+
+
 class ChatOrchestrator:
     def __init__(
         self,
@@ -814,6 +840,11 @@ class ChatOrchestrator:
         request_id: str | None = None,
     ) -> RespondOutcome:
         request_id = request_id or new_request_id()
+        # ONE clock for the whole turn, started before any work. Every phase
+        # deadline and every retry attempt reads from it, so they share a budget
+        # instead of each getting a fresh one — the difference between a bounded
+        # turn and one that merely looks bounded.
+        budget = RequestBudget()
         headers = {
             "X-Daintree-Protocol": str(PROTOCOL_VERSION),
             "X-Request-Id": request_id,
@@ -832,6 +863,7 @@ class ChatOrchestrator:
                     upstream_model=upstream_model,
                     request_id=request_id,
                     api_key=api_key,
+                    budget=budget,
                 )
             )
             # If the stream is never consumed (client vanished before the body was
@@ -850,16 +882,85 @@ class ChatOrchestrator:
                 streaming=True,
                 stream=_PrepOwnedStream(
                     self._stream_with_heartbeat(
-                        request, prep_task=prep_task, request_id=request_id
+                        request,
+                        prep_task=prep_task,
+                        request_id=request_id,
+                        budget=budget,
                     ),
                     prep_task,
                 ),
             )
 
+        try:
+            return await self._complete_nonstream(
+                request,
+                upstream_model=upstream_model,
+                request_id=request_id,
+                api_key=api_key,
+                budget=budget,
+                headers=headers,
+            )
+        except DeadlineExceeded as exc:
+            # Nothing has been sent yet on this path, so a clean 504 is available
+            # — strictly better than the streaming path's in-band error.
+            logger.warning(
+                "respond_deadline_exceeded",
+                request_id=request_id,
+                phase=exc.phase.value,
+                elapsed_ms=round(exc.elapsed * 1000),
+                streaming=False,
+            )
+            raise turn_deadline_exceeded(exc.phase.value) from exc
+
+    async def _complete_nonstream(
+        self,
+        request: RespondRequest,
+        *,
+        upstream_model: str,
+        request_id: str,
+        api_key: SecretStr,
+        budget: RequestBudget,
+        headers: dict[str, str],
+    ) -> RespondOutcome:
+        """The non-streaming turn, under the total wall-clock budget.
+
+        One `asyncio.timeout` around the whole thing rather than per-step limits:
+        the caller is blocked on a single response, so the only number that
+        matters to them is when it arrives — and the per-attempt bounds inside
+        (prep deadline, shared retry budget) already stop any one step running
+        away.
+        """
+        try:
+            async with asyncio.timeout(budget.remaining_total()):
+                return await self._complete_nonstream_inner(
+                    request,
+                    upstream_model=upstream_model,
+                    request_id=request_id,
+                    api_key=api_key,
+                    budget=budget,
+                    headers=headers,
+                )
+        except TimeoutError as exc:
+            raise DeadlineExceeded(TurnPhase.TOTAL, budget.elapsed()) from exc
+
+    async def _complete_nonstream_inner(
+        self,
+        request: RespondRequest,
+        *,
+        upstream_model: str,
+        request_id: str,
+        api_key: SecretStr,
+        budget: RequestBudget,
+        headers: dict[str, str],
+    ) -> RespondOutcome:
         prepared = await self._prepare(
-            request, upstream_model=upstream_model, request_id=request_id, api_key=api_key
+            request,
+            upstream_model=upstream_model,
+            request_id=request_id,
+            api_key=api_key,
+            budget=budget,
         )
-        result = await self._complete_with_retry(prepared.provider_request)
+        result = await self._complete_with_retry(prepared.provider_request, budget=budget)
         # A round that only announced a tool call it never emitted would end the turn
         # having performed nothing. Re-roll it once here, before anything is built or
         # sent, so neither the client nor the transcript ever sees the dead draft.
@@ -886,6 +987,50 @@ class ChatOrchestrator:
         return RespondOutcome(headers=headers, streaming=False, body=body)
 
     async def _prepare(
+        self,
+        request: RespondRequest,
+        *,
+        upstream_model: str,
+        request_id: str,
+        api_key: SecretStr,
+        budget: RequestBudget | None = None,
+    ) -> _PreparedTurn:
+        """Validate, decode state, select skills and assemble — under a deadline.
+
+        Everything here happens BEFORE the user has seen anything, so a stall is
+        pure dead air. Bounding it separately from the rest of the turn also
+        makes the failure attributable: "timed out in preparation" says the model
+        was never reached, which is a completely different investigation from a
+        slow generation.
+        """
+        if budget is None:
+            return await self._prepare_inner(
+                request,
+                upstream_model=upstream_model,
+                request_id=request_id,
+                api_key=api_key,
+            )
+        try:
+            async with asyncio.timeout(budget.remaining(TurnPhase.PREPARATION)):
+                return await self._prepare_inner(
+                    request,
+                    upstream_model=upstream_model,
+                    request_id=request_id,
+                    api_key=api_key,
+                )
+        except TimeoutError as exc:
+            phase = (
+                TurnPhase.TOTAL if budget.expired() else TurnPhase.PREPARATION
+            )
+            logger.warning(
+                "respond_deadline_exceeded",
+                request_id=request_id,
+                phase=phase.value,
+                elapsed_ms=round(budget.elapsed() * 1000),
+            )
+            raise turn_deadline_exceeded(phase.value) from exc
+
+    async def _prepare_inner(
         self,
         request: RespondRequest,
         *,
@@ -1604,6 +1749,7 @@ class ChatOrchestrator:
         *,
         prep_task: asyncio.Task[_PreparedTurn],
         request_id: str,
+        budget: RequestBudget | None = None,
     ) -> AsyncGenerator[str, None]:
         """Wrap the event stream with SSE comment heartbeats.
 
@@ -1612,7 +1758,9 @@ class ChatOrchestrator:
         ``: hb`` comment goes out so intermediaries and the CLI's idle watchdog
         see a live stream. Comments are invisible to SSE event parsing.
         """
-        inner = self._stream_events(request, prep_task=prep_task, request_id=request_id)
+        inner = self._stream_events(
+            request, prep_task=prep_task, request_id=request_id, budget=budget
+        )
         pending: asyncio.Task[str] | None = None
         try:
             while True:
@@ -1646,6 +1794,7 @@ class ChatOrchestrator:
         *,
         prep_task: asyncio.Task[_PreparedTurn],
         request_id: str,
+        budget: RequestBudget | None = None,
     ) -> AsyncGenerator[str, None]:
         """Await prep inside the stream, then delegate to the provider event body.
 
@@ -1688,10 +1837,28 @@ class ChatOrchestrator:
             active_ids=prepared.active_ids,
             speculative_stream=prepared.speculation,
             api_key=prepared.api_key,
+            budget=budget,
         )
         try:
             async for event in body:
                 yield event
+        except DeadlineExceeded as exc:
+            # The turn outran its budget mid-generation. The HTTP 200 committed
+            # long ago, so this can only be reported in-band — as a terminal
+            # error naming the phase, never as a fabricated ``done`` that would
+            # present a truncated answer as a complete one.
+            logger.warning(
+                "respond_deadline_exceeded",
+                request_id=request_id,
+                phase=exc.phase.value,
+                elapsed_ms=round(exc.elapsed * 1000),
+            )
+            yield self._sse(
+                "error",
+                StreamError(
+                    error=turn_deadline_exceeded(exc.phase.value).envelope().error
+                ),
+            )
         except Exception:
             # _stream_body already maps DaintreeError to a terminal event; this
             # catches what it could not anticipate (e.g. a malformed provider
@@ -1713,6 +1880,7 @@ class ChatOrchestrator:
         active_ids: list[str],
         api_key: SecretStr,
         speculative_stream: _SpeculativeStream | None = None,
+        budget: RequestBudget | None = None,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
@@ -1800,7 +1968,7 @@ class ChatOrchestrator:
                 if stream is None:
                     try:
                         opened_stream, first_event = await self._open_stream_with_retry(
-                            active_request
+                            active_request, budget=budget
                         )
                     except DaintreeError as exc:
                         if fallback is None:
@@ -1862,7 +2030,9 @@ class ChatOrchestrator:
                 if attempt == 0 and tools_callable:
                     held = []
 
-                async for chunk in self._chunk_iter(opened_stream, first_event):
+                async for chunk in self._chunk_iter(
+                    opened_stream, first_event, budget=budget
+                ):
                     finish_reason = self._chunk_finish_reason(chunk) or finish_reason
                     delta = self._chunk_to_delta(chunk)
                     if delta is None:
@@ -2025,12 +2195,67 @@ class ChatOrchestrator:
 
     @staticmethod
     async def _chunk_iter(
-        stream: ProviderStream, first_event: dict[str, Any] | None
+        stream: ProviderStream,
+        first_event: dict[str, Any] | None,
+        *,
+        budget: RequestBudget | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
-        """The stream's chunks, with the already-prefetched first event back in front."""
+        """The stream's chunks, with the already-prefetched first event back in front.
+
+        Also THE enforcement point for the two streaming deadlines, because it is
+        the single funnel every chunk passes through. Two different limits apply
+        depending on what has happened so far:
+
+        * **first_output** until the first chunk carrying visible content or a
+          tool call — the interval a user experiences as "is this broken?".
+        * **stream_idle** thereafter, per gap — which distinguishes a slow
+          generation (chunks still arriving) from a dead one (nothing arriving),
+          a distinction an `httpx` read timeout can make but a total budget
+          cannot.
+
+        Both are clamped by the total budget inside :meth:`RequestBudget.remaining`,
+        so a generous idle allowance cannot outlive the turn.
+        """
         if first_event is not None:
+            if budget is not None and budget.expired():
+                # The open/prefetch consumed the whole turn. Delivering this now
+                # would let an expired budget still produce output — and, if the
+                # iterator then ended, a `done` claiming the turn succeeded.
+                raise DeadlineExceeded(TurnPhase.TOTAL, budget.elapsed())
             yield first_event
-        async for chunk in stream:
+        if budget is None:
+            async for chunk in stream:
+                yield chunk
+            return
+
+        saw_output = _carries_output(first_event) if first_event else False
+        iterator = stream.__aiter__()
+        last_chunk_at = time.monotonic()
+        while True:
+            # Before output: an ABSOLUTE first-output deadline measured from the
+            # start of the turn, so reasoning fragments cannot renew it.
+            # After output: a per-gap idle allowance, which legitimately resets
+            # because a chunk arriving IS the evidence the stream is alive.
+            if saw_output:
+                phase = TurnPhase.STREAM_IDLE
+                allowance = budget.remaining_idle(last_chunk_at)
+            else:
+                phase = TurnPhase.FIRST_OUTPUT
+                allowance = budget.remaining(phase)
+            try:
+                async with asyncio.timeout(allowance):
+                    chunk = await iterator.__anext__()
+            except StopAsyncIteration:
+                return
+            except TimeoutError as exc:
+                # Total exhaustion outranks the phase limit in the report: it is
+                # the more useful fact, and the phase limit merely happened to be
+                # the one being waited on.
+                effective = TurnPhase.TOTAL if budget.expired() else phase
+                raise DeadlineExceeded(effective, budget.elapsed()) from exc
+            last_chunk_at = time.monotonic()
+            if not saw_output and _carries_output(chunk):
+                saw_output = True
             yield chunk
 
     @staticmethod
@@ -2077,7 +2302,16 @@ class ChatOrchestrator:
         by a close failure.
         """
         try:
-            await stream.aclose()
+            # Bounded, because this runs in a `finally` on the way OUT of a
+            # deadline failure: an `aclose()` that hangs waiting on the same dead
+            # upstream would swallow the terminal error the client is waiting for
+            # and let the request outlive the very budget that just fired. A close
+            # we abandon leaks a connection until the pool reaps it — strictly
+            # better than never answering.
+            async with asyncio.timeout(_CLOSE_GRACE_SECONDS):
+                await stream.aclose()
+        except TimeoutError:
+            logger.warning("provider_close_timeout", request_id=request_id)
         except Exception:
             logger.warning("provider_close_failed", request_id=request_id, exc_info=True)
 
@@ -2212,15 +2446,20 @@ class ChatOrchestrator:
 
     # ---- retries (before any model output is emitted) -------------------
 
-    async def _complete_with_retry(self, request: ProviderChatRequest) -> Any:
+    async def _complete_with_retry(
+        self, request: ProviderChatRequest, *, budget: RequestBudget | None = None
+    ) -> Any:
         return await retry_upstream(
             lambda: self.provider.complete(request),
             retries=self.settings.max_upstream_retries,
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
+            # Attempts share the turn's remaining time rather than each getting a
+            # fresh timeout, so N retries cannot multiply into an unbounded turn.
+            remaining_seconds=(budget.remaining_total if budget is not None else None),
         )
 
     async def _open_stream_with_retry(
-        self, request: ProviderChatRequest
+        self, request: ProviderChatRequest, *, budget: RequestBudget | None = None
     ) -> tuple[ProviderStream, dict[str, Any] | None]:
         # Opening the stream and reading its first event are one retryable unit:
         # a failure in either is transient and recoverable before model output,
@@ -2239,8 +2478,30 @@ class ChatOrchestrator:
                 if not ok:
                     await stream.aclose()
 
+        async def _bounded_open() -> tuple[ProviderStream, dict[str, Any] | None]:
+            # Open and first-event prefetch were the largest hole in the budget:
+            # a provider can send HTTP headers and then never complete an SSE
+            # event, which no `httpx` read timeout inside the attempt bounds
+            # usefully and which `_chunk_iter` never sees because it has not
+            # started yet. Bound the pair by the same absolute first-output
+            # deadline the chunk loop uses, so "time until something visible"
+            # means the same thing before and after the stream exists.
+            if budget is None:
+                return await _open()
+            try:
+                async with asyncio.timeout(budget.remaining(TurnPhase.FIRST_OUTPUT)):
+                    return await _open()
+            except TimeoutError as exc:
+                phase = (
+                    TurnPhase.TOTAL if budget.expired() else TurnPhase.FIRST_OUTPUT
+                )
+                raise DeadlineExceeded(phase, budget.elapsed()) from exc
+
         return await retry_upstream(
-            _open,
+            _bounded_open,
             retries=self.settings.max_upstream_retries,
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
+            # Open retries share the turn's clock too — otherwise each attempt
+            # got a fresh upstream timeout and the retry multiplied the bound.
+            remaining_seconds=(budget.remaining_total if budget is not None else None),
         )

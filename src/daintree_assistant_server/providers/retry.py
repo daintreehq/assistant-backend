@@ -36,6 +36,9 @@ _MAX_BACKOFF_SECONDS = 5.0
 # Hard ceiling on an upstream-directed Retry-After wait; a longer directive
 # aborts the retry budget entirely (see module docstring).
 _MAX_RETRY_AFTER_SECONDS = 10.0
+# Least time in which a retry could plausibly do anything. Below this, starting
+# another attempt spends the remaining budget to reach the same failure.
+_MIN_ATTEMPT_SECONDS = 1.0
 
 
 def _retry_after_seconds(exc: DaintreeError) -> float | None:
@@ -88,16 +91,37 @@ async def retry_upstream[T](
     *,
     retries: int,
     backoff_base_seconds: float,
+    remaining_seconds: Callable[[], float] | None = None,
 ) -> T:
     """Run ``operation``, retrying transient upstream failures.
 
     Makes ``1 + max(0, retries)`` attempts. Re-raises immediately on a
     non-retryable :class:`DaintreeError`, and re-raises the last error once the
     attempts are exhausted.
+
+    ``remaining_seconds`` reports the turn's remaining budget. When supplied, the
+    attempts **share** it rather than each getting a fresh one — the difference
+    between a bounded system and one that merely looks bounded. Without it, N
+    attempts at T seconds each cost N×T, which is exactly how a per-attempt
+    timeout composes into an unbounded turn. Optional so standalone tooling
+    (benchmarks, live tests) can retry without inventing a budget.
     """
     attempts = 1 + max(0, retries)
     last: DaintreeError | None = None
     for attempt in range(attempts):
+        # Checked at the TOP of each retry, not only before sleeping. The budget
+        # can be exhausted by the sleep itself or by event-loop delay, and an
+        # attempt started with no time left spends the caller's remaining budget
+        # only to reach the same failure — replacing a clean, attributable
+        # deadline error with a confusing upstream one.
+        out_of_time = (
+            attempt > 0
+            and remaining_seconds is not None
+            and remaining_seconds() < _MIN_ATTEMPT_SECONDS
+        )
+        if out_of_time:
+            assert last is not None
+            raise last
         try:
             return await operation()
         except DaintreeError as exc:
@@ -106,10 +130,20 @@ async def retry_upstream[T](
                 raise
             retry_after = _retry_after_seconds(exc)
             if retry_after is not None and retry_after > _MAX_RETRY_AFTER_SECONDS:
-                # The provider asked for a longer pause than a live turn can
-                # absorb; retrying earlier would just buy a second rejection.
+                # A fixed policy, not a budget decision: the provider asked for a
+                # longer pause than a live turn can absorb, so retrying earlier
+                # would just buy a second rejection. Applies even with plenty of
+                # budget left.
                 raise
             delay = _next_delay(attempt, backoff_base_seconds, retry_after)
+            # Sleeping past the deadline turns a clean, attributable timeout into
+            # a confusing upstream error raised after the turn was already over.
+            # Surface the failure we have instead.
+            if (
+                remaining_seconds is not None
+                and remaining_seconds() < delay + _MIN_ATTEMPT_SECONDS
+            ):
+                raise
             if delay > 0:
                 await asyncio.sleep(delay)
     assert last is not None  # pragma: no cover - loop always returns or raises
