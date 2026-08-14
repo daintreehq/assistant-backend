@@ -173,6 +173,132 @@ async def test_json_repair_path(task_runner: TaskRunner, fake_provider: FakeProv
 
 
 @pytest.mark.asyncio
+async def test_a_repaired_task_reports_both_calls_when_both_reported(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """The repair was billed to the caller too, so its cost belongs in the figure."""
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    results = iter(
+        [
+            make_result(content="not json at all", usage=ProviderUsage(cost=0.0002)),
+            make_result(
+                content=json.dumps({"reason": "r", "confidence": 0.5, "matched": True}),
+                usage=ProviderUsage(cost=0.0003),
+            ),
+        ]
+    )
+    fake_provider.complete_result = lambda _req: next(results)
+    result = await task_runner.run(
+        TaskRequest(task="terminal_judge", input={"question": "q"}), api_key=TEST_API_KEY
+    )
+    assert result.usage.cost == pytest.approx(0.0005)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("priced_first", [True, False])
+async def test_a_half_reported_task_repair_withholds_the_cost(
+    task_runner: TaskRunner, fake_provider: FakeProvider, priced_first: bool
+) -> None:
+    """Two calls billed, one reported — the sum is short, and /tasks cannot say so.
+
+    There is no `complete` flag on this contract to qualify the number with, and
+    a client folding it into a session total would read it as exact. Absent
+    already means unknown, so the honest move is to omit it rather than ship a
+    figure that is quietly low. Either attempt can be the silent one, and the
+    summing helper handles the two directions in separate branches.
+    """
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    priced, silent = ProviderUsage(cost=0.0002), ProviderUsage()
+    results = iter(
+        [
+            make_result(content="not json at all", usage=priced if priced_first else silent),
+            make_result(
+                content=json.dumps({"reason": "r", "confidence": 0.5, "matched": True}),
+                usage=silent if priced_first else priced,
+            ),
+        ]
+    )
+    fake_provider.complete_result = lambda _req: next(results)
+    result = await task_runner.run(
+        TaskRequest(task="terminal_judge", input={"question": "q"}), api_key=TEST_API_KEY
+    )
+    assert result.output["matched"] is True, "the answer itself is unaffected"
+    assert result.usage.cost is None
+
+
+@pytest.mark.asyncio
+async def test_a_withheld_task_cost_is_logged_rather_than_silently_dropped(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """Dropping the figure is the right wire answer, but it must leave a trace.
+
+    Otherwise a developer reconciling their OpenRouter dashboard against these
+    numbers has no way to tell a task that reported nothing from one whose
+    partial figure we deliberately withheld.
+    """
+    from structlog.testing import capture_logs
+
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    results = iter(
+        [
+            make_result(content="not json at all", usage=ProviderUsage(cost=0.0002)),
+            make_result(
+                content=json.dumps({"reason": "r", "confidence": 0.5, "matched": True}),
+                usage=ProviderUsage(),
+            ),
+        ]
+    )
+    fake_provider.complete_result = lambda _req: next(results)
+    with capture_logs() as logs:
+        await task_runner.run(
+            TaskRequest(task="terminal_judge", input={"question": "q"}), api_key=TEST_API_KEY
+        )
+    partial = [entry for entry in logs if entry["event"] == "task_cost_partial"]
+    assert len(partial) == 1
+    assert partial[0]["task"] == "terminal_judge"
+    assert partial[0]["calls"] == 2
+    assert partial[0]["observed_cost_usd"] == pytest.approx(0.0002)
+
+
+@pytest.mark.asyncio
+async def test_an_unrepaired_task_logs_no_partial_cost(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """Negative control: the ordinary path must not emit the warning at all."""
+    from structlog.testing import capture_logs
+
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    fake_provider.complete_result = make_result(
+        content="summary", usage=ProviderUsage(cost=0.0002)
+    )
+    with capture_logs() as logs:
+        await task_runner.run(
+            TaskRequest(task="terminal_summarize", input={"tail": "x"}), api_key=TEST_API_KEY
+        )
+    assert not [entry for entry in logs if entry["event"] == "task_cost_partial"]
+
+
+@pytest.mark.asyncio
+async def test_an_unrepaired_task_still_reports_its_cost(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """The withholding rule must not swallow the ordinary single-call case."""
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    fake_provider.complete_result = make_result(
+        content="summary", usage=ProviderUsage(cost=0.0002)
+    )
+    result = await task_runner.run(
+        TaskRequest(task="terminal_summarize", input={"tail": "x"}), api_key=TEST_API_KEY
+    )
+    assert result.usage.cost == pytest.approx(0.0002)
+
+
+@pytest.mark.asyncio
 async def test_json_repair_exhausted_raises(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(content="never valid json")
     with pytest.raises(DaintreeError) as exc:

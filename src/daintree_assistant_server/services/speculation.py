@@ -164,6 +164,21 @@ class _SpeculativeStream(ProviderStream):
         )
         self._producer_task.add_done_callback(self._consume_task_exception)
 
+    @property
+    def upstream_opened(self) -> bool:
+        """Whether an upstream stream actually opened — i.e. whether this
+        speculation could have cost the caller anything at all.
+
+        The distinction matters only for accounting, and it cuts both ways. An
+        open that generated tokens bills the caller whether or not a byte of it
+        was ever used, so throwing it away without counting it under-reports
+        their turn. An open that never happened bills nothing, so counting it as
+        unmeasurable spend would mark an exact total as a floor. ``usage`` alone
+        cannot tell the two apart: a stream cancelled mid-flight and a stream
+        that never opened both report ``None``.
+        """
+        return self._upstream_opened
+
     @staticmethod
     def _consume_task_exception(task: asyncio.Task[Any]) -> None:
         if not task.cancelled():

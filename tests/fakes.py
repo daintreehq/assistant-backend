@@ -48,9 +48,19 @@ def make_result(
 
 
 def make_text_chunks(
-    text: str, *, model: str = "deepseek-v4-flash", with_usage: bool = True
+    text: str,
+    *,
+    model: str = "deepseek-v4-flash",
+    with_usage: bool = True,
+    cost: float | None = None,
 ) -> list[dict[str, Any]]:
-    """Split text into role + content chunks plus a final stop (and usage) chunk."""
+    """Split text into role + content chunks plus a final stop (and usage) chunk.
+
+    ``cost`` mirrors the real usage object's field. Left off by default because
+    most tests do not care, but a stream that reports tokens and NO cost is a
+    real shape (and the one that makes a summed total a floor), so it has to be
+    expressible.
+    """
     chunks: list[dict[str, Any]] = [
         {
             "id": "chatcmpl-fake",
@@ -87,6 +97,13 @@ def make_text_chunks(
         # _chunk_finish_reason/_chunk_to_delta never executed under any test, so a
         # regression there would have been invisible. Emitting the real shape means
         # every existing streaming test covers both guards.
+        usage: dict[str, Any] = {
+            "prompt_tokens": 12,
+            "completion_tokens": 8,
+            "total_tokens": 20,
+        }
+        if cost is not None:
+            usage["cost"] = cost
         chunks.append(
             {
                 "id": "chatcmpl-fake",
@@ -94,7 +111,7 @@ def make_text_chunks(
                 "created": 1700000000,
                 "model": model,
                 "choices": [],
-                "usage": {"prompt_tokens": 12, "completion_tokens": 8, "total_tokens": 20},
+                "usage": usage,
             }
         )
     return chunks

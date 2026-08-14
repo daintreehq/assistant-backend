@@ -90,6 +90,73 @@ def test_summing_preserves_not_reported() -> None:
     assert sum_usage(ProviderUsage(), ProviderUsage(cost=0.003)).cost == 0.003
 
 
+# ---------------------------------------------------------------------------
+# Partial SUMS. `None` is visibly unknown; a short float is not.
+# ---------------------------------------------------------------------------
+
+
+def test_a_sum_with_one_side_unreported_is_marked_partial() -> None:
+    """The number survives, the fact that it is short must survive with it.
+
+    Two calls were billed and one reported. `cost` is a real figure below what
+    the caller paid, and nothing about the float itself says so — which is
+    exactly why the bit travels alongside it.
+    """
+    assert sum_usage(ProviderUsage(cost=0.002), ProviderUsage()).cost_complete is False
+    assert sum_usage(ProviderUsage(), ProviderUsage(cost=0.003)).cost_complete is False
+
+
+def test_a_sum_with_both_sides_reported_stays_complete() -> None:
+    summed = sum_usage(ProviderUsage(cost=0.002), ProviderUsage(cost=0.003))
+    assert summed.cost == pytest.approx(0.005)
+    assert summed.cost_complete is True
+
+
+def test_neither_side_reporting_is_unknown_not_partial() -> None:
+    """`cost is None` already reads as unknown; it needs no second flag."""
+    summed = sum_usage(ProviderUsage(), ProviderUsage())
+    assert summed.cost is None
+    assert summed.cost_complete is True
+
+
+def test_an_empty_accumulator_is_the_identity_not_a_silent_call() -> None:
+    """`None` means "nothing summed yet"; `ProviderUsage()` means "a call told us nothing".
+
+    The streaming path accumulates from `None` for exactly this reason. If the
+    empty accumulator were a `ProviderUsage()`, the very first sum would look
+    like a call that reported nothing and every turn would be marked partial.
+    """
+    assert sum_usage(None, ProviderUsage(cost=0.002)).cost_complete is True
+    assert sum_usage(ProviderUsage(cost=0.002), None).cost_complete is True
+
+
+def test_a_partial_propagates_through_a_further_sum() -> None:
+    """Folding a third, fully-reported call must not launder an earlier gap."""
+    partial = sum_usage(ProviderUsage(cost=0.002), ProviderUsage())
+    assert sum_usage(partial, ProviderUsage(cost=0.001)).cost_complete is False
+
+
+def test_three_fully_reported_calls_stay_complete() -> None:
+    """The positive control for the case above: depth alone is not doubt."""
+    two = sum_usage(ProviderUsage(cost=0.002), ProviderUsage(cost=0.001))
+    three = sum_usage(two, ProviderUsage(cost=0.003))
+    assert three.cost == pytest.approx(0.006)
+    assert three.cost_complete is True
+
+
+def test_two_empty_accumulators_sum_to_an_unknown_not_a_partial() -> None:
+    """Nothing plus nothing is still nothing — not a gap in something."""
+    summed = sum_usage(None, None)
+    assert summed.cost is None
+    assert summed.cost_complete is True
+
+
+def test_a_wire_usage_record_is_never_partial() -> None:
+    """One call is reported or not; only aggregation can be short."""
+    assert ProviderUsage.from_wire(LIVE_USAGE).cost_complete is True
+    assert ProviderUsage.from_wire({"prompt_tokens": 6}).cost_complete is True
+
+
 def test_the_response_usage_carries_cost_through() -> None:
     out = response_usage(ProviderUsage(prompt_tokens=10, cached_tokens=8, cost=0.004))
     assert out.cost == 0.004
@@ -101,7 +168,7 @@ def test_the_response_usage_carries_cost_through() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _meta(selector_usage=None):  # type: ignore[no-untyped-def]
+def _meta(selector_usage=None, *, selector_cost_complete=True):  # type: ignore[no-untyped-def]
     from daintree_assistant_server.contracts.daintree_api import SkillsBlock
     from daintree_assistant_server.contracts.extensions import SelectorMeta
     from daintree_assistant_server.services.chat_orchestrator import _RespondMeta
@@ -113,6 +180,7 @@ def _meta(selector_usage=None):  # type: ignore[no-untyped-def]
         prompt_version="p",
         skills=SkillsBlock(selector=SelectorMeta(usage=selector_usage)),
         warnings=[],
+        selector_cost_complete=selector_cost_complete,
     )
 
 
@@ -157,6 +225,53 @@ def test_both_components_known_is_complete() -> None:
     assert cost.complete is True
 
 
+def test_a_partial_main_sum_is_not_reported_as_a_complete_total() -> None:
+    """The re-roll case: `main` is non-None and short, so `complete` must clear.
+
+    A bare-intent re-roll bills the main slot twice. When only one attempt
+    reported, `main.cost is not None` is true and used to be the whole test —
+    so the turn went out as `complete: true` carrying a figure below what the
+    caller was charged. The one case where the flag said "complete" and the
+    number underneath it was not.
+    """
+    from daintree_assistant_server.contracts.extensions import SelectorUsage
+
+    main = sum_usage(ProviderUsage(cost=0.002), ProviderUsage())
+    cost = turn_cost(main, _meta(SelectorUsage(cost=0.0004)))
+    assert cost is not None
+    assert cost.total == pytest.approx(0.0024)
+    assert cost.complete is False, "a partial main sum must not be labelled complete"
+
+
+def test_a_partial_selector_sum_is_not_reported_as_a_complete_total() -> None:
+    """Same defect one slot over: a repaired selection that half-reported."""
+    from daintree_assistant_server.contracts.extensions import SelectorUsage
+
+    cost = turn_cost(
+        ProviderUsage(cost=0.002),
+        _meta(SelectorUsage(cost=0.0004), selector_cost_complete=False),
+    )
+    assert cost is not None
+    assert cost.complete is False
+
+
+def test_a_selector_repair_where_both_calls_reported_stays_complete() -> None:
+    """The fix must not make every repaired turn a floor — only the short ones."""
+    from daintree_assistant_server.skills.selector import _sum_usage
+
+    summed = _sum_usage(ProviderUsage(cost=0.0004), ProviderUsage(cost=0.0005))
+    assert summed is not None
+    assert summed.cost_complete is True
+
+
+def test_a_selector_repair_that_half_reported_is_marked_partial() -> None:
+    from daintree_assistant_server.skills.selector import _sum_usage
+
+    summed = _sum_usage(ProviderUsage(cost=0.0004), ProviderUsage())
+    assert summed is not None
+    assert summed.cost_complete is False
+
+
 def test_a_selector_repair_call_is_billed_into_the_selector_cost() -> None:
     """A malformed selector response costs TWICE — the attempt and the repair.
 
@@ -174,9 +289,16 @@ def test_a_task_repair_call_is_billed_into_the_task_cost() -> None:
     """Same defect, same fix, in the task runner's copy of the helper."""
     from daintree_assistant_server.services.task_runner import _sum_usage
 
-    assert _sum_usage(
-        ProviderUsage(cost=0.0002), ProviderUsage(cost=0.0003)
-    ).cost == pytest.approx(0.0005)
+    summed = _sum_usage(ProviderUsage(cost=0.0002), ProviderUsage(cost=0.0003))
+    assert summed.cost == pytest.approx(0.0005)
+    assert summed.cost_complete is True
+
+
+def test_a_half_reported_task_repair_is_marked_partial() -> None:
+    """`/tasks` has no `complete` flag, so the runner needs the bit to withhold on."""
+    from daintree_assistant_server.services.task_runner import _sum_usage
+
+    assert _sum_usage(ProviderUsage(cost=0.0002), ProviderUsage()).cost_complete is False
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +342,73 @@ def test_a_losing_speculation_is_billed_into_the_turn() -> None:
     )
     assert cost is not None
     assert cost.total == pytest.approx(0.0034)
+    assert cost.complete is True
+
+
+def test_a_reported_zero_is_a_measurement_not_a_gap() -> None:
+    """`0.0` is falsy, and every check here has to be `is None` rather than truthy.
+
+    A genuinely-free call (a promo endpoint, a fully-cached prompt) reports
+    `0.0`. Treating that as "unreported" would flip a turn we measured exactly
+    into a floor — the mirror image of the bug this file is about.
+    """
+    summed = sum_usage(ProviderUsage(cost=0.0), ProviderUsage(cost=0.002))
+    assert summed.cost == pytest.approx(0.002)
+    assert summed.cost_complete is True
+
+    cost = turn_cost(ProviderUsage(cost=0.0), _meta(None))
+    assert cost is not None
+    assert cost.total == 0.0
+    assert cost.complete is True
+
+
+def test_a_reported_zero_beside_a_silent_call_is_still_partial() -> None:
+    """...and the same `is None` discipline must not let the gap slip through."""
+    assert sum_usage(ProviderUsage(cost=0.0), ProviderUsage()).cost_complete is False
+
+
+def test_a_wire_zero_is_parsed_as_a_zero_not_as_absent() -> None:
+    """The falsy-value check has to start at the parser, or nothing after it helps."""
+    assert ProviderUsage.from_wire({"cost": 0.0}).cost == 0.0
+    assert ProviderUsage.from_wire({"cost": 0}).cost == 0.0
+
+
+def test_a_partial_main_still_clears_complete_when_speculation_reported() -> None:
+    """Two independent reasons to doubt a total; either one alone is enough.
+
+    The speculation arm passes its own `complete=` and could otherwise overwrite
+    what the main sum already knew.
+    """
+    from daintree_assistant_server.contracts.extensions import SelectorUsage
+
+    main = sum_usage(ProviderUsage(cost=0.002), ProviderUsage())
+    cost = turn_cost_with_speculation(
+        main,
+        _meta(SelectorUsage(cost=0.0004)),
+        discarded_usage=ProviderUsage(cost=0.001),
+        speculation_billed=True,
+    )
+    assert cost is not None
+    assert cost.total == pytest.approx(0.0034)
+    assert cost.complete is False
+
+
+def test_no_speculation_does_not_fold_an_empty_record_into_the_total() -> None:
+    """`discarded_usage` defaults to an empty record and must stay unread.
+
+    Summing it when nothing was speculated would look exactly like a call that
+    reported nothing, and mark every ordinary turn a floor.
+    """
+    from daintree_assistant_server.contracts.extensions import SelectorUsage
+
+    cost = turn_cost_with_speculation(
+        ProviderUsage(cost=0.002),
+        _meta(SelectorUsage(cost=0.0004)),
+        discarded_usage=ProviderUsage(),
+        speculation_billed=False,
+    )
+    assert cost is not None
+    assert cost.total == pytest.approx(0.0024)
     assert cost.complete is True
 
 

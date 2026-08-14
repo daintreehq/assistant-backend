@@ -718,6 +718,13 @@ def _sum_usage(a: ProviderUsage, b: ProviderUsage) -> ProviderUsage:
         total_tokens=add(a.total_tokens, b.total_tokens),
         cached_tokens=add(a.cached_tokens, b.cached_tokens),
         cost=add_cost(a.cost, b.cost),
+        # If exactly one of the two attempts reported, that sum covers one call
+        # and is billed for two. `/tasks` has no `complete` flag to qualify it
+        # with, so the result is dropped rather than shipped — see the TaskUsage
+        # construction in `run`.
+        cost_complete=(
+            a.cost_complete and b.cost_complete and (a.cost is None) == (b.cost is None)
+        ),
     )
 
 
@@ -936,6 +943,23 @@ class TaskRunner:
             "task_run", task=profile.id, finish_reason=finish, endpoint=endpoint, calls=calls
         )
 
+        # A repaired task billed TWICE. If only one of those calls reported a
+        # cost, `usage.cost` is a number that is real and short — and unlike
+        # /respond's `cost.complete`, this contract has no field to say so. A
+        # client adding it into a session total would read it as exact, so the
+        # figure is withheld: absent already means "unknown", which is the one
+        # honest thing left to say. Logged, so it is dropped visibly rather than
+        # silently.
+        reported_cost = usage.cost
+        if not usage.cost_complete:
+            logger.info(
+                "task_cost_partial",
+                task=profile.id,
+                calls=calls,
+                observed_cost_usd=reported_cost,
+            )
+            reported_cost = None
+
         return TaskResult(
             id=new_task_run_id(),
             task=profile.id,
@@ -947,7 +971,7 @@ class TaskRunner:
                 completion_tokens=usage.completion_tokens or 0,
                 total_tokens=usage.total_tokens or 0,
                 cached_tokens=usage.cached_tokens or 0,
-                cost=usage.cost,
+                cost=reported_cost,
             ),
             prompt_version=profile.id,
         )

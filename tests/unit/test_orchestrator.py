@@ -10,12 +10,16 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import pytest
-from fakes import FakeProvider, FakeStream, make_text_chunks, selection_result
+from fakes import FakeProvider, FakeStream, make_result, make_text_chunks, selection_result
 from pydantic import SecretStr
 
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import upstream_error
-from daintree_assistant_server.providers.base import ProviderStream
+from daintree_assistant_server.providers.base import (
+    ProviderChatResult,
+    ProviderStream,
+    ProviderUsage,
+)
 from daintree_assistant_server.services import chat_orchestrator as orchestrator_module
 from daintree_assistant_server.services.chat_orchestrator import (
     ChatOrchestrator,
@@ -894,6 +898,174 @@ async def test_cold_speculation_is_discarded_when_the_selector_picks_skills(
     assert "private loser" not in "".join(events)
 
 
+# ---- speculation, on the wire, as money ----------------------------------
+#
+# `turn_cost_with_speculation` is unit-tested directly in
+# test_cost_transparency.py. These prove the OTHER half: that `_PreparedTurn`
+# actually hands it the losing generation's spend, so a broken handoff cannot
+# pass by leaving the arithmetic correct over an empty record.
+
+
+def _priced_decision(skill_ids: list[str], cost: float = 0.0004) -> SelectionDecision:
+    return SelectionDecision(
+        skill_ids=skill_ids,
+        ran=True,
+        degraded=False,
+        usage=ProviderUsage(prompt_tokens=3000, cost=cost),
+    )
+
+
+def _done_cost(events: list[str]) -> dict[str, Any]:
+    done = json.loads(events[-1].split("data: ", 1)[1])
+    assert "cost" in done, "the turn reported no cost at all"
+    cost: dict[str, Any] = done["cost"]
+    return cost
+
+
+@pytest.mark.asyncio
+async def test_a_reported_losing_speculation_lands_in_the_streamed_total(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The caller paid for the guess that lost. It belongs in their total.
+
+    The loser finishes before it is discarded, so OpenRouter did send its final
+    usage chunk and the spend is exactly known — nothing about this turn is a
+    floor.
+    """
+    ids = sorted(orchestrator.catalog.known_ids)
+    started, release = _gate_selector(monkeypatch, orchestrator, _priced_decision([ids[0]]))
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        first = not streams
+        stream = FakeStream(
+            make_text_chunks("private loser" if first else "canonical winner",
+                             cost=0.001 if first else 0.002)
+        )
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, []),
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
+        )
+    )
+    await started.wait()
+    # Released only once the loser has closed, which is the moment AFTER its
+    # producer published usage — otherwise the discard races the final chunk and
+    # the test silently becomes the "cancelled mid-flight" case below.
+    await _wait_until(lambda: bool(streams) and streams[0].closed)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    cost = _done_cost(await _drain(outcome.stream))
+
+    assert cost["main"] == pytest.approx(0.003), "canonical + the discarded guess"
+    assert cost["selector"] == pytest.approx(0.0004)
+    assert cost["total"] == pytest.approx(0.0034)
+    assert cost["complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_speculation_cancelled_mid_flight_makes_the_streamed_total_a_floor(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Real spend that nothing can measure — so the total says so.
+
+    Usage arrives only in a stream's final chunk. A loser cut off before that
+    charged the caller an amount no API call can recover, and the honest report
+    is a total that admits it is a lower bound.
+    """
+    ids = sorted(orchestrator.catalog.known_ids)
+    started, release = _gate_selector(monkeypatch, orchestrator, _priced_decision([ids[0]]))
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        first = not streams
+        stream = FakeStream(
+            make_text_chunks("private loser", with_usage=False)
+            if first
+            else make_text_chunks("canonical winner", cost=0.002)
+        )
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, []),
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: len(streams) == 1)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    cost = _done_cost(await _drain(outcome.stream))
+
+    assert cost["main"] == pytest.approx(0.002), "only what was observed"
+    assert cost["complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_declined_claim_still_bills_the_generation_it_throws_away(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The other way a speculation is discarded — and the one nothing counted.
+
+    Here the selector AGREES with the guess, so the mismatch path that records
+    discarded spend never runs. The claim is then declined anyway (a private
+    post-open failure), the stream is thrown away, and a canonical one replaces
+    it. That generation opened upstream and was billed exactly like a mismatched
+    one, so a total reported as exact would be short by a whole stream.
+    """
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(monkeypatch, orchestrator, _priced_decision([skill_id]))
+    streams: list[FakeStream] = []
+
+    def stream_factory(_request: object) -> FakeStream:
+        first = not streams
+        stream = FakeStream(
+            # Opens, produces, then fails privately — no byte of it was public,
+            # so the claim declines and falls back to one canonical open.
+            make_text_chunks("private loser", with_usage=False) if first
+            else make_text_chunks("canonical winner", cost=0.002),
+            error_at=2 if first else None,
+            error=RuntimeError("private post-open failure") if first else None,
+        )
+        streams.append(stream)
+        return stream
+
+    fake_provider.stream_factory = stream_factory  # type: ignore[assignment]
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, [skill_id]),
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: len(streams) == 1)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+
+    assert len(streams) == 2, "the declined claim must have fallen back to a canonical open"
+    assert _streamed_content(events) == "canonical winner "
+    cost = _done_cost(events)
+    assert cost["main"] == pytest.approx(0.002)
+    assert cost["complete"] is False, "a thrown-away generation was billed and not measured"
+
+
 @pytest.mark.asyncio
 async def test_continuation_round_with_active_skill_does_not_speculate(
     orchestrator: ChatOrchestrator,
@@ -1692,6 +1864,16 @@ def _nudged(request: object) -> bool:
     )
 
 
+def _priced_selection(cost: float = 0.0004) -> ProviderChatResult:
+    """A selector run that reported its cost.
+
+    The default fake selector fails open and reports no cost, which alone clears
+    `cost.complete`. Cost assertions about the MAIN slot need the selector out of
+    the way, or every one of them passes for the wrong reason.
+    """
+    return selection_result([], usage=ProviderUsage(prompt_tokens=3000, cost=cost))
+
+
 @pytest.mark.asyncio
 async def test_stream_discarded_draft_never_reaches_skill_learning(
     orchestrator: ChatOrchestrator,
@@ -1759,6 +1941,288 @@ async def test_stream_discarded_attempt_is_closed_before_the_reroll_opens(
     assert opens[0][1] == []
     assert opens[1][1] == [True]
     assert all(s.closed for s in streams)
+
+
+@pytest.mark.asyncio
+async def test_stream_reroll_that_half_reported_cost_is_not_labelled_complete(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """A re-roll bills TWICE; one silent attempt makes the reported total a floor.
+
+    The discarded draft is summed into the accepted one, so `cost.main` is
+    non-null and looks answerable. It is short by whatever the silent attempt
+    charged, and `complete: true` would present that as an exact receipt — the
+    one place the flag said "complete" over a number that was not.
+    """
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.stream_chunks = lambda request: (  # type: ignore[assignment]
+        make_text_chunks("Tallied.")
+        if _nudged(request)
+        else make_text_chunks(_DEAD_ROUND, cost=0.002)
+    )
+    outcome = await orchestrator.complete(
+        _intent_stream_request("bi-cost"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+    done = json.loads(events[-1].split("data: ", 1)[1])
+    assert done["cost"]["main"] == pytest.approx(0.002)
+    assert done["cost"]["complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_stream_reroll_with_both_attempts_reported_stays_complete(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The floor rule must not swallow an ordinary re-roll that reported twice."""
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.stream_chunks = lambda request: (  # type: ignore[assignment]
+        make_text_chunks("Tallied.", cost=0.003)
+        if _nudged(request)
+        else make_text_chunks(_DEAD_ROUND, cost=0.002)
+    )
+    outcome = await orchestrator.complete(
+        _intent_stream_request("bi-cost-ok"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+    done = json.loads(events[-1].split("data: ", 1)[1])
+    assert done["cost"]["main"] == pytest.approx(0.005)
+    assert done["cost"]["complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_stream_single_attempt_cost_is_still_complete(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The accumulator starts empty; that must not read as a silent first call.
+
+    If the empty accumulator were summed as a real record, EVERY streamed turn
+    would report `complete: false` — the fix would have traded a rare wrong
+    "complete" for a universal wrong "floor".
+    """
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.stream_chunks = lambda _request: make_text_chunks(  # type: ignore[assignment]
+        "Read five votes; here is the tally.", cost=0.004
+    )
+    outcome = await orchestrator.complete(
+        _intent_stream_request("bi-cost-single"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+    done = json.loads(events[-1].split("data: ", 1)[1])
+    assert done["cost"]["main"] == pytest.approx(0.004)
+    assert done["cost"]["complete"] is True
+
+
+def _intent_body_request(session_id: str = "bi-body") -> RespondRequest:
+    """The same tool-offering turn, NON-streaming: the re-roll lives in
+    `_repair_bare_intent` rather than in the stream loop, and its summed usage
+    reaches the response body instead of a `done` event."""
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": session_id, "turn_id": "turn-1"},
+            "input": {
+                "messages": [{"role": "user", "content": "read the votes"}],
+                "tools": [_INTENT_TOOL],
+            },
+            "startup": {},
+            "generation": {"stream": False},
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_body_reroll_that_half_reported_cost_is_not_labelled_complete(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The non-streaming half of the same defect.
+
+    `_repair_bare_intent` sums the discarded draft into the accepted reply on a
+    plain `ProviderChatResult`, a different code path from the stream loop's
+    accumulator — so the completeness bit has to survive that assignment too.
+    """
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.complete_result = [
+        make_result(content=_DEAD_ROUND, usage=ProviderUsage(cost=0.002)),
+        make_result(content="Read five votes; here is the tally."),
+    ]
+    outcome = await orchestrator.complete(
+        _intent_body_request("bi-body-cost"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.body is not None
+    assert len(fake_provider.requests) == 2, "the draft must actually have been re-rolled"
+    assert outcome.body["cost"]["main"] == pytest.approx(0.002)
+    assert outcome.body["cost"]["complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_body_reroll_with_both_attempts_reported_stays_complete(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """Positive control for the path above: a fully-reported re-roll is exact."""
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.complete_result = [
+        make_result(content=_DEAD_ROUND, usage=ProviderUsage(cost=0.002)),
+        make_result(
+            content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.003)
+        ),
+    ]
+    outcome = await orchestrator.complete(
+        _intent_body_request("bi-body-ok"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.body is not None
+    assert outcome.body["cost"]["main"] == pytest.approx(0.005)
+    assert outcome.body["cost"]["complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_repaired_selection_that_half_reported_makes_the_turn_a_floor(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The selector bills twice when its first JSON is malformed.
+
+    Its partial sum never reaches the wire as its own flag — `cost.complete` is
+    the single field a client is told to trust — so this proves the fact travels
+    the internal route (`_RespondMeta.selector_cost_complete`) all the way there.
+    """
+    fake_provider.selection_result = [
+        make_result(content="not json at all", usage=ProviderUsage(cost=0.0004)),
+        selection_result([], usage=ProviderUsage(prompt_tokens=3000)),
+    ]
+    fake_provider.complete_result = make_result(
+        content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
+    )
+    outcome = await orchestrator.complete(
+        _intent_body_request("sel-cost"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.body is not None
+    assert len(fake_provider.selection_requests) == 2, "the selection must have been repaired"
+    assert outcome.body["cost"]["selector"] == pytest.approx(0.0004)
+    assert outcome.body["cost"]["complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_repaired_selection_that_reported_twice_stays_complete(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """Positive control: a repair is not by itself a reason to report a floor."""
+    fake_provider.selection_result = [
+        make_result(content="not json at all", usage=ProviderUsage(cost=0.0004)),
+        selection_result([], usage=ProviderUsage(prompt_tokens=3000, cost=0.0005)),
+    ]
+    fake_provider.complete_result = make_result(
+        content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
+    )
+    outcome = await orchestrator.complete(
+        _intent_body_request("sel-cost-ok"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.body is not None
+    assert outcome.body["cost"]["selector"] == pytest.approx(0.0009)
+    assert outcome.body["cost"]["complete"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("priced_first", [True, False])
+async def test_a_selector_that_never_parsed_still_reports_what_it_billed(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    priced_first: bool,
+) -> None:
+    """Both selector calls were billed; neither produced a usable selection.
+
+    `degraded_open` carries the summed usage out of a selection that failed —
+    the turn still owes the caller that money — and the summed figure is short
+    whichever of the two attempts went unreported, so the order is parameterized
+    rather than assumed.
+    """
+    priced, silent = ProviderUsage(cost=0.0004), ProviderUsage()
+    fake_provider.selection_result = [
+        make_result(content="not json at all", usage=priced if priced_first else silent),
+        make_result(content="still not json", usage=silent if priced_first else priced),
+    ]
+    fake_provider.complete_result = make_result(
+        content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
+    )
+    outcome = await orchestrator.complete(
+        _intent_body_request(f"sel-degraded-{priced_first}"),
+        upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
+    )
+    assert outcome.body is not None
+    assert len(fake_provider.selection_requests) == 2
+    assert outcome.body["skills"]["selector"]["degraded"] is True
+    assert outcome.body["cost"]["selector"] == pytest.approx(0.0004)
+    assert outcome.body["cost"]["total"] == pytest.approx(0.0024)
+    assert outcome.body["cost"]["complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_selector_that_reported_both_calls_stays_complete(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """Failing to parse is not the same as failing to measure.
+
+    A selection that degraded still knows exactly what it spent when both calls
+    reported, and marking that turn a floor would be its own wrong answer.
+    """
+    fake_provider.selection_result = [
+        make_result(content="not json at all", usage=ProviderUsage(cost=0.0004)),
+        make_result(content="still not json", usage=ProviderUsage(cost=0.0005)),
+    ]
+    fake_provider.complete_result = make_result(
+        content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
+    )
+    outcome = await orchestrator.complete(
+        _intent_body_request("sel-degraded-ok"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.body is not None
+    assert outcome.body["skills"]["selector"]["degraded"] is True
+    assert outcome.body["cost"]["selector"] == pytest.approx(0.0009)
+    assert outcome.body["cost"]["complete"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_reported_zero_survives_the_stream_as_an_exact_total(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """`0.0` is falsy, and it travels through parsing, summing and narrowing.
+
+    A fully-cached or promotional call genuinely costs nothing. Any truthiness
+    check on the way to the wire would turn that measurement into "unreported"
+    and put a floor on a turn we know exactly.
+    """
+    fake_provider.selection_result = _priced_selection(0.0)
+    fake_provider.stream_chunks = lambda _request: make_text_chunks(  # type: ignore[assignment]
+        "Read five votes; here is the tally.", cost=0.0
+    )
+    outcome = await orchestrator.complete(
+        _intent_stream_request("zero-cost"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    done = json.loads((await _drain(outcome.stream))[-1].split("data: ", 1)[1])
+    assert done["usage"]["cost"] == 0.0
+    assert done["cost"]["main"] == 0.0
+    assert done["cost"]["total"] == 0.0
+    assert done["cost"]["complete"] is True
 
 
 @pytest.mark.asyncio

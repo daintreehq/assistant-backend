@@ -36,6 +36,22 @@ class ProviderUsage:
     # counts, including the final chunk of a stream. So there is no second call
     # and no added latency; verified against the live API 2026-08-14.
     cost: float | None = None
+    # Whether ``cost`` accounts for EVERY billed call folded into this record.
+    #
+    # A record straight off the wire describes one call, so it is always True:
+    # the call either reported a cost or it did not, and ``cost is None`` already
+    # says "unknown". The bit only ever matters for an AGGREGATE — a bare-intent
+    # re-roll, a JSON-repair retry, a losing speculation summed into the accepted
+    # generation. There, if one constituent reported and another did not, `cost`
+    # is a non-``None`` number that is nonetheless SHORT of what the caller paid,
+    # and nothing about the float itself reveals that. Without this flag the
+    # partial sum reaches the client indistinguishable from an exact one — the
+    # "zero means free" lie wearing its subtlest hat.
+    #
+    # Set only by the summing helpers (``turn_accounting.sum_usage`` and the two
+    # local variants in the selector and the task runner). ``from_wire`` never
+    # clears it.
+    cost_complete: bool = True
 
     @classmethod
     def from_wire(cls, usage: dict[str, Any] | None) -> ProviderUsage:

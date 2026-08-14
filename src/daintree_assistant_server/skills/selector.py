@@ -257,6 +257,13 @@ def _sum_usage(a: ProviderUsage | None, b: ProviderUsage | None) -> ProviderUsag
         total_tokens=add(a.total_tokens, b.total_tokens),
         cached_tokens=add(a.cached_tokens, b.cached_tokens),
         cost=add_cost(a.cost, b.cost),
+        # ...and when only ONE of the two attempts reported, the sum is real but
+        # short. `turn_cost` reads this (via `_RespondMeta.selector_cost_complete`)
+        # so a repaired selection cannot quietly downgrade the turn's total into a
+        # partial figure labelled complete.
+        cost_complete=(
+            a.cost_complete and b.cost_complete and (a.cost is None) == (b.cost is None)
+        ),
     )
 
 

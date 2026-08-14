@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fakes import make_result, selection_result
 from unit.test_task_runner import EXPECTED_TASK_IDS
 
@@ -179,6 +180,52 @@ def test_tasks_endpoint(client, auth, fake_provider) -> None:
     assert body["object"] == "daintree.task.result"
     assert body["output"]["matched"] is True
     assert body["prompt_version"] == "terminal_judge"
+
+
+def test_a_repaired_task_omits_a_partial_cost_from_the_body(
+    client, auth, fake_provider
+) -> None:
+    """The wire half of the withholding rule, asserted where a client reads it.
+
+    A repaired task billed twice and reported once. `usage.cost` has no
+    completeness flag to qualify a short figure with, so the key must be absent
+    entirely — a client summing a session total treats absent as unknown, and
+    would treat a present float as exact.
+    """
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    results = iter([
+        make_result(content="not json at all", usage=ProviderUsage(cost=0.0002)),
+        make_result(
+            content=json.dumps({"reason": "ok", "confidence": 0.8, "matched": True}),
+            usage=ProviderUsage(),
+        ),
+    ])
+    fake_provider.complete_result = lambda _req: next(results)
+    r = client.post("/v1/daintree/tasks", headers=auth, json={
+        "task": "terminal_judge", "input": {"question": "pass?", "tail": "OK"},
+    })
+    assert r.status_code == 200
+    body = r.json()
+    assert body["output"]["matched"] is True
+    assert "cost" not in body["usage"]
+
+
+def test_an_ordinary_task_still_carries_its_cost_in_the_body(
+    client, auth, fake_provider
+) -> None:
+    """Negative control: the rule must not strip the cost from every task."""
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    fake_provider.complete_result = make_result(
+        content=json.dumps({"reason": "ok", "confidence": 0.8, "matched": True}),
+        usage=ProviderUsage(cost=0.0002),
+    )
+    r = client.post("/v1/daintree/tasks", headers=auth, json={
+        "task": "terminal_judge", "input": {"question": "pass?", "tail": "OK"},
+    })
+    assert r.status_code == 200
+    assert r.json()["usage"]["cost"] == pytest.approx(0.0002)
 
 
 def test_workflow_plan_task_endpoint(client, auth, fake_provider) -> None:

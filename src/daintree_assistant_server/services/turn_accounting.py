@@ -81,6 +81,13 @@ def turn_cost(
     ``complete=False`` may also be passed by the caller for a cost we know
     was incurred and cannot observe at all — a losing speculative stream that
     was cancelled before its usage arrived.
+
+    The third way it clears is the least visible: either component may itself
+    be a PARTIAL SUM. A bare-intent re-roll bills twice, a malformed selector
+    response bills twice, and if only one of those attempts reported, the
+    surviving number is non-``None`` and short. ``ProviderUsage.cost_complete``
+    (and ``meta.selector_cost_complete``) carry that fact out of the summing
+    helpers, because by the time the float arrives here it is unrecoverable.
     """
     selector_usage = meta.skills.selector.usage
     selector = selector_usage.cost if selector_usage is not None else None
@@ -93,8 +100,10 @@ def turn_cost(
         return None
     if main.cost is None and selector is None:
         return None
-    known_complete = complete and main.cost is not None
+    known_complete = complete and main.cost is not None and main.cost_complete
     if selector_ran and selector is None:
+        known_complete = False
+    if not meta.selector_cost_complete:
         known_complete = False
     return TurnCost(
         total=(main.cost or 0.0) + (selector or 0.0),
@@ -159,6 +168,18 @@ def sum_usage(first: ProviderUsage | None, second: ProviderUsage | None) -> Prov
     the accepted attempt would under-bill what the turn actually cost them.
     ``None`` means "not reported" and stays ``None`` only if neither side had a
     number, so a provider that omits usage is not silently turned into a zero.
+
+    ``None`` for a whole SIDE is the identity — an empty accumulator, not a call.
+    That distinction is load-bearing: an all-``None`` ``ProviderUsage`` is exactly
+    what a real call that reported nothing looks like, and the two must not be
+    confused. Callers accumulate from ``None``, and pass ``ProviderUsage()`` only
+    when a call genuinely happened and told us nothing.
+
+    ``cost_complete`` rides along because ``add_cost`` cannot say what it lost:
+    when one attempt reports and the other does not, the returned ``cost`` is a
+    real number that is nonetheless short of the bill, and nothing downstream can
+    recover that fact from the float. Prior partials propagate, so a three-way
+    sum stays honest.
     """
 
     def add(a: int | None, b: int | None) -> int | None:
@@ -171,8 +192,10 @@ def sum_usage(first: ProviderUsage | None, second: ProviderUsage | None) -> Prov
             return b
         return a if b is None else a + b
 
-    first = first or ProviderUsage()
-    second = second or ProviderUsage()
+    if first is None:
+        return second if second is not None else ProviderUsage()
+    if second is None:
+        return first
     return ProviderUsage(
         prompt_tokens=add(first.prompt_tokens, second.prompt_tokens),
         completion_tokens=add(first.completion_tokens, second.completion_tokens),
@@ -182,5 +205,13 @@ def sum_usage(first: ProviderUsage | None, second: ProviderUsage | None) -> Prov
         # part of what this turn cost them — the same reason the tokens are
         # summed rather than replaced.
         cost=add_cost(first.cost, second.cost),
+        # Exactly one side reporting is the partial case: a sum that looks exact
+        # and is not. Both silent is not a partial — the result is ``None``,
+        # which already reads as unknown.
+        cost_complete=(
+            first.cost_complete
+            and second.cost_complete
+            and (first.cost is None) == (second.cost is None)
+        ),
     )
 

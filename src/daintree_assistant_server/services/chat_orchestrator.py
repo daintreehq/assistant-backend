@@ -110,6 +110,12 @@ class _RespondMeta:
     prompt_version: str
     skills: SkillsBlock
     warnings: list[str] = field(default_factory=list)
+    # Whether `skills.selector.usage.cost` accounts for every selector call this
+    # turn made. A malformed selection is repaired with a SECOND billed call, and
+    # if only one of the two reported, the summed figure is short. Internal
+    # rather than a wire field: `cost.complete` is the single flag a client is
+    # told to trust, so the fact travels to `turn_cost` and is folded into that.
+    selector_cost_complete: bool = True
 
 
 @dataclass
@@ -831,7 +837,11 @@ class ChatOrchestrator:
                     # that unknowable-but-real spend is what clears `complete`
                     # below rather than being silently treated as zero.
                     discarded_usage = speculation.usage or ProviderUsage()
-                    speculation_billed = True
+                    # Gated on the OPEN, not on the object existing: a
+                    # speculation whose open never succeeded cost nothing, and
+                    # counting it as unmeasurable spend would turn an exact total
+                    # into a floor on every turn a speculative open failed.
+                    speculation_billed = speculation.upstream_opened
                     speculation = None
                     provider_request = replace(
                         self.assembler.build_main_request(
@@ -1356,6 +1366,9 @@ class ChatOrchestrator:
             prompt_version=MAIN_PROMPT_VERSION,
             skills=skills,
             warnings=warnings,
+            selector_cost_complete=(
+                decision.usage.cost_complete if decision.usage is not None else True
+            ),
         )
 
     # ---- response bodies ------------------------------------------------
@@ -1617,7 +1630,10 @@ class ChatOrchestrator:
         # produces is what the user gets, so there is nothing to delay it for.
         attempt = 0
         active_request = provider_request
-        carried_usage = ProviderUsage()
+        # Starts as None, not ProviderUsage(): an empty record is what a real
+        # attempt that reported NOTHING looks like, and `sum_usage` has to be
+        # able to tell that gap from an accumulator with nothing in it yet.
+        carried_usage: ProviderUsage | None = None
         # The discarded draft, kept only until the re-roll's stream actually opens.
         # Up to that point nothing of the retry is public, so the first attempt is
         # still replay-safe and remains the honest fail-open answer.
@@ -1632,10 +1648,24 @@ class ChatOrchestrator:
                     used_speculation = True
                 else:
                     stream = None
+                    # A declined claim throws away a generation that already
+                    # happened — a private post-open failure or a buffer
+                    # overflow, both AFTER the upstream opened and started
+                    # billing. It is the same discarded spend a selection
+                    # mismatch produces, arriving one step later, and nothing
+                    # upstream of here records it: `_prepare_inner` accounts only
+                    # for the mismatch path, and this source passed that check.
+                    # (`upstream_open_exhausted` never reaches this branch — that
+                    # claim succeeds and preserves its error — so the only
+                    # unopened cases here are ones that cost nothing.)
+                    if speculative_stream.upstream_opened:
+                        discarded_usage = speculative_stream.usage or ProviderUsage()
+                        speculation_billed = True
                     logger.info(
                         "skill_speculation_fallback",
                         request_id=meta.request_id,
                         reason=speculative_stream.claim_failure_reason,
+                        speculation_billed=speculation_billed,
                         **speculative_stream.stats(),
                     )
 
@@ -1834,6 +1864,11 @@ class ChatOrchestrator:
                     )
                 break
 
+            # Every path out of the loop above has summed at least once; the
+            # fallback keeps the accumulator's "nothing yet" state expressible
+            # without leaking an Optional into the reporting helpers.
+            total_usage = carried_usage or ProviderUsage()
+
             # One terminal event for the whole round, whichever attempt produced it.
             # Anything still held belongs to the accepted attempt and goes out now.
             for pending in held or []:
@@ -1847,11 +1882,11 @@ class ChatOrchestrator:
                 "done",
                 StreamDone(
                     finish_reason=finish_reason,
-                    usage=response_usage(carried_usage),
-                    # `carried_usage` already sums a discarded re-roll, so this
+                    usage=response_usage(total_usage),
+                    # `total_usage` already sums a discarded re-roll, so this
                     # total covers every generation the caller paid for.
                     cost=turn_cost_with_speculation(
-                        carried_usage,
+                        total_usage,
                         meta,
                         discarded_usage=discarded_usage,
                         speculation_billed=speculation_billed,
@@ -1893,13 +1928,14 @@ class ChatOrchestrator:
         # yield above and never reaches here). A tool-continuation round is filtered
         # by had_tool_calls inside the trigger.
         if completed:
+            final_usage = carried_usage or ProviderUsage()
             log_turn_usage(
-                carried_usage,
+                final_usage,
                 request_id=meta.request_id,
                 stream=True,
                 finish_reason=finish_reason,
                 turn_cost=turn_cost_with_speculation(
-                    carried_usage,
+                    final_usage,
                     meta,
                     discarded_usage=discarded_usage,
                     speculation_billed=speculation_billed,

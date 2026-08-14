@@ -366,7 +366,7 @@ calculated ourselves would be a guess presented as a bill.
 | `POST /respond` body | `cost.main`, `cost.selector` | the breakdown |
 | `POST /respond` body | `cost.complete` | whether `total` is exact or a floor |
 | streaming | `done` event, same shape | as above |
-| `POST /tasks` body | `usage.cost` | that task, including any repair call |
+| `POST /tasks` body | `usage.cost` | that task, including any repair call — omitted unless every call in it reported |
 
 A `/respond` request can bill **more calls than are obvious**:
 
@@ -389,7 +389,7 @@ client must treat a missing block as unknown, and
 
 **`complete: false` means the total is a floor.** A turn can spend money we
 cannot measure, and the field exists so that case never masquerades as an exact
-figure. Two things clear it:
+figure. Three things clear it:
 
 - **A component that ran but reported no cost.** A selector call whose cost is
   missing would otherwise contribute `0.0` to a field named `total`, turning a
@@ -403,6 +403,30 @@ figure. Two things clear it:
   included in `total`. If it was cut off mid-flight, OpenRouter never sent the
   final chunk that carries usage, so the spend is real but unobservable —
   recovering it would mean a second `/generation?id=` call per turn.
+
+  A speculation can also be thrown away one step later, when the selector picked
+  the SAME skills but the claim is declined (a private post-open failure, or the
+  buffer cap overflowing). That generation was billed exactly as a mismatched one
+  is, so it lands in `total` on the same terms. Both cases are gated on whether
+  the upstream stream actually OPENED: a speculative open that never succeeded
+  cost nothing, and counting it would put a false floor on every turn one failed.
+- **A component that is itself a partial sum.** `main` and `selector` are each
+  one *number* but not always one *call*: a bare-intent re-roll bills the main
+  slot twice, and a malformed selection bills the selector slot twice. If only
+  one of those two attempts reported, the surviving figure is real, non-null,
+  and short — and the float alone cannot say so. The summing helpers therefore
+  carry a `cost_complete` bit alongside the number
+  (`ProviderUsage.cost_complete`, propagated through
+  `_RespondMeta.selector_cost_complete`) and `turn_cost` folds it into
+  `complete`. This was the last hole: every other case surfaced as a `None` that
+  the rules above already caught.
+
+The `/tasks` surface has no `complete` field of its own, so it takes the other
+branch of the same rule: a repaired task whose two calls did not both report has
+`usage.cost` **omitted**, since absent already means unknown. A partial there is
+not a rounding error — a busy orchestration session runs dozens of
+`terminal_summarize` / `terminal_extract` calls, and each silently-low figure
+would compound into the session total.
 
 Speculation only runs on a streamed turn that already has a verified,
 catalog-current, non-empty active skill set, and is only abandoned when selection
