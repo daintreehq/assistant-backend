@@ -25,71 +25,36 @@ drift shows up as a measurement change rather than a documentation lie.
 ### Regenerating
 
 The CLI lives in the `cli/` git submodule, which is **pinned to a commit and never
-fetched by CI**, so this fixture cannot be regenerated automatically and drifts
-silently whenever the CLI adds or changes a tool. It is refreshed by hand.
+fetched by CI**, so this fixture is refreshed by hand rather than automatically.
 
-The projection call is `(*tools.Registry).OpenAITools(nil)` — `nil` means "no
-filter", i.e. the full surface, in registration order
-(`cli/internal/tools/registry.go`). The registry is not self-populating: the CLI
-fills it in `App.Create` via `DefaultToolBuilder(a *App)`
-(`cli/internal/app/app.go`, `cli/internal/app/tools.go`).
+The CLI now ships a committed generator for exactly this, so refreshing it needs
+no source edits on that side and no guessing about how its registry is wired:
 
-You do NOT need a booted app. `DefaultToolBuilder` only reads fields off the
-`*App` into adapter structs — it never calls through them — so a zero-value
-`&App{}` produces the identical registration set, which is what makes this a
-30-second job instead of a wiring exercise.
+```
+go run ./cmd/tooldump              # the projection a normal launch sends, to stdout
+go run ./cmd/tooldump -o out.json
+```
+
+It boots a real offline `App` in a throwaway state directory and projects
+`OpenAITools(nil)` through the same conversion a live turn uses, so what it prints
+is the payload, not a re-derivation of it. Everything the old recipe here explained
+about building the registry by hand — `DefaultToolBuilder(&App{})`, the module
+path, deleting the throwaway afterwards — is obsolete; that knowledge now lives in
+`cli/internal/app/toolinventory.go`, next to the wiring it depends on. This is what
+lets CI check the fixture instead of only checking that our two copies agree with
+each other.
 
 1. Populate the submodule: `git submodule update --init cli` (from the repo root).
-2. Inside `cli/`, write a **throwaway** test at `internal/app/zz_dumptools_test.go`
-   (that package can reach both `DefaultToolBuilder` and the registry):
-
-   ```go
-   package app
-
-   import (
-       "encoding/json"
-       "os"
-       "testing"
-
-       "github.com/daintreehq/assistant/internal/tools"
-   )
-
-   func TestZZDumpTools(t *testing.T) {
-       out := os.Getenv("DUMP_TOOLS_TO")
-       if out == "" {
-           t.Skip("set DUMP_TOOLS_TO")
-       }
-       built, err := DefaultToolBuilder(&App{})
-       if err != nil {
-           t.Fatalf("build: %v", err)
-       }
-       reg := tools.NewRegistry()
-       if err := reg.RegisterAll(built...); err != nil {
-           t.Fatalf("register: %v", err)
-       }
-       specs, err := reg.OpenAITools(nil)
-       if err != nil {
-           t.Fatalf("project: %v", err)
-       }
-       b, _ := json.Marshal(specs)
-       if err := os.WriteFile(out, b, 0o644); err != nil {
-           t.Fatalf("write: %v", err)
-       }
-       t.Logf("wrote %d tools", len(specs))
-   }
-   ```
-
-   The module path is `github.com/daintreehq/assistant` (it was renamed from
-   `daintreehq/daintree-assistant`); check it against the pinned `cli/go.mod`
-   rather than trusting this line.
-3. Run it — the first build of the CLI tree takes a couple of minutes — then
-   **delete the throwaway**; the submodule is pinned and must stay clean:
+2. Generate (the first build of the CLI tree takes a couple of minutes):
 
    ```bash
-   DUMP_TOOLS_TO=/tmp/cli_tools.json go test ./internal/app/ -run TestZZDumpTools -count=1
-   rm cli/internal/app/zz_dumptools_test.go && git -C cli status --porcelain   # must be empty
+   (cd cli && go run ./cmd/tooldump -o /tmp/cli_tools.json)
+   git -C cli status --porcelain   # must be empty — the submodule stays pinned and clean
    ```
-4. Re-serialize into this fixture's formatting so the diff stays additive:
+3. Re-serialize into this fixture's formatting so the diff stays additive. The
+   generator emits two-space indentation with a trailing newline; this fixture uses
+   `indent=1`, `ensure_ascii=True`, no trailing newline. Normalizing here rather
+   than matching formats keeps a refresh from reflowing the whole file:
 
    ```bash
    python - <<'PY'
@@ -100,7 +65,7 @@ You do NOT need a booted app. `DefaultToolBuilder` only reads fields off the
    print(len(tools), 'tools')
    PY
    ```
-5. Re-run the deterministic cost suite and refresh any snapshot numbers the
+4. Re-run the deterministic cost suite and refresh any snapshot numbers the
    READMEs quote:
 
    ```bash
