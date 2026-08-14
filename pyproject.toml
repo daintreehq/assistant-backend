@@ -95,7 +95,11 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["tests"]
+# "." so `tools/` imports under the bare `pytest` console script, not just under
+# `python -m pytest`. Only the latter puts the working directory on sys.path, and
+# CI runs the former — so `test_baseline.py` (which imports tools.baseline)
+# collected fine on every developer machine and failed on every push.
+pythonpath = [".", "tests"]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
