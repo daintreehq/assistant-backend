@@ -1067,6 +1067,78 @@ async def test_a_declined_claim_still_bills_the_generation_it_throws_away(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("docs_query", ["create worktree", None])
+async def test_a_docs_hit_disqualifies_an_otherwise_exact_speculation(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+    docs_query: str | None,
+) -> None:
+    """Matching skill ids do not make it the same request.
+
+    Speculation opens before selection finishes, so its prompt cannot contain
+    documentation fetched afterwards. Reusing it would stream an answer generated
+    without the pages it is supposed to be citing. Parameterized against its own
+    control: with no docs lookup, the identical setup reuses the live stream —
+    so this proves the docs condition is what forces the rebuild, not the setup.
+    """
+    import httpx
+
+    from daintree_assistant_server.services.docs_mcp import DocsMcpClient
+
+    body = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps(
+                        {"q": "q", "results": [{"url": "/docs/worktrees", "chunkText": "body"}]}
+                    ),
+                }
+            ]
+        },
+    }
+    orchestrator.docs_client = DocsMcpClient(
+        httpx.AsyncClient(
+            transport=httpx.MockTransport(lambda _r: httpx.Response(200, json=body))
+        )
+    )
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(
+            skill_ids=[skill_id], ran=True, degraded=False, docs_query=docs_query
+        ),
+    )
+    fake_provider.stream_chunks = lambda _request: make_text_chunks(  # type: ignore[assignment]
+        "answer"
+    )
+    pending = asyncio.create_task(
+        orchestrator.complete(
+            _stream_request_with_state(orchestrator, [skill_id]),
+            upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
+        )
+    )
+    await started.wait()
+    await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+    await _drain(outcome.stream)
+
+    sent = fake_provider.stream_requests[-1].messages[-1]["content"]
+    if docs_query is None:
+        assert len(fake_provider.stream_requests) == 1, "no docs: the guess still wins"
+        assert "daintree_docs" not in sent
+    else:
+        assert len(fake_provider.stream_requests) == 2, "docs: the guess must be rebuilt"
+        assert "daintree_docs" in sent
+
+
+@pytest.mark.asyncio
 async def test_continuation_round_with_active_skill_does_not_speculate(
     orchestrator: ChatOrchestrator,
     fake_provider: FakeProvider,

@@ -208,7 +208,10 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
                 container.orchestrator, spy, provider, container.state_codec, trace))
         await container.orchestrator.drain_background_tasks(timeout=5.0)
     finally:
-        await provider.aclose()
+        # The container's own teardown, not just the provider's: it owns a second
+        # connection pool (the documentation MCP client) that closing the
+        # provider alone would leave open.
+        await container.aclose()
 
     return {
         "meta": {

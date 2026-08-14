@@ -406,7 +406,10 @@ async def run_async(
                 trial_rows.append(row)
             results.append(_summarize(scenario, trial_rows))
     finally:
-        await provider.aclose()
+        # The container's own teardown, not just the provider's: it owns a second
+        # connection pool (the documentation MCP client) that closing the
+        # provider alone would leave open.
+        await container.aclose()
 
     return {"scenarios": results}
 

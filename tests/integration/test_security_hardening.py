@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from conftest import respond_body
+from conftest import detach_docs_client, respond_body
 from fakes import FakeProvider
 from fastapi.testclient import TestClient
 
@@ -25,7 +25,10 @@ def _client(**overrides: Any) -> TestClient:
     )
     provider = FakeProvider()
     app = create_app(settings=settings, provider=provider)
-    app.state.container = build_container(settings, provider)
+    container = build_container(settings, provider)
+    # No outbound documentation call from the suite — see conftest.
+    detach_docs_client(container)
+    app.state.container = container
     app.state.ready = True
     return TestClient(app)
 

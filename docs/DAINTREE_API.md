@@ -413,6 +413,55 @@ Skill selection is removed from the main thread:
 `skill.find` / `skill.load` (and their wire-safe `skill__find` / `skill__load` forms) are
 reserved and rejected if a client offers them as tools or replays them in history.
 
+---
+
+## Documentation lookup
+
+Questions about **Daintree itself** are answered by the server, not by handing the client a
+tool call to run. The public documentation MCP (`https://daintree.org/api/mcp`) is no-auth,
+stateless and identical for every caller, so nothing about it needs to run on the user's
+machine — unlike the Daintree control plane, which drives local terminals and worktrees
+behind a per-session token.
+
+1. **Classification.** The selector call already on the turn's first-byte path returns a
+   second answer alongside `skill_ids`: `docs_query`, a short search string, or `null`. It is
+   independent of skill selection — a turn can need both, either, or neither — and `null` is
+   the common case. A turn that skips selection (continuation round, no-task fast path) or
+   whose selector degraded never looks anything up.
+2. **Retrieval.** One stateless JSON-RPC `tools/call` to the docs server's `search` tool,
+   before the main upstream stream opens. It gets its own slice of the turn's `preparation`
+   budget — *minus a reserve* for the assembly and teardown that still follow — enforced as a
+   wall-clock bound and skipped entirely when too little remains. A slow docs host therefore
+   costs first-byte latency and never the turn. Redirects are refused rather than followed,
+   and the response is read under a size cap.
+3. **Injection.** The top few ranked sections are sanitized, byte-capped, framed as an inert
+   `<daintree_docs>` data block and appended to the **volatile user-role tail** (row 7 above)
+   — never a system message, which would re-encode the tool schemas for content that lives
+   for exactly one turn. Each section carries a complete `URL:` built server-side from a
+   validated same-site path; the model cites what it is given rather than assembling a URL.
+3b. **Continuation.** The query is carried in the signed state token, scoped to the
+   `turn_id`, and re-run on the turn's tool-continuation rounds — those skip selection, and
+   the tail carrying the pages is rebuilt every round, so without this a usage question that
+   takes a tool call to answer would lose its sources between asking and answering. A new
+   instruction is classified afresh and never inherits the query.
+4. **Visibility.** The search appears in `skills.prelude.tool_executions` as a `docs__search`
+   execution (display name `docs.search`), the same channel a skill load rides, so the user
+   sees which query produced the cited pages. Its result carries the matched **paths only** —
+   the page text is already going to the model through the prompt.
+5. **Speculation.** A docs hit disqualifies an otherwise-exact speculative stream: that
+   stream's prompt was assembled before the pages existed, so matching skill ids do not make
+   it the same request.
+
+**Best-effort by construction.** Every failure — no client, no budget, a docs server that
+errors, times out or matches nothing — leaves the turn to answer without documentation. It
+never fails the request. Advertised as `capabilities.docs_lookup`; a client gating on it
+should stop offering its own docs tools, since two paths to the same answer means the model
+uses both.
+
+**The tradeoff, stated:** docs answers now depend on the backend being reachable. They
+previously survived a backend outage and a Daintree outage independently, and usage
+questions get asked precisely when something is broken.
+
 Operational controls are `SKILL_SPECULATION_MAX_CONCURRENCY` (`0` is the kill switch),
 `SKILL_SPECULATION_BUFFER_CHUNKS`, `SKILL_SPECULATION_BUFFER_BYTES`, and
 `SKILL_SPECULATION_CLAIM_TIMEOUT_SECONDS` (closes a winner whose HTTP body is never
@@ -440,7 +489,7 @@ block, where it costs exactly its own tokens.
 | 4 | Response contract | system | static — output-shape rules |
 | 5 | Injected startup context | user | required, session-stable project/agent/instruction data |
 | 6 | Visible `input.messages` conversation | user/assistant/tool | append-only — selector/learner transcript |
-| 7 | Injected context (runtime + turn footer) | user | per-request tail — the only volatile block |
+| 7 | Injected context (runtime + turn footer + retrieved docs) | user | per-request tail — the only volatile block |
 
 All client-provided context (ids, names, MCP details, project instructions, memories,
 worktrees) is treated as untrusted data. Prose fields collapse whitespace; multiline fields

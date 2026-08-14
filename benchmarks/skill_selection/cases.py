@@ -60,6 +60,14 @@ class BenchCase:
     turn_context: str | None
     available_tools: list[str]
     note: str
+    # The selector's SECOND answer: does this turn warrant a documentation
+    # lookup? `True` demands a query, `False` demands `null`, and `None` — the
+    # default for the many cases written before the classifier existed — leaves
+    # it unscored rather than silently asserting one answer over the whole
+    # corpus. It is scored SEPARATELY from skill ids: a turn can route correctly
+    # and classify the docs question wrongly, and a single pass/fail would hide
+    # which half moved.
+    expect_docs: bool | None = None
 
     @property
     def allowed(self) -> set[str]:
@@ -116,6 +124,9 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
     expect = raw.get("expect") or {}
     required = _validate_ids(expect.get("required") or [], catalog, case_id, "required")
     _check_foundation_convention(required, catalog, case_id)
+    expect_docs = expect.get("docs")
+    if expect_docs is not None and not isinstance(expect_docs, bool):
+        raise CaseError(f"{case_id}: expect.docs must be true, false, or omitted")
     return BenchCase(
         id=case_id,
         category=str(raw.get("category") or "uncategorized"),
@@ -127,6 +138,7 @@ def _build_case(raw: dict[str, Any], source: str, catalog: Catalog) -> BenchCase
         turn_context=raw.get("turn_context"),
         available_tools=list(raw.get("available_tools") or []),
         note=str(raw.get("note") or ""),
+        expect_docs=expect_docs,
     )
 
 

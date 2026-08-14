@@ -175,7 +175,10 @@ async def run_bench(
                     await _run_case(runner, provider, case, caller_api_key(settings))
                 )
     finally:
-        await inner.aclose()
+        # The container's own teardown, not just the provider's: it owns a second
+        # connection pool (the documentation MCP client) that closing the
+        # provider alone would leave open.
+        await container.aclose()
     finished_at = datetime.now(UTC)
 
     return {

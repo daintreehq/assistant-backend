@@ -27,6 +27,19 @@ class StatePayload(BaseModel):
     last_instruction_revision: int = 0
     issued_at: int = 0
     expires_at: int = 0
+    # The documentation search this TURN ran, carried so its pages survive the
+    # turn's tool-continuation rounds.
+    #
+    # Those rounds deliberately skip the selector, so nothing would re-derive the
+    # query — and the pages live in the volatile tail, which is rebuilt every
+    # round. Without this, a usage question that takes one tool call to answer
+    # loses the documentation it was about to cite, between asking and answering.
+    # The query is re-run rather than the results being stored: a signed token is
+    # not a place to put kilobytes of prose, and it travels through the client.
+    #
+    # Scoped to `last_turn_id` by the reader: a NEW instruction gets its own
+    # classification, so a stale query must never search on its behalf.
+    docs_query: str | None = None
 
     def active_ids(self) -> list[str]:
         return [s.id for s in self.active_skills]

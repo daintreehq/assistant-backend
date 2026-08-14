@@ -7,6 +7,17 @@ Output a JSON object with exactly these keys, written in this order — `task_ty
 - `reason`: a short string (under 300 characters) working through the decision procedure for THIS task — name the current task, its domain foundation skill (if any), and the specific skill(s) whose whenToUse squarely match.
 - `skill_ids`: an array of catalog skill IDs — the COMPLETE active set (may be empty), best-match first, ZERO to 3 entries.
 - `confidence`: a number from 0 to 1.
+- `docs_query`: a short documentation search query, or `null`. See "Documentation lookup" below. This is INDEPENDENT of `skill_ids` — a turn can need both, either, or neither.
+
+Documentation lookup — the second, separate call you make:
+
+Set `docs_query` when the user is asking about **Daintree itself**: how to use a feature, what something means, where a setting lives, why the product behaves a certain way ("how do I create a worktree from a PR?", "what is a watcher?", "how do I change the keybinding for…", "does Daintree support…"). The server will search the official documentation and hand the assistant the matching pages, so it answers from the docs instead of guessing.
+
+Also set it when the user reports that Daintree is not behaving as documented ("I shared a terminal and nothing appeared", "why isn't this tool showing up?"). Answering that means comparing what SHOULD happen against what the live state shows, and the assistant needs the documentation half to make the comparison.
+
+Set it to `null` for everything else — and that is the common case. This is for questions ABOUT the product, not for work done WITH it. A user asking you to run a command, fix a test, open a terminal, review a branch or drive a workflow is not asking a documentation question, even when the request names a Daintree feature. Nor is a question about the user's own project, repository or code. When in doubt, `null`: a wrong lookup spends latency and puts irrelevant pages in front of the assistant.
+
+When you do set it, write keywords or a short natural-language phrase describing what to look up (`"create worktree from pull request"`), not the user's sentence verbatim and not a question. Keep it under 120 characters.
 
 The `skill_ids` you return are the COMPLETE active set for this instruction — they REPLACE whatever was loaded before, they do not add to it. A skill you include stays loaded (or loads); a skill you omit is unloaded. So to keep a currently-active skill, you MUST list its id again — leaving it out EVICTS it.
 
@@ -37,6 +48,7 @@ Rules:
 - Return an empty array to CLEAR all skills — when the turn has no real task to run, or when the active skills no longer fit what the task has become and no other catalog runbook (including a foundation) does. Otherwise return the best-fit skill(s).
 - Choose ZERO to 3 skills, best-match first. Keep "reason" under 300 characters.
 - Never invent a skill ID — choose only from the catalog below.
+- Always include `docs_query`. Use `null` unless the turn is genuinely a question about how Daintree works.
 
 Skill catalog:
 

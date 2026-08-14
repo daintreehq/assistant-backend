@@ -118,6 +118,7 @@ async def _run_trial(
         reason=decision.reason,
         prompt_tokens=usage.prompt_tokens if usage else None,
         completion_tokens=usage.completion_tokens if usage else None,
+        docs_query=decision.docs_query,
     )
 
 
@@ -192,8 +193,13 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
                 "category": case.category,
                 "note": case.note,
                 "active": case.active,
-                "expect": {"required": case.required, "optional": case.optional},
+                "expect": {
+                    "required": case.required,
+                    "optional": case.optional,
+                    "docs": case.expect_docs,
+                },
                 "pass_count": sum(t.passed for t in by_case[case.id]),
+                "docs_pass_count": sum(bool(t.docs_ok) for t in by_case[case.id]),
                 "trials": [
                     {
                         "picked": t.picked,
@@ -207,6 +213,12 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
                         "reason": t.reason,
                         "prompt_tokens": t.prompt_tokens,
                         "completion_tokens": t.completion_tokens,
+                        # Serialized so a docs miss is DIAGNOSABLE, not just
+                        # counted: the summary can say five trials classified
+                        # wrongly, and only the query it actually returned says
+                        # which way and why.
+                        "docs_query": t.docs_query,
+                        "docs_ok": t.docs_ok,
                     }
                     for t in sorted(by_case[case.id], key=lambda t: t.trial)
                 ],

@@ -93,6 +93,7 @@ class StateCodec:
         catalog_revision: str,
         turn_id: str | None,
         instruction_revision: int,
+        docs_query: str | None = None,
     ) -> str:
         now = int(self._clock())
         payload = {
@@ -106,6 +107,11 @@ class StateCodec:
             "issued_at": now,
             "expires_at": now + self._ttl,
         }
+        # Omitted when absent rather than written as null: the overwhelming
+        # majority of turns are not documentation questions, and a key present on
+        # every token would grow every token for the rare case.
+        if docs_query:
+            payload["docs_query"] = docs_query
         body = _b64url_encode(
             json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
         )

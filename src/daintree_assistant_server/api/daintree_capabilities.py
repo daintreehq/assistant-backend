@@ -13,6 +13,7 @@ from ..providers.policy import (
     EndpointSort,
     PrivacyMode,
 )
+from ..services.docs_events import DOCS_SEARCH_WIRE_NAME
 from .deps import require_ready
 
 router = APIRouter()
@@ -95,6 +96,27 @@ async def capabilities(
         "skills": {
             "catalog_revision": container.catalog.revision,
             "manual_resolve": True,
+        },
+        # Daintree usage questions are answered HERE now: the server classifies
+        # them on the selector call it already makes, searches the public docs
+        # MCP itself, and hands the pages to the model before it opens. The
+        # client no longer needs a docs tool family or a second MCP connection —
+        # and MUST NOT keep offering one alongside this, or the model will have
+        # two ways to answer the same question and use both.
+        #
+        # `prelude_tool` is what the search surfaces as: an ordinary entry in
+        # `skills.prelude.tool_executions`, the same channel a skill load rides,
+        # so a client that renders those already renders this.
+        #
+        # Advertised so the CLI can gate the removal. It is best-effort by
+        # design: a docs lookup that fails leaves the turn to answer without
+        # documentation, so a client seeing this flag is never promised an answer
+        # — only that it does not have to fetch one.
+        "docs_lookup": {
+            "server_side": True,
+            "source": "https://daintree.org",
+            "prelude_tool": DOCS_SEARCH_WIRE_NAME,
+            "best_effort": True,
         },
         "tasks": container.task_runner.task_ids(),
         # Workflow intelligence: the CLI owns the durable execution graphs; the

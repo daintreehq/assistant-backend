@@ -41,7 +41,7 @@ def test_parse_select_args_drops_unknown_dedups_clamps(catalog) -> None:
             "task_type": "x",
         }
     )
-    ids, conf, _tt, _r = parse_select_args(raw, catalog, 3)  # type: ignore[misc]
+    ids, conf, _tt, _r, _dq = parse_select_args(raw, catalog, 3)  # type: ignore[misc]
     assert ids == known[:3]
     assert conf == 1.0
 
@@ -71,11 +71,78 @@ def test_parse_select_args_reason_first_order(catalog) -> None:
     )
     parsed = parse_select_args(raw, catalog, 3)
     assert parsed is not None
-    ids, confidence, task_type, reason = parsed
+    ids, confidence, task_type, reason, docs_query = parsed
     assert ids == known[:2]
     assert confidence == 1.0
     assert task_type == "multi-agent orchestration"
     assert len(reason) == 300
+    # An omitted docs_query is the common answer, not a parse failure.
+    assert docs_query is None
+
+
+def test_parse_select_args_carries_a_docs_query(catalog) -> None:
+    """The selector's second answer: search the docs for this.
+
+    It rides the same call because it is the same classification over the same
+    evidence, and that call is already on the turn's first-byte path.
+    """
+    raw = json.dumps(
+        {
+            "task_type": "product question",
+            "reason": "asking how a feature works",
+            "skill_ids": [],
+            "confidence": 0.9,
+            "docs_query": "  create   worktree from pull request  ",
+        }
+    )
+    parsed = parse_select_args(raw, catalog, 3)
+    assert parsed is not None
+    # Whitespace-collapsed, since it goes straight into a search request.
+    assert parsed[4] == "create worktree from pull request"
+
+
+@pytest.mark.parametrize(
+    "value", [None, "", "   ", 42, [], {"q": "x"}, True]
+)
+def test_a_junk_docs_query_degrades_to_no_lookup(catalog, value) -> None:
+    """No lookup is the safe default, so anything unusable becomes it.
+
+    Not a parse failure: a selection with a good skill set and a junk docs_query
+    is a good selection, and repairing the whole call over an optional secondary
+    field would spend a second billed round-trip to recover something the turn
+    can do without.
+    """
+    raw = json.dumps(
+        {"skill_ids": [], "confidence": 0.5, "task_type": "x", "docs_query": value}
+    )
+    parsed = parse_select_args(raw, catalog, 3)
+    assert parsed is not None, "a bad docs_query must not invalidate the selection"
+    assert parsed[4] is None
+
+
+def test_the_repair_instruction_still_asks_for_a_docs_query() -> None:
+    """An omitted docs_query is accepted as "no lookup" — so a repair must ask.
+
+    Otherwise a malformed FIRST response to a genuine documentation question
+    repairs into a valid selection that has quietly dropped the lookup, and the
+    turn answers unaided while every signal says the repair worked.
+    """
+    from daintree_assistant_server.skills.selector import _REPAIR_INSTRUCTION
+
+    assert "docs_query" in _REPAIR_INSTRUCTION
+
+
+def test_a_long_docs_query_is_capped_not_rejected(catalog) -> None:
+    """An over-long query is a classifier that pasted instead of classifying.
+
+    It still searches fine once trimmed, and dropping it would cost the turn its
+    documentation over a formatting slip.
+    """
+    raw = json.dumps({"skill_ids": [], "docs_query": "worktrees " * 40})
+    parsed = parse_select_args(raw, catalog, 3)
+    assert parsed is not None
+    assert parsed[4] is not None
+    assert len(parsed[4]) <= 120
 
 
 def test_parse_select_args_missing_skill_ids_is_malformed(catalog) -> None:

@@ -50,6 +50,11 @@ proof that the whole corpus is accurate.
   change, or `selection.force`.
 - Selector failure fails *open* (keeps the prior active set) rather than blocking
   the assistant.
+- The same selector call also classifies whether the turn is a question about
+  Daintree itself. When it is, the server searches the public documentation MCP
+  and folds the matching pages into the volatile prompt tail — the client is not
+  handed a docs tool to run. Best-effort: any failure leaves the turn to answer
+  without documentation, never to fail.
 - Streamed selector turns with verified, catalog-current active skills race the
   selector against a private main stream built from the exact ordered prior set.
   An exact resolved match reuses that stream; any set/revision change closes it

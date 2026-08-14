@@ -38,6 +38,7 @@ from ..contracts.openai import (
     ToolDef,
 )
 from ..prompts.loader import (
+    TEMPLATE_DOCS_CONTEXT,
     TEMPLATE_INTEGRATIONS,
     TEMPLATE_LOADED_SKILLS,
     TEMPLATE_RESPONSE_CONTRACT,
@@ -58,6 +59,7 @@ from ..text_utils import (
     sanitize_line,
     utf8_len,
 )
+from .docs_mcp import DocsLookup, render_docs_sections
 
 PROMPT_CACHE_KEY = "daintree-main"
 
@@ -517,6 +519,30 @@ class PromptAssembler:
             out.append(rendered)
         return out
 
+    def render_docs_context(self, lookup: DocsLookup | None) -> str:
+        """The documentation the server retrieved for this turn, as prompt text.
+
+        Framed as an inert data block for the same reason the turn goal is: the
+        text is quoted from a web page, and the live injection benchmark showed
+        that carriers rendered bare leak while carriers rendered inside a
+        delimited block do not. First-party pages are still pages, and a docs
+        edit must not be able to become an instruction to the assistant.
+        """
+        if lookup is None or not lookup.sections:
+            return ""
+        body = render_docs_sections(lookup.sections)
+        if not body.strip():
+            return ""
+        return self.prompts.render(
+            TEMPLATE_DOCS_CONTEXT,
+            docs_query=frame_value(
+                sanitize_line(lookup.query, self.settings.cap_docs_query), tag="docs_query"
+            ),
+            docs_sections=frame_data_block(
+                body, self.settings.cap_docs_block_bytes, tag="daintree_docs"
+            ),
+        )
+
     def render_turn_footer(self, turn: TurnContext | None) -> str:
         if turn is None:
             return self.prompts.render(TEMPLATE_TURN_FOOTER, turn_context=None)
@@ -712,6 +738,7 @@ class PromptAssembler:
         request: RespondRequest,
         skills: list[Skill],
         upstream_model: str,
+        docs: DocsLookup | None = None,
     ) -> ProviderChatRequest:
         """Assemble the upstream request so the upstream prefix cache covers the base
         prompt, the integration surface, the skill bodies, the tool schemas, and the
@@ -781,6 +808,14 @@ class PromptAssembler:
         footer = self.render_turn_footer(turn)
         if footer.strip():
             variable_parts.append(footer)
+        # Retrieved documentation rides the volatile tail with everything else
+        # per-request. It is emphatically NOT a system message: it exists for
+        # exactly one turn, and a system-role block would land ahead of the tool
+        # schemas and re-encode ~18k tokens of them for a question the next turn
+        # will not ask again (see this method's docstring).
+        docs_block = self.render_docs_context(docs)
+        if docs_block.strip():
+            variable_parts.append(docs_block)
         if variable_parts:
             framed = (
                 "[Injected context — automated state from the local Daintree runtime, "

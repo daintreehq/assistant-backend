@@ -1,0 +1,162 @@
+# The selector's SECOND answer: does this turn warrant a documentation lookup?
+#
+# Scored separately from skill routing (`expect.docs`), because they are two
+# independent decisions over the same evidence and one number could not say
+# which of them moved. The two failure modes are opposites and both matter:
+#
+#   MISSED  — a product question answered from a half-remembered surface. This
+#             is the failure the feature exists to prevent, and the user acts on
+#             the wrong answer.
+#   SPURIOUS — a lookup on an operational turn. It buys a third-party round-trip
+#             on the first-byte path and puts irrelevant pages in front of the
+#             model, on turns that are the overwhelming majority.
+#
+# The hard cases are deliberate: every negative here NAMES a Daintree feature,
+# because keyword overlap is exactly what a classifier over-fires on. "Ask about
+# it" vs "do it with it" is the line, and the pairs below straddle it.
+
+cases:
+  # ---- should look up: questions ABOUT the product ------------------------
+  - id: docs-how-do-i-worktree
+    category: docs-classification
+    note: The canonical usage question.
+    messages:
+      - role: user
+        content: How do I create a worktree from a pull request?
+    expect:
+      required: [daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
+      docs: true
+
+  - id: docs-what-is-a-watcher
+    category: docs-classification
+    messages:
+      - role: user
+        content: What actually is a watcher, and when would I want one?
+    expect:
+      required: [daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
+      docs: true
+
+  - id: docs-where-is-the-setting
+    category: docs-classification
+    note: Configuration questions are documentation, not an instruction to change it.
+    messages:
+      - role: user
+        content: Where do I change the keybinding for switching terminal tabs?
+    expect:
+      required: [daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
+      docs: true
+
+  - id: docs-capability-question
+    category: docs-classification
+    note: A "does it support X" question is answerable only from the docs.
+    messages:
+      - role: user
+        content: Does Daintree support running agents against a remote host?
+    expect:
+      required: [daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
+      docs: true
+
+  - id: docs-explain-then-do
+    category: docs-classification
+    note: >-
+      A compound turn. The explanation half is still a documentation question, so
+      the lookup is warranted even though work follows.
+    messages:
+      - role: user
+        content: >-
+          Before we start — remind me how Daintree's worktree cleanup works, then
+          go ahead and prep this branch for review.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation, daintree.help-and-diagnostics]
+      docs: true
+
+  # ---- should NOT look up: work done WITH the product ---------------------
+  - id: docs-negative-do-the-thing
+    category: docs-classification
+    note: >-
+      Names the same feature as the first case and is the opposite request. This
+      is the pair the classifier most has to get right.
+    messages:
+      - role: user
+        content: Create a worktree from PR #142 and get an agent started on it.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-negative-rename-terminals
+    category: docs-classification
+    messages:
+      - role: user
+        content: Rename my terminals so I can tell the agents apart.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-negative-users-own-code
+    category: docs-classification
+    note: A "how does X work" question about the USER's project, not about Daintree.
+    messages:
+      - role: user
+        content: How does the retry logic in our upload client work? Walk me through it.
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-negative-failing-test
+    category: docs-classification
+    messages:
+      - role: user
+        content: The watcher tests are failing on CI — figure out why and fix them.
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-negative-acknowledgement
+    category: docs-classification
+    note: No task at all, so nothing to look up either.
+    messages:
+      - role: user
+        content: thanks, that's exactly what I needed
+    expect:
+      required: []
+      docs: false
+
+  - id: docs-negative-continuation-work
+    category: docs-classification
+    note: >-
+      Mid-workflow. A turn that keeps a runbook going is operational however much
+      product vocabulary it contains.
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+    messages:
+      - role: user
+        content: Looks good — push it and open the PR.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-live-state-complaint
+    category: docs-classification
+    note: >-
+      A genuine hard case, expected TRUE. "I did X and nothing happened" reads
+      as an operational turn, but the help skill's whole procedure is to compare
+      what the docs say SHOULD happen against what the state shows — so the
+      answer needs both halves. It is also the shape that most needs the query
+      carried: the docs comparison happens on the round AFTER daintree.status
+      returns, and a classifier that answers `null` here leaves nothing to carry.
+    messages:
+      - role: user
+        content: I shared a terminal with the fleet and nothing showed up on the other side.
+    expect:
+      required: [daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
+      docs: true

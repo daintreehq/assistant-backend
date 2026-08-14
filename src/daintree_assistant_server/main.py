@@ -42,6 +42,7 @@ from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
 from .providers.openrouter import OpenRouterProvider
 from .services.chat_orchestrator import ChatOrchestrator
+from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
 from .services.prompt_assembler import PromptAssembler
 from .services.skill_learning import SkillLearner
 from .services.task_runner import TaskRunner
@@ -207,6 +208,11 @@ class Container:
     orchestrator: ChatOrchestrator
     task_runner: TaskRunner
     skill_learner: SkillLearner | None = None
+    # Its own httpx client, kept here so lifespan can close it. Deliberately not
+    # the provider's: the docs server is a different host with a different
+    # latency profile, and a documentation search must never queue behind a
+    # long-lived streaming completion holding a pooled connection.
+    docs_http_client: httpx.AsyncClient | None = None
 
     @property
     def catalog(self) -> Catalog:
@@ -226,6 +232,9 @@ class Container:
             await self.orchestrator.drain_background_tasks()
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
             await self.provider.aclose()
+        if self.docs_http_client is not None:
+            with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
+                await self.docs_http_client.aclose()
 
 
 # Structured upstream-timeout components, hardcoded (no env toggles — one
@@ -237,6 +246,23 @@ class Container:
 # legitimately take that long, so they get tight bounds of their own.
 _UPSTREAM_WRITE_TIMEOUT_SECONDS = 30.0
 _UPSTREAM_POOL_TIMEOUT_SECONDS = 10.0
+
+
+def _build_docs_client() -> tuple[httpx.AsyncClient, DocsMcpClient]:
+    """The documentation MCP client and the connection pool it owns.
+
+    Small and short-timeout by design, and separate from the provider pool. Every
+    per-call timeout is passed explicitly by the caller from what remains of the
+    turn's preparation budget; the values here are the ceiling that applies when
+    nothing tighter is in force. Connection limits are modest because a docs
+    lookup happens on a small fraction of turns — the search only runs when the
+    selector classified the turn as a question about Daintree itself.
+    """
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(DOCS_LOOKUP_TIMEOUT_SECONDS, connect=2.0),
+        limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
+    )
+    return client, DocsMcpClient(client)
 
 
 def _build_provider(settings: Settings) -> ChatProvider:
@@ -317,6 +343,7 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
             catalog_manager=catalog_manager,
         )
 
+    docs_http_client, docs_client = _build_docs_client()
     orchestrator = ChatOrchestrator(
         settings=settings,
         catalog_manager=catalog_manager,
@@ -325,6 +352,7 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
         assembler=assembler,
         provider=chat_provider,
         learner=skill_learner,
+        docs_client=docs_client,
     )
     task_runner = TaskRunner(
         settings=settings,
@@ -344,6 +372,7 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
         orchestrator=orchestrator,
         task_runner=task_runner,
         skill_learner=skill_learner,
+        docs_http_client=docs_http_client,
     )
 
 

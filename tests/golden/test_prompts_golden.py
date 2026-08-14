@@ -31,6 +31,7 @@ from daintree_assistant_server.contracts.extensions import (
     WorktreeSnapshot,
 )
 from daintree_assistant_server.prompts.loader import PromptLoader
+from daintree_assistant_server.services.docs_mcp import DocsLookup, DocsSection
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from daintree_assistant_server.services.task_runner import build_profiles
 from daintree_assistant_server.skills.catalog import Catalog, load_catalog
@@ -275,6 +276,45 @@ def test_turn_footer_workflow_state(assembler: PromptAssembler) -> None:
 
 def test_response_contract(assembler: PromptAssembler) -> None:
     assert_golden("response_contract.md", assembler.render_response_contract())
+
+
+def test_docs_context(assembler: PromptAssembler) -> None:
+    """What the model sees when the server answered a usage question for it.
+
+    Snapshotted like every other prompt layer: this text tells the model to
+    prefer these pages over its own memory and how to turn a path into a
+    citation, so a change to it is a change to what gets cited.
+    """
+    lookup = DocsLookup(
+        query="create worktree from pull request",
+        sections=[
+            DocsSection(
+                path="/docs/worktrees",
+                title="Worktrees",
+                section_title="PR Checkout",
+                text="You can create a worktree straight from a pull request with the "
+                "**Create Worktree** button in the Code Forge panel's PR list.",
+            ),
+            DocsSection(
+                path="/docs/code-forge",
+                title="Code Forge",
+                section_title="Pull requests",
+                text="The PR list shows open pull requests for the current repository.",
+            ),
+        ],
+    )
+    assert_golden("docs_context.md", assembler.render_docs_context(lookup))
+
+
+def test_docs_context_is_empty_without_a_lookup(assembler: PromptAssembler) -> None:
+    """No lookup and no matches render nothing at all — not an empty block.
+
+    An "I searched and found nothing" preamble would spend tokens on every
+    non-docs turn and invite the model to remark on a search the user never
+    asked for.
+    """
+    assert assembler.render_docs_context(None) == ""
+    assert assembler.render_docs_context(DocsLookup(query="x", sections=[])) == ""
 
 
 def test_response_contract_is_final_system_message(assembler: PromptAssembler) -> None:

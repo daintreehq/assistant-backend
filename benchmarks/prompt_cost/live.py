@@ -125,7 +125,10 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
                 pass
         await container.orchestrator.drain_background_tasks(timeout=5.0)
     finally:
-        await provider.aclose()
+        # The container's own teardown, not just the provider's: it owns a second
+        # connection pool (the documentation MCP client) that closing the
+        # provider alone would leave open.
+        await container.aclose()
     return {"trials": trials, "first_byte": latency_summary(first_byte)}
 
 

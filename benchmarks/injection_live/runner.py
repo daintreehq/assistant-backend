@@ -297,7 +297,10 @@ async def run_bench(
                 i += 1
         await container.orchestrator.drain_background_tasks(timeout=5.0)
     finally:
-        await provider.aclose()
+        # The container's own teardown, not just the provider's: it owns a second
+        # connection pool (the documentation MCP client) that closing the
+        # provider alone would leave open.
+        await container.aclose()
     finished_at = datetime.now(UTC)
 
     return {

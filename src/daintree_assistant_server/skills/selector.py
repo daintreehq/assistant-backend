@@ -48,8 +48,14 @@ _REPAIR_INSTRUCTION = (
     "Your previous response was not a valid JSON object. Reply now with ONLY a "
     "JSON object (no prose, no code fence) with these keys in this order: "
     "task_type (a short string), reason (a SHORT string, well under 300 characters), "
-    "skill_ids (an array of catalog skill IDs, possibly empty), and confidence "
-    "(a number between 0 and 1). Keep the whole object brief."
+    "skill_ids (an array of catalog skill IDs, possibly empty), confidence "
+    "(a number between 0 and 1), and docs_query (a short documentation search "
+    "string, or null if this turn is not a question about how Daintree itself "
+    "works). Keep the whole object brief."
+    # docs_query is named here for the same reason it is named in the prompt: an
+    # omitted one is accepted as "no lookup", so a repair schema that left it out
+    # would make a repaired documentation question quietly answer without
+    # documentation — the failure would look like a working repair.
 )
 
 # The selector sits on the turn's first-byte path, so transient failures get ONE
@@ -91,6 +97,14 @@ class SelectionDecision:
     # what lets the fast path clear the set without claiming a selector call
     # happened — which would falsify the selector telemetry.
     authoritative: bool = False
+    # The selector's SECOND answer: what to search the Daintree documentation
+    # for, or None. Rides the same call because it is the same classification
+    # question about the same evidence, and that call is already on the turn's
+    # first-byte path — a dedicated one would double the latency floor to
+    # recognize a question the same model just read. `None` on every degraded or
+    # reused decision: no lookup is the correct fallback, and a stale query from
+    # a previous turn would search for the wrong thing.
+    docs_query: str | None = None
 
     def __post_init__(self) -> None:
         if self.warnings is None:
@@ -267,9 +281,30 @@ def _sum_usage(a: ProviderUsage | None, b: ProviderUsage | None) -> ProviderUsag
     )
 
 
+# A documentation query is a search string, not prose: the docs server ranks
+# keywords, and a long value is a sign the classifier pasted the user's message
+# instead of classifying it. Capped rather than rejected — a slightly long query
+# still searches fine.
+_MAX_DOCS_QUERY_CHARS = 120
+
+
+def _parse_docs_query(value: Any) -> str | None:
+    """The selector's second answer: search the docs for this, or don't.
+
+    Absent, ``null``, a non-string, or blank all mean the same thing — no
+    lookup. That is the common case and the safe default, so anything the
+    classifier returns that is not a usable query degrades to it rather than
+    failing the whole selection.
+    """
+    if not isinstance(value, str):
+        return None
+    query = " ".join(value.split())[:_MAX_DOCS_QUERY_CHARS].strip()
+    return query or None
+
+
 def parse_select_args(
     raw_json: str, catalog: Catalog, max_active: int
-) -> tuple[list[str], float, str, str] | None:
+) -> tuple[list[str], float, str, str, str | None] | None:
     """Validate and normalize selector arguments. Returns ``None`` if malformed."""
     try:
         data = json.loads(raw_json)
@@ -318,7 +353,11 @@ def parse_select_args(
 
     task_type = str(data.get("task_type") or "")[:80]
     reason = str(data.get("reason") or "")[:300]
-    return clean, confidence, task_type, reason
+    # NOT part of the malformed check: a selection with a good skill set and a
+    # junk docs_query is a good selection. Repairing the whole call over an
+    # optional secondary field would spend a second billed round-trip to recover
+    # something the turn can simply do without.
+    return clean, confidence, task_type, reason, _parse_docs_query(data.get("docs_query"))
 
 
 class Selector:
@@ -474,7 +513,7 @@ class Selector:
                     ["skill_selector_failed_open"], usage=usage, endpoint=endpoint, calls=calls
                 )
 
-        ids, confidence, task_type, reason = parsed
+        ids, confidence, task_type, reason, docs_query = parsed
         return SelectionDecision(
             skill_ids=ids,
             ran=True,
@@ -486,6 +525,7 @@ class Selector:
             endpoint=endpoint,
             calls=calls,
             warnings=[],
+            docs_query=docs_query,
         )
 
     async def _call_once(self, request: ProviderChatRequest) -> ProviderChatResult:

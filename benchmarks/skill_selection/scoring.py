@@ -22,9 +22,19 @@ class TrialResult:
     reason: str | None
     prompt_tokens: int | None
     completion_tokens: int | None
+    # What the selector answered about documentation, and whether that matched
+    # the case — `None` when the case does not score it.
+    docs_query: str | None = None
+    docs_ok: bool | None = None
 
     @property
     def passed(self) -> bool:
+        """Skill routing only.
+
+        The docs classification is reported beside this rather than folded into
+        it: they are two independent decisions over the same evidence, and one
+        combined number cannot say which of them moved.
+        """
         return not self.degraded and not self.missing and not self.extra
 
 
@@ -40,8 +50,10 @@ def score_trial(
     reason: str | None,
     prompt_tokens: int | None,
     completion_tokens: int | None,
+    docs_query: str | None = None,
 ) -> TrialResult:
     picked_set = set(picked)
+    docs_ok = None if case.expect_docs is None else bool(docs_query) is case.expect_docs
     return TrialResult(
         case_id=case.id,
         trial=trial,
@@ -55,6 +67,8 @@ def score_trial(
         reason=reason,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
+        docs_query=docs_query,
+        docs_ok=docs_ok,
     )
 
 
@@ -87,6 +101,18 @@ def summarize(cases: list[BenchCase], results: list[TrialResult]) -> dict[str, A
         cat["trials"] += len(trials)
         cat["trials_passed"] += sum(t.passed for t in trials)
 
+    # Scored only over trials whose case declares an expectation. Two separate
+    # counters rather than one accuracy, because the two failures are opposite
+    # problems: a MISSED lookup answers a product question from memory, while a
+    # SPURIOUS one puts irrelevant pages in front of every operational turn and
+    # buys a third-party round-trip on the first-byte path. An overall percentage
+    # would let one mask the other.
+    docs_scored = [r for r in results if r.docs_ok is not None]
+    docs_missed = sum(
+        1 for r in docs_scored if not r.docs_ok and not r.docs_query
+    )
+    docs_spurious = sum(1 for r in docs_scored if not r.docs_ok and r.docs_query)
+
     latencies = sorted(r.latency_s for r in results)
     completion = [r.completion_tokens for r in results if r.completion_tokens is not None]
     prompt = [r.prompt_tokens for r in results if r.prompt_tokens is not None]
@@ -98,6 +124,12 @@ def summarize(cases: list[BenchCase], results: list[TrialResult]) -> dict[str, A
         "degraded_trials": sum(r.degraded for r in results),
         "recall_miss_trials": sum(bool(r.missing) for r in results),
         "precision_extra_trials": sum(bool(r.extra) for r in results),
+        "docs": {
+            "scored_trials": len(docs_scored),
+            "correct_trials": sum(1 for r in docs_scored if r.docs_ok),
+            "missed_lookup_trials": docs_missed,
+            "spurious_lookup_trials": docs_spurious,
+        },
         "latency_s": {
             "mean": round(sum(latencies) / len(latencies), 3) if latencies else 0.0,
             "p50": round(percentile(latencies, 50), 3),

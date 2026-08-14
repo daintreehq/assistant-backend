@@ -352,6 +352,15 @@ class Settings(BaseSettings):
     cap_mcp_servers: int = Field(default=32, alias="CAP_MCP_SERVERS")
     cap_mcp_block_bytes: int = Field(default=64 * 1024, alias="CAP_MCP_BLOCK_BYTES")
 
+    # ---- Server-retrieved Daintree documentation ------------------------
+    # The one MCP the SERVER calls (docs are public, stateless and identical for
+    # every caller — see services/docs_mcp.py). Capped like every other body of
+    # text that reaches the prompt from outside: first-party pages are still
+    # pages, and this block rides the volatile tail where each byte is re-encoded
+    # on the following turn.
+    cap_docs_query: int = Field(default=256, alias="CAP_DOCS_QUERY")
+    cap_docs_block_bytes: int = Field(default=16 * 1024, alias="CAP_DOCS_BLOCK_BYTES")
+
     # ---- Skill learning (LOCAL DEVELOPMENT ONLY) ------------------------
     # A backend-internal harness that watches completed local workflows and, when
     # warranted, writes or improves skill files so the catalog "learns". It is

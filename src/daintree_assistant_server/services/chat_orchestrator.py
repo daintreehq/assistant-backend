@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -60,6 +60,13 @@ from ..state.codec import StateCodec
 from ..text_utils import sanitize_line
 from .bare_intent import could_still_be_bare_intent, is_bare_tool_intent
 from .deadlines import DeadlineExceeded, RequestBudget, TurnPhase
+from .docs_events import DocsSearchExecution
+from .docs_mcp import (
+    DOCS_LOOKUP_TIMEOUT_SECONDS,
+    DocsLookup,
+    DocsLookupError,
+    DocsMcpClient,
+)
 from .output_policy import lint_output, repair_tables
 from .prompt_assembler import PromptAssembler, render_order_ids
 from .skill_learning import SkillLearner
@@ -141,6 +148,18 @@ HEARTBEAT_INTERVAL_SECONDS = 8.0
 # that fired and swallow the terminal error owed to the client.
 _CLOSE_GRACE_SECONDS = 5.0
 
+# Floor for the docs lookup's share of the preparation budget. Below this a call
+# would almost certainly time out, and spending the last second of preparation to
+# find that out is worse than answering without documentation.
+_DOCS_MIN_TIMEOUT_SECONDS = 0.5
+
+# What the docs lookup may NOT spend, no matter how much is left. Preparation
+# still has to assemble a >50 KiB prompt and, on a losing speculation, wait out a
+# stream teardown after this returns. Handing the lookup every remaining second
+# means a slow docs host turns a turn that would have answered unaided into a
+# preparation-deadline error — trading the feature's soft failure for a hard one.
+_DOCS_BUDGET_RESERVE_SECONDS = 3.0
+
 
 @dataclass
 class _PreparedTurn:
@@ -199,6 +218,11 @@ class ChatOrchestrator:
         assembler: PromptAssembler,
         provider: ChatProvider,
         learner: SkillLearner | None = None,
+        # The public documentation MCP. Optional so a turn is constructible
+        # without one — a container built for a test or a benchmark simply never
+        # looks anything up, which is the same outcome as a docs server that is
+        # down, and is already a path this code has to handle.
+        docs_client: DocsMcpClient | None = None,
     ) -> None:
         self.settings = settings
         self.catalog_manager = catalog_manager
@@ -207,6 +231,7 @@ class ChatOrchestrator:
         self.assembler = assembler
         self.provider = provider
         self.learner = learner
+        self.docs_client = docs_client
         # In-flight fire-and-forget skill-learning tasks. asyncio holds only a weak
         # reference to a bare task, so we keep a strong one here (discarded on done)
         # to stop a learning pass being garbage-collected mid-flight.
@@ -539,6 +564,7 @@ class ChatOrchestrator:
                 upstream_model=upstream_model,
                 request_id=request_id,
                 api_key=api_key,
+                budget=None,
             )
         try:
             async with asyncio.timeout(budget.remaining(TurnPhase.PREPARATION)):
@@ -547,6 +573,7 @@ class ChatOrchestrator:
                     upstream_model=upstream_model,
                     request_id=request_id,
                     api_key=api_key,
+                    budget=budget,
                 )
         except TimeoutError as exc:
             phase = (
@@ -567,6 +594,11 @@ class ChatOrchestrator:
         upstream_model: str,
         request_id: str,
         api_key: SecretStr,
+        # Only the docs lookup reads it: everything else in preparation is bounded
+        # by the enclosing `asyncio.timeout`, but an outbound call to a third
+        # server needs a slice of its own or a slow docs host silently spends the
+        # whole preparation budget the selector also has to fit inside.
+        budget: RequestBudget | None = None,
     ) -> _PreparedTurn:
         session_id = request.session.id
         t_start = time.perf_counter()
@@ -580,10 +612,25 @@ class ChatOrchestrator:
         # Only a fully valid token carries prior active skills forward; an
         # invalid/expired/wrong-session token is ignored (selection reruns).
         prior_active_ids: list[str] = []
+        # The documentation query this TURN already ran, if the turn is still
+        # going. Scoped to the turn id AND the instruction revision — the same
+        # pair that decides selector cadence, and for the same reason: a
+        # mid-turn interjection ("actually, run the tests") is a NEW instruction
+        # that gets classified afresh, so a query carried across it would search
+        # the documentation for a question the user has moved on from. Same
+        # fail-closed posture as the active set — an untrusted token carries
+        # nothing forward.
+        prior_docs_query: str | None = None
         if verification.valid and verification.payload is not None:
             prior_active_ids = catalog_at_start.filter_known(
                 verification.payload.active_ids()
             )
+            payload = verification.payload
+            if (
+                payload.last_turn_id == request.session.turn_id
+                and payload.last_instruction_revision == request.session.instruction_revision
+            ):
+                prior_docs_query = payload.docs_query
 
         # The deterministic no-task fast path. A greeting or a bare acknowledgement
         # needs no runbook, and concluding that with a model call costs a round
@@ -783,12 +830,46 @@ class ChatOrchestrator:
             newly_loaded_ids = resolution.newly_loaded
 
             skills = resolved_catalog.get_many(active_ids)
-            executions = [
+            executions: list[SkillLoadExecution | DocsSearchExecution] = [
                 SkillLoadExecution.from_skill(
                     new_call_id(), resolved_catalog.get(sid)  # type: ignore[arg-type]
                 )
                 for sid in newly_loaded_ids
             ]
+
+            # The selector's second answer: this turn asked how Daintree works, so
+            # the documentation is fetched HERE — before the model opens — and
+            # handed to it as context. The alternative is a mid-stream tool loop
+            # (intercept the model's docs call, run it, splice a second provider
+            # stream into the same client connection), which both response paths
+            # are built around not doing.
+            #
+            # `prior_docs_query` is what keeps the pages alive across a tool
+            # round: a continuation skips the selector, so `decision.docs_query`
+            # is None there, and the volatile tail carrying the pages is rebuilt
+            # every round. Without the carry, a usage question that takes one
+            # tool call to answer arrives at the answer with its sources gone.
+            #
+            # The carry applies ONLY when this turn did not answer for itself.
+            # Same authority test the active set uses (`resolve_active_skills`):
+            # a successful run and the no-task fast path each speak for the
+            # turn, and their answer stands even when it is `null` — a re-run
+            # selector that says "not a documentation question" must not be
+            # overridden by what the previous round decided. A continuation or a
+            # degraded selector did not answer, so the turn's own finding holds.
+            authoritative = (decision.ran or decision.authoritative) and not decision.degraded
+            docs_query = decision.docs_query if authoritative else prior_docs_query
+            docs = await self._lookup_docs(
+                docs_query, request_id=request_id, budget=budget
+            )
+            if docs is not None:
+                executions.append(
+                    DocsSearchExecution(
+                        call_id=new_call_id(),
+                        query=docs.query,
+                        paths=[s.path for s in docs.sections],
+                    )
+                )
 
             new_state = self.state_codec.issue(
                 session_id=session_id,
@@ -796,6 +877,12 @@ class ChatOrchestrator:
                 catalog_revision=resolved_catalog.revision,
                 turn_id=request.session.turn_id,
                 instruction_revision=request.session.instruction_revision,
+                # Carried only when the lookup actually produced pages. Carrying
+                # a query whose search failed would re-attempt it on every
+                # continuation round of the turn, turning a docs host that is
+                # down into a per-round latency tax — and the turn has already
+                # decided to answer without documentation.
+                docs_query=docs_query if docs is not None else None,
             )
 
             if speculation is not None:
@@ -812,6 +899,11 @@ class ChatOrchestrator:
                 exact_winner = (
                     resolved_catalog.revision == catalog_at_start.revision
                     and render_order_ids(skills) == speculative_render_ids
+                    # Docs are retrieved AFTER the speculative request was built,
+                    # so a lookup means the live stream is generating against a
+                    # prompt that lacks the pages the answer is supposed to come
+                    # from. Matching skill ids do not make it the same request.
+                    and docs is None
                 )
                 if exact_winner:
                     # The request, settings, and catalog snapshot that produced
@@ -848,6 +940,7 @@ class ChatOrchestrator:
                             request=request,
                             skills=skills,
                             upstream_model=upstream_model,
+                            docs=docs,
                         ),
                         api_key=api_key,
                     )
@@ -857,6 +950,7 @@ class ChatOrchestrator:
                         request=request,
                         skills=skills,
                         upstream_model=upstream_model,
+                        docs=docs,
                     ),
                     api_key=api_key,
                 )
@@ -943,6 +1037,86 @@ class ChatOrchestrator:
             discarded_usage=discarded_usage,
             speculation_billed=speculation_billed,
         )
+
+    # ---- server-side documentation lookup -------------------------------
+
+    async def _lookup_docs(
+        self,
+        query: str | None,
+        *,
+        request_id: str,
+        budget: RequestBudget | None,
+    ) -> DocsLookup | None:
+        """Search the public Daintree docs for this turn, or don't.
+
+        Returns ``None`` for every outcome that is not "we have pages": no
+        question was classified, no client is configured, too little budget is
+        left, the server failed, or it simply matched nothing. The caller treats
+        all of them identically, because they mean the same thing to the turn —
+        the model answers without retrieved documentation, exactly as it did
+        before this existed.
+
+        **Nothing here may raise.** A docs lookup is an enhancement to a turn
+        that would otherwise have proceeded fine; letting it fail the request
+        would make "how do I use Daintree?" the most fragile question a user can
+        ask, which is precisely backwards.
+        """
+        if not query or self.docs_client is None:
+            return None
+        # Its own slice, clamped by what preparation has left MINUS a reserve for
+        # the work that still follows it. Starting a call that cannot finish
+        # inside that spends latency to produce a timeout, and — worse — a lookup
+        # allowed to run the phase to zero converts this feature's soft failure
+        # into a hard one: the turn errors instead of answering unaided.
+        timeout = DOCS_LOOKUP_TIMEOUT_SECONDS
+        if budget is not None:
+            timeout = min(
+                timeout,
+                budget.remaining(TurnPhase.PREPARATION) - _DOCS_BUDGET_RESERVE_SECONDS,
+            )
+        if timeout < _DOCS_MIN_TIMEOUT_SECONDS:
+            logger.info("docs_lookup_skipped", request_id=request_id, reason="no_budget")
+            return None
+        started = time.perf_counter()
+        try:
+            # The httpx timeout bounds each I/O operation, not the call: a server
+            # that trickles a byte at a time resets it forever. This makes the
+            # slice a wall-clock bound, which is the only kind the phase budget
+            # can actually be protected by.
+            async with asyncio.timeout(timeout):
+                sections = await self.docs_client.search(query, timeout=timeout)
+        except TimeoutError:
+            logger.info(
+                "docs_lookup_timeout",
+                request_id=request_id,
+                timeout_ms=round(timeout * 1000),
+            )
+            return None
+        except DocsLookupError as exc:
+            logger.info(
+                "docs_lookup_failed",
+                request_id=request_id,
+                reason=str(exc),
+                elapsed_ms=round((time.perf_counter() - started) * 1000),
+            )
+            return None
+        except Exception:
+            # The docs server is a third party on the first-byte path. A shape we
+            # never anticipated must cost the turn its documentation, not the turn.
+            logger.exception("docs_lookup_unexpected", request_id=request_id)
+            return None
+        elapsed_ms = round((time.perf_counter() - started) * 1000)
+        if not sections:
+            logger.info("docs_lookup_empty", request_id=request_id, elapsed_ms=elapsed_ms)
+            return None
+        logger.info(
+            "docs_lookup",
+            request_id=request_id,
+            sections=len(sections),
+            paths=[s.path for s in sections],
+            elapsed_ms=elapsed_ms,
+        )
+        return DocsLookup(query=query, sections=sections)
 
     # ---- output linting (non-stream backstop; observability) ------------
 
@@ -1317,7 +1491,13 @@ class ChatOrchestrator:
         state: str,
         active_ids: list[str],
         newly_loaded_ids: list[str],
-        executions: list[SkillLoadExecution],
+        # Both kinds of server-run "tool call" the CLI renders as a prelude: a
+        # skill that loaded, and a documentation search that answered a usage
+        # question. They share the channel because they are the same thing from
+        # the client's side — work the server did before the model spoke.
+        # Sequence, not list: a caller with only skill loads should not have to
+        # widen its own list to hand it over.
+        executions: Sequence[SkillLoadExecution | DocsSearchExecution],
         decision: SelectionDecision,
         run_selector: bool,
         warnings: list[str],

@@ -45,6 +45,17 @@ def print_summary(doc: dict[str, Any]) -> None:
         f"errors  recall-miss trials={s['recall_miss_trials']}  "
         f"precision-extra trials={s['precision_extra_trials']}"
     )
+    docs = s.get("docs") or {}
+    if docs.get("scored_trials"):
+        # The two counts stay split: a missed lookup answers a product question
+        # from memory, a spurious one taxes every operational turn. One accuracy
+        # figure would let the two cancel.
+        print(
+            f"docs    {docs['correct_trials']}/{docs['scored_trials']} trials "
+            f"({_pct(docs['correct_trials'], docs['scored_trials'])})   "
+            f"missed={docs['missed_lookup_trials']}  "
+            f"spurious={docs['spurious_lookup_trials']}"
+        )
     print(
         f"latency mean={lat['mean']}s p50={lat['p50']}s p90={lat['p90']}s "
         f"p99={lat['p99']}s max={lat['max']}s"
@@ -61,7 +72,16 @@ def print_summary(doc: dict[str, Any]) -> None:
 
 
 def print_failures(doc: dict[str, Any], max_reason: int = 160) -> None:
-    failing = [c for c in doc["cases"] if c["pass_count"] < len(c["trials"])]
+    # A case fails if EITHER decision was wrong. Routing-only was the old rule,
+    # and it let a run print "No failing cases" directly under a summary line
+    # reporting docs misses — the one report shape that actively misleads.
+    failing = [
+        c
+        for c in doc["cases"]
+        if c["pass_count"] < len(c["trials"])
+        or (c["expect"].get("docs") is not None
+            and c.get("docs_pass_count", 0) < len(c["trials"]))
+    ]
     if not failing:
         print("\nNo failing cases.")
         return
@@ -73,10 +93,13 @@ def print_failures(doc: dict[str, Any], max_reason: int = 160) -> None:
             f"  active={case['active']} required={case['expect']['required']} "
             f"optional={case['expect']['optional']}"
         )
+        if case["expect"].get("docs") is not None:
+            print(f"  expect docs={case['expect']['docs']}")
         if case["note"]:
             print(f"  note: {case['note']}")
         for i, t in enumerate(case["trials"]):
-            if t["passed"]:
+            docs_wrong = t.get("docs_ok") is False
+            if t["passed"] and not docs_wrong:
                 continue
             problems = []
             if t["degraded"]:
@@ -85,6 +108,13 @@ def print_failures(doc: dict[str, Any], max_reason: int = 160) -> None:
                 problems.append(f"missing={t['missing']}")
             if t["extra"]:
                 problems.append(f"extra={t['extra']}")
+            if docs_wrong:
+                # Named by direction: a missed lookup and a spurious one are
+                # opposite problems with opposite fixes.
+                problems.append(
+                    f"docs SPURIOUS={t['docs_query']!r}" if t.get("docs_query")
+                    else "docs MISSED"
+                )
             print(f"  trial {i}: picked={t['picked']}  {' '.join(problems)}")
             if t["reason"]:
                 print(f"    reason: {t['reason'][:max_reason]}")

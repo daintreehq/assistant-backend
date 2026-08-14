@@ -135,11 +135,27 @@ def task_runner(
     )
 
 
+def detach_docs_client(container: Any) -> None:
+    """Cut a container's link to the LIVE documentation server.
+
+    `build_container` wires a real `DocsMcpClient` pointed at daintree.org, so a
+    test whose selector stub happens to return a `docs_query` would make a real
+    outbound call from the suite. Nothing today does, which is exactly why it
+    needs a guard rather than vigilance. Tests that exercise the lookup inject
+    their own client over a MockTransport (see tests/unit/test_docs_lookup.py).
+
+    Detaching also means the client is never used, so there is no pool to close.
+    """
+    container.orchestrator.docs_client = None
+
+
 @pytest.fixture
 def app(settings: Settings, fake_provider: FakeProvider) -> Any:
     """A FastAPI app with an injected fake provider, marked ready (no lifespan needed)."""
     application = create_app(settings=settings, provider=fake_provider)
-    application.state.container = build_container(settings, fake_provider)
+    container = build_container(settings, fake_provider)
+    detach_docs_client(container)
+    application.state.container = container
     application.state.ready = True
     return application
 
@@ -147,6 +163,11 @@ def app(settings: Settings, fake_provider: FakeProvider) -> Any:
 @pytest.fixture
 def client(app: Any) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
+        # Entering TestClient runs the app lifespan, which builds its OWN
+        # container and replaces the one the `app` fixture installed — so the
+        # detachment has to be reapplied to the container that actually serves
+        # these requests, not the one that was discarded.
+        detach_docs_client(app.state.container)
         yield test_client
 
 
