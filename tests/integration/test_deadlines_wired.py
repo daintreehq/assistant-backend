@@ -45,7 +45,9 @@ async def test_a_stalled_preparation_becomes_an_attributable_error(
         {
             "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
-            "input": {"messages": [{"role": "user", "content": "hi"}]},
+            # A substantive request: a bare greeting takes the no-task fast path
+            # and never reaches the selector, so it could not exercise this deadline.
+            "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},
         }
     )
@@ -122,7 +124,9 @@ async def test_a_stalled_stream_ends_with_a_terminal_error_not_a_fabricated_done
         {
             "protocol_version": 2,
             "session": {"id": "s", "turn_id": "t"},
-            "input": {"messages": [{"role": "user", "content": "hi"}]},
+            # A substantive request: a bare greeting takes the no-task fast path
+            # and never reaches the selector, so it could not exercise this deadline.
+            "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},
             "generation": {"stream": True},
         }

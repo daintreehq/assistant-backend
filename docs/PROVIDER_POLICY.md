@@ -303,6 +303,41 @@ disconnect until the response completes, so the handler waits for the client
 while the client waits for the handler. The total deadline bounds the waste.
 The streaming path has no such gap: `GeneratorExit` closes the upstream stream.
 
+## 5b. Skill selection — the no-task fast path, and why shortlisting waits
+
+The selector is a small-model call on the turn's first-byte path. Two ways to
+make it cheaper; one is shipped, one is deliberately not.
+
+**Shipped: the no-task fast path.** A cold opening turn whose message is a
+recognised greeting or acknowledgement skips the call entirely and clears the
+active set. It matches a **closed list of exact phrases**, not a vocabulary — a
+token-bag version accepted `"ok ｃｌｏｓｅ ａｌｌ ｔｅｒｍｉｎａｌｓ"` (an ASCII matcher saw
+only `ok`) and `"right all this"` (every word allowed, the combination an
+imperative). It also refuses whenever anything is in flight: an existing active
+set, a background wake, a goal, a workflow digest or run, async operations, or a
+resumed watcher. `tests/unit/test_no_task_fast_path.py` replays the whole
+selector benchmark corpus and fails on any case that declares a required skill.
+
+**Not shipped: candidate shortlisting.** Sending 6–10 lexically-retrieved
+candidates instead of all 26 skills would cut the ~8,900-token selector prompt
+substantially. It is not implemented because the saving is not obviously a win:
+
+> The catalog block is deliberately request-INVARIANT (`Catalog.selector_metadata`)
+> so the upstream can match a shared content prefix across calls. The selector
+> cannot use `prompt_cache_key` at all. Shortlisting makes that block vary per
+> request, trading a smaller prompt for the loss of prefix locality — and TTFT,
+> not token count, is the actual goal.
+
+That is a measurement, not an argument. The experiment that settles it: a
+sequential, endpoint-attributed A/B over the benchmark corpus comparing the full
+catalog against shortlist sizes 6/8/10, at concurrency 1, recording endpoint,
+selector latency, prompt tokens, **cached** tokens, repair calls and cost —
+scoring retrieval recall@K separately from end-to-end selection quality, and
+including both repeated-shortlist and changing-shortlist pairs so locality is
+actually exercised. The existing selector benchmark captures neither cached
+tokens nor endpoint attribution and runs at concurrency six, so it cannot answer
+this as written.
+
 ## 6. Failure mapping
 
 The caller must be able to tell *whose* problem a failure is: their key, their

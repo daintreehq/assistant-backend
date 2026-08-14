@@ -11,7 +11,7 @@ URL = "/v1/daintree/respond"
 
 
 def _body(**kwargs: object) -> dict:
-    return respond_body([{"role": "user", "content": "hi"}], session_id="s", turn_id="t1", **kwargs)
+    return respond_body([{"role": "user", "content": "rename my terminals"}], session_id="s", turn_id="t1", **kwargs)
 
 
 def _stream_body() -> dict:
@@ -67,7 +67,7 @@ def test_stream_open_retries_before_success(client, auth, fake_provider) -> None
         return FakeStream(
             [
                 {"id": "x", "object": "chat.completion.chunk", "created": 1, "model": "m",
-                 "choices": [{"index": 0, "delta": {"content": "hi"}, "finish_reason": None}]},
+                 "choices": [{"index": 0, "delta": {"content": "rename my terminals"}, "finish_reason": None}]},
                 {"id": "x", "object": "chat.completion.chunk", "created": 1, "model": "m",
                  "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
             ]
@@ -132,7 +132,7 @@ def test_stream_closes_upstream_on_completion(client, auth, fake_provider) -> No
     fake_provider.selection_result = selection_result([])
     fake_provider.stream_chunks = [
         {"id": "x", "object": "chat.completion.chunk", "created": 1, "model": "m",
-         "choices": [{"index": 0, "delta": {"content": "hi"}, "finish_reason": "stop"}]},
+         "choices": [{"index": 0, "delta": {"content": "rename my terminals"}, "finish_reason": "stop"}]},
     ]
     with client.stream("POST", URL, headers=auth, json=_stream_body()) as s:
         list(s.iter_text())

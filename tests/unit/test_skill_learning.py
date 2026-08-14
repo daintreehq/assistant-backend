@@ -977,7 +977,7 @@ async def test_ineligible_short_conversation_skips_gate(tmp_path: Path) -> None:
     fake = _provider(GATE_CREATE, PROPOSAL_CREATE)
     learner, _, _ = _learner(tmp_path, fake)
     # No assistant message → not eligible → gate never runs.
-    req = _request([{"role": "user", "content": "hi"}])
+    req = _request([{"role": "user", "content": "rename my terminals"}])
     outcome = await learner.run(api_key=TEST_API_KEY, request=req, active_ids=[])
     assert outcome.changed is False
     assert fake.requests == []

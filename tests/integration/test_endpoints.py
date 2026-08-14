@@ -261,7 +261,7 @@ def test_authed_routes_reject_missing_and_malformed_bearer(client) -> None:
         r = client.post(
             "/v1/daintree/respond",
             headers=headers,
-            json=respond_body([{"role": "user", "content": "hi"}]),
+            json=respond_body([{"role": "user", "content": "rename my terminals"}]),
         )
         assert r.status_code == 401
         r = client.post(
@@ -346,7 +346,7 @@ def test_streaming_turn_carries_the_caller_key(client, fake_provider) -> None:
     from conftest import parse_sse, respond_body
 
     fake_provider.selection_result = selection_result([])
-    body = respond_body([{"role": "user", "content": "hi"}], generation={"stream": True})
+    body = respond_body([{"role": "user", "content": "rename my terminals"}], generation={"stream": True})
     with client.stream(
         "POST",
         "/v1/daintree/respond",

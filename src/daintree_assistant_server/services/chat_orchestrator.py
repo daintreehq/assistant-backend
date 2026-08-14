@@ -48,6 +48,7 @@ from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, 
 from ..providers.policy import RoutingPreference, routing_preference
 from ..providers.retry import retry_upstream
 from ..skills.catalog import Catalog, CatalogManager
+from ..skills.fast_path import can_skip_selection
 from ..skills.load_events import SkillLoadExecution
 from ..skills.selector import SelectionDecision, Selector
 from ..state.codec import StateCodec
@@ -255,7 +256,12 @@ def resolve_active_skills(
     already carries its foundation, so a continuation round never surfaces a surprise
     foundation load.
     """
-    if decision.ran and not decision.degraded:
+    # Authority, not merely "did a call happen". A successful selector run is
+    # authoritative; so is the no-task fast path, which reaches the same answer
+    # without a call. Deriving authority from `ran` alone silently turned the
+    # fast path's empty result into a REUSE of the prior set — the opposite of
+    # the clear it advertised.
+    if (decision.ran or decision.authoritative) and not decision.degraded:
         # authoritative — replaces the prior set, admitted as foundation-paired units
         active, dropped = _admit_with_domain_foundations(
             decision.skill_ids, catalog, max_active
@@ -1055,7 +1061,26 @@ class ChatOrchestrator:
                 verification.payload.active_ids()
             )
 
-        run_selector = self._should_run_selector(
+        # The deterministic no-task fast path. A greeting or a bare acknowledgement
+        # needs no runbook, and concluding that with a model call costs a round
+        # trip on the turn a tester judges the product's speed by.
+        #
+        # It CLEARS rather than reuses, which is what separates it from an
+        # ordinary skipped-selector round: the turn has no task, so carrying a
+        # workflow skill into it would keep a finished workflow loaded. That is
+        # also exactly what the selector is instructed to return here.
+        #
+        # `selection.force` and `policy == "always"` still win — a client asking
+        # for selection gets selection.
+        no_task = can_skip_selection(request, prior_active_ids=prior_active_ids)
+        if no_task:
+            logger.info(
+                "selector_fast_path",
+                request_id=request_id,
+                reason="no_task",
+            )
+
+        run_selector = not no_task and self._should_run_selector(
             force=request.selection.force,
             policy=request.selection.policy,
             state_valid=verification.valid,
@@ -1200,6 +1225,13 @@ class ChatOrchestrator:
                     await speculation.discard()
                     speculation_outcome = "selector_exception"
                 raise
+        elif no_task:
+            # CLEAR, not reuse. A greeting or acknowledgement has no task, so a
+            # workflow skill left loaded would follow a finished workflow into an
+            # unrelated conversation — and `resolve_active_skills` treats an
+            # authoritative empty result as "clear", which is exactly what the
+            # selector itself is told to return for these turns.
+            decision = SelectionDecision.cleared()
         else:
             decision = SelectionDecision.reuse(prior_active_ids)
         try:

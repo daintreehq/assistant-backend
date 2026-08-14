@@ -118,7 +118,7 @@ def test_structured_startup_reaches_main_model_but_not_selector(
 def test_scenario2_no_relevant_skill_no_prelude(client, auth, fake_provider) -> None:
     fake_provider.selection_result = selection_result([])
     r = client.post(URL, headers=auth, json=respond_body(
-        [{"role": "user", "content": "hello"}], session_id="s2", turn_id="t1",
+        [{"role": "user", "content": "rename my terminals"}], session_id="s2", turn_id="t1",
     ))
     meta = meta_of(r.json())
     assert meta["active_skills"] == []
@@ -314,7 +314,7 @@ def test_nonstream_surfaces_reasoning_content(client, auth, fake_provider) -> No
     fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = make_result(content="done", reasoning_content="my cot")
     r = client.post(URL, headers=auth, json=respond_body(
-        [{"role": "user", "content": "hi"}], session_id="rc1", turn_id="t1",
+        [{"role": "user", "content": "rename my terminals"}], session_id="rc1", turn_id="t1",
     ))
     assert r.status_code == 200
     assert r.json()["message"]["reasoning_content"] == "my cot"
@@ -324,7 +324,7 @@ def test_nonstream_omits_reasoning_content_when_absent(client, auth, fake_provid
     fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = make_result(content="done")
     r = client.post(URL, headers=auth, json=respond_body(
-        [{"role": "user", "content": "hi"}], session_id="rc1b", turn_id="t1",
+        [{"role": "user", "content": "rename my terminals"}], session_id="rc1b", turn_id="t1",
     ))
     assert "reasoning_content" not in r.json()["message"]
 
@@ -341,7 +341,7 @@ def test_stream_surfaces_reasoning_content(client, auth, fake_provider) -> None:
         },
     ]
     body = respond_body(
-        [{"role": "user", "content": "hi"}], session_id="rc2", turn_id="t1",
+        [{"role": "user", "content": "rename my terminals"}], session_id="rc2", turn_id="t1",
         generation={"stream": True},
     )
     with client.stream("POST", URL, headers=auth, json=body) as s:
@@ -362,7 +362,7 @@ def test_stream_surfaces_reasoning_content(client, auth, fake_provider) -> None:
 def test_missing_session_rejected_422(client, auth) -> None:
     # The native protocol has no stateless mode: session is required by schema.
     r = client.post(URL, headers=auth, json={
-        "protocol_version": 2, "input": {"messages": [{"role": "user", "content": "hi"}]},
+        "protocol_version": 2, "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
     })
     assert r.status_code == 400  # RequestValidationError -> invalid_request_error
 
@@ -1036,7 +1036,7 @@ def test_request_id_is_unified_across_header_and_meta(client, auth, fake_provide
     fake_provider.selection_result = selection_result([])
     fake_provider.stream_chunks = make_text_chunks("hi")
     body = respond_body(
-        [{"role": "user", "content": "hi"}], session_id="rid1", turn_id="t1",
+        [{"role": "user", "content": "rename my terminals"}], session_id="rid1", turn_id="t1",
         generation={"stream": True},
     )
     # No client-supplied id: the middleware mints one and everything uses it.

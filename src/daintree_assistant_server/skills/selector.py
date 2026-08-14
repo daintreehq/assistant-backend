@@ -84,6 +84,13 @@ class SelectionDecision:
     endpoint: str | None = None
     calls: int = 0
     warnings: list[str] = None  # type: ignore[assignment]
+    # Whether ``skill_ids`` REPLACES the prior active set rather than being
+    # reused alongside it. A successful selector run is authoritative by
+    # definition; the no-task fast path is authoritative WITHOUT having run, so
+    # authority cannot be derived from ``ran`` alone. Keeping them separate is
+    # what lets the fast path clear the set without claiming a selector call
+    # happened — which would falsify the selector telemetry.
+    authoritative: bool = False
 
     def __post_init__(self) -> None:
         if self.warnings is None:
@@ -92,6 +99,16 @@ class SelectionDecision:
     @classmethod
     def reuse(cls, active_ids: list[str]) -> SelectionDecision:
         return cls(skill_ids=list(active_ids), ran=False, degraded=False)
+
+    @classmethod
+    def cleared(cls) -> SelectionDecision:
+        """No task: clear the active set without running the selector.
+
+        ``ran=False`` because none did — the timing and call counters must stay
+        honest — but ``authoritative=True`` because this IS the answer for the
+        turn, not a fallback to whatever was loaded before.
+        """
+        return cls(skill_ids=[], ran=False, degraded=False, authoritative=True)
 
     @classmethod
     def degraded_open(

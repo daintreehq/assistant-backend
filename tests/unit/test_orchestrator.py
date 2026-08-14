@@ -462,7 +462,7 @@ async def test_stream_meta_is_yielded_before_upstream_open(
         {
             "protocol_version": 2,
             "session": {"id": "stream-session", "turn_id": "turn-1"},
-            "input": {"messages": [{"role": "user", "content": "hello"}]},
+            "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},
             "generation": {"stream": True},
         }
@@ -1396,7 +1396,7 @@ def _basic_stream_request(session_id: str = "hb-session") -> RespondRequest:
         {
             "protocol_version": 2,
             "session": {"id": session_id, "turn_id": "turn-1"},
-            "input": {"messages": [{"role": "user", "content": "hello"}]},
+            "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},
             "generation": {"stream": True},
         }
