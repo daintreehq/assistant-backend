@@ -7,8 +7,10 @@ free of stray hidden metadata.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -79,13 +81,45 @@ class SkillMeta(BaseModel):
         return out
 
 
+def content_hash_of(meta: SkillMeta, normalized_body: str) -> str:
+    """The identity of a skill's *content* — metadata plus body.
+
+    Feeds ``Catalog.revision`` (so a rewritten skill busts client-side skill
+    state) and keys the assembler's rendered-skill cache. Both depend on it being
+    derived from the current body rather than carried alongside it.
+    """
+    canonical = json.dumps(
+        meta.model_dump(mode="json"),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    digest = hashlib.sha256(
+        (canonical + "\n---\n" + normalized_body).encode("utf-8")
+    ).hexdigest()
+    return f"sha256:{digest}"
+
+
 @dataclass(frozen=True)
 class Skill:
-    """A fully-loaded skill: validated metadata, normalized body, content hash."""
+    """A fully-loaded skill: validated metadata, normalized body, content hash.
+
+    ``content_hash`` is DERIVED, not supplied. It was a plain field, which meant
+    ``dataclasses.replace(skill, body=...)`` produced a skill whose stored hash
+    described the old body — and the rendered-skill cache keys on that hash, so
+    such an object would have served the previous runbook while the catalog
+    reported the new one. Deriving it makes that state unconstructable rather
+    than merely unreached.
+    """
 
     meta: SkillMeta
     body: str
-    content_hash: str
+    content_hash: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        # object.__setattr__ because the dataclass is frozen; this is the
+        # documented way to populate a derived field on a frozen dataclass.
+        object.__setattr__(self, "content_hash", content_hash_of(self.meta, self.body))
 
     @property
     def id(self) -> str:

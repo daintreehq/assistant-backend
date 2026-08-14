@@ -438,9 +438,14 @@ def test_readiness_rejects_a_task_whose_prompt_file_is_missing(tmp_path, monkeyp
     src = Path(__file__).resolve().parents[2] / "src" / "daintree_assistant_server" / "prompts"
     staged = tmp_path / "prompts"
     shutil.copytree(src, staged)
-    loader = PromptLoader(staged)
-    loader.validate()  # baseline: the real prompt set validates
+    PromptLoader(staged).validate()  # baseline: the real prompt set validates
 
+    # Delete, then build a FRESH loader — which is the real lifecycle. Prompt
+    # bodies are read once at construction (they are immutable packaged files and
+    # the loader is a process-wide singleton), so the deployment that matters is
+    # "the file was missing when the process started", not "someone unlinked it
+    # mid-run". Reusing the old loader here would only prove that an in-memory
+    # copy survives a deletion, which is the intended behaviour, not a bug.
     (staged / "tasks" / "checkpoint.md").unlink()
     with pytest.raises(PromptError, match="checkpoint"):
-        loader.validate()
+        PromptLoader(staged).validate()

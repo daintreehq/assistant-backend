@@ -26,7 +26,7 @@ from pydantic import SecretStr
 from ..config import OPENROUTER_MODEL, Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
-from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
+from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader, RenderCache
 from ..providers.base import (
     ChatProvider,
     ProviderChatRequest,
@@ -302,6 +302,7 @@ class Selector:
         self.prompt_loader = prompt_loader
         self.catalog_manager = catalog_manager
         self.settings = settings
+        self._system_cache = RenderCache(maxsize=64)
 
     @property
     def catalog(self) -> Catalog:
@@ -326,12 +327,7 @@ class Selector:
         # whenever it does, so the upstream can only match a shared content prefix —
         # which an inline "(currently active)" marker on an early-sorting skill
         # used to break for most of the prompt on every turn.
-        system = self.prompt_loader.render(
-            TEMPLATE_SELECTOR_SYSTEM,
-            catalog=catalog.selector_metadata(),
-            active_ids=catalog.filter_known(active_ids),
-            max_active=self.settings.max_active_skills,
-        )
+        system = self._render_system(catalog, catalog.filter_known(active_ids))
         evidence, _truncated = sanitize_for_selector(
             conversation, self.settings.selector_context_tokens
         )
@@ -341,6 +337,34 @@ class Selector:
             {"role": "user", "content": user},
         ]
         return await self._run(messages, api_key, routing)
+
+    def _render_system(self, catalog: Catalog, active_ids: list[str]) -> str:
+        """The selector system prompt, memoised.
+
+        The largest render on the turn's first-byte path — the whole catalog as a
+        classification menu, ~28 KB across 26 skills — and a pure function of
+        (catalog revision, active set, cap). The catalog block is deliberately
+        request-invariant, so the only thing that varies between calls is the
+        short trailing active-set line, and consecutive turns in a session
+        usually share even that.
+
+        Keyed on the catalog REVISION rather than held on the catalog object,
+        because skill learning can swap the catalog underneath at any time: a
+        stale entry then simply never matches, instead of serving a menu that no
+        longer describes the skills that exist.
+        """
+        key = (catalog.revision, str(self.settings.max_active_skills), *active_ids)
+        cached = self._system_cache.get(key)
+        if cached is not None:
+            return cached
+        rendered = self.prompt_loader.render(
+            TEMPLATE_SELECTOR_SYSTEM,
+            catalog=catalog.selector_metadata(),
+            active_ids=active_ids,
+            max_active=self.settings.max_active_skills,
+        )
+        self._system_cache.put(key, rendered)
+        return rendered
 
     def _build_request(
         self,

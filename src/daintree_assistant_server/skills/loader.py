@@ -7,8 +7,6 @@ which the startup path turns into a readiness failure.
 
 from __future__ import annotations
 
-import hashlib
-import json
 from pathlib import Path
 
 import yaml
@@ -73,21 +71,10 @@ def parse_skill(text: str, *, expected_id: str | None = None) -> Skill:
             f"skill id {meta.id!r} does not match filename id {expected_id!r}"
         )
 
-    content_hash = _content_hash(meta, body)
-    return Skill(meta=meta, body=body, content_hash=content_hash)
-
-
-def _content_hash(meta: SkillMeta, normalized_body: str) -> str:
-    canonical = json.dumps(
-        meta.model_dump(mode="json"),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    digest = hashlib.sha256(
-        (canonical + "\n---\n" + normalized_body).encode("utf-8")
-    ).hexdigest()
-    return f"sha256:{digest}"
+    # The hash is derived inside Skill.__post_init__ — see models.py. It used to
+    # be computed here and passed in, which left `dataclasses.replace` able to
+    # produce a skill whose stored hash described a body it no longer had.
+    return Skill(meta=meta, body=body)
 
 
 def load_skill_file(path: Path) -> Skill:

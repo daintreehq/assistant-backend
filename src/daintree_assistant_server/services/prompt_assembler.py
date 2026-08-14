@@ -45,6 +45,7 @@ from ..prompts.loader import (
     TEMPLATE_STARTUP_CONTEXT,
     TEMPLATE_TURN_FOOTER,
     PromptLoader,
+    RenderCache,
 )
 from ..providers.base import ProviderChatRequest
 from ..providers.policy import routing_preference
@@ -143,6 +144,10 @@ class PromptAssembler:
     def __init__(self, prompt_loader: PromptLoader, settings: Settings) -> None:
         self.prompts = prompt_loader
         self.settings = settings
+        # Bounded: a runaway key space would be a slow memory leak in a process
+        # that is meant to be stateless. Sized well above the number of distinct
+        # active-skill sets a busy instance sees.
+        self._loaded_skills_cache = RenderCache(maxsize=64)
 
     # ---- system message rendering --------------------------------------
 
@@ -410,9 +415,26 @@ class PromptAssembler:
         return capped
 
     def render_loaded_skills(self, skills: list[Skill]) -> str:
-        return self.prompts.render(
-            TEMPLATE_LOADED_SKILLS, loaded_skills=skills_in_render_order(skills)
-        )
+        """The active skill bodies, rendered — memoised by content.
+
+        This is the largest per-request render in the assembler (skill bodies run
+        to tens of kilobytes), and it is a pure function of which skills are
+        active: the same ordered set always produces the same bytes. Sessions
+        converge on a handful of skill sets, so the hit rate is high.
+
+        Keyed on each skill's CONTENT hash, not its id. Ids are stable across a
+        skill-learning rewrite while the body changes underneath, so an id-keyed
+        cache would serve the pre-rewrite body until the process restarted — the
+        one failure mode a cache here could actually cause.
+        """
+        ordered = skills_in_render_order(skills)
+        key = tuple(s.content_hash for s in ordered)
+        cached = self._loaded_skills_cache.get(key)
+        if cached is not None:
+            return cached
+        rendered = self.prompts.render(TEMPLATE_LOADED_SKILLS, loaded_skills=ordered)
+        self._loaded_skills_cache.put(key, rendered)
+        return rendered
 
     def render_response_contract(self) -> str:
         """The output-shape contract — the final STABLE system block before the
