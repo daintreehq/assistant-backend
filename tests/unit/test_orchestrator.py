@@ -1153,7 +1153,11 @@ async def test_cleanup_timeout_keeps_capacity_until_resistant_producer_finishes(
     fake_provider: FakeProvider,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(orchestrator_module, "_SPECULATION_CLOSE_TIMEOUT_SECONDS", 0.01)
+    # The constant now lives with the speculation machinery it bounds; patching
+    # the orchestrator module would silently no-op.
+    from daintree_assistant_server.services import speculation as speculation_module
+
+    monkeypatch.setattr(speculation_module, "_SPECULATION_CLOSE_TIMEOUT_SECONDS", 0.01)
     ids = sorted(orchestrator.catalog.known_ids)
     started, release_selector = _gate_selector(
         monkeypatch,

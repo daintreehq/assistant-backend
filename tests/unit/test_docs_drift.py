@@ -821,10 +821,8 @@ def test_the_documented_total_is_a_sum_of_both_calls() -> None:
     from daintree_assistant_server.contracts.daintree_api import SkillsBlock
     from daintree_assistant_server.contracts.extensions import SelectorMeta, SelectorUsage
     from daintree_assistant_server.providers.base import ProviderUsage
-    from daintree_assistant_server.services.chat_orchestrator import (
-        ChatOrchestrator,
-        _RespondMeta,
-    )
+    from daintree_assistant_server.services.chat_orchestrator import _RespondMeta
+    from daintree_assistant_server.services.turn_accounting import turn_cost
 
     meta = _RespondMeta(
         request_id="r",
@@ -836,7 +834,7 @@ def test_the_documented_total_is_a_sum_of_both_calls() -> None:
         ),
         warnings=[],
     )
-    cost = ChatOrchestrator._turn_cost(ProviderUsage(cost=0.0021), meta)
+    cost = turn_cost(ProviderUsage(cost=0.0021), meta)
     assert cost is not None
     assert cost.total == pytest.approx(0.0025)
     assert cost.main == 0.0021

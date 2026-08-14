@@ -17,7 +17,12 @@ from __future__ import annotations
 import pytest
 
 from daintree_assistant_server.providers.base import ProviderUsage
-from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
+from daintree_assistant_server.services.turn_accounting import (
+    response_usage,
+    sum_usage,
+    turn_cost,
+    turn_cost_with_speculation,
+)
 
 # Captured verbatim from a live deepseek/deepseek-v4-flash-0731 call.
 LIVE_USAGE = {
@@ -55,7 +60,7 @@ def test_an_unreported_cost_stays_none_rather_than_zero() -> None:
     """
     usage = ProviderUsage.from_wire({"prompt_tokens": 6, "completion_tokens": 5})
     assert usage.cost is None
-    assert ChatOrchestrator._usage(usage).cost is None
+    assert response_usage(usage).cost is None
 
 
 def test_a_non_numeric_cost_does_not_break_the_response() -> None:
@@ -70,7 +75,7 @@ def test_a_discarded_attempt_is_still_billed_to_the_caller() -> None:
     Same reason the token counts are summed rather than replaced — the caller's
     key funded the generation we threw away.
     """
-    summed = ChatOrchestrator._sum_usage(
+    summed = sum_usage(
         ProviderUsage(prompt_tokens=100, cost=0.002),
         ProviderUsage(prompt_tokens=120, cost=0.003),
     )
@@ -80,13 +85,13 @@ def test_a_discarded_attempt_is_still_billed_to_the_caller() -> None:
 
 def test_summing_preserves_not_reported() -> None:
     """`None` must survive when NEITHER side reported, and defer when one did."""
-    assert ChatOrchestrator._sum_usage(ProviderUsage(), ProviderUsage()).cost is None
-    assert ChatOrchestrator._sum_usage(ProviderUsage(cost=0.002), ProviderUsage()).cost == 0.002
-    assert ChatOrchestrator._sum_usage(ProviderUsage(), ProviderUsage(cost=0.003)).cost == 0.003
+    assert sum_usage(ProviderUsage(), ProviderUsage()).cost is None
+    assert sum_usage(ProviderUsage(cost=0.002), ProviderUsage()).cost == 0.002
+    assert sum_usage(ProviderUsage(), ProviderUsage(cost=0.003)).cost == 0.003
 
 
 def test_the_response_usage_carries_cost_through() -> None:
-    out = ChatOrchestrator._usage(ProviderUsage(prompt_tokens=10, cached_tokens=8, cost=0.004))
+    out = response_usage(ProviderUsage(prompt_tokens=10, cached_tokens=8, cost=0.004))
     assert out.cost == 0.004
     assert out.cached_tokens == 8
 
@@ -121,7 +126,7 @@ def test_a_selector_that_ran_without_reporting_cost_makes_the_total_incomplete()
     """
     from daintree_assistant_server.contracts.extensions import SelectorUsage
 
-    cost = ChatOrchestrator._turn_cost(
+    cost = turn_cost(
         ProviderUsage(cost=0.002), _meta(SelectorUsage(prompt_tokens=3000, cost=None))
     )
     assert cost is not None
@@ -135,7 +140,7 @@ def test_a_turn_that_skipped_selection_is_still_complete() -> None:
     The no-task fast path and continuation rounds skip selection entirely. Their
     missing selector cost is not a gap and must not degrade the turn's total.
     """
-    cost = ChatOrchestrator._turn_cost(ProviderUsage(cost=0.002), _meta(None))
+    cost = turn_cost(ProviderUsage(cost=0.002), _meta(None))
     assert cost is not None
     assert cost.total == 0.002
     assert cost.complete is True
@@ -144,7 +149,7 @@ def test_a_turn_that_skipped_selection_is_still_complete() -> None:
 def test_both_components_known_is_complete() -> None:
     from daintree_assistant_server.contracts.extensions import SelectorUsage
 
-    cost = ChatOrchestrator._turn_cost(
+    cost = turn_cost(
         ProviderUsage(cost=0.002), _meta(SelectorUsage(cost=0.0004))
     )
     assert cost is not None
@@ -207,7 +212,7 @@ def test_a_losing_speculation_is_billed_into_the_turn() -> None:
     """
     from daintree_assistant_server.contracts.extensions import SelectorUsage
 
-    cost = ChatOrchestrator._turn_cost_with_speculation(
+    cost = turn_cost_with_speculation(
         ProviderUsage(cost=0.002),
         _meta(SelectorUsage(cost=0.0004)),
         discarded_usage=ProviderUsage(cost=0.001),
@@ -226,7 +231,7 @@ def test_a_speculation_cancelled_before_reporting_makes_the_total_a_floor() -> N
     total that admits it is incomplete — not one that pretends the discarded
     generation was free.
     """
-    cost = ChatOrchestrator._turn_cost_with_speculation(
+    cost = turn_cost_with_speculation(
         ProviderUsage(cost=0.002),
         _meta(None),
         discarded_usage=ProviderUsage(),

@@ -13,8 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections import deque
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -26,7 +25,6 @@ from ..contracts.daintree_api import (
     RespondMessage,
     RespondRequest,
     RespondResponse,
-    RespondUsage,
     SkillsBlock,
     StreamDelta,
     StreamDone,
@@ -48,6 +46,11 @@ from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
 from ..providers.policy import RoutingPreference, routing_preference
 from ..providers.retry import retry_upstream
+from ..skills.active_set import (
+    filter_dedup_cap,
+    merge_active_skills,
+    resolve_active_skills,
+)
 from ..skills.catalog import Catalog, CatalogManager
 from ..skills.fast_path import can_skip_selection
 from ..skills.load_events import SkillLoadExecution
@@ -60,16 +63,25 @@ from .deadlines import DeadlineExceeded, RequestBudget, TurnPhase
 from .output_policy import lint_output, repair_tables
 from .prompt_assembler import PromptAssembler, render_order_ids
 from .skill_learning import SkillLearner
+from .speculation import (
+    _PrepOwnedStream,
+    _SpeculativeStream,
+)
 from .tool_call_repair import (
     ParameterIndex,
     StreamToolCallBuffer,
     build_parameter_index,
     repair_tool_call_arguments,
 )
+from .turn_accounting import (
+    log_turn_usage,
+    response_usage,
+    sum_usage,
+    turn_cost_with_speculation,
+)
 
 logger = get_logger("daintree.respond")
 
-_SPECULATION_CLOSE_TIMEOUT_SECONDS = 2.0
 
 # Sent as the sole addition to a re-rolled round whose first draft announced an
 # action and emitted no tool call (issue #25). Phrased to correct the behavior
@@ -86,193 +98,6 @@ _BARE_INTENT_NUDGE: dict[str, Any] = {
     ),
 }
 
-
-@dataclass(frozen=True)
-class ActiveSkillSet:
-    """A resolved active set, plus what the ``max_active`` budget actually cost.
-
-    ``dropped_over_cap`` is the observability half: ids a caller asked for that the
-    cap refused. Unknown and duplicate ids are NOT reported there — they carry no
-    capacity signal.
-
-    One caveat if this field is ever wired to a metric or a warning: on the explicit
-    ``skill.load`` path (:func:`merge_active_skills`) the candidate list is
-    ``selected + prior``, so what lands here is *previously active skills evicted to
-    make room*, not *requested skills the cap refused*. Same field, different meaning —
-    split it before treating the two as one number.
-    """
-
-    active: list[str]
-    newly_loaded: list[str]
-    dropped_over_cap: list[str]
-
-
-def _filter_dedup_cap(
-    candidate: Sequence[str], catalog: Catalog, max_active: int
-) -> tuple[list[str], list[str]]:
-    """Keep the first ``max_active`` known, de-duplicated ids in order.
-
-    This is the VERBATIM path: a continuation round, a fail-open selector, and the
-    explicit-load merge all reuse a set exactly as given. Foundation pairing belongs
-    only to an authoritative selection (see :func:`_admit_with_domain_foundations`),
-    so a mid-workflow round never surfaces a surprise load.
-
-    Returns ``(active, dropped_over_cap)``.
-    """
-    active: list[str] = []
-    seen: set[str] = set()
-    dropped: list[str] = []
-    for sid in candidate:
-        if sid in seen or sid not in catalog:
-            continue
-        seen.add(sid)
-        # Check the cap BEFORE admitting — appending first and breaking after would
-        # always let one id through, even at max_active == 0. Unknown and duplicate
-        # ids are filtered ABOVE this check so they never consume capacity, and a
-        # refused id is RECORDED rather than breaking the scan, so the structured log
-        # reports everything the cap actually cost instead of just the first casualty.
-        if len(active) >= max_active:
-            dropped.append(sid)
-            continue
-        active.append(sid)
-    return active, dropped
-
-
-def _admit_with_domain_foundations(
-    candidate: Sequence[str], catalog: Catalog, max_active: int
-) -> tuple[list[str], list[str]]:
-    """Budget-aware ATOMIC-UNIT admission of an authoritative selection.
-
-    Pairing used to append every missing domain foundation and then truncate to
-    ``max_active`` — which, at full capacity, was deterministically DEAD CODE: the
-    selector already truncates its own output to ``max_active``, so whenever the
-    classifier returned a full set without the foundation, the appended foundation
-    was GUARANTEED to be the first id the cap discarded. Pairing was not "outranked
-    by explicit picks"; it simply never ran when it mattered, leaving front-loading
-    model-dependent — the exact opposite of why it exists. Worse, a new full
-    selection silently EVICTED an already-active foundation mid-workflow (and, per
-    the assembler's cache rules, forced a full tools+conversation re-encode). The
-    selector prompt's own tie-break puts the domain foundation ABOVE the marginal
-    specific; this now matches it.
-
-    The fix is unit admission, not slot reservation. Each selected specific is
-    walked in rank order and admitted as one atomic unit — itself plus its domain
-    foundation when that foundation is not already admitted — and only while the
-    remaining budget fits the WHOLE unit. A unit that does not fit is skipped and
-    the next specific is tried: a later specific whose foundation is already
-    admitted costs one slot and can still fill the gap. Naively reserving a slot
-    for the foundation is wrong in both directions — with three cross-domain
-    specifics and a cap of three it evicts the third specific AND then drops the
-    reserved-but-unclaimed foundation, returning two skills against a budget of
-    three. Here no slot is ever reserved for a foundation that is then discarded.
-
-    Every admitted skill's domain foundation is itself admitted, which holds even
-    when the catalog resolves a foundation for EVERY id (a prefix walk-up).
-
-    The policy is RANK RETENTION, not maximum cardinality, and the two can disagree
-    once a catalog holds more than one foundation. With foundations ``a.base`` and
-    ``b.base``, a selection of ``[a.one, b.one, b.two]`` and a cap of 3, this admits
-    ``[a.one, a.base]`` and stops — both ``b.*`` units cost two at the moment they are
-    considered. ``[b.one, b.base, b.two]`` is closed and fills all three slots, but
-    reaching it means dropping the classifier's TOP-ranked pick to fit two lower-ranked
-    ones. The selector returns best-match-first, so its first id is the strongest signal
-    on the turn and keeping it wins. Deliberate — do not "fix" this with a subset search.
-
-    Returns ``(active, dropped_over_cap)``; unknown and duplicate ids are dropped
-    silently, as before.
-    """
-    active: list[str] = []
-    admitted: set[str] = set()
-    dropped: list[str] = []
-    considered: set[str] = set()
-    for sid in candidate:
-        if sid in considered or sid not in catalog:
-            continue
-        considered.add(sid)
-        if sid in admitted:
-            continue
-        unit = [sid]
-        foundation_id = catalog.domain_foundation(sid)
-        if (
-            foundation_id is not None
-            and foundation_id != sid
-            and foundation_id not in admitted
-            and foundation_id in catalog
-        ):
-            unit.append(foundation_id)
-        if len(active) + len(unit) > max_active:
-            # The unit does not fit. Skip it (never a partial admission) and try
-            # the next specific, which may be cheaper because its foundation is
-            # already in.
-            dropped.append(sid)
-            continue
-        for uid in unit:
-            admitted.add(uid)
-            active.append(uid)
-    return active, dropped
-
-
-def merge_active_skills(
-    selected_ids: list[str],
-    prior_active_ids: list[str],
-    catalog: Catalog,
-    max_active: int,
-) -> ActiveSkillSet:
-    """Additive, new-first merge — the EXPLICIT-load path (``resolve`` action ``load``).
-
-    A caller that already knows which skills to ADD on top of the prior set uses this;
-    the prior set is preserved and the new ids land first. The automatic per-turn path
-    uses :func:`resolve_active_skills` instead, where a selector run is authoritative.
-
-    Foundation closure applies here TOO, via the same unit admission. This path signs a
-    state token, and the reuse/degraded paths then replay that set verbatim on the
-    strength of "a prior set already carries its foundation" — so an unclosed set minted
-    here would propagate a foundation-less active set through every following round.
-    """
-    candidate = list(selected_ids) + [p for p in prior_active_ids if p not in selected_ids]
-    active, dropped = _admit_with_domain_foundations(candidate, catalog, max_active)
-    newly = [sid for sid in active if sid not in prior_active_ids]
-    return ActiveSkillSet(active=active, newly_loaded=newly, dropped_over_cap=dropped)
-
-
-def resolve_active_skills(
-    decision: SelectionDecision,
-    prior_active_ids: list[str],
-    catalog: Catalog,
-    max_active: int,
-) -> ActiveSkillSet:
-    """Per-turn active set from a selection decision (section 7.9).
-
-    A SUCCESSFUL selector run is authoritative: its ``skill_ids`` ARE the complete
-    active set for this instruction — a topic-shift replacement, so an empty list
-    clears all prior skills. When the selector did NOT run (a tool-continuation round,
-    ``SelectionDecision.reuse``) or failed OPEN (``degraded``), the prior active set is
-    reused unchanged — a classifier hiccup never evicts an in-progress runbook. The
-    paired selector prompt therefore instructs the model to re-list any active skill it
-    wants to keep.
-
-    On an authoritative run the selection is admitted as specific+foundation UNITS
-    (:func:`_admit_with_domain_foundations`) so a foundation loads on the SAME turn its
-    specific is selected, not a turn late, and can never be squeezed out by the cap.
-    The reuse/degraded path is left untouched: a prior set resolved on a successful run
-    already carries its foundation, so a continuation round never surfaces a surprise
-    foundation load.
-    """
-    # Authority, not merely "did a call happen". A successful selector run is
-    # authoritative; so is the no-task fast path, which reaches the same answer
-    # without a call. Deriving authority from `ran` alone silently turned the
-    # fast path's empty result into a REUSE of the prior set — the opposite of
-    # the clear it advertised.
-    if (decision.ran or decision.authoritative) and not decision.degraded:
-        # authoritative — replaces the prior set, admitted as foundation-paired units
-        active, dropped = _admit_with_domain_foundations(
-            decision.skill_ids, catalog, max_active
-        )
-    else:
-        # reuse (no run) / fail-open (degraded) — verbatim, never re-paired
-        active, dropped = _filter_dedup_cap(prior_active_ids, catalog, max_active)
-    newly = [sid for sid in active if sid not in prior_active_ids]
-    return ActiveSkillSet(active=active, newly_loaded=newly, dropped_over_cap=dropped)
 
 
 @dataclass
@@ -331,409 +156,11 @@ class _PreparedTurn:
     # turn is a foot-gun waiting for the first caller that writes to it.
     projection: ToolProjection = field(default_factory=ToolProjection)
     # Spend on a speculative generation this turn opened and then threw away.
-    # Billed to the caller either way; see `_turn_cost`.
+    # Billed to the caller either way; see `turn_accounting.turn_cost`.
     discarded_usage: ProviderUsage = field(default_factory=ProviderUsage)
     # True when such a generation happened at all, which is what distinguishes
     # "no speculation" from "speculation whose cost we could not read".
     speculation_billed: bool = False
-
-
-class _PrepOwnedStream:
-    """The streaming body, with explicit ownership of the eager prep task.
-
-    The response body may be closed before it is ever polled (an endpoint
-    failure after ``complete()`` returned, or a client that vanished before the
-    body started). Closing an un-started async generator never enters its body,
-    which would leave selection running and a committed speculation idling
-    until its claim timeout. This wrapper cancels prep in exactly that window;
-    once iteration has started, closure is delegated to the generator, whose
-    finally-chain already cancels prep and closes the provider.
-    """
-
-    def __init__(
-        self,
-        gen: AsyncGenerator[str, None],
-        prep_task: asyncio.Task[_PreparedTurn],
-    ) -> None:
-        self._gen = gen
-        self._prep_task = prep_task
-        self._started = False
-
-    def __aiter__(self) -> _PrepOwnedStream:
-        return self
-
-    async def __anext__(self) -> str:
-        self._started = True
-        return await self._gen.__anext__()
-
-    async def aclose(self) -> None:
-        if not self._started:
-            self._prep_task.cancel()
-            await asyncio.gather(self._prep_task, return_exceptions=True)
-            if (
-                self._prep_task.done()
-                and not self._prep_task.cancelled()
-                and self._prep_task.exception() is None
-            ):
-                # Prep finished before the cancel landed: nobody will ever claim
-                # its speculation, so discard it now instead of letting the
-                # producer idle out its claim timeout.
-                prepared = self._prep_task.result()
-                if prepared.speculation is not None:
-                    await prepared.speculation.discard()
-        await self._gen.aclose()
-
-
-class _SpeculationBufferOverflow(Exception):
-    """A pre-handoff provider event exceeded the private byte budget."""
-
-
-class _SpeculativeStream(ProviderStream):
-    """A private, bounded producer for a possible main-stream winner.
-
-    The producer is the sole reader of the upstream ``ProviderStream``. While the
-    selector is pending it advances generation into a byte-and-chunk bounded
-    deque; after an exact selection match, ``_stream_body`` claims this object and
-    consumes that deque followed by live chunks through the same iterator. A
-    mismatch (or abandoned handoff) cancels the producer and awaits its upstream
-    close, so no half-open request or unobserved task survives.
-
-    No public wire object is built here. Chunks, errors, and usage remain private
-    until the orchestrator has committed the authoritative selector result.
-    """
-
-    def __init__(
-        self,
-        *,
-        request: ProviderChatRequest,
-        open_stream: Callable[
-            [ProviderChatRequest],
-            Awaitable[tuple[ProviderStream, dict[str, Any] | None]],
-        ],
-        max_chunks: int,
-        max_bytes: int,
-        claim_timeout_seconds: float,
-        request_id: str,
-        release_slot: Callable[[], None],
-    ) -> None:
-        self._request = request
-        self._open_stream = open_stream
-        self._max_chunks = max_chunks
-        self._max_bytes = max_bytes
-        self._claim_timeout_seconds = claim_timeout_seconds
-        self._request_id = request_id
-        self._release_slot_callback = release_slot
-        self._slot_released = False
-        self._cleanup_pending: set[asyncio.Task[Any]] = set()
-
-        self._condition = asyncio.Condition()
-        self._buffer: deque[tuple[dict[str, Any], int]] = deque()
-        self._buffered_bytes = 0
-        self._peak_buffered_bytes = 0
-        self._peak_buffered_chunks = 0
-        self._prefetched_chunks = 0
-        self._prefetched_bytes = 0
-        self._done = False
-        self._error: BaseException | None = None
-        self._discarded = False
-        self._claimed = False
-        self._committed = False
-        self._stream_completed = False
-        self._upstream_opened = False
-        self.claim_failure_reason: str | None = None
-        self._started_at = time.perf_counter()
-        self.open_ms: int | None = None
-        self.usage: ProviderUsage | None = None
-        self.endpoint: str | None = None
-        self._expiry_task: asyncio.Task[None] | None = None
-        self._producer_task = asyncio.create_task(
-            self._produce(), name=f"skill-speculation:{request_id}"
-        )
-        self._producer_task.add_done_callback(self._consume_task_exception)
-
-    @staticmethod
-    def _consume_task_exception(task: asyncio.Task[Any]) -> None:
-        if not task.cancelled():
-            task.exception()
-
-    @staticmethod
-    def _chunk_bytes(chunk: dict[str, Any]) -> int:
-        # This is also the representation used on the upstream/public JSON wires,
-        # making it a useful deterministic memory-pressure proxy.
-        return len(
-            json.dumps(chunk, separators=(",", ":"), ensure_ascii=False, default=str).encode(
-                "utf-8"
-            )
-        )
-
-    async def _put(self, chunk: dict[str, Any]) -> bool:
-        size = self._chunk_bytes(chunk)
-        # Before handoff this is optional work: fail the private attempt rather
-        # than let one malicious/malformed event defeat its byte budget. ``claim``
-        # observes the error and opens canonically. After claim the source is the
-        # canonical response, so an indivisible event must be delivered intact.
-        if size > self._max_bytes and not self._claimed:
-            raise _SpeculationBufferOverflow
-        async with self._condition:
-            await self._condition.wait_for(
-                lambda: self._discarded
-                or (
-                    len(self._buffer) < self._max_chunks
-                    and (
-                        not self._buffer
-                        or self._buffered_bytes + size <= self._max_bytes
-                    )
-                )
-            )
-            if self._discarded:
-                return False
-            self._buffer.append((chunk, size))
-            self._buffered_bytes += size
-            self._prefetched_chunks += 1
-            self._prefetched_bytes += size
-            self._peak_buffered_chunks = max(
-                self._peak_buffered_chunks, len(self._buffer)
-            )
-            self._peak_buffered_bytes = max(
-                self._peak_buffered_bytes, self._buffered_bytes
-            )
-            self._condition.notify_all()
-            return True
-
-    async def _set_terminal(self, error: BaseException | None) -> None:
-        async with self._condition:
-            if error is not None:
-                self._error = error
-            self._done = True
-            self._condition.notify_all()
-
-    async def _produce(self) -> None:
-        upstream: ProviderStream | None = None
-        error: BaseException | None = None
-        try:
-            upstream, first_event = await self._open_stream(self._request)
-            self._upstream_opened = True
-            self.open_ms = round((time.perf_counter() - self._started_at) * 1000)
-            # Mirror the serving endpoint out as soon as the open completes: the
-            # claim path logs it, and waiting for the `finally` (where usage is
-            # published) would always be too late for that line.
-            self.endpoint = upstream.endpoint
-            if first_event is not None and not await self._put(first_event):
-                return
-            async for chunk in upstream:
-                if not await self._put(chunk):
-                    return
-            self._stream_completed = True
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:  # propagated privately by ``__anext__``
-            error = exc
-            # Publish the failure before close cleanup so claim can distinguish an
-            # exhausted pre-open retry budget (preserve as terminal) from a private
-            # post-open failure (safe to replay through one canonical fallback).
-            async with self._condition:
-                self._error = exc
-                self._condition.notify_all()
-        finally:
-            if upstream is not None:
-                self.usage = upstream.usage
-                self.endpoint = upstream.endpoint or self.endpoint
-                try:
-                    async with asyncio.timeout(_SPECULATION_CLOSE_TIMEOUT_SECONDS):
-                        await upstream.aclose()
-                except TimeoutError:
-                    logger.warning(
-                        "skill_speculation_close_timeout",
-                        request_id=self._request_id,
-                        timeout_ms=round(_SPECULATION_CLOSE_TIMEOUT_SECONDS * 1000),
-                    )
-                except Exception as exc:  # pragma: no cover - provider close is best-effort
-                    logger.warning(
-                        "skill_speculation_close_failed",
-                        request_id=self._request_id,
-                        error_type=type(exc).__name__,
-                    )
-            await self._set_terminal(error)
-
-    def commit(self) -> None:
-        """Transfer the matching source toward the public iterator.
-
-        The iterator does not actually own it until ``claim`` runs. The deadline
-        closes it if FastAPI/the client never begins body iteration.
-        """
-        if self._discarded or self._committed:
-            return
-        self._committed = True
-        self._expiry_task = asyncio.create_task(
-            self._expire_unclaimed(), name=f"skill-speculation-handoff:{self._request_id}"
-        )
-
-    async def _expire_unclaimed(self) -> None:
-        try:
-            await asyncio.sleep(self._claim_timeout_seconds)
-            if not self._claimed:
-                await self.discard()
-                logger.info(
-                    "skill_speculation_abandoned",
-                    request_id=self._request_id,
-                    claim_timeout_ms=round(self._claim_timeout_seconds * 1000),
-                )
-        except asyncio.CancelledError:
-            return
-
-    async def claim(self) -> bool:
-        """Claim a committed winner, or decline a failed/expired source.
-
-        An exhausted open/prefetch retry budget is claimed and preserved as the
-        terminal SSE result after authoritative metadata; it never receives a
-        race-dependent second budget. A private post-open failure or buffer-cap
-        overflow declines the source so the caller can open canonically. Once
-        claimed, later failures keep ordinary terminal SSE semantics.
-        """
-        if self._discarded or not self._committed:
-            self.claim_failure_reason = (
-                "discarded" if self._discarded else "not_committed"
-            )
-            return False
-        self._claimed = True
-        expiry = self._expiry_task
-        if expiry is not None and expiry is not asyncio.current_task():
-            expiry.cancel()
-            await asyncio.gather(expiry, return_exceptions=True)
-        if self._error is not None:
-            # `_open_stream_with_retry` already spent the canonical retry budget.
-            # Preserve that exhausted error for SSE after authoritative `meta`
-            # instead of race-dependently granting a second full budget. A private
-            # failure after a stream DID open is replay-safe (no model bytes were
-            # public), so it may still fall back to one fresh canonical stream.
-            if isinstance(self._error, DaintreeError) and not self._upstream_opened:
-                self.claim_failure_reason = "upstream_open_exhausted"
-                self._release_slot()
-                return True
-            self.claim_failure_reason = (
-                "buffer_overflow"
-                if isinstance(self._error, _SpeculationBufferOverflow)
-                else "private_stream_error"
-            )
-            await self.discard()
-            return False
-        # Claimed means the request is now the one canonical main stream, not an
-        # overlapping speculative attempt. Its bounded buffer is immediately
-        # owned/drained by the public iterator, so release overlap capacity here.
-        self._release_slot()
-        return True
-
-    async def prefetch_first_event(self) -> dict[str, Any] | None:
-        try:
-            return await self.__anext__()
-        except StopAsyncIteration:
-            return None
-
-    def __aiter__(self) -> _SpeculativeStream:
-        return self
-
-    async def __anext__(self) -> dict[str, Any]:
-        async with self._condition:
-            await self._condition.wait_for(lambda: bool(self._buffer) or self._done)
-            if self._buffer:
-                chunk, size = self._buffer.popleft()
-                self._buffered_bytes -= size
-                self._condition.notify_all()
-                return chunk
-            if self._error is not None:
-                raise self._error
-            raise StopAsyncIteration
-
-    async def discard(self) -> None:
-        """Cancel production, await closure, and make buffered chunks unreachable."""
-        # Mark synchronously before the first await. This makes expiry vs claim an
-        # atomic event-loop transition: either claim sets ``_claimed`` first and
-        # expiry does nothing, or expiry/discard sets ``_discarded`` first and a
-        # late claim cleanly falls back to the canonical request.
-        newly_discarded = not self._discarded
-        self._discarded = True
-        if newly_discarded:
-            async with self._condition:
-                self._buffer.clear()
-                self._buffered_bytes = 0
-                self._condition.notify_all()
-
-        current = asyncio.current_task()
-        expiry = self._expiry_task
-        if expiry is not None and expiry is not current:
-            expiry.cancel()
-        producer = self._producer_task
-        if not producer.done() and producer is not current:
-            producer.cancel()
-
-        waits = [
-            task
-            for task in (producer, expiry)
-            if task is not None and task is not current
-        ]
-        defer_slot_release = False
-        try:
-            if waits:
-                done, pending = await asyncio.wait(
-                    waits, timeout=_SPECULATION_CLOSE_TIMEOUT_SECONDS
-                )
-                for task in done:
-                    if not task.cancelled():
-                        task.exception()
-                if pending:
-                    defer_slot_release = self._defer_slot_release(waits)
-                    logger.warning(
-                        "skill_speculation_cleanup_timeout",
-                        request_id=self._request_id,
-                        timeout_ms=round(_SPECULATION_CLOSE_TIMEOUT_SECONDS * 1000),
-                    )
-        except BaseException:
-            # A caller cancellation must not make overlap capacity available while
-            # a cancellation-resistant producer still owns an upstream request.
-            defer_slot_release = self._defer_slot_release(waits)
-            raise
-        finally:
-            # A loser occupies overlap capacity until its upstream has actually
-            # closed. Idempotence also covers selector/request cancellation races.
-            if not defer_slot_release:
-                self._release_slot()
-
-    async def aclose(self) -> None:
-        await self.discard()
-
-    def _release_slot(self) -> None:
-        if self._slot_released:
-            return
-        self._slot_released = True
-        self._release_slot_callback()
-
-    def _defer_slot_release(self, tasks: list[asyncio.Task[Any]]) -> bool:
-        pending = {task for task in tasks if not task.done()}
-        if not pending:
-            return False
-        for task in pending - self._cleanup_pending:
-            task.add_done_callback(self._cleanup_finished)
-        self._cleanup_pending.update(pending)
-        return True
-
-    def _cleanup_finished(self, task: asyncio.Task[Any]) -> None:
-        if not task.cancelled():
-            task.exception()
-        self._cleanup_pending.discard(task)
-        if not self._cleanup_pending:
-            self._release_slot()
-
-    def stats(self) -> dict[str, Any]:
-        return {
-            "open_ms": self.open_ms,
-            "buffered_chunks": len(self._buffer),
-            "buffered_bytes": self._buffered_bytes,
-            "peak_buffered_chunks": self._peak_buffered_chunks,
-            "peak_buffered_bytes": self._peak_buffered_bytes,
-            "prefetched_chunks": self._prefetched_chunks,
-            "prefetched_bytes": self._prefetched_bytes,
-            "stream_completed": self._stream_completed,
-        }
 
 
 def _carries_output(chunk: dict[str, Any] | None) -> bool:
@@ -1058,7 +485,7 @@ class ChatOrchestrator:
             # id ignored, and dropping either loses a distinct diagnosis.
             prepared.meta.warnings.extend(lint_warnings)
         turn_cost = self._turn_cost_for(result.usage, prepared)
-        self._log_turn_usage(
+        log_turn_usage(
             result.usage,
             request_id=request_id,
             stream=False,
@@ -1255,7 +682,7 @@ class ChatOrchestrator:
                     and verification.payload.catalog_revision == catalog_at_start.revision
                 )
                 if state_usable:
-                    speculative_active_ids, _ = _filter_dedup_cap(
+                    speculative_active_ids, _ = filter_dedup_cap(
                         prior_active_ids,
                         catalog_at_start,
                         self.settings.max_active_skills,
@@ -1518,6 +945,21 @@ class ChatOrchestrator:
         "oversized": "output_oversized",
         "pipe_table": "output_wide_table",
     }
+
+    @staticmethod
+    def _turn_cost_for(usage: ProviderUsage, prepared: _PreparedTurn) -> TurnCost | None:
+        """The turn's cost, with this prepared turn's discarded speculation folded in.
+
+        Stays here rather than in ``turn_accounting`` because it is the only
+        piece that needs ``_PreparedTurn`` — keeping it out of that module keeps
+        the accounting arithmetic free of any dependency on how a turn is built.
+        """
+        return turn_cost_with_speculation(
+            usage,
+            prepared.meta,
+            discarded_usage=prepared.discarded_usage,
+            speculation_billed=prepared.speculation_billed,
+        )
 
     def _lint_final_output(
         self, result: Any, *, request_id: str, had_tool_calls: bool
@@ -1941,7 +1383,7 @@ class ChatOrchestrator:
                 ),
             ),
             finish_reason=result.finish_reason,
-            usage=self._usage(result.usage),
+            usage=response_usage(result.usage),
             cost=cost,
             skills=meta.skills,
             state=meta.state,
@@ -1988,141 +1430,6 @@ class ChatOrchestrator:
                 tool=tool,
                 repairs=notes,
             )
-
-    @classmethod
-    def _turn_cost_with_speculation(
-        cls,
-        usage: ProviderUsage,
-        meta: _RespondMeta,
-        *,
-        discarded_usage: ProviderUsage,
-        speculation_billed: bool,
-    ) -> TurnCost | None:
-        """``_turn_cost`` with a losing speculation's spend folded in.
-
-        One home for the arithmetic, called identically by both response paths —
-        the streaming path cannot see the ``_PreparedTurn`` itself, so the two
-        pieces it needs are passed explicitly rather than duplicated inline.
-        """
-        if not speculation_billed:
-            return cls._turn_cost(usage, meta)
-        return cls._turn_cost(
-            cls._sum_usage(usage, discarded_usage),
-            meta,
-            # A losing speculation is only fully accounted for if it reported a
-            # cost before we cancelled it. Otherwise real spend happened that
-            # nothing can measure, and the total is a floor.
-            complete=discarded_usage.cost is not None,
-        )
-
-    @classmethod
-    def _turn_cost_for(cls, usage: ProviderUsage, prepared: _PreparedTurn) -> TurnCost | None:
-        """The non-streaming caller's shorthand, which does hold a prepared turn."""
-        return cls._turn_cost_with_speculation(
-            usage,
-            prepared.meta,
-            discarded_usage=prepared.discarded_usage,
-            speculation_billed=prepared.speculation_billed,
-        )
-
-    @staticmethod
-    def _turn_cost(
-        main: ProviderUsage, meta: _RespondMeta, *, complete: bool = True
-    ) -> TurnCost | None:
-        """Total USD this request charged the caller, across every upstream call.
-
-        A turn is normally TWO billed calls — the skill selector and the main
-        completion — plus, on a re-rolled round, a generation the user never saw.
-        All of it is charged to the caller's own key, so reporting only the main
-        call would understate their bill by the part they cannot see.
-
-        Both figures are OpenRouter's own reported ``cost``, not a token-price
-        estimate we compute: the router knows which of ~24 endpoints served the
-        request and what cache discount applied, and we do not.
-
-        Returns ``None`` when NOTHING reported a cost — the absence says "we do
-        not know", which a zero would misreport as "free".
-
-        The subtler case is a PARTIAL answer, and it is why ``complete`` exists.
-        A selector that ran but whose cost went unreported would otherwise
-        contribute 0.0 to a field named ``total``, quietly turning a partial sum
-        into a claimed complete one. So a component is treated as unknown only
-        when its call actually happened, and any unknown clears ``complete``.
-
-        ``complete=False`` may also be passed by the caller for a cost we know
-        was incurred and cannot observe at all — a losing speculative stream that
-        was cancelled before its usage arrived.
-        """
-        selector_usage = meta.skills.selector.usage
-        selector = selector_usage.cost if selector_usage is not None else None
-        # "Ran" is what makes a missing cost UNKNOWN rather than genuinely zero.
-        # A turn that skipped selection entirely (continuation round, no-task
-        # fast path) has no selector usage at all, and its absent cost is a
-        # truthful zero rather than a gap.
-        selector_ran = selector_usage is not None
-        if main.cost is None and selector is None and not selector_ran:
-            return None
-        if main.cost is None and selector is None:
-            return None
-        known_complete = complete and main.cost is not None
-        if selector_ran and selector is None:
-            known_complete = False
-        return TurnCost(
-            total=(main.cost or 0.0) + (selector or 0.0),
-            main=main.cost,
-            selector=selector,
-            complete=known_complete,
-        )
-
-    @staticmethod
-    def _log_turn_usage(
-        usage: ProviderUsage,
-        *,
-        request_id: str,
-        stream: bool,
-        finish_reason: str | None,
-        turn_cost: TurnCost | None = None,
-    ) -> None:
-        """What this turn cost the caller, as metadata.
-
-        The response body carries the same numbers to the CLI; this is the half
-        that survives the request, so a tester reporting "it burned through my
-        credit" can be answered from logs rather than from memory.
-
-        ``cache_ratio`` is the number the prompt-cache work exists to move, and
-        the one most worth watching regress: the assembler's whole layout is
-        built to keep the tool schemas byte-stable, and a drop here is the first
-        symptom that something started re-encoding them.
-        """
-        prompt = usage.prompt_tokens or 0
-        logger.info(
-            "turn_usage",
-            request_id=request_id,
-            stream=stream,
-            finish_reason=finish_reason,
-            prompt_tokens=prompt,
-            completion_tokens=usage.completion_tokens or 0,
-            cached_tokens=usage.cached_tokens or 0,
-            cache_ratio=(round((usage.cached_tokens or 0) / prompt, 3) if prompt else None),
-            cost_usd=usage.cost,
-            # The figure that answers "what did this request cost me?" — every
-            # upstream call the turn made, including the selector.
-            turn_cost_usd=turn_cost.total if turn_cost else None,
-            selector_cost_usd=turn_cost.selector if turn_cost else None,
-        )
-
-    @staticmethod
-    def _usage(usage: ProviderUsage) -> RespondUsage:
-        return RespondUsage(
-            prompt_tokens=usage.prompt_tokens or 0,
-            completion_tokens=usage.completion_tokens or 0,
-            total_tokens=usage.total_tokens or 0,
-            cached_tokens=usage.cached_tokens or 0,
-            # NOT `or 0`: an unreported cost must stay None. Zero would read as
-            # "this turn was free", which is a claim about the caller's bill we
-            # have no basis for.
-            cost=usage.cost,
-        )
 
     async def _stream_with_heartbeat(
         self,
@@ -2479,7 +1786,7 @@ class ChatOrchestrator:
                         stream=True,
                         first_chars=len("".join(content_parts)),
                     )
-                    carried_usage = self._sum_usage(
+                    carried_usage = sum_usage(
                         carried_usage, opened_stream.usage or ProviderUsage()
                     )
                     # Hand off ownership BEFORE tearing anything down: the draft has
@@ -2513,7 +1820,7 @@ class ChatOrchestrator:
                     held = None
                     continue
 
-                carried_usage = self._sum_usage(
+                carried_usage = sum_usage(
                     carried_usage, opened_stream.usage or ProviderUsage()
                 )
                 if attempt:
@@ -2540,10 +1847,10 @@ class ChatOrchestrator:
                 "done",
                 StreamDone(
                     finish_reason=finish_reason,
-                    usage=self._usage(carried_usage),
+                    usage=response_usage(carried_usage),
                     # `carried_usage` already sums a discarded re-roll, so this
                     # total covers every generation the caller paid for.
-                    cost=self._turn_cost_with_speculation(
+                    cost=turn_cost_with_speculation(
                         carried_usage,
                         meta,
                         discarded_usage=discarded_usage,
@@ -2586,12 +1893,12 @@ class ChatOrchestrator:
         # yield above and never reaches here). A tool-continuation round is filtered
         # by had_tool_calls inside the trigger.
         if completed:
-            self._log_turn_usage(
+            log_turn_usage(
                 carried_usage,
                 request_id=meta.request_id,
                 stream=True,
                 finish_reason=finish_reason,
-                turn_cost=self._turn_cost_with_speculation(
+                turn_cost=turn_cost_with_speculation(
                     carried_usage,
                     meta,
                     discarded_usage=discarded_usage,
@@ -2794,39 +2101,6 @@ class ChatOrchestrator:
         """
         return replace(request, messages=[*request.messages, dict(_BARE_INTENT_NUDGE)])
 
-    @staticmethod
-    def _sum_usage(first: ProviderUsage | None, second: ProviderUsage | None) -> ProviderUsage:
-        """Total tokens across both attempts.
-
-        The caller's own key funded the discarded generation too, so reporting only
-        the accepted attempt would under-bill what the turn actually cost them.
-        ``None`` means "not reported" and stays ``None`` only if neither side had a
-        number, so a provider that omits usage is not silently turned into a zero.
-        """
-
-        def add(a: int | None, b: int | None) -> int | None:
-            if a is None:
-                return b
-            return a if b is None else a + b
-
-        def add_cost(a: float | None, b: float | None) -> float | None:
-            if a is None:
-                return b
-            return a if b is None else a + b
-
-        first = first or ProviderUsage()
-        second = second or ProviderUsage()
-        return ProviderUsage(
-            prompt_tokens=add(first.prompt_tokens, second.prompt_tokens),
-            completion_tokens=add(first.completion_tokens, second.completion_tokens),
-            total_tokens=add(first.total_tokens, second.total_tokens),
-            cached_tokens=add(first.cached_tokens, second.cached_tokens),
-            # A discarded attempt was still billed to the caller, so its cost is
-            # part of what this turn cost them — the same reason the tokens are
-            # summed rather than replaced.
-            cost=add_cost(first.cost, second.cost),
-        )
-
     def _log_bare_intent(self, phase: str, *, request_id: str, **fields: Any) -> None:
         """Structured record of a re-roll. Never logs response content — only its
         shape — so a transcript can be diagnosed from logs without leaking it."""
@@ -2867,7 +2141,7 @@ class ChatOrchestrator:
             )
             return result
 
-        repaired.usage = self._sum_usage(result.usage, repaired.usage)
+        repaired.usage = sum_usage(result.usage, repaired.usage)
         self._log_bare_intent(
             "completed",
             request_id=request_id,
