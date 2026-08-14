@@ -73,9 +73,16 @@ shared flag. Re-enabling interactive thinking must not silently drag the selecto
 
 ## 3. Endpoint-selection policy
 
-Sent as the top-level `provider` block on every request. Hardcoded beside the
-model ids (`_PROVIDER_ROUTING` in `providers/openrouter.py`); there are
+Sent as the top-level `provider` block on every request. The **defaults** live
+beside the model ids (`providers/policy.py`, `DEFAULT_POLICY`); there are
 deliberately no environment toggles.
+
+A caller may narrow or re-rank them per request through the validated `routing`
+block ([`DAINTREE_API.md`](DAINTREE_API.md#endpoint-routing-optional)) — they own
+the key and pay the bill, so privacy strictness and the speed/price trade are
+legitimately theirs. What they cannot do is weaken the floor: `data_collection:
+"deny"` is emitted unconditionally and is derived from no caller-controlled
+field. The shipped default block is:
 
 ```json
 {
@@ -150,12 +157,18 @@ in that pool may still hold a request transiently, e.g. for abuse monitoring.
 The stricter mode is OpenRouter's separate `zdr` flag, which this server does not
 send. <!-- privacy-copy-ok -->
 
-**Current posture: `NO_TRAINING`.** The stricter flag is a one-key escalation in
-`_PROVIDER_ROUTING` and narrows the endpoint pool substantially, so it stays off
-until it has been live-tested against every request shape this server emits
-(streaming with tools, non-streaming, `json_object`, forced tool choice,
-tool-free). Enabling it without that measurement risks
-`upstream_no_compliant_provider` on ordinary turns.
+**Current default: `NO_TRAINING`.** The stricter mode is available per request
+as `routing.privacy: "zdr"`, and is `PrivacyMode.ZDR` in code. <!-- privacy-copy-ok -->
+It stays off *by
+default* because it narrows the endpoint pool substantially and has not been
+live-tested against every request shape this server emits (streaming with tools,
+non-streaming, `json_object`, forced tool choice, tool-free) — defaulting to it
+would risk `upstream_no_compliant_provider` on ordinary turns.
+
+A caller who opts in gets it on **every** upstream call the turn makes: the main
+completion, the skill selector, utility tasks, `/skills/resolve`'s `find`, and
+(in local development) skill learning. A privacy choice honoured only on the
+visible call would be worse than none, because it would look like it worked.
 
 If the posture ever changes, every one of these must change with it, in the same
 commit: this file, `README.md`, `CLAUDE.md`, `.env.example`,
@@ -233,26 +246,35 @@ being down. `providers/openrouter.py` maps upstream status codes onto the stable
 codes in [`DAINTREE_API.md`](DAINTREE_API.md#errors); the CLI branches on
 `error.code`, never on prose.
 
-### Current mapping — and its gap
+### Current mapping
 
-| Upstream | Daintree | Code |
-|---|---:|---|
-| 429 | 429 | `upstream_rate_limited` (preserves a bounded `Retry-After`) |
-| 408, 504 | 504 | `upstream_timeout` |
-| ≥ 500 | 502 | `upstream_error`, retryable |
-| **401, 402, 403** | **502** | **`upstream_error`** |
-| **404** (no endpoint matched the routing policy) | **502** | **`upstream_error`** |
-| other 4xx | 502 | `upstream_error` |
+| Upstream | Daintree | Code | Retried? |
+|---|---:|---|---|
+| 401 | 401 | `provider_invalid_api_key` | no |
+| 402 | 402 | `provider_insufficient_credits` | no |
+| 403 | 403 | `provider_key_forbidden` | no |
+| 404 | 503 | `upstream_no_compliant_provider` | no |
+| 503 *with a no-route message* | 503 | `upstream_no_compliant_provider` | no |
+| 429 | 429 | `upstream_rate_limited` (bounded `Retry-After`) | yes |
+| 408, 504 | 504 | `upstream_timeout` | yes |
+| other ≥ 500 | 503 | `upstream_unavailable` | yes |
+| other 4xx | 502 | `upstream_request_rejected` | no |
+| unparseable response | 502 | `upstream_protocol_error` | no |
 
-> ⏳ **Known gap.** The four bold rows are four different problems with four
-> different fixes — a revoked key, an empty balance, a key guardrail, and a
-> routing policy that matched nothing — and they are currently indistinguishable
-> to the client, which branches on `error.code`. A tester with an exhausted
-> account sees "the upstream provider rejected the supplied credentials" and
-> reasonably concludes their key is wrong. Splitting these into
-> `provider_invalid_api_key` / `provider_insufficient_credits` /
-> `provider_key_forbidden` / `upstream_no_compliant_provider` is a release gate;
-> until it lands, no document may describe those codes as available.
+Two subtleties worth knowing before editing this:
+
+- **Retryability is load-bearing, not decoration.** An account failure or an empty
+  routing pool is deterministic; replaying it reaches the same answer more slowly,
+  and on the streaming path it burns the CLI's retry budget *after* `meta` has
+  already committed a 200.
+- **A no-route answer can arrive as 404 or 503**, depending on which filter
+  emptied the pool, so the 503 branch is disambiguated by the message
+  (`_looks_unroutable`). That match is biased toward reading an ambiguous 503 as
+  an outage: mistaking an outage for a policy dead-end would mark a transient
+  failure permanent and kill a retry that would have worked.
+
+`upstream_no_compliant_provider` **fails closed**. The alternative — quietly
+relaxing the privacy filter until something routes — would make §4 a lie.
 
 ### Diagnostics and content
 

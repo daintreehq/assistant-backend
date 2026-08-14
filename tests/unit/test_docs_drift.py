@@ -44,6 +44,7 @@ from daintree_assistant_server.providers.openrouter import (
     _PROVIDER_ROUTING_STRUCTURED,
     OpenRouterProvider,
 )
+from daintree_assistant_server.providers.policy import DEFAULT_POLICY, PrivacyMode
 from daintree_assistant_server.services.task_runner import TaskRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -192,6 +193,40 @@ def test_the_privacy_scan_catches_its_own_motivating_phrase() -> None:
     for sentence in allowed:
         offenders = [p.pattern for p in _OVERSTATED_PRIVACY if p.search(sentence)]
         assert not offenders, f"{sentence!r} is accurate copy but trips {offenders}"
+
+
+def test_the_shipped_privacy_mode_matches_the_documented_posture() -> None:
+    """The enum and the prose are two halves of one promise."""
+    assert DEFAULT_POLICY.privacy is PrivacyMode.NO_TRAINING, (
+        "the shipped privacy mode changed. docs/PROVIDER_POLICY.md section 4 says "
+        "'Current posture: NO_TRAINING' and every user-facing string is written to "
+        "match; update them in this commit."
+    )
+    assert "NO_TRAINING" in _read(DOC_PROVIDER)
+
+
+@pytest.mark.parametrize("mode", list(PrivacyMode))
+def test_every_privacy_mode_has_accurate_copy(mode: PrivacyMode) -> None:
+    """The description ships with the enum precisely so a client cannot invent its
+    own wording.
+
+    Note this is NOT the corpus-wide banned-phrase scan: a retention claim is
+    accurate for ZDR (it is exactly what that mode buys) and inaccurate for
+    NO_TRAINING. The blunt scan cannot tell those apart, so the assertion is
+    per-mode.
+    """
+    text = mode.description
+    assert "collect or train" in text, (
+        f"PrivacyMode.{mode.name}.description omits the no-training guarantee, "
+        "which every mode provides"
+    )
+    if mode is PrivacyMode.NO_TRAINING:
+        assert "not enforced" in text, (
+            "the default mode's copy must say explicitly that zero data retention "
+            "is NOT enforced — silence reads as a promise"
+        )
+    else:
+        assert "zero data retention" in text.lower()
 
 
 def test_provider_policy_states_the_privacy_posture_explicitly() -> None:
@@ -529,6 +564,87 @@ def test_reasoning_effort_tiers_are_documented() -> None:
             f"docs/PROVIDER_POLICY.md section 2 does not name the {effort!r} effort "
             "tier that config.py actually sends"
         )
+
+
+# ---------------------------------------------------------------------------
+# Error taxonomy.
+#
+# The CLI branches on `error.code`, so these strings are a wire contract. A code
+# that exists in the source but appears in no document is one the client author
+# never learns to handle.
+# ---------------------------------------------------------------------------
+
+# Every code an error factory can produce. Kept explicit rather than derived, so
+# ADDING a factory forces a decision about documenting it.
+_ERROR_CODES = (
+    "invalid_api_key",
+    "provider_invalid_api_key",
+    "provider_insufficient_credits",
+    "provider_key_forbidden",
+    "upstream_rate_limited",
+    "upstream_timeout",
+    "upstream_no_compliant_provider",
+    "upstream_unavailable",
+    "upstream_request_rejected",
+    "upstream_protocol_error",
+    "upstream_error",
+    "internal_error",
+    "request_too_large",
+    "unsupported_daintree_protocol",
+    "system_messages_not_allowed",
+    "reserved_tool_name",
+    "unknown_task",
+)
+
+
+@pytest.mark.parametrize("code", _ERROR_CODES)
+def test_every_error_code_is_documented(code: str) -> None:
+    assert code in _read(DOC_API), (
+        f"the service can emit {code!r} but docs/DAINTREE_API.md never mentions it. "
+        "The CLI branches on error.code; an undocumented code is one no client "
+        "author learns to handle."
+    )
+
+
+def test_no_error_factory_produces_an_undocumented_code() -> None:
+    """The other direction: catch a factory added without a doc entry.
+
+    Introspects the module rather than trusting the list above, so the two cannot
+    drift apart silently.
+    """
+    import inspect as _inspect
+
+    from daintree_assistant_server import errors as errors_module
+
+    produced: set[str] = set()
+    for name, obj in vars(errors_module).items():
+        if name.startswith("_") or not _inspect.isfunction(obj):
+            continue
+        if obj.__module__ != errors_module.__name__:
+            continue
+        try:
+            result = obj()
+        except (TypeError, Exception):  # noqa: B014 - needs an argument; not a factory
+            continue
+        if isinstance(result, DaintreeError) and result.code:
+            produced.add(result.code)
+
+    undocumented = sorted(produced - set(_ERROR_CODES))
+    assert not undocumented, (
+        f"{undocumented} are produced by errors.py but missing from _ERROR_CODES "
+        "here — add them and document them in docs/DAINTREE_API.md."
+    )
+
+
+def test_account_failures_are_documented_as_the_callers_to_fix() -> None:
+    """The distinction that motivated the split: an exhausted balance is not a
+    rejected key, and the doc has to say so."""
+    text = _read(DOC_API)
+    assert "provider_insufficient_credits" in text
+    assert "Add credits" in text
+    # And the two 401s must be explained as different, not merely both listed.
+    assert "provider_invalid_api_key" in text
+    assert "Distinct from `invalid_api_key`" in text
 
 
 # ---------------------------------------------------------------------------

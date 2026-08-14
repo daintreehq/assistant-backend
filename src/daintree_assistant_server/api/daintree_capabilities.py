@@ -7,6 +7,12 @@ from fastapi import APIRouter, Depends, Request
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
 from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
+from ..providers.policy import (
+    DEFAULT_POLICY,
+    MAX_ENDPOINT_LIST,
+    EndpointSort,
+    PrivacyMode,
+)
 from .deps import require_ready
 
 router = APIRouter()
@@ -42,6 +48,23 @@ async def capabilities(
             "system_messages_accepted": False,
             "max_active_skills": settings.max_active_skills,
             "metadata_transport": "body+stream_meta_event",
+        },
+        # The active endpoint-routing posture, and what a caller may change about
+        # it. Surfaced because privacy is part of the tester's trust decision and
+        # must be visible BEFORE the first turn — not discovered from a doc. The
+        # description string is served from PrivacyMode itself so a client cannot
+        # invent its own wording (and cannot say "does not store").
+        "routing": {
+            "privacy_mode": DEFAULT_POLICY.privacy.value,
+            "privacy_description": DEFAULT_POLICY.privacy.description,
+            "sort": DEFAULT_POLICY.sort.value,
+            "client_selectable": {
+                "field": "routing",
+                "privacy": [mode.value for mode in PrivacyMode],
+                "sort": [axis.value for axis in EndpointSort],
+                "endpoint_lists": ["only", "ignore"],
+                "max_endpoints": MAX_ENDPOINT_LIST,
+            },
         },
         "skills": {
             "catalog_revision": container.catalog.revision,

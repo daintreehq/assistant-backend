@@ -42,9 +42,16 @@ from pydantic import SecretStr
 from ..errors import (
     DaintreeError,
     invalid_api_key,
+    provider_insufficient_credits,
+    provider_invalid_api_key,
+    provider_key_forbidden,
     upstream_error,
+    upstream_no_compliant_provider,
+    upstream_protocol_error,
     upstream_rate_limited,
+    upstream_request_rejected,
     upstream_timeout,
+    upstream_unavailable,
 )
 from ..observability import get_logger
 from .base import (
@@ -54,6 +61,7 @@ from .base import (
     ProviderToolCallResult,
     ProviderUsage,
 )
+from .policy import DEFAULT_POLICY
 from .sse import (
     ChunkShapeError,
     SseProtocolError,
@@ -109,9 +117,15 @@ _APP_TITLE = "Daintree Assistant"
 # common with the main model's budget and there is no deployment that wants it long.
 _VERIFY_TIMEOUT_SECONDS = 10.0
 
-# Endpoint-selection policy, sent on EVERY request. Hardcoded like the model ids
-# and the thinking posture (config.py): there is one optimum and the server ships
-# it. Two product decisions are encoded here.
+# Endpoint-selection policy, sent on EVERY request. The policy OBJECT lives in
+# providers/policy.py (RoutingPolicy / PrivacyMode); these module-level dicts are
+# its rendered wire form, kept here because the surrounding adapter and its tests
+# read them directly.
+#
+# The shipped defaults are hardcoded like the model ids and the thinking posture
+# (config.py): there is one optimum and the server ships it. A caller may narrow
+# or re-rank it through a validated RoutingPreference, but can never disable the
+# no-training floor. Two product decisions are encoded:
 #
 # THROUGHPUT FIRST. ``sort: "throughput"`` ranks the eligible endpoints by
 # measured tokens/second and takes the fastest — explicitly at the cost of price,
@@ -130,10 +144,10 @@ _VERIFY_TIMEOUT_SECONDS = 10.0
 # ``data_collection: "deny"`` is a NO-TRAINING / no-collection guarantee. It is
 # NOT a no-retention one: an endpoint may still hold a request transiently for
 # abuse monitoring. Zero data retention is OpenRouter's SEPARATE ``"zdr": True``
-# flag, which narrows the pool much further and is not sent by default. Every
-# user-facing statement must say "does not collect or train on", never "does not
-# store" (docs/PROVIDER_POLICY.md is the authority, and tests/unit/
-# test_docs_drift.py fails CI if the copy and this dict disagree).
+# flag (PrivacyMode.ZDR), which narrows the pool much further and is not sent by
+# default. Every user-facing statement must say "does not collect or train on",
+# never "does not store" (docs/PROVIDER_POLICY.md is the authority, and
+# tests/unit/test_docs_drift.py fails CI if the copy and this policy disagree).
 #
 # ``require_parameters`` drops endpoints that would silently ignore something we
 # sent. It matters most for the json_object calls (selector, utility tasks):
@@ -144,16 +158,13 @@ _VERIFY_TIMEOUT_SECONDS = 10.0
 # ``allow_fallbacks`` keeps the next-fastest compliant endpoint available when the
 # winner is down. With filters this strict, turning it off would make any single
 # outage a hard 404/503 ("No allowed providers are available").
-_PROVIDER_ROUTING: dict[str, Any] = {
-    "sort": "throughput",
-    "data_collection": "deny",
-    "require_parameters": True,
-    "allow_fallbacks": True,
-}
+_PROVIDER_ROUTING: dict[str, Any] = DEFAULT_POLICY.to_wire()
 
 # Routing for STRUCTURED calls — anything carrying ``response_format`` (the skill
-# selector, the utility tasks, the skill-learning gate). Same policy plus a tail
-# bound, because these calls have the opposite cost shape to a chat turn.
+# selector, the utility tasks, the skill-learning gate, the skill
+# builder/improver, and a main call whose client asked for JSON mode). Same
+# policy plus a tail bound, because these calls have the opposite cost shape to a
+# chat turn.
 #
 # WHY A SEPARATE POLICY. ``require_parameters`` drops every endpoint that does not
 # implement ``response_format``, and for this model that includes the fastest one
@@ -166,6 +177,7 @@ _PROVIDER_ROUTING: dict[str, Any] = {
 # TAILS are catastrophic: wafer p90 5.4s / p99 12.6s, parasail p99 13.9s, novita
 # p99 5.4s. That is not theoretical — a selector call on the turn's first-byte path
 # was measured at 10.75s, three quarters of a 14.4s time-to-first-token.
+# (Measured 2026-07; see docs/PROVIDER_POLICY.md section 8 on dated observations.)
 #
 # ``preferred_max_latency`` DEPRIORITIZES (never excludes) endpoints whose measured
 # TTFT percentiles exceed the bound, so it cannot empty the pool the way a filter
@@ -177,10 +189,7 @@ _PROVIDER_ROUTING: dict[str, Any] = {
 # Throughput stays the sort key underneath: among endpoints that answer promptly we
 # still want the fastest generator, which matters for the longer utility tasks
 # (terminal summarize/extract) that share this policy with the tiny selector call.
-_PROVIDER_ROUTING_STRUCTURED: dict[str, Any] = {
-    **_PROVIDER_ROUTING,
-    "preferred_max_latency": {"p90": 2.0, "p99": 5.0},
-}
+_PROVIDER_ROUTING_STRUCTURED: dict[str, Any] = DEFAULT_POLICY.for_structured_call().to_wire()
 
 
 def _extract_upstream_error(
@@ -343,18 +352,180 @@ def _normalize_choices(choices: Any, key: str) -> None:
             part["reasoning_content"] = value
 
 
-def _looks_rate_limited(err: dict[str, Any]) -> bool:
-    blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
+# Markers OpenRouter uses when routing preferences matched no endpoint. It
+# answers this with a 404 *or* a 503 depending on which filter emptied the pool
+# ("No endpoints found matching your data policy", "No allowed providers are
+# available for the selected model", "There is no available model provider that
+# meets your routing requirements"), so on the 503 branch the message is the only
+# thing separating a policy dead-end from a real outage.
+#
+# Matched conservatively and biased toward the outage reading: mistaking an
+# outage for a policy problem sends the operator to inspect a routing policy that
+# is fine, and — worse — marks a transient failure permanent, killing a retry
+# that would have succeeded.
+# Each entry is a set of fragments that must ALL appear. Requiring a combination
+# rather than any single phrase is deliberate: "no endpoints found" on its own
+# also occurs in messages like "No endpoints found because the service is
+# temporarily unavailable", and classifying that as a policy dead-end would mark
+# a transient failure permanent and kill a retry that would have succeeded.
+_UNROUTABLE_MARKER_SETS = (
+    ("no endpoints found", "data policy"),
+    ("no endpoints found", "routing"),
+    ("no allowed providers",),
+    ("no available model provider",),
+    ("meets your routing requirements",),
+)
+
+
+def _looks_unroutable(detail: str | None) -> bool:
+    """Whether an upstream message says the routing policy matched no endpoint.
+
+    Biased toward reading an ambiguous message as an OUTAGE, not a policy
+    dead-end. Getting it wrong in that direction costs one wasted retry; getting
+    it wrong the other way marks a transient failure permanent and sends an
+    operator to inspect a routing policy that is fine.
+    """
+    if not detail:
+        return False
+    blob = detail.lower()
     return any(
-        token in blob
-        for token in ("rate limit", "rate_limit", "429", "quota", "overloaded", "too many requests")
+        all(fragment in blob for fragment in fragments)
+        for fragments in _UNROUTABLE_MARKER_SETS
     )
 
 
+def _looks_rate_limited(err: dict[str, Any]) -> bool:
+    """Whether an in-band stream error is a rate limit.
+
+    Deliberately does NOT match "quota". A quota message is far more often an
+    exhausted *balance* — a permanent, caller-fixable condition — than a rate
+    limit, and calling it a rate limit makes it retryable, so the turn replays a
+    doomed request and reports the wrong fix. Insufficient credit is matched
+    explicitly in ``_stream_error_status`` instead.
+    """
+    blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
+    return any(
+        token in blob
+        for token in ("rate limit", "rate_limit", "429", "overloaded", "too many requests")
+    )
+
+
+def _stream_error_status(err: dict[str, Any]) -> int | None:
+    """The HTTP-ish status an in-band stream error is reporting, if it says.
+
+    OpenRouter puts a numeric ``code`` on most in-band errors. When it is there,
+    it is a far better signal than prose — so the streaming path can reuse the
+    exact same taxonomy as the HTTP path rather than inventing a second, weaker
+    one.
+    """
+    code = err.get("code")
+    if isinstance(code, bool):
+        return None
+    if isinstance(code, int):
+        return code if 100 <= code <= 599 else None
+    if isinstance(code, str):
+        stripped = code.strip()
+        if stripped.isdigit() and len(stripped) == 3:
+            value = int(stripped)
+            return value if 100 <= value <= 599 else None
+    return None
+
+
+# Phrases that identify a spent balance in an in-band error, where there is no
+# HTTP status to read. Kept narrow and specific.
+_INSUFFICIENT_CREDIT_MARKERS = (
+    "insufficient credit",
+    "insufficient funds",
+    "insufficient balance",
+    "not enough credit",
+    "payment required",
+    "add more credits",
+)
+
+
 def map_stream_error(err: dict[str, Any]) -> DaintreeError:
+    """Map an in-band SSE error onto the SAME taxonomy as an HTTP failure.
+
+    Without this, the streaming path had its own two-outcome world — rate limited
+    or generic ``upstream_error`` — which recreated the exact bug the taxonomy
+    exists to fix: an invalid key, a spent balance and a routing dead-end all
+    arrived as one retryable-looking code, and the CLI replayed each of them.
+
+    Most turns are streamed, so this is the path that matters most.
+    """
+    status = _stream_error_status(err)
+    if status is not None:
+        # Reuse the HTTP mapping wholesale. No headers are available in-band, so
+        # a rate limit here simply carries no Retry-After.
+        detail = str(err.get("message") or "")
+        return _map_status(status, retry_after=None, detail=detail or None)
+
+    # No usable status: fall back to prose, narrowly.
+    blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
+    if any(marker in blob for marker in _INSUFFICIENT_CREDIT_MARKERS):
+        return provider_insufficient_credits()
     if _looks_rate_limited(err):
         return upstream_rate_limited()
+    if _looks_unroutable(blob):
+        return upstream_no_compliant_provider()
     return upstream_error("The upstream model stream reported an error.")
+
+
+def _map_status(
+    status: int, *, retry_after: str | None, detail: str | None
+) -> DaintreeError:
+    """Status -> Daintree error. Shared by the HTTP and in-band stream paths.
+
+    The organizing question is **whose problem is this, and what do they do about
+    it?** These outcomes used to collapse into one 502 ``upstream_error``, which
+    told a tester with an exhausted balance that their credentials were rejected
+    — so they replaced a perfectly good key. The CLI branches on ``error.code``,
+    so only distinct codes can produce distinct advice.
+
+    Retryability is set per branch and is load-bearing: an account failure or an
+    empty routing pool is deterministic, and replaying it burns the CLI's retry
+    budget to arrive at the same answer more slowly.
+    """
+    if status == 429:
+        return upstream_rate_limited(retry_after=retry_after)
+    if status in (408, 504):
+        return upstream_timeout()
+
+    # ---- The caller's provider account -------------------------------
+    # Their own key rode this request, so these are their settings to fix, and
+    # each fix is different. Upstream prose is deliberately NOT echoed: the log
+    # already carries it, and account/quota detail is not ours to relay.
+    if status == 401:
+        return provider_invalid_api_key()
+    if status == 402:
+        return provider_insufficient_credits()
+    if status == 403:
+        return provider_key_forbidden()
+
+    # ---- Routing ------------------------------------------------------
+    # OpenRouter answers "no endpoint matched your preferences" with EITHER a 404
+    # or a 503 depending on which filter emptied the pool, so status alone cannot
+    # separate routing from a real outage. A 404 on a chat completion is
+    # unambiguous (the path is fixed and correct, so it is never a bad URL); a
+    # 503 has to be disambiguated by its message.
+    if status == 404:
+        return upstream_no_compliant_provider()
+    if status == 503 and _looks_unroutable(detail):
+        return upstream_no_compliant_provider()
+
+    if status >= 500:
+        # Genuine upstream fault or capacity shortfall. Transient, so retry while
+        # no model output is exposed.
+        return upstream_unavailable()
+
+    # Any other 4xx means the upstream rejected OUR request as malformed:
+    # permanent, and almost always a server-side bug in what we sent. Carry the
+    # upstream's own reason through so the failure is diagnosable instead of an
+    # opaque "status 400" — the CLI and logs then name the offending field.
+    suffix = f" {detail}" if detail else ""
+    return upstream_request_rejected(
+        f"The upstream provider rejected this server's request (HTTP {status}).{suffix}"
+    )
 
 
 class OpenRouterStream(ProviderStream):
@@ -383,7 +554,7 @@ class OpenRouterStream(ProviderStream):
             # A clean end WITHOUT the upstream [DONE] marker means the stream was
             # truncated; never treat that as a successful finish.
             if not self._saw_done:
-                raise upstream_error("Upstream stream ended before completion.") from exc
+                raise upstream_protocol_error("Upstream stream ended before completion.") from exc
             return None
         except httpx.TimeoutException as exc:
             self._done = True
@@ -393,27 +564,25 @@ class OpenRouterStream(ProviderStream):
             # A dropped connection is transient. Retrying is only acted on during
             # open/prefetch, before any model delta is exposed; the mid-stream
             # consumer ignores the flag and surfaces a terminal error instead.
-            raise upstream_error(
-                "The upstream model stream was interrupted.", retryable=True
-            ) from exc
+            raise upstream_unavailable("The upstream model stream was interrupted.") from exc
         except SseProtocolError as exc:
             self._done = True
             # Framing violation (oversized line, invalid UTF-8). Surface it as an
             # upstream error like every other malformed-stream case — letting it
             # escape raw would render an internal-error envelope instead of a 502.
-            raise upstream_error("Malformed SSE stream from upstream.") from exc
+            raise upstream_protocol_error("Malformed SSE stream from upstream.") from exc
 
         try:
             chunk = parse_chunk(data)
         except json.JSONDecodeError as exc:
             self._done = True
-            raise upstream_error("Malformed SSE payload from upstream.") from exc
+            raise upstream_protocol_error("Malformed SSE payload from upstream.") from exc
         except ChunkShapeError as exc:
             # Valid JSON, unusable structure (list root, non-dict choice/delta, …):
             # an upstream protocol violation, surfaced here as a DaintreeError so
             # the consumer never crashes indexing into the chunk.
             self._done = True
-            raise upstream_error(f"Malformed stream chunk from upstream ({exc}).") from exc
+            raise upstream_protocol_error(f"Malformed stream chunk from upstream ({exc}).") from exc
 
         if chunk is None:  # [DONE]
             self._saw_done = True
@@ -571,7 +740,7 @@ class OpenRouterProvider:
         except httpx.TimeoutException as exc:
             raise upstream_timeout("Verifying the key with the provider timed out.") from exc
         except httpx.HTTPError as exc:
-            raise upstream_error("Could not reach the provider to verify the key.") from exc
+            raise upstream_unavailable("Could not reach the provider to verify the key.") from exc
 
         if response.status_code in (401, 403):
             raise invalid_api_key("The provider rejected this API key.")
@@ -587,12 +756,14 @@ class OpenRouterProvider:
         try:
             payload = response.json()
         except ValueError as exc:
-            raise upstream_error("The provider returned an unreadable key record.") from exc
+            raise upstream_protocol_error(
+                "The provider returned an unreadable key record."
+            ) from exc
         if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
             # A 200 whose body is not a key record answers nothing. Degrading it to an
             # empty record would surface as `valid: true` — the exact false positive
             # this endpoint exists to prevent — so it is an error, not a default.
-            raise upstream_error("The provider returned no key record.")
+            raise upstream_protocol_error("The provider returned no key record.")
         data: dict[str, Any] = payload["data"]
         return data
 
@@ -623,6 +794,10 @@ class OpenRouterProvider:
             return upstream_rate_limited(retry_after=response.headers.get("retry-after"))
         if status in (408, 504):
             return upstream_timeout("Verifying the key with the provider timed out.")
+        if status >= 500:
+            return upstream_unavailable(
+                f"The provider could not verify the key (HTTP {status})."
+            )
         return upstream_error(f"The provider could not verify the key (HTTP {status}).")
 
     def _headers(self, *, stream: bool, api_key: SecretStr) -> dict[str, str]:
@@ -674,11 +849,19 @@ class OpenRouterProvider:
         # Structured calls route under the tail-bounded policy: `response_format`
         # is exactly the signal that this call sits in the slower JSON-capable pool
         # and cares about time-to-first-token, not tokens/second.
-        body["provider"] = (
-            _PROVIDER_ROUTING_STRUCTURED
-            if request.response_format is not None
-            else _PROVIDER_ROUTING
-        )
+        structured = request.response_format is not None
+        if request.routing is None:
+            # The overwhelmingly common path. Reuse the prebuilt module-level dict
+            # rather than re-rendering: this block is serialized into every request
+            # body, and the prompt cache keys on a byte-identical prefix.
+            body["provider"] = (
+                _PROVIDER_ROUTING_STRUCTURED if structured else _PROVIDER_ROUTING
+            )
+        else:
+            policy = DEFAULT_POLICY.merged_with(request.routing)
+            if structured:
+                policy = policy.for_structured_call()
+            body["provider"] = policy.to_wire()
         if stream:
             body["stream"] = True
             if request.include_usage:
@@ -703,36 +886,14 @@ class OpenRouterProvider:
     def _map_http_error(
         self, status: int, headers: httpx.Headers, detail: str | None = None
     ) -> DaintreeError:
-        if status == 429:
-            return upstream_rate_limited(retry_after=headers.get("retry-after"))
-        if status in (408, 504):
-            return upstream_timeout()
-        if status >= 500:
-            # Transient upstream fault — retry while no model output is exposed.
-            return upstream_error(retryable=True)
-        # An auth/billing rejection concerns the CALLER's upstream account (their
-        # own key rode this request), not the shape of their request. The 502
-        # upstream_error code keeps it distinguishable from our own 401
-        # invalid_api_key (missing/malformed at our door); upstream prose stays in
-        # the log (the upstream_http_error entry already carries the full body)
-        # rather than the response, so account/quota detail is never echoed.
-        if status in (401, 402, 403):
-            return upstream_error("The upstream provider rejected the supplied credentials.")
-        # OpenRouter-specific: 404 on a chat completion is routing, not a bad URL —
-        # no endpoint satisfied `_PROVIDER_ROUTING` (privacy filter plus
-        # require_parameters can empty the pool for an unusual parameter mix). Name
-        # it, because the generic "rejected the request" reads as a malformed body
-        # and sends the reader hunting in entirely the wrong place.
-        if status == 404:
-            return upstream_error(
-                "No upstream endpoint matched this server's provider-routing policy."
-            )
-        # Any other 4xx means the upstream rejected OUR request as malformed: permanent
-        # (never retried) and almost always a server-side bug in what we sent. Carry
-        # the upstream's own reason through so the failure is diagnosable instead of
-        # an opaque "status 400" — the CLI and logs then name the offending field.
-        suffix = f" {detail}" if detail else ""
-        return upstream_error(f"Upstream rejected the request (HTTP {status}).{suffix}")
+        """The HTTP half of the taxonomy — see :func:`_map_status`.
+
+        A thin wrapper so the streaming in-band path and the HTTP path can never
+        drift into two different answers for the same condition.
+        """
+        return _map_status(
+            status, retry_after=headers.get("retry-after"), detail=detail
+        )
 
     def _build_result(self, data: dict[str, Any]) -> ProviderChatResult:
         # `or []` only for a genuinely absent key — a present-but-wrong `choices`
@@ -747,7 +908,9 @@ class OpenRouterProvider:
         try:
             validate_message_shape(choices, data.get("usage"))
         except ChunkShapeError as exc:
-            raise upstream_error("Upstream returned a malformed completion response.") from exc
+            raise upstream_protocol_error(
+                "Upstream returned a malformed completion response."
+            ) from exc
         finish = choices[0].get("finish_reason") if choices else None
         return ProviderChatResult(
             id=data.get("id", ""),
@@ -775,7 +938,7 @@ class OpenRouterProvider:
         except httpx.TimeoutException as exc:
             raise upstream_timeout() from exc
         except httpx.TransportError as exc:
-            raise upstream_error("Could not reach the upstream provider.", retryable=True) from exc
+            raise upstream_unavailable("Could not reach the upstream provider.") from exc
         if resp.status_code >= 400:
             detail = _extract_upstream_error(resp.content, secret=api_key)
             logger.warning(
@@ -789,9 +952,9 @@ class OpenRouterProvider:
         try:
             data = resp.json()
         except json.JSONDecodeError as exc:
-            raise upstream_error("Upstream returned a non-JSON response.") from exc
+            raise upstream_protocol_error("Upstream returned a non-JSON response.") from exc
         if not isinstance(data, dict):
-            raise upstream_error("Upstream returned a malformed completion response.")
+            raise upstream_protocol_error("Upstream returned a malformed completion response.")
         return self._build_result(data)
 
     async def structured_tool_call(
@@ -826,6 +989,10 @@ class OpenRouterProvider:
             # field, so an omission here would silently spend the SERVER's default
             # credential on every forced-tool-call path instead of the caller's.
             api_key=request.api_key,
+            # Same reasoning: dropping the caller's routing preference here would
+            # silently downgrade a ZDR request to the default privacy filter on
+            # the one path that rebuilds its request from scratch.
+            routing=request.routing,
         )
         result = await self.complete(sub)
         calls = result.tool_calls
@@ -863,7 +1030,7 @@ class OpenRouterProvider:
         except httpx.TimeoutException as exc:
             raise upstream_timeout() from exc
         except httpx.TransportError as exc:
-            raise upstream_error("Could not reach the upstream provider.", retryable=True) from exc
+            raise upstream_unavailable("Could not reach the upstream provider.") from exc
         if response.status_code >= 400:
             detail: str | None = None
             try:

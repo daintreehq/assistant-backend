@@ -9,7 +9,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..auth import Principal, require_auth
+from ..contracts.extensions import Routing
 from ..errors import invalid_request
+from ..providers.policy import routing_preference
 from .deps import check_protocol_header, check_protocol_value, require_ready
 
 router = APIRouter()
@@ -48,6 +50,10 @@ class ResolveRequest(BaseModel):
     action: Literal["find", "load", "clear"]
     query: str | None = Field(default=None, max_length=8192)
     skill_ids: list[str] | None = None
+    # A 'find' runs the selector, which sends the query upstream — so this
+    # endpoint needs the same routing choice as /respond. 'load' and 'clear' are
+    # local and ignore it.
+    routing: Routing | None = None
 
 
 @router.post("/v1/daintree/skills/resolve")
@@ -76,6 +82,7 @@ async def resolve_skills(
         instruction_revision=body.instruction_revision,
         query=body.query,
         skill_ids=body.skill_ids,
+        routing=routing_preference(body.routing),
         # The middleware-resolved id, so the body and X-Request-Id always agree.
         # Reading the raw header instead mints a SECOND id when the client sends none.
         request_id=getattr(request.state, "request_id", None),

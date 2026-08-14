@@ -37,8 +37,8 @@ is not a description of today's build, so every line carries a status:
 | 8 | **The backend is stateless across instances**, apart from process-local caches; skill state travels in a signed, opaque token. | ✅ `state/codec.py` |
 | 9 | **Skill learning is off in staging and production** — an enabled mode fails `/readyz`. | ✅ `Settings.local_only_problems` |
 | 10 | **Tester prompt and tool content is never logged.** | ✅ with one exception — see §5 |
-| 11 | **The tester can verify their key before the first model call.** | ⏳ endpoint exists (`/v1/daintree/auth/verify`); the CLI does not yet call it during login |
-| 12 | **Failures identify their owner**: Daintree, OpenRouter, account credits, key permissions, rate limiting, provider routing, or malformed input. | ⏳ upstream 401/402/403/404 all collapse to one `upstream_error` today |
+| 11 | **The tester can verify their key before the first model call.** | ⏳ endpoint exists and now reports `usable` separately from `valid`; the CLI does not yet call it during login |
+| 12 | **Failures identify their owner**: Daintree, OpenRouter, account credits, key permissions, rate limiting, provider routing, or malformed input. | ✅ distinct codes — see [`DAINTREE_API.md`](DAINTREE_API.md#errors) |
 | 13 | **A release can be rolled back** to the immediately previous Cloud Run revision. | ⏳ the previous revision is retained, but rollback is manual `gcloud` work with no script and no drill |
 
 ## 3. What is explicitly *not* in the beta
@@ -159,8 +159,9 @@ State these to testers up front rather than letting them discover them:
   (`ALLOW_REMOTE_IMAGE_URLS=false`, reported in `/v1/daintree/capabilities`).
   Nothing prevents a hardened environment from setting it, so read capabilities
   rather than assuming.
-- Upstream 401/402/403/404 are indistinguishable to the client (§2 item 12), so an
-  exhausted balance currently reads as a rejected key.
+- The CLI still replays a deterministic `upstream_error` when it arrives as a
+  terminal SSE event rather than an HTTP one, so a doomed turn can retry a few
+  times before giving up. Tracked in the CLI repository.
 
 ## 9. Reporting a problem
 

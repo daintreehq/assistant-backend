@@ -45,6 +45,7 @@ from ..errors import DaintreeError, internal_error
 from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
+from ..providers.policy import RoutingPreference, routing_preference
 from ..providers.retry import retry_upstream
 from ..skills.catalog import Catalog, CatalogManager
 from ..skills.load_events import SkillLoadExecution
@@ -1041,6 +1042,11 @@ class ChatOrchestrator:
                     api_key=api_key,
                     turn_context=self._selector_turn_context(request),
                     available_tools=self._available_tool_names(request),
+                    # The selector sends the conversation upstream too, so the
+                    # caller's routing choice has to reach it — otherwise a ZDR
+                    # turn would honour the request on the visible call and quietly
+                    # route the same content under the default policy here.
+                    routing=routing_preference(request.routing),
                 )
                 selector_ms = round((time.perf_counter() - t_sel) * 1000)
             except BaseException:
@@ -1379,6 +1385,7 @@ class ChatOrchestrator:
         query: str | None = None,
         skill_ids: list[str] | None = None,
         request_id: str | None = None,
+        routing: RoutingPreference | None = None,
     ) -> dict[str, Any]:
         request_id = request_id or new_request_id()
         verification = self.state_codec.verify(state_token, session_id=session_id)
@@ -1409,7 +1416,7 @@ class ChatOrchestrator:
             run_selector = True
             conversation = [ChatMessage(role="user", content=query or "")]
             decision = await self.selector.select(
-                conversation, prior_active_ids, api_key=api_key
+                conversation, prior_active_ids, api_key=api_key, routing=routing
             )
             warnings.extend(decision.warnings)
             # A find re-selects: the selector result is authoritative, same as a turn.

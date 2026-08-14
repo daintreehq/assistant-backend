@@ -14,6 +14,8 @@ from typing import Any, Protocol, runtime_checkable
 
 from pydantic import SecretStr
 
+from .policy import RoutingPreference
+
 
 @dataclass(frozen=True)
 class ProviderUsage:
@@ -72,6 +74,13 @@ class ProviderChatRequest:
     # plain dataclass that coerces nothing and untyped callers (benchmarks)
     # could put a bare string here without mypy objecting.
     api_key: SecretStr | None = field(default=None, repr=False)
+    # The caller's validated endpoint-routing preference for THIS call, or
+    # ``None`` for the server default. Like ``api_key`` it rides the request
+    # rather than the provider instance, because one shared provider serves every
+    # caller — a per-process policy could not represent "this turn's choice".
+    # Already normalized to the typed form by the request boundary; the adapter
+    # never sees raw client input here.
+    routing: RoutingPreference | None = None
 
 
 @dataclass

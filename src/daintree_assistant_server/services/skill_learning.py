@@ -56,6 +56,7 @@ from ..contracts.skill_learning import GateVerdict, SkillProposal
 from ..observability import get_logger
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest
+from ..providers.policy import RoutingPreference, routing_preference
 from ..providers.retry import retry_upstream
 from ..skills.catalog import Catalog, CatalogManager
 from ..skills.loader import SkillLoadError, parse_skill
@@ -470,8 +471,15 @@ class SkillLearner:
         catalog = self.catalog_manager.catalog
         transcript = self._transcript(messages)
         tools = [t.function.name for t in (request.input.tools or [])]
+        # Derived once here, from the turn that triggered learning, so the gate,
+        # the builder and the improver all route identically. Learning ships the
+        # full transcript to a second model — honouring a caller's ZDR request on
+        # the visible turn and not on this would be exactly backwards.
+        routing = routing_preference(request.routing)
 
-        verdict = await self._gate(transcript, catalog, active_ids, tools, api_key)
+        verdict = await self._gate(
+            transcript, catalog, active_ids, tools, api_key, routing
+        )
         if not self._verdict_actionable(verdict, catalog):
             logger.info(
                 "skill_learning_gate",
@@ -548,6 +556,7 @@ class SkillLearner:
                 tools=tools,
                 session_id=session_id,
                 api_key=api_key,
+                routing=routing,
             )
         finally:
             if improve_key is not None:
@@ -564,6 +573,7 @@ class SkillLearner:
         tools: list[str],
         session_id: str,
         api_key: SecretStr,
+        routing: RoutingPreference | None,
     ) -> LearningOutcome:
         logger.info(
             "skill_learning_gate",
@@ -586,11 +596,13 @@ class SkillLearner:
             model=SKILL_BUILDER_MODEL if is_create else SKILL_IMPROVER_MODEL,
         )
         if is_create:
-            proposal = await self._build_create(transcript, catalog, verdict, tools, api_key)
+            proposal = await self._build_create(
+                transcript, catalog, verdict, tools, api_key, routing
+            )
         else:
             assert old_skill is not None  # guarded by _verdict_actionable
             proposal = await self._build_improve(
-                old_skill, transcript, verdict, tools, catalog, api_key
+                old_skill, transcript, verdict, tools, catalog, api_key, routing
             )
 
         if proposal.action == "no_change":
@@ -675,6 +687,7 @@ class SkillLearner:
         active_ids: list[str],
         tools: list[str],
         api_key: SecretStr,
+        routing: RoutingPreference | None,
     ) -> GateVerdict:
         system = self.prompts.skill_learning_prompt("gate")
         user = (
@@ -705,6 +718,7 @@ class SkillLearner:
             thinking_disabled=False,
             reasoning_effort=OPENROUTER_REASONING_EFFORT,
             api_key=api_key,
+            routing=routing,
         )
         return GateVerdict.model_validate(_clamp_confidence(data))
 
@@ -715,6 +729,7 @@ class SkillLearner:
         verdict: GateVerdict,
         tools: list[str],
         api_key: SecretStr,
+        routing: RoutingPreference | None,
     ) -> SkillProposal:
         system = self.prompts.skill_learning_prompt("build")
         user = (
@@ -744,6 +759,7 @@ class SkillLearner:
             thinking_disabled=False,
             reasoning_effort=SKILL_LEARNING_REASONING_EFFORT,
             api_key=api_key,
+            routing=routing,
         )
         return SkillProposal.model_validate(_clamp_confidence(data))
 
@@ -755,6 +771,7 @@ class SkillLearner:
         tools: list[str],
         catalog: Catalog,
         api_key: SecretStr,
+        routing: RoutingPreference | None,
     ) -> SkillProposal:
         system = self.prompts.skill_learning_prompt("improve")
         current = self._render_markdown(self._meta_dict(target), target.body)
@@ -803,6 +820,7 @@ class SkillLearner:
             thinking_disabled=False,
             reasoning_effort=SKILL_LEARNING_REASONING_EFFORT,
             api_key=api_key,
+            routing=routing,
         )
         return SkillProposal.model_validate(_clamp_confidence(data))
 
@@ -817,6 +835,7 @@ class SkillLearner:
         thinking_disabled: bool,
         reasoning_effort: str | None,
         api_key: SecretStr,
+        routing: RoutingPreference | None = None,
     ) -> dict[str, Any]:
         messages = [
             {"role": "system", "content": system},
@@ -836,6 +855,11 @@ class SkillLearner:
                 # The captured caller credential — both the first attempt and the
                 # JSON-repair retry ride it; the provider holds no default.
                 api_key=api_key,
+                # And the caller's routing choice. Learning ships the FULL
+                # transcript to a second model, so it is the largest payload the
+                # turn produces — honouring a ZDR request on the visible call and
+                # not on this one would be exactly backwards.
+                routing=routing,
             )
 
         result = await self._complete_with_retry(_request(messages))

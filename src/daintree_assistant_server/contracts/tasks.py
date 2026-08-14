@@ -12,6 +12,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .extensions import Routing
+
 # --------------------------------------------------------------------------
 # Envelope.
 # --------------------------------------------------------------------------
@@ -32,6 +34,12 @@ class TaskRequest(BaseModel):
     input: dict[str, Any] = Field(default_factory=dict)
     # Only consumed by terminal_extract_json.
     result_schema: dict[str, Any] | None = None
+    # Optional endpoint-routing preference, identical in shape and meaning to the
+    # one on /respond. A task sends the caller's content upstream just as a turn
+    # does — terminal tails, transcripts, memories — so a privacy choice that
+    # applied only to /respond would be honoured exactly where the user could see
+    # it and dropped everywhere else.
+    routing: Routing | None = None
 
 
 class TaskUsage(BaseModel):

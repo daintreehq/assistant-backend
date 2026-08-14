@@ -55,7 +55,25 @@ def test_verify_reports_a_rejected_key_as_a_200_verdict(client, auth, fake_provi
     assert r.status_code == 200
     body = r.json()
     assert body["valid"] is False
+    assert body["usable"] is False
+    assert body["reason"] == "provider_rejected"
     assert "rejected" in body["detail"].lower()
+
+
+def test_verify_reports_the_new_provider_rejection_code_too(
+    client, auth, fake_provider
+) -> None:
+    """The provider adapter now raises `provider_invalid_api_key` rather than
+    reusing our own door's `invalid_api_key`. This endpoint must recognise both,
+    or a rejected key would propagate as a 401 instead of a 200 verdict."""
+    from daintree_assistant_server.errors import provider_invalid_api_key
+
+    fake_provider.verify_key_error = provider_invalid_api_key()
+
+    r = client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert r.status_code == 200
+    assert r.json()["reason"] == "provider_rejected"
 
 
 def test_verify_propagates_an_unreachable_provider_as_502(client, auth, fake_provider) -> None:
@@ -126,11 +144,57 @@ def test_verify_reports_a_timeout_as_504(client, auth, fake_provider) -> None:
     assert r.json()["error"]["code"] == "upstream_timeout"
 
 
-def test_verify_passes_through_an_exhausted_key_with_its_limit(client, auth, fake_provider) -> None:
-    """Zero remaining credit is still `valid` here; the CLI decides how to warn."""
+def test_verify_reports_an_exhausted_key_as_valid_but_not_usable(
+    client, auth, fake_provider
+) -> None:
+    """The distinction the `usable` field exists for.
+
+    A recognised key with a spent balance is genuinely `valid` — and completely
+    unable to run a turn. A client reading only `valid` shows a successful
+    sign-in, then fails on the first real request with what looks like an
+    unrelated error.
+    """
     fake_provider.verify_key_result = {"label": "spent", "limit_remaining": 0}
 
     body = client.post("/v1/daintree/auth/verify", headers=auth).json()
 
     assert body["valid"] is True
+    assert body["usable"] is False
+    assert body["reason"] == "credits_exhausted"
     assert body["limit_remaining"] == 0
+    assert "credit" in body["detail"].lower()
+
+
+def test_verify_reports_a_funded_key_as_usable(client, auth, fake_provider) -> None:
+    fake_provider.verify_key_result = {"label": "good", "limit_remaining": 12.5}
+
+    body = client.post("/v1/daintree/auth/verify", headers=auth).json()
+
+    assert body["valid"] is True
+    assert body["usable"] is True
+    assert body["reason"] == "ok"
+
+
+def test_verify_treats_an_unlimited_key_as_usable(client, auth, fake_provider) -> None:
+    """A pay-as-you-go or unlimited key reports no `limit_remaining` at all.
+
+    Guessing "unusable" from a missing field would block a sign-in that would
+    have worked — the worse of the two failure modes, since the first real turn
+    was never going to fail.
+    """
+    fake_provider.verify_key_result = {"label": "unlimited"}
+
+    body = client.post("/v1/daintree/auth/verify", headers=auth).json()
+
+    assert body["valid"] is True
+    assert body["usable"] is True
+    assert body["reason"] == "ok"
+
+
+def test_verify_reports_a_negative_balance_as_unusable(client, auth, fake_provider) -> None:
+    fake_provider.verify_key_result = {"limit_remaining": -3.0}
+
+    body = client.post("/v1/daintree/auth/verify", headers=auth).json()
+
+    assert body["usable"] is False
+    assert body["reason"] == "credits_exhausted"

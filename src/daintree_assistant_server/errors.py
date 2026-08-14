@@ -165,6 +165,153 @@ def upstream_timeout(message: str = "The upstream model provider timed out.") ->
     )
 
 
+# --------------------------------------------------------------------------
+# Provider account failures.
+#
+# These four used to collapse into one 502 ``upstream_error``, which meant a
+# tester with an exhausted balance was told their credentials were rejected and
+# reasonably concluded their key was wrong. They are four different problems with
+# four different fixes, and the caller — who owns the key and pays the bill — is
+# the only one who can apply any of them.
+#
+# None is retryable. Replaying a revoked key, an empty balance or a guardrail
+# denial reaches the same answer, slower; on the streaming path it also burns the
+# CLI's retry budget after `meta` has already committed a 200.
+# --------------------------------------------------------------------------
+
+
+def provider_invalid_api_key(
+    message: str = "The model provider rejected this API key. Replace or rotate it.",
+) -> DaintreeError:
+    """Upstream 401 — the provider does not recognise the caller's credential.
+
+    Deliberately 401 with a code distinct from our own ``invalid_api_key``. Both
+    mean "fix your key", but ours means the header was missing or malformed at
+    Daintree's door, and this one means the key travelled fine and the provider
+    refused it. A client that cannot tell them apart cannot write correct copy
+    for either.
+    """
+    return DaintreeError(
+        status_code=401,
+        message=message,
+        type=TYPE_AUTHENTICATION,
+        code="provider_invalid_api_key",
+    )
+
+
+def provider_insufficient_credits(
+    message: str = (
+        "The model provider account backing this API key has insufficient credits. "
+        "Add credits or use a different key."
+    ),
+) -> DaintreeError:
+    """Upstream 402 — the key is valid and the account cannot fund the call."""
+    return DaintreeError(
+        status_code=402,
+        message=message,
+        type=TYPE_AUTHENTICATION,
+        code="provider_insufficient_credits",
+    )
+
+
+def provider_key_forbidden(
+    message: str = (
+        "The model provider refused this request for this API key. Check the key's "
+        "model permissions, spend limits and guardrails."
+    ),
+) -> DaintreeError:
+    """Upstream 403 — recognised, funded, and not permitted to do *this*.
+
+    Covers a key scoped away from the model, a per-key spend cap, and a provider
+    moderation/guardrail block. All are settings on the caller's own account.
+    """
+    return DaintreeError(
+        status_code=403,
+        message=message,
+        type=TYPE_AUTHENTICATION,
+        code="provider_key_forbidden",
+    )
+
+
+# --------------------------------------------------------------------------
+# Provider routing and availability.
+# --------------------------------------------------------------------------
+
+
+def upstream_no_compliant_provider(
+    message: str = (
+        "No upstream endpoint matched the active routing policy for this request."
+    ),
+) -> DaintreeError:
+    """No endpoint satisfied the privacy/parameter policy we sent.
+
+    503 rather than 502 because nothing is wrong with the request: it is a
+    capacity/eligibility condition that may clear on its own. Crucially it is
+    **not** retryable within the turn — the policy is deterministic, so an
+    immediate replay re-derives the same empty pool. Failing closed here is the
+    point: the alternative is silently relaxing the privacy floor to find a
+    route, which would make the promise in docs/PROVIDER_POLICY.md a lie.
+    """
+    return DaintreeError(
+        status_code=503,
+        message=message,
+        type=TYPE_API,
+        code="upstream_no_compliant_provider",
+    )
+
+
+def upstream_unavailable(
+    message: str = "The upstream model provider is currently unavailable.",
+) -> DaintreeError:
+    """Provider outage / no capacity. Transient, so retryable."""
+    return DaintreeError(
+        status_code=503,
+        message=message,
+        type=TYPE_API,
+        code="upstream_unavailable",
+        retryable=True,
+    )
+
+
+# --------------------------------------------------------------------------
+# Failures that are OUR bug, not the caller's.
+# --------------------------------------------------------------------------
+
+
+def upstream_request_rejected(
+    message: str = "The upstream model provider rejected this server's request.",
+) -> DaintreeError:
+    """The provider judged the body Daintree generated to be malformed.
+
+    Almost always a server-side bug in what we sent. Permanent, and the useful
+    action is a bug report carrying the request id — not anything the caller can
+    change about their own account.
+    """
+    return DaintreeError(
+        status_code=502,
+        message=message,
+        type=TYPE_API,
+        code="upstream_request_rejected",
+    )
+
+
+def upstream_protocol_error(
+    message: str = "The upstream model provider returned a malformed response.",
+) -> DaintreeError:
+    """A response we could not parse: bad JSON, a broken chunk, a truncated stream.
+
+    Distinct from ``upstream_request_rejected`` because the direction of the
+    fault is opposite, and from ``upstream_unavailable`` because the provider did
+    answer. Usually a provider/compatibility problem rather than an outage.
+    """
+    return DaintreeError(
+        status_code=502,
+        message=message,
+        type=TYPE_API,
+        code="upstream_protocol_error",
+    )
+
+
 def upstream_error(
     message: str = "The upstream model provider returned an error.",
     *,

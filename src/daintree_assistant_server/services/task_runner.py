@@ -50,6 +50,7 @@ from ..errors import DaintreeError, invalid_request, unknown_task
 from ..observability import get_logger, new_task_run_id
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
+from ..providers.policy import routing_preference
 from ..providers.retry import retry_upstream
 from ..skills.catalog import CatalogManager
 from ..text_utils import cap_bytes
@@ -755,6 +756,9 @@ class TaskRunner:
         # its visible-output ceiling above the cap its profile deliberately set.
         thinking_enabled = INTERACTIVE_THINKING_ENABLED
         reasoning_effort = OPENROUTER_REASONING_EFFORT if thinking_enabled else None
+        # Normalize the caller's routing choice once, so the first attempt and any
+        # repair attempt route identically.
+        routing = routing_preference(request.routing)
         max_tokens = profile.max_output_tokens + (
             self.settings.thinking_headroom_tokens if thinking_enabled else 0
         )
@@ -769,6 +773,11 @@ class TaskRunner:
             timeout=timeout,
             # The caller's own credential (threaded from the route handler).
             api_key=api_key,
+            # And their routing preference. A task ships terminal tails,
+            # transcripts and memories upstream just as a turn does, so a privacy
+            # choice honoured only on /respond would be honoured exactly where the
+            # user can see it and dropped everywhere else.
+            routing=routing,
         )
 
         result = await self._complete_with_retry(provider_request)
@@ -795,6 +804,9 @@ class TaskRunner:
                 # Same caller credential as the first attempt — an omission here
                 # would fail the repair call outright (no provider default).
                 api_key=api_key,
+                # ...and the same routing, so a repair cannot land on an endpoint
+                # the original call was routed away from.
+                routing=routing,
             )
             repair = await self._complete_with_retry(repair_request)
             usage = _sum_usage(usage, repair.usage)

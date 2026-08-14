@@ -9,9 +9,10 @@ block (non-streaming) or first SSE ``meta`` event (streaming). See
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # --------------------------------------------------------------------------
 # Request extension (section 6.4).
@@ -292,3 +293,75 @@ class SelectorMeta(BaseModel):
     usage: SelectorUsage | None = None
     # Free-text reason is omitted by default; only present under a debug flag.
     reason: str | None = None
+
+
+# OpenRouter endpoint slugs are lowercase alphanumerics with separators
+# ("deepinfra", "together", "wafer-ai"). Constrained rather than free text
+# because these strings are forwarded upstream verbatim.
+_ENDPOINT_SLUG = r"^[a-z0-9][a-z0-9._-]*$"
+
+
+class Routing(BaseModel):
+    """A caller's endpoint-routing preference.
+
+    The caller owns the key and pays the bill, so two of this server's routing
+    decisions are legitimately theirs to make differently: how strict the privacy
+    filter is, and whether speed or price ranks the eligible endpoints.
+
+    **Deliberately a closed set, not a pass-through.** Forwarding an arbitrary
+    ``provider`` block would let a client silently drop the no-training floor,
+    pin an endpoint that ignores ``response_format`` (breaking every JSON call),
+    or send a key this server has never tested — and each failure would surface
+    as an inscrutable upstream error rather than a validation one. Every field
+    here selects among modes the server defines and has reasoned about; the
+    no-training floor is not derived from any of them and so cannot be turned off.
+
+    Omitting the block entirely keeps the server default, which is what almost
+    every request does.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: ``no_training`` (default) routes only to endpoints that do not collect or
+    #: train on request data. ``zdr`` additionally demands zero data retention,
+    #: which narrows the pool substantially — an unusual parameter mix is then
+    #: materially more likely to find no route, failing closed as
+    #: ``upstream_no_compliant_provider`` rather than quietly relaxing the filter.
+    privacy: Literal["no_training", "zdr"] | None = None
+    #: Which axis ranks the surviving endpoints.
+    sort: Literal["throughput", "price", "latency"] | None = None
+    #: Endpoint allowlist. An empty list is not "allow nothing" — it is omitted.
+    only: list[str] = Field(
+        default_factory=list, max_length=24
+    )
+    ignore: list[str] = Field(default_factory=list, max_length=24)
+
+    @field_validator("only", "ignore")
+    @classmethod
+    def _check_slugs(cls, value: list[str]) -> list[str]:
+        for slug in value:
+            # fullmatch, NOT match: Python's `$` also matches before a trailing
+            # newline, so `re.match(r"...$", "deepinfra\n")` succeeds — and that
+            # slug would then be forwarded upstream verbatim, newline included.
+            if not 1 <= len(slug) <= 64 or not re.fullmatch(_ENDPOINT_SLUG, slug):
+                raise ValueError(
+                    f"{slug!r} is not a valid provider slug (lowercase alphanumeric, "
+                    "'.', '-' and '_', 1-64 characters)"
+                )
+        if len(set(value)) != len(value):
+            # Duplicates consume the list cap for nothing and produce a distinct
+            # request body for a semantically identical policy.
+            raise ValueError("provider slugs must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def _check_lists_do_not_contradict(self) -> Routing:
+        overlap = sorted(set(self.only) & set(self.ignore))
+        if overlap:
+            # An endpoint that is both required and forbidden guarantees an empty
+            # pool. Better a 400 naming the contradiction than a 503 the caller
+            # has to reverse-engineer.
+            raise ValueError(
+                f"{overlap} appear in both 'only' and 'ignore', which can never route"
+            )
+        return self

@@ -41,9 +41,11 @@ Authorization: Bearer <caller API key>
 The server holds no shared inbound secret and no upstream credential of its own, and
 performs only structural validation (present, header-safe ASCII) — a missing or
 malformed key is `401 invalid_api_key`, while a well-formed key the upstream then
-rejects surfaces as `502 upstream_error`. The two codes are deliberately distinct so
-the CLI can tell "fix your header" from "fix your account". There is no unauthenticated
-mode in any environment.
+rejects surfaces as `401 provider_invalid_api_key`. Same status, deliberately
+different codes: ours means "fix your header", theirs means "the key travelled fine
+and OpenRouter refused it". An underfunded or permission-limited key is different
+again (`402 provider_insufficient_credits`, `403 provider_key_forbidden`) — see
+[Errors](#errors). There is no unauthenticated mode in any environment.
 
 `/healthz`, `/readyz`, and `/version` are unauthenticated (Cloud Run probes them; they
 carry no user data).
@@ -59,21 +61,35 @@ bearer header like every other authed route.
 `POST /v1/daintree/auth/verify` with no body →
 
 ```json
-{ "valid": true, "detail": "The provider accepted this API key.",
+{ "valid": true, "usable": true, "reason": "ok",
+  "detail": "The provider accepted this API key.",
   "label": "my-key", "limit": 20, "usage": 4.5, "limit_remaining": 15.5,
   "is_free_tier": false }
 ```
 
-`valid` means **the provider recognises this credential** — not that it can fund a turn.
-A recognised but exhausted key is `valid: true` with `limit_remaining: 0`; deciding how
-to warn about that is the CLI's call. Every field after `detail` is optional: each is
+`valid` and `usable` answer **different questions**, and collapsing them is the bug
+this split exists to fix:
+
+- `valid` — the provider recognises this credential.
+- `usable` — it recognises it *and* the account can actually fund a turn.
+
+A recognised key with a spent balance is `valid: true, usable: false,
+reason: "credits_exhausted"`. A client reading only `valid` would show a successful
+sign-in, then fail on the first real request with what looks like an unrelated error.
+
+`reason` is the stable machine-readable outcome — branch on it, not on `detail`:
+`ok`, `provider_rejected`, `credits_exhausted`. Usability is judged conservatively:
+only a *positively reported* zero-or-negative `limit_remaining` counts as exhausted,
+so an unlimited or pay-as-you-go key (which reports no limit at all) stays usable.
+
+`label`, `limit`, `usage`, `limit_remaining` and `is_free_tier` are optional: each is
 echoed only when the provider supplies it with the expected type. `label` is
 upstream-controlled text — it is stripped of control characters, bounded to 120
 characters, and dropped entirely if it contains (or is contained by) the bearer, since
 some providers default a key's label to the key itself.
 
-A rejected key is a **200 with `valid: false`**, deliberately *not* the `502
-upstream_error` the section above describes for the serving path. A rejection is a
+A rejected key is a **200 with `valid: false`** and `reason: "provider_rejected"`,
+deliberately *not* the `401 provider_invalid_api_key` the serving path returns. A rejection is a
 successful answer to the question this endpoint asks, and our own `401` would be wrong
 twice over: the request authenticated fine at our door, and `401` conventionally tells a
 client to re-send the same credential — the useless retry loop this endpoint exists to
@@ -81,11 +97,47 @@ prevent.
 
 Not knowing is never reported as a verdict. Anything other than a provider verdict
 propagates as the usual error envelope: `429 upstream_rate_limited` (with `Retry-After`),
-`504 upstream_timeout`, `502 upstream_error` (unreachable, a non-200, or a 200 whose body
-is not a key record), `401 invalid_api_key` for a missing/malformed bearer at our own
-door, and `503` before readiness. The probe carries a short 10s read budget rather than
+`504 upstream_timeout`, `503 upstream_unavailable` (unreachable), `502
+upstream_protocol_error` (a 200 whose body is not a key record), `401 invalid_api_key`
+for a missing/malformed bearer at our own door, and `503` before readiness. The probe carries a short 10s read budget rather than
 the main-model timeout. Being a sign-in bootstrap call, it does not require or check
 `X-Daintree-Protocol`.
+
+## Endpoint routing (optional)
+
+`/v1/daintree/respond` accepts an optional top-level `routing` block. Omit it —
+almost every request does — and the server default applies.
+
+```jsonc
+"routing": {
+  "privacy": "no_training",        // "no_training" (default) | "zdr"
+  "sort": "throughput",            // "throughput" (default) | "price" | "latency"
+  "only":   ["deepinfra"],         // optional endpoint allowlist (≤24 slugs)
+  "ignore": ["some-endpoint"]      // optional endpoint denylist  (≤24 slugs)
+}
+```
+
+The caller owns the key and pays the bill, so how strict the privacy filter is
+and whether speed or price ranks endpoints are legitimately theirs to choose.
+
+**This is a closed set, not a pass-through.** An arbitrary `provider` block is
+rejected: forwarding one would let a client drop the no-training floor, pin an
+endpoint that cannot do `response_format` (breaking every JSON call), or send a
+parameter this server has never tested — each failing as an inscrutable upstream
+error rather than a validation one. Unknown fields and unknown values are `400`.
+Slugs must be lowercase alphanumerics with `.`, `-` or `_`.
+
+Two things a caller cannot do:
+
+- **Weaken privacy.** `data_collection: "deny"` is sent unconditionally and is not
+  derived from any field here. `privacy: "zdr"` is *additive* — it adds the
+  stricter retention filter on top, it does not replace the no-training one.
+- **Guarantee a route.** `zdr`, an `only` list, or an unusual parameter mix can
+  empty the eligible pool. That fails closed with `503
+  upstream_no_compliant_provider` rather than silently relaxing the policy.
+
+`/v1/daintree/capabilities` reports the active mode, its accurate description, and
+the values a client may select.
 
 ## Protocol negotiation
 
@@ -401,14 +453,16 @@ routing policy's `require_parameters` filter would find no eligible endpoint for
 carrying one. Prefix caching is implicit at whichever endpoint serves the request.
 
 Every request also carries a top-level `provider` block — OpenRouter's endpoint-selection
-policy, hardcoded like the model ids: `sort: "throughput"` (fastest tokens/sec wins, price
+policy. Its defaults sit beside the model ids and a caller may narrow or re-rank them via
+the request's [`routing`](#endpoint-routing-optional) block: `sort: "throughput"` (fastest tokens/sec wins, price
 second), `data_collection: "deny"` (only endpoints that do not collect prompt data or train on
 it — a no-training floor, **not** zero data retention <!-- privacy-copy-ok -->; see
 [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md)), `require_parameters: true` (drop endpoints that would silently ignore something we
 sent — this is what routes a json_object call away from an otherwise-faster endpoint with no
 `response_format` support), and `allow_fallbacks: true` (the next-fastest compliant endpoint
-covers an outage). A policy that matches nothing returns 404, surfaced as an explicit
-routing-failure message rather than a generic bad-request.
+covers an outage). A policy that matches nothing returns 404 **or** 503 depending on which
+filter emptied the pool; both surface as `upstream_no_compliant_provider` rather than a
+generic bad-request.
 
 Reasoning is controlled by OpenRouter's unified `reasoning` object, sent explicitly on every
 call: `{"enabled": false}` turns thinking off, `{"effort": "<tier>"}` turns it on at a tier.
@@ -465,15 +519,54 @@ after streaming `meta` as an `error` event):
              "code": "…", "message": "…", "param": "…" } }
 ```
 
-| HTTP | Examples |
-|------|----------|
-| 400  | malformed request, `system_messages_not_allowed`, `reserved_tool_name`, `invalid_tool_schema`, `tool_choice_not_offered` |
-| 401  | `invalid_api_key` |
-| 413  | `request_too_large` (body cap, per-message/tool caps) |
-| 426  | `unsupported_daintree_protocol` |
-| 429  | `upstream_rate_limited` (with `Retry-After`) |
-| 502 / 504 | `upstream_error` / `upstream_timeout` |
-| 503  | not ready (`/readyz` failing) |
+Codes are the contract; **branch on `code`, never on `message` or on the HTTP
+status alone** (502 covers more than one condition). Each row names who can fix
+the problem, because that is the whole reason these are separate codes.
+
+### Daintree's own failures
+
+| HTTP | Code | Meaning / action |
+|------|------|------------------|
+| 400  | `system_messages_not_allowed`, `reserved_tool_name`, `invalid_tool_schema`, `tool_choice_not_offered`, `invalid_request_error` | The request is malformed. Client bug. |
+| 401  | `invalid_api_key` | Bearer missing or malformed **at Daintree's door**. Send a valid header. |
+| 413  | `request_too_large` | Body cap, or a per-message / per-tool cap. |
+| 426  | `unsupported_daintree_protocol` | Upgrade the client. |
+| 404  | `unknown_task` | `/v1/daintree/tasks` was asked for a task profile that does not exist. Read the available ids from `/v1/daintree/capabilities`. |
+| 503  | *(not ready)* | `/readyz` is failing; the instance has not finished starting or is misconfigured. |
+| 500  | `internal_error` | Daintree bug. Report with the request id. |
+
+### The caller's provider account
+
+The caller's own key rode the request, so these are settings on **their**
+OpenRouter account — and each one has a different fix. Never retried.
+
+| HTTP | Code | Action |
+|------|------|--------|
+| 401  | `provider_invalid_api_key` | OpenRouter rejected the key. Replace or rotate it. Distinct from `invalid_api_key`: the key travelled fine, the provider refused it. |
+| 402  | `provider_insufficient_credits` | The account cannot fund the call. Add credits or use another key. |
+| 403  | `provider_key_forbidden` | Key model-permissions, spend limit or a provider guardrail. |
+
+### Provider routing and availability
+
+| HTTP | Code | Action |
+|------|------|--------|
+| 429  | `upstream_rate_limited` | OpenRouter is rate limiting. Honour `Retry-After`. Retryable. |
+| 503  | `upstream_no_compliant_provider` | No endpoint matched the active routing policy (see [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md)). **Not** retried — the policy is deterministic, so an immediate replay re-derives the same empty pool. Relax the request's `routing` block, or report a routing-policy problem. |
+| 503  | `upstream_unavailable` | Provider outage or no capacity. Retryable. |
+| 504  | `upstream_timeout` | Upstream inactivity/deadline. Retryable. |
+
+### Faults on our side of the upstream call
+
+| HTTP | Code | Action |
+|------|------|--------|
+| 502  | `upstream_request_rejected` | OpenRouter judged the body **Daintree generated** malformed. Almost always a server bug; report the request id. Carries the provider's own reason. |
+| 502  | `upstream_protocol_error` | An unparseable response: bad JSON, a broken chunk, a stream that ended without `[DONE]`. Provider/compatibility problem. |
+| 502  | `upstream_error` | Residual/legacy catch-all. Still emitted for a missing or malformed upstream credential and for a non-verdict verification failure. |
+
+Raw upstream bodies are never returned. For a non-auth 4xx a **bounded,
+credential-scrubbed excerpt** of the provider's reason is appended to the message
+— it is usually the only thing that says *why*. Account-class failures carry no
+upstream prose at all.
 
 For a streaming `/respond`, public generation begins only after the `200` and `meta` event;
 an exhausted canonical 429/502/504 failure therefore uses the SSE `error` shape rather than

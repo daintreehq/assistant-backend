@@ -416,9 +416,13 @@ async def test_404_reads_as_a_routing_failure_not_a_bad_request() -> None:
     provider = _provider(handler)
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req())
-    assert exc.value.status_code == 502
+    # 503, not 502: nothing is wrong with the request — no endpoint satisfied the
+    # policy we sent. Not retryable, because the policy is deterministic and an
+    # immediate replay re-derives the same empty pool.
+    assert exc.value.status_code == 503
+    assert exc.value.code == "upstream_no_compliant_provider"
     assert exc.value.retryable is False
-    assert "provider-routing policy" in exc.value.message
+    assert "routing policy" in exc.value.message
     await provider.aclose()
 
 
@@ -454,7 +458,8 @@ async def test_500_maps_retryable() -> None:
     provider = _provider(handler)
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req())
-    assert exc.value.status_code == 502
+    assert exc.value.status_code == 503
+    assert exc.value.code == "upstream_unavailable"
     assert exc.value.retryable is True
     await provider.aclose()
 
@@ -513,7 +518,8 @@ async def test_400_empty_body_still_yields_a_sensible_message() -> None:
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req())
     # No detail available, but the message must not be empty or read "None".
-    assert "rejected the request" in exc.value.message.lower()
+    assert exc.value.code == "upstream_request_rejected"
+    assert "rejected this server's request" in exc.value.message.lower()
     assert "none" not in exc.value.message.lower()
     await provider.aclose()
 
@@ -591,7 +597,7 @@ async def test_stream_eof_before_done_raises() -> None:
     assert first["choices"][0]["delta"]["content"] == "partial"
     with pytest.raises(DaintreeError) as exc:
         await stream.__anext__()
-    assert exc.value.code == "upstream_error"
+    assert exc.value.code == "upstream_protocol_error"
     await stream.aclose()
     await provider.aclose()
 
@@ -626,7 +632,7 @@ async def test_stream_malformed_chunk_shape_raises_upstream_error(payload: str) 
     stream = await provider.open_stream(_req(stream=True))
     with pytest.raises(DaintreeError) as exc:
         await stream.prefetch_first_event()
-    assert exc.value.code == "upstream_error"
+    assert exc.value.code == "upstream_protocol_error"
     assert exc.value.status_code == 502
     await stream.aclose()
     await provider.aclose()
@@ -662,7 +668,7 @@ async def test_complete_non_object_response_raises_upstream_error() -> None:
     provider = _provider(handler)
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req())
-    assert exc.value.code == "upstream_error"
+    assert exc.value.code == "upstream_protocol_error"
     await provider.aclose()
 
 
@@ -674,7 +680,7 @@ async def test_complete_malformed_choices_raises_upstream_error() -> None:
     provider = _provider(handler)
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req())
-    assert exc.value.code == "upstream_error"
+    assert exc.value.code == "upstream_protocol_error"
     await provider.aclose()
 
 
@@ -1022,11 +1028,25 @@ async def test_concurrent_calls_do_not_cross_credentials() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status", [401, 402, 403])
-async def test_upstream_auth_rejection_maps_to_502_upstream_error(status: int) -> None:
-    # The caller's own key was rejected/underfunded upstream: a permanent 502
-    # upstream_error, distinct from our 401 invalid_api_key at the door, and the
-    # response text must not echo upstream account prose or the key itself.
+@pytest.mark.parametrize(
+    ("status", "code", "hint"),
+    [
+        (401, "provider_invalid_api_key", "replace or rotate"),
+        (402, "provider_insufficient_credits", "credits"),
+        (403, "provider_key_forbidden", "permissions"),
+    ],
+)
+async def test_provider_account_failures_are_distinguishable(
+    status: int, code: str, hint: str
+) -> None:
+    """Three different problems with three different fixes.
+
+    These used to collapse into one 502 ``upstream_error``, which told a tester
+    with an exhausted balance that their credentials were rejected — so they
+    replaced a perfectly good key. The CLI branches on ``error.code``, so only
+    distinct codes can produce distinct advice.
+    """
+
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             status, json={"error": {"message": f"account problem for {_CALL_KEY}"}}
@@ -1035,11 +1055,34 @@ async def test_upstream_auth_rejection_maps_to_502_upstream_error(status: int) -
     provider = _provider(handler)
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
-    assert exc.value.status_code == 502
-    assert exc.value.code == "upstream_error"
+    # The status mirrors the upstream's own semantics rather than flattening to
+    # 502: these are genuinely the caller's account, not a gateway fault.
+    assert exc.value.status_code == status
+    assert exc.value.code == code
+    assert hint in exc.value.message.lower()
+    # Never echo upstream account prose or the credential it quoted back.
     assert _CALL_KEY not in exc.value.message
-    assert "rejected the supplied credentials" in exc.value.message
+    assert "account problem" not in exc.value.message
+    # Deterministic: replaying reaches the same answer, slower, and on the
+    # streaming path burns the CLI's retry budget after meta committed a 200.
+    assert exc.value.retryable is False
     await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_provider_invalid_key_is_distinct_from_our_own_door_401() -> None:
+    """Both are 401 and both mean "fix your key" — but not the same fix.
+
+    Ours means the header was missing or malformed at Daintree's door; this one
+    means the key travelled fine and OpenRouter refused it. A client that cannot
+    tell them apart cannot write correct copy for either.
+    """
+    from daintree_assistant_server.errors import invalid_api_key, provider_invalid_api_key
+
+    ours = invalid_api_key()
+    theirs = provider_invalid_api_key()
+    assert ours.status_code == theirs.status_code == 401
+    assert ours.code != theirs.code
 
 
 @pytest.mark.asyncio
@@ -1215,7 +1258,7 @@ async def test_stream_transport_interruption_is_retryable() -> None:
     stream = OpenRouterStream(_Ctx(), _Resp(), _MODEL)
     with pytest.raises(DaintreeError) as exc:
         await stream.prefetch_first_event()
-    assert exc.value.code == "upstream_error"
+    assert exc.value.code == "upstream_unavailable"
     assert exc.value.retryable is True
     await stream.aclose()
 
@@ -1335,7 +1378,7 @@ async def test_verify_key_maps_other_failures_to_upstream_error() -> None:
         with pytest.raises(DaintreeError) as exc:
             await provider.verify_key(SecretStr("sk-or-v1-caller"))
 
-    assert exc.value.code == "upstream_error"
+    assert exc.value.code == "upstream_unavailable"
 
 
 @pytest.mark.asyncio
@@ -1418,7 +1461,7 @@ async def test_verify_key_rejects_a_200_that_is_not_a_key_record(payload: Any) -
         with pytest.raises(DaintreeError) as exc:
             await provider.verify_key(SecretStr("sk-or-v1-caller"))
 
-    assert exc.value.code == "upstream_error"
+    assert exc.value.code == "upstream_protocol_error"
 
 
 @pytest.mark.asyncio
@@ -1463,7 +1506,7 @@ async def test_verify_key_maps_a_transport_error_to_upstream_error() -> None:
         with pytest.raises(DaintreeError) as exc:
             await provider.verify_key(SecretStr("sk-or-v1-caller"))
 
-    assert exc.value.code == "upstream_error"
+    assert exc.value.code == "upstream_unavailable"
 
 
 @pytest.mark.asyncio

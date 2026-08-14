@@ -47,6 +47,7 @@ from ..prompts.loader import (
     PromptLoader,
 )
 from ..providers.base import ProviderChatRequest
+from ..providers.policy import routing_preference
 from ..skills.models import Skill
 from ..text_utils import (
     cap_bytes,
@@ -763,4 +764,7 @@ class PromptAssembler:
             thinking_disabled=not thinking_enabled,
             reasoning_effort=OPENROUTER_REASONING_EFFORT if thinking_enabled else None,
             timeout=self.settings.main_timeout_seconds,
+            # The caller's endpoint-routing preference, normalized once here so
+            # every downstream provider call for this turn routes identically.
+            routing=routing_preference(request.routing),
         )

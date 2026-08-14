@@ -33,6 +33,7 @@ from ..providers.base import (
     ProviderChatResult,
     ProviderUsage,
 )
+from ..providers.policy import RoutingPreference
 from ..providers.retry import retry_upstream
 from ..text_utils import (
     estimate_tokens,
@@ -315,6 +316,7 @@ class Selector:
         api_key: SecretStr,
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
+        routing: RoutingPreference | None = None,
     ) -> SelectionDecision:
         catalog = self.catalog
         # The catalog block is request-invariant; the active set is rendered ONCE
@@ -338,10 +340,13 @@ class Selector:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
-        return await self._run(messages, api_key)
+        return await self._run(messages, api_key, routing)
 
     def _build_request(
-        self, messages: list[dict[str, Any]], api_key: SecretStr
+        self,
+        messages: list[dict[str, Any]],
+        api_key: SecretStr,
+        routing: RoutingPreference | None,
     ) -> ProviderChatRequest:
         # HARDCODED non-thinking (see INTERACTIVE_THINKING_ENABLED in config.py):
         # this call gates the turn's first byte, and the prompt's reason-first key
@@ -361,12 +366,21 @@ class Selector:
             # The caller's own credential; the provider has no default to fall
             # back to, so omitting this would fail the call, not bill anyone.
             api_key=api_key,
+            # The caller's routing preference must reach THIS call too. The
+            # selector sends the conversation upstream just as the main completion
+            # does, so a turn that asked for ZDR and got it only on the main call
+            # would still have routed the same content to a non-ZDR endpoint here —
+            # the privacy choice honoured everywhere except where it was invisible.
+            routing=routing,
         )
 
     async def _run(
-        self, messages: list[dict[str, Any]], api_key: SecretStr
+        self,
+        messages: list[dict[str, Any]],
+        api_key: SecretStr,
+        routing: RoutingPreference | None = None,
     ) -> SelectionDecision:
-        request = self._build_request(messages, api_key)
+        request = self._build_request(messages, api_key, routing)
 
         try:
             result = await self._call_once(request)
@@ -380,7 +394,9 @@ class Selector:
 
         if parsed is None:
             repair_request = self._build_request(
-                [*messages, {"role": "user", "content": _REPAIR_INSTRUCTION}], api_key
+                [*messages, {"role": "user", "content": _REPAIR_INSTRUCTION}],
+                api_key,
+                routing,
             )
             try:
                 repair = await self._call_once(repair_request)
