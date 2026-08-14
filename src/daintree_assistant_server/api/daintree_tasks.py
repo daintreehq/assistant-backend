@@ -24,4 +24,7 @@ async def run_task(
     container = request.app.state.container
     result = await container.task_runner.run(body, api_key=principal.api_key)
     headers = {"X-Request-Id": body.request_id} if body.request_id else {}
-    return JSONResponse(content=result.model_dump(), headers=headers)
+    # exclude_none, matching /respond: an unreported `usage.cost` must be ABSENT
+    # rather than null, or a client testing key presence to distinguish "unknown"
+    # from "free" gets a different answer per endpoint.
+    return JSONResponse(content=result.model_dump(exclude_none=True), headers=headers)

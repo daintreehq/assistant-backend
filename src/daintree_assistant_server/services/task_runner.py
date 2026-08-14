@@ -704,11 +704,20 @@ def _sum_usage(a: ProviderUsage, b: ProviderUsage) -> ProviderUsage:
     def add(x: int | None, y: int | None) -> int:
         return (x or 0) + (y or 0)
 
+    def add_cost(x: float | None, y: float | None) -> float | None:
+        # A JSON task that needed a repair call made TWO billed completions. The
+        # token counts already sum; the cost must too, or the caller is shown
+        # less than they paid.
+        if x is None:
+            return y
+        return x if y is None else x + y
+
     return ProviderUsage(
         prompt_tokens=add(a.prompt_tokens, b.prompt_tokens),
         completion_tokens=add(a.completion_tokens, b.completion_tokens),
         total_tokens=add(a.total_tokens, b.total_tokens),
         cached_tokens=add(a.cached_tokens, b.cached_tokens),
+        cost=add_cost(a.cost, b.cost),
     )
 
 
@@ -938,6 +947,7 @@ class TaskRunner:
                 completion_tokens=usage.completion_tokens or 0,
                 total_tokens=usage.total_tokens or 0,
                 cached_tokens=usage.cached_tokens or 0,
+                cost=usage.cost,
             ),
             prompt_version=profile.id,
         )

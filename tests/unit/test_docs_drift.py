@@ -481,8 +481,7 @@ def test_provider_policy_documents_both_retry_hops() -> None:
     # Tolerant of formatting (`= 1`, `is 1`, `, default 1`) but not of the number,
     # which is the fact that can drift.
     assert re.search(rf"MAX_UPSTREAM_RETRIES\D{{0,20}}{default}\b", text), (
-        f"docs/PROVIDER_POLICY.md does not state the current default "
-        f"MAX_UPSTREAM_RETRIES={default}"
+        f"docs/PROVIDER_POLICY.md does not state the current default MAX_UPSTREAM_RETRIES={default}"
     )
 
 
@@ -551,8 +550,7 @@ def test_structured_routing_bound_is_documented() -> None:
         # number, which is the fact that drifts.
         pattern = rf'"{key}"\D{{0,4}}{re.escape(str(value).rstrip("0").rstrip("."))}'
         assert re.search(pattern, text), (
-            f"docs/PROVIDER_POLICY.md does not document preferred_max_latency "
-            f"{key}={value}"
+            f"docs/PROVIDER_POLICY.md does not document preferred_max_latency {key}={value}"
         )
 
 
@@ -753,3 +751,93 @@ def test_skill_learning_is_permitted_in_local_environments(environment: str) -> 
     )
     assert not local.is_hardened
     assert not any("SKILL_LEARNING_MODE" in p for p in local.local_only_problems())
+
+
+# ---------------------------------------------------------------------------
+# Cost reporting (PROVIDER_POLICY section 5c)
+# ---------------------------------------------------------------------------
+
+
+def test_every_documented_cost_field_exists_on_the_wire_model() -> None:
+    """Section 5c's table names fields a CLI will be written against.
+
+    A doc promising `cost.selector` that the model does not carry sends someone
+    to build a display for a field that never arrives.
+    """
+    from daintree_assistant_server.contracts.daintree_api import (
+        RespondResponse,
+        StreamDone,
+        TurnCost,
+    )
+
+    assert set(TurnCost.model_fields) == {"total", "main", "selector", "complete"}
+    assert "cost" in RespondResponse.model_fields
+    assert "cost" in StreamDone.model_fields
+
+
+def test_the_absent_means_unknown_rule_is_real() -> None:
+    """The doc's strongest claim: a missing cost block is never "free".
+
+    Both halves have to hold — the field must be nullable in the model, AND the
+    serializer must actually drop it, or the promise is prose only.
+    """
+    from daintree_assistant_server.contracts.daintree_api import RespondResponse
+
+    assert RespondResponse.model_fields["cost"].default is None
+    from daintree_assistant_server.contracts.daintree_api import RespondMessage
+
+    body = RespondResponse(
+        request_id="r",
+        model="m",
+        message=RespondMessage(content="hi"),
+        catalog_revision="c",
+        prompt_version="p",
+    ).model_dump(exclude_none=True)
+    assert "cost" not in body
+
+
+def test_the_doc_does_not_claim_a_cost_opt_in_is_needed() -> None:
+    """OpenRouter's `usage: {include: true}` is deprecated and inert.
+
+    The request builder must not send it, and the doc must not tell a reader to.
+    A stale instruction here costs nothing to follow and teaches the wrong model
+    of where the number comes from.
+    """
+    import inspect as _inspect
+
+    from daintree_assistant_server.providers import openrouter as _or
+
+    source = _inspect.getsource(_or)
+    assert '"include"' not in source, "the deprecated usage opt-in crept back in"
+    assert "deprecated and has no effect" in DOC_PROVIDER.read_text(encoding="utf-8")
+
+
+def test_the_documented_total_is_a_sum_of_both_calls() -> None:
+    """Section 5c says a turn is normally two billed calls and total covers both.
+
+    Asserted against the arithmetic rather than the prose, so a change that
+    quietly reports only the main call fails here.
+    """
+    from daintree_assistant_server.contracts.daintree_api import SkillsBlock
+    from daintree_assistant_server.contracts.extensions import SelectorMeta, SelectorUsage
+    from daintree_assistant_server.providers.base import ProviderUsage
+    from daintree_assistant_server.services.chat_orchestrator import (
+        ChatOrchestrator,
+        _RespondMeta,
+    )
+
+    meta = _RespondMeta(
+        request_id="r",
+        state=None,
+        catalog_revision="c",
+        prompt_version="p",
+        skills=SkillsBlock(
+            selector=SelectorMeta(usage=SelectorUsage(cost=0.0004)),
+        ),
+        warnings=[],
+    )
+    cost = ChatOrchestrator._turn_cost(ProviderUsage(cost=0.0021), meta)
+    assert cost is not None
+    assert cost.total == pytest.approx(0.0025)
+    assert cost.main == 0.0021
+    assert cost.selector == 0.0004

@@ -22,6 +22,7 @@ from . import __version__
 from .api import (
     daintree_auth,
     daintree_capabilities,
+    daintree_doctor,
     daintree_respond,
     daintree_skills,
     daintree_tasks,
@@ -427,6 +428,9 @@ def create_app(
     app.include_router(daintree_respond.router)
     app.include_router(daintree_capabilities.router)
     app.include_router(daintree_auth.router)
+    # Deliberately NOT behind require_ready: a doctor that goes down with the
+    # patient cannot diagnose the outage a tester is calling about.
+    app.include_router(daintree_doctor.router)
     app.include_router(daintree_skills.router)
     app.include_router(daintree_tasks.router)
 

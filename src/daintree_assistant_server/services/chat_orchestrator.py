@@ -33,6 +33,7 @@ from ..contracts.daintree_api import (
     StreamError,
     StreamMeta,
     StreamStatus,
+    TurnCost,
 )
 from ..contracts.extensions import (
     Prelude,
@@ -329,6 +330,12 @@ class _PreparedTurn:
     # a mutable `reasons` dict, and one instance shared by every default-built
     # turn is a foot-gun waiting for the first caller that writes to it.
     projection: ToolProjection = field(default_factory=ToolProjection)
+    # Spend on a speculative generation this turn opened and then threw away.
+    # Billed to the caller either way; see `_turn_cost`.
+    discarded_usage: ProviderUsage = field(default_factory=ProviderUsage)
+    # True when such a generation happened at all, which is what distinguishes
+    # "no speculation" from "speculation whose cost we could not read".
+    speculation_billed: bool = False
 
 
 class _PrepOwnedStream:
@@ -1042,9 +1049,27 @@ class ChatOrchestrator:
             [c.get("function", {}).get("name", "") for c in result.tool_calls],
             request_id=request_id,
         )
-        self._lint_final_output(result, request_id=request_id, had_tool_calls=had_tool_calls)
+        lint_warnings = self._lint_final_output(
+            result, request_id=request_id, had_tool_calls=had_tool_calls
+        )
+        if lint_warnings:
+            # Appended to the turn's existing warnings rather than replacing
+            # them: a reply can be both over-wide AND have had an unknown skill
+            # id ignored, and dropping either loses a distinct diagnosis.
+            prepared.meta.warnings.extend(lint_warnings)
+        turn_cost = self._turn_cost_for(result.usage, prepared)
+        self._log_turn_usage(
+            result.usage,
+            request_id=request_id,
+            stream=False,
+            finish_reason=result.finish_reason,
+            turn_cost=turn_cost,
+        )
         body = self._build_nonstream_body(
-            result, prepared.meta, param_index=build_parameter_index(request.input.tools)
+            result,
+            prepared.meta,
+            param_index=build_parameter_index(request.input.tools),
+            cost=turn_cost,
         )
         self._maybe_learn_after_turn(
             request=request,
@@ -1194,6 +1219,12 @@ class ChatOrchestrator:
         # cold empty-set guess or to a prior set that went stale.
         speculation_basis = "none"
         speculation_stats: dict[str, Any] | None = None
+        # A losing speculation's spend. `speculation_billed` is the honest half:
+        # it records that a generation WAS paid for, even on the branch where the
+        # amount is unknowable, so the turn's cost can be marked incomplete
+        # instead of quietly reporting less than the caller was charged.
+        discarded_usage = ProviderUsage()
+        speculation_billed = False
 
         def release_speculation_slot() -> None:
             nonlocal speculation_slot
@@ -1364,6 +1395,16 @@ class ChatOrchestrator:
                         (time.perf_counter() - t_discard) * 1000
                     )
                     speculation_outcome = "discarded"
+                    # The caller was billed for this generation whether or not we
+                    # used a byte of it. Read the usage AFTER discard: the
+                    # producer records it in its `finally`, which discard awaits,
+                    # so a speculation that finished before losing still reports
+                    # a real cost here. One cancelled mid-flight reports nothing —
+                    # OpenRouter only sends usage in a stream's final chunk — and
+                    # that unknowable-but-real spend is what clears `complete`
+                    # below rather than being silently treated as zero.
+                    discarded_usage = speculation.usage or ProviderUsage()
+                    speculation_billed = True
                     speculation = None
                     provider_request = replace(
                         self.assembler.build_main_request(
@@ -1462,36 +1503,51 @@ class ChatOrchestrator:
             active_ids=active_ids,
             speculation=speculation,
             api_key=api_key,
+            discarded_usage=discarded_usage,
+            speculation_billed=speculation_billed,
         )
 
     # ---- output linting (non-stream backstop; observability) ------------
 
+    # Output-contract findings, as stable codes the CLI can branch on. Prefixed so
+    # they are distinguishable at a glance from the request-level warnings
+    # (``unknown_skill_id_ignored``) that share the same list on the non-streaming
+    # path.
+    _LINT_WARNING_CODES = {
+        "think_leak": "output_think_leak",
+        "oversized": "output_oversized",
+        "pipe_table": "output_wide_table",
+    }
+
     def _lint_final_output(
         self, result: Any, *, request_id: str, had_tool_calls: bool
-    ) -> None:
-        """Lint the final assistant message: observability, plus optional table repair.
+    ) -> list[str]:
+        """Lint the final assistant message: warn the caller, plus optional table repair.
 
         Runs only when the turn ENDED (no tool calls) with visible content — a
-        continuation round's content is interstitial. Logs any contract violation
-        (over-budget pipe table, visible ``<think>`` leakage, oversized dump). When
+        continuation round's content is interstitial. When
         ``main_output_repair_tables`` is on, an over-budget table is rewritten to a
         per-entity list in place. Never raises — a lint bug must not break a response
-        the user is already owed. Streaming bypasses this (bytes already sent).
+        the user is already owed.
+
+        Returns the warning codes for the caller to surface. Previously these were
+        logged and nothing more, which meant the one party who could act on a
+        malformed reply — the client rendering it — was the only one not told.
         """
         if not self.settings.main_output_lint_enabled or had_tool_calls:
-            return
+            return []
         try:
             message = result.message or {}
             text = message.get("content") or ""
             if not text.strip():
-                return
+                return []
             findings = lint_output(
                 text,
                 terminal_width=self.settings.main_terminal_width,
                 warn_chars=self.settings.main_output_warn_chars,
             )
             if not findings.has_violation:
-                return
+                return []
             violating = findings.violating_tables
             repaired = False
             if self.settings.main_output_repair_tables and violating:
@@ -1502,6 +1558,7 @@ class ChatOrchestrator:
             logger.info(
                 "main_output_lint",
                 request_id=request_id,
+                stream=False,
                 violations=findings.violation_types(),
                 content_chars=findings.char_count,
                 table_count=len(findings.tables),
@@ -1514,8 +1571,77 @@ class ChatOrchestrator:
                 repair_attempted=self.settings.main_output_repair_tables and bool(violating),
                 repair_succeeded=repaired,
             )
+            # Report against what the client will ACTUALLY receive. Re-linting
+            # rather than clearing the `pipe_table` finding matters because
+            # `repair_tables` converts what it can and leaves the rest: a table
+            # with no usable body rows is deliberately untouched. Treating "the
+            # text changed" as "every table is fixed" would suppress the warning
+            # for a table that still violates the contract.
+            final = findings
+            if repaired:
+                final = lint_output(
+                    message.get("content") or "",
+                    terminal_width=self.settings.main_terminal_width,
+                    warn_chars=self.settings.main_output_warn_chars,
+                )
+            return [
+                self._LINT_WARNING_CODES[t]
+                for t in final.violation_types()
+                if t in self._LINT_WARNING_CODES
+            ]
         except Exception as exc:  # noqa: BLE001 - observability must never break the turn
             logger.warning("main_output_lint_error", request_id=request_id, error=str(exc))
+            return []
+
+    def _lint_streamed_output(
+        self, text: str, *, request_id: str, had_tool_calls: bool
+    ) -> list[str]:
+        """Lint text that has ALREADY been sent, for the terminal ``done`` event.
+
+        The streaming twin of :meth:`_lint_final_output`, and deliberately weaker:
+        nothing can be repaired here, because the bytes left before the defect was
+        knowable. What it can still do is tell the client what it just rendered,
+        which is enough for the CLI to flag the reply or drop a leaked
+        ``<think>`` block from its scrollback.
+
+        No mid-stream termination. The review that prompted this asked for one on
+        "severe hidden-content leakage", but there is no third party to protect
+        here: the hidden material is our own prompt and the user's own local
+        context. Killing a stream the user is reading, to prevent them seeing
+        their own data, trades a real cost for a cosmetic one.
+        """
+        if not self.settings.main_output_lint_enabled or had_tool_calls or not text.strip():
+            return []
+        try:
+            findings = lint_output(
+                text,
+                terminal_width=self.settings.main_terminal_width,
+                warn_chars=self.settings.main_output_warn_chars,
+            )
+            if not findings.has_violation:
+                return []
+            logger.info(
+                "main_output_lint",
+                request_id=request_id,
+                stream=True,
+                violations=findings.violation_types(),
+                content_chars=findings.char_count,
+                think_leak=findings.think_leak,
+                oversized=findings.oversized,
+                violating_table_count=len(findings.violating_tables),
+                # Repair is structurally impossible once bytes are public. Stated
+                # explicitly so the two paths' records stay comparable.
+                repair_attempted=False,
+                repair_succeeded=False,
+            )
+            return [
+                self._LINT_WARNING_CODES[t]
+                for t in findings.violation_types()
+                if t in self._LINT_WARNING_CODES
+            ]
+        except Exception as exc:  # noqa: BLE001 - a lint bug must not break the stream
+            logger.warning("main_output_lint_error", request_id=request_id, error=str(exc))
+            return []
 
     # ---- skill learning (local dev only, off the response path) ---------
 
@@ -1763,6 +1889,7 @@ class ChatOrchestrator:
                 completion_tokens=u.completion_tokens or 0,
                 total_tokens=u.total_tokens or 0,
                 cached_tokens=u.cached_tokens or 0,
+                cost=u.cost,
             )
 
         reason = decision.reason if self.settings.expose_debug_selector_reason else None
@@ -1792,7 +1919,12 @@ class ChatOrchestrator:
     # ---- response bodies ------------------------------------------------
 
     def _build_nonstream_body(
-        self, result: Any, meta: _RespondMeta, *, param_index: ParameterIndex
+        self,
+        result: Any,
+        meta: _RespondMeta,
+        *,
+        param_index: ParameterIndex,
+        cost: TurnCost | None = None,
     ) -> dict[str, Any]:
         message = result.message or {}
         response = RespondResponse(
@@ -1810,6 +1942,7 @@ class ChatOrchestrator:
             ),
             finish_reason=result.finish_reason,
             usage=self._usage(result.usage),
+            cost=cost,
             skills=meta.skills,
             state=meta.state,
             catalog_revision=meta.catalog_revision,
@@ -1856,6 +1989,128 @@ class ChatOrchestrator:
                 repairs=notes,
             )
 
+    @classmethod
+    def _turn_cost_with_speculation(
+        cls,
+        usage: ProviderUsage,
+        meta: _RespondMeta,
+        *,
+        discarded_usage: ProviderUsage,
+        speculation_billed: bool,
+    ) -> TurnCost | None:
+        """``_turn_cost`` with a losing speculation's spend folded in.
+
+        One home for the arithmetic, called identically by both response paths —
+        the streaming path cannot see the ``_PreparedTurn`` itself, so the two
+        pieces it needs are passed explicitly rather than duplicated inline.
+        """
+        if not speculation_billed:
+            return cls._turn_cost(usage, meta)
+        return cls._turn_cost(
+            cls._sum_usage(usage, discarded_usage),
+            meta,
+            # A losing speculation is only fully accounted for if it reported a
+            # cost before we cancelled it. Otherwise real spend happened that
+            # nothing can measure, and the total is a floor.
+            complete=discarded_usage.cost is not None,
+        )
+
+    @classmethod
+    def _turn_cost_for(cls, usage: ProviderUsage, prepared: _PreparedTurn) -> TurnCost | None:
+        """The non-streaming caller's shorthand, which does hold a prepared turn."""
+        return cls._turn_cost_with_speculation(
+            usage,
+            prepared.meta,
+            discarded_usage=prepared.discarded_usage,
+            speculation_billed=prepared.speculation_billed,
+        )
+
+    @staticmethod
+    def _turn_cost(
+        main: ProviderUsage, meta: _RespondMeta, *, complete: bool = True
+    ) -> TurnCost | None:
+        """Total USD this request charged the caller, across every upstream call.
+
+        A turn is normally TWO billed calls — the skill selector and the main
+        completion — plus, on a re-rolled round, a generation the user never saw.
+        All of it is charged to the caller's own key, so reporting only the main
+        call would understate their bill by the part they cannot see.
+
+        Both figures are OpenRouter's own reported ``cost``, not a token-price
+        estimate we compute: the router knows which of ~24 endpoints served the
+        request and what cache discount applied, and we do not.
+
+        Returns ``None`` when NOTHING reported a cost — the absence says "we do
+        not know", which a zero would misreport as "free".
+
+        The subtler case is a PARTIAL answer, and it is why ``complete`` exists.
+        A selector that ran but whose cost went unreported would otherwise
+        contribute 0.0 to a field named ``total``, quietly turning a partial sum
+        into a claimed complete one. So a component is treated as unknown only
+        when its call actually happened, and any unknown clears ``complete``.
+
+        ``complete=False`` may also be passed by the caller for a cost we know
+        was incurred and cannot observe at all — a losing speculative stream that
+        was cancelled before its usage arrived.
+        """
+        selector_usage = meta.skills.selector.usage
+        selector = selector_usage.cost if selector_usage is not None else None
+        # "Ran" is what makes a missing cost UNKNOWN rather than genuinely zero.
+        # A turn that skipped selection entirely (continuation round, no-task
+        # fast path) has no selector usage at all, and its absent cost is a
+        # truthful zero rather than a gap.
+        selector_ran = selector_usage is not None
+        if main.cost is None and selector is None and not selector_ran:
+            return None
+        if main.cost is None and selector is None:
+            return None
+        known_complete = complete and main.cost is not None
+        if selector_ran and selector is None:
+            known_complete = False
+        return TurnCost(
+            total=(main.cost or 0.0) + (selector or 0.0),
+            main=main.cost,
+            selector=selector,
+            complete=known_complete,
+        )
+
+    @staticmethod
+    def _log_turn_usage(
+        usage: ProviderUsage,
+        *,
+        request_id: str,
+        stream: bool,
+        finish_reason: str | None,
+        turn_cost: TurnCost | None = None,
+    ) -> None:
+        """What this turn cost the caller, as metadata.
+
+        The response body carries the same numbers to the CLI; this is the half
+        that survives the request, so a tester reporting "it burned through my
+        credit" can be answered from logs rather than from memory.
+
+        ``cache_ratio`` is the number the prompt-cache work exists to move, and
+        the one most worth watching regress: the assembler's whole layout is
+        built to keep the tool schemas byte-stable, and a drop here is the first
+        symptom that something started re-encoding them.
+        """
+        prompt = usage.prompt_tokens or 0
+        logger.info(
+            "turn_usage",
+            request_id=request_id,
+            stream=stream,
+            finish_reason=finish_reason,
+            prompt_tokens=prompt,
+            completion_tokens=usage.completion_tokens or 0,
+            cached_tokens=usage.cached_tokens or 0,
+            cache_ratio=(round((usage.cached_tokens or 0) / prompt, 3) if prompt else None),
+            cost_usd=usage.cost,
+            # The figure that answers "what did this request cost me?" — every
+            # upstream call the turn made, including the selector.
+            turn_cost_usd=turn_cost.total if turn_cost else None,
+            selector_cost_usd=turn_cost.selector if turn_cost else None,
+        )
+
     @staticmethod
     def _usage(usage: ProviderUsage) -> RespondUsage:
         return RespondUsage(
@@ -1863,6 +2118,10 @@ class ChatOrchestrator:
             completion_tokens=usage.completion_tokens or 0,
             total_tokens=usage.total_tokens or 0,
             cached_tokens=usage.cached_tokens or 0,
+            # NOT `or 0`: an unreported cost must stay None. Zero would read as
+            # "this turn was free", which is a claim about the caller's bill we
+            # have no basis for.
+            cost=usage.cost,
         )
 
     async def _stream_with_heartbeat(
@@ -1961,6 +2220,8 @@ class ChatOrchestrator:
             api_key=prepared.api_key,
             budget=budget,
             projection=prepared.projection,
+            discarded_usage=prepared.discarded_usage,
+            speculation_billed=prepared.speculation_billed,
         )
         try:
             async for event in body:
@@ -2005,6 +2266,8 @@ class ChatOrchestrator:
         speculative_stream: _SpeculativeStream | None = None,
         budget: RequestBudget | None = None,
         projection: ToolProjection,
+        discarded_usage: ProviderUsage,
+        speculation_billed: bool,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
@@ -2276,8 +2539,25 @@ class ChatOrchestrator:
             yield self._sse(
                 "done",
                 StreamDone(
-                    finish_reason=finish_reason, usage=self._usage(carried_usage)
-                ).model_dump(),
+                    finish_reason=finish_reason,
+                    usage=self._usage(carried_usage),
+                    # `carried_usage` already sums a discarded re-roll, so this
+                    # total covers every generation the caller paid for.
+                    cost=self._turn_cost_with_speculation(
+                        carried_usage,
+                        meta,
+                        discarded_usage=discarded_usage,
+                        speculation_billed=speculation_billed,
+                    ),
+                    # Lint what was actually streamed. A round that ended in tool
+                    # calls is interstitial and is not linted, matching the
+                    # non-streaming rule.
+                    warnings=self._lint_streamed_output(
+                        "".join(content_parts),
+                        request_id=meta.request_id,
+                        had_tool_calls=saw_tool_calls or finish_reason == "tool_calls",
+                    ),
+                ).model_dump(exclude_none=True),
             )
             completed = True
         except DaintreeError as exc:
@@ -2306,6 +2586,18 @@ class ChatOrchestrator:
         # yield above and never reaches here). A tool-continuation round is filtered
         # by had_tool_calls inside the trigger.
         if completed:
+            self._log_turn_usage(
+                carried_usage,
+                request_id=meta.request_id,
+                stream=True,
+                finish_reason=finish_reason,
+                turn_cost=self._turn_cost_with_speculation(
+                    carried_usage,
+                    meta,
+                    discarded_usage=discarded_usage,
+                    speculation_billed=speculation_billed,
+                ),
+            )
             # Consolidated names only, and only from the buffer that survived:
             # a re-rolled attempt got a fresh buffer, so its discarded calls are
             # not graded as if the model had made them. `names_complete` carries
@@ -2517,6 +2809,11 @@ class ChatOrchestrator:
                 return b
             return a if b is None else a + b
 
+        def add_cost(a: float | None, b: float | None) -> float | None:
+            if a is None:
+                return b
+            return a if b is None else a + b
+
         first = first or ProviderUsage()
         second = second or ProviderUsage()
         return ProviderUsage(
@@ -2524,6 +2821,10 @@ class ChatOrchestrator:
             completion_tokens=add(first.completion_tokens, second.completion_tokens),
             total_tokens=add(first.total_tokens, second.total_tokens),
             cached_tokens=add(first.cached_tokens, second.cached_tokens),
+            # A discarded attempt was still billed to the caller, so its cost is
+            # part of what this turn cost them — the same reason the tokens are
+            # summed rather than replaced.
+            cost=add_cost(first.cost, second.cost),
         )
 
     def _log_bare_intent(self, phase: str, *, request_id: str, **fields: Any) -> None:

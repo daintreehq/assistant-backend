@@ -9,6 +9,7 @@ prompt construction, or the public endpoints.
 from __future__ import annotations
 
 import abc
+import math
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
@@ -25,6 +26,16 @@ class ProviderUsage:
     completion_tokens: int | None = None
     total_tokens: int | None = None
     cached_tokens: int | None = None
+    # What this call actually charged the CALLER's account, in provider credits
+    # (USD for OpenRouter). It is not a per-token estimate we compute: the router
+    # reports what it billed, so it already accounts for the endpoint that served
+    # the request and for any cache discount. `None` means "not reported".
+    #
+    # OpenRouter returns this unconditionally — the `usage: {include: true}`
+    # opt-in is deprecated and has no effect — in the same object as the token
+    # counts, including the final chunk of a stream. So there is no second call
+    # and no added latency; verified against the live API 2026-08-14.
+    cost: float | None = None
 
     @classmethod
     def from_wire(cls, usage: dict[str, Any] | None) -> ProviderUsage:
@@ -32,11 +43,25 @@ class ProviderUsage:
             return cls()
         details = usage.get("prompt_tokens_details") or {}
         cached = details.get("cached_tokens") if isinstance(details, dict) else None
+        # Defensive: a provider that reports cost as a string, a bool, NaN, or
+        # not at all must not turn a good usage record into an exception — nor
+        # into a fake zero. `bool` is checked explicitly because it subclasses
+        # `int`, so `"cost": false` would otherwise become 0.0 and be reported to
+        # the caller as "this was free". Non-finite values are rejected for the
+        # same reason plus a practical one: NaN and Infinity are not valid JSON
+        # and would produce a body no strict client can parse.
+        raw_cost = usage.get("cost")
+        cost: float | None = None
+        if isinstance(raw_cost, (int, float)) and not isinstance(raw_cost, bool):
+            candidate = float(raw_cost)
+            if math.isfinite(candidate):
+                cost = candidate
         return cls(
             prompt_tokens=usage.get("prompt_tokens"),
             completion_tokens=usage.get("completion_tokens"),
             total_tokens=usage.get("total_tokens"),
             cached_tokens=cached,
+            cost=cost,
         )
 
 

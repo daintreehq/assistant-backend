@@ -291,7 +291,11 @@ def tool_call_for(skill_ids: list[str], *, confidence: float = 0.9, task_type: s
 
 
 def selection_result(
-    skill_ids: list[str], *, confidence: float = 0.9, task_type: str = "task"
+    skill_ids: list[str],
+    *,
+    confidence: float = 0.9,
+    task_type: str = "task",
+    usage: ProviderUsage | None = None,
 ) -> ProviderChatResult:
     """A selector completion result: the choice as a JSON object in ``content``.
 
@@ -309,7 +313,8 @@ def selection_result(
                 "confidence": confidence,
             }
         ),
-        usage=ProviderUsage(
+        usage=usage
+        or ProviderUsage(
             prompt_tokens=3000, completion_tokens=50, total_tokens=3050, cached_tokens=2800
         ),
     )

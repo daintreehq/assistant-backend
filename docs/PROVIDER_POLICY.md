@@ -338,6 +338,88 @@ actually exercised. The existing selector benchmark captures neither cached
 tokens nor endpoint attribution and runs at concurrency six, so it cannot answer
 this as written.
 
+## 5c. Cost reporting — the caller's bill, not our metric
+
+Every upstream call is funded by the caller's own OpenRouter key. What a request
+costs is therefore their money, which makes it a product surface rather than an
+internal metric, and makes two failure modes unacceptable: reporting a cost we
+did not observe, and reporting zero for one we could not observe.
+
+**Where it comes from.** OpenRouter returns a `cost` field inside the usage
+object on every completion. The historical `usage: {"include": true}` opt-in is
+**deprecated and has no effect** — full usage is now always included. It arrives
+in the non-streaming body and in the *final chunk* of a stream, computed
+in-flight, so there is no second call and no added latency. Verified against the
+live API on 2026-08-14; `tests/unit/test_cost_transparency.py` parses a captured
+response verbatim.
+
+It is the router's own reported figure, never a token-price estimate we compute.
+That matters because OpenRouter fronts ~24 endpoints for the same weights at
+different prices and applies cache discounts we cannot see; anything we
+calculated ourselves would be a guess presented as a bill.
+
+**What is reported.**
+
+| surface | field | covers |
+|---|---|---|
+| `POST /respond` body | `cost.total` | every upstream call the request made |
+| `POST /respond` body | `cost.main`, `cost.selector` | the breakdown |
+| `POST /respond` body | `cost.complete` | whether `total` is exact or a floor |
+| streaming | `done` event, same shape | as above |
+| `POST /tasks` body | `usage.cost` | that task, including any repair call |
+
+A `/respond` request can bill **more calls than are obvious**:
+
+- the skill selector, plus one JSON-repair call if its output was malformed;
+- a speculative main stream that lost, plus the canonical one that replaced it;
+- the main completion;
+- a bare-intent semantic re-roll, whose output the user never saw.
+
+`cost.total` sums every one of those it can observe, because every one of them
+lands on the caller's card. The breakdown is kept because it answers the
+follow-up question ("why was that turn expensive?") and because `selector` is the
+component prompt work can actually move.
+
+**Absent means unknown.** When the provider reports no cost, the whole `cost`
+block is omitted rather than filled with zeros. A zero would read as "this turn
+was free" — a claim about someone's money that we would have no basis for. A
+client must treat a missing block as unknown, and
+`/v1/daintree/capabilities` says so explicitly under
+`respond.cost_reporting.absent_when_unknown`.
+
+**`complete: false` means the total is a floor.** A turn can spend money we
+cannot measure, and the field exists so that case never masquerades as an exact
+figure. Two things clear it:
+
+- **A component that ran but reported no cost.** A selector call whose cost is
+  missing would otherwise contribute `0.0` to a field named `total`, turning a
+  partial sum into a claimed complete one — the same "zero means free" error the
+  absent-block rule prevents, one level up. Note the distinction: a turn that
+  *skipped* selection (continuation round, no-task fast path) has no selector
+  usage at all, and its missing cost is a truthful zero rather than a gap.
+- **A losing speculative stream cancelled before it reported.** When speculation
+  opens a private upstream stream and the selector then picks a different skill
+  set, that stream is cancelled. If it *finished* first its cost is known and is
+  included in `total`. If it was cut off mid-flight, OpenRouter never sent the
+  final chunk that carries usage, so the spend is real but unobservable —
+  recovering it would mean a second `/generation?id=` call per turn.
+
+Speculation only runs on a streamed turn that already has a verified,
+catalog-current, non-empty active skill set, and is only abandoned when selection
+contradicts it. Every occurrence is logged (`skill_speculation_fallback`), so the
+gap is measurable rather than assumed.
+
+**What is not counted at all:** skill learning. It runs fire-and-forget *after*
+the response, on a stronger model (`openai/gpt-5.6-sol`), and can cost more than
+the turn that triggered it. It is off by default and fails readiness in
+production, so no beta tester is exposed — but a local developer who enables it
+must read their spend from the OpenRouter dashboard, not from these fields.
+
+The authority on a bill is always the OpenRouter dashboard; these figures are for
+proportion and trend.
+
+---
+
 ## 6. Failure mapping
 
 The caller must be able to tell *whose* problem a failure is: their key, their

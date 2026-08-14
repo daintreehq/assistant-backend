@@ -129,6 +129,63 @@ class RespondUsage(BaseModel):
     completion_tokens: int = 0
     total_tokens: int = 0
     cached_tokens: int = 0
+    # What this turn's MAIN call charged the caller, in USD. The caller's own key
+    # funds every upstream call, so this is their bill, not ours — which is the
+    # whole reason it is surfaced rather than merely logged.
+    #
+    # It covers the main completion ONLY. The selector's cost is reported
+    # separately under ``skills.selector.usage``; a client showing a turn total
+    # adds the two. Kept split rather than summed because they answer different
+    # questions — "what did the answer cost" and "what did routing cost" — and a
+    # single number hides the one the prompt work is trying to move.
+    #
+    # ``None`` means the provider reported no cost, never "free".
+    cost: float | None = None
+
+
+class TurnCost(BaseModel):
+    """What this whole request charged the caller, in USD.
+
+    The caller's own key funds every upstream call a turn makes, so the number
+    that matters to them is the TOTAL — not what any one call cost. A turn can
+    open two upstream calls (the skill selector, then the main completion) and a
+    re-rolled round pays for a generation nobody ever saw; all of it lands on
+    their card, so all of it is counted here.
+
+    ``total`` is the headline. The breakdown is kept because it answers the
+    follow-up question — "why was that turn expensive?" — and because
+    ``selector`` is the part that prompt work can actually move.
+
+    The whole object is ABSENT when the provider reported no cost at all. That is
+    deliberate: a zero would read as "this turn was free", which is a claim about
+    someone's bill that we would have no basis for.
+
+    **``total`` is a lower bound, not a receipt.** One billed generation is
+    structurally uncountable: when skill speculation opens a private upstream
+    stream and the selector then picks a different skill set, that stream is
+    CANCELLED mid-flight. The tokens it produced were billed, but OpenRouter
+    reports usage only in a stream's final chunk — which a cancelled stream never
+    sends — so its cost cannot be observed at any price. It is rare (speculation
+    only runs when a verified, catalog-current active set already exists, and is
+    only abandoned when selection contradicts it) and it is measurable from the
+    ``skill_speculation_fallback`` log, but it is real. The authority on a bill is
+    the OpenRouter dashboard; this field is for proportion and trend.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    total: float
+    main: float | None = None
+    selector: float | None = None
+    # False when a call this turn MADE did not report its cost, so ``total`` is
+    # the sum of what we could observe and nothing more.
+    #
+    # This distinction is the whole contract. Without it, a selector whose cost
+    # went unreported contributes 0.0 to a field labelled "total", and a partial
+    # sum is presented as a complete one — the same "zero means free" lie the
+    # absent-block rule exists to prevent, wearing a different hat. A client
+    # showing a session total should render an incomplete turn as a lower bound.
+    complete: bool = True
 
 
 class RespondMessage(BaseModel):
@@ -150,6 +207,9 @@ class RespondResponse(BaseModel):
     message: RespondMessage
     finish_reason: str | None = None
     usage: RespondUsage = Field(default_factory=RespondUsage)
+    # What this request cost the caller in total, across every upstream call it
+    # made. Absent when the provider reported no cost. See TurnCost.
+    cost: TurnCost | None = None
     # First-class skill outcome.
     skills: SkillsBlock = Field(default_factory=SkillsBlock)
     state: str | None = None
@@ -203,6 +263,21 @@ class StreamStatus(BaseModel):
 class StreamDone(BaseModel):
     finish_reason: str | None = None
     usage: RespondUsage = Field(default_factory=RespondUsage)
+    # The turn's total spend, same shape and same rule as the non-streaming
+    # body's. Carried on the terminal event because that is the first moment the
+    # main call's usage is known — OpenRouter reports it in the final chunk.
+    cost: TurnCost | None = None
+    # Output-contract findings for the text just streamed (``output_think_leak``,
+    # ``output_oversized``, ``output_wide_table``). Advisory only — the bytes are
+    # already on the wire, so this is the terminal event's chance to tell the CLI
+    # that what it just rendered was malformed.
+    #
+    # Deliberately NOT an error and deliberately not a mid-stream termination:
+    # the "hidden" content that can leak here is the server's own prompt and the
+    # user's own local context, never a third party's secret, so a leak is ugly
+    # rather than dangerous — and killing the stream would cost the user a reply
+    # they are already reading in exchange for nothing.
+    warnings: list[str] = Field(default_factory=list)
 
 
 class StreamError(BaseModel):

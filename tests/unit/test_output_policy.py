@@ -206,3 +206,34 @@ def test_lint_wiring_skips_tool_call_round(
     res = _result(WIDE_TABLE, finish_reason="tool_calls")
     orch._lint_final_output(res, request_id="r", had_tool_calls=True)
     assert res.text == WIDE_TABLE  # a continuation round is never linted/repaired
+
+
+def test_a_partial_table_repair_does_not_suppress_the_warning() -> None:
+    """`repair_tables` converts what it can and leaves the rest.
+
+    A table with no usable body rows is deliberately untouched. Treating "the
+    text changed" as "every table is now compliant" would clear the warning for
+    a table that still violates the contract — the client is told the reply is
+    clean while rendering something that is not.
+    """
+    text = (
+        "| a | b | c | d |\n"
+        "|---|---|---|---|\n"
+        "| 1 | 2 | 3 | 4 |\n"
+        "| 5 | 6 | 7 | 8 |\n"
+        "\n"
+        "| w | x | y | z |\n"
+        "|---|---|---|---|\n"  # header + delimiter only: nothing to convert
+    )
+    findings = lint_output(text, terminal_width=56, warn_chars=8000)
+    assert findings.violating_tables
+
+    repaired = repair_tables(text, findings)
+    assert repaired != text, "the convertible table should have been rewritten"
+
+    # Re-lint what the client would actually receive.
+    after = lint_output(repaired, terminal_width=56, warn_chars=8000)
+    assert after.violating_tables, (
+        "the unconvertible table still violates the contract, so the warning "
+        "must survive the repair"
+    )

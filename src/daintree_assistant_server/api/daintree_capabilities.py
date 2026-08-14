@@ -48,6 +48,32 @@ async def capabilities(
             "system_messages_accepted": False,
             "max_active_skills": settings.max_active_skills,
             "metadata_transport": "body+stream_meta_event",
+            # Every upstream call is funded by the caller's own key, so what a
+            # request cost is their money and is reported back to them.
+            #
+            # `total` sums every upstream call the request made that we could
+            # observe — the skill selector and its repair, a losing speculative
+            # generation, the main completion, a re-rolled round the user never
+            # saw. It is the provider's own reported figure, not a token-price
+            # estimate: OpenRouter knows which endpoint served the call and what
+            # cache discount applied.
+            #
+            # Two rules a client must implement, not infer:
+            #   * the block is ABSENT rather than zero when nothing was reported,
+            #     so a missing block means "unknown", never "free";
+            #   * `complete: false` means real spend could not be measured, so
+            #     `total` is a floor rather than a sum.
+            "cost_reporting": {
+                "field": "cost",
+                "currency": "USD",
+                "components": ["total", "main", "selector", "complete"],
+                "stream_event": "done",
+                "absent_when_unknown": True,
+                # False on `cost.complete` means real spend happened that could
+                # not be measured, so `total` is a floor. A session accumulator
+                # must render such a total as a lower bound rather than a sum.
+                "total_may_be_incomplete": True,
+            },
         },
         # The active endpoint-routing posture, and what a caller may change about
         # it. Surfaced because privacy is part of the tester's trust decision and
@@ -84,6 +110,30 @@ async def capabilities(
             ],
             "max_workflow_digests": settings.cap_workflow_digests,
             "max_workflow_state_bytes": settings.cap_workflow_state_bytes,
+        },
+        # One authenticated call that answers "why isn't this working?" — build,
+        # readiness, a live verdict on the caller's key, and catalog identity, in
+        # a bundle safe to paste into a support channel. Advertised so the CLI's
+        # doctor can use it when present and degrade when it is not.
+        #
+        # `available_when_not_ready` is the load-bearing part: it tells the CLI
+        # this is the ONE endpoint worth calling after another route returns 503,
+        # rather than assuming the whole server is unreachable.
+        "doctor": {
+            "endpoint": "/v1/daintree/doctor",
+            "method": "POST",
+            "available_when_not_ready": True,
+            # NOT an unconditional promise. Every field is allowlisted, but in a
+            # non-hardened (development) environment the startup-failure reason
+            # is passed through verbatim, and that text can name environment
+            # variables and filesystem paths — `/Users/alice/ClientProject/...`
+            # is a real thing to leak into a support channel. A hardened
+            # environment collapses it to "configuration", which is what makes
+            # the bundle genuinely paste-safe there.
+            #
+            # Reported honestly so the CLI can decide: offer one-click copy when
+            # true, and prompt the user to review first when false.
+            "safe_to_share": settings.is_hardened,
         },
         "limits": {
             "request_bytes": settings.max_request_bytes,

@@ -243,11 +243,20 @@ def _sum_usage(a: ProviderUsage | None, b: ProviderUsage | None) -> ProviderUsag
             return None
         return (x or 0) + (y or 0)
 
+    def add_cost(x: float | None, y: float | None) -> float | None:
+        # `None` survives only when NEITHER side reported. A repair call the
+        # caller was billed for must not vanish from their total just because the
+        # first attempt's cost was unknown.
+        if x is None:
+            return y
+        return x if y is None else x + y
+
     return ProviderUsage(
         prompt_tokens=add(a.prompt_tokens, b.prompt_tokens),
         completion_tokens=add(a.completion_tokens, b.completion_tokens),
         total_tokens=add(a.total_tokens, b.total_tokens),
         cached_tokens=add(a.cached_tokens, b.cached_tokens),
+        cost=add_cost(a.cost, b.cost),
     )
 
 
