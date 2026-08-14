@@ -221,6 +221,13 @@ class StreamToolCallBuffer:
         self._passthrough = False
         # (tool name, notes) per repaired call, for the caller to log.
         self.repairs: list[tuple[str, list[str]]] = []
+        # Every call name this buffer consolidated, in flush order. The name is
+        # ACCUMULATED across fragments (``add`` appends), so a caller reading
+        # names off raw fragments can see "terminal" and "__rename" as two
+        # separate calls; only the consolidated value is a real tool name.
+        # Discarded with the buffer when an attempt is re-rolled, which is what
+        # keeps a rejected attempt's calls out of the caller's accounting.
+        self.called_names: list[str] = []
 
     def add(self, fragments: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Absorb one delta's fragments; return anything to forward now."""
@@ -259,6 +266,19 @@ class StreamToolCallBuffer:
         self._pending.clear()
         return out
 
+    @property
+    def names_complete(self) -> bool:
+        """Whether ``called_names`` is the WHOLE set of calls this round made.
+
+        False once the buffer has entered passthrough: from that point fragments
+        are forwarded verbatim and never consolidated, so their names are not
+        recorded. A caller measuring "did the model call anything it should not
+        have" must treat that as UNKNOWN — an unmeasured call reported as zero is
+        a false all-clear, and the whole point of the measurement is to decide
+        when it is safe to start withholding tools.
+        """
+        return not self._passthrough
+
     def _enter_passthrough(self, fragment: Any) -> list[dict[str, Any]]:
         self._passthrough = True
         flushed = self.flush()
@@ -270,6 +290,8 @@ class StreamToolCallBuffer:
         repaired, notes = repair_tool_call_arguments(entry["name"], arguments, self._index)
         if notes:
             self.repairs.append((entry["name"], notes))
+        if entry["name"]:
+            self.called_names.append(entry["name"])
         return {
             "index": idx,
             "id": entry["id"],

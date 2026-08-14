@@ -346,3 +346,54 @@ def test_property_without_a_type_is_still_unconstrained() -> None:
     schema = {"type": "object", "properties": {"payload": {}}}
     repaired, _ = repair_arguments(schema, {"payload": {"anything": True}})
     assert repaired == {"payload": {"anything": True}}
+
+
+def test_called_names_survive_a_name_split_across_fragments() -> None:
+    """A split name must consolidate before anyone counts it as a call.
+
+    ``add`` APPENDS to the name (``entry["name"] += ...``), so a provider is free
+    to chunk it. A caller reading names off raw fragments then sees "terminal"
+    and "__rename" — two strings, neither of which is a tool. The shadow tool
+    projection grades called names against the set it would have withheld, so
+    those fragments would both count as calls outside the projection and make a
+    correct projection look unsafe to enable.
+    """
+    buffer = StreamToolCallBuffer(_index())
+    buffer.add([_fragment(0, call_id="call_0", name="termi")])
+    buffer.add([_fragment(0, name="nal__extract")])
+    buffer.add([_fragment(0, arguments='{"terminalIds": ["t-1"]}')])
+    assert buffer.called_names == []  # nothing is a call until it consolidates
+    buffer.flush()
+    assert buffer.called_names == ["terminal__extract"]
+
+
+def test_called_names_records_each_call_once_in_flush_order() -> None:
+    buffer = StreamToolCallBuffer(_index())
+    buffer.add(
+        [
+            _fragment(1, call_id="call_1", name="terminal__extract"),
+            _fragment(0, call_id="call_0", name="terminal__sendCommand"),
+        ]
+    )
+    buffer.add([_fragment(0, arguments='{"terminalId": "t-1", "command": "ls"}')])
+    buffer.add([_fragment(1, arguments='{"terminalIds": ["t-2"]}')])
+    buffer.flush()
+    # Flush order is by index, so this is the order the client dispatches in.
+    assert buffer.called_names == ["terminal__sendCommand", "terminal__extract"]
+
+
+def test_called_names_are_discarded_with_a_re_rolled_buffer() -> None:
+    """A rejected attempt's calls must not be graded as if the model made them.
+
+    The streaming path builds a FRESH buffer when it re-rolls a bare-intent
+    round. Holding call names anywhere else — a list in the orchestrator that
+    the re-roll does not reset — would keep the discarded attempt's calls.
+    """
+    first = StreamToolCallBuffer(_index())
+    first.add([_fragment(0, call_id="call_0", name="terminal__extract")])
+    first.add([_fragment(0, arguments='{"terminalIds": ["t-1"]}')])
+    first.flush()
+    assert first.called_names == ["terminal__extract"]
+
+    second = StreamToolCallBuffer(_index())  # what the re-roll does
+    assert second.called_names == []

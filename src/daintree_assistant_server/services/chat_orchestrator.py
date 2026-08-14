@@ -51,6 +51,7 @@ from ..skills.catalog import Catalog, CatalogManager
 from ..skills.fast_path import can_skip_selection
 from ..skills.load_events import SkillLoadExecution
 from ..skills.selector import SelectionDecision, Selector
+from ..skills.tool_projection import ToolProjection, project_tools
 from ..state.codec import StateCodec
 from ..text_utils import sanitize_line
 from .bare_intent import could_still_be_bare_intent, is_bare_tool_intent
@@ -321,6 +322,13 @@ class _PreparedTurn:
     # carried separately so the post-stream learning dispatch can capture it by
     # value without re-narrowing the request's optional field.
     api_key: SecretStr
+    # The SHADOW tool projection for this turn. Carried so both response paths
+    # can grade what the model actually called against what a filter would have
+    # withheld — the one number that says whether filtering is safe to enable.
+    # default_factory, not a shared instance: ToolProjection is frozen but holds
+    # a mutable `reasons` dict, and one instance shared by every default-built
+    # turn is a foot-gun waiting for the first caller that writes to it.
+    projection: ToolProjection = field(default_factory=ToolProjection)
 
 
 class _PrepOwnedStream:
@@ -798,6 +806,59 @@ class ChatOrchestrator:
         return instruction_revision != state_instruction_revision
 
     @staticmethod
+    def _grade_projection(
+        projection: ToolProjection,
+        called: list[str],
+        *,
+        request_id: str,
+        names_complete: bool = True,
+    ) -> None:
+        """Log whether the shadow projection would have broken this turn.
+
+        `outside_proposed` is THE gate on enabling filtering: it names the calls
+        the projection would have withheld. Filtering is safe when that is
+        durably empty across real usage, and the admission reasons say which rule
+        should have covered a miss — almost always a skill whose `requiredTools`
+        is incomplete, which is a metadata fix rather than a design flaw.
+
+        `names_complete=False` means some call this round could not be read (the
+        tool-call buffer fell back to passthrough and never consolidated it).
+        Such a round is logged as INDETERMINATE rather than as a clean zero: an
+        unmeasured call that reads as "nothing outside the projection" is a false
+        all-clear, and this number's only job is to authorize withholding tools.
+
+        Never raises. Shadow instrumentation that could fail a turn would cost
+        more than the measurement is worth.
+        """
+        try:
+            names = [name for name in called if name]
+            if not names and names_complete:
+                return
+            logger.info(
+                "tool_projection_shadow",
+                request_id=request_id,
+                called=len(names),
+                outside_proposed=projection.outside(names),
+                proposed=len(projection.proposed),
+                offered=len(projection.offered),
+                # Explicit on every record, so a query for "rounds with nothing
+                # outside the projection" cannot silently include rounds where
+                # that was never established.
+                measured=names_complete,
+            )
+        except Exception:  # noqa: BLE001 — measurement must never break a turn
+            logger.warning("tool_projection_shadow_failed", request_id=request_id)
+
+    @staticmethod
+    def _forced_tool_name(tool_choice: object) -> str | None:
+        """The tool a client pinned, if it pinned one by name.
+
+        Only the named form matters here: "required" forces *a* call without
+        naming one, so there is nothing specific to keep.
+        """
+        return getattr(tool_choice, "name", None)
+
+    @staticmethod
     def _selector_turn_context(request: RespondRequest) -> str | None:
         """A short, bounded turn-context hint for the selector (evidence only).
 
@@ -976,6 +1037,11 @@ class ChatOrchestrator:
         # finish_reason is a second, independent signal: treat a continuation round as
         # such even if a malformed upstream drops the tool_calls payload.
         had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
+        self._grade_projection(
+            prepared.projection,
+            [c.get("function", {}).get("name", "") for c in result.tool_calls],
+            request_id=request_id,
+        )
         self._lint_final_output(result, request_id=request_id, had_tool_calls=had_tool_calls)
         body = self._build_nonstream_body(
             result, prepared.meta, param_index=build_parameter_index(request.input.tools)
@@ -1335,6 +1401,21 @@ class ChatOrchestrator:
                 await speculation.discard()
             raise
 
+        # Shadow measurement only — it must not be able to fail a turn. An empty
+        # projection grades as "nothing was withheld", which is the honest
+        # reading when the projection could not be computed.
+        try:
+            projection = project_tools(
+                offered=request.input.tools,
+                active_skills=skills,
+                catalog=resolved_catalog,
+                messages=request.input.messages,
+                forced_tool=self._forced_tool_name(request.input.tool_choice),
+            )
+        except Exception:  # noqa: BLE001 — measurement must never break a turn
+            logger.warning("tool_projection_failed", request_id=request_id)
+            projection = ToolProjection()
+
         logger.info(
             "respond",
             request_id=request_id,
@@ -1363,10 +1444,19 @@ class ChatOrchestrator:
             # problem worth chasing).
             skill_speculation_basis=speculation_basis,
             skill_speculation_stats=speculation_stats,
+            # SHADOW tool projection: what a skill-aware filter WOULD have sent
+            # this turn. The full inventory still goes upstream — this is the
+            # measurement that decides whether filtering is safe to enable.
+            # `tools_proposed` vs `tools_offered` is the size of the prize;
+            # `tools_outside_proposed` (logged per-turn below, on the round that
+            # actually calls tools) is the safety signal.
+            tools_offered=len(projection.offered),
+            tools_proposed=len(projection.proposed),
             pre_upstream_ms=round((time.perf_counter() - t_start) * 1000),
         )
 
         return _PreparedTurn(
+            projection=projection,
             provider_request=provider_request,
             meta=meta,
             active_ids=active_ids,
@@ -1870,6 +1960,7 @@ class ChatOrchestrator:
             speculative_stream=prepared.speculation,
             api_key=prepared.api_key,
             budget=budget,
+            projection=prepared.projection,
         )
         try:
             async for event in body:
@@ -1913,6 +2004,7 @@ class ChatOrchestrator:
         api_key: SecretStr,
         speculative_stream: _SpeculativeStream | None = None,
         budget: RequestBudget | None = None,
+        projection: ToolProjection,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
@@ -2214,6 +2306,16 @@ class ChatOrchestrator:
         # yield above and never reaches here). A tool-continuation round is filtered
         # by had_tool_calls inside the trigger.
         if completed:
+            # Consolidated names only, and only from the buffer that survived:
+            # a re-rolled attempt got a fresh buffer, so its discarded calls are
+            # not graded as if the model had made them. `names_complete` carries
+            # whether that buffer could read every call at all.
+            self._grade_projection(
+                projection,
+                tool_call_buffer.called_names,
+                request_id=meta.request_id,
+                names_complete=tool_call_buffer.names_complete,
+            )
             self._maybe_learn_after_turn(
                 request=request,
                 active_ids=active_ids,
