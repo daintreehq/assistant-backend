@@ -1,0 +1,156 @@
+# The five everyday-tester skills: help/diagnostics, memory, repository exploration,
+# review, and CI. These cover intents that previously fell through to the permanent
+# prompt and raw tool descriptions, so the routing risk is not "which specialist" but
+# "does the selector reach for a runbook at all".
+#
+# The user text is deliberately NOT the skill's own trigger phrasing. Echoing
+# whenToUse back at the selector measures keyword overlap; these are meant to read
+# like a tester who has never seen the catalog.
+
+cases:
+  # ---- help and diagnostics ------------------------------------------------
+  - id: help-how-do-worktrees-work
+    category: single-skill
+    note: >-
+      A plain product question. The answer lives in Daintree's docs, and the whole
+      point of the skill is that the model searches them instead of answering from a
+      half-remembered version.
+    messages:
+      - role: user
+        content: I keep seeing "worktree" in the UI. What actually is one, and do I need more than one?
+    expect:
+      required: [daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
+
+  - id: help-mcp-disconnected
+    category: single-skill
+    note: >-
+      "Nothing works" with no other signal. daintree.status answers it while
+      disconnected, which is exactly when every other diagnosis is unavailable.
+    messages:
+      - role: user
+        content: >-
+          Every Daintree tool you try just errors out now — terminals, git, all of it.
+          It was fine ten minutes ago.
+    expect:
+      required: [daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
+
+  - id: help-key-question
+    category: single-skill
+    messages:
+      - role: user
+        content: >-
+          Am I actually signed in properly? I want to be sure before I start
+          burning credit on a big job.
+    expect:
+      required: [daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
+
+  # ---- memory --------------------------------------------------------------
+  - id: memory-save-a-convention
+    category: single-skill
+    messages:
+      - role: user
+        content: For future reference, we always use pnpm here, never npm. Don't forget that.
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  - id: memory-recall-a-decision
+    category: single-skill
+    messages:
+      - role: user
+        content: Didn't we decide something about how the API returns dates? I can't remember what we landed on.
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  - id: memory-correct-a-stale-fact
+    category: single-skill
+    note: >-
+      A correction saves the replacement first and only then forgets the stale id —
+      never a second, contradicting memory alongside the old one.
+    messages:
+      - role: user
+        content: That thing you saved about us being on Postgres is out of date, we moved to SQLite months ago.
+    expect:
+      required: [daintree.memory.manage-project-memory]
+      optional: [daintree.foundation]
+
+  # ---- repository exploration ---------------------------------------------
+  - id: explore-what-does-this-repo-do
+    category: single-skill
+    messages:
+      - role: user
+        content: I've just been handed this codebase. Give me the tour — what is it, how is it put together?
+    expect:
+      # spawn-visible-agent is NOT optional here: both whenToUse texts now say
+      # understanding-without-changing belongs to explore, so admitting it would
+      # stop this case from testing the boundary it exists for.
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+
+  - id: explore-where-is-it-implemented
+    category: single-skill
+    messages:
+      - role: user
+        content: Where does the rate limiting actually happen? I've been grepping and I can't find it.
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+
+  # ---- review --------------------------------------------------------------
+  - id: review-the-branch
+    category: single-skill
+    messages:
+      - role: user
+        content: Before I put this up, can you go over what's on this branch and tell me what you'd push back on?
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation, daintree.workflow.prep-branch-for-review]
+
+  - id: review-security-lens
+    category: single-skill
+    note: A named concern becomes the criterion; it must not be diluted into a general pass.
+    messages:
+      - role: user
+        content: >-
+          Have a careful look at the upload handler on this branch for anything a
+          hostile user could abuse.
+    expect:
+      required: [daintree.review.review-change]
+      optional: [daintree.foundation]
+
+  # ---- CI ------------------------------------------------------------------
+  - id: ci-why-is-it-red
+    category: single-skill
+    messages:
+      - role: user
+        content: The checks on my PR have gone red and I don't know why. Sort it out?
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation, daintree.workflow.follow-up-on-issue]
+
+  - id: ci-failing-test-fix
+    category: single-skill
+    messages:
+      - role: user
+        content: test_checkout_totals is failing on main. Work out what broke it and fix it.
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+
+  - id: ci-flaky-suspicion
+    category: single-skill
+    note: >-
+      Flaky is a different diagnosis from broken, and the skill owns both — the
+      distinction is made inside the runbook, not by routing elsewhere.
+    messages:
+      - role: user
+        content: >-
+          Same test fails maybe one run in four, passes if I just re-run it.
+          Nothing's changed in that file for weeks.
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
