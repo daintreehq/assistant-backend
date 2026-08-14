@@ -1,0 +1,23 @@
+{
+  "catalog": {
+    "foundations": 1,
+    "revision": "sha256:42d542afe1740114614bccd686e8a5ff5d3e2bd79ae93bfad724909750263b02",
+    "skills": 31
+  },
+  "identity": {
+    "endpoint_sort": "throughput",
+    "model": "deepseek/deepseek-v4-flash-0731",
+    "privacy_mode": "no_training",
+    "public_model": "daintree-assistant"
+  },
+  "prompt": {
+    "base_prompt_bytes": 27527,
+    "selector_prompt_bytes": 42024,
+    "skill_body_bytes_total": 223637
+  },
+  "tools": {
+    "count": 79,
+    "names_sha256": "fde0a97d114b7a2fb2f4af6a91bdfc268273a19a78a3c461f29c5e44467abb51",
+    "tool_inventory_bytes": 101720
+  }
+}

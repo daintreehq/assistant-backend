@@ -108,6 +108,12 @@ omit = [
 ]
 
 [tool.coverage.report]
+# A floor, not a target. Set just under the measurement at the time it was
+# introduced (93% with branch coverage) so ordinary churn does not trip it while
+# a real drop still does. Per-MODULE floors for the security and reliability
+# surfaces live in `tools/coverage_floors.py`, because one global number can stay
+# green while exactly the code that must not regress does.
+fail_under = 90
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",

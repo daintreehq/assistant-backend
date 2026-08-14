@@ -24,7 +24,7 @@ pytest tests/unit/test_selector.py       # one file
 pytest tests/unit/test_selector.py::test_name   # one test
 pytest -k selector                       # by keyword
 ruff check .
-mypy --strict src
+mypy --strict src tools    # tools/ holds the CI gate logic
 
 # Prompt golden snapshots — REQUIRED after any intentional change to a prompt
 # template or the assembler (see "Golden tests" below); review the diff before
@@ -175,6 +175,42 @@ What this means concretely:
 
 If real release versioning is ever wanted, that is a deliberate, separate decision — not
 something to reintroduce incidentally.
+
+## CI gates
+
+CI runs install-from-lock, ruff, `mypy --strict src tools`, pytest with coverage,
+the coverage floors, and the deterministic benchmark dashboard. Three of those are
+newer and easy to misread:
+
+**Coverage is two gates, not one.** `fail_under = 90` in `pyproject.toml` is the
+global floor (measured 93% at introduction). `tools/coverage_floors.py` carries
+PER-MODULE floors for the security and reliability surfaces — auth, error mapping,
+the state token, retries, provider parsing, validation, deadlines, redaction —
+because a global percentage stays green while exactly that code regresses: a
+thousand covered lines elsewhere absorb the loss. Each floor is the measurement
+when it was added, rounded down, so it can only ratchet up. Lowering one is a
+deliberate act that needs a reason in the commit message.
+
+**`benchmarks/baseline.json` records what the server actually sends** — base and
+selector prompt bytes, catalog and tool counts, the pinned model and privacy
+posture — with declared movement bands (`tools/baseline.py`), gated through
+`tests/unit/test_baseline.py`. It catches what the per-file budget tests cannot:
+those assert CEILINGS, which a slow 4%-a-month growth sits under for a year. This
+asserts MOVEMENT. Refresh it deliberately with
+`python -m tools.baseline capture > benchmarks/baseline.json` and explain the move.
+
+**The two CLI fixtures are one capture.** `tests/fixtures/cli_tool_names.txt` must
+be exactly the name projection of `benchmarks/_harness/fixtures/cli_tool_inventory.json`;
+`test_skill_catalog_hygiene.py` fails if they disagree. Refreshing one and
+forgetting the other is the obvious mistake, and nothing else would notice — both
+files still parse, and the damage only surfaces as a skill declaring a tool the CLI
+dropped. CI cannot regenerate either (it does not fetch the `cli/` submodule), so
+this offline equality check is the available gate.
+
+Not gated here, deliberately: anything needing a paid call. Live latency,
+selection accuracy and injection results belong in a nightly run against a
+low-spend key — a baseline that cannot be checked offline either gets skipped or
+makes every push cost money.
 
 ## Golden tests
 

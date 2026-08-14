@@ -39,6 +39,7 @@ live in ``test_prompt_budgets.py``; the eight house-style body checks live in
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from daintree_assistant_server.skills.catalog import load_catalog
@@ -116,4 +117,59 @@ def test_required_tools_exist_in_the_cli_registry() -> None:
         f"({TOOL_NAMES_FIXTURE.name}): {unknown}. Either fix the typo in the skill "
         "frontmatter, or regenerate the snapshot if the CLI added the tool "
         "(recipe is in the fixture header)."
+    )
+
+
+# ---------------------------------------------------------------------------
+# The two CLI fixtures are ONE capture. They must not drift apart.
+# ---------------------------------------------------------------------------
+
+
+def test_the_name_fixture_is_exactly_the_projection_of_the_inventory() -> None:
+    """`cli_tool_names.txt` is the name-only view of `cli_tool_inventory.json`.
+
+    They are refreshed by hand from the same dump, which makes a HALF refresh the
+    obvious mistake — update the inventory, forget the names, and the hygiene
+    check above starts validating skills against a registry that no longer
+    exists. Nothing else would notice: both files parse, both look plausible, and
+    the failure only appears as a skill declaring a tool the CLI dropped.
+
+    This is free and offline, which matters because CI does not fetch the `cli/`
+    submodule and so cannot regenerate either file to compare.
+    """
+    inventory = json.loads(
+        (
+            Path(__file__).resolve().parents[2]
+            / "benchmarks"
+            / "_harness"
+            / "fixtures"
+            / "cli_tool_inventory.json"
+        ).read_text(encoding="utf-8")
+    )
+    projected = sorted(t["function"]["name"] for t in inventory)
+    recorded = sorted(_known_tool_names())
+
+    only_names = sorted(set(recorded) - set(projected))
+    only_inventory = sorted(set(projected) - set(recorded))
+    assert not only_names and not only_inventory, (
+        "the two CLI fixtures disagree — they are one capture and must be "
+        f"regenerated together.\n  in cli_tool_names.txt only: {only_names}\n"
+        f"  in cli_tool_inventory.json only: {only_inventory}\n"
+        "Recipe: benchmarks/_harness/fixtures/README.md."
+    )
+
+
+def test_the_fixtures_record_which_cli_commit_they_came_from() -> None:
+    """A snapshot with no provenance cannot be checked against the submodule.
+
+    The header names the commit the capture was taken at. Without it, "is this
+    stale?" is unanswerable, and a pin that moved silently takes the fixtures
+    with it.
+    """
+    header = TOOL_NAMES_FIXTURE.read_text(encoding="utf-8")
+    match = re.search(r"cli/ @ ([0-9a-f]{7,40})", header)
+    assert match, (
+        "cli_tool_names.txt no longer records the cli/ commit it was captured "
+        "at. Keep that line when regenerating — it is the only way to tell a "
+        "current fixture from a stale one."
     )

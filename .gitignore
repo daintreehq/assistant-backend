@@ -29,6 +29,9 @@ benchmarks/*/results/
 .pytest_cache/
 .coverage
 coverage.xml
+# Written by the CI coverage step and read by tools/coverage_floors.py.
+coverage.json
+htmlcov/
 htmlcov/
 .mypy_cache/
 .ruff_cache/

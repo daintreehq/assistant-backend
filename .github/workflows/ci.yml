@@ -28,11 +28,23 @@ jobs:
       - name: Ruff
         run: ruff check .
 
+      # tools/ is in scope: it holds the coverage-floor and baseline gates, and a
+      # type error there would weaken a gate silently rather than fail loudly.
       - name: Mypy (strict)
-        run: mypy --strict src
+        run: mypy --strict src tools
 
-      - name: Pytest
-        run: pytest -q
+      # Coverage is measured on the same run rather than a second pass: the
+      # suite takes ~40s under coverage and duplicating it to keep a bare `-q`
+      # run would double CI for no signal.
+      - name: Pytest (with coverage)
+        run: pytest -q --cov --cov-report=json --cov-report=term:skip-covered
+
+      # A global percentage stays green while exactly the code that must not
+      # regress does — a thousand covered lines elsewhere absorb the loss. These
+      # floors name auth, error mapping, the state token, retries, provider
+      # parsing, validation, deadlines and redaction individually.
+      - name: Coverage floors (security/reliability modules)
+        run: python -m tools.coverage_floors coverage.json
 
       # benchmarks/ imports src but sits outside `mypy --strict src` and pytest's
       # testpaths, so a signature change in the assembler rotted this suite silently
