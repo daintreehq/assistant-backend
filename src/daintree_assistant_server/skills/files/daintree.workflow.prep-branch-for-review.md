@@ -9,6 +9,8 @@ requiredTools:
   - worktree.getCurrent
   - forge.listPRs
   - forge.getPR
+  - forge.listIssues
+  - forge.getIssue
   - workflow.prepBranchForReview
   - agentTask.spawnForEdits
   - terminal.awaitAll

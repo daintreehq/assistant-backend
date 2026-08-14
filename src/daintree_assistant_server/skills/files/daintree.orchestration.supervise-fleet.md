@@ -21,11 +21,6 @@ requiredTools:
   - queue.resolve
   - queue.publish
   - terminal.focus
-  - agent.focusNextWaiting
-  - agent.focusNextWorking
-  - agent.focusNextAgent
-  - agent.focusPreviousAgent
-  - workflow.focusNextAttention
   - terminal.arm
   - terminal.disarm
   - terminal.disarmAll
@@ -53,7 +48,7 @@ Procedure:
 
 5. Cross-check the supervision that has no visible tab — a fleet is bigger than its terminals. All read-only, all no-argument unless shown: `watcher.list({})` (who is watched — and therefore which running terminals are UNSUPERVISED), `async.list({})` (live async waits and runs), `timer.list({})` (scheduled wakes), `queue.digest({})` (what is already flagged for the user), `workflow.list({"status":"active"})` (ledger entries still open), and `agentTask.list({})` — this session's spawn sagas, and the ONLY way to see a launch that FAILED before it ever bound a terminal, so the roster alone under-reports. Pass scope:"all" only for older history; chase one launch with `agentTask.status({"launchId":"agt_…"})`. Read these to answer "what is running" — never to poll for a completion, which wakes you on its own.
 
-6. "Show me" is navigation, not a read. All UI-only, all no-argument: `agent.focusNextWaiting({})` for the next agent needing input, `agent.focusNextWorking({})` for the next busy one, `agent.focusNextAgent({})` and `agent.focusPreviousAgent({})` to step through the fleet, `workflow.focusNextAttention({})` for the next workflow needing attention. `terminal.focus({"terminalId":"<id>"})` reveals one specific terminal. None of them answers a question, sends input, or changes state — pair a focus with the summary you already read.
+6. "Show me" is navigation, not a read. Focus is per-terminal and you choose the target: `terminal.focus({"terminalId":"<id>"})` reveals one terminal. "The next one needing input" is not its own call — pick that terminal out of the roster you already read (agentState "waiting", waitingReason "question") and focus it by id. Focus answers no question, sends no input, and changes no state, so pair it with the summary you already have rather than issuing it alone.
 
 7. Arming routes the HUMAN's keystrokes, not yours. Daintree keeps a fleet arming set: whatever the user types as broadcast input is typed into EVERY armed terminal. `terminal.arm({"terminalId":"<id>"})` adds one, `terminal.disarm({"terminalId":"<id>"})` removes one, `terminal.disarmAll({})` clears the set. Arming N terminals is N separate arm calls batched in one reply — there is no arm-all and no arm-by-state on the tool surface. All three reroute the user's input, so all three CONFIRM, and all three report the resulting armed set: quote that set back verbatim, because there is no list-armed tool and the call's own result is the only record. When the user has lost track of what is armed, `terminal.disarmAll({})` is the route to a known state (empty), then arm what they name. Never arm a terminal the user did not name.
 

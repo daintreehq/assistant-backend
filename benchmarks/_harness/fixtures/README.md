@@ -31,31 +31,64 @@ silently whenever the CLI adds or changes a tool. It is refreshed by hand.
 The projection call is `(*tools.Registry).OpenAITools(nil)` — `nil` means "no
 filter", i.e. the full surface, in registration order
 (`cli/internal/tools/registry.go`). The registry is not self-populating: the CLI
-fills it in `app.New` via `DefaultToolBuilder(a *App)`
-(`cli/internal/app/app.go`, `cli/internal/app/tools.go`), which needs a live
-`*app.App`. So the dump has to run from inside a booted app, not from a bare
-`tools.NewRegistry()`.
+fills it in `App.Create` via `DefaultToolBuilder(a *App)`
+(`cli/internal/app/app.go`, `cli/internal/app/tools.go`).
+
+You do NOT need a booted app. `DefaultToolBuilder` only reads fields off the
+`*App` into adapter structs — it never calls through them — so a zero-value
+`&App{}` produces the identical registration set, which is what makes this a
+30-second job instead of a wiring exercise.
 
 1. Populate the submodule: `git submodule update --init cli` (from the repo root).
-2. Inside `cli/`, add a **throwaway** program or test that boots an app the same
-   way the real entrypoint does, then marshals the projection:
+2. Inside `cli/`, write a **throwaway** test at `internal/app/zz_dumptools_test.go`
+   (that package can reach both `DefaultToolBuilder` and the registry):
 
    ```go
-   specs, err := a.Registry.OpenAITools(nil)   // a is the constructed *app.App
-   if err != nil {
-       panic(err)
+   package app
+
+   import (
+       "encoding/json"
+       "os"
+       "testing"
+
+       "github.com/daintreehq/assistant/internal/tools"
+   )
+
+   func TestZZDumpTools(t *testing.T) {
+       out := os.Getenv("DUMP_TOOLS_TO")
+       if out == "" {
+           t.Skip("set DUMP_TOOLS_TO")
+       }
+       built, err := DefaultToolBuilder(&App{})
+       if err != nil {
+           t.Fatalf("build: %v", err)
+       }
+       reg := tools.NewRegistry()
+       if err := reg.RegisterAll(built...); err != nil {
+           t.Fatalf("register: %v", err)
+       }
+       specs, err := reg.OpenAITools(nil)
+       if err != nil {
+           t.Fatalf("project: %v", err)
+       }
+       b, _ := json.Marshal(specs)
+       if err := os.WriteFile(out, b, 0o644); err != nil {
+           t.Fatalf("write: %v", err)
+       }
+       t.Logf("wrote %d tools", len(specs))
    }
-   enc := json.NewEncoder(os.Stdout)
-   enc.SetIndent("", "  ")
-   _ = enc.Encode(specs)
    ```
 
-   Putting it in `internal/app` as a `_test.go` file is usually least work — that
-   package can already construct an `App`, and `go test -run DumpTools` needs no
-   new wiring. The module is `github.com/daintreehq/daintree-assistant`; check the
-   current `app.New` signature at the pinned commit before copying anything.
-3. Run it, redirect stdout to a scratch file, then **delete the throwaway** — the
-   submodule is pinned and must stay clean.
+   The module path is `github.com/daintreehq/assistant` (it was renamed from
+   `daintreehq/daintree-assistant`); check it against the pinned `cli/go.mod`
+   rather than trusting this line.
+3. Run it — the first build of the CLI tree takes a couple of minutes — then
+   **delete the throwaway**; the submodule is pinned and must stay clean:
+
+   ```bash
+   DUMP_TOOLS_TO=/tmp/cli_tools.json go test ./internal/app/ -run TestZZDumpTools -count=1
+   rm cli/internal/app/zz_dumptools_test.go && git -C cli status --porcelain   # must be empty
+   ```
 4. Re-serialize into this fixture's formatting so the diff stays additive:
 
    ```bash

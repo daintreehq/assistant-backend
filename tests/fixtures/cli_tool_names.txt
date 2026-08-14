@@ -3,7 +3,7 @@
 # Consumed by tests/unit/test_skill_catalog_hygiene.py to check that every skill's
 # requiredTools entry names a tool that actually exists. It is a SNAPSHOT on purpose:
 # CI does not fetch the cli/ submodule, so a test that read cli/ at runtime would
-# silently no-op there (or hard-fail). Snapshot taken against cli/ @ dceef8c.
+# silently no-op there (or hard-fail). Snapshot taken against cli/ @ 1da2c71 (origin/develop).
 #
 # Format: one wire name per line, sorted, "#" lines are comments. The registry maps
 # an internal dotted name to its OpenAI wire name by replacing EVERY "." with "__"
@@ -28,10 +28,6 @@ agentTask__list
 agentTask__spawnForEdits
 agentTask__status
 agentTask__superviseTerminal
-agent__focusNextAgent
-agent__focusNextWaiting
-agent__focusNextWorking
-agent__focusPreviousAgent
 artifact__read
 async__cancel
 async__list
@@ -82,7 +78,6 @@ terminal__close
 terminal__disarm
 terminal__disarmAll
 terminal__extract
-terminal__extract__async
 terminal__extract__json
 terminal__focus
 terminal__read
@@ -100,7 +95,6 @@ watcher__list
 watcher__terminal__create
 watcher__watchPR
 workflow__create
-workflow__focusNextAttention
 workflow__get
 workflow__list
 workflow__prepBranchForReview

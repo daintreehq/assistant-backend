@@ -1,3 +1,7 @@
 [submodule "cli"]
 	path = cli
 	url = https://github.com/daintreehq/assistant
+	# The CLI integrates on develop; main trails it. Pinning the branch here
+	# makes `git submodule update --remote cli` follow the branch the two repos
+	# actually move together on, rather than silently rewinding to main.
+	branch = develop

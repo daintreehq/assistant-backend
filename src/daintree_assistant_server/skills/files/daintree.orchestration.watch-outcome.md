@@ -11,7 +11,8 @@ requiredTools:
   - watcher.watchPR
   - watcher.list
   - watcher.cancel
-  - terminal.extract.async
+  - terminal.extract
+  - terminal.await.async
   - timer.schedule
   - timer.list
   - timer.cancel
@@ -31,7 +32,7 @@ Procedure:
 
 1. Fix the target, then pick ONE mechanism. Resolve the full terminal ids or PR number live this turn: a watcher built on a stale id waits forever on nothing and never wakes you.
    - (a) A terminal outcome needing goal-based classification ("wake me when it's green", "alert me if it breaks") → `watcher.terminal.create`, step 2.
-   - (b) A pass/fail verdict on a terminal without blocking the turn → `terminal.extract.async {"terminalIds":["terminal-…"],"instruction":"report the final test summary","verdictInstruction":"did the suite pass with zero failures?","dedupeKey":"nightly-suite"}`. The result publishes to the attention queue with severity set by the verdict; `dedupeKey` collapses repeats. Add `wait:{}` for a SINGLE agent terminal (the confirmed-finish shorthand); omit `wait` to read once now.
+   - (b) A pass/fail verdict on a terminal → there is no fire-and-forget verdict call. If the work has ALREADY settled, `terminal.extract` reads and judges it once, this turn. If it has not, that is case (a): a `watcher.terminal.create` whose `alertWhen` is a `modelJudge` question ("did the suite pass with zero failures?") publishes the judged answer to the attention queue.
    - (c) A PR reaching a terminal state → `watcher.watchPR {"prNumber":123,"title":"…"}` (optional `cwd`, `stopAfterMs`) — read "What the PR watcher cannot watch" before promising anything about it.
    - (d) A nudge with no terminal to observe → `timer.schedule`, step 4.
    Spawning the agent right now? The cheapest supervisor is the spawn itself: `agentTask.spawnForEdits` with flat `watch:true` + `watchGoal:"…"` and an `acceptanceCriteria` contract. Its supervisor already confirms completion — add no second watcher.
@@ -85,7 +86,7 @@ watcher.terminal.create {
 THE KEY TRAP: to stop when an AGENT finishes its turn, do NOT use a bare `stopWhen: {"stateIs":"waiting"}`. An agent reads `waiting` before it starts, while paused, and when its window is backgrounded, so a raw state stop fires early and reports a finish that never happened. For an explore or edit agent you usually need NO custom `stopWhen` at all — the default supervisor treats working→waiting as a candidate and CONFIRMS it with a small-model tail check before stopping. If you must express it yourself, pair the state with a judge so a bare idle cannot false-trip:
 `{"all": [{"stateIs": "waiting"}, {"modelJudge": "has the agent posted its final answer and stopped working?"}]}`
 
-`terminal.extract.async`'s `wait` takes this same DSL MINUS `modelJudge` (watcher-only), plus the `{}` shorthand for a genuine finish on ONE terminal.
+`terminal.await.async` needs none of this DSL — it watches plain agent state and wakes you when every terminal has finished, failed, or asked a question. Reach for the DSL only when the stop or alert depends on what the output SAYS.
 
 ## What the PR watcher cannot watch
 

@@ -185,12 +185,12 @@
   "type": "function",
   "function": {
    "name": "artifact__read",
-   "description": "Read ONE page of a large tool result that was archived as an artifact because it overflowed the inline size limit. A page is at most 3500 characters \u2014 a single call NEVER returns the whole artifact. To read it: call with the artifactId and offset 0 (omit limit; it defaults to the 3500 max), then call again with offset set to the returned nextOffset, repeating until eof is true. Do NOT set limit to totalChars (or any value above 3500) to grab it all at once \u2014 that still returns just one 3500-char page; page with offset/nextOffset instead.",
+   "description": "Read ONE page of an archived artifact: a large tool result that overflowed the inline size limit, or the full pre-compaction transcript a [checkpoint] note's breadcrumb points at (page a few relevant pages surgically \u2014 never replay the whole transcript). A page is at most 3500 characters \u2014 a single call NEVER returns the whole artifact. To read it: call with the artifactId and offset 0 (omit limit; it defaults to the 3500 max), then call again with offset set to the returned nextOffset, repeating until eof is true. Do NOT set limit to totalChars (or any value above 3500) to grab it all at once \u2014 that still returns just one 3500-char page; page with offset/nextOffset instead.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "artifactId": {
-      "description": "The artifactId from a truncated tool result.",
+      "description": "The artifactId from a truncated tool result, or from a checkpoint note's archived-transcript breadcrumb.",
       "type": "string"
      },
      "limit": {
@@ -377,7 +377,7 @@
   "type": "function",
   "function": {
    "name": "context__snapshot",
-   "description": "Build a compact snapshot of the current workspace: Daintree MCP status, and (when connected) action context, worktrees, terminals, plus the open attention queue. Best-effort and read-only; degrades gracefully when Daintree is offline.",
+   "description": "Build a compact snapshot of the current workspace: the endpoints this assistant is wired to (Daintree MCP URL + assistant backend URL), Daintree MCP status, and (when connected) action context, worktrees, terminals, plus the open attention queue. Best-effort and read-only; degrades gracefully when Daintree is offline.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -712,159 +712,14 @@
  {
   "type": "function",
   "function": {
-   "name": "terminal__extract__async",
-   "description": "Fire-and-forget terminal extraction. Polls the terminal(s) until the wait condition is met, extracts text with the small model, optionally judges the result against a pass/fail condition, and publishes the outcome to the attention queue (instead of blocking the turn). The main thread drains the verdict when next idle. Read-only; requires Daintree MCP.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {
-     "dedupeKey": {
-      "description": "Events sharing this key collapse into one in the queue.",
-      "type": "string"
-     },
-     "instruction": {
-      "description": "What to extract from the output, as plain text.",
-      "type": "string"
-     },
-     "maxAttempts": {
-      "default": 30,
-      "description": "Hard cap on poll attempts in wait mode.",
-      "maximum": 120,
-      "minimum": 1,
-      "type": "integer"
-     },
-     "maxTokens": {
-      "default": 1024,
-      "description": "Max tokens the extraction model may produce. For a verbatim/full-reproduction instruction prefer terminal.read (raw scrollback, no model, no cap).",
-      "maximum": 2000,
-      "minimum": 1,
-      "type": "integer"
-     },
-     "pollIntervalMs": {
-      "default": 2000,
-      "description": "Delay between polls in wait mode, in ms.",
-      "maximum": 60000,
-      "minimum": 0,
-      "type": "integer"
-     },
-     "tailBytes": {
-      "default": 12000,
-      "description": "Max characters of each terminal's tail fed to the model.",
-      "maximum": 100000,
-      "minimum": 1,
-      "type": "integer"
-     },
-     "terminalIds": {
-      "description": "Daintree terminal id(s) to read and extract from \u2014 full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids).",
-      "items": {
-       "minLength": 1,
-       "type": "string"
-      },
-      "maxItems": 16,
-      "minItems": 1,
-      "type": "array"
-     },
-     "title": {
-      "description": "Short label for the queue event the result is published under.",
-      "type": "string"
-     },
-     "ttlMs": {
-      "description": "Time-to-live for the published event, in ms (omit for no expiry).",
-      "minimum": 1,
-      "type": "integer"
-     },
-     "verdictInstruction": {
-      "description": "A pass/fail question evaluated against the extracted result; drives event severity.",
-      "type": "string"
-     },
-     "wait": {
-      "additionalProperties": false,
-      "description": "Poll until this condition is met before extracting; omit to read once. A WatchCondition object with EXACTLY ONE of the keys below \u2014 or the empty object {} to wait until the agent has genuinely FINISHED its turn. Prefer {} for 'wait for the agent to finish': a bare stateIs:'waiting' is an unreliable proxy (a pre-start prompt or a backgrounded window also reads as 'waiting'), while {} prefers a real working->waiting transition (or a stable idle past a short grace) and ALWAYS confirms with a small-model check on the tail before it resolves; completed/exited resolve immediately. {} is single-terminal (one agent's state) \u2014 for a COHORT use terminal.awaitAll, then read with a no-wait extract over the same ids. modelJudge is NOT supported here (watcher-only).",
-      "maxProperties": 1,
-      "properties": {
-       "all": {
-        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape; modelJudge is not supported anywhere in the tree) must hold.",
-        "items": {
-         "maxProperties": 1,
-         "minProperties": 1,
-         "type": "object"
-        },
-        "minItems": 1,
-        "type": "array"
-       },
-       "any": {
-        "description": "OR \u2014 at least one nested condition (same one-key shape; no modelJudge anywhere) holds.",
-        "items": {
-         "maxProperties": 1,
-         "minProperties": 1,
-         "type": "object"
-        },
-        "minItems": 1,
-        "type": "array"
-       },
-       "contains": {
-        "description": "Fires when the terminal tail contains this literal substring (non-empty). Matches the COMBINED tail across multiple terminalIds.",
-        "minLength": 1,
-        "type": "string"
-       },
-       "noOutputForMs": {
-        "description": "Fires once no NEW output has appeared for this many ms.",
-        "minimum": 1,
-        "type": "integer"
-       },
-       "not": {
-        "description": "Negates ONE nested condition (same one-key shape; no modelJudge anywhere). This is a property named not, NOT the JSON-Schema keyword.",
-        "maxProperties": 1,
-        "minProperties": 1,
-        "type": "object"
-       },
-       "regex": {
-        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
-        "minLength": 1,
-        "type": "string"
-       },
-       "runtimeStatusIs": {
-        "description": "Fires on the coarse terminal runtime status.",
-        "enum": [
-         "running",
-         "exited"
-        ],
-        "type": "string"
-       },
-       "stateIs": {
-        "description": "Fires when the agent state equals this value exactly. Do NOT use stateIs:'waiting' to mean finished \u2014 pass {} instead (it confirms a real finish).",
-        "enum": [
-         "idle",
-         "working",
-         "waiting",
-         "directing",
-         "completed",
-         "exited"
-        ],
-        "type": "string"
-       }
-      },
-      "type": "object"
-     }
-    },
-    "required": [
-     "terminalIds",
-     "instruction"
-    ],
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
    "name": "terminal__awaitAll",
-   "description": "Wait (bounded) for a COHORT of agent terminals to all return to an idle prompt. Pure state-machine: it polls agentState only \u2014 NO model call, NO output read \u2014 so it is fast and light. Returns allFinished plus a perTerminal array whose status is exactly one of \"finished\" | \"failed\" | \"question\" | \"working\" \u2014 and NO content. It also returns top-level stillWorking and askingQuestion arrays of terminal IDs, so when the wait budget runs out you can re-await exactly the stillWorking stragglers (and route answers to askingQuestion) without scanning perTerminal. Use this ONCE for the whole cohort instead of one wait per agent. Terminals that settle finished/failed automatically RETIRE their spawn-attached supervising watcher (watchersRetired in the result) \u2014 the completion is in your hands now, so do NOT watcher.cancel them yourself and do NOT expect a later completion notification for those agents. IMPORTANT: a bare 'waiting' is an imperfect signal \u2014 an agent can momentarily read idle while still working. So AFTER awaitAll returns, read each output yourself (a no-wait terminal.extract/read of the last few lines) to confirm the result makes sense; if a terminal reported 'finished' but its tail shows it is still mid-work, re-await just that one or set a watcher on it and poll. Bound the outer loop: re-await stillWorking IDs at most twice (three awaitAll calls total on the same terminal); after that a still-working terminal is hung \u2014 escalate via queue.publish (severity 'blocked') + watcher.terminal.create and end the turn instead of awaiting it again. INTERRUPTIBLE: if the user sends a message while you are waiting, awaitAll returns EARLY with interruptedByUser:true plus whatever has settled so far \u2014 their message is already folded into the conversation, so READ IT and adapt (they may want to redirect, e.g. 'that agent errored, re-spawn it') before deciding whether to re-await the stillWorking agents. Read-only; requires Daintree MCP.",
+   "description": "Wait (bounded) for a COHORT of agent terminals to all return to an idle prompt. Pure state-machine: it polls agentState only \u2014 NO model call, NO output read \u2014 so it is fast and light. Returns allFinished plus a perTerminal array whose status is exactly one of \"finished\" | \"failed\" | \"question\" | \"working\" \u2014 and NO content. It also returns top-level stillWorking and askingQuestion arrays of terminal IDs, so when the wait budget runs out you can re-await exactly the stillWorking stragglers (and route answers to askingQuestion) without scanning perTerminal. Use this ONCE for the whole cohort instead of one wait per agent. Terminals that settle finished/failed automatically RETIRE their spawn-attached supervising watcher (watchersRetired in the result) \u2014 the completion is in your hands now, so do NOT watcher.cancel them yourself and do NOT expect a later completion notification for those agents. IMPORTANT: a bare 'waiting' is an imperfect signal \u2014 an agent can momentarily read idle while still working. So AFTER awaitAll returns, read each output yourself (a no-wait terminal.extract/read of the last few lines) to confirm the result makes sense; if a terminal reported 'finished' but its tail shows it is still mid-work, re-await just that one or set a watcher on it and poll. Bound the outer loop: re-await stillWorking IDs at most twice (three awaitAll calls total on the same terminal); after that a still-working terminal is hung \u2014 escalate via queue.publish (severity 'blocked') + watcher.terminal.create and end the turn instead of awaiting it again. ENFORCED BUDGET: all awaitAll calls in one turn share a cumulative foreground-wait budget of 120s \u2014 this is enforced, not advisory. When it runs out mid-wait the call returns early with budgetExhausted:true (still-working agents in stillWorking), and every further awaitAll this turn returns immediately with the same marker \u2014 so on budgetExhausted do NOT re-await: hand the stragglers to the async path (watcher.terminal.create + queue.publish) and end the turn. INTERRUPTIBLE: if the user sends a message while you are waiting, awaitAll returns EARLY with interruptedByUser:true plus whatever has settled so far \u2014 their message is already folded into the conversation, so READ IT and adapt (they may want to redirect, e.g. 'that agent errored, re-spawn it') before deciding whether to re-await the stillWorking agents. Read-only; requires Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "maxAttempts": {
       "default": 30,
-      "description": "Hard cap on poll rounds (default 30 \u2248 60s, max 240 \u2248 480s \u2014 durations assume the default 2s pollIntervalMs). Bounded so it cannot hang. Raise it only for a known-slow cohort whose agents need a single round past 120s \u2014 most waits should leave it at the default.",
+      "description": "Hard cap on poll rounds (default 30 \u2248 60s, max 240 \u2248 480s \u2014 durations assume the default 2s pollIntervalMs). Bounded so it cannot hang. Raise it only for a known-slow cohort whose agents need a single round past 120s \u2014 most waits should leave it at the default. Independent of the cap, the turn's ENFORCED cumulative foreground-wait budget (shared across all awaitAll calls this turn \u2014 see the tool description) can end the wait earlier with budgetExhausted:true.",
       "maximum": 240,
       "minimum": 1,
       "type": "integer"
@@ -945,7 +800,7 @@
   "type": "function",
   "function": {
    "name": "fs__search",
-   "description": "Text-search file contents across the project (read-only). Recursive pure-Go walk skipping .git, node_modules, and dist.",
+   "description": "Substring search across the project's text files (read-only): a recursive walk skipping .git/node_modules/dist and credential paths, an optional filename-suffix `glob`, capped at maxResults (default 50, max 500). Returns file/line/text per match plus a `capped` flag. LITERAL substring \u2014 not a regex, not case-insensitive. Locate code here, then read it with fs.read; it runs serially, so prefer one good needle to a batch of searches.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -973,7 +828,7 @@
   "type": "function",
   "function": {
    "name": "daintree__status",
-   "description": "Report Daintree MCP connection status (connected, transport, tool count). Works even when disconnected.",
+   "description": "Report the Daintree MCP link: the endpoint URL it is connected to, connected, transport, tool count, and the error text when it is down. Works even while disconnected \u2014 it never fails on a broken link. The endpoint and the same summary ALREADY ride every round's context, so call this only when diagnosing an MCP_UNAVAILABLE failure or when the user asks whether Daintree is reachable \u2014 not to orient yourself each turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -1050,7 +905,7 @@
   "type": "function",
   "function": {
    "name": "terminal__focus",
-   "description": "Focus/reveal a Daintree terminal in the UI (read-only side effect on the UI; no state mutation).",
+   "description": "Bring ONE Daintree terminal to the front in the UI (forwards to Daintree's panel.focus with the terminal id as the panelId). Pure UI: no confirmation, no state change \u2014 it does not read, send to, or close anything. Use it when the user asks to see or switch to a terminal, or to point them at a tab you just spawned. Pass the full terminal-<uuid> id.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1248,54 +1103,6 @@
  {
   "type": "function",
   "function": {
-   "name": "agent__focusNextWaiting",
-   "description": "Focus the next agent terminal that is waiting for input or a decision (UI focus change; no state mutation). Typed wrapper around the Daintree agent.focusNextWaiting MCP tool.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {},
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
-   "name": "agent__focusNextWorking",
-   "description": "Focus the next agent terminal that is actively working (UI focus change; no state mutation). Typed wrapper around the Daintree agent.focusNextWorking MCP tool.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {},
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
-   "name": "agent__focusNextAgent",
-   "description": "Focus the next agent terminal in order (UI focus change; no state mutation). Typed wrapper around the Daintree agent.focusNextAgent MCP tool.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {},
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
-   "name": "agent__focusPreviousAgent",
-   "description": "Focus the previous agent terminal in order (UI focus change; no state mutation). Typed wrapper around the Daintree agent.focusPreviousAgent MCP tool.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {},
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
    "name": "copyTree__generateAndCopyFile",
    "description": "Generate a worktree's copy tree and copy it to the OS clipboard as a file. System tier \u2014 always confirms. Typed wrapper around the Daintree copyTree.generateAndCopyFile MCP tool. 'options' is forwarded verbatim.",
    "parameters": {
@@ -1395,7 +1202,7 @@
   "type": "function",
   "function": {
    "name": "scratch__delete",
-   "description": "Delete one key from a scratch store. To remove the entire store, use scratch.drop.",
+   "description": "Delete ONE key from a scratch store (storeId + key). Use it to drop an intermediate result you no longer need, including to free a slot when a store hits its 100-key limit (SCRATCH_KEYS_FULL). A missing key fails SCRATCH_KEY_NOT_FOUND and a missing store SCRATCH_STORE_NOT_FOUND, both unrecoverable. To discard the whole store instead, use scratch.drop.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1421,7 +1228,7 @@
   "type": "function",
   "function": {
    "name": "scratch__drop",
-   "description": "Discard an entire scratch store and all of its keys. Frees a slot toward the per-session store limit.",
+   "description": "Discard an ENTIRE scratch store and every key in it, freeing one of the 20 per-session store slots (drop a finished store when scratch.create returns SCRATCH_STORE_FULL). Unknown storeId \u21d2 SCRATCH_STORE_NOT_FOUND (unrecoverable). Scratch data is in-memory and session-only so nothing durable is lost \u2014 but there is no undo. To remove a single key instead, use scratch.delete.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1503,7 +1310,7 @@
   "type": "function",
   "function": {
    "name": "grant__list",
-   "description": "List live automation grants (non-revoked, non-expired, with uses remaining).",
+   "description": "List the LIVE automation grants (non-revoked, non-expired, uses remaining), optionally filtered by actorId: grant id, actorId/actorType (watcher|timer|wake), the allowed risk classes and tool names, expiresAt and usesRemaining. Grants do NOT ride the turn context \u2014 call this when the user asks what may run unattended, before minting a duplicate, or to get the id for grant.revoke.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1519,7 +1326,7 @@
   "type": "function",
   "function": {
    "name": "grant__revoke",
-   "description": "Revoke an automation grant by id.",
+   "description": "Revoke an automation grant by its grt_\u2026 id, immediately withdrawing that actor's pre-authorization to run confirm-required tools unattended \u2014 the next watcher/timer/wake call that needed it becomes a blocked pending-approval inbox item instead. Interactive main actor only (else GRANT_ACTOR_FORBIDDEN); an unknown id fails GRANT_NOT_FOUND. Use it when the user calls off unattended work.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1538,7 +1345,7 @@
   "type": "function",
   "function": {
    "name": "recipe__list",
-   "description": "List the available Daintree recipes (worktree/operation templates).",
+   "description": "List the Daintree recipes available in this project \u2014 the worktree/operation templates that recipe.run and worktree.createWithRecipe execute \u2014 with their ids and recipe-defined argument shapes. Read-only passthrough to Daintree. Call it BEFORE recipe.run so you pass a real recipeId and real argument keys instead of guessing. MCP_UNAVAILABLE when Daintree is disconnected.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1555,7 +1362,7 @@
   "type": "function",
   "function": {
    "name": "recipe__run",
-   "description": "Run a Daintree recipe by id. Creates/operates on project state per the recipe.",
+   "description": "Run a Daintree recipe by recipeId, forwarding the recipe-defined `arguments` record verbatim. MUTATING (always confirms): a recipe can create worktrees, branches and terminals. Read recipe.list first for the real recipeId and argument keys \u2014 never invent either. Pass requestKey to make a retry idempotent. Returns Daintree's raw result; a refusal comes back as MCP_TOOL_ERROR.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1582,7 +1389,7 @@
   "type": "function",
   "function": {
    "name": "worktree__list",
-   "description": "List Daintree worktrees for the current project.",
+   "description": "List Daintree's worktrees for this project \u2014 each entry's id, path, branch, and whether it is active/main. Read-only passthrough. The CURRENT worktree already rides every round's runtime context, so call this when you need the OTHERS: choosing a spawn target, answering \"which worktrees are ready?\", or resolving a worktreeId \u2014 which is a PATH-like id from this list, never a branch name.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1599,7 +1406,7 @@
   "type": "function",
   "function": {
    "name": "worktree__getCurrent",
-   "description": "Get the current Daintree worktree context.",
+   "description": "Get the Daintree worktree the user is currently in \u2014 its exact id, path, branch and bound issue/PR. The runtime context already carries a ONE-LINE worktree summary every round, so call this only when you need those exact fields (e.g. a worktreeId to spawn into), after an action that may have switched worktrees, or when the runtime context reported no current worktree.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1616,7 +1423,7 @@
   "type": "function",
   "function": {
    "name": "worktree__createWithRecipe",
-   "description": "Create a worktree from a recipe. Arguments are recipe-defined and forwarded verbatim.",
+   "description": "Create a NEW git worktree from a Daintree recipe, forwarding the recipe-defined `arguments` record verbatim (Daintree owns the keys \u2014 read recipe.list for the real ones, do not invent them). MUTATING project state, so it always confirms. Prefer agentTask.spawnForEdits when what you actually want is a worktree WITH a supervised agent in it. Pass requestKey so a retry is idempotent.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1639,7 +1446,7 @@
   "type": "function",
   "function": {
    "name": "forge__listIssues",
-   "description": "List forge (GitHub) issues for the project.",
+   "description": "List the project's GitHub issues through Daintree's forge integration. `arguments` is a forge-defined options record forwarded verbatim (state, labels, limit, \u2026) \u2014 omit it for the default listing rather than inventing keys. Read-only. PARALLEL: forge.* reads batched in ONE reply run concurrently. MCP_UNAVAILABLE when Daintree is disconnected; a forge refusal returns MCP_TOOL_ERROR.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1656,7 +1463,7 @@
   "type": "function",
   "function": {
    "name": "forge__getIssue",
-   "description": "Get a single forge (GitHub) issue.",
+   "description": "Fetch ONE GitHub issue's detail through Daintree's forge integration. `arguments` is forwarded verbatim \u2014 pass the issue number under the key the forge expects (mirror what forge.listIssues returned); do not invent keys. Read-only. PARALLEL: several forge.* reads in ONE batch run concurrently, so fetch multiple issues in a single reply rather than one per turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1673,7 +1480,7 @@
   "type": "function",
   "function": {
    "name": "forge__listPRs",
-   "description": "List forge (GitHub) pull requests for the project.",
+   "description": "List the project's GitHub pull requests through Daintree's forge integration. `arguments` is a forge-defined options record forwarded verbatim (state, limit, \u2026) \u2014 omit it for the default listing rather than inventing keys. Read-only. PARALLEL: forge.* reads batched in ONE reply run concurrently. For one PR's full detail use forge.getPR with its prNumber.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1714,7 +1521,7 @@
   "type": "function",
   "function": {
    "name": "git__getProjectPulse",
-   "description": "Read a worktree's git pulse \u2014 branch state, uncommitted changes, and recent commits \u2014 for the current or a specified worktree.",
+   "description": "Read a worktree's git pulse through Daintree: current branch, uncommitted/staged changes and recent commits. Takes an optional opaque {worktreeId} \u2014 omit it for the active worktree. Read-only, no confirmation: this wrapper is why a plain \"what's the git state?\" never needs the system-tier daintree.call escape hatch. For a review-readiness go/no-go verdict use workflow.prepBranchForReview.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1731,7 +1538,7 @@
   "type": "function",
   "function": {
    "name": "workflow__startWorkOnIssue",
-   "description": "Start work on an issue in Daintree (spawns a worktree + agent terminal), then attach a supervisor watcher.",
+   "description": "Ask Daintree to start work on an issue: it creates the worktree and spawns the agent terminal, then (unless attachWatcher:false) this attaches a durable supervisor watcher and opens a workflow ledger row so the run is tracked and reported. `arguments` is Daintree-defined and forwarded verbatim; attachWatcher is assistant-side and never sent. Use agentTask.spawnForEdits instead when the work is a task, not an issue.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1773,18 +1580,6 @@
     "required": [
      "arguments"
     ],
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
-   "name": "workflow__focusNextAttention",
-   "description": "Focus the Daintree UI on the next workflow/terminal needing attention.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {},
     "type": "object"
    }
   }
@@ -1872,7 +1667,7 @@
   "type": "function",
   "function": {
    "name": "memory__recall",
-   "description": "Recall project memories most relevant to a query (BM25-ranked full-text search).",
+   "description": "BM25-ranked full-text search over this project's saved memories (default 10 hits, max 50; optional category filter). Returns id, content, kind, pinned flag and timestamps. Every turn ALREADY carries the pinned memories plus an automatic recall snapshot for the user's ask \u2014 so call this only to dig for what those did not surface (a past decision, a convention, an earlier attempt). Query with a few plain keywords.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1899,7 +1694,7 @@
   "type": "function",
   "function": {
    "name": "memory__list",
-   "description": "List project memories (pinned first, then most recent).",
+   "description": "Browse saved project memories, pinned first then most recent (default 50, max 200); filter by category or pinnedOnly. Pinned memories and this turn's recall hits ALREADY ride every round's turn context, so use this to audit the store \u2014 spot a stale fact to memory.forget, or grab a mem_\u2026 id to pin/unpin. To find facts on a topic, use memory.recall instead.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1923,7 +1718,7 @@
   "type": "function",
   "function": {
    "name": "memory__save",
-   "description": "Save a durable project memory (persists across sessions).",
+   "description": "Save ONE durable fact about this project \u2014 it persists across sessions and is BM25-searchable via memory.recall. Save decisions, conventions and stable user preferences ('always X', 'never Y'); do NOT save transient run state (use scratch.*) or anything you can re-derive. kind defaults to semantic; use episodic for session-scoped events and ttlMs for a fact with a shelf life. Returns the mem_\u2026 id.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1965,7 +1760,7 @@
   "type": "function",
   "function": {
    "name": "memory__forget",
-   "description": "Soft-delete a project memory by id.",
+   "description": "Soft-delete ONE project memory by its mem_\u2026 id so it stops surfacing in recall, in memory.list, and in the pinned block. Use it when a saved fact is wrong or obsolete \u2014 prefer forgetting the stale fact over saving a contradicting one. Unknown id \u21d2 MEMORY_NOT_FOUND (unrecoverable). There is no undo tool; the row is soft-deleted, not restorable from here.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1984,7 +1779,7 @@
   "type": "function",
   "function": {
    "name": "memory__pin",
-   "description": "Pin a project memory so it sorts first and resists pruning (idempotent).",
+   "description": "Pin a project memory by its mem_\u2026 id so it rides EVERY round's turn context (the pinned block) and resists pruning. Idempotent. Pin sparingly \u2014 each pin costs tokens on every round, so reserve it for standing directives and facts you must not lose mid-task; ordinary facts are fine unpinned and reachable through memory.recall. Unknown id \u21d2 MEMORY_NOT_FOUND.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2003,7 +1798,7 @@
   "type": "function",
   "function": {
    "name": "memory__unpin",
-   "description": "Unpin a project memory (idempotent).",
+   "description": "Unpin a project memory by its mem_\u2026 id: it stays saved and recallable but drops out of the pinned block that rides every round's turn context. Idempotent \u2014 unpinning an unpinned memory succeeds. Use it when a pin is no longer worth its per-round token cost. Unknown id \u21d2 MEMORY_NOT_FOUND. To delete the fact outright use memory.forget.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2022,7 +1817,7 @@
   "type": "function",
   "function": {
    "name": "queue__publish",
-   "description": "Publish an event to the attention queue (the human's inbox). Use dedupeKey to collapse repeats.",
+   "description": "Publish ONE event to the human's attention inbox \u2014 how background work reports without interrupting the conversation. Use it when you must STOP leaving something the user needs to see later (a blocked step, a finished long run, an escalation from a wait you gave up on); in a live turn, just say it in your reply instead. Pass a stable dedupeKey so repeats collapse into one counted item.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2131,7 +1926,7 @@
   "type": "function",
   "function": {
    "name": "queue__digest",
-   "description": "Read a digest of the attention queue, optionally filtered by minimum severity.",
+   "description": "Read the human's attention inbox: open events newest-first (default 50, max 200), filter with severityAtLeast, add includeResolved for history. Returns the structured events plus a pre-rendered `text` digest you can relay. The inbox does NOT ride the turn context, so call this when the user asks what needs attention, or on a wake turn to see what was published while you were away.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2163,7 +1958,7 @@
   "type": "function",
   "function": {
    "name": "queue__resolve",
-   "description": "Mark an attention-queue event resolved by id.",
+   "description": "Mark ONE attention-queue (inbox) event resolved by its id so it stops appearing in queue.digest and stops re-surfacing as open work. Call it AFTER you have actually acted on the item \u2014 resolving is the acknowledgement, not the fix. An unknown or already-resolved id fails QUEUE_NOT_FOUND (unrecoverable). Local bookkeeping only: it never touches terminals, watchers or async work.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2217,7 +2012,7 @@
   "type": "function",
   "function": {
    "name": "skill__run__get",
-   "description": "Get the stepwise progress state of a skill run in this session (absence is a normal OK answer).",
+   "description": "Read your stepwise progress through a loaded skill's runbook in THIS session: currentStep, per-step status (done|skipped) with notes and timestamps, and the run status. Absence is a NORMAL ok answer ({state: null}) \u2014 it means no step has been advanced yet, not an error. Use it after a compaction or a wake turn to find where you left off. Requires a live session.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2237,7 +2032,7 @@
   "type": "function",
   "function": {
    "name": "skill__step__advance",
-   "description": "Record that a skill step is complete (or skipped) and advance to the next step. Omitting nextStep finishes the run.",
+   "description": "Record that step N of a loaded skill's runbook is done (or skipped) and move to nextStep; OMIT nextStep to finish the run. Call it as you complete each step, not in one batch at the end \u2014 this is the progress record a compaction or a wake turn reads back through skill.run.get. currentStep never regresses. notes is an optional one-liner about what the step produced. Requires a live session.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2276,7 +2071,7 @@
   "type": "function",
   "function": {
    "name": "timer__schedule",
-   "description": "Schedule a durable timer that enqueues a reminder or runs a safe tool at a future time (optionally repeating).",
+   "description": "Schedule a durable timer that fires once (fireAt ISO-8601 or delayMs) or repeats (repeat.everyMs plus maxRuns/until). payload.type \"enqueue\" posts message to the attention inbox; \"call_safe_tool\" runs toolCall.toolName \u2014 a MUTATING tool there needs a grant.create for that tmr_\u2026 actor or the call lands as a blocked approval. Timers keep firing after the assistant closes; missed occurrences catch up. Returns the timer id.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2381,7 +2176,7 @@
   "type": "function",
   "function": {
    "name": "timer__list",
-   "description": "List scheduled (not-yet-fired) timers.",
+   "description": "List the timers still SCHEDULED (not yet fired, not cancelled): id, title, fireAt (RFC3339 UTC), payloadType, runCount and any repeat settings. Timers do NOT ride the turn context, so this is the only way to see what is pending \u2014 call it before scheduling a near-duplicate reminder, when the user asks what is scheduled, or to get a tmr_\u2026 id for timer.cancel.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -2393,7 +2188,7 @@
   "type": "function",
   "function": {
    "name": "timer__cancel",
-   "description": "Cancel a scheduled timer by id.",
+   "description": "Cancel a scheduled timer by its tmr_\u2026 id (from timer.list): it never fires again and any automation grant held by that timer actor is revoked. Use it when the reminder or scheduled tool call is no longer wanted. An unknown id fails TIMER_NOT_FOUND (unrecoverable). Local bookkeeping only \u2014 it never touches terminals or project state.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2412,18 +2207,18 @@
   "type": "function",
   "function": {
    "name": "watcher__terminal__create",
-   "description": "Create a background watcher over one or more terminals that classifies their state and alerts on a condition.",
+   "description": "Attach a durable background watcher to one or more terminals: it classifies their state on a cadence (default 120s), publishes an attention event when alertWhen fires, and ends on stopWhen or after 24h. Use it for work you are NOT waiting on this turn \u2014 for an in-turn wait use terminal.awaitAll, and note agentTask.spawnForEdits attaches its own supervisor only when you pass watch:true or watchGoal. stopWhen/alertWhen are one-key WatchCondition objects, e.g. {\"stateIs\": \"idle\"}. Returns the wch_\u2026 id.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "alertWhen": {
       "additionalProperties": false,
-      "description": "Condition that publishes an attention alert (the watcher keeps running). A WatchCondition object with EXACTLY ONE of the keys below.",
+      "description": "Condition that publishes an attention alert (the watcher keeps running). A WatchCondition object with EXACTLY ONE of the keys below \u2014 the same shape as stopWhen, see its per-key descriptions.",
       "maxProperties": 1,
       "minProperties": 1,
       "properties": {
        "all": {
-        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape) must hold.",
+        "description": "AND over nested one-key conditions.",
         "items": {
          "maxProperties": 1,
          "minProperties": 1,
@@ -2433,7 +2228,7 @@
         "type": "array"
        },
        "any": {
-        "description": "OR \u2014 at least one nested condition (same one-key shape) holds.",
+        "description": "OR over nested one-key conditions.",
         "items": {
          "maxProperties": 1,
          "minProperties": 1,
@@ -2443,33 +2238,33 @@
         "type": "array"
        },
        "contains": {
-        "description": "Fires when the terminal tail contains this literal substring (non-empty).",
+        "description": "Tail contains this literal substring.",
         "minLength": 1,
         "type": "string"
        },
        "modelJudge": {
-        "description": "A yes/no question answered against the terminal tail on each check. Costs one model call per check at the watcher's modelTier (deduped across stopWhen/alertWhen) \u2014 prefer the free deterministic leaves when they can express the condition.",
+        "description": "Yes/no question against the tail (costs a model call per check).",
         "minLength": 1,
         "type": "string"
        },
        "noOutputForMs": {
-        "description": "Fires once no NEW output has appeared for this many ms.",
+        "description": "No new output for this many ms.",
         "minimum": 1,
         "type": "integer"
        },
        "not": {
-        "description": "Negates ONE nested condition (same one-key shape).",
+        "description": "Negates ONE nested one-key condition.",
         "maxProperties": 1,
         "minProperties": 1,
         "type": "object"
        },
        "regex": {
-        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
+        "description": "Tail matches this Go/RE2 regex.",
         "minLength": 1,
         "type": "string"
        },
        "runtimeStatusIs": {
-        "description": "Fires on the coarse terminal runtime status.",
+        "description": "Coarse terminal runtime status.",
         "enum": [
          "running",
          "exited"
@@ -2477,7 +2272,7 @@
         "type": "string"
        },
        "stateIs": {
-        "description": "Fires when the agent state equals this value exactly. A bare stateIs:'waiting' fires too early for 'agent finished' (pre-start, paused, and backgrounded agents also read waiting) \u2014 pair it with a modelJudge under all:[...], or rely on the default supervisor's confirmed completion.",
+        "description": "Agent state equals this value exactly.",
         "enum": [
          "idle",
          "working",
@@ -2622,7 +2417,7 @@
   "type": "function",
   "function": {
    "name": "watcher__watchPR",
-   "description": "Watch a pull request's state (open/merged/draft/closed) and alert on a change.",
+   "description": "Create a durable background watcher on ONE GitHub PR: it polls every 60s and publishes an attention event when the PR's state changes (open/merged/closed) or the draft flag flips \u2014 use it instead of re-polling forge.getPR yourself. Returns the wch_\u2026 id. Project-scoped: it keeps running after the assistant closes and self-expires after 24h unless stopAfterMs says otherwise. It only OBSERVES; it never merges or comments.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2657,7 +2452,7 @@
   "type": "function",
   "function": {
    "name": "watcher__list",
-   "description": "List active watchers.",
+   "description": "List the project's ACTIVE watchers: id, kind (terminal|pr_state), title, goal, targets, cadence, status, last classification and nextCheckAt. Live watchers do NOT ride the turn context \u2014 this is the ONLY way to see what is being supervised, so call it before attaching a watcher to a terminal (never double-supervise one) and to get the wch_\u2026 id for watcher.cancel. Ended watchers are never listed.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -2669,7 +2464,7 @@
   "type": "function",
   "function": {
    "name": "watcher__cancel",
-   "description": "Cancel an active watcher by id.",
+   "description": "Stop an ACTIVE watcher by its wch_\u2026 id: it stops checking, its automation grants are revoked, and any workflow ledger row it supervises closes as cancelled. Use it when the watched work is done or the user no longer wants it supervised. An already-ended watcher (condition_met/timeout/error/cancelled) returns WATCHER_NOT_FOUND \u2014 do not re-cancel. This NEVER touches the terminal: nothing is closed or killed.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2688,7 +2483,7 @@
   "type": "function",
   "function": {
    "name": "workflow__create",
-   "description": "Create a workflow ledger entry tracking an end-to-end run (issue/branch/worktree/PR).",
+   "description": "Open a workflow ledger row tracking ONE end-to-end unit of work (issue \u2192 branch \u2192 worktree \u2192 agent terminals \u2192 PR) so it survives compaction, restarts and wake turns \u2014 every open row rides each round's turn context. Status defaults to pending. Returns the wfr_\u2026 id; advance the row with workflow.update as the work progresses. A local record only: it spawns nothing and runs nothing.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2783,7 +2578,7 @@
   "type": "function",
   "function": {
    "name": "workflow__get",
-   "description": "Get a workflow ledger entry by id.",
+   "description": "Read ONE workflow ledger row by its wfr_\u2026 id: status, issue/branch/worktree/PR, the terminal/watcher/queue-event ids it owns, notes and nextAction. Open runs already ride every round's turn context as one-line rows, so call this only when you need a run's FULL detail \u2014 its notes, complete id lists, or a run that has already finished. Unknown id \u21d2 WORKFLOW_NOT_FOUND (unrecoverable).",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2802,7 +2597,7 @@
   "type": "function",
   "function": {
    "name": "workflow__list",
-   "description": "List workflow ledger entries, optionally filtered by status.",
+   "description": "List workflow ledger runs, newest-updated first (capped at 100), optionally filtered by status (pending|active|blocked|done|cancelled|failed). OPEN runs already ride every round's turn context as one-line rows, so call this for HISTORY \u2014 finished/cancelled/failed runs, or a full listing the user asked for. Each row carries the run id, status, issue/branch/worktree/PR, its id lists and nextAction.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2826,7 +2621,7 @@
   "type": "function",
   "function": {
    "name": "workflow__update",
-   "description": "Update a workflow ledger entry. Provided array fields REPLACE the stored arrays.",
+   "description": "Patch a workflow ledger row by id: status, issue/branch/worktree/PR fields, nextAction, or the terminalIds/watcherIds/queueEventIds/notes arrays. Every provided ARRAY field REPLACES the stored array wholesale \u2014 to append one note or id, read the row with workflow.get and send the full list back. Omitted fields are untouched. A move to done/cancelled/failed stamps completedAt once.",
    "parameters": {
     "additionalProperties": false,
     "properties": {

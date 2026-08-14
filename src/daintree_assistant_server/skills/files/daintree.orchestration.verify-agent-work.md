@@ -9,10 +9,11 @@ requiredTools:
   - git.getProjectPulse
   - workflow.prepBranchForReview
   - forge.getPR
+  - forge.listPRs
   - terminal.awaitAll
   - terminal.extract
-  - terminal.extract.async
   - terminal.extract.json
+  - watcher.terminal.create
   - agentTask.spawnForEdits
   - agentTask.superviseTerminal
   - daintree.call
@@ -38,10 +39,8 @@ Procedure:
 
 4. Semantic check with the SMALL model, not with your own eyes. Ask the terminal a targeted question instead of pulling scrollback into your context.
    - In-turn, when the user is waiting: `terminal.extract {"terminalIds": ["<full-id>"], "instruction": "Did it run the test suite, and what was the final result line? Quote it."}` — one question, one id. Over several ids a plain-text extract MERGES the tails into ONE answer; for a verdict per agent, batch one extract per id in a single turn (they dispatch concurrently) or use `terminal.extract.json` with an array schema keyed by terminalId.
-   - Off-turn, the purpose-built path: `terminal.extract.async` polls, extracts, JUDGES, and publishes the outcome to the attention queue instead of blocking the turn:
-     `{"terminalIds": ["<full-id>"], "instruction": "Summarize what the agent changed and what it reported about tests.", "verdictInstruction": "Pass only if the full suite ran and every test passed.", "title": "verify: <task>", "dedupeKey": "verify-<task>"}`
-     `verdictInstruction` is a pass/fail question judged against the extracted text and drives the event's severity, so what lands in the inbox is already a verdict rather than raw output. `dedupeKey` collapses repeat checks of the same thing into one item; `ttlMs` expires a check that stops mattering.
-     Supervision rule: adding `"wait": {}` turns this call into a SUPERVISOR — use that form only on an agent that has none, never stacked on a live watcher or an in-flight await. On an agent that has ALREADY settled, omit `wait`: it reads once, judges, and publishes without waiting on anything. Clear the resulting inbox item with `queue.resolve {"id": "<id>"}` once you have reported the verdict.
+   - Off-turn, when the user should not wait on the verdict: attach a watcher that judges instead of blocking the turn. `watcher.terminal.create {"terminalIds": ["<full-id>"], "title": "verify: <task>", "goal": "Confirm the agent ran the full test suite and every test passed.", "alertWhen": {"modelJudge": "Has the agent finished AND does its output show the full suite passing?"}, "stopWhen": {"stateIs": "exited"}}` — the watcher classifies on a cadence and publishes an attention event when `alertWhen` fires, so what lands in the inbox is a judged answer rather than raw scrollback. `modelJudge` costs a model call per check, so keep the cadence coarse for a long run.
+     Supervision rule: ONE mode per task — a watcher here means no in-flight `terminal.awaitAll` or `terminal.await.async` on the same terminal, which would leave a stale inbox event behind. If the agent has ALREADY settled, do not attach a watcher at all: a plain `terminal.extract` reads and judges it once, now. Clear the resulting inbox item with `queue.resolve {"id": "<id>"}` once you have reported the verdict.
 
 5. When the claim needs real inspection, DELEGATE it. If deciding requires reading code, a diff, or test output in depth, spawn a reviewer: `agentTask.spawnForEdits {"mode": "explore", "worktreeId": "<worktree path>", "title": "verify <task>", "taskPrompt": "<the acceptance criteria as the brief: check each one against the working tree and report PASS or FAIL per criterion with file evidence; change nothing>"}`. Explore mode is read-only by construction, and `acceptanceCriteria` is IGNORED for it — the criteria go in the taskPrompt. Supervise it like any other agent (ONE mode), then run its report back through step 6 as the evidence.
 

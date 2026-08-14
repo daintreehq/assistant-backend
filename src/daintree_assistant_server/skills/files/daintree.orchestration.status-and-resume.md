@@ -9,7 +9,7 @@ requiredTools:
   - workflow.list
   - workflow.get
   - workflow.update
-  - workflow.focusNextAttention
+  - terminal.focus
   - watcher.list
   - async.list
   - timer.list
@@ -49,7 +49,7 @@ Procedure:
 
 5. Resumable sessions live outside the ledger. `agentSessionHistory.list` has no typed wrapper, so it goes through the escape hatch: `daintree.call({"name":"agentSessionHistory.list","arguments":{}})` — an optional `worktreeId` inside `arguments` scopes it to one worktree; omit it to list every resumable session. Records come back newest-first with sessionId, agentId, worktreeId, title, projectId, savedAt, and sometimes agentLaunchFlags / agentModelId / cwd / branch. CRITICAL and easy to get wrong: there is NO restore tool and you CANNOT read a closed session's transcript. To bring one back you spawn a FRESH agent in that worktree with `agentTask.spawnForEdits`, reusing the record's `worktreeId` and `agentId` and writing a `taskPrompt` that states what to continue (rebuild that context from the ledger row, the branch state and the user — not from the dead session). Tell the user plainly that this is a new agent in the old worktree, not a faithful resume: its prior conversation is gone. Never present it as "resuming session X".
 
-6. Report ONE ranked picture, not five tool dumps. Order it: (a) needs you now — open queue items, agents asking a question, blocked rows; (b) live and supervised — terminal id, watcher or async handle, and what will wake you; (c) live but UNsupervised — say the outcome is unknown and offer to adopt it (step 3) or wait; (d) closed — which rows you closed, to what status, and on what evidence; (e) resumable from history, newest first. Give real ids verbatim. Then `queue.resolve {"id":"<id>"}` per the foundation's inbox rule — only what you actually relayed here. `workflow.focusNextAttention` (no arguments) points the UI at the next thing when the user wants to look at it.
+6. Report ONE ranked picture, not five tool dumps. Order it: (a) needs you now — open queue items, agents asking a question, blocked rows; (b) live and supervised — terminal id, watcher or async handle, and what will wake you; (c) live but UNsupervised — say the outcome is unknown and offer to adopt it (step 3) or wait; (d) closed — which rows you closed, to what status, and on what evidence; (e) resumable from history, newest first. Give real ids verbatim. Then `queue.resolve {"id":"<id>"}` per the foundation's inbox rule — only what you actually relayed here. If the user then wants to LOOK at one of these, `terminal.focus({"terminalId":"<id>"})` reveals that terminal — focus is per-terminal and by id; there is no "next thing needing attention" call.
 
 7. Optional forensics for "what happened while I was away". `audit.export({"format":"json","tsFrom":<epoch ms>,"tsTo":<epoch ms>,"limit":200})` with optional `actor` (main, watcher, timer, workflow, system), `toolName` (exact dotted name), and `outcome` (ok, error, denied, dedup, grant_ok). Filters AND-combine and rows return newest-first, so one filtered read answers the question — narrow it with `outcome:"error"` or a single toolName rather than exporting everything. Summarize what it shows; never paste raw rows back.
 
