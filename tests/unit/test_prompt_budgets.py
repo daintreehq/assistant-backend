@@ -8,11 +8,53 @@ regression toward bloat, not every incremental edit.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from daintree_assistant_server.prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
 from daintree_assistant_server.skills.catalog import load_catalog
 
-# Base prompt is ~28 KB; this ceiling catches regrowth without churning on small edits.
-BASE_PROMPT_CEILING = 36 * 1024
+# The permanent base prompt is sent on EVERY request and is the second-largest
+# region of it, after the client's tool schemas. A ceiling with 8 KB of slack let
+# it drift upward unnoticed for a long time, so this is now a RATCHET: set just
+# above the current size, and lowered whenever real compression lands. Raising it
+# should require the same argument as adding a rule — what behaviour needs this,
+# and why does it have to hold on every turn rather than in a skill?
+#
+# Current: ~27.5 KB across seven partials, down from 31.7 KB.
+#
+# WHY IT STOPPED THERE. The remaining reduction to the 15-20 KB target needs
+# rules MOVED out of the permanent block, not tighter wording — and the two
+# destinations both have a catch:
+#
+#   * A skill. `daintree.foundation` is only paired in when the selector picks a
+#     `daintree.*` skill, so it is absent on a greeting or a plain question. An
+#     audit of the six bullets trimmed here found the foundation does NOT in fact
+#     restate several of them (per-task supervision scope, the one-agent extract
+#     wait, partial results on an interrupted await, PR-watcher auto-stop), so
+#     those were restored rather than left to a skill that may not load.
+#   * A tool description. Those live in the CLI repository, not here.
+#
+# Both routes change behaviour in ways only a LIVE tool-use benchmark can
+# falsify, and that benchmark needs a paid key. Compressing a safety-critical
+# prompt on faith is exactly the change that looks fine offline and degrades in
+# production, so the byte target waits on the measurement rather than the other
+# way round.
+BASE_PROMPT_CEILING = 28 * 1024
+
+# Per-partial ceilings. The aggregate alone hides where growth actually happens —
+# tool-discipline is nearly half the prompt on its own, and a rule added there is
+# far more likely to be skill-local than one added to the hard rules.
+BASE_PARTIAL_CEILINGS = {
+    "00-persona.md": 1024,
+    "10-hard-rules.md": 5 * 1024,
+    "20-tool-discipline.md": 14 * 1024,
+    "30-skills.md": 3 * 1024,
+    "35-daintree-docs.md": 3 * 1024,
+    "40-communication.md": 3 * 1024,
+    "50-formatting.md": 3 * 1024,
+}
 # The selector system prompt is the catalog rendered as a classification menu, so it
 # grows monotonically with every skill added — and it sits on the turn's FIRST-BYTE
 # path (the selector is hardcoded non-thinking precisely to keep that path fast). Left
@@ -51,7 +93,35 @@ def _base() -> str:
 
 def test_base_prompt_under_ceiling() -> None:
     size = len(_base().encode("utf-8"))
-    assert size <= BASE_PROMPT_CEILING, f"base prompt {size}B exceeds {BASE_PROMPT_CEILING}B ceiling"
+    assert size <= BASE_PROMPT_CEILING, (
+        f"base prompt {size}B exceeds the {BASE_PROMPT_CEILING}B ratchet. This text "
+        "is sent on every request. Before raising the ceiling, ask whether the new "
+        "rule has to hold on EVERY turn — if it only matters while orchestrating "
+        "agents, or answering a docs question, it belongs in that skill instead."
+    )
+
+
+def _base_dir() -> Path:
+    return PromptLoader().dir / "main" / "base"
+
+
+@pytest.mark.parametrize("name", sorted(BASE_PARTIAL_CEILINGS))
+def test_each_base_partial_under_its_ceiling(name: str) -> None:
+    """Per-partial, because the aggregate hides where growth happens."""
+    path = _base_dir() / name
+    assert path.is_file(), f"{name} is missing; update BASE_PARTIAL_CEILINGS"
+    size = len(path.read_bytes())
+    ceiling = BASE_PARTIAL_CEILINGS[name]
+    assert size <= ceiling, f"{name} is {size}B, over its {ceiling}B ceiling"
+
+
+def test_every_base_partial_has_a_ceiling() -> None:
+    """A new partial must be budgeted deliberately, not slip in unbounded."""
+    on_disk = {p.name for p in _base_dir().glob("*.md")}
+    assert on_disk == set(BASE_PARTIAL_CEILINGS), (
+        "base partials and BASE_PARTIAL_CEILINGS disagree: "
+        f"{sorted(on_disk ^ set(BASE_PARTIAL_CEILINGS))}"
+    )
 
 
 def test_selector_prompt_under_ceiling() -> None:
