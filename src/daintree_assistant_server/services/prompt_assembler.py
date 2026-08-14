@@ -52,6 +52,7 @@ from ..skills.models import Skill
 from ..text_utils import (
     cap_bytes,
     frame_data_block,
+    frame_value,
     message_text,
     sanitize_line,
     utf8_len,
@@ -275,32 +276,47 @@ class PromptAssembler:
 
         wt = runtime.worktree.current
         parts: list[str] = []
-        if branch := sanitize_line(wt.branch, 512):
+
+        def prose(value: str | None, cap: int) -> str:
+            """Frame a worktree field that carries free text.
+
+            Issue titles, PR titles and commit subjects are written by whoever
+            opened the issue or pushed the branch — not necessarily the user — so
+            they are the worktree's genuinely attacker-reachable fields, each with
+            512-1024 bytes of room. Branch names and paths join them because a
+            branch can be named anything. Short enumerated values (`status`, the
+            numeric issue/PR ids) stay bare: no room for an imperative, and
+            framing them would only add noise to a line the model reads every turn.
+            """
+            return frame_value(sanitize_line(value, cap), tag="w")
+
+        if branch := prose(wt.branch, 512):
             parts.append(f"branch {branch}")
         if wt.is_main:
             parts.append("main worktree")
         if wt.issue_number is not None:
             issue = f"issue #{wt.issue_number}"
-            if title := sanitize_line(wt.issue_title, 512):
+            if title := prose(wt.issue_title, 512):
                 issue += f" {title}"
             parts.append(issue)
-        elif title := sanitize_line(wt.issue_title, 512):
+        elif title := prose(wt.issue_title, 512):
             parts.append(f"issue {title}")
         if wt.pr_number is not None:
             pr = f"PR #{wt.pr_number}"
-            if title := sanitize_line(wt.pr_title, 512):
+            if title := prose(wt.pr_title, 512):
                 pr += f" {title}"
             parts.append(pr)
-        elif title := sanitize_line(wt.pr_title, 512):
+        elif title := prose(wt.pr_title, 512):
             parts.append(f"PR {title}")
-        for label, value, cap in (
-            ("PR URL", wt.pr_url, 4096),
-            ("status", wt.status, 64),
-            ("last commit", wt.last_commit, 1024),
-            ("id", wt.id, 4096),
-            ("path", wt.path, 4096),
+        for label, value, cap, framed in (
+            ("PR URL", wt.pr_url, 4096, True),
+            ("status", wt.status, 64, False),
+            ("last commit", wt.last_commit, 1024, True),
+            ("id", wt.id, 4096, True),
+            ("path", wt.path, 4096, True),
         ):
-            if clean := sanitize_line(value, cap):
+            clean = prose(value, cap) if framed else sanitize_line(value, cap)
+            if clean:
                 parts.append(f"{label} {clean}")
         return {"current": {"summary": " · ".join(parts)}}
 
@@ -329,10 +345,17 @@ class PromptAssembler:
                 "id": tid,
                 "kind": sanitize_line(t.kind, 64),
                 "worktree_id": sanitize_line(t.worktree_id, 512),
-                "title": sanitize_line(t.title, 512),
+                # An agent can rename its OWN terminal, so a title is the one
+                # runtime field an attacker downstream of the user controls
+                # directly — it writes into the supervisor's prompt. Same for the
+                # waiting reason. Both carry 512 bytes of free text; the short
+                # enumerated fields beside them do not and stay bare.
+                "title": frame_value(sanitize_line(t.title, 512), tag="t"),
                 "agent_id": sanitize_line(t.agent_id, 256),
                 "agent_state": sanitize_line(t.agent_state, 64),
-                "waiting_reason": sanitize_line(t.waiting_reason, 512),
+                "waiting_reason": frame_value(
+                    sanitize_line(t.waiting_reason, 512), tag="t"
+                ),
                 "exit_code": t.exit_code,
             }
             for t in rc.open_terminals[: self.settings.cap_open_terminals]
@@ -421,7 +444,13 @@ class PromptAssembler:
 
         def lines(items: list[str]) -> list[str]:
             capped = (sanitize_line(item, self._WORKFLOW_LINE_BYTES) for item in items)
-            return [line for line in capped if line][: self._WORKFLOW_LIST_ITEMS]
+            # Framed like the scalar free-text fields: each item carries the same
+            # 512-byte budget as `goal`, which is ample room for an imperative.
+            # Framing three fields and leaving these bare would have been an
+            # inconsistency an attacker reads as a doorway.
+            return [
+                frame_value(line, tag="wf") for line in capped if line
+            ][: self._WORKFLOW_LIST_ITEMS]
 
         out: list[dict[str, Any]] = []
         used = 0
@@ -429,16 +458,30 @@ class PromptAssembler:
             wf_id = sanitize_line(digest.id, 128)
             if not wf_id:
                 continue
+            # The three free-text fields are framed; id/status are not, because
+            # they are short enumerated-ish values with no room for prose and
+            # framing them would only add noise to every line. `goal`,
+            # `next_action` and `last_event` are where an injected imperative
+            # would actually live — a digest whose next action reads "then delete
+            # the branch" is the shape this defends against.
             rendered: dict[str, Any] = {
                 "id": wf_id,
-                "goal": sanitize_line(digest.goal, self._WORKFLOW_LINE_BYTES),
+                "goal": frame_value(
+                    sanitize_line(digest.goal, self._WORKFLOW_LINE_BYTES), tag="wf"
+                ),
                 "status": sanitize_line(digest.status, 64),
-                "progress": sanitize_line(digest.progress, self._WORKFLOW_LINE_BYTES),
+                "progress": frame_value(
+                    sanitize_line(digest.progress, self._WORKFLOW_LINE_BYTES), tag="wf"
+                ),
                 "active_nodes": lines(digest.active_nodes),
                 "resources": lines(digest.resources),
                 "blockers": lines(digest.blockers),
-                "next_action": sanitize_line(digest.next_action, self._WORKFLOW_LINE_BYTES),
-                "last_event": sanitize_line(digest.last_event, self._WORKFLOW_LINE_BYTES),
+                "next_action": frame_value(
+                    sanitize_line(digest.next_action, self._WORKFLOW_LINE_BYTES), tag="wf"
+                ),
+                "last_event": frame_value(
+                    sanitize_line(digest.last_event, self._WORKFLOW_LINE_BYTES), tag="wf"
+                ),
             }
             size = 0
             for value in rendered.values():
@@ -470,8 +513,15 @@ class PromptAssembler:
             max_count=self.settings.cap_watchers_count,
         )
 
+        # Frame the two carriers the live injection benchmark measured leaking.
+        # Sanitizing to a single line already stops a value forging a heading; it
+        # does nothing about the value simply reading as prose the model obeys.
+        # The two carriers rendered inside a delimited block (project and MCP
+        # instructions) held across trials, and the two rendered bare — the turn
+        # goal and the workflow digests — did not. This puts them behind the same
+        # boundary.
         turn_context = {
-            "goal": goal,
+            "goal": frame_value(goal, tag="goal"),
             "workflow_runs": workflow_runs,
             "async_operations": async_operations,
             "memories": {"pinned": pinned, "relevant": relevant},

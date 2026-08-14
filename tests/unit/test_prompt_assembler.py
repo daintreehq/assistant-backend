@@ -107,7 +107,7 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
     assert tail["role"] == "user"
     assert tail["content"].startswith("[Injected context")
     assert "Permission tier:" in tail["content"]  # runtime block folded in
-    assert "Current objective: g" in tail["content"]  # turn footer folded in
+    assert "Current objective: <goal>g" in tail["content"]  # turn footer folded in
     # Skills reach the model as plain context only — never a synthetic skill__load tool call.
     assert not any(
         m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "skill__load"
@@ -201,7 +201,7 @@ def test_project_instructions_cannot_break_framing(assembler: PromptAssembler) -
     )
     rendered = assembler.render_startup_context(startup)
     assert rendered.count("</project_instructions>") == 1
-    assert "<\\/project_instructions>" in rendered
+    assert "[/project_instructions]" in rendered
 
 
 def test_runtime_context_omits_open_terminals_when_empty(assembler: PromptAssembler) -> None:
@@ -294,7 +294,7 @@ def test_integrations_neutralizes_instruction_injection(assembler: PromptAssembl
     )
     rendered = assembler.render_integrations(rc)
     assert rendered.count("</mcp_instructions>") == 1
-    assert "<\\/mcp_instructions>" in rendered
+    assert "[/mcp_instructions]" in rendered
 
 
 def test_integrations_message_inserted_only_when_present(assembler: PromptAssembler) -> None:

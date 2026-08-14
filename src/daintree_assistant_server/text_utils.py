@@ -95,6 +95,39 @@ def sanitize_line(text: str | None, max_bytes: int) -> str:
     return capped
 
 
+def neutralize_delimiter(text: str, tag: str) -> str:
+    """Defuse any occurrence of ``<tag>`` / ``</tag>`` inside ``text``.
+
+    Matched the way a lenient reader would — case-insensitively, tolerating
+    internal whitespace, and tolerating **backslashes**, because the audience is
+    a language model rather than an XML parser. ``</TAG>``, ``</tag >``,
+    ``< /tag>`` and ``<\\/tag>`` are all spellings a model may read as closing the
+    block.
+
+    The backslash tolerance is not hypothetical: an earlier version defused
+    ``</tag>`` by rewriting it to ``<\\/tag>`` — which is itself a widely
+    recognised escaped-closing-tag spelling, and which that same regex then let
+    through untouched when supplied directly. Escaping *into* an alias of the
+    thing being escaped is worse than not escaping at all, because it looks
+    handled.
+
+    So the delimiter is not escaped, it is **replaced with a different bracket**:
+    ``</goal>`` becomes ``[/goal]``. Square brackets are not the delimiter under
+    any spelling, so the result cannot be re-read as a tag, and the substitution
+    is idempotent — running it twice changes nothing.
+
+    Split out from :func:`frame_data_block` so every framing helper defuses
+    identically: a second convention that forgot this step would be a breakout
+    hole that looks, in the rendered prompt, exactly like a safe one.
+    """
+    return re.sub(
+        rf"<[\s\\/]*{re.escape(tag)}\s*/?\s*>",
+        lambda m: "[" + m.group(0)[1:-1] + "]",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+
 def frame_data_block(text: str | None, max_bytes: int, *, tag: str) -> str:
     """Frame multiline untrusted text as an inert, delimited data block.
 
@@ -106,17 +139,28 @@ def frame_data_block(text: str | None, max_bytes: int, *, tag: str) -> str:
     cleaned, _ = sanitize_field(text, max_bytes)
     if not cleaned.strip():
         return ""
-    # Match the delimiter the way a lenient reader would: case-insensitively and
-    # tolerating internal whitespace. Escaping only the two exact byte sequences let
-    # `</TAG>`, `</tag >` and `< /tag>` through un-escaped, any of which a model may
-    # well read as closing the block.
-    neutralized = re.sub(
-        rf"<\s*/?\s*{re.escape(tag)}\s*>",
-        lambda m: m.group(0).replace("<", "<\\", 1),
-        cleaned,
-        flags=re.IGNORECASE,
-    )
-    return f"<{tag}>\n{neutralized}\n</{tag}>"
+    return f"<{tag}>\n{neutralize_delimiter(cleaned, tag)}\n</{tag}>"
+
+
+def frame_value(text: str | None, *, tag: str) -> str:
+    """Frame one ALREADY-SANITIZED single-line value as inert data.
+
+    The counterpart to :func:`frame_data_block` for the many short fields —
+    a turn goal, a memory, a workflow digest line — that are collapsed to one
+    line by :func:`sanitize_line` before they ever reach a template.
+
+    Collapsing to a single line already stops a value forging a heading or an
+    extra line. What it does *not* stop is the value simply reading as prose the
+    model might obey, which is precisely what the live injection benchmark
+    measured: the two carriers rendered bare (``turn_goal``, ``workflow_digest``)
+    leaked, while the two rendered inside a delimited block did not. This puts
+    the leaking carriers behind the same visible boundary.
+
+    Returns ``""`` for empty input so a template can omit the field entirely.
+    """
+    if not text:
+        return ""
+    return f"<{tag}>{neutralize_delimiter(text, tag)}</{tag}>"
 
 
 def message_text(content: str | list[ContentPart] | None) -> str:

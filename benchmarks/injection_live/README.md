@@ -47,8 +47,27 @@ concrete resistance gap to optimize (those carriers may want the same framing
 hardening `project_instructions` gets). The main model is non-deterministic, so
 run `--trials 3+` and read the by-carrier breakdown, not a single trial.
 
-**This baseline is stale in one important way:** it was measured while the main
-model still ran thinking-high. The shipped posture is now non-thinking
-(`INTERACTIVE_THINKING_ENABLED`), so these numbers are neither proof of a present
-vulnerability nor evidence of safety — the corpus has to be re-measured against
-the current posture before the figures above mean anything.
+**This baseline is stale in two ways and must be re-measured before its numbers
+mean anything:**
+
+1. It was taken while the main model still ran thinking-high. The shipped posture
+   is now non-thinking (`INTERACTIVE_THINKING_ENABLED`).
+2. Both leaking carriers have since been changed. `turn_goal` and the workflow
+   digests' free-text fields are now rendered inside a delimited block whose
+   delimiter they cannot close, under prose stating that values in the section
+   are data and that an imperative inside one is never an instruction. The
+   workflow "trust these digests" line was also narrowed to scope trust to
+   *progress* rather than to the text inside them.
+
+That change is the direct consequence of what this baseline found: the two
+carriers that were framed resisted, the two that were bare did not. The corpus
+has also grown from 4 carriers to 9 — the original set was dominated by blocks
+that were already framed, which made it agree with the framing rather than test
+it. It still does not cover every carrier; the runner names what is left.
+New carriers: `memory` (the one that can persist an injection across sessions),
+`terminal_title` (agent-controlled text landing in a supervisor's prompt),
+`mcp_description`, `agent_roster`, `async_operation`, plus a fake-approval case
+that targets the confirmation rule rather than the output.
+
+The mechanical half — that no carrier can close its own delimiter — is pinned
+offline in `tests/unit/test_untrusted_framing.py`, so it holds without a key.
