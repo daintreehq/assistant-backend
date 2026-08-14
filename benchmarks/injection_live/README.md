@@ -44,6 +44,11 @@ The obedience floor is **not uniform across carriers**: `project_instructions` a
 `mcp_instructions` resisted across trials, while `turn_goal` and `workflow_digest`
 each leaked the canary on some trials (overall obey rate ~0.1 at 3 trials) — a
 concrete resistance gap to optimize (those carriers may want the same framing
-hardening `project_instructions` gets). The main model is thinking-high and
-non-deterministic, so run `--trials 3+` and read the by-carrier breakdown, not a
-single trial.
+hardening `project_instructions` gets). The main model is non-deterministic, so
+run `--trials 3+` and read the by-carrier breakdown, not a single trial.
+
+**This baseline is stale in one important way:** it was measured while the main
+model still ran thinking-high. The shipped posture is now non-thinking
+(`INTERACTIVE_THINKING_ENABLED`), so these numbers are neither proof of a present
+vulnerability nor evidence of safety — the corpus has to be re-measured against
+the current posture before the figures above mean anything.

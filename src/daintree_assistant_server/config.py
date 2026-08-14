@@ -222,12 +222,16 @@ class Settings(BaseSettings):
     selector_timeout_seconds: float = Field(default=8.0, alias="SELECTOR_TIMEOUT_SECONDS")
     main_timeout_seconds: float = Field(default=840.0, alias="MAIN_TIMEOUT_SECONDS")
     # Default budget for utility tasks. Deliberately NOT tightened to the
-    # aspirational 25s: every profile runs thinking-high with a ~4k-token
-    # reasoning+output budget over inputs up to 120k chars, and the model can emit
-    # no bytes at all while thinking — a 25s read cap risks repeatable timeouts.
-    # Revisit only from measured latency distributions. The heavyweight
-    # transcript/graph tasks also carry an explicit 60s on their TaskProfile so a
-    # future default cut cannot silently starve them.
+    # aspirational 25s: a profile reads inputs up to 120k chars, and this is an
+    # httpx READ budget (the gap between chunks, not a total wall clock), so a
+    # tight cap risks repeatable timeouts on the heavy extractions rather than on
+    # anything pathological. Revisit only from measured latency distributions. The
+    # heavyweight transcript/graph tasks also carry an explicit 60s on their
+    # TaskProfile so a future default cut cannot silently starve them.
+    # (The original justification here was the ~4k-token reasoning budget of a
+    # thinking-high profile. Utility tasks are NON-thinking now — see
+    # INTERACTIVE_THINKING_ENABLED — so that argument no longer applies; the input
+    # size one does.)
     utility_timeout_seconds: float = Field(default=60.0, alias="UTILITY_TIMEOUT_SECONDS")
     upstream_connect_timeout_seconds: float = Field(
         default=10.0, alias="UPSTREAM_CONNECT_TIMEOUT_SECONDS"
@@ -248,19 +252,30 @@ class Settings(BaseSettings):
     selector_max_output_tokens: int = Field(default=800, alias="SELECTOR_MAX_OUTPUT_TOKENS")
 
     # ---- Utility tasks --------------------------------------------------
-    # Named small-model tasks (checkpoint, summarize, classify, workflow_plan, …) run
-    # thinking-high — hardcoded, like all thinking posture. Each TaskProfile's
-    # max_output_tokens sizes its VISIBLE output; thinking headroom is added on top.
-    # json tasks use response_format json_object (compatible with thinking); no
-    # utility task uses a forced tool call.
+    # Named small-model tasks (checkpoint, summarize, classify, workflow_plan, …) are
+    # NON-THINKING, like the rest of the interactive surface — they read
+    # INTERACTIVE_THINKING_ENABLED (task_runner.py), which is False. Each
+    # TaskProfile's max_output_tokens therefore sizes its whole completion;
+    # thinking_headroom_tokens is added only if that flag is switched back on, so a
+    # non-thinking task is never handed 4k tokens of slack to spend on visible
+    # output. json tasks use response_format json_object; no utility task uses a
+    # forced tool call.
 
     # ---- Retries --------------------------------------------------------
-    # Applies to every upstream call (main completion, stream open,
-    # selector, utility tasks): retries transient failures only while no model
-    # output or replay-unsafe side effect has been exposed. Streaming metadata may
-    # already be public during an open/prefetch retry. The backend owns retries;
-    # one retry (= up to 2 attempts) is the normal posture — the CLI must never
-    # stack its own retries on top.
+    # ONE HOP ONLY: backend -> OpenRouter. Applies to every upstream call (main
+    # completion, stream open, selector, utility tasks): retries transient
+    # failures only while no model output or replay-unsafe side effect has been
+    # exposed. Streaming metadata may already be public during an open/prefetch
+    # retry. One retry (= up to 2 attempts) is the normal posture.
+    #
+    # A SECOND retry layer exists on the OTHER hop — CLI -> backend
+    # (cli/internal/backend/retry.go: up to 10 attempts inside a 2-minute
+    # elapsed window, sized to ride out a backend restart). That is deliberate,
+    # not a stacking bug: it recovers a different failure mode on a different
+    # network, and it never replays a deterministic failure (401/403/400/426), an
+    # application verdict keyed on error.code, or a turn that has already
+    # streamed visible tokens. docs/PROVIDER_POLICY.md documents how the two
+    # layers compose; do not "fix" one by assuming the other does not exist.
     max_upstream_retries: int = Field(default=1, ge=0, alias="MAX_UPSTREAM_RETRIES")
     retry_backoff_base_seconds: float = Field(
         default=0.25, ge=0.0, alias="RETRY_BACKOFF_BASE_SECONDS"

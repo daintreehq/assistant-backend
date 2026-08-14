@@ -282,8 +282,10 @@ async def test_light_task_uses_default_utility_timeout(
     )
     await _run(task_runner, "terminal_judge", {"question": "q", "tail": "t"})
     assert fake_provider.requests[-1].timeout == settings.utility_timeout_seconds
-    # Deliberately 60s, not the aspirational 25s — see the config.py comment
-    # (thinking-high tasks can sit >25s with zero bytes on the wire).
+    # Deliberately 60s, not the aspirational 25s — see the config.py comment.
+    # This is an httpx READ budget (the gap between chunks), and a heavy
+    # extraction over ~120k chars of input can legitimately sit a long time
+    # before its first byte.
     assert settings.utility_timeout_seconds == 60.0
 
 

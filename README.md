@@ -2,9 +2,11 @@
 
 A Daintree-operated model-orchestration service. It moves the orchestration
 boundary off the local CLI: the server owns the permanent system prompt, the
-skill catalog and bodies, automatic skill selection, prompt assembly, the
-small-model utility prompts, and upstream credentials. The CLI keeps local
-state and local tool execution.
+skill catalog and bodies, automatic skill selection, prompt assembly, and the
+small-model utility prompts. The CLI keeps local state, local tool execution,
+and **the upstream credential** — the server holds none: every request's bearer
+token *is* the caller's own OpenRouter key, and it funds that turn's upstream
+calls.
 
 It exposes a **Daintree-native** API (`POST /v1/daintree/respond`) — purpose-built,
 not OpenAI-compatible. The session/skill envelope is first-class, skills are surfaced
@@ -12,15 +14,34 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 `error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** OpenRouter (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek/deepseek-v4-flash-0731` for the main/selector/utility calls and the skill-learning gate, routed to the fastest endpoint that neither stores nor trains on request data; the local skill-learning builder/improver name a stronger model (`openai/gpt-5.6-sol`) on the same provider and the same key
+- **Upstream:** OpenRouter (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek/deepseek-v4-flash-0731` for the main/selector/utility calls and the skill-learning gate, routed to the fastest endpoint that does not collect or train on request data ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, *not* zero data retention <!-- privacy-copy-ok -->); the local skill-learning builder/improver name a stronger model (`openai/gpt-5.6-sol`) on the same provider and the same key
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
+
+## Authoritative documents
+
+This README is a summary. Where it disagrees with one of these, the document wins:
+
+| Document | Authority for |
+|---|---|
+| [`docs/INTERNAL_BETA.md`](docs/INTERNAL_BETA.md) | What the beta is: included/excluded scope, required tester disclosure, environments, invariants |
+| [`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) | Model ids, endpoint routing, privacy posture, thinking posture, both retry layers, failure mapping |
+| [`docs/KEY_HANDLING.md`](docs/KEY_HANDLING.md) | What a key is, how it moves, where it must never appear, verification, rotation |
+| [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md) | The wire contract |
+
+`tests/unit/test_docs_drift.py` pins the highest-risk facts in those documents —
+privacy wording, thinking posture, model ids, credential ownership, retry layers,
+routing policy — against the code that implements them, so those postures cannot
+change without the prose moving in the same commit. It is a targeted gate, not a
+proof that the whole corpus is accurate.
 
 ## Key invariants
 
 - Client `system`/`developer` messages are rejected (server owns all system text).
 - Every respond request carries required structured `startup` context. Its curated project,
   agent-roster, and project-instruction data reaches only the main model in a stable framed
-  block; selector and skill-learning transcripts remain exactly `input.messages`.
+  block. Neither the selector nor the skill learner ever sees `startup`: the selector's
+  evidence is sanitized `input.messages` plus bounded turn/workflow hints and tool names;
+  the learner's is `input.messages` plus the just-generated final answer and tool names.
 - `skill.find` / `skill.load` are never offered to the main model; selection runs
   as a separate small-model call before the main completion.
 - Only the active skill bodies (max 3) are injected — never the full catalog.
@@ -112,8 +133,8 @@ auto-reload during development: `uvicorn daintree_assistant_server.main:app
 
 The server can **learn skills from your own sessions**: after a workflow, a
 backend-internal pipeline can write a brand-new skill or improve an existing one,
-so the catalog gets better as you use it. It is **off by default** and **cannot run
-in production** (an enabled mode fails `/readyz` when `ENVIRONMENT=production`).
+so the catalog gets better as you use it. It is **off by default** and **cannot run in a hardened environment** (an
+enabled mode fails `/readyz` when `ENVIRONMENT` is `production` *or* `staging`).
 
 It is invisible to the CLI. The main assistant model is never told it exists.
 Learning runs **off the response path, in the background, after** the turn's answer
@@ -185,8 +206,8 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `POST` | `/v1/daintree/respond` | yes | Native generation (+ first-class `skills` block; stream or JSON) |
-| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task profiles, catalog revision |
-| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: is the bearer usable upstream? (no body; costs no tokens) |
+| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision |
+| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: does OpenRouter recognise the bearer? (no body; no inference). Returns `valid` plus optional budget metadata — recognised is not the same as fundable |
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual find / load / clear |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks |
@@ -210,8 +231,10 @@ step in the release path.
 push to main → Cloud Build trigger `deploy-main` → cloudbuild.yaml
    build the image (BUILD_SHA = commit sha)
    push to Artifact Registry
-   deploy a no-traffic revision behind the `rc` tag
-   smoke-test it: /healthz, /readyz, and /version == the released commit
+   deploy a no-traffic revision behind the `candidate` tag
+   smoke-test it: /readyz and /version == the released commit
+     (NOT /healthz: Cloud Run's frontend answers that path itself with an
+      HTML 404 before the container sees it — /health is the reachable alias)
    promote to 100%
 ```
 

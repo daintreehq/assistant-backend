@@ -122,11 +122,18 @@ _VERIFY_TIMEOUT_SECONDS = 10.0
 # newly-faster endpoint is picked up with no code change.
 #
 # PRIVACY FLOOR. ``data_collection: "deny"`` restricts routing to endpoints that
-# do not store or train on request data — the pool is filtered FIRST, then sorted,
-# so throughput never buys its speed with user prompts. (The stricter
-# ``"zdr": True`` — zero on-disk retention, not merely no training — is a
-# one-key escalation here if it is ever wanted; it narrows the pool further, so
-# it is off until measured.)
+# do not COLLECT prompt data or train on it — the pool is filtered FIRST, then
+# sorted, so throughput never buys its speed with user prompts.
+#
+# BE PRECISE ABOUT WHAT THIS PROMISES, because it is a user trust decision and
+# Daintree carries source code, terminal output and project instructions.
+# ``data_collection: "deny"`` is a NO-TRAINING / no-collection guarantee. It is
+# NOT a no-retention one: an endpoint may still hold a request transiently for
+# abuse monitoring. Zero data retention is OpenRouter's SEPARATE ``"zdr": True``
+# flag, which narrows the pool much further and is not sent by default. Every
+# user-facing statement must say "does not collect or train on", never "does not
+# store" (docs/PROVIDER_POLICY.md is the authority, and tests/unit/
+# test_docs_drift.py fails CI if the copy and this dict disagree).
 #
 # ``require_parameters`` drops endpoints that would silently ignore something we
 # sent. It matters most for the json_object calls (selector, utility tasks):

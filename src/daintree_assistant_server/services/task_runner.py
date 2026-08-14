@@ -556,8 +556,10 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
     # Most tasks are small classify/judge/extract calls and run inside the tight
     # default budget (settings.utility_timeout_seconds). The heavyweight tasks —
     # whole-transcript digestion (checkpoint, memory_distill) and the workflow
-    # graph tasks (plan/reconcile/resume digest) — think long and emit large JSON,
-    # so they carry an explicit, larger budget of their own.
+    # graph tasks (plan/reconcile/resume digest) — read far more input and emit
+    # large JSON, so they carry an explicit, larger budget of their own. (Not a
+    # reasoning budget: every utility task is non-thinking. See
+    # INTERACTIVE_THINKING_ENABLED and docs/PROVIDER_POLICY.md section 2.)
     heavy_timeout = 60.0
     return {
         p.id: p

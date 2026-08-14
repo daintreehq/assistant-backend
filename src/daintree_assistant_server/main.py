@@ -112,7 +112,84 @@ class BodySizeLimitMiddleware:
             return {"type": "http.request", "body": b"", "more_body": False}
 
         response = request_too_large("Request body exceeds the configured limit.").to_response()
+        # This middleware is OUTERMOST, so it answers before the request-context
+        # middleware that normally mints and attaches the id. Without this, a 413
+        # is the one response a tester cannot quote a request id for — precisely
+        # the failure they are most likely to be reporting. Honor an inbound id
+        # when the client sent one, exactly as the inner middleware does.
+        headers = dict(scope.get("headers") or [])
+        try:
+            inbound = headers.get(b"x-request-id", b"").decode("ascii")
+            authorization = headers.get(b"authorization", b"").decode("ascii")
+        except UnicodeDecodeError:  # pragma: no cover - defensive
+            inbound, authorization = "", ""
+        response.headers.setdefault(
+            "X-Request-Id", _safe_request_id(inbound, authorization)
+        )
         await response(scope, _eat, send)
+
+
+# Bounds on an inbound X-Request-Id we are willing to adopt. A request id is a
+# correlation handle: it lands in every structured log line for the request and is
+# echoed in the response header, so it is the one caller-controlled string that
+# gets copied verbatim into our logs.
+_MAX_REQUEST_ID_LENGTH = 128
+_REQUEST_ID_SAFE = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+)
+# Shortest id that is treated as a possible credential FRAGMENT. Below this, an
+# id being a substring of the bearer means nothing — "a" is a substring of almost
+# every key — and rejecting on it would discard legitimate short ids. Above it,
+# the overlap is long enough to be real credential material worth withholding.
+_MIN_CREDENTIAL_FRAGMENT = 8
+
+
+def _safe_request_id(inbound: str | None, authorization: str | None) -> str:
+    """Adopt the caller's correlation id, or mint one when it isn't safe to.
+
+    Honoring an inbound id is genuinely useful — it is how a CLI ties its own
+    logs to ours — but it is also an unvalidated caller string headed straight
+    for our log pipeline. Three ways it is refused:
+
+    * **Shape.** Bounded length and a conservative charset, so an id cannot smuggle
+      newlines, control characters or a kilobyte of padding into a log line.
+    * **Credential overlap.** A bearer token is header-safe ASCII, which means a
+      caller's own OpenRouter key is a *structurally valid* request id. Somebody
+      scripting against this API can paste one into the wrong variable, and we
+      would faithfully log and echo their spend-authorizing credential. Checked
+      both directions, since a prefix is as damaging as the whole value.
+    * **Emptiness.**
+
+    Refusal is silent and non-fatal: we simply mint our own. Rejecting the request
+    would turn a harmless client mistake into an outage, and the caller's id has
+    no authority here anyway.
+    """
+    if not inbound:
+        return new_request_id()
+    candidate = inbound.strip()
+    if not candidate or len(candidate) > _MAX_REQUEST_ID_LENGTH:
+        return new_request_id()
+    if not all(ch in _REQUEST_ID_SAFE for ch in candidate):
+        return new_request_id()
+    token = _bearer_token(authorization)
+    if token:
+        # Containing the whole token is damaging at any length. The reverse — the
+        # id being a fragment OF the token — only matters once the fragment is long
+        # enough to be credential material rather than a coincidence.
+        if token in candidate:
+            return new_request_id()
+        if len(candidate) >= _MIN_CREDENTIAL_FRAGMENT and candidate in token:
+            return new_request_id()
+    return candidate
+
+
+def _bearer_token(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    return parts[1].strip() or None
 
 
 @dataclass
@@ -328,7 +405,9 @@ def create_app(
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):  # type: ignore[no-untyped-def]
-        request_id = request.headers.get("x-request-id") or new_request_id()
+        request_id = _safe_request_id(
+            request.headers.get("x-request-id"), request.headers.get("authorization")
+        )
         # One request identity for the whole turn: handlers read it from
         # request.state so logs, response headers, and SSE meta never diverge.
         request.state.request_id = request_id

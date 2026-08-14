@@ -201,8 +201,11 @@ Notes:
 - `startup` is required even when empty. It contains only curated, session-stable project
   identity, agent-registry metadata, and project instructions bounded to 16 KiB of UTF-8.
   It is deliberately
-  outside `input.messages`: only the main model receives its framed user-role data block;
-  the selector and skill learner see the visible `input.messages` transcript only.
+  outside `input.messages`: only the main model receives its framed user-role data block.
+  Neither the selector nor the skill learner ever sees it — the selector's evidence is the
+  sanitized `input.messages` transcript plus bounded turn/workflow hints and the available
+  tool names; the learner's is `input.messages` plus the just-generated final answer and
+  the available tool names.
 - Agent ids are launch identifiers. They are preserved exactly and JSON-quoted in the
   prompt; aggregate limits omit whole agent rows rather than truncating an id. No launch
   commands, environment variables, presets, authentication paths, raw settings, or secrets
@@ -399,8 +402,9 @@ carrying one. Prefix caching is implicit at whichever endpoint serves the reques
 
 Every request also carries a top-level `provider` block — OpenRouter's endpoint-selection
 policy, hardcoded like the model ids: `sort: "throughput"` (fastest tokens/sec wins, price
-second), `data_collection: "deny"` (only endpoints that neither store nor train on request
-data), `require_parameters: true` (drop endpoints that would silently ignore something we
+second), `data_collection: "deny"` (only endpoints that do not collect prompt data or train on
+it — a no-training floor, **not** zero data retention <!-- privacy-copy-ok -->; see
+[`PROVIDER_POLICY.md`](PROVIDER_POLICY.md)), `require_parameters: true` (drop endpoints that would silently ignore something we
 sent — this is what routes a json_object call away from an otherwise-faster endpoint with no
 `response_format` support), and `allow_fallbacks: true` (the next-fastest compliant endpoint
 covers an outage). A policy that matches nothing returns 404, surfaced as an explicit
@@ -487,8 +491,8 @@ top-level SSE `retry_after` field; other terminal stream errors omit the field.
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `POST` | `/v1/daintree/respond` | yes | Generation (native, + first-class skills) |
-| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task profiles, catalog revision |
-| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: is the bearer actually usable upstream? (no body; tokenless) |
+| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision |
+| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: does OpenRouter recognise the bearer? (no body; no inference). `valid` plus optional budget metadata; recognised is not the same as fundable |
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual `find` / `load` / `clear`; returns the same `skills` block + `state` |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks (server-owned prompts; no client task prompt) |
