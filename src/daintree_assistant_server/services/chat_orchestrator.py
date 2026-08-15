@@ -789,10 +789,11 @@ class ChatOrchestrator:
                     api_key=api_key,
                     turn_context=self._selector_turn_context(request),
                     available_tools=self._available_tool_names(request),
-                    # The selector sends the conversation upstream too, so the
-                    # caller's routing choice has to reach it — otherwise a ZDR
-                    # turn would honour the request on the visible call and quietly
-                    # route the same content under the default policy here.
+                    # The selector sends a bounded slice of the conversation
+                    # upstream too, so the caller's routing choice has to reach it
+                    # — otherwise a ZDR turn would honour the request on the
+                    # visible call and quietly route the user's own words under the
+                    # default policy here.
                     routing=routing_preference(request.routing),
                 )
                 selector_ms = round((time.perf_counter() - t_sel) * 1000)

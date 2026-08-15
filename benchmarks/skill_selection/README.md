@@ -3,7 +3,8 @@
 Measures the **accuracy and latency** of the automatic skill selector
 (`skills/selector.py`) against the live DeepSeek API, using the real production
 path end-to-end: the real `Selector` class, the real selector prompt template, the
-real catalog, `sanitize_for_selector`, the DeepSeek adapter, and the retry policy.
+real catalog, `split_selector_evidence` (the two-window evidence bound), the
+DeepSeek adapter, and the retry policy.
 The only injectable seam is the prompts directory, which is how candidate prompts
 are benchmarked before being promoted into `src`.
 

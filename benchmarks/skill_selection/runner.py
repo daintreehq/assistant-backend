@@ -1,7 +1,7 @@
 """Drives the REAL production selector against live DeepSeek.
 
 Everything the production request path uses is used here unchanged — the
-``Selector`` class, the selector prompt template, ``sanitize_for_selector``, the
+``Selector`` class, the selector prompt template, ``split_selector_evidence``, the
 catalog, the DeepSeek provider adapter, and the retry policy — so a measured
 improvement here is exactly what ``/respond`` will see. The only injectable seam
 is the prompts directory, which is how prompt variants are benchmarked before

@@ -244,7 +244,6 @@ class Settings(BaseSettings):
     # latency argument, and keeps its own hardcode rather than reading the shared
     # flag — flipping the interactive posture back on must not silently drag the
     # selector with it.
-    selector_context_tokens: int = Field(default=64000, alias="SELECTOR_CONTEXT_TOKENS")
     # Sized with wide margin over the observed 120-190-token completions: the
     # reason-first key order puts skill_ids LAST in the JSON, so a length
     # truncation would now lose the critical key (parse fail -> repair -> possibly

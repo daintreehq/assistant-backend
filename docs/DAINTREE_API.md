@@ -521,7 +521,7 @@ block, where it costs exactly its own tokens.
 | 3 | Active skill bodies | system | semi-stable — replaced wholesale on a selector topic shift (omitted when empty) |
 | 4 | Response contract | system | static — output-shape rules |
 | 5 | Injected startup context | user | required, session-stable project/agent/instruction data |
-| 6 | Visible `input.messages` conversation | user/assistant/tool | append-only — selector/learner transcript |
+| 6 | Visible `input.messages` conversation | user/assistant/tool | append-only. The learner reads a bounded transcript of it; the selector reads only the newest message plus a small labelled slice of history |
 | 7 | Injected context (runtime + turn footer + retrieved docs) | user | per-request tail — the only volatile block |
 
 All client-provided context (ids, names, MCP details, project instructions, memories,
