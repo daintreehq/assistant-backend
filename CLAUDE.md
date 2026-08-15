@@ -225,6 +225,23 @@ selection accuracy and injection results belong in a nightly run against a
 low-spend key — a baseline that cannot be checked offline either gets skipped or
 makes every push cost money.
 
+## Deploying (Cloud Run)
+
+Nothing is ever built or pushed from a dev machine. **Pushing to `main` is the deploy** —
+work lands on `develop`, and a release fast-forwards `main` (Cloud Build trigger pattern is
+`^main$`; `develop` runs CI but never deploys). `cloudbuild.yaml` builds → pushes → deploys
+a **no-traffic** revision tagged `candidate` → smokes `/readyz` and asserts `/version`
+`build_sha` equals the commit → promotes to 100%, so a bad revision fails the build and
+never takes traffic. Project `daintree-research`, region `us-central1`, service
+`daintree-assistant`.
+
+Use the **`/release` skill** (`.claude/skills/release/`) rather than doing it by hand: it
+gates on green GitHub CI, fast-forwards and pushes `main`, then watches the build and
+confirms live `/version` reports the released commit. `infra/gcp/smoke.sh` checks a
+deployment afterwards (free by default; `--full` sends two real turns that cost money on the
+caller's key), and `infra/gcp/bootstrap.sh` is the idempotent one-time GCP setup. Note Cloud
+Run reserves `/healthz` — probe `/health` or `/readyz` externally.
+
 ## Golden tests
 
 `tests/golden/` snapshots rendered prompts and the fully-assembled upstream message array into `tests/golden/snapshots/`. Any intentional change to a **prompt template or the assembler** will fail these until you regenerate with `DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/` — treat the resulting snapshot diff as the human-reviewable record of what the model will actually see. The catalog-dependent snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/skills/`), deliberately decoupled from the live catalog so the self-evolving skill files (skill learning) never redden the suite; `test_selector_prompt_renders_real_catalog` keeps a structural check over the real catalog.
