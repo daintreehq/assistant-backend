@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:d6940fb3a291a29fd101b57333b92a2e3369c5cde878bbfec877e1331af73411",
+    "revision": "sha256:c981d86da09ced2d6154610172a81b7e03e2557eb39e4fc13a8cfa446806a023",
     "skills": 31
   },
   "identity": {
@@ -12,8 +12,8 @@
   },
   "prompt": {
     "base_prompt_bytes": 27584,
-    "selector_prompt_bytes": 43862,
-    "skill_body_bytes_total": 223522
+    "selector_prompt_bytes": 47643,
+    "skill_body_bytes_total": 222708
   },
   "tools": {
     "count": 79,

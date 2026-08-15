@@ -16,15 +16,18 @@ cases:
   - id: novel-connection-check
     category: foundation-only
     note: >-
-      "checking Daintree is connected" is named verbatim in the foundation's whenToUse
-      and nowhere else, and its step 1 pairs daintree.status with exactly this symptom
-      ("worth checking when the workspace reads empty"). Nothing is running, so there is
-      no cohort to sweep and nothing to leave watching.
+      A SYMPTOM-FREE status read, which is the only connection question the foundation
+      still owns. The wording used to lead with "nothing I click does anything and the
+      workspace reads empty" — a reported failure, which is squarely daintree.diagnostics
+      ("nothing is responding", "the MCP is disconnected"). Two cases in this corpus then
+      demanded opposite answers for the same intent. Selector step 4 gives a reported
+      failure to the specific and auto-pairs the foundation behind it; what is left here,
+      and genuinely foundation-only, is a user with no complaint who just wants the link
+      read. Nothing is running, so there is no cohort to sweep and nothing to leave
+      watching.
     messages:
       - role: user
-        content: >-
-          Nothing I click in Daintree seems to do anything and the workspace is reading
-          empty. Is the connection to it even up?
+        content: Quick sanity check before I start — is Daintree connected?
     expect:
       required: [daintree.foundation]
 

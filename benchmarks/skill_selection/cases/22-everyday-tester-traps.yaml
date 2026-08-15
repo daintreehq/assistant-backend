@@ -59,22 +59,24 @@ cases:
       required: [daintree.edits.spawn-visible-agent]
       optional: [daintree.foundation]
 
-  # ---- help (Daintree) vs explore (the project) ---------------------------
-  - id: help-not-explore
+  # ---- docs (Daintree) vs explore (the project) ---------------------------
+  - id: docs-not-explore
     category: routing-trap
     note: >-
-      "How does X work" about DAINTREE, not about the user's code. The docs answer it;
-      an explore agent pointed at the project would find nothing.
+      "How does X work" about DAINTREE, not about the user's code. The retrieved
+      documentation answers it; an explore agent pointed at the project would find
+      nothing. Doubles as a no-skill assertion — with no optional ids, reaching for
+      explore OR for a Daintree runbook fails the case.
     messages:
       - role: user
         content: >-
           In Daintree, how does the agent supervision decide something has finished?
           Is that documented anywhere?
     expect:
-      required: [daintree.help-and-diagnostics]
-      optional: [daintree.foundation]
+      required: []
+      docs: true
 
-  - id: explore-not-help
+  - id: explore-not-docs
     category: routing-trap
     note: "The mirror - same shape of question, aimed at the project's own code."
     messages:
@@ -83,6 +85,7 @@ cases:
     expect:
       required: [daintree.explore.repository]
       optional: [daintree.foundation]
+      docs: false
 
   # ---- CI vs its neighbours ------------------------------------------------
   - id: ci-not-follow-up
@@ -113,11 +116,11 @@ cases:
       required: [daintree.workflow.follow-up-on-issue]
       optional: [daintree.foundation]
 
-  - id: ci-not-help
+  - id: ci-not-diagnostics
     category: routing-trap
     note: >-
       "Why isn't this working" about the PROJECT's tests, not about Daintree.
-      help-and-diagnostics fences itself to Daintree's own behaviour.
+      daintree.diagnostics fences itself to Daintree's own behaviour.
     messages:
       - role: user
         content: Three of my tests started failing after I rebased and I can't see what I broke.
@@ -125,7 +128,7 @@ cases:
       required: [daintree.ci.diagnose-and-fix]
       optional: [daintree.foundation]
 
-  - id: help-not-ci
+  - id: diagnostics-not-ci
     category: routing-trap
     note: "The mirror - the thing that is broken is Daintree, not the suite."
     messages:
@@ -134,7 +137,7 @@ cases:
           None of the terminal tools are showing up for you any more. Did something
           come unplugged on your end?
     expect:
-      required: [daintree.help-and-diagnostics]
+      required: [daintree.diagnostics]
       optional: [daintree.foundation]
 
   # ---- memory vs its neighbours -------------------------------------------

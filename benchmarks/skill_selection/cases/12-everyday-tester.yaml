@@ -1,4 +1,4 @@
-# The five everyday-tester skills: help/diagnostics, memory, repository exploration,
+# The five everyday-tester skills: diagnostics, memory, repository exploration,
 # review, and CI. These cover intents that previously fell through to the permanent
 # prompt and raw tool descriptions, so the routing risk is not "which specialist" but
 # "does the selector reach for a runbook at all".
@@ -8,21 +8,22 @@
 # like a tester who has never seen the catalog.
 
 cases:
-  # ---- help and diagnostics ------------------------------------------------
-  - id: help-how-do-worktrees-work
-    category: single-skill
+  # ---- diagnostics ---------------------------------------------------------
+  - id: docs-how-do-worktrees-work
+    category: docs-classification
     note: >-
-      A plain product question. The answer lives in Daintree's docs, and the whole
-      point of the skill is that the model searches them instead of answering from a
-      half-remembered version.
+      A plain product question, and the answer is NO skill. The documentation is
+      retrieved server-side and arrives with the turn, and the base instructions
+      already say to answer from it and cite it — so there is nothing a runbook
+      adds. No optional ids, so any pick fails the case.
     messages:
       - role: user
         content: I keep seeing "worktree" in the UI. What actually is one, and do I need more than one?
     expect:
-      required: [daintree.help-and-diagnostics]
-      optional: [daintree.foundation]
+      required: []
+      docs: true
 
-  - id: help-mcp-disconnected
+  - id: diagnostics-mcp-disconnected
     category: single-skill
     note: >-
       "Nothing works" with no other signal. daintree.status answers it while
@@ -33,10 +34,26 @@ cases:
           Every Daintree tool you try just errors out now — terminals, git, all of it.
           It was fine ten minutes ago.
     expect:
-      required: [daintree.help-and-diagnostics]
+      required: [daintree.diagnostics]
       optional: [daintree.foundation]
 
-  - id: help-key-question
+  - id: diagnostics-repair-imperative
+    category: single-skill
+    note: >-
+      A REPAIR imperative, not a why-question. The skill's fence excludes ordinary
+      working requests that merely name Daintree ("rename my tabs"), and an earlier
+      draft of that fence read "do not use when the user wants you to DO the thing"
+      — which would have pushed "fix it" to the foundation alone, even though the
+      runbook's whole payoff is the exact remediation step. Wanting it fixed does
+      not make it a different diagnosis.
+    messages:
+      - role: user
+        content: Daintree's dropped its connection again. Just get it working.
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+
+  - id: diagnostics-key-question
     category: single-skill
     messages:
       - role: user
@@ -44,7 +61,7 @@ cases:
           Am I actually signed in properly? I want to be sure before I start
           burning credit on a big job.
     expect:
-      required: [daintree.help-and-diagnostics]
+      required: [daintree.diagnostics]
       optional: [daintree.foundation]
 
   # ---- memory --------------------------------------------------------------

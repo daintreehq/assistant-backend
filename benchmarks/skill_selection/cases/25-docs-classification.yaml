@@ -19,13 +19,20 @@ cases:
   # ---- should look up: questions ABOUT the product ------------------------
   - id: docs-how-do-i-worktree
     category: docs-classification
-    note: The canonical usage question.
+    note: >-
+      The canonical usage question, and the canonical LOADS-NOTHING case. Observed
+      in the wild answering correctly from the docs while also loading a diagnostics
+      runbook and dragging in the domain foundation behind it — roughly 14 KB of
+      procedure for a turn that used none of it. The retrieved page plus the base
+      instructions are the whole answer.
     messages:
       - role: user
         content: How do I create a worktree from a pull request?
     expect:
-      required: [daintree.help-and-diagnostics]
-      optional: [daintree.foundation]
+      # No optional ids: any pick at all is an `extra` and fails the case. That is
+      # the assertion — a STANDALONE documentation question loads nothing. (Asked
+      # mid-workflow it is a different turn; see docs-question-mid-workflow.)
+      required: []
       docs: true
 
   - id: docs-what-is-a-watcher
@@ -34,8 +41,10 @@ cases:
       - role: user
         content: What actually is a watcher, and when would I want one?
     expect:
-      required: [daintree.help-and-diagnostics]
-      optional: [daintree.foundation]
+      # No optional ids: any pick at all is an `extra` and fails the case. That is
+      # the assertion — a STANDALONE documentation question loads nothing. (Asked
+      # mid-workflow it is a different turn; see docs-question-mid-workflow.)
+      required: []
       docs: true
 
   - id: docs-where-is-the-setting
@@ -45,8 +54,10 @@ cases:
       - role: user
         content: Where do I change the keybinding for switching terminal tabs?
     expect:
-      required: [daintree.help-and-diagnostics]
-      optional: [daintree.foundation]
+      # No optional ids: any pick at all is an `extra` and fails the case. That is
+      # the assertion — a STANDALONE documentation question loads nothing. (Asked
+      # mid-workflow it is a different turn; see docs-question-mid-workflow.)
+      required: []
       docs: true
 
   - id: docs-capability-question
@@ -56,8 +67,10 @@ cases:
       - role: user
         content: Does Daintree support running agents against a remote host?
     expect:
-      required: [daintree.help-and-diagnostics]
-      optional: [daintree.foundation]
+      # No optional ids: any pick at all is an `extra` and fails the case. That is
+      # the assertion — a STANDALONE documentation question loads nothing. (Asked
+      # mid-workflow it is a different turn; see docs-question-mid-workflow.)
+      required: []
       docs: true
 
   - id: docs-explain-then-do
@@ -72,7 +85,7 @@ cases:
           go ahead and prep this branch for review.
     expect:
       required: [daintree.workflow.prep-branch-for-review]
-      optional: [daintree.foundation, daintree.help-and-diagnostics]
+      optional: [daintree.foundation]
       docs: true
 
   # ---- should NOT look up: work done WITH the product ---------------------
@@ -80,13 +93,25 @@ cases:
     category: docs-classification
     note: >-
       Names the same feature as the first case and is the opposite request. This
-      is the pair the classifier most has to get right.
+      is the pair the classifier most has to get right, and the DOCS half is what
+      it tests: an imperative is not a lookup, however much it reads like one.
+
+      The skill half used to demand daintree.workflow.start-work-on-issue and
+      failed 3/3 both before and after this file was rewritten. That expectation
+      was wrong: start-work-on-issue owns ONE FORGE ISSUE by its own whenToUse,
+      and the catalog has no PR-checkout runbook at all — the docs describe that
+      as a Code Forge UI button. The classifier said so itself, every trial
+      ("closest is start-work-on-issue, but that's for issues, not PRs"), so
+      selector step 6 makes foundation-alone the correct answer, not a miss.
+      spawn-visible-agent is admitted because "get an agent started on it" is
+      genuinely its clause. Corrected rather than left red: a knowingly-wrong
+      expectation trains the next person to ignore the case.
     messages:
       - role: user
         content: Create a worktree from PR #142 and get an agent started on it.
     expect:
-      required: [daintree.workflow.start-work-on-issue]
-      optional: [daintree.foundation]
+      required: [daintree.foundation]
+      optional: [daintree.edits.spawn-visible-agent]
       docs: false
 
   - id: docs-negative-rename-terminals
@@ -144,19 +169,40 @@ cases:
       optional: [daintree.foundation]
       docs: false
 
+  - id: docs-question-mid-workflow
+    category: docs-classification
+    note: >-
+      The eviction trap, and the reason "a documentation question loads nothing"
+      is scoped to an idle turn. Pausing to ask about the product does not
+      abandon the workflow: clearing the active set here strands the assistant
+      mid-runbook AND pays a full tools+conversation re-encode when it reloads a
+      turn later. Both answers are needed — keep the skills, AND set the query.
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+    messages:
+      - role: user
+        content: >-
+          Hang on, before you push — what does Daintree actually do with the
+          worktree once the PR is merged?
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+      docs: true
+
   - id: docs-live-state-complaint
     category: docs-classification
     note: >-
-      A genuine hard case, expected TRUE. "I did X and nothing happened" reads
-      as an operational turn, but the help skill's whole procedure is to compare
-      what the docs say SHOULD happen against what the state shows — so the
-      answer needs both halves. It is also the shape that most needs the query
-      carried: the docs comparison happens on the round AFTER daintree.status
-      returns, and a classifier that answers `null` here leaves nothing to carry.
+      A genuine hard case, expected TRUE — a docs turn that SHOULD also load a
+      skill, as explain-then-do and docs-question-mid-workflow are in their own ways. "I did X and nothing happened" reads as an operational turn,
+      but diagnosing it means comparing what the docs say SHOULD happen against
+      what the live state shows, so the answer needs both halves. It is also the
+      shape that most needs the query carried: the docs comparison happens on the
+      round AFTER daintree.status returns, and a classifier that answers `null`
+      here leaves nothing to carry. Contrast docs-how-do-i-worktree, where the
+      documentation IS the answer and no runbook belongs.
     messages:
       - role: user
         content: I shared a terminal with the fleet and nothing showed up on the other side.
     expect:
-      required: [daintree.help-and-diagnostics]
+      required: [daintree.diagnostics]
       optional: [daintree.foundation]
       docs: true
