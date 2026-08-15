@@ -39,7 +39,7 @@ is not a description of today's build, so every line carries a status:
 | 10 | **Tester prompt and tool content is never logged.** | ✅ with one exception — see §5 |
 | 11 | **The tester can verify their key before the first model call.** | ✅ `/auth/verify` reports `usable` and a stable `reason` separately from `valid`, and `App.SignIn` calls it against a throwaway client BEFORE persisting, so a key the provider REJECTS never reaches disk. An inconclusive probe (provider unreachable) persists with a warning — deliberately: that is not evidence about the key |
 | 12 | **Failures identify their owner**: Daintree, OpenRouter, account credits, key permissions, rate limiting, provider routing, or malformed input. | ✅ distinct codes — see [`DAINTREE_API.md`](DAINTREE_API.md#errors) |
-| 13 | **A release can be rolled back** to the immediately previous Cloud Run revision. | ⏳ the previous revision is retained, but rollback is manual `gcloud` work with no script and no drill |
+| 13 | **A release can be rolled back** to the immediately previous Cloud Run revision. | ◐ `infra/gcp/rollback.sh` exists (`--dry-run`, `--list`, `--to <revision>`), refuses every case where guessing would be worse than stopping, and fails closed unless it can confirm the target is serving. Its selection logic is tested offline against a fake `gcloud`; **moving real traffic has never been rehearsed**, so this is not ✅ until a drill has been run |
 
 ## 3. What is explicitly *not* in the beta
 

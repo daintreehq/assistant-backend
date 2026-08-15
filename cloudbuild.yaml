@@ -23,6 +23,26 @@ substitutions:
   _REGION: us-central1
   _AR_REPO: daintree
   _RUNTIME_SA: daintree-assistant-run
+  # State-signing key ids. A signed state token carries the kid it was signed
+  # with, and verification selects the key by that kid — so a rotation only
+  # preserves in-flight sessions if the OUTGOING key is mounted under the kid its
+  # tokens actually name. Both are substitutions because both change on a
+  # rotation, and a hardcoded current kid makes the previous one useless: the old
+  # tokens say `state-prod`, the new key is also `state-prod`, and the previous
+  # key is never selected.
+  #
+  # Rotating (a single release, then a second one once the old TTL has expired):
+  #   1. copy the live key to a `state-signing-key-previous` secret
+  #   2. write the new key to `state-signing-key-current`
+  #   3. deploy with
+  #      --substitutions=_CURRENT_KID=state-prod-2,_PREVIOUS_KID=state-prod
+  #   4. after the token TTL, delete the previous secret and deploy again
+  #
+  # _PREVIOUS_KID is EMPTY by default and the deploy fails closed if the previous
+  # secret exists without one — a plausible-but-wrong placeholder would silently
+  # verify nothing, which presents as every session losing its skills at once.
+  _CURRENT_KID: state-prod
+  _PREVIOUS_KID: ''
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -65,6 +85,55 @@ steps:
       - |
         IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$COMMIT_SHA"
 
+        # Signing-key rotation: the PREVIOUS key rides alongside the current one so
+        # a token issued before the rotation still verifies for the rest of its
+        # TTL, rather than forcing a re-selection on every in-flight session.
+        #
+        # Mounted only when the secret exists, because --set-secrets fails the
+        # deploy outright on a missing one and this secret does not exist outside a
+        # rotation window. BOTH HALVES OR NEITHER: `Settings.missing_secrets`
+        # rejects "STATE_SIGNING_KEY_PREVIOUS and STATE_SIGNING_KID_PREVIOUS must
+        # be set together", so mounting the secret alone would fail the candidate's
+        # /readyz and abort the release.
+        ENV_FLAGS="ENVIRONMENT=production,LOG_LEVEL=INFO,STATE_SIGNING_KID=${_CURRENT_KID}"
+        SECRET_FLAGS="STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest"
+
+        # `describe` distinguishes ABSENT from FORBIDDEN. Treating every failure as
+        # "no previous key" would turn a missing IAM grant into a silently
+        # rotation-less deploy — the one outcome that looks fine and drops every
+        # live session's state token.
+        PREV_STATUS=0
+        gcloud secrets describe state-signing-key-previous \
+          --project="$PROJECT_ID" >/dev/null 2>/workspace/secret_err || PREV_STATUS=$$?
+        if [ "$$PREV_STATUS" -eq 0 ]; then
+          if [ -z "${_PREVIOUS_KID}" ]; then
+            echo "ERROR: state-signing-key-previous exists but _PREVIOUS_KID is empty."
+            echo "       Deploy with --substitutions=_CURRENT_KID=<new>,_PREVIOUS_KID=<old>"
+            echo "       so tokens signed with the old kid still verify."
+            exit 1
+          fi
+          if [ "${_PREVIOUS_KID}" = "${_CURRENT_KID}" ]; then
+            # StateCodec installs the current key first and `setdefault`s the
+            # previous ones, so a shared kid means the previous key is never
+            # selected — the rotation would look configured and do nothing.
+            echo "ERROR: _PREVIOUS_KID and _CURRENT_KID are both '${_CURRENT_KID}'."
+            echo "       They must differ, or the previous key can never be selected."
+            exit 1
+          fi
+          echo "Previous signing key found — mounting it as kid '${_PREVIOUS_KID}'."
+          SECRET_FLAGS="$$SECRET_FLAGS,STATE_SIGNING_KEY_PREVIOUS=state-signing-key-previous:latest"
+          ENV_FLAGS="$$ENV_FLAGS,STATE_SIGNING_KID_PREVIOUS=${_PREVIOUS_KID}"
+        elif grep -qi 'not found\|NOT_FOUND' /workspace/secret_err 2>/dev/null; then
+          echo "No previous signing key — deploying with the current key only."
+        else
+          # Permission denied, a transient API error, anything else. Failing closed
+          # here costs a re-run; failing open ships a deploy that silently dropped
+          # the rotation overlap.
+          echo "ERROR: could not determine whether state-signing-key-previous exists:"
+          cat /workspace/secret_err >&2
+          exit 1
+        fi
+
         # --set-* rather than --update-*: the deployed configuration is exactly
         # what this file says. A flag removed here is removed from the service
         # on the next release instead of lingering invisibly from an old one.
@@ -79,10 +148,25 @@ steps:
         # Memory stays at 1Gi rather than dropping to 512Mi: with scale-to-zero
         # the idle saving is nil and memory is only billed while serving, so
         # trimming it buys pennies in exchange for an OOM risk on a process that
-        # holds the prompt templates and all 26 skill bodies in memory.
+        # holds the prompt templates and every skill body in memory.
         #
-        # timeout=1800 is sized against the app's own upstream budget (see
-        # infra/terraform/main.tf for the arithmetic).
+        # timeout=420 is a CUSHION over the app's own 300s total turn deadline
+        # (services/deadlines.py TOTAL), not an independent limit. It was 1800 —
+        # six times the app budget — which made the platform limit unable to catch
+        # anything: a request that escaped the app's own accounting would hold a
+        # concurrency slot for half an hour before Cloud Run noticed. 420 leaves
+        # two minutes of headroom for connection setup and response flush while
+        # still bounding the pathological case. The app deadline stays the one
+        # that fires in normal operation, so a client sees the typed
+        # `turn_deadline_exceeded` error rather than a bare platform 504.
+        #
+        # Probes: the startup probe is generous (10 x 3s) because readiness waits
+        # on prompt and catalog load; liveness talks to /healthz, which Cloud Run
+        # reaches directly inside the container (its frontend only intercepts that
+        # path from OUTSIDE). Liveness deliberately does NOT use /readyz —
+        # readiness fails on configuration AND could be made to depend on an
+        # upstream, and a transient provider blip must never restart a healthy
+        # process mid-turn.
         FLAGS=(
           --image="$$IMAGE"
           --region="${_REGION}"
@@ -94,10 +178,12 @@ steps:
           --concurrency=8
           --min-instances=0
           --max-instances=10
-          --timeout=1800
+          --timeout=420
           --ingress=all
-          --set-env-vars=ENVIRONMENT=production,LOG_LEVEL=INFO,STATE_SIGNING_KID=state-prod
-          --set-secrets=STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest
+          --startup-probe=httpGet.path=/healthz,httpGet.port=8080,initialDelaySeconds=0,periodSeconds=3,timeoutSeconds=3,failureThreshold=10
+          --liveness-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=30,timeoutSeconds=5,failureThreshold=3
+          --set-env-vars="$$ENV_FLAGS"
+          --set-secrets="$$SECRET_FLAGS"
           --labels=commit-sha=$SHORT_SHA
           --quiet
         )

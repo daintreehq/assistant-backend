@@ -197,22 +197,32 @@ no copy and no cache.
 **The server's state-signing key** (`STATE_SIGNING_KEY_CURRENT`) is unrelated
 material — it signs the opaque skill-state token, not any caller credential.
 
-> ⏳ **The application supports rotation; the deployment pipeline does not yet.**
-> `StateCodec` accepts a current/previous key pair, but Cloud Build pins the KID
-> and mounts only the current key and salt — there is no previous-key secret for
-> it to mount. Executing the procedure below against the managed deployment
-> therefore requires a corresponding pipeline change first.
-
-It rotates through a current/previous pair:
+It rotates through a current/previous pair, and `cloudbuild.yaml` supports the
+overlap: it mounts `state-signing-key-previous` **when that secret exists**, and
+both key ids are build substitutions (`_CURRENT_KID`, `_PREVIOUS_KID`) because
+both change on a rotation. A hardcoded current kid would make the previous key
+useless — the outgoing tokens name `state-prod`, the incoming key is also
+`state-prod`, and `StateCodec` installs the current key first and `setdefault`s
+the previous, so the old key is never selected. The deploy therefore **fails
+closed** if the previous secret exists without a `_PREVIOUS_KID`, or if the two
+ids are equal.
 
 1. generate a new key and KID;
-2. move the outgoing key into `STATE_SIGNING_KEY_PREVIOUS` /
-   `STATE_SIGNING_KID_PREVIOUS` and set the new one as current;
-3. deploy, and verify that tokens signed by the old key are still accepted and
-   that newly issued tokens carry the new KID;
+2. copy the outgoing key into a `state-signing-key-previous` secret, write the
+   new one to `state-signing-key-current`, and re-run `infra/gcp/bootstrap.sh`
+   so the runtime identity can read the new secret (it is idempotent);
+3. deploy with
+   `--substitutions=_CURRENT_KID=<new>,_PREVIOUS_KID=<old>`, then verify that
+   tokens signed by the old key are still accepted and that newly issued tokens
+   carry the new KID;
 4. wait longer than `STATE_TOKEN_TTL_SECONDS` (default 7 days);
-5. remove the previous key and KID;
+5. delete the `state-signing-key-previous` secret and deploy again — with the
+   secret gone, the build drops both the mount and `_PREVIOUS_KID`;
 6. verify a stale token is now rejected.
+
+Untested against a real rotation. The pipeline logic is there and fails closed on
+the mistakes that would silently break it, but nobody has run the procedure end
+to end.
 
 `infra/gcp/bootstrap.sh` deliberately **never rotates an existing secret
 version** — doing so would invalidate every outstanding state token at once.

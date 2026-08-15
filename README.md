@@ -264,15 +264,37 @@ green, merges to `main`, pushes, watches the build, and verifies that the live
 
 `infra/gcp/smoke.sh` checks a deployed instance. By default it exercises only
 the free surface — `/health`, `/readyz`, `/version`, and the 401 auth gate.
-Export `OPENROUTER_API_KEY` to add the authenticated metadata routes, and pass
-`--full` to send two real model turns (streaming and non-streaming), which spend
-money on that key:
+Export `OPENROUTER_API_KEY` to add the authenticated routes: the metadata reads,
+the `/auth/verify` sign-in probe (free — a key introspection, not a model call),
+the 426 protocol gate on both content endpoints, request-id echo, and the typed
+error envelope. Pass `--full` to send two real model turns (streaming and
+non-streaming), which spend money on that key:
 
 ```bash
 ./infra/gcp/smoke.sh
 OPENROUTER_API_KEY=sk-or-v1-... ./infra/gcp/smoke.sh --full
 ./infra/gcp/smoke.sh --url https://assistant.daintree.org
 ```
+
+`infra/gcp/rollback.sh` moves traffic back when a revision deploys cleanly and is
+nonetheless **wrong** — a prompt change that degrades answers, a skill that routes
+badly. The build gate cannot catch those: it only proves the candidate starts and
+reports the right commit. Rolling forward again is the same command with the
+revision you left.
+
+```bash
+./infra/gcp/rollback.sh --list        # ready revisions, with the serving one marked
+./infra/gcp/rollback.sh --dry-run     # the plan, and stop
+./infra/gcp/rollback.sh               # ask, then move traffic, then verify
+./infra/gcp/rollback.sh --to daintree-assistant-00042-abc
+```
+
+It targets the revision *behind the one serving*, not simply the newest one that
+is not serving — after a first rollback those differ, and the naive reading rolls
+straight forward into the bad build. It verifies `/readyz` and `/version` after
+the switch and exits non-zero if they disagree, because a traffic split that
+applied while leaving the service unhealthy is the worst outcome: the operator
+believes they have recovered and stops looking.
 
 The only secrets the deployment mounts are state-signing material
 (`STATE_SIGNING_KEY_CURRENT`, `STATE_SALT`) — there is **no server-side model

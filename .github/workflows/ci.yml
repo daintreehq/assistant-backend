@@ -7,7 +7,12 @@ on:
     # no green signal to gate the release on, and the deploy would race CI.
     branches: [main, develop]
   pull_request:
-    branches: [main]
+    # develop as well as main. Work lands on develop, so a PR gated only against
+    # main is a PR gated against nothing: it merges, and the failure is then
+    # discovered on the branch by whoever pushes next. The push trigger above
+    # already runs there — this just moves the signal to before the merge, where
+    # it can still prevent something.
+    branches: [main, develop]
 
 jobs:
   test:

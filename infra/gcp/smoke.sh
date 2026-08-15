@@ -29,7 +29,10 @@ FULL=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --url)  URL="${2:-}"; shift 2 ;;
+    # `shift 2` on a flag with no value shifts once and leaves the flag in place,
+    # which without `set -e` spins forever.
+    --url)  [ $# -gt 1 ] || { echo "--url requires a value" >&2; exit 2; }
+            URL="$2"; shift 2 ;;
     --full) FULL=1; shift ;;
     -h|--help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -147,6 +150,89 @@ print(len(json.load(sys.stdin).get('data', [])))" 2>/dev/null)"
     pass "/v1/daintree/skills lists ${n:-?} skills (catalog metadata only, never bodies)"
   else
     fail "/v1/daintree/skills returned $code" "$BODY"
+  fi
+
+  # The sign-in probe. Free — a tokenless key introspection against the provider,
+  # not a model call — and the one route whose verdict a tester acts on directly,
+  # so a deployment where it answers wrongly breaks onboarding for everyone at
+  # once. `valid` and `usable` are DIFFERENT questions and the CLI branches on
+  # `reason`, so all three are asserted rather than just the status code.
+  code="$(req "${AUTH[@]}" -X POST "$URL/v1/daintree/auth/verify")"; load_body
+  if [ "$code" = "200" ]; then
+    # Checked as a TUPLE against the verdicts the contract defines, not field by
+    # field. Any-non-empty-reason would accept `{"reason":"ok"}` with no verdict
+    # at all, which is precisely the shape a half-implemented route returns.
+    # Types are checked too: `jq_field` prints Python reprs, so a JSON string
+    # "True" and a JSON boolean true are indistinguishable downstream.
+    verdict="$(printf '%s' "$BODY" | python3 -c "import json,sys
+d = json.load(sys.stdin)
+v, u, r = d.get('valid'), d.get('usable'), d.get('reason')
+if not all(isinstance(x, bool) for x in (v, u)) or not isinstance(r, str):
+    print('MALFORMED')
+elif (v, u, r) == (True, True, 'ok'):
+    print('OK')
+elif (v, u, r) == (True, False, 'credits_exhausted'):
+    print('EXHAUSTED')
+elif (v, u, r) == (False, False, 'provider_rejected'):
+    print('REJECTED')
+else:
+    print('INCONSISTENT')" 2>/dev/null)"
+    case "${verdict:-MALFORMED}" in
+      OK)        pass "/v1/daintree/auth/verify: valid, usable, reason=ok" ;;
+      # A true verdict about the key, not a broken deployment — so not a smoke
+      # failure. Surfaced loudly because it explains the --full turns failing.
+      EXHAUSTED) pass "/v1/daintree/auth/verify: key recognised, NO CREDIT REMAINING" ;;
+      REJECTED)  pass "/v1/daintree/auth/verify: key REJECTED by the provider" ;;
+      *)         fail "/v1/daintree/auth/verify returned an inconsistent verdict" "$BODY" ;;
+    esac
+  else
+    fail "/v1/daintree/auth/verify returned $code" "$BODY"
+  fi
+
+  # Protocol negotiation, on both content routes. A client one version ahead must
+  # get 426 rather than a 400 blaming its fields — see docs/DAINTREE_API.md. This
+  # sends a body the current build parses so a 426 can only come from the header.
+  for path in respond tasks; do
+    case "$path" in
+      respond) payload='{"protocol_version":2,"session":{"id":"smoke-426","turn_id":"t"},"startup":{},"input":{"messages":[{"role":"user","content":"hi"}]}}' ;;
+      tasks)   payload='{"task":"terminal_judge","input":{"question":"q","tail":"t"}}' ;;
+    esac
+    code="$(req "${AUTH[@]}" -X POST "$URL/v1/daintree/$path" \
+      -H 'content-type: application/json' -H 'X-Daintree-Protocol: 999' -d "$payload")"
+    load_body
+    if [ "$code" = "426" ]; then
+      pass "/v1/daintree/$path rejects an unsupported protocol with 426"
+    else
+      fail "/v1/daintree/$path returned $code for protocol 999 (expected 426)" "$BODY"
+    fi
+  done
+
+  # One correlation id, echoed back. This is the primitive a tester quotes in a
+  # bug report, so a deployment where it is missing or rewritten costs every
+  # support conversation afterwards.
+  hdrs="$(curl -sS -o /dev/null -D - --max-time 20 "${AUTH[@]}" \
+    -H 'X-Request-Id: smoke-correlation-1' "$URL/v1/daintree/capabilities" 2>/dev/null \
+    | tr -d '\r')"
+  echoed="$(printf '%s' "$hdrs" | awk 'tolower($1) == "x-request-id:" { print $2 }')"
+  if [ "$echoed" = "smoke-correlation-1" ]; then
+    pass "X-Request-Id is echoed back unchanged"
+  else
+    fail "X-Request-Id came back as '${echoed:-<missing>}', expected smoke-correlation-1"
+  fi
+
+  # A malformed request must produce the TYPED envelope rather than a bare
+  # framework error — that envelope is what the CLI branches on to tell a user
+  # whose problem it is. (The request-id check above covers the header; this one
+  # is about the body shape.)
+  code="$(req "${AUTH[@]}" -X POST "$URL/v1/daintree/tasks" \
+    -H 'content-type: application/json' -d '{"task":"no-such-task","input":{}}')"
+  load_body
+  err_code="$(printf '%s' "$BODY" | python3 -c "import json,sys
+print((json.load(sys.stdin).get('error') or {}).get('code',''))" 2>/dev/null)"
+  if [ "$code" = "404" ] && [ "$err_code" = "unknown_task" ]; then
+    pass "an unknown task returns 404 unknown_task in the typed envelope"
+  else
+    fail "unknown task returned $code / code='$err_code' (expected 404 / unknown_task)" "$BODY"
   fi
 
   if [ "$FULL" = "1" ]; then

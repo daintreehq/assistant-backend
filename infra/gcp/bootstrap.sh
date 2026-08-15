@@ -132,7 +132,7 @@ else
   ok "created $RUNTIME_SA_EMAIL"
 fi
 # Scoped per-secret rather than project-wide: this identity can read exactly the
-# two secrets it mounts and nothing else in the project.
+# secrets it mounts and nothing else in the project.
 for s in state-signing-key-current state-salt; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
@@ -140,6 +140,21 @@ for s in state-signing-key-current state-salt; do
     --project="$PROJECT" --quiet >/dev/null
 done
 ok "granted secretAccessor on state-signing-key-current, state-salt"
+
+# The rotation-overlap secret, granted only if it exists. It is created by hand at
+# the start of a rotation and deleted once the old token TTL has expired, so it is
+# absent most of the time — but a rotating deploy MOUNTS it, and a mount the
+# runtime identity cannot read fails the revision at startup. Re-run bootstrap
+# after creating it (it is idempotent), or the rotation release will not come up.
+if gcloud secrets describe state-signing-key-previous --project="$PROJECT" >/dev/null 2>&1; then
+  retry 12 gcloud secrets add-iam-policy-binding state-signing-key-previous \
+    --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
+    --role=roles/secretmanager.secretAccessor \
+    --project="$PROJECT" --quiet >/dev/null
+  ok "granted secretAccessor on state-signing-key-previous (rotation in progress)"
+else
+  ok "no state-signing-key-previous — not in a rotation window, nothing to grant"
+fi
 
 # ---------------------------------------------------------------------------
 say "Build service account (what Cloud Build runs as)"
@@ -154,9 +169,17 @@ fi
 # without it the build fails before running a step. builds.builder is what Cloud
 # Build itself checks when a trigger names a user-specified service account —
 # without it, trigger creation is rejected outright with PERMISSION_DENIED.
+# secretmanager.viewer is the deploy's own need, not the app's: cloudbuild.yaml
+# asks whether `state-signing-key-previous` EXISTS to decide whether to mount it,
+# and without `secrets.get` that question comes back PERMISSION_DENIED. The build
+# now fails closed on that rather than reading it as "no previous key", so the
+# missing grant would break every deploy rather than silently skipping the
+# rotation — but the grant is what makes it work at all. Viewer reads metadata
+# only; it cannot read a secret's VALUE.
 for role in roles/cloudbuild.builds.builder \
             roles/logging.logWriter \
             roles/artifactregistry.writer \
+            roles/secretmanager.viewer \
             roles/run.admin; do
   retry 12 gcloud projects add-iam-policy-binding "$PROJECT" \
     --member="serviceAccount:${BUILD_SA_EMAIL}" --role="$role" \
