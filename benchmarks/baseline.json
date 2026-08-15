@@ -12,7 +12,7 @@
   },
   "prompt": {
     "base_prompt_bytes": 27584,
-    "selector_prompt_bytes": 47643,
+    "selector_prompt_bytes": 44129,
     "skill_body_bytes_total": 222708
   },
   "tools": {
