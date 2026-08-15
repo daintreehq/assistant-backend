@@ -18,7 +18,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # `submodules: true` fetches the pinned `cli/` snapshot. Several gates read
+      # the CLI's own source as the authority — the typed-wrapper denylist, the
+      # credential path, the sign-in ordering — and without the checkout each of
+      # them SKIPS here, which is the shape of a gate that looks green and
+      # enforces nothing. The repo is public, so this needs no credential.
+      #
+      # It does NOT make the tool fixtures regenerable in CI: that needs a Go
+      # toolchain and a build of the CLI, so `cli_tool_inventory.json` and
+      # `cli_tool_names.txt` still refresh by hand and their offline equality
+      # check remains the available gate for them.
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5

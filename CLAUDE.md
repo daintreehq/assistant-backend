@@ -10,7 +10,7 @@ The public API is **Daintree-native** (`POST /v1/daintree/respond`), not OpenAI-
 
 `TODO.md` holds deliberately-deferred work, each entry gated on a trigger (currently: move the serving path off OpenRouter to Novita direct, if and when there is a paid tier).
 
-**The CLI source is vendored at `cli/`** — a git submodule tracking `github.com/daintreehq/assistant` (the Go CLI that talks to this server). It's checked in so the two repos can evolve together and so this repo can read the CLI's actual tool/function definitions as we move toward sourcing them from there; it is **not** part of the Python package, build, or test scope (ruff `extend-exclude`, pytest `testpaths`, and mypy/coverage are all pinned to `src`/`tests`, and CI does not fetch submodules). After cloning, run `git submodule update --init cli` to populate it; it is otherwise pinned to a commit and does not update on its own. **It tracks `develop`, not `main`** (`branch = develop` in `.gitmodules`) — the CLI integrates there and `main` trails it, so `--remote` against the default would silently rewind. Because it does not float, the pin goes stale quietly and takes the tool fixtures with it: when a bump removes or renames a tool, `tests/unit/test_skill_catalog_hygiene.py` fails against skills still declaring the old name, which is the intended alarm. Refresh `benchmarks/_harness/fixtures/cli_tool_inventory.json` (recipe in its README) whenever you move the pin.
+**The CLI source is vendored at `cli/`** — a git submodule tracking `github.com/daintreehq/assistant` (the Go CLI that talks to this server). It's checked in so the two repos can evolve together and so this repo can read the CLI's actual tool/function definitions as we move toward sourcing them from there; it is **not** part of the Python package, build, or test scope (ruff `extend-exclude`, pytest `testpaths`, and mypy/coverage are all pinned to `src`/`tests`). CI **does** check it out (`submodules: true`), because several gates read the CLI's own source as the authority — the typed-wrapper denylist, the credential path, the sign-in ordering — and without it each of those skips rather than runs. It still does not BUILD it, so the tool fixtures refresh by hand. After cloning, run `git submodule update --init cli` to populate it; it is otherwise pinned to a commit and does not update on its own. **It tracks `develop`, not `main`** (`branch = develop` in `.gitmodules`) — the CLI integrates there and `main` trails it, so `--remote` against the default would silently rewind. Because it does not float, the pin goes stale quietly and takes the tool fixtures with it: when a bump removes or renames a tool, `tests/unit/test_skill_catalog_hygiene.py` fails against skills still declaring the old name, which is the intended alarm. Refresh `benchmarks/_harness/fixtures/cli_tool_inventory.json` (recipe in its README) whenever you move the pin.
 
 ## Commands
 
@@ -224,8 +224,8 @@ be exactly the name projection of `benchmarks/_harness/fixtures/cli_tool_invento
 `test_skill_catalog_hygiene.py` fails if they disagree. Refreshing one and
 forgetting the other is the obvious mistake, and nothing else would notice — both
 files still parse, and the damage only surfaces as a skill declaring a tool the CLI
-dropped. CI cannot regenerate either (it does not fetch the `cli/` submodule), so
-this offline equality check is the available gate.
+dropped. CI checks the submodule out but does not BUILD it — regenerating needs a
+Go toolchain — so this offline equality check remains the available gate.
 
 Not gated here, deliberately: anything needing a paid call. Live latency,
 selection accuracy and injection results belong in a nightly run against a

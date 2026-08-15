@@ -69,7 +69,7 @@ DeepSeek-cacheable-region model (`wire`), stats, the results-doc writer (`result
 a YAML case loader (`cases`), and the captured CLI tool projection
 (`fixtures/cli_tool_inventory.json`, from `(*tools.Registry).OpenAITools(nil)`).
 That fixture is the real tool-schema region every request-driving suite pays for;
-the CLI is a pinned submodule CI never fetches, so it refreshes only by hand —
+regenerating it needs a Go build of the pinned submodule, so it refreshes by hand —
 recipe in `_harness/fixtures/README.md`.
 
 ## Conventions for adding a suite
