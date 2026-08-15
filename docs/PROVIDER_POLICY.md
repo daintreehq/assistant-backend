@@ -24,6 +24,11 @@ model when last checked, 2026-07 — a provider-side number that moves, not
 something this repository can assert), and the `provider` block on every request
 decides which one answers.
 
+⏳ A paid tier would change that calculus — we would hold the credential and pay
+per token, which makes a single known host cheaper than a router. The deferred
+plan to serve the main model directly from Novita is in [`TODO.md`](../TODO.md).
+Nothing below describes anything but OpenRouter today.
+
 | Call | Model | Source of truth |
 |---|---|---|
 | Main completion | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
