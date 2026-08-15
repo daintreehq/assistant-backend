@@ -31,6 +31,7 @@ from daintree_assistant_server.skills.catalog import (
 )
 from daintree_assistant_server.skills.selector import Selector
 
+from .._harness.quality import attach_verdict
 from .cases import BenchCase, load_cases
 from .scoring import TrialResult, score_trial, summarize
 
@@ -133,6 +134,11 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     catalog = load_catalog()
     manager = CatalogManager(catalog, primary_dir=default_skills_dir())
     cases = load_cases(catalog, id_filter=config.id_filter)
+    # The unfiltered corpus, read BEFORE the paid run rather than after it. Read
+    # afterwards it would be a time-of-check/time-of-use window: an edit made
+    # while 438 calls were in flight would be discovered only once the money was
+    # spent. Same catalog object, so grading cannot shift under the run either.
+    whole_corpus = cases if not config.id_filter else load_cases(catalog)
 
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(
@@ -166,13 +172,58 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
         await provider.aclose()
     finished_at = datetime.now(UTC)
 
+    return build_results_doc(
+        config=config,
+        cases=cases,
+        whole_corpus=whole_corpus,
+        results=results,
+        catalog=catalog,
+        settings=settings,
+        prompt_path=prompt_path,
+        prompt_source=prompt_source,
+        started_at=started_at,
+        finished_at=finished_at,
+    )
+
+
+def build_results_doc(
+    *,
+    config: BenchConfig,
+    cases: list[BenchCase],
+    whole_corpus: list[BenchCase],
+    results: list[TrialResult],
+    catalog: Any,
+    settings: Any,
+    prompt_path: Any,
+    prompt_source: str,
+    started_at: datetime,
+    finished_at: datetime,
+) -> dict[str, Any]:
+    """Assemble the results document, verdict included.
+
+    A separate function so the VERDICT WIRING is testable without a paid run.
+    It is not hypothetical prudence: this wiring was written, silently removed by
+    an unused-import cleanup, and every offline test stayed green — because the
+    tests built the metadata themselves rather than asking the runner for it. The
+    only thing that would have caught it was a live run, which is the one thing
+    nobody does casually.
+    """
     by_case: dict[str, list[TrialResult]] = {c.id: [] for c in cases}
     for r in results:
         by_case[r.case_id].append(r)
 
-    return {
+    return attach_verdict({
         "meta": {
             "benchmark": "skill_selection",
+            # What a COMPLETE run looks like, from the UNFILTERED corpus. Derived
+            # from `cases` it would be self-certifying: a --filter'd run would
+            # declare its own subset to be the corpus and pass for covering it.
+            "cases_expected": len(whole_corpus),
+            "trials_expected": len(whole_corpus) * config.trials,
+            "docs_trials_expected": sum(
+                1 for c in whole_corpus if c.expect_docs is not None
+            ) * config.trials,
+            "categories_expected": sorted({c.category for c in whole_corpus}),
             "variant": config.variant,
             "model": OPENROUTER_MODEL,
             "trials": config.trials,
@@ -225,4 +276,4 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
             }
             for case in cases
         ],
-    }
+    }, "skill_selection")

@@ -22,6 +22,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+from .._harness.quality import print_verdict
 from .cases import CaseError, load_cases
 from .coverage import print_coverage
 from .reporting import load_doc, print_compare, print_failures, print_summary, save_doc
@@ -48,7 +49,19 @@ def _cmd_run(args: argparse.Namespace) -> int:
         docs.append(doc)
     if len(docs) == 2:
         print_compare(docs[0], docs[1])
-    return 0
+    # Every variant must pass, not just the last one. A --variant A --variant B
+    # compare is an experiment, and an experiment whose control regressed is a
+    # result to look at rather than a run to wave through.
+    #
+    # Graded into a list first: `all(...)` over a generator short-circuits, so a
+    # failing first variant would suppress the second's verdict — hiding half the
+    # output of a run that has already been paid for.
+    verdicts = [print_verdict(doc, "skill_selection") for doc in docs]
+    passed = all(verdicts)
+    # Non-zero on a QUALITY failure, not just an exception. Without this a
+    # release step could run the selector corpus, watch cases fail on screen, and
+    # still receive a successful process exit — which is what it did.
+    return 0 if passed else 1
 
 
 def _cmd_list(args: argparse.Namespace) -> int:
@@ -76,10 +89,13 @@ def _cmd_coverage(args: argparse.Namespace) -> int:
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
+    # Re-derives the verdict rather than trusting a stored `passed`, so an
+    # artifact saved before a threshold existed is graded against today's — and so
+    # replaying a failed run in CI stays a failure.
     doc = load_doc(Path(args.path))
     print_summary(doc)
     print_failures(doc)
-    return 0
+    return 0 if print_verdict(doc, "skill_selection") else 1
 
 
 def _cmd_compare(args: argparse.Namespace) -> int:

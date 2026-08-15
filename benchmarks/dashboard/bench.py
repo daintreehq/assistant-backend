@@ -16,6 +16,14 @@ way that matters: a missing key SKIPS the live suites in the everyday dashboard
 (convenient, and correct there) but FAILS here. A release qualification that could
 not reach the model has qualified nothing, and recording that as a green run is
 the failure mode this whole gate exists to prevent.
+
+WHAT IT COSTS, stated because nothing else on the way in says so: roughly 520
+model calls at three trials, of which ~438 are the skill-selection corpus (146
+cases). That suite dominates the bill by an order of magnitude, and it is also
+the one measuring whether the classifier still routes correctly — the decision
+every other behaviour in the product hangs off. Small-model calls, so the money
+is modest, but it is the caller's own key and worth knowing before the run
+rather than after it.
 """
 
 from __future__ import annotations

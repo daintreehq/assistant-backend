@@ -53,7 +53,11 @@ Three rules the thresholds rest on, and they matter more than the numbers:
   targets awaiting the first paid qualification run; moving one is deliberate and
   wants a reason in the commit message, like `tools/coverage_floors.py`.
 
-`qualify-release` differs from `run --live` in one way that matters: a missing key
+`qualify-release` costs roughly **520 model calls** at three trials, ~438 of them
+the 146-case skill-selection corpus — which is both the bulk of the bill and the
+suite measuring whether the classifier still routes correctly.
+
+It differs from `run --live` in one way that matters: a missing key
 *skips* the live suites in the everyday dashboard and *fails* here. A qualification
 that could not reach the model has qualified nothing.
 

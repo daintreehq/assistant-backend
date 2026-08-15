@@ -22,9 +22,15 @@ python -m benchmarks.skill_selection.bench compare results/a.json results/b.json
 Only `run` costs money. `list`, `coverage`, `report`, and `compare` are offline
 and free — they work with `OPENROUTER_API_KEY=` blanked.
 
-A full default run is `cases x trials` (currently ~95 x 3 = ~285) real selector
-calls per variant — cheap on deepseek-v4-flash, but not free. Run `bench list` for
-the current count.
+A full default run is `cases x trials` (currently 146 x 3 = 438) real selector
+calls per variant — cheap on deepseek-v4-flash, but not free, and it is the bulk
+of what `dashboard qualify-release` spends. Run `bench list` for the current
+count rather than trusting this number.
+
+`run` and `report` exit NON-ZERO on a quality failure, graded by
+`skill_selection_verdict()` in `_harness/quality.py`. Both used to return 0
+unconditionally, so a release job could watch cases fail on screen and still get
+a successful exit.
 
 ## Cases (`cases/*.yaml`)
 

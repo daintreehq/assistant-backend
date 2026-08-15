@@ -74,6 +74,42 @@ def _utility_json(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
     return asyncio.run(run_bench(trials=ctx.get("live_trials", 1), env_file=ctx.get("env_file")))
 
 
+def _skill_selection(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
+    from daintree_assistant_server.skills.catalog import load_catalog
+
+    from ..skill_selection.cases import load_cases
+    from ..skill_selection.coverage import print_coverage
+    from ..skill_selection.runner import BenchConfig, run_bench
+
+    # FREE PREFLIGHT before spending ~438 model calls. `bench coverage` answers
+    # offline whether every skill has a case requiring it and every declared
+    # neighbour has a trap excluding it — and a skill with no cases is invisible
+    # to the live run by construction: it grades the cases that exist, so a skill
+    # nobody wrote a case for is one it cannot report on. Qualifying a release
+    # that way would mean paying to not test the newest skill.
+    catalog = load_catalog()
+    rows = print_coverage(catalog, load_cases(catalog))
+    if not rows or not all(r.gate_ok for r in rows):
+        gaps = [r.skill_id for r in rows if not r.gate_ok]
+        raise RuntimeError(
+            "skill-selection routing coverage has gaps, so a live run cannot "
+            f"qualify the catalog: {', '.join(gaps) or '<no skills>'}. "
+            "Run `python -m benchmarks.skill_selection.bench coverage`."
+        )
+
+    # Three trials minimum — the verdict rejects fewer, because the selector is
+    # stochastic even at temperature 0 and one sample cannot separate a routing
+    # fix from a lucky draw.
+    return asyncio.run(
+        run_bench(
+            BenchConfig(
+                trials=max(ctx.get("live_trials", 3), 3),
+                env_file=ctx.get("env_file"),
+            )
+        )
+    )
+
+
 DETERMINISTIC: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     ("prompt_cost", _prompt_cost_det),
     ("safety", _safety),
@@ -85,6 +121,12 @@ LIVE: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     ("workflow_intel", _workflow_intel),
     ("injection_live", _injection_live),
     ("utility_json", _utility_json),
+    # Routing accuracy of the classifier that decides which runbook the main
+    # model gets. It was outside this roll-up entirely and documented as "run
+    # separately" — so a release could qualify without ever asking whether skill
+    # selection still worked, in a system whose whole design is a small model
+    # governed by skills.
+    ("skill_selection", _skill_selection),
 ]
 
 
@@ -147,6 +189,12 @@ def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
             return {"injection_obey_rate": s.get("injection_obey_rate")}
         if name == "utility_json":
             return {"pass_rate": s.get("pass_rate"), "repair_rate": s.get("repair_rate")}
+        if name == "skill_selection":
+            return {
+                "cases": f"{s.get('cases_passed')}/{s.get('cases_total')}",
+                "recall_miss_trials": s.get("recall_miss_trials"),
+                "degraded_trials": s.get("degraded_trials"),
+            }
     except Exception:  # noqa: BLE001 — a headline is best-effort
         return {}
     return {}
