@@ -26,11 +26,13 @@ class TaskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task: str = Field(min_length=1, max_length=128)
-    # Echoed into a response HEADER, so constrain it to header-safe characters here.
-    # A non-latin-1 value would otherwise raise UnicodeEncodeError inside JSONResponse
-    # AFTER the upstream call has run and been billed — a 500 for a request that should
-    # have been rejected (as a 400) before any spend.
-    request_id: str | None = Field(default=None, max_length=256, pattern=r"^[A-Za-z0-9._:-]+$")
+    # There is deliberately NO `request_id` here. Correlation is one value resolved
+    # once by the request-context middleware from `X-Request-Id` (or minted), bound
+    # to the logs and echoed in the response header. A second body-borne channel
+    # gave this endpoint two competing identities: the body field won the response
+    # header while the logs kept the middleware id, so the id a tester was handed
+    # matched nothing an operator could search. `extra="forbid"` means a client
+    # still sending it now gets a loud 400 rather than being quietly ignored.
     input: dict[str, Any] = Field(default_factory=dict)
     # Only consumed by terminal_extract_json.
     result_schema: dict[str, Any] | None = None

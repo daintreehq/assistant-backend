@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from ..auth import Principal, require_auth
 from ..contracts.daintree_api import RespondRequest
 from ..services.validation import validate_respond_request
-from .deps import check_protocol_header, check_protocol_value, require_ready
+from .deps import check_protocol_header, check_protocol_value, request_id, require_ready
 
 router = APIRouter()
 
@@ -24,6 +24,7 @@ async def respond(
     request: Request,
     principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
+    _protocol: None = Depends(check_protocol_header),
 ) -> JSONResponse | StreamingResponse:
     """Run one turn.
 
@@ -43,7 +44,6 @@ async def respond(
     settings = request.app.state.settings
     container = request.app.state.container
 
-    check_protocol_header(request)
     check_protocol_value(body.protocol_version)
 
     upstream_model = validate_respond_request(body, settings)
@@ -54,7 +54,7 @@ async def respond(
         # The caller's own key funds every upstream call this turn makes.
         api_key=principal.api_key,
         # The middleware-resolved id, so logs, X-Request-Id, and SSE meta all agree.
-        request_id=getattr(request.state, "request_id", None),
+        request_id=request_id(request),
     )
 
     if outcome.streaming:

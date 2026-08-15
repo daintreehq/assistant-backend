@@ -283,10 +283,20 @@ class StreamDone(BaseModel):
 class StreamError(BaseModel):
     """Terminal streaming error.
 
+    ``request_id`` carries the SAME correlation id as the response header and every
+    log line for this turn. It is on the ERROR event specifically because a stream
+    can fail BEFORE ``meta`` is ever emitted — a preparation failure is exactly
+    that — and ``meta`` is otherwise the only event carrying the id. Without this
+    field the one stream a tester reports is the one whose identity never reached
+    them. Repeating it on an error that follows a ``meta`` costs a few bytes on a
+    path that is already terminating, and saves the client from having to have
+    retained the earlier event to report the failure.
+
     ``retry_after`` preserves the upstream's raw ``Retry-After`` header when a
     rate-limited open/prefetch exhausts its internal retries after SSE metadata
     has already committed the HTTP 200. It is absent for every other error.
     """
 
     error: ErrorDetail
+    request_id: str | None = None
     retry_after: str | None = None

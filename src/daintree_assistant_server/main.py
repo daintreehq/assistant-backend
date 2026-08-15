@@ -438,13 +438,21 @@ def create_app(
         request_id = _safe_request_id(
             request.headers.get("x-request-id"), request.headers.get("authorization")
         )
-        # One request identity for the whole turn: handlers read it from
-        # request.state so logs, response headers, and SSE meta never diverge.
+        # One request identity for the whole turn: handlers read it back through
+        # api.deps.request_id() so logs, response headers, SSE meta and SSE error
+        # never diverge. It rides request.state (i.e. the ASGI scope), which
+        # outlives this middleware's own frame — the outer 500 handler reads it
+        # from there after this one has unwound.
         request.state.request_id = request_id
         bind_request_context(request_id=request_id, path=request.url.path, method=request.method)
         try:
             response = await call_next(request)
-            response.headers.setdefault("X-Request-Id", request_id)
+            # Assigned, NOT setdefault. This middleware OWNS the header; a route
+            # that sets its own would win a setdefault and hand the caller an id
+            # absent from every log line, which is exactly the bug /tasks shipped.
+            # Making the assignment unconditional turns that from a convention
+            # route authors must remember into something they cannot get wrong.
+            response.headers["X-Request-Id"] = request_id
             return response
         finally:
             clear_request_context()

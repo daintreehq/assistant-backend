@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from ..auth import Principal, require_auth
 from ..contracts.tasks import TaskRequest
 from ..services.validation import reject_forbidden_prompt_keys
-from .deps import require_ready
+from .deps import check_protocol_header, request_id, require_ready
 
 router = APIRouter()
 
@@ -19,12 +19,25 @@ async def run_task(
     request: Request,
     principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
+    # `_protocol` carries the same rule as /respond and /skills/resolve: a task
+    # sends the caller's content upstream and returns a typed result the client
+    # parses, so an unsupported client must be told 426 rather than handed a body
+    # whose shape it may not understand. There is no `protocol_version` body field
+    # on a task request — the header the CLI sends on every backend call is the
+    # whole declaration.
+    _protocol: None = Depends(check_protocol_header),
 ) -> JSONResponse:
     reject_forbidden_prompt_keys(body.input, param="input")
     container = request.app.state.container
     result = await container.task_runner.run(body, api_key=principal.api_key)
-    headers = {"X-Request-Id": body.request_id} if body.request_id else {}
     # exclude_none, matching /respond: an unreported `usage.cost` must be ABSENT
     # rather than null, or a client testing key presence to distinguish "unknown"
     # from "free" gets a different answer per endpoint.
-    return JSONResponse(content=result.model_dump(exclude_none=True), headers=headers)
+    #
+    # The header is redundant now that the middleware assigns it unconditionally,
+    # and is kept as the explicit statement that this route's id is the request's
+    # id. Setting anything else here is the bug this endpoint used to ship.
+    return JSONResponse(
+        content=result.model_dump(exclude_none=True),
+        headers={"X-Request-Id": request_id(request)},
+    )

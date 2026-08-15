@@ -1702,13 +1702,17 @@ class ChatOrchestrator:
                 "error",
                 StreamError(
                     error=exc.envelope().error,
+                    request_id=request_id,
                     retry_after=exc.headers.get("Retry-After"),
                 ),
             )
             return
         except Exception:
             logger.exception("respond_prepare_unexpected", request_id=request_id)
-            yield self._sse("error", StreamError(error=internal_error().envelope().error))
+            yield self._sse(
+                "error",
+                StreamError(error=internal_error().envelope().error, request_id=request_id),
+            )
             return
 
         body = self._stream_body(
@@ -1740,7 +1744,8 @@ class ChatOrchestrator:
             yield self._sse(
                 "error",
                 StreamError(
-                    error=turn_deadline_exceeded(exc.phase.value).envelope().error
+                    error=turn_deadline_exceeded(exc.phase.value).envelope().error,
+                    request_id=request_id,
                 ),
             )
         except Exception:
@@ -1748,7 +1753,10 @@ class ChatOrchestrator:
             # catches what it could not anticipate (e.g. a malformed provider
             # chunk crashing delta handling) so the client still gets a typed end.
             logger.exception("respond_stream_unexpected", request_id=request_id)
-            yield self._sse("error", StreamError(error=internal_error().envelope().error))
+            yield self._sse(
+                "error",
+                StreamError(error=internal_error().envelope().error, request_id=request_id),
+            )
         finally:
             # ``async for`` does not close a generator it abandoned mid-iteration
             # (GeneratorExit lands HERE, not in the body's finally) — close it
@@ -2096,6 +2104,7 @@ class ChatOrchestrator:
                 "error",
                 StreamError(
                     error=exc.envelope().error,
+                    request_id=meta.request_id,
                     retry_after=exc.headers.get("Retry-After"),
                 ),
             )

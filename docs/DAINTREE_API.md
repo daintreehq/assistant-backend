@@ -141,9 +141,31 @@ the values a client may select.
 
 ## Protocol negotiation
 
-Every request carries `protocol_version` (currently `2`). The supported range is also
-advertised by `/version` and `/v1/daintree/capabilities`. A request may additionally
-send `X-Daintree-Protocol: 2`; an unsupported version yields `426`.
+A generation or skill-resolve request carries `protocol_version` in its body. Any
+request may additionally declare it as a header — `X-Daintree-Protocol: 2`. The
+supported range is advertised by `/version` and `/v1/daintree/capabilities`. An
+unsupported version yields `426` from either channel.
+
+The header is checked on every route that runs the caller's content through the model —
+`/respond`, `/skills/resolve` and `/tasks` alike. (`/tasks` has no `protocol_version`
+body field; the header is its whole declaration.) The health, version, capabilities and
+`auth/verify` routes are exempt: they exist to *negotiate* or diagnose compatibility, so
+failing them on a version mismatch would deny a client the very answer it needs to fix
+itself. Omitting the header stays permitted everywhere — only a present, out-of-range
+value fails.
+
+## Request correlation
+
+Every response carries `X-Request-Id`, and it is the **only** correlation id: the same
+value goes into every structured log line for the request and into the SSE `meta` and
+`error` events. A caller may propose one by sending `X-Request-Id`; it is adopted when
+it is short, conservatively charactered, and not a fragment of the bearer token (a
+pasted API key is *structurally* a valid request id, and would otherwise be logged and
+echoed). Otherwise the server mints one silently — a caller's id has no authority here,
+so refusing it is never worth failing the request over.
+
+There is no body-borne request id on any endpoint. Quote the response header when
+reporting a problem; anything else identifies nothing in the logs.
 
 ---
 
@@ -349,8 +371,14 @@ data: { "finish_reason": "stop",
 
 event: error
 data: { "error": { "type":"…","code":"…","message":"…","param":"…" },
+        "request_id":"req_…",                  // same id as the response header
         "retry_after":"5" }                    // optional raw Retry-After on rate limits
 ```
+
+`request_id` is on the **error** event as well as `meta` because a stream can fail
+*before* `meta` is ever sent — a preparation failure does exactly that — and `meta` is
+otherwise the only event carrying it. The HTTP status is already committed to 200 by
+then, so this is the only channel a failed stream has to identify itself.
 
 Guarantees:
 - `meta` is always first, before any token — so the client renders the skill prelude and

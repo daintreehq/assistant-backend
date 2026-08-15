@@ -12,7 +12,7 @@ from ..auth import Principal, require_auth
 from ..contracts.extensions import Routing
 from ..errors import invalid_request
 from ..providers.policy import routing_preference
-from .deps import check_protocol_header, check_protocol_value, require_ready
+from .deps import check_protocol_header, check_protocol_value, request_id, require_ready
 
 router = APIRouter()
 
@@ -62,8 +62,8 @@ async def resolve_skills(
     request: Request,
     principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
+    _protocol: None = Depends(check_protocol_header),
 ) -> JSONResponse:
-    check_protocol_header(request)
     check_protocol_value(body.protocol_version)
 
     if body.action == "find" and not (body.query or "").strip():
@@ -85,6 +85,6 @@ async def resolve_skills(
         routing=routing_preference(body.routing),
         # The middleware-resolved id, so the body and X-Request-Id always agree.
         # Reading the raw header instead mints a SECOND id when the client sends none.
-        request_id=getattr(request.state, "request_id", None),
+        request_id=request_id(request),
     )
     return JSONResponse(content=result)

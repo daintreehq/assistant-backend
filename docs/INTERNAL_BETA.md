@@ -176,5 +176,7 @@ Two details about that id:
   but only if it is short, in a conservative charset, and not the caller's own
   bearer token. Anything else is silently replaced with a server-minted id, so a
   key pasted into the wrong variable never reaches a log line.
-- A utility-task body may carry its own `request_id`. For log correlation, quote
-  the one in the **response header**.
+- No endpoint takes a request id in its BODY. `/tasks` used to, and it won the
+  response header while the logs kept the middleware's — so quote the
+  **response header**, which is the only correlation id the server knows about.
+  It is also on the SSE `error` event, because a stream can fail before `meta`.

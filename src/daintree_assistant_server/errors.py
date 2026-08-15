@@ -418,15 +418,36 @@ async def http_exception_handler(_request: Request, exc: StarletteHTTPException)
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """The 500 of last resort — and the response most likely to be reported.
+
+    This handler runs in Starlette's OUTERMOST middleware, above the request-context
+    middleware. By the time it is reached that middleware has unwound: its
+    contextvars are cleared, so the bound request id is no longer attached to log
+    lines automatically, and its ``return response`` never ran, so nothing has set
+    the response header. Left alone, the one failure a tester is certain to report
+    is the one they can quote no id for, and whose log line an operator cannot find.
+
+    The id survives on ``request.state`` (the ASGI scope outlives the middleware
+    frame), so both are recovered here explicitly. It is read defensively rather
+    than through ``api.deps.request_id``: this handler must not raise, and a
+    request that failed before the middleware ran has no id to recover.
+    """
+    correlation = getattr(request.state, "request_id", None)
+    if not isinstance(correlation, str) or not correlation:
+        correlation = None
     # Log the failure (route + exception class + stack) without request content.
     logger.error(
         "unhandled_exception",
+        request_id=correlation,
         path=request.url.path,
         method=request.method,
         exc_type=type(exc).__name__,
         exc_info=exc,
     )
-    return internal_error().to_response()
+    response = internal_error().to_response()
+    if correlation:
+        response.headers["X-Request-Id"] = correlation
+    return response
 
 
 def register_exception_handlers(app: Any) -> None:
