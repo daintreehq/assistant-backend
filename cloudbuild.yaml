@@ -138,17 +138,19 @@ steps:
         # what this file says. A flag removed here is removed from the service
         # on the next release instead of lingering invisibly from an old one.
         #
-        # DEVELOPMENT POSTURE: min-instances=0 lets the service scale to zero, so
-        # it costs nothing while idle. The trade is a cold start on the first
-        # request after a quiet spell — Python startup plus prompt and catalog
-        # load — which --cpu-boost softens. Going to production means raising
-        # min-instances to 1 or 2 so a turn never pays that, and revisiting cpu
-        # and memory at the same time.
+        # min-instances=1 keeps one instance warm so no turn pays a cold start —
+        # Python startup plus prompt and catalog load — on the first request
+        # after a quiet spell. It buys that with a bill that now runs around the
+        # clock rather than only while serving. --cpu-boost stays: it still
+        # covers the SECOND instance and every scale-out above it, which are
+        # cold by definition.
         #
-        # Memory stays at 1Gi rather than dropping to 512Mi: with scale-to-zero
-        # the idle saving is nil and memory is only billed while serving, so
-        # trimming it buys pennies in exchange for an OOM risk on a process that
-        # holds the prompt templates and every skill body in memory.
+        # Memory stays at 1Gi rather than dropping to 512Mi, but the reasoning
+        # changed with the always-warm instance: idle memory is billed
+        # continuously now, so this is a real recurring cost rather than the
+        # rounding error it was under scale-to-zero. It is still the right
+        # trade — the process holds the prompt templates and every skill body
+        # resident, and an OOM restart costs more than the difference.
         #
         # timeout=420 is a CUSHION over the app's own 300s total turn deadline
         # (services/deadlines.py TOTAL), not an independent limit. It was 1800 —
@@ -176,7 +178,7 @@ steps:
           --memory=1Gi
           --cpu-boost
           --concurrency=8
-          --min-instances=0
+          --min-instances=1
           --max-instances=10
           --timeout=420
           --ingress=all
