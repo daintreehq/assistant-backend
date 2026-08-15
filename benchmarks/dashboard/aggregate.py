@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .._harness.env import build_settings, require_api_key
+from .._harness.quality import VERDICTS
 
 # ---- suite adapters --------------------------------------------------------
 # Each returns a full suite results doc. Imports are deferred inside the thunks so a
@@ -90,9 +91,20 @@ LIVE: list[tuple[str, Callable[..., dict[str, Any]]]] = [
 # ---- headline extraction (the few numbers worth one glance) ----------------
 
 def _passed(name: str, s: dict[str, Any]) -> bool:
-    """A semantic pass per suite, so a regression (not just an exception) reddens the
-    dashboard. Live-quality rates (obey rate, first-try rate) are informational and
-    only fail on a hard error condition (a 502 / infra error)."""
+    """A semantic pass per suite, so a regression (not just an exception) reddens
+    the dashboard.
+
+    The three live suites now carry their own ``summary.passed``, stamped by
+    ``_harness.quality`` — the same verdict their standalone CLI exits on, so the
+    dashboard and the command can never disagree about whether a run was
+    acceptable. They are handled by the first branch here.
+
+    They used to be graded in this function on ``error_rate == 0`` (did anything
+    502?) and, for injection, ``counter_over_refusal_rate == 0`` (did it answer the
+    benign controls?). None of that looked at obedience, canary leakage, or
+    forbidden tool calls: a model could fail every hostile case in the corpus and
+    this printed `ok`.
+    """
     if "passed" in s:
         return bool(s["passed"])
     if name == "prompt_cost":
@@ -101,13 +113,11 @@ def _passed(name: str, s: dict[str, Any]) -> bool:
         return s.get("false_accept_total") == 0
     if name == "session_trace":
         return s.get("turns_passed") == s.get("turns_total")
-    if name == "workflow_intel":
-        return (s.get("error_rate") or 0.0) == 0.0
-    if name == "utility_json":
-        return (s.get("error_rate") or 0.0) == 0.0
-    if name == "injection_live":
-        return (s.get("counter_over_refusal_rate") or 0.0) == 0.0
-    return True  # microperf / prompt_cost_live carry their own or are informational
+    # `name in VERDICTS` is reached only if a live suite somehow returned a summary
+    # with no verdict stamped — a wiring break, and it fails rather than defaulting
+    # to green. An ungraded security suite is not a passing one. Everything else
+    # (microperf / prompt_cost_live) carries its own verdict or is informational.
+    return name not in VERDICTS
 
 
 def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
@@ -143,7 +153,11 @@ def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
 
 
 def run_dashboard(
-    *, include_live: bool, env_file: str | None = None, live_trials: int | None = None
+    *,
+    include_live: bool,
+    env_file: str | None = None,
+    live_trials: int | None = None,
+    require_live: bool = False,
 ) -> dict[str, Any]:
     settings = build_settings(env_file)
     ctx: dict[str, Any] = {"env_file": env_file}
@@ -152,11 +166,13 @@ def run_dashboard(
 
     suites = list(DETERMINISTIC)
     live_note = None
+    live_missing = None
     if include_live:
         try:
             require_api_key(settings)
             suites += LIVE
         except Exception as exc:  # noqa: BLE001
+            live_missing = str(exc)
             live_note = f"live suites skipped: {exc}"
 
     results: dict[str, Any] = {}
@@ -175,10 +191,23 @@ def run_dashboard(
             results[name] = {"ok": False, "passed": False,
                              "error": f"{type(exc).__name__}: {exc}"}
 
+    if live_missing and require_live:
+        # A release qualification that cannot reach the model has not qualified
+        # anything. The convenient "skip without a key" behaviour is right for the
+        # everyday dashboard and wrong here, where the absence of evidence would
+        # otherwise be recorded as a green run.
+        for name, _ in LIVE:
+            results[name] = {
+                "ok": False,
+                "passed": False,
+                "error": f"live run required but unavailable: {live_missing}",
+            }
+
     return {
         "meta": {
             "benchmark": "dashboard",
             "mode": "full" if include_live else "deterministic-only",
+            "require_live": require_live,
             "suites_run": list(results),
             "live_note": live_note,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),

@@ -37,6 +37,7 @@ from daintree_assistant_server.services.task_runner import build_profiles
 from .._harness.cases import CaseError, load_yaml_cases
 from .._harness.counting import CountingProvider
 from .._harness.env import build_settings, caller_api_key, make_upstream_provider
+from .._harness.quality import attach_verdict
 from .._harness.stats import latency_summary
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
@@ -183,6 +184,8 @@ async def run_bench(
 
     configure_logging("WARNING")
     settings = build_settings(env_file)
+    # Two reads: what a full run WOULD be, and what this run will actually do.
+    whole_corpus = load_cases()
     cases = load_cases(id_filter)
 
     inner = make_upstream_provider(settings, timeout=settings.utility_timeout_seconds)
@@ -207,15 +210,26 @@ async def run_bench(
         await container.aclose()
     finished_at = datetime.now(UTC)
 
-    return {
+    return attach_verdict({
         "meta": {
             "benchmark": "workflow_intel",
             "mode": "live",
             "model": OPENROUTER_MODEL,
             "trials": trials,
+            # What a COMPLETE run looks like, so the quality gate can tell one
+            # from a --filter'd or interrupted run rather than grading whatever
+            # happened to execute. A floor picked as a constant would either sit
+            # under the real corpus (and let a partial run pass) or drift above it
+            # as cases are added (and go permanently red).
+            #
+            # From `whole_corpus`, NOT `cases`: measuring the filtered list would
+            # let a run declare its own subset to be the corpus and pass for
+            # covering it — a self-certifying expectation, i.e. none at all.
+            "cases_expected": len(whole_corpus) * trials,
+            "tasks_expected": sorted({c["task"] for c in whole_corpus}),
             "started_at": started_at.isoformat(timespec="seconds"),
             "finished_at": finished_at.isoformat(timespec="seconds"),
         },
         "summary": _summarize(results),
         "cases": results,
-    }
+    }, "workflow_intel")

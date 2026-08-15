@@ -18,6 +18,7 @@ from typing import Any
 
 from .._harness.cases import CaseError
 from .._harness.env import EnvError
+from .._harness.quality import print_verdict
 from .._harness.results import load_doc, save_doc
 from .runner import load_cases, run_bench
 
@@ -42,10 +43,15 @@ def _print(doc: dict[str, Any]) -> None:
 def _cmd_run(args: argparse.Namespace) -> int:
     doc = asyncio.run(run_bench(trials=args.trials, id_filter=args.filter, env_file=args.env_file))
     _print(doc)
+    passed = print_verdict(doc, "workflow_intel")
     if not args.no_save:
         path = save_doc(doc, __file__, "live", Path(args.out) if args.out else None)
         print(f"\nsaved: {path}")
-    return 0
+    # Non-zero on a QUALITY failure, not just an exception. Without this the
+    # command is a printout: a release step could run it, read `0`, and promote
+    # plans the client cannot apply, or a next_action naming
+    # a tool that does not exist.
+    return 0 if passed else 1
 
 
 def _cmd_list(args: argparse.Namespace) -> int:
@@ -55,8 +61,12 @@ def _cmd_list(args: argparse.Namespace) -> int:
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
-    _print(load_doc(Path(args.path)))
-    return 0
+    # Re-derives the verdict rather than trusting a stored `passed`, so an
+    # artifact saved before a threshold existed is graded against today's — and so
+    # replaying a failed run in CI stays a failure.
+    doc = load_doc(Path(args.path))
+    _print(doc)
+    return 0 if print_verdict(doc, "workflow_intel") else 1
 
 
 def main(argv: list[str] | None = None) -> int:
