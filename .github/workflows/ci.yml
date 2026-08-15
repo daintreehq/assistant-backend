@@ -69,3 +69,12 @@ jobs:
       # deterministic mode needs no API key and no network, so it gates cheaply.
       - name: Benchmarks (deterministic only)
         run: python -m benchmarks.dashboard.bench run --deterministic-only
+
+      # Free, offline, non-zero on a routing gap. It asks whether every skill has
+      # a case that REQUIRES it, and whether every skill declaring confusable
+      # neighbours has a trap excluding one. A skill with no cases is invisible to
+      # the live corpus by construction — that run grades the cases that exist —
+      # so without this a skill can enter the catalog untested and stay that way.
+      # Five did, for three weeks.
+      - name: Skill-selection routing coverage
+        run: python -m benchmarks.skill_selection.bench coverage

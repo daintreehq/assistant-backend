@@ -41,7 +41,14 @@ from daintree_assistant_server.skills.catalog import load_catalog
 # prompt on faith is exactly the change that looks fine offline and degrades in
 # production, so the byte target waits on the measurement rather than the other
 # way round.
-BASE_PROMPT_CEILING = 28 * 1024
+# Raised from 28 KiB (28,672 B) once, deliberately, for the two terminal-safety
+# rules added after a session where the assistant typed raw git into the user's
+# own shell — moving their checkout onto a new branch and breaking the operation
+# it was attempting. The test above asks the right question before a raise: does
+# the rule have to hold on EVERY turn? It does. That session had no orchestration
+# skill loaded, only the foundation, and a terminal is reachable on any turn — so
+# a skill, which applies only when selected, cannot carry it.
+BASE_PROMPT_CEILING = 29 * 1024
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —
 # tool-discipline is nearly half the prompt on its own, and a rule added there is

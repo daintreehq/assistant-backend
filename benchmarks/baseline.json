@@ -1,8 +1,8 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:c981d86da09ced2d6154610172a81b7e03e2557eb39e4fc13a8cfa446806a023",
-    "skills": 31
+    "revision": "sha256:46202b0b8b1403049ed8dd2aa471a5163a14223e755df843a6e264c9b1f8db82",
+    "skills": 32
   },
   "identity": {
     "endpoint_sort": "throughput",
@@ -11,9 +11,9 @@
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 27584,
-    "selector_prompt_bytes": 44129,
-    "skill_body_bytes_total": 222708
+    "base_prompt_bytes": 28705,
+    "selector_prompt_bytes": 44943,
+    "skill_body_bytes_total": 226733
   },
   "tools": {
     "count": 77,

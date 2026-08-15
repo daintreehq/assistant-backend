@@ -60,18 +60,18 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-08-15, 31 skills / 77 tools (sizes are KiB):
+Measured 2026-08-15, 32 skills / 77 tools (sizes are KiB):
 
 | metric | value |
 |---|---|
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
-| system+tools stable — topic-shift (expected drop) | 0.2670 |
+| system+tools stable — topic-shift (expected drop) | 0.2745 |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~116.8 KB, ~29.9k proxy tok |
-| tool schemas share of request | ~73.5 KB, **62.9%**, ~18.8k tok |
-| base prompt | ~26.9 KB, 23.1%, ~6.9k tok |
-| loaded skills (2 active) | ~11.6 KB, 10.0%, ~3.0k tok |
-| selector prompt | ~43.1 KB, ~11.0k tok / 31 skills (~1.4 KB per skill) |
+| total request | ~118.0 KB, ~30.2k proxy tok |
+| tool schemas share of request | ~73.5 KB, **62.4%**, ~18.7k tok |
+| base prompt | ~28.0 KB, 23.8%, ~7.1k tok |
+| loaded skills (2 active) | ~11.6 KB, 9.9%, ~3.0k tok |
+| selector prompt | ~43.9 KB, ~11.2k tok / 32 skills (~1.4 KB per skill) |
 | state token | 389–492 B (0–3 skills; 16 KiB cap) |
 
 The tool region fell ~10% (81.6 → 73.5 KiB, ~20.9k → ~18.8k proxy tokens) when

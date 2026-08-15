@@ -166,3 +166,22 @@ cases:
     expect:
       required: [daintree.context.curate-copytree-bundle]
       optional: [daintree.foundation]
+
+  - id: plain-worktree-new-branch
+    category: single-skill
+    note: >-
+      The recall case for the skill skill-learning wrote after a session where the
+      assistant reached for raw git in the user's own terminal. The wording is a
+      user's, not the skill's: no "plain", no "standalone", no "worktree", no "set
+      up" — all of those are the runbook's own trigger vocabulary, and echoing them
+      measures keyword overlap rather than routing. What decides it is that a
+      branch is named, a base is named, the isolation is the point, and nothing
+      asks for a recipe, an agent or an issue.
+    messages:
+      - role: user
+        content: >-
+          I want a separate checkout off develop for spike-auth-refactor, so I can
+          leave what I'm doing here alone.
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]

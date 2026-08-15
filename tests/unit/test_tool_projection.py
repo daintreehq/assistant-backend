@@ -335,6 +335,16 @@ _REVIEWED_UNDECLARED = {
     ("daintree.orchestration.status-and-resume", "workflow.startWorkOnIssue"),
     ("daintree.orchestration.watch-outcome", "daintree.call"),
     ("daintree.terminals.rename", "terminal.extract"),
+    # PROHIBITION. This skill exists because a session reached for raw git in the
+    # user's own terminal when the typed wrapper's schema gave it no argument
+    # names; its step 5 forbids both the raw `daintree.call` and improvised
+    # `git checkout`/`git worktree add`. Declaring it would be a false statement
+    # about the runbook's dependencies — `requiredTools` says what a skill NEEDS,
+    # and this one needs the tool not to be used. (It would not actually withhold
+    # anything: the foundation declares `daintree.call` and is projected alongside
+    # every specific, and projection is shadow-only regardless. The reason is
+    # metadata truth, not enforcement.)
+    ("daintree.worktree.create-plain-worktree", "daintree.call"),
 }
 
 

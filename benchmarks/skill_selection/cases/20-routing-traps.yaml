@@ -269,3 +269,54 @@ cases:
     expect:
       required: [daintree.context.curate-copytree-bundle]
       optional: [daintree.foundation]
+
+  - id: worktree-with-recipe-not-plain
+    category: routing-trap
+    note: >-
+      The nearest neighbour, and the one the skill's own whenToUse excludes first:
+      "Do not use for a worktree with a workspace recipe (use
+      daintree.recipe.run-or-create)". The bait is real — this IS a worktree
+      creation request, and the plain skill owns most of those — but "saved …
+      layout" plus terminals coming up with it is a stored Daintree recipe, which
+      is recipe.run-or-create's whole trigger. The plain skill must not be picked.
+    messages:
+      - role: user
+        content: >-
+          Make a worktree with our saved release-prep layout, so the usual terminals
+          come up with it.
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.foundation]
+
+  - id: worktree-for-issue-is-start-work
+    category: routing-trap
+    note: >-
+      The second exclusion in the same whenToUse: "for starting a forge issue with
+      an agent (use daintree.workflow.start-work-on-issue)". A worktree IS created
+      here, which is exactly why it baits — but the deliverable is work started on
+      a numbered issue, not a worktree handed back empty.
+    messages:
+      - role: user
+        content: Get someone going on issue 412 in its own worktree.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.foundation]
+
+  - id: plain-worktree-not-an-agent-spawn
+    category: routing-trap
+    note: >-
+      The skill's own trap, in the direction the coverage gate reads: this skill is
+      the answer and a declared neighbour must NOT come with it. The bait is the
+      word "work on" plus a named branch, which reads toward
+      daintree.edits.spawn-visible-agent — but the deliverable stops at a worktree
+      the user will open themselves, and that skill's carve-out is explicit: it is
+      for spawning an agent into a worktree that ALREADY exists. Nothing is being
+      launched here, so an agent-spawn pick is wrong rather than merely extra.
+    messages:
+      - role: user
+        content: >-
+          Give the caching fix its own checkout beside this one, based on main —
+          I'll drive it myself from there.
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]
