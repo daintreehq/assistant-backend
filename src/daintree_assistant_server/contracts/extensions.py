@@ -164,6 +164,31 @@ class CurrentWorktreeSnapshot(BaseModel):
     current: WorktreeSnapshot | None = None
 
 
+class DisplayInfo(BaseModel):
+    """How wide the reply will actually render, in terminal cells (issue #33).
+
+    ``content_width`` is the load-bearing value: the measure the assistant's own
+    markdown is WRAPPED at, after the cockpit's left inset, its autowrap gutter
+    and its prose cap. ``columns`` is the raw window, carried so the model can
+    answer a question about the terminal it is running in without having to
+    infer one number from the other.
+
+    The CLI omits the whole block when it has no terminal to measure — a piped
+    one-shot, the stdio host, the headless daemon. Absent therefore means
+    UNKNOWN, never NARROW: the server falls back to ``MAIN_TERMINAL_WIDTH``
+    rather than shaping a reply for a width nobody reported.
+
+    Bounds mirror the CLI's own clamp (``displayWidthMax``, 10000): the request
+    is validated BEFORE it is used, so an absurd width from a confused terminal
+    probe would 422 the turn rather than quietly degrade.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    columns: int | None = Field(default=None, ge=0, le=10_000)
+    content_width: int | None = Field(default=None, ge=0, le=10_000)
+
+
 class RuntimeContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -180,6 +205,11 @@ class RuntimeContext(BaseModel):
     # roster the CLI fetched this turn, rendered as inert data so the model can
     # see what is open without a mid-turn terminal.list discovery call.
     open_terminals: list[OpenTerminal] = Field(default_factory=list)
+    # The live render geometry of the surface this reply is drawn in. Republished
+    # by the CLI on every resize, so a dragged window lands on the next round.
+    # Read by the response contract and the output lint alike — see
+    # ``services.output_policy.resolve_content_width``.
+    display: DisplayInfo | None = None
 
 
 class Memories(BaseModel):

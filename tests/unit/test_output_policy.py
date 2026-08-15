@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from daintree_assistant_server.config import Settings
+from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.providers.base import ProviderChatResult, ProviderUsage
 from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
 from daintree_assistant_server.services.output_policy import (
@@ -10,7 +11,24 @@ from daintree_assistant_server.services.output_policy import (
     find_pipe_tables,
     lint_output,
     repair_tables,
+    resolve_content_width,
 )
+
+
+def _request(display: dict | None = None) -> RespondRequest:
+    """A minimal request, optionally carrying the client's measured geometry."""
+    runtime: dict[str, object] = {"permission_tier": "operator"}
+    if display is not None:
+        runtime["display"] = display
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": [{"role": "user", "content": "hi"}]},
+            "startup": {},
+            "runtime": runtime,
+        }
+    )
 
 WIDE_TABLE = (
     "Here are the terminals:\n\n"
@@ -179,7 +197,7 @@ def test_lint_wiring_repairs_when_enabled(
         fake_provider=fake_provider,
     )
     res = _result(WIDE_TABLE)
-    orch._lint_final_output(res, request_id="r", had_tool_calls=False)
+    orch._lint_final_output(res, request=_request(), request_id="r", had_tool_calls=False)
     assert "|---" not in res.text
     assert "- **Claude**" in res.text
 
@@ -187,7 +205,9 @@ def test_lint_wiring_repairs_when_enabled(
 def test_lint_wiring_default_does_not_mutate(orchestrator: ChatOrchestrator) -> None:
     # Default settings: lint (observability) on, repair off → content unchanged.
     res = _result(WIDE_TABLE)
-    orchestrator._lint_final_output(res, request_id="r", had_tool_calls=False)
+    orchestrator._lint_final_output(
+        res, request=_request(), request_id="r", had_tool_calls=False
+    )
     assert res.text == WIDE_TABLE
 
 
@@ -204,8 +224,54 @@ def test_lint_wiring_skips_tool_call_round(
         fake_provider=fake_provider,
     )
     res = _result(WIDE_TABLE, finish_reason="tool_calls")
-    orch._lint_final_output(res, request_id="r", had_tool_calls=True)
+    orch._lint_final_output(res, request=_request(), request_id="r", had_tool_calls=True)
     assert res.text == WIDE_TABLE  # a continuation round is never linted/repaired
+
+
+def test_lint_wiring_honours_reported_width(
+    settings, catalog_manager, selector, state_codec, assembler, fake_provider
+) -> None:
+    """A wide client terminal must not have its tables rewritten as lists.
+
+    WIDE_TABLE is over-wide at the 56-column default and gets repaired there
+    (test_lint_wiring_repairs_when_enabled). On a terminal that actually fits it,
+    the same reply is left alone — it never violated the contract the model was
+    handed, which quoted the same resolved width.
+    """
+    repair_settings = settings.model_copy(update={"main_output_repair_tables": True})
+    orch = _orch_with(
+        repair_settings,
+        catalog_manager=catalog_manager,
+        selector=selector,
+        state_codec=state_codec,
+        assembler=assembler,
+        fake_provider=fake_provider,
+    )
+    res = _result(WIDE_TABLE)
+    orch._lint_final_output(
+        res,
+        request=_request({"columns": 220, "content_width": 200}),
+        request_id="r",
+        had_tool_calls=False,
+    )
+    assert res.text == WIDE_TABLE
+
+
+def test_resolve_content_width_prefers_reported_content_width() -> None:
+    assert resolve_content_width(_request({"content_width": 100}).runtime, fallback=56) == 100
+
+
+def test_resolve_content_width_falls_back_when_unmeasured() -> None:
+    # An omitted block means UNKNOWN, not narrow — and so does an omitted runtime.
+    assert resolve_content_width(_request().runtime, fallback=56) == 56
+    assert resolve_content_width(None, fallback=56) == 56
+    # `columns` alone is not the wrap width and must not stand in for it.
+    assert resolve_content_width(_request({"columns": 180}).runtime, fallback=56) == 56
+
+
+def test_resolve_content_width_rejects_an_implausible_width() -> None:
+    # A terminal probe reporting a handful of cells is confused, not tiny.
+    assert resolve_content_width(_request({"content_width": 4}).runtime, fallback=56) == 56
 
 
 def test_a_partial_table_repair_does_not_suppress_the_warning() -> None:

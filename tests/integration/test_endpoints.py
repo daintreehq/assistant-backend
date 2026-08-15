@@ -80,6 +80,11 @@ def test_capabilities(client, auth) -> None:
     r = client.get("/v1/daintree/capabilities", headers=auth)
     body = r.json()
     assert body["respond"]["system_messages_accepted"] is False
+    # The CLI's ONLY signal that `runtime.display` is safe to send. `runtime` is
+    # extra="forbid", so a client that sends the block to a backend advertising
+    # false here 422s the whole turn — asserted as a literal so dropping the
+    # field cannot pass silently.
+    assert body["respond"]["display_context"] is True
     assert body["respond"]["max_active_skills"] == 3
     assert body["respond"]["stream_events"] == ["meta", "status", "delta", "done", "error"]
     # Hardcoded posture, not config. Asserted as a literal rather than against the

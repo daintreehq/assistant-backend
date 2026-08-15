@@ -47,6 +47,16 @@ async def capabilities(
                 "remote_urls": settings.allow_remote_image_urls,
             },
             "system_messages_accepted": False,
+            # This backend accepts `runtime.display` — the client's measured
+            # terminal geometry — and shapes the response contract and the output
+            # lint around its `content_width`.
+            #
+            # A GATE, not a nicety. `runtime` is validated with extra="forbid", so
+            # sending the block to a deployment that predates it 422s the WHOLE
+            # turn before the model runs; the CLI fails closed and withholds the
+            # geometry until it sees this flag. Which is why nothing breaks in
+            # either rollout order.
+            "display_context": True,
             "max_active_skills": settings.max_active_skills,
             "metadata_transport": "body+stream_meta_event",
             # Every upstream call is funded by the caller's own key, so what a

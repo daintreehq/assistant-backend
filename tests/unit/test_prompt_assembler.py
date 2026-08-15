@@ -780,3 +780,44 @@ def test_oversized_text_part_is_capped_not_dropped(
     # if capping over-truncated the value down to a single character.
     assert len(parts[0]["text"]) == settings.cap_message_text_part
     assert parts[0]["text"].startswith("xxxx")
+
+
+# ---- response contract width (issue #33) -----------------------------------
+
+
+def _contract(assembler: PromptAssembler, req: RespondRequest) -> str:
+    pr = assembler.build_main_request(
+        request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731"
+    )
+    systems = [m["content"] for m in pr.messages if m["role"] == "system"]
+    return next(s for s in systems if s.startswith("# Response contract"))
+
+
+def test_contract_uses_the_client_reported_width(assembler: PromptAssembler) -> None:
+    text = _contract(assembler, _req(runtime={"display": {"columns": 180, "content_width": 100}}))
+    assert "about 100 characters wide" in text
+    # Only the framing line is checked for narrowness — a later rule mentions narrow
+    # table columns regardless of the terminal, and is not what this governs.
+    assert "narrow" not in text.splitlines()[1]
+    # The column cap scales with the width, and is the same number the linter uses.
+    assert "≤ 5 columns" in text
+
+
+def test_contract_falls_back_when_the_client_reports_no_display(
+    assembler: PromptAssembler, settings: Settings
+) -> None:
+    """An omitted block means UNKNOWN, so the narrow default stands."""
+    for req in (_req(), _req(runtime={"permission_tier": "operator"})):
+        text = _contract(assembler, req)
+        assert f"about {settings.main_terminal_width} characters wide" in text
+        assert "narrow" in text
+        assert "≤ 3 columns" in text
+
+
+def test_contract_stays_narrow_for_a_genuinely_narrow_terminal(
+    assembler: PromptAssembler,
+) -> None:
+    text = _contract(assembler, _req(runtime={"display": {"columns": 44, "content_width": 40}}))
+    assert "about 40 characters wide" in text
+    assert "narrow" in text
+    assert "≤ 3 columns" in text

@@ -18,6 +18,48 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
+from ..contracts.extensions import RuntimeContext
+
+# The floor a client-reported width has to clear to be believed. Mirrors the
+# ``ge=20`` floor on MAIN_TERMINAL_WIDTH in config.py: a terminal probe that comes
+# back with a handful of cells is confused, not tiny, and shaping a reply around it
+# would be worse than using the default.
+_MIN_CREDIBLE_WIDTH = 20
+
+
+def resolve_content_width(runtime: RuntimeContext | None, *, fallback: int) -> int:
+    """The width THIS turn's output is shaped against (issue #33).
+
+    The CLI measures its own terminal and reports ``runtime.display``; an omitted
+    block means unknown — a pipe, the stdio host, the headless daemon — so the
+    server's own default stands rather than a fabricated 80x24.
+
+    One resolver for both consumers on purpose: the response contract the model is
+    GIVEN and the lint that GRADES what it wrote must quote the same number, or a
+    reply gets its tables rewritten for breaking a rule it was never told.
+    """
+    display = runtime.display if runtime is not None else None
+    width = display.content_width if display is not None else None
+    if width is None or width < _MIN_CREDIBLE_WIDTH:
+        return fallback
+    return width
+
+
+# Above this, a terminal has room for something other than a stack of one-liners.
+WIDE_TERMINAL_WIDTH = 80
+
+
+def max_table_columns(terminal_width: int) -> int:
+    """How many pipe-table columns stay legible at this width.
+
+    The cap is a WIDTH proxy, not a taste rule: four columns across 56 cells is
+    ~12 cells each, which shatters, while four across 100 is ordinary. So it
+    scales. The ROW cap deliberately does not — that is about vertical
+    scannability, which the client does not report and a wider window does not
+    change.
+    """
+    return 5 if terminal_width >= WIDE_TERMINAL_WIDTH else 3
+
 # A fenced code block boundary (``` or ~~~). Lines inside a fence are exempt.
 _FENCE_RE = re.compile(r"^\s*(```|~~~)")
 # A GFM table delimiter row: ``|---|:--:|`` — at least two columns (one interior pipe),
@@ -135,10 +177,17 @@ def lint_output(
     *,
     terminal_width: int,
     warn_chars: int,
-    max_columns: int = 3,
+    max_columns: int | None = None,
     max_rows: int = 5,
 ) -> OutputFindings:
-    """Lint a final assistant message against the terminal output contract."""
+    """Lint a final assistant message against the terminal output contract.
+
+    ``max_columns`` defaults to the cap for this width, which is the same number
+    the response contract quoted to the model — derived rather than passed so the
+    two cannot drift apart.
+    """
+    if max_columns is None:
+        max_columns = max_table_columns(terminal_width)
     tables = tuple(
         TableFinding(
             table=t,

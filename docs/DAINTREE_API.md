@@ -245,7 +245,11 @@ The single generation endpoint. Returns a native JSON body, or — when
     "open_terminals": [                        // fresh metadata only; no terminal output
       { "id": "terminal-…", "kind": "agent", "worktree_id": "wt_…",
         "title": "Fix context", "agent_id": "codex", "agent_state": "working" }
-    ]
+    ],
+    "display": {                               // omitted when there is no terminal to measure
+      "columns": 180,                          // the terminal window, in cells
+      "content_width": 100                     // the width the reply is actually wrapped at
+    }
   },
 
   "turn": {                                    // per-turn context (optional)
@@ -292,6 +296,14 @@ Notes:
 - `runtime.worktree` is a typed, fresh per-request snapshot. An omitted wrapper means the
   live read was unavailable; `{ "current": null }` means Daintree successfully reported
   that there is no current worktree.
+- `runtime.display` is the client's live render geometry, both values in terminal cells and
+  bounded to 10000. `content_width` is the load-bearing one — the measure the reply is
+  actually wrapped at, after the cockpit's inset, gutter and prose cap — and both the
+  response contract handed to the model and the server-side output lint are written against
+  it. An omitted block means UNKNOWN (a piped one-shot, the stdio host, the headless
+  daemon), not narrow, so `MAIN_TERMINAL_WIDTH` stands. The client republishes on resize.
+  Gated on `capabilities.respond.display_context`: `runtime` is `extra="forbid"`, so a
+  client must not send the block to a backend that does not advertise it.
 - `tools`/`tool_calls` use the standard `{id, type, function:{name, arguments}}` shape.
   `tool_choice` is flattened to `{ "name": … }` for the named case.
 - `reasoning_content` (assistant turns only) carries thinking-mode chain-of-thought.

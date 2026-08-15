@@ -60,6 +60,7 @@ from ..text_utils import (
     utf8_len,
 )
 from .docs_mcp import DocsLookup, render_docs_sections
+from .output_policy import WIDE_TERMINAL_WIDTH, max_table_columns, resolve_content_width
 
 PROMPT_CACHE_KEY = "daintree-main"
 
@@ -438,16 +439,23 @@ class PromptAssembler:
         self._loaded_skills_cache.put(key, rendered)
         return rendered
 
-    def render_response_contract(self) -> str:
+    def render_response_contract(self, runtime: RuntimeContext | None = None) -> str:
         """The output-shape contract — the final STABLE system block before the
         conversation (see build_main_request's cache-critical layout).
 
-        Width comes from settings (the narrow Daintree terminal is ~56 columns);
-        a future runtime field can override it per-request without moving the block.
+        Width is the client's measured ``runtime.display.content_width`` when it
+        reported one, else the settings default (~56 columns). This block stays in
+        the STABLE system prefix, so a changed width does re-encode that prefix —
+        but only on an actual terminal resize, and the alternative (a width line in
+        the volatile tail contradicting the contract's own number) is worse.
         """
+        width = resolve_content_width(runtime, fallback=self.settings.main_terminal_width)
         return self.prompts.render(
             TEMPLATE_RESPONSE_CONTRACT,
-            terminal_width=self.settings.main_terminal_width,
+            terminal_width=width,
+            is_narrow=width < WIDE_TERMINAL_WIDTH,
+            # The same cap the linter will grade this reply against.
+            max_table_columns=max_table_columns(width),
         )
 
     # Workflow-digest line/list bounds (turn.workflow_state). The per-line cap is
@@ -780,7 +788,7 @@ class PromptAssembler:
         #    system prefix. (It serialized before the conversation even
         #    when the array placed it last, so this costs no "nearness to
         #    generation" that ever actually existed.)
-        contract = self.render_response_contract()
+        contract = self.render_response_contract(runtime)
         if contract.strip():
             messages.append({"role": "system", "content": contract})
         # 5. session-stable project/agent/instruction data. It is a user-role

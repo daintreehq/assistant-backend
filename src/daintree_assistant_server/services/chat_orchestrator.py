@@ -67,7 +67,7 @@ from .docs_mcp import (
     DocsLookupError,
     DocsMcpClient,
 )
-from .output_policy import lint_output, repair_tables
+from .output_policy import lint_output, repair_tables, resolve_content_width
 from .prompt_assembler import PromptAssembler, render_order_ids
 from .skill_learning import SkillLearner
 from .speculation import (
@@ -508,7 +508,7 @@ class ChatOrchestrator:
             request_id=request_id,
         )
         lint_warnings = self._lint_final_output(
-            result, request_id=request_id, had_tool_calls=had_tool_calls
+            result, request=request, request_id=request_id, had_tool_calls=had_tool_calls
         )
         if lint_warnings:
             # Appended to the turn's existing warnings rather than replacing
@@ -1162,7 +1162,7 @@ class ChatOrchestrator:
         )
 
     def _lint_final_output(
-        self, result: Any, *, request_id: str, had_tool_calls: bool
+        self, result: Any, *, request: RespondRequest, request_id: str, had_tool_calls: bool
     ) -> list[str]:
         """Lint the final assistant message: warn the caller, plus optional table repair.
 
@@ -1183,9 +1183,15 @@ class ChatOrchestrator:
             text = message.get("content") or ""
             if not text.strip():
                 return []
+            # The SAME width the response contract quoted to the model this turn.
+            # Grading a 100-column reply against a hardcoded 56 is what rewrote
+            # perfectly good tables into lists for anyone not in a narrow pane.
+            terminal_width = resolve_content_width(
+                request.runtime, fallback=self.settings.main_terminal_width
+            )
             findings = lint_output(
                 text,
-                terminal_width=self.settings.main_terminal_width,
+                terminal_width=terminal_width,
                 warn_chars=self.settings.main_output_warn_chars,
             )
             if not findings.has_violation:
@@ -1201,6 +1207,7 @@ class ChatOrchestrator:
                 "main_output_lint",
                 request_id=request_id,
                 stream=False,
+                terminal_width=terminal_width,
                 violations=findings.violation_types(),
                 content_chars=findings.char_count,
                 table_count=len(findings.tables),
@@ -1223,7 +1230,7 @@ class ChatOrchestrator:
             if repaired:
                 final = lint_output(
                     message.get("content") or "",
-                    terminal_width=self.settings.main_terminal_width,
+                    terminal_width=terminal_width,
                     warn_chars=self.settings.main_output_warn_chars,
                 )
             return [
@@ -1236,7 +1243,7 @@ class ChatOrchestrator:
             return []
 
     def _lint_streamed_output(
-        self, text: str, *, request_id: str, had_tool_calls: bool
+        self, text: str, *, request: RespondRequest, request_id: str, had_tool_calls: bool
     ) -> list[str]:
         """Lint text that has ALREADY been sent, for the terminal ``done`` event.
 
@@ -1255,9 +1262,12 @@ class ChatOrchestrator:
         if not self.settings.main_output_lint_enabled or had_tool_calls or not text.strip():
             return []
         try:
+            terminal_width = resolve_content_width(
+                request.runtime, fallback=self.settings.main_terminal_width
+            )
             findings = lint_output(
                 text,
-                terminal_width=self.settings.main_terminal_width,
+                terminal_width=terminal_width,
                 warn_chars=self.settings.main_output_warn_chars,
             )
             if not findings.has_violation:
@@ -1266,6 +1276,7 @@ class ChatOrchestrator:
                 "main_output_lint",
                 request_id=request_id,
                 stream=True,
+                terminal_width=terminal_width,
                 violations=findings.violation_types(),
                 content_chars=findings.char_count,
                 think_leak=findings.think_leak,
@@ -2100,6 +2111,7 @@ class ChatOrchestrator:
                     # non-streaming rule.
                     warnings=self._lint_streamed_output(
                         "".join(content_parts),
+                        request=request,
                         request_id=meta.request_id,
                         had_tool_calls=saw_tool_calls or finish_reason == "tool_calls",
                     ),

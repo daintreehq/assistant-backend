@@ -219,7 +219,7 @@ def _layer_budget(
     base = loader.base_prompt()
     integrations = assembler.render_integrations(request.runtime)
     skills_block = assembler.render_loaded_skills(skills)
-    contract = assembler.render_response_contract()
+    contract = assembler.render_response_contract(request.runtime)
     startup_block = assembler.render_startup_context(request.startup)
     runtime_block = assembler.render_runtime_context(request.runtime)
     footer = assembler.render_turn_footer(request.turn)

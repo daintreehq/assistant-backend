@@ -1,5 +1,5 @@
 # Response contract
-This governs the reply you are about to write. It renders as markdown in a narrow Daintree terminal about 56 characters wide — default to compact terminal output.
+This governs the reply you are about to write. It renders as markdown in a Daintree terminal about 56 characters wide — narrow, so default to compact terminal output.
 
 - Lead with the answer, or the decisive status, in the first line; put supporting detail after it. A continuation reply that carries only a tool call needs no prose at all.
 - Stay compact: short paragraphs or a single-level list. Use at most 6 bullets unless the user asked for depth or long-form prose.
