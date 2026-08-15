@@ -20,7 +20,7 @@ from typing import Any
 from pydantic import SecretStr
 
 from .. import PROTOCOL_VERSION
-from ..config import PUBLIC_MODEL_ID, Settings
+from ..config import DOCS_SKILL_ID, PUBLIC_MODEL_ID, Settings
 from ..contracts.daintree_api import (
     RespondMessage,
     RespondRequest,
@@ -821,11 +821,35 @@ class ChatOrchestrator:
             # state, and metadata. If learning reloaded the catalog during selection,
             # the speculative prompt can never win even when its ids happen to match.
             resolved_catalog = self.catalog
+
+            # ORDER MATTERS: the docs query is settled BEFORE the active set, not
+            # after. Both are answers from the same selector call, but the active
+            # set has to know whether this turn is a documentation question so it
+            # can pin the runbook for one — and the query is available on the
+            # decision immediately, while the LOOKUP (below) is the slow part.
+            # Resolving before settling `docs_query` would leave the pin depending
+            # on a value computed later in the same function.
+            #
+            # The carry applies ONLY when this turn did not answer for itself.
+            # Same authority test the active set uses: a successful run and the
+            # no-task fast path each speak for the turn, and their answer stands
+            # even when it is `null` — a re-run selector that says "not a
+            # documentation question" must not be overridden by what the previous
+            # round decided. A continuation or a degraded selector did not answer,
+            # so the turn's own finding holds.
+            authoritative = (decision.ran or decision.authoritative) and not decision.degraded
+            docs_query = decision.docs_query if authoritative else prior_docs_query
+
             resolution = resolve_active_skills(
                 decision,
                 prior_active_ids,
                 resolved_catalog,
                 self.settings.max_active_skills,
+                # Pinned on the CLASSIFICATION, not on the lookup succeeding. The
+                # runbook's job includes what to do when no pages arrive — say so
+                # and answer unverified rather than fabricate — and that is exactly
+                # the turn where a fabricated menu path is most likely.
+                pinned_id=DOCS_SKILL_ID if docs_query else None,
             )
             active_ids = resolution.active
             newly_loaded_ids = resolution.newly_loaded
@@ -845,21 +869,12 @@ class ChatOrchestrator:
             # stream into the same client connection), which both response paths
             # are built around not doing.
             #
-            # `prior_docs_query` is what keeps the pages alive across a tool
-            # round: a continuation skips the selector, so `decision.docs_query`
-            # is None there, and the volatile tail carrying the pages is rebuilt
-            # every round. Without the carry, a usage question that takes one
-            # tool call to answer arrives at the answer with its sources gone.
-            #
-            # The carry applies ONLY when this turn did not answer for itself.
-            # Same authority test the active set uses (`resolve_active_skills`):
-            # a successful run and the no-task fast path each speak for the
-            # turn, and their answer stands even when it is `null` — a re-run
-            # selector that says "not a documentation question" must not be
-            # overridden by what the previous round decided. A continuation or a
-            # degraded selector did not answer, so the turn's own finding holds.
-            authoritative = (decision.ran or decision.authoritative) and not decision.degraded
-            docs_query = decision.docs_query if authoritative else prior_docs_query
+            # `prior_docs_query` (settled above) is what keeps the pages alive
+            # across a tool round: a continuation skips the selector, so
+            # `decision.docs_query` is None there, and the volatile tail carrying
+            # the pages is rebuilt every round. Without the carry, a usage question
+            # that takes one tool call to answer arrives at the answer with its
+            # sources gone.
             docs = await self._lookup_docs(
                 docs_query, request_id=request_id, budget=budget
             )

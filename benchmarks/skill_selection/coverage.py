@@ -163,11 +163,26 @@ def build_coverage(catalog: Catalog, cases: list[BenchCase]) -> list[SkillCovera
     Iterates the CATALOG (not the cases), so a skill no case mentions at all still
     gets a row of zeros rather than silently vanishing from the report — that
     absence is the whole point.
+
+    SELECTABLE skills only. One is server-pinned and hidden from the classifier;
+    a routing corpus cannot cover a skill the classifier never chooses, and
+    demanding it would only produce a case that misstates the expectation.
     """
     neighbours = declared_neighbours(catalog)
     rows: list[SkillCoverage] = []
+    selectable = {m["id"] for m in catalog.selector_metadata()}
     for skill in catalog.skills:
         sid = skill.id
+        if sid not in selectable:
+            # SERVER-PINNED, and therefore not the classifier's to reach. The
+            # documentation runbook is loaded off the turn's `docs_query` (see
+            # config.DOCS_SKILL_ID) and is hidden from the selector's catalog
+            # entirely, so demanding a recall case for it would demand a case
+            # asserting the selector picks something it cannot see — a case that
+            # can only be written by lying about the expectation. Its loading is
+            # covered by unit tests over `resolve_active_skills`, which is where a
+            # deterministic rule belongs.
+            continue
         nbrs = neighbours[sid]
         rows.append(
             SkillCoverage(

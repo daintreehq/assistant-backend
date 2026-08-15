@@ -34,6 +34,23 @@ SKILL_BUILDER_MODEL = "openai/gpt-5.6-sol"
 SKILL_IMPROVER_MODEL = "openai/gpt-5.6-sol"
 PUBLIC_MODEL_ID = "daintree-assistant"
 
+# The runbook loaded whenever a turn produces a `docs_query` — i.e. whenever the
+# server is about to search the documentation MCP. SERVER-PINNED, not classified:
+# by the time this matters the selector has ALREADY answered "is this a
+# documentation question", so routing the matching runbook through a SECOND
+# judgement over the same evidence is a coin flip about a fact already in hand.
+# The same argument as foundation pairing, one step earlier.
+#
+# Because it is pinned, it is also HIDDEN FROM THE SELECTOR (`Catalog.selector_metadata`
+# omits it): a skill the server always supplies is one the classifier should never
+# spend prompt bytes reading or risk mis-picking on an operational turn. That
+# hiding is what keeps the two decisions from disagreeing.
+#
+# An id the catalog does not contain is a silent no-op — `resolve_active_skills`
+# filters unknown ids — so deleting the skill file degrades to the previous
+# behaviour rather than breaking the turn.
+DOCS_SKILL_ID = "daintree.docs.answer-usage-question"
+
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
 # There is one optimum and the server ships it.
 #

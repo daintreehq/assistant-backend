@@ -14,12 +14,23 @@ import hashlib
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 
+from ..config import DOCS_SKILL_ID
 from .loader import SkillLoadError, load_skills_dir
 from .models import Skill
 
 
 def default_skills_dir() -> Path:
     return Path(__file__).resolve().parent / "files"
+
+
+# Skills the classifier is never shown and may never name. One entry today: the
+# server pins the docs runbook itself whenever a turn produces a `docs_query`
+# (see ``config.DOCS_SKILL_ID``), so offering it to the classifier would spend
+# selector bytes on every call and add a false-positive surface for a decision
+# that has already been made. Hidden here rather than filtered at the prompt, so
+# `public_list` and the injected bodies are untouched — it is a real, loadable
+# skill, just not a selectable one.
+_HIDDEN_FROM_SELECTOR = frozenset({DOCS_SKILL_ID})
 
 
 class Catalog:
@@ -53,6 +64,12 @@ class Catalog:
                 )
             foundation_by_domain[domain] = skill.id
         self._foundation_by_domain = foundation_by_domain
+        # Ids the classifier is allowed to name. Precomputed because the selector's
+        # output parser tests membership per returned id, and because it is the same
+        # answer for every call at a given revision.
+        self._selectable_ids = frozenset(
+            s.id for s in self._skills if s.id not in _HIDDEN_FROM_SELECTOR
+        )
 
     @staticmethod
     def _domain_of(skill_id: str) -> str:
@@ -142,7 +159,21 @@ class Catalog:
         selector cannot use ``prompt_cache_key`` at all — the provider withholds it
         whenever ``response_format`` is set, which the selector always sets).
         """
-        return [s.selector_view() for s in self._skills]
+        return [s.selector_view() for s in self._skills if s.id in self._selectable_ids]
+
+    @property
+    def selectable_ids(self) -> frozenset[str]:
+        """Ids the classifier may name — `known_ids` minus the server-pinned ones."""
+        return self._selectable_ids
+
+    def selectable(self, skill_ids: Sequence[str]) -> list[str]:
+        """Known ids the SELECTOR may name — `filter_known` minus the pinned ones.
+
+        The active set can legitimately contain a skill the classifier cannot see,
+        so the two filters are different questions: `filter_known` asks "does this
+        exist", this asks "may the selector say it".
+        """
+        return [sid for sid in skill_ids if sid in self._selectable_ids]
 
     def public_list(self) -> list[dict[str, object]]:
         return [s.public_view() for s in self._skills]

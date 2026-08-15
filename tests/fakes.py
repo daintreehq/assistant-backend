@@ -312,6 +312,7 @@ def selection_result(
     *,
     confidence: float = 0.9,
     task_type: str = "task",
+    docs_query: str | None = None,
     usage: ProviderUsage | None = None,
 ) -> ProviderChatResult:
     """A selector completion result: the choice as a JSON object in ``content``.
@@ -328,6 +329,10 @@ def selection_result(
                 "reason": "matches the current task",
                 "skill_ids": skill_ids,
                 "confidence": confidence,
+                # Omitted rather than null when unset, matching a selector that
+                # simply did not answer the documentation question — the parser
+                # treats an absent key as "no lookup".
+                **({"docs_query": docs_query} if docs_query is not None else {}),
             }
         ),
         usage=usage

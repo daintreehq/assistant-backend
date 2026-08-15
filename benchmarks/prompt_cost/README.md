@@ -60,18 +60,21 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-08-15, 32 skills / 77 tools (sizes are KiB):
+Measured 2026-08-15, 33 skills / 77 tools (sizes are KiB). The catalog holds 33
+but the selector prompt renders 32 — `daintree.docs.answer-usage-question` is
+server-pinned off the turn's `docs_query` and hidden from the classifier, so it
+costs the selector nothing:
 
 | metric | value |
 |---|---|
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
-| system+tools stable — topic-shift (expected drop) | 0.2745 |
+| system+tools stable — topic-shift (expected drop) | 0.2770 |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~118.0 KB, ~30.2k proxy tok |
-| tool schemas share of request | ~73.5 KB, **62.4%**, ~18.7k tok |
-| base prompt | ~28.0 KB, 23.8%, ~7.1k tok |
-| loaded skills (2 active) | ~11.6 KB, 9.9%, ~3.0k tok |
-| selector prompt | ~43.9 KB, ~11.2k tok / 32 skills (~1.4 KB per skill) |
+| total request | ~118.3 KB, ~30.3k proxy tok |
+| tool schemas share of request | ~73.5 KB, **62.2%**, ~18.7k tok |
+| base prompt | ~28.4 KB, 24.0%, ~7.2k tok |
+| loaded skills (2 active) | ~11.6 KB, 9.8%, ~3.0k tok |
+| selector prompt | ~43.9 KB, ~11.2k tok / 32 selectable skills (~1.4 KB per skill) |
 | state token | 389–492 B (0–3 skills; 16 KiB cap) |
 
 The tool region fell ~10% (81.6 → 73.5 KiB, ~20.9k → ~18.8k proxy tokens) when

@@ -20,17 +20,21 @@ cases:
   - id: docs-how-do-i-worktree
     category: docs-classification
     note: >-
-      The canonical usage question, and the canonical LOADS-NOTHING case. Observed
-      in the wild answering correctly from the docs while also loading a diagnostics
-      runbook and dragging in the domain foundation behind it — roughly 14 KB of
-      procedure for a turn that used none of it. The retrieved page plus the base
-      instructions are the whole answer.
+      The canonical usage question. Observed in the wild answering correctly from
+      the docs while ALSO loading a diagnostics runbook and dragging the domain
+      foundation in behind it — roughly 14 KB of procedure for a turn that used
+      none of it. The turn does load a runbook now, the documentation one, but the
+      SERVER pins that off the docs_query rather than the classifier choosing it;
+      from the selector's side the right answer is still nothing.
     messages:
       - role: user
         content: How do I create a worktree from a pull request?
     expect:
-      # No optional ids: any pick at all is an `extra` and fails the case. That is
-      # the assertion — a STANDALONE documentation question loads nothing. (Asked
+      # No optional ids: any pick at all is an `extra` and fails the case. The
+      # documentation runbook IS loaded on this turn — but the SERVER pins it off
+      # the `docs_query` (config.DOCS_SKILL_ID), and the selector cannot even see
+      # it, so it must not appear in the classifier's answer. What is asserted here
+      # is what the selector should say: nothing. (Asked
       # mid-workflow it is a different turn; see docs-question-mid-workflow.)
       required: []
       docs: true
@@ -41,8 +45,11 @@ cases:
       - role: user
         content: What actually is a watcher, and when would I want one?
     expect:
-      # No optional ids: any pick at all is an `extra` and fails the case. That is
-      # the assertion — a STANDALONE documentation question loads nothing. (Asked
+      # No optional ids: any pick at all is an `extra` and fails the case. The
+      # documentation runbook IS loaded on this turn — but the SERVER pins it off
+      # the `docs_query` (config.DOCS_SKILL_ID), and the selector cannot even see
+      # it, so it must not appear in the classifier's answer. What is asserted here
+      # is what the selector should say: nothing. (Asked
       # mid-workflow it is a different turn; see docs-question-mid-workflow.)
       required: []
       docs: true
@@ -54,8 +61,11 @@ cases:
       - role: user
         content: Where do I change the keybinding for switching terminal tabs?
     expect:
-      # No optional ids: any pick at all is an `extra` and fails the case. That is
-      # the assertion — a STANDALONE documentation question loads nothing. (Asked
+      # No optional ids: any pick at all is an `extra` and fails the case. The
+      # documentation runbook IS loaded on this turn — but the SERVER pins it off
+      # the `docs_query` (config.DOCS_SKILL_ID), and the selector cannot even see
+      # it, so it must not appear in the classifier's answer. What is asserted here
+      # is what the selector should say: nothing. (Asked
       # mid-workflow it is a different turn; see docs-question-mid-workflow.)
       required: []
       docs: true
@@ -67,8 +77,11 @@ cases:
       - role: user
         content: Does Daintree support running agents against a remote host?
     expect:
-      # No optional ids: any pick at all is an `extra` and fails the case. That is
-      # the assertion — a STANDALONE documentation question loads nothing. (Asked
+      # No optional ids: any pick at all is an `extra` and fails the case. The
+      # documentation runbook IS loaded on this turn — but the SERVER pins it off
+      # the `docs_query` (config.DOCS_SKILL_ID), and the selector cannot even see
+      # it, so it must not appear in the classifier's answer. What is asserted here
+      # is what the selector should say: nothing. (Asked
       # mid-workflow it is a different turn; see docs-question-mid-workflow.)
       required: []
       docs: true
@@ -172,7 +185,7 @@ cases:
   - id: docs-question-mid-workflow
     category: docs-classification
     note: >-
-      The eviction trap, and the reason "a documentation question loads nothing"
+      The eviction trap, and the reason "a documentation question selects nothing"
       is scoped to an idle turn. Pausing to ask about the product does not
       abandon the workflow: clearing the active set here strands the assistant
       mid-runbook AND pays a full tools+conversation re-encode when it reloads a
@@ -206,3 +219,4 @@ cases:
       required: [daintree.diagnostics]
       optional: [daintree.foundation]
       docs: true
+

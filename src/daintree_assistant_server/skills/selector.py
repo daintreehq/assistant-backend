@@ -136,8 +136,11 @@ class SelectionDecision:
     # question about the same evidence, and that call is already on the turn's
     # first-byte path — a dedicated one would double the latency floor to
     # recognize a question the same model just read. `None` on every degraded or
-    # reused decision: no lookup is the correct fallback, and a stale query from
-    # a previous turn would search for the wrong thing.
+    # reused decision — such a decision has no answer of its own to give. The
+    # orchestrator may still carry the query THIS TURN already ran (scoped to the
+    # turn id and instruction revision, off the signed state token), so a usage
+    # question that takes a tool call to answer keeps its sources on the
+    # continuation round; nothing carries across a new instruction.
     docs_query: str | None = None
 
     def __post_init__(self) -> None:
@@ -477,7 +480,14 @@ def parse_select_args(
         if not isinstance(item, str):
             continue
         sid = item.strip()
-        if not sid or sid in seen or sid not in catalog:
+        # SELECTABLE, not merely known. A server-pinned skill is absent from the
+        # prompt's catalog, but "absent from the prompt" is not a guarantee the
+        # model never names it — the id is a public string that can appear in the
+        # conversation the classifier is reading, and copying it back would load a
+        # pinned runbook (auto-paired with its foundation, no less) on a turn the
+        # server never pinned it for. The projection the prompt was built from is
+        # the authority on what may come back out of it.
+        if not sid or sid in seen or sid not in catalog.selectable_ids:
             continue
         seen.add(sid)
         clean.append(sid)
@@ -543,7 +553,15 @@ class Selector:
         # whenever it does, so the upstream can only match a shared content prefix —
         # which an inline "(currently active)" marker on an early-sorting skill
         # used to break for most of the prompt on every turn.
-        system = self._render_system(catalog, catalog.filter_known(active_ids))
+        # The active-set line names only SELECTABLE skills. A server-pinned skill
+        # (config.DOCS_SKILL_ID) is deliberately absent from the catalog menu, and
+        # naming it here would put the prompt in contradiction with itself: step 3
+        # says re-list an active id or it is EVICTED, while the closing checklist
+        # says never invent an id and choose only from the catalog below. The
+        # classifier would be instructed to name something it is forbidden to name.
+        # Its loading does not depend on the answer anyway — the server re-pins it
+        # whenever the turn still has a docs query.
+        system = self._render_system(catalog, catalog.selectable(active_ids))
         current, history, history_truncated = split_selector_evidence(conversation)
         user = build_selector_user_message(
             current,

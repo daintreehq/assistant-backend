@@ -16,6 +16,10 @@ The three rules worth knowing before editing:
   turn late. Front-loading is deterministic here, not left to the classifier.
 * **Reuse never re-pairs.** A prior set already carries its foundation, so a
   continuation round can never surprise the user with a new load.
+* **A PINNED skill is admitted first, on both paths, unpaired.** It carries a need
+  the server has already established rather than one the classifier inferred — the
+  documentation runbook when the turn produced a ``docs_query``. It costs one slot
+  and the rest of the set fills what remains.
 
 ``merge_active_skills`` stays ADDITIVE and is for the explicit ``/skills/resolve``
 ``load`` path only — never for ordinary selection.
@@ -183,6 +187,7 @@ def resolve_active_skills(
     prior_active_ids: list[str],
     catalog: Catalog,
     max_active: int,
+    pinned_id: str | None = None,
 ) -> ActiveSkillSet:
     """Per-turn active set from a selection decision (section 7.9).
 
@@ -200,20 +205,66 @@ def resolve_active_skills(
     The reuse/degraded path is left untouched: a prior set resolved on a successful run
     already carries its foundation, so a continuation round never surfaces a surprise
     foundation load.
+
+    ``pinned_id`` is a skill the SERVER has decided the turn needs, admitted unpaired
+    into whatever slot the selection leaves — see the comment below the admission for
+    why it goes last rather than first.
     """
     # Authority, not merely "did a call happen". A successful selector run is
     # authoritative; so is the no-task fast path, which reaches the same answer
     # without a call. Deriving authority from `ran` alone silently turned the
     # fast path's empty result into a REUSE of the prior set — the opposite of
     # the clear it advertised.
-    if (decision.ran or decision.authoritative) and not decision.degraded:
+    authoritative = (decision.ran or decision.authoritative) and not decision.degraded
+    candidates = [s for s in (decision.skill_ids if authoritative else prior_active_ids)
+                  if s != pinned_id]
+
+    if authoritative:
         # authoritative — replaces the prior set, admitted as foundation-paired units
-        active, dropped = _admit_with_domain_foundations(
-            decision.skill_ids, catalog, max_active
-        )
+        active, dropped = _admit_with_domain_foundations(candidates, catalog, max_active)
     else:
         # reuse (no run) / fail-open (degraded) — verbatim, never re-paired
-        active, dropped = filter_dedup_cap(prior_active_ids, catalog, max_active)
+        active, dropped = filter_dedup_cap(candidates, catalog, max_active)
+
+    # The PIN — a skill whose need the SERVER already knows about, loaded without
+    # asking the classifier to notice. Same argument as foundation pairing, one step
+    # earlier: when the selector returns a `docs_query`, the turn IS a documentation
+    # question by the classifier's own answer, so routing the matching runbook
+    # through a second judgement it might get wrong is a coin flip over a fact
+    # already in hand.
+    #
+    # It takes the LEFTOVER slot, and takes the whole set only when there is no work
+    # to leave room for. Priority-0 (pin first, budget for the rest) reads more
+    # faithful to "always load it" and is worse in every direction the cap is tight:
+    # `max_active` is configurable and 2 is legal, where reserving a slot leaves one
+    # — too few for a specific+foundation pair. The same turn would then resolve to
+    # docs-only on a successful selector run and docs-plus-ORPHANED-specific on a
+    # degraded one (the reuse path truncates verbatim, so it is the foundation that
+    # falls off), making the coherence of the active set depend on whether a
+    # classifier call happened to succeed. It would also evict an in-progress runbook
+    # mid-workflow, which is precisely what the reuse path exists to prevent.
+    #
+    # Going last costs nothing where it matters. The case the pin exists for — the
+    # standalone usage question, where the classifier correctly selects nothing — has
+    # an empty remainder at every cap. The mid-workflow case fits at the shipped cap
+    # of 3 (one specific + its foundation + the pin). Only a SATURATED set displaces
+    # it, and there the base prompt still carries the citation rules the runbook
+    # elaborates, so the turn degrades to the behaviour that shipped before the pin
+    # existed rather than losing its workflow.
+    #
+    # Deliberately admitted WITHOUT foundation pairing. Pairing walks up the dotted
+    # namespace, so `daintree.docs.*` would drag `daintree.foundation` in behind it
+    # and cost two slots — and the foundation is live-state judgement a documentation
+    # answer does not use. A standalone usage question should load one runbook, not
+    # two.
+    if pinned_id is not None and pinned_id in catalog:
+        if len(active) < max_active:
+            active = active + [pinned_id]
+        else:
+            # Recorded, not silent. A displaced pin is the one case where the turn
+            # quietly reverts to pre-pin behaviour, and `dropped_over_cap` is where
+            # the rest of the system already looks to see what the cap cost it.
+            dropped = [*dropped, pinned_id]
     newly = [sid for sid in active if sid not in prior_active_ids]
     return ActiveSkillSet(active=active, newly_loaded=newly, dropped_over_cap=dropped)
 

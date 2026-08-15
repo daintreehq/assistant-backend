@@ -40,8 +40,6 @@ from ..contracts.extensions import (
 # current client sends it.
 DOCS_SEARCH_WIRE_NAME = "docs__search"
 DOCS_SEARCH_DISPLAY_NAME = "docs.search"
-
-
 @dataclass(frozen=True)
 class DocsSearchExecution:
     """One server-side documentation search, as the CLI renders it."""

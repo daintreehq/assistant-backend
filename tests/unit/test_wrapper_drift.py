@@ -36,12 +36,6 @@ DISCOVERY_GO = REPO_ROOT / "cli" / "internal" / "tools" / "mcpx" / "discovery.go
 REVIEWED_WARNINGS: set[tuple[str, str]] = set()
 
 
-# Entries that must survive any parse, spanning the block from first to last. A
-# truncated parse silently drops actions from the END, and each dropped action is
-# one whose check quietly stops running — the failure mode this whole file exists
-# to prevent, one level up. Anchors at both ends catch a truncation anywhere.
-_DENYLIST_ANCHORS = ("agent.launch", "terminal.sendCommand", "forge.getCIStatus")
-
 
 def _go_map_body(source: str, decl: str) -> str:
     """The body of a Go map literal, found by BRACE BALANCE, not by a regex.

@@ -378,13 +378,20 @@ def test_selector_prompt_renders_real_catalog(loader: PromptLoader) -> None:
     # a fixture catalog above.
     catalog = load_catalog()
     assert catalog.skills, "real catalog is empty"
+    metadata = catalog.selector_metadata()
     rendered = loader.render(
         "selector/system.md.j2",
-        catalog=catalog.selector_metadata(),
+        catalog=metadata,
         active_ids=[],
         max_active=3,
     )
-    for skill in catalog.skills:
+    # Every SELECTABLE skill. `selector_metadata` omits the server-pinned
+    # documentation runbook (config.DOCS_SKILL_ID) — it is loaded off the turn's
+    # docs_query rather than chosen, so its absence from the classifier's menu is
+    # the intent, not a rendering bug.
+    selectable = {m["id"] for m in metadata}
+    assert selectable, "the selector sees no skills at all"
+    for skill in [s for s in catalog.skills if s.id in selectable]:
         # exact list-item line, plus the trigger text — catches the template
         # dropping a field, not just an id substring coincidence.
         assert f"- id: {skill.id}" in rendered

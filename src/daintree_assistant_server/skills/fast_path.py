@@ -36,6 +36,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
+from ..config import DOCS_SKILL_ID
 from ..contracts.daintree_api import RespondRequest
 from ..contracts.openai import ChatMessage
 from ..text_utils import message_text
@@ -167,11 +168,19 @@ def can_skip_selection(request: RespondRequest, *, prior_active_ids: list[str]) 
       watchers.
 
     What survives is the case actually worth optimising — the cold opening turn
-    of a session, where there is nothing to clear and nothing in flight.
+    of a session, where there is nothing to clear and nothing in flight...
+
+    ...and the turn AFTER a standalone documentation answer, which is the same
+    situation wearing an active set. The server pins the docs runbook for the turn
+    it retrieved pages for; it is not a workflow and nothing about it is in
+    progress, so "thanks" landing on top of it should not buy a selector call to
+    conclude what this function already knows. It is excluded from the evidence,
+    not from the clear — the fast path still resolves to an empty set, which is
+    exactly right, since the next instruction gets its own docs decision.
     """
     if request.selection.force or request.selection.policy == "always":
         return False
-    if prior_active_ids:
+    if [sid for sid in prior_active_ids if sid != DOCS_SKILL_ID]:
         return False
 
     turn = request.turn
