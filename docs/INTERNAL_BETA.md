@@ -37,7 +37,7 @@ is not a description of today's build, so every line carries a status:
 | 8 | **The backend is stateless across instances**, apart from process-local caches; skill state travels in a signed, opaque token. | ✅ `state/codec.py` |
 | 9 | **Skill learning is off in staging and production** — an enabled mode fails `/readyz`. | ✅ `Settings.local_only_problems` |
 | 10 | **Tester prompt and tool content is never logged.** | ✅ with one exception — see §5 |
-| 11 | **The tester can verify their key before the first model call.** | ⏳ endpoint exists and now reports `usable` separately from `valid`; the CLI does not yet call it during login |
+| 11 | **The tester can verify their key before the first model call.** | ✅ `/auth/verify` reports `usable` and a stable `reason` separately from `valid`, and `App.SignIn` calls it against a throwaway client BEFORE persisting, so a key the provider REJECTS never reaches disk. An inconclusive probe (provider unreachable) persists with a warning — deliberately: that is not evidence about the key |
 | 12 | **Failures identify their owner**: Daintree, OpenRouter, account credits, key permissions, rate limiting, provider routing, or malformed input. | ✅ distinct codes — see [`DAINTREE_API.md`](DAINTREE_API.md#errors) |
 | 13 | **A release can be rolled back** to the immediately previous Cloud Run revision. | ⏳ the previous revision is retained, but rollback is manual `gcloud` work with no script and no drill |
 
@@ -70,8 +70,10 @@ maximum instance count — that is platform capacity, not Daintree policy, and i
 is not per-caller.)
 
 That is a decision, not an oversight. Model spend is caller-funded and therefore
-self-limiting; the only resource a bad actor can consume is Cloud Run CPU on a URL
-that is not advertised. Revisit it if — and only if — the beta produces evidence
+self-limiting, and the URL is not advertised. Be accurate about what is still
+consumable, though: not just CPU but memory (the outer middleware buffers a whole
+body — up to 8 MiB — before authentication runs), concurrency slots, connections,
+log volume, and therefore availability for real testers. Revisit it if — and only if — the beta produces evidence
 of abuse or capacity starvation. Anything built then belongs at the edge (Cloud
 Armor, an allowlist) before it belongs in application code.
 
@@ -86,8 +88,12 @@ Onboarding must state all of this, plainly, before the tester hands over a key:
   **Zero data retention is not enforced** <!-- privacy-copy-ok -->  — see
   [`PROVIDER_POLICY.md` §4](PROVIDER_POLICY.md#4-privacy--what-is-and-is-not-promised).
   Never say "does not store". <!-- privacy-copy-ok -->
-- Where the CLI stores the key (`~/.daintree/credentials.json`, mode `0600` in a
-  mode `0700` directory) and how to remove or rotate it.
+- Where the CLI stores the key — by default
+  `~/.daintree/assistant-cli/credentials.json`, per-user so one login serves every
+  project, moved by an explicit `DAINTREE_ASSISTANT_STATE_DIR`. The file is `0600`;
+  the directory is `0700` **when the CLI creates it**, and a pre-existing root
+  keeps whatever mode it had (`doctor` reports the file's mode, not that one). And
+  how to remove or rotate it.
 - That Daintree logs **metadata but not prompt or tool content**, with one
   exception: when OpenRouter rejects a request, a bounded excerpt of *its* error
   body is logged and may appear in the error message, and a provider is free to

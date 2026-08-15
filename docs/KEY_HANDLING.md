@@ -88,55 +88,99 @@ question, not a request failure.
 | Field | When | Meaning |
 |---|---|---|
 | `valid` | always | the provider recognised the key |
-| `detail` | always | human-readable verdict |
+| `usable` | always | the key is **not known to be exhausted** — see the caveat below |
+| `reason` | always | the stable machine-readable outcome: `ok`, `provider_rejected`, `credits_exhausted` |
+| `detail` | always | human-readable verdict — prose, never branch on it |
 | `label` | when the provider reports one | a safe echo so the user can confirm they pasted the key they meant to. Dropped entirely if it contains the bearer — some providers default a key's label to the key itself |
 | `limit`, `usage`, `limit_remaining` | when numeric | lets the client warn about an exhausted key, which otherwise reads as a broken sign-in |
 | `is_free_tier` | when boolean | |
 
-Failure to *reach* the provider propagates as the usual upstream envelope (502
-`upstream_error`, or 504 `upstream_timeout`) — then we genuinely do not know, and
-must not imply a verdict.
+`valid` and `usable` answer **different questions**, and collapsing them was the
+bug the split exists to fix: a recognised key with a spent balance is `valid:
+true, usable: false, reason: "credits_exhausted"`, and a client reading only
+`valid` shows a successful sign-in and then fails on the first real request with
+what looks like an unrelated error.
 
-**Not yet implemented:** a `usable` field distinct from `valid`. A valid key with
-an exhausted balance is a different problem with a different fix, and today the
-client has to infer that from `limit_remaining`. Tracked as part of the error
-taxonomy work; until it lands, do not describe `usable` as available.
+**`usable: true` is not a promise that a turn can be funded.** It is the weaker,
+honest claim that nothing we can see says otherwise: usability is judged
+conservatively, and only a *positively reported* zero-or-negative
+`limit_remaining` counts as exhausted. A provider that reports no limit at all —
+unlimited, pay-as-you-go, or simply silent — yields `usable: true` on no evidence.
+Stating it the other way round would make the field a guarantee it cannot keep,
+and a sign-in that promised funding and then failed is exactly the confusion the
+split exists to prevent.
+
+A client must decode `usable` as **optional**, not as a plain boolean: a backend
+predating the field omits it entirely, and a plain `bool` decodes that absence as
+`false` — declaring every key on every older deployment unusable. Absent means
+"not reported", and the fallback is `limit_remaining`. (The pinned CLI does not
+decode `usable` or `reason` yet; it branches on `valid` and then `limit_remaining`,
+which reaches the same verdict for the exhausted case by its own arithmetic.)
+
+Failure to *reach* the provider propagates as the usual upstream envelope — 503
+`upstream_unavailable` for an unreachable provider, 504 `upstream_timeout` for a
+probe that ran out of time, 502 `upstream_protocol_error` for a 200 whose body is
+not a key record. Then we genuinely do not know, and must not imply a verdict.
 
 ## 5. Client-side storage (the CLI)
 
 Owned by the CLI repository; recorded here because it is part of the same
 lifecycle.
 
-- Global `~/.daintree/credentials.json`, written atomically as mode `0600`. The
-  parent directory is created as `0700` **when it is absent**; an existing
-  directory's mode is not currently corrected, so a pre-existing world-readable
-  `~/.daintree` stays that way.
-- **Endpoint pairing is fail-closed**: a key persisted against one backend
-  endpoint is never sent to an environment-overridden URL. A custom endpoint gets
-  no credential rather than the production-paired one.
+- `~/.daintree/assistant-cli/credentials.json`, written atomically as mode `0600`.
+  The sign-in is **per-user, not per-project**: it lives at the CLI's state root
+  rather than in the per-project subdirectory, so one login serves every project.
+  (An explicit `DAINTREE_ASSISTANT_STATE_DIR` override moves it, which is how
+  tests and benchmarks avoid reading or clobbering the real sign-in.)
+- The parent directory is created `0700` — but `MkdirAll`'s mode applies only to
+  directories it **creates**, so a pre-existing state root (an older build, an
+  installer, a restored backup, a permissive umask) keeps whatever mode it already
+  had. The `0700` is a promise about new installs.
+- What closes that gap today is detection, not repair, and only for the FILE:
+  `doctor` re-checks the credential file's own mode and **fails** — not warns — on
+  anything wider than `0600`, because the CLI writes it `0600` by construction, so
+  a wider mode means something else set it and the file spends the user's money.
+  Its containing directory is not covered: doctor's directory check runs against
+  the resolved state dir, which under the normal project-scoped configuration is
+  the per-project subdirectory, while the sign-in lives in the parent root.
+- **The stored key is NOT bound to the stored endpoint.** `DAINTREE_BACKEND_URL`
+  resolves ahead of the persisted URL while the persisted key still applies, so a
+  process-level override sends the caller's own provider credential to whatever
+  host it names. That is deliberate — the key is valid against a local backend as
+  well as the deployed one, and binding it would break the sign-in-once dev loop —
+  but it is a fail-OPEN default and must be described as one. What the pairing
+  does protect against is a *bound project's* `.env`: neither the key nor the URL
+  is read from untrusted project configuration.
 - For this internal beta, a `0600` file is acceptable **provided it is
   disclosed**. Native OS keychain storage is a worthwhile later enhancement,
   especially because this key carries spend authority.
 
-### Required lifecycle — ⏳ a release gate, not current behaviour
+### Required lifecycle
 
-Today the CLI accepts a pasted token and persists it immediately: it has no caller
-of `/v1/daintree/auth/verify`, no post-verification smoke, and no credential-clear
-path. Everything below is what must be true before testers are invited, tracked in
-the CLI repository. Do not describe it in the present tense anywhere.
+What must be true before testers are invited. Implemented in the CLI repository.
 
-1. On first launch, state plainly that the key is an **OpenRouter** key and that
-   OpenRouter bills it.
-2. Normalise and display the target backend endpoint *before* asking for the key.
-3. **Verify the key before persisting it.** Login must not silently persist a
-   rejected key.
-4. Show the safe label and remaining limit when the provider reports them.
-5. Run a tiny streaming smoke after verification.
-6. Persist only after both checks pass — unless the tester explicitly chooses an
-   offline/custom-endpoint setup.
-7. Provide a clear/logout path that removes the key completely.
-8. Provide rotation instructions.
-9. No debug, audit, crash or doctor output may contain the raw key.
+Statuses are `✅` done, `◐` partly, `⏳` not yet. They describe the **`cli/`
+submodule at its current pin**, not the CLI's `develop` tip: the pin does not
+float, so it trails, and a row that has landed upstream but not here stays ⏳ until
+the pin moves.
+
+`tests/unit/test_docs_drift.py` pins the rows whose evidence is a symbol in the
+vendored source. Two limits worth knowing: symbol presence cannot establish
+semantics (so the one ordering that matters — verify before persist — is checked
+positionally instead), and CI does not fetch the submodule, so those checks are a
+LOCAL gate that skips in CI rather than a green-build guarantee.
+
+| | Requirement | Status |
+|---|---|---|
+| 1 | On first launch, state plainly that the key is an **OpenRouter** key and that OpenRouter bills it. | ⏳ the pinned `login.go` prompts for "API key" without naming the provider or who is billed; landed upstream, arrives here when the pin moves |
+| 2 | Normalise and display the target backend endpoint *before* asking for the key. | ⏳ the pinned `promptEndpoint` normalises and returns, and the key prompt follows without echoing the resolved value — so what was typed is not necessarily the host the key is about to reach |
+| 3 | **Verify the key before persisting it.** Login must not silently persist a rejected key. | ✅ `App.SignIn` runs `backend.CheckSignIn` against a THROWAWAY client, then persists, then swaps the live client |
+| 4 | Show the safe label and remaining limit when the provider reports them. | ◐ the startup login path does, on the no-warning branch; the in-session `App.SignIn` discards the verification object and shows only a generic warning |
+| 5 | Run a tiny streaming smoke after verification. | ⏳ verification is a tokenless key probe, so it proves the credential without proving a turn can stream |
+| 6 | Persist only after the checks pass — unless the tester explicitly chooses an offline/custom-endpoint setup. | ◐ a DEFINITE rejection is not persisted; an INCONCLUSIVE verification (provider unreachable, or a backend not serving the route on loopback) persists with a warning, deliberately — neither is evidence about the key, and refusing would leave no way to configure the CLI |
+| 7 | Provide a clear/logout path that removes the stored key. | ✅ `logout` deletes the file and names the path it removed. Note it cannot clear a key supplied through `DAINTREE_API_KEY`, which keeps applying |
+| 8 | Provide rotation instructions. | ⏳ §6 below is the content; nothing surfaces it in the CLI |
+| 9 | No debug, audit, crash or doctor output may contain the raw key. | ✅ `redact.RegisterSecret` is called on the new key before it is persisted. Note it is registered *after* the verification call that first uses it, so redaction covers storage and every later use, not the probe |
 
 ## 6. Rotation
 

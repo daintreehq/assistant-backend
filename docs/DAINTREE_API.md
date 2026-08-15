@@ -71,16 +71,21 @@ bearer header like every other authed route.
 this split exists to fix:
 
 - `valid` — the provider recognises this credential.
-- `usable` — it recognises it *and* the account can actually fund a turn.
+- `usable` — it recognises it *and* nothing we can see says the account is spent.
 
 A recognised key with a spent balance is `valid: true, usable: false,
 reason: "credits_exhausted"`. A client reading only `valid` would show a successful
 sign-in, then fail on the first real request with what looks like an unrelated error.
 
+`usable: true` is deliberately the weaker claim — **not** a promise that a turn can
+be funded. Usability is judged conservatively: only a *positively reported*
+zero-or-negative `limit_remaining` counts as exhausted, so an unlimited or
+pay-as-you-go key, which reports no limit at all, is `usable: true` on no evidence
+either way. Rendering it as a funding guarantee would make it one the field cannot
+keep.
+
 `reason` is the stable machine-readable outcome — branch on it, not on `detail`:
-`ok`, `provider_rejected`, `credits_exhausted`. Usability is judged conservatively:
-only a *positively reported* zero-or-negative `limit_remaining` counts as exhausted,
-so an unlimited or pay-as-you-go key (which reports no limit at all) stays usable.
+`ok`, `provider_rejected`, `credits_exhausted`.
 
 `label`, `limit`, `usage`, `limit_remaining` and `is_free_tier` are optional: each is
 echoed only when the provider supplies it with the expected type. `label` is
@@ -502,7 +507,7 @@ cover degraded lifecycle paths without logging request content.
 
 The DeepSeek chat template serializes the prompt as **[all system messages, in
 array order] → [tools] → [non-system conversation]** — a system message anywhere in the array
-lands in the leading system region, before the ~18k-token tool schemas
+lands in the leading system region, before the ~21k-token tool schemas
 (measured 2026-07-08: volatile system-role runtime context after the
 conversation cut byte-identical turns to a 36% cache hit; 99% after this
 layout). The rule: **only stable content may be system-role**; per-request

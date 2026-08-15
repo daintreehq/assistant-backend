@@ -19,7 +19,7 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
   `new_session`, the fraction
   of the `[system messages] + [tools]` region that stays a byte prefix of the next
   turn's. Target is **1.0** for the three continuity transitions (the layout's core
-  promise — the ~18k-token tool region is fully reused); a topic-shift is an
+  promise — the ~21k-token tool region is fully reused); a topic-shift is an
   **expected** drop (only base+integrations stay stable) and is reported, not
   failed. Computed over the exact httpx wire bytes — the suite asserts its compact
   encoder equals `httpx`'s (`wire_encoder_matches_httpx`), so it can never measure
@@ -50,19 +50,28 @@ invariants the suite enforces; the size rows are descriptive. Re-run
 `python -m benchmarks.prompt_cost.bench run` and refresh this table rather than
 reasoning from a stale figure.
 
-Measured **2026-07-28**, `deepseek-v4-flash`, **16-skill catalog**
-(`catalog_revision sha256:4b56003…`), **85-tool** CLI projection:
+> **These are a dated snapshot, not a live reading.** Hand-copied numbers decay
+> silently — this table claimed a 16-skill catalog and a 20.3 KB selector prompt
+> (against a real 43 KB one)
+> for long enough that a reviewer quoted it back as current. Regenerate with
+> `python -m benchmarks.prompt_cost.bench run` (free, no key) and update the date
+> when you do. The two figures a change is most likely to move — selector prompt
+> bytes and catalog size — are separately gated by `benchmarks/baseline.json`
+> with declared movement bands, which is the mechanism that actually catches
+> drift; this table is for reading, not for gating.
+
+Measured 2026-08-15, 31 skills / 79 tools (sizes are KiB):
 
 | metric | value |
 |---|---|
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
-| system+tools stable — topic-shift (expected drop) | 0.2718 |
+| system+tools stable — topic-shift (expected drop) | 0.2482 |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~122 KB, ~30.3k proxy tok |
-| tool schemas share of request | ~76.7 KB, **63.0%**, ~19.1k tok |
-| base prompt | ~28.8 KB, 23.6%, ~7.1k tok |
-| loaded skills (2 active) | ~11.9 KB, 9.8%, ~2.9k tok |
-| selector prompt | ~20.3 KB, ~5040 tok / 16 skills (~770 B per skill) |
+| total request | ~124.9 KB, ~32.0k proxy tok |
+| tool schemas share of request | ~81.6 KB, **65.3%**, ~20.9k tok |
+| base prompt | ~26.9 KB, 21.6%, ~6.9k tok |
+| loaded skills (2 active) | ~11.6 KB, 9.3%, ~3.0k tok |
+| selector prompt | ~43.1 KB, ~11.0k tok / 31 skills (~1.4 KB per skill) |
 | state token | 389–492 B (0–3 skills; 16 KiB cap) |
 
 Live rows below are **older and not re-measured here** (they cost money); treat

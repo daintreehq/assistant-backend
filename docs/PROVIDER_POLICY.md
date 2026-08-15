@@ -324,7 +324,7 @@ resumed watcher. `tests/unit/test_no_task_fast_path.py` replays the whole
 selector benchmark corpus and fails on any case that declares a required skill.
 
 **Not shipped: candidate shortlisting.** Sending 6–10 lexically-retrieved
-candidates instead of all 26 skills would cut the ~8,900-token selector prompt
+candidates instead of all 31 skills would cut the ~11k-token selector prompt
 substantially. It is not implemented because the saving is not obviously a win:
 
 > The catalog block is deliberately request-INVARIANT (`Catalog.selector_metadata`)

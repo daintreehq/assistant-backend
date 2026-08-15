@@ -839,3 +839,319 @@ def test_the_documented_total_is_a_sum_of_both_calls() -> None:
     assert cost.total == pytest.approx(0.0025)
     assert cost.main == 0.0021
     assert cost.selector == 0.0004
+
+
+# ---------------------------------------------------------------------------
+# Key verification: the contract the CLI branches on.
+#
+# `KEY_HANDLING.md` claimed for several releases that `usable` was "not yet
+# implemented" and told readers not to describe it as available — while the
+# endpoint had been returning it, and the CLI had been branching on it. That is
+# the most dangerous shape of stale doc: not vague, but confidently wrong about
+# the field a client uses to decide whether a sign-in succeeded.
+# ---------------------------------------------------------------------------
+
+
+def _verify_response_fields() -> set[str]:
+    """The keys `/auth/verify` can return, read out of the route's own source."""
+    from daintree_assistant_server.api import daintree_auth
+
+    source = inspect.getsource(daintree_auth)
+    # Both the literal dict returned on rejection and the `out[...] = ` assignments.
+    return set(re.findall(r'out\["(\w+)"\]', source)) | set(
+        re.findall(r'"(\w+)":\s*(?:False|True|REASON_|_REASON_)', source)
+    )
+
+
+@pytest.mark.parametrize("field", ["valid", "usable", "reason"])
+def test_key_handling_documents_every_verification_verdict_field(field: str) -> None:
+    """Each verdict field the endpoint returns must appear in the doc that claims
+    to be authoritative for the credential lifecycle."""
+    assert field in _verify_response_fields(), (
+        f"/auth/verify no longer returns {field!r}; update docs/KEY_HANDLING.md §4"
+    )
+    assert f"`{field}`" in _read(DOC_KEYS), (
+        f"docs/KEY_HANDLING.md does not document the `{field}` field that "
+        f"/auth/verify returns and the CLI branches on"
+    )
+
+
+def test_no_document_says_usable_is_unimplemented() -> None:
+    """The specific stale sentence, kept as a named regression.
+
+    It read: "Not yet implemented: a `usable` field distinct from `valid` ...
+    until it lands, do not describe `usable` as available."
+    """
+    stale = re.compile(r"(not yet implemented|not implemented)[^.\n]{0,60}`?usable`?", re.I)
+    for path in PROSE_FILES:
+        assert not stale.search(_read(path)), (
+            f"{path.relative_to(REPO_ROOT)} still says `usable` is unimplemented — "
+            "/auth/verify returns it and the CLI branches on it"
+        )
+
+
+def _stable_reason_codes() -> dict[str, str]:
+    """Every `REASON_*` the route defines, discovered rather than listed.
+
+    Hardcoding the three current codes would mean a FOURTH one — the case where
+    a client most needs telling — is added to the route and silently absent from
+    the documentation, with this test still green.
+    """
+    from daintree_assistant_server.api import daintree_auth
+
+    return {
+        name: value
+        for name, value in vars(daintree_auth).items()
+        if name.startswith("REASON_") and isinstance(value, str)
+    }
+
+
+def test_the_route_still_defines_reason_codes() -> None:
+    """Guards the discovery above: a rename to `_REASON_*` or a move to an enum
+    would empty the mapping and make the parametrised test below vacuous."""
+    codes = _stable_reason_codes()
+    assert len(codes) >= 3, f"expected the REASON_* outcome codes, found {codes}"
+    assert "ok" in codes.values()
+
+
+@pytest.mark.parametrize("constant", sorted(_stable_reason_codes()))
+def test_key_handling_lists_every_stable_reason_code(constant: str) -> None:
+    """`reason` is the machine-readable outcome a client maps to user-facing copy.
+    A code the route can return and the doc does not list is a code no client
+    knows to handle."""
+    reason = _stable_reason_codes()[constant]
+    assert f"`{reason}`" in _read(DOC_KEYS), (
+        f"docs/KEY_HANDLING.md does not list the `{reason}` outcome code "
+        f"({constant}), which /auth/verify can return"
+    )
+
+
+# ---------------------------------------------------------------------------
+# The credential path, checked against the CLI that writes it.
+#
+# Both authoritative documents said `~/.daintree/credentials.json` while the CLI
+# had moved the sign-in to its per-user state root one level down. Telling a
+# tester the wrong path to a file holding a spend-authorizing key is a support
+# problem and a security one: "delete this to sign out" pointing at nothing.
+# ---------------------------------------------------------------------------
+
+CLI_ROOT = REPO_ROOT / "cli"
+
+
+def _require_cli_submodule() -> None:
+    """Skip when `cli/` is genuinely absent — and only then.
+
+    The submodule is pinned and CI does not fetch it, so these checks are a LOCAL
+    gate. That is a real limitation and docs/KEY_HANDLING.md says so rather than
+    claiming CI protection it does not have. What must NOT happen is a skip that
+    hides a parse failure: an unpopulated submodule and a Go-side rename would
+    otherwise look identical, and the second one is the case the gate exists for.
+    """
+    if not (CLI_ROOT / "internal").is_dir():
+        pytest.skip("cli/ submodule is not populated (git submodule update --init cli)")
+
+
+def _cli_credentials_path() -> str:
+    """The credential path the vendored CLI actually resolves.
+
+    Raises rather than returning None on a parse failure. Returning None and
+    skipping would turn any Go-side change this regex does not understand — a
+    switch to `path.Join`, a renamed constant, a computed filename — into a green
+    build, and the whole point is to notice when the CLI moves the file.
+    """
+    config = (CLI_ROOT / "internal" / "config" / "config.go").read_text(encoding="utf-8")
+    credentials = (
+        CLI_ROOT / "internal" / "credentials" / "credentials.go"
+    ).read_text(encoding="utf-8")
+    root = re.search(r'stateRootSubpath\s*=\s*filepath\.Join\(([^)]*)\)', config)
+    name = re.search(r'FileName\s*=\s*"([^"]+)"', credentials)
+    assert root, (
+        "cannot find `stateRootSubpath = filepath.Join(...)` in the vendored "
+        "config.go — the CLI changed how it resolves the state root, so the "
+        "credential path in docs/ can no longer be checked and may be wrong"
+    )
+    assert name, (
+        "cannot find `FileName = \"...\"` in the vendored credentials.go — the "
+        "CLI changed how it names the credential file"
+    )
+    parts = [p.strip().strip('"') for p in root.group(1).split(",")]
+    return "~/" + "/".join(parts) + "/" + name.group(1)
+
+
+@pytest.mark.parametrize("doc", [DOC_BETA, DOC_KEYS])
+def test_the_documented_credential_path_is_the_one_the_cli_writes(doc: Path) -> None:
+    _require_cli_submodule()
+    path = _cli_credentials_path()
+    assert path in _read(doc), (
+        f"{doc.relative_to(REPO_ROOT)} does not name {path}, which is where the "
+        f"CLI actually stores the sign-in. A tester told to delete the wrong file "
+        f"believes they have signed out."
+    )
+
+
+@pytest.mark.parametrize("doc", [DOC_BETA, DOC_KEYS])
+def test_no_document_names_the_old_credential_path(doc: Path) -> None:
+    """The pre-move path, which is a real directory that will simply contain no
+    credentials file — so the mistake reads as "already signed out"."""
+    text = _read(doc)
+    stale = re.compile(r"~/\.daintree/credentials\.json")
+    assert not stale.search(text), (
+        f"{doc.relative_to(REPO_ROOT)} names the pre-move credential path"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Benchmark prose vs the committed baseline.
+#
+# The benchmark READMEs carried hand-copied absolute numbers — "16 skills",
+# "~20.3 KB selector prompt" — long enough that a reviewer quoted them back as
+# current against a 31-skill catalog. Hand-copied metrics decay silently; this
+# pins the two that a reader is most likely to act on.
+# ---------------------------------------------------------------------------
+
+BASELINE = REPO_ROOT / "benchmarks" / "baseline.json"
+DOC_PROMPT_COST = REPO_ROOT / "benchmarks" / "prompt_cost" / "README.md"
+
+
+_SNAPSHOT_HEADER = re.compile(r"Measured\s+\*{0,2}(\d{4}-\d{2}-\d{2})\*{0,2},?\s+"
+                              r"[^\n]*?(\d+)[- ]skills?[^\n]*?(\d+)[- ]tools?", re.I)
+
+
+def test_the_prompt_cost_readme_declares_exactly_one_current_snapshot() -> None:
+    """Two "Measured …" headers above the history section means the file
+    contradicts itself, which is how the stale 16-skill table survived beside a
+    corrected one: a reader takes whichever they reach first."""
+    current = _read(DOC_PROMPT_COST).split("### Snapshot history", 1)[0]
+    headers = _SNAPSHOT_HEADER.findall(current)
+    assert len(headers) == 1, (
+        f"benchmarks/prompt_cost/README.md declares {len(headers)} current snapshots "
+        f"({[h[0] for h in headers]}). Dated HISTORY belongs under '### Snapshot "
+        f"history'; above it there must be exactly one."
+    )
+
+
+def test_the_prompt_cost_readme_snapshot_matches_the_live_catalog() -> None:
+    """The snapshot must describe the catalog that exists NOW.
+
+    Checked against the live catalog and tool fixture rather than
+    benchmarks/baseline.json: the baseline declares MOVEMENT BANDS, so the real
+    counts can drift inside them while the baseline and the prose stay stale
+    together — which is two documents agreeing with each other and neither with
+    the code.
+    """
+    from tools.baseline import capture
+
+    live = capture()
+    skills = live["catalog"]["skills"]
+    tools = live["tools"]["count"]
+    current = _read(DOC_PROMPT_COST).split("### Snapshot history", 1)[0]
+    header = _SNAPSHOT_HEADER.search(current)
+    assert header, (
+        "benchmarks/prompt_cost/README.md has no dated 'Measured <date>, N skills / "
+        "M tools' line — the snapshot cannot be checked for staleness without one"
+    )
+    assert (int(header.group(2)), int(header.group(3))) == (skills, tools), (
+        f"the prompt_cost README snapshot says {header.group(2)} skills / "
+        f"{header.group(3)} tools; the live catalog and tool fixture are "
+        f"{skills} / {tools}. Re-run `python -m benchmarks.prompt_cost.bench run` "
+        f"and refresh the table."
+    )
+
+
+def test_the_prompt_cost_readme_quotes_the_current_selector_size() -> None:
+    """The single number the original staleness got most wrong: it advertised a
+    ~20.3 KB selector prompt against a real 44 KB one, and a reader sizing a
+    change against that is out by a factor of two."""
+    from tools.baseline import capture
+
+    kb = capture()["prompt"]["selector_prompt_bytes"] / 1024
+    current = _read(DOC_PROMPT_COST).split("### Snapshot history", 1)[0]
+    quoted = re.search(r"selector prompt \|\s*~([\d.]+)\s*KB", current)
+    assert quoted, "the prompt_cost README snapshot no longer quotes a selector prompt size"
+    assert abs(float(quoted.group(1)) - kb) < 1.0, (
+        f"the prompt_cost README says the selector prompt is ~{quoted.group(1)} KB; "
+        f"it is {kb:.1f} KB"
+    )
+
+
+def test_the_benchmark_readme_ci_claim_matches_the_workflow() -> None:
+    """It said the suite "is not part of ... CI" while CI ran the deterministic
+    dashboard as a step. Both halves are asserted — the prose AND the workflow —
+    because pinning only the prose lets the CI step be deleted with the doc left
+    claiming it runs, which is the same lie the other way round.
+    """
+    workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "benchmarks.dashboard.bench" in workflow, (
+        "the deterministic dashboard is no longer a CI step, but benchmarks/README.md "
+        "tells contributors it is"
+    )
+    text = _read(REPO_ROOT / "benchmarks" / "README.md")
+    assert re.search(r"CI runs the\s+deterministic dashboard", text), (
+        "benchmarks/README.md no longer states that CI runs the deterministic "
+        "dashboard — check it has not reverted to claiming benchmarks are outside CI"
+    )
+
+
+# ---------------------------------------------------------------------------
+# The credential-lifecycle table, checked against the vendored CLI.
+#
+# That table is the reason this whole section exists: it read "the CLI accepts a
+# pasted token and persists it immediately: it has no caller of
+# /v1/daintree/auth/verify ... and no credential-clear path" while the CLI had
+# been doing all three for some time. A status table nobody checks becomes an
+# inventory of what USED to be missing.
+#
+# Each row is pinned to the symbol that implements it. These are necessarily
+# coarse — the presence of a call is not proof of its ordering — so the one
+# ordering that actually matters (verify BEFORE persist; a typo must never reach
+# disk) is checked positionally.
+# ---------------------------------------------------------------------------
+
+CLI_LIFECYCLE_EVIDENCE = {
+    "shows the resolved endpoint before asking for the key": (
+        CLI_ROOT / "internal" / "cli" / "login.go", "promptEndpoint",
+    ),
+    "verifies the key against the backend during sign-in": (
+        CLI_ROOT / "internal" / "app" / "signin.go", "backend.CheckSignIn",
+    ),
+    "removes the credential on logout": (
+        CLI_ROOT / "internal" / "cli" / "login.go", "credentials.Delete",
+    ),
+    "registers the new key as a redaction secret": (
+        CLI_ROOT / "internal" / "app" / "signin.go", "redact.RegisterSecret",
+    ),
+    "fails doctor on a credential file wider than 0600": (
+        CLI_ROOT / "internal" / "cli" / "doctorreport.go", "StatusFail",
+    ),
+}
+
+
+@pytest.mark.parametrize("behaviour", sorted(CLI_LIFECYCLE_EVIDENCE))
+def test_key_handling_only_claims_cli_behaviour_the_vendored_source_has(
+    behaviour: str,
+) -> None:
+    _require_cli_submodule()
+    path, symbol = CLI_LIFECYCLE_EVIDENCE[behaviour]
+    assert symbol in path.read_text(encoding="utf-8"), (
+        f"docs/KEY_HANDLING.md §5 claims the CLI {behaviour}, but {symbol} is gone "
+        f"from {path.relative_to(REPO_ROOT)}. Either the CLI regressed or the pin "
+        f"moved; the doc says ✅ either way, which is the failure this test exists for."
+    )
+
+
+def test_the_cli_verifies_the_key_before_it_reaches_disk() -> None:
+    """The ordering claim, which symbol presence alone cannot establish.
+
+    "Verify, then persist" is the whole value of row 3: a typo must never reach
+    disk. Both calls being present in the file would satisfy the coarse check
+    above even if they were the wrong way round.
+    """
+    _require_cli_submodule()
+    source = (CLI_ROOT / "internal" / "app" / "signin.go").read_text(encoding="utf-8")
+    verify = source.find("backend.CheckSignIn(")
+    persist = source.find("credentials.Save(")
+    assert verify != -1 and persist != -1, "sign-in no longer verifies or no longer persists"
+    assert verify < persist, (
+        "credentials.Save now runs before backend.CheckSignIn — a rejected key "
+        "would reach disk, which docs/KEY_HANDLING.md §5 row 3 says cannot happen"
+    )
