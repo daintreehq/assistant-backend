@@ -40,7 +40,10 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from daintree_assistant_server.skills.catalog import load_catalog
 
@@ -147,7 +150,8 @@ def test_the_name_fixture_is_exactly_the_projection_of_the_inventory() -> None:
         ).read_text(encoding="utf-8")
     )
     projected = sorted(t["function"]["name"] for t in inventory)
-    recorded = sorted(_known_tool_names())
+    raw = TOOL_NAMES_FIXTURE.read_text(encoding="utf-8")
+    recorded = [ln for ln in raw.splitlines() if ln.strip() and not ln.startswith("#")]
 
     only_names = sorted(set(recorded) - set(projected))
     only_inventory = sorted(set(projected) - set(recorded))
@@ -156,6 +160,19 @@ def test_the_name_fixture_is_exactly_the_projection_of_the_inventory() -> None:
         f"regenerated together.\n  in cli_tool_names.txt only: {only_names}\n"
         f"  in cli_tool_inventory.json only: {only_inventory}\n"
         "Recipe: benchmarks/_harness/fixtures/README.md."
+    )
+    # Compared as a LIST, not a set: set equality passes on a duplicated or
+    # unsorted file, and both are the shape a hand-edit produces. The file is
+    # meant to be the projection verbatim, so a reviewer can diff two captures
+    # and read the change rather than re-derive it.
+    assert recorded == projected, (
+        "cli_tool_names.txt holds the right names in the wrong form — it must be "
+        "the sorted projection with no duplicates. Regenerate it rather than "
+        "editing by hand."
+    )
+    assert raw.endswith("\n") and not raw.endswith("\n\n"), (
+        "cli_tool_names.txt must end with exactly one newline, so a refresh is an "
+        "additive diff rather than a whitespace change on the last name"
     )
 
 
@@ -172,4 +189,28 @@ def test_the_fixtures_record_which_cli_commit_they_came_from() -> None:
         "cli_tool_names.txt no longer records the cli/ commit it was captured "
         "at. Keep that line when regenerating — it is the only way to tell a "
         "current fixture from a stale one."
+    )
+    # ... and the recorded commit must be the one the submodule is pinned at.
+    # Accepting any hash made the line decorative: it recorded that SOMEBODY once
+    # captured against SOMETHING, which is exactly what it looked like after the
+    # pin moved and the header did not.
+    #
+    # Read from the INDEX (`ls-files -s`), not a populated checkout and not HEAD.
+    # The checkout is absent in CI, which never fetches the submodule. HEAD would
+    # be the PREVIOUS pin during the very commit that moves it — so a correct
+    # refresh would fail and the fix would be to weaken this test.
+    recorded = match.group(1)
+    ls = subprocess.run(
+        ["git", "ls-files", "-s", "cli"],
+        cwd=Path(__file__).resolve().parents[2],
+        capture_output=True, text=True, check=False,
+    )
+    if ls.returncode != 0 or not ls.stdout.strip():
+        pytest.skip("not a git checkout, or cli/ is not a submodule here")
+    pinned = ls.stdout.split()[1]
+    assert pinned.startswith(recorded), (
+        f"cli_tool_names.txt says it was captured at cli/ @ {recorded}, but the "
+        f"submodule is pinned at {pinned[:7]}. Either the pin moved without the "
+        f"fixtures being refreshed — which is how a skill ends up declaring a tool "
+        f"the CLI no longer has — or the header was not updated with them."
     )

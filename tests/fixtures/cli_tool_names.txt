@@ -3,7 +3,7 @@
 # Consumed by tests/unit/test_skill_catalog_hygiene.py to check that every skill's
 # requiredTools entry names a tool that actually exists. It is a SNAPSHOT on purpose:
 # CI does not fetch the cli/ submodule, so a test that read cli/ at runtime would
-# silently no-op there (or hard-fail). Snapshot taken against cli/ @ 1da2c71 (origin/develop).
+# silently no-op there (or hard-fail). Snapshot taken against cli/ @ 401f8a7 (origin/develop).
 #
 # Format: one wire name per line, sorted, "#" lines are comments. The registry maps
 # an internal dotted name to its OpenAI wire name by replacing EVERY "." with "__"
@@ -12,12 +12,10 @@
 # substitution before comparing.
 #
 # REGENERATION. This file is the name-only projection of the full-schema capture at
-# benchmarks/_harness/fixtures/cli_tool_inventory.json. Refresh that one first (its
-# recipe lives in benchmarks/_harness/fixtures/README.md: populate the pinned cli/
-# submodule with `git submodule update --init cli`, build a throwaway main.go inside
-# the module tree that registers every tool family with zero-value Deps and prints
-# `Registry.OpenAITools(nil)`, then delete the throwaway package), then regenerate
-# this file from it, keeping this header:
+# benchmarks/_harness/fixtures/cli_tool_inventory.json. Refresh that one FIRST — the
+# CLI ships a committed generator for it now (`go run ./cmd/tooldump`), and the full
+# recipe lives in benchmarks/_harness/fixtures/README.md. Then regenerate this file
+# from it, keeping this header and the commit line above in step with the pin:
 #
 #   python -c "import json;print('\n'.join(sorted(t['function']['name'] for t in json.load(open('benchmarks/_harness/fixtures/cli_tool_inventory.json')))))"
 #
@@ -39,9 +37,7 @@ copyTree__injectToTerminal
 daintree__call
 daintree__listTools
 daintree__status
-docs__getPage
-docs__getRelatedPages
-docs__search
+forge__getChecks
 forge__getIssue
 forge__getPR
 forge__listIssues

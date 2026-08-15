@@ -1107,7 +1107,20 @@ def test_the_benchmark_readme_ci_claim_matches_the_workflow() -> None:
 # disk) is checked positionally.
 # ---------------------------------------------------------------------------
 
+# Each entry is `row number -> (file, symbol)`. The row number matters: the test
+# reads the table row too, so a requirement whose CODE has landed while its STATUS
+# still says ⏳ fails. Without that, the map proved only that a symbol exists
+# somewhere in the CLI — which is true of a row nobody updated.
 CLI_LIFECYCLE_EVIDENCE = {
+    "states the key is an OpenRouter key that OpenRouter bills": (
+        CLI_ROOT / "internal" / "cli" / "login.go", "KeyPurposeNotice",
+    ),
+    "repairs a group- or world-readable credential directory on save": (
+        CLI_ROOT / "internal" / "credentials" / "credentials.go", "tightenDirMode(dir)",
+    ),
+    "decodes `usable` as an optional field, not a plain bool": (
+        CLI_ROOT / "internal" / "backend" / "client.go", "Usable *bool",
+    ),
     "shows the resolved endpoint before asking for the key": (
         CLI_ROOT / "internal" / "cli" / "login.go", "promptEndpoint",
     ),
@@ -1125,6 +1138,18 @@ CLI_LIFECYCLE_EVIDENCE = {
     ),
 }
 
+# Row number -> the symbol whose PRESENCE means that row can no longer be ⏳.
+# Chosen to appear only once the behaviour exists, not merely once the function
+# does: `promptEndpoint` predates the endpoint actually being displayed, so row 2
+# keys on the restatement itself.
+CLI_LIFECYCLE_ROWS: dict[int, tuple[Path, str]] = {
+    1: (CLI_ROOT / "internal" / "cli" / "login.go", "KeyPurposeNotice"),
+    2: (CLI_ROOT / "internal" / "cli" / "login.go", "Signing in to"),
+    3: (CLI_ROOT / "internal" / "app" / "signin.go", "backend.CheckSignIn"),
+    7: (CLI_ROOT / "internal" / "cli" / "login.go", "credentials.Delete"),
+    9: (CLI_ROOT / "internal" / "app" / "signin.go", "redact.RegisterSecret"),
+}
+
 
 @pytest.mark.parametrize("behaviour", sorted(CLI_LIFECYCLE_EVIDENCE))
 def test_key_handling_only_claims_cli_behaviour_the_vendored_source_has(
@@ -1136,6 +1161,41 @@ def test_key_handling_only_claims_cli_behaviour_the_vendored_source_has(
         f"docs/KEY_HANDLING.md §5 claims the CLI {behaviour}, but {symbol} is gone "
         f"from {path.relative_to(REPO_ROOT)}. Either the CLI regressed or the pin "
         f"moved; the doc says ✅ either way, which is the failure this test exists for."
+    )
+
+
+def _lifecycle_rows() -> dict[int, str]:
+    """The §5 lifecycle table, as `row number -> status cell`."""
+    section = _read(DOC_KEYS).split("### Required lifecycle", 1)[-1]
+    rows: dict[int, str] = {}
+    for line in section.splitlines():
+        cells = [c.strip() for c in line.split("|")]
+        if len(cells) >= 4 and cells[1].isdigit():
+            rows[int(cells[1])] = cells[3]
+    return rows
+
+
+@pytest.mark.parametrize("row", sorted(CLI_LIFECYCLE_ROWS))
+def test_a_lifecycle_row_whose_code_has_landed_is_not_still_marked_pending(
+    row: int,
+) -> None:
+    """The other direction, and the one that actually bit.
+
+    Checking only that a claimed ✅ has its symbol catches a REGRESSION. It does
+    nothing about the opposite drift: the pin moves, the behaviour arrives, and the
+    row still says ⏳ because nobody looked. That is how a status table turns into
+    an inventory of what used to be missing — the failure this section was rewritten
+    to fix in the first place.
+    """
+    _require_cli_submodule()
+    path, symbol = CLI_LIFECYCLE_ROWS[row]
+    if symbol not in path.read_text(encoding="utf-8"):
+        pytest.skip(f"row {row}'s implementation is genuinely absent from the pin")
+    status = _lifecycle_rows().get(row)
+    assert status is not None, f"docs/KEY_HANDLING.md §5 has no row {row}"
+    assert "⏳" not in status, (
+        f"docs/KEY_HANDLING.md §5 row {row} is still ⏳, but {symbol} is present in "
+        f"{path.relative_to(REPO_ROOT)} — the pin moved and the status did not"
     )
 
 

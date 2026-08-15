@@ -9,6 +9,7 @@ requiredTools:
   - worktree.getCurrent
   - git.getProjectPulse
   - forge.getPR
+  - forge.getChecks
   - daintree.call
   - agentTask.spawnForEdits
   - terminal.awaitAll
@@ -25,7 +26,7 @@ Never call this done because an agent said it fixed it. "Tests pass now" from th
 
 Procedure:
 
-1. READ THE STATE. `git.getProjectPulse` for branch and uncommitted changes; `worktree.getCurrent` for the `worktreeId`. For a PR: `forge.getPR({"prNumber":<int>})` gives `reviewDecision` but NOT CI. Check runs have no typed wrapper, so they come through the raw escape hatch: `daintree.call {"name":"forge.getCIStatus","arguments":{"prNumber":<int>}}` — system tier, so it is CONFIRMED, unlike every other read in this step. It is AGGREGATE only — `ciStatus` can come back null and there is no per-check list. Read `state`; counts cover REQUIRED checks only, and `total:0` also appears when the list could not be read, so it is never evidence that nothing gates the merge. Values are provider-cached and lag about a minute, so one `success` is not a settled verdict.
+1. READ THE STATE. `git.getProjectPulse` for branch and uncommitted changes; `worktree.getCurrent` for the `worktreeId`. For a PR: `forge.getPR({"prNumber":<int>})` gives `reviewDecision` but NOT CI. CI comes from `forge.getChecks({"prNumber":<int>})` — an ordinary typed read like the rest of this step, not a confirmation-gated escape hatch. Gate on `conclusive`, NOT on `state`: `conclusive:false` means the state could not be determined — the forge returned nothing, or reported ZERO required checks, which is also what it reports when it could not read the required list. That is never evidence a merge is safe, *even when `state` is `"success"`*. Counts cover REQUIRED checks only. There is no per-check breakdown, so this cannot tell you WHICH check failed — that comes from the terminal in step 3. Readings are provider-cached (~1m), so an immediate re-read may hand back the same value and one `success` is not a settled verdict.
 
 2. GET THE ACTUAL FAILURE. A check name is not evidence. You need the failing command and its output. If a terminal already ran it, `terminal.extract` the exact error and the command that produced it. If nothing has run it here, have an agent run it (step 3) — no registry tool reads CI job logs, so if the failure only exists in the provider's logs, say so plainly rather than inventing its content.
 

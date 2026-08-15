@@ -60,7 +60,7 @@ def _tools(*names: str) -> list[ToolDef]:
 
     Building these in dotted form is what hid the name-format bug: the tests all
     passed while the projection, fed a real inventory, matched nothing and would
-    have withheld all 85 tools.
+    have withheld the whole captured inventory.
     """
     return [
         ToolDef(
@@ -441,7 +441,7 @@ def test_the_projection_matches_the_real_captured_inventory(catalog) -> None:  #
     """Every unit test above passed while the projection matched NOTHING.
 
     Skills declare dotted names (`terminal.rename`); the CLI sends wire names
-    (`terminal__rename`). Comparing them directly withheld all 85 tools — a total
+    (`terminal__rename`). Comparing them directly withheld the whole captured inventory — a total
     inversion that only showed up against a real inventory, because the synthetic
     helpers were building dotted names on both sides.
     """

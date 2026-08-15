@@ -335,7 +335,7 @@ Notes:
   "skills": {                                   // first-class skill outcome
     "active":       [ { "id": "…", "title": "…" } ],
     "newly_loaded": [ { "id": "…", "title": "…" } ],
-    "prelude": {                                // render BEFORE the assistant reply
+    "prelude": {                                // OPTIONAL: render before the reply
       "tool_executions": [
         { "call":   { "id": "call_…", "type": "function",
                       "function": { "name": "skill__load", "arguments": "{\"skillId\":\"…\"}" } },
@@ -507,7 +507,7 @@ cover degraded lifecycle paths without logging request content.
 
 The DeepSeek chat template serializes the prompt as **[all system messages, in
 array order] → [tools] → [non-system conversation]** — a system message anywhere in the array
-lands in the leading system region, before the ~21k-token tool schemas
+lands in the leading system region, before the ~19k-token tool schemas
 (measured 2026-07-08: volatile system-role runtime context after the
 conversation cut byte-identical turns to a 36% cache hit; 99% after this
 layout). The rule: **only stable content may be system-role**; per-request

@@ -105,11 +105,17 @@ async def capabilities(
         # two ways to answer the same question and use both.
         #
         # `prelude_tool` is what the search surfaces as: an ordinary entry in
-        # `skills.prelude.tool_executions`, the same channel a skill load rides,
-        # so a client that renders those already renders this.
+        # `skills.prelude.tool_executions`, the same channel a skill load rides.
         #
-        # Advertised so the CLI can gate the removal. It is best-effort by
-        # design: a docs lookup that fails leaves the turn to answer without
+        # NOT a claim that it is visible. The CLI decodes `prelude` and does not
+        # render it — a newly-active skill reaches the model as body text in the
+        # loaded-skills system message rather than as a replayed tool call, which
+        # left the prelude vestigial on that side. So a server-side docs lookup is
+        # currently INVISIBLE to the user; the field says where it would appear if
+        # a client chose to show it, not that one does.
+        #
+        # Advertised so a client can gate its own docs tooling on it. Best-effort
+        # by design: a lookup that fails leaves the turn to answer without
         # documentation, so a client seeing this flag is never promised an answer
         # — only that it does not have to fetch one.
         "docs_lookup": {

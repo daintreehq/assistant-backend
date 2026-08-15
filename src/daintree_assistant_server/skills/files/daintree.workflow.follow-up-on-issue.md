@@ -8,6 +8,7 @@ requiredTools:
   - context.snapshot
   - forge.getIssue
   - forge.getPR
+  - forge.getChecks
   - forge.listPRs
   - daintree.call
   - agentTask.spawnForEdits
@@ -19,7 +20,7 @@ Use when: the user wants to know where an issue or its PR stands on the forge ri
 or wants it commented on and closed.
 
 CI, review decisions and issue threads ARE readable — that changed, and older habits
-assume otherwise. `forge.getCIStatus` returns a check roll-up, `forge.getPR` carries
+assume otherwise. `forge.getChecks` returns a check roll-up, `forge.getPR` carries
 `reviewDecision`, and `forge.listIssueComments` reads a thread back. You no longer need an
 agent to answer "is it green". What an agent is still for is DETAIL none of them carry:
 check names, job logs, failure output, the text of a review left on the PR.
@@ -61,7 +62,7 @@ absent is not `success`. The CI verdict has its own action, reached through the 
 hatch:
 
 ```
-daintree.call({"name": "forge.getCIStatus", "arguments": {"prNumber": <int>}})
+forge.getChecks({"prNumber": <int>})
 ```
 
 `daintree.call` is the highest-risk tool there is — system tier, ALWAYS confirmed, and it

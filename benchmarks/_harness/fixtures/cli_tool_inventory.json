@@ -78,7 +78,7 @@
       "type": "object"
      },
      "worktreeId": {
-      "description": "Worktree to run the agent in. Usually OMIT this: Daintree then runs the agent in the active worktree (the common case). To target a specific worktree, prefer its id \u2014 a PATH like \"/Users/you/Projects/app\". A branch name (e.g. \"main\") is accepted only as a fallback and is resolved to that worktree's id; a value that resolves to no worktree is rejected with the available list.",
+      "description": "Worktree to run the agent in. Usually OMIT it \u2014 Daintree uses the active worktree. The id is a PATH (\"/Users/you/Projects/app\"); a branch name is accepted only as a fallback, and an unresolvable value is rejected with the available list.",
       "type": "string"
      }
     },
@@ -162,7 +162,7 @@
   "type": "function",
   "function": {
    "name": "agentTask__list",
-   "description": "List recent spawn sagas (newest first) with their stage, bound terminal/watcher, and any error. Use it to see what agentTask.spawnForEdits launches happened and where they stand. By default it lists ONLY this session's launches \u2014 the usual 'did my spawns land?' check \u2014 so stale terminal ids from earlier sessions (whose titles can collide with today's) never mix into the answer; pass scope:\"all\" when the user asks about older history. Read-only. Any launch still in a non-terminal stage belongs to THIS session \u2014 a prior session's in-flight sagas are swept to 'failed' when the DB opens, so a live-looking stage is always current.",
+   "description": "List recent spawn sagas (newest first) with their stage, bound terminal/watcher, and any error \u2014 the 'did my spawns land?' check for agentTask.spawnForEdits. Defaults to THIS session's launches, so stale terminal ids from earlier sessions (whose titles can collide) never mix in; pass scope:\"all\" for older history. Any non-terminal stage belongs to this session \u2014 a prior session's in-flight sagas are swept to 'failed' when the DB opens. Read-only.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -185,7 +185,7 @@
   "type": "function",
   "function": {
    "name": "artifact__read",
-   "description": "Read ONE page of an archived artifact: a large tool result that overflowed the inline size limit, or the full pre-compaction transcript a [checkpoint] note's breadcrumb points at (page a few relevant pages surgically \u2014 never replay the whole transcript). A page is at most 3500 characters \u2014 a single call NEVER returns the whole artifact. To read it: call with the artifactId and offset 0 (omit limit; it defaults to the 3500 max), then call again with offset set to the returned nextOffset, repeating until eof is true. Do NOT set limit to totalChars (or any value above 3500) to grab it all at once \u2014 that still returns just one 3500-char page; page with offset/nextOffset instead.",
+   "description": "Read ONE page of an archived artifact: a large tool result that overflowed the inline limit, or the full pre-compaction transcript a [checkpoint] breadcrumb points at (page the relevant parts surgically \u2014 never replay the whole transcript). A page is at most 3500 characters, so ONE call never returns the whole artifact. Call with the artifactId and offset 0 (omit limit), then repeat with offset set to the returned nextOffset until eof is true. Setting limit above 3500 does NOT grab it all at once \u2014 it still returns one page.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -216,7 +216,7 @@
   "type": "function",
   "function": {
    "name": "terminal__run__async",
-   "description": "Send a command (or a prompt to an agent) to ONE Daintree terminal and watch it to completion ASYNCHRONOUSLY: the command is typed and run exactly like terminal.sendCommand, then this returns IMMEDIATELY with an async handle (asy_\u2026) and the runtime takes over \u2014 cheap 1-second agent-state polls (no model cost, no output reads) until the terminal settles, then an attention-queue event that WAKES you with the outcome. Use it instead of terminal.sendCommand + terminal.awaitAll whenever the work will take more than a minute or two, or the user should get your reply now while the work continues. AFTER calling it: tell the user what is running and END the turn (or move on to other work) \u2014 do NOT awaitAll/extract-wait the same terminal, do NOT poll async.list for it, and do NOT re-send the command. When the completion wake arrives, read the output then (terminal.summarize or terminal.extract) and continue the task. Finish detection tracks agent state, so it is built for agent terminals. PROJECT-SCOPED AND DURABLE: the watch keeps running after the assistant closes \u2014 the background supervisor adopts it and integrates the completion, so you MAY promise the user an after-close or overnight result (it pauses only if Daintree itself closes, and resumes on the next launch). Mutating (it runs a command), so it confirms like terminal.sendCommand.",
+   "description": "Send a command (or an agent prompt) to ONE Daintree terminal and watch it to completion ASYNCHRONOUSLY. Types and runs it exactly like terminal.sendCommand, then returns IMMEDIATELY with an async handle (asy_\u2026); the runtime polls agent state every second (no model cost, no output reads) until the terminal settles, then WAKES you through the attention queue. Use it instead of terminal.sendCommand + terminal.awaitAll whenever the work will take more than a minute or two, or the user should get your reply now. AFTER calling it, say what is running and END the turn: do NOT awaitAll or extract-wait the same terminal, do NOT poll async.list for it, do NOT re-send. Read the output when the wake arrives. Finish detection tracks agent state, so it is built for agent terminals. DURABLE and project-scoped: the watch survives the assistant closing \u2014 the supervisor adopts it \u2014 so you MAY promise an after-close or overnight result. It pauses only if Daintree itself closes, and resumes next launch. Mutating (it runs a command), so it confirms like terminal.sendCommand.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -253,7 +253,7 @@
   "type": "function",
   "function": {
    "name": "terminal__await__async",
-   "description": "Watch agent terminal(s) to completion ASYNCHRONOUSLY \u2014 the out-of-turn twin of terminal.awaitAll. Returns IMMEDIATELY with an async handle (asy_\u2026); the runtime polls the cohort's agent state every second (no model cost, no output reads) and WAKES you through the attention queue once EVERY terminal has finished, failed, or asked a question (or the deadline passes \u2014 you are woken with whatever settled). Choose by wait length and user experience: terminal.awaitAll BLOCKS the turn and is right for short waits whose results you need immediately to continue; terminal.await.async lets you reply to the user NOW and end the turn while agents keep working \u2014 right after spawning a cohort with agentTask.spawnForEdits, or after sending long work with terminal.sendCommand. AFTER calling it: report what is running and end the turn \u2014 do NOT also awaitAll/extract-wait the same terminals, and do NOT attach a watcher just for finish detection (watchers are for goal-based observation with classification). When the wake arrives, read outputs with terminal.summarize/terminal.extract and continue. PROJECT-SCOPED AND DURABLE: the watch keeps running after the assistant closes \u2014 the background supervisor adopts it and integrates the completion, so you MAY promise the user an after-close or overnight result (it pauses only if Daintree itself closes, and resumes on the next launch). Read-only; requires Daintree MCP.",
+   "description": "Watch agent terminal(s) to completion ASYNCHRONOUSLY \u2014 the out-of-turn twin of terminal.awaitAll. Returns IMMEDIATELY with an async handle (asy_\u2026); the runtime polls agent state every second (no model cost, no output reads) and WAKES you through the attention queue once every terminal has finished, failed, or asked a question, or the deadline passes. Choose by wait length: awaitAll BLOCKS the turn and suits short waits whose results you need to continue; this one lets you reply NOW and end the turn while agents work \u2014 right after spawning a cohort, or after sending long work. AFTER calling it, report what is running and END the turn: do NOT also awaitAll or extract-wait the same terminals, and do NOT attach a watcher just for finish detection (watchers are for goal-based observation). Read outputs when the wake arrives. DURABLE and project-scoped: the watch survives the assistant closing \u2014 the supervisor adopts it \u2014 so you MAY promise an after-close or overnight result. It pauses only if Daintree itself closes, and resumes next launch. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -389,7 +389,7 @@
   "type": "function",
   "function": {
    "name": "terminal__summarize",
-   "description": "Read a bounded tail of a Daintree terminal's output and summarize it with the small model. This is the DEFAULT way to relay what an agent said: a coding agent's raw scrollback is garbled, repainted TUI output, so summarizing it gives clean prose and keeps it out of your context. Prefer this over terminal.read unless the user needs the exact literal text. PARALLEL: summarize/extract calls batched in ONE reply run CONCURRENTLY \u2014 to relay a whole cohort, emit one summarize per terminal as one batch of calls, not one per turn; the total wait is roughly the slowest single call. Read-only; requires Daintree MCP.",
+   "description": "Read a bounded tail of a Daintree terminal and summarize it with the small model. The DEFAULT way to relay what an agent said: raw scrollback is garbled, repainted TUI output, so summarizing gives clean prose and keeps it out of your context. Prefer it over terminal.read unless the user needs the exact literal text. PARALLEL: summarize/extract calls batched in ONE reply run CONCURRENTLY \u2014 relay a whole cohort as one batch, not one per turn. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -453,12 +453,12 @@
   "type": "function",
   "function": {
    "name": "terminal__extract",
-   "description": "Read a bounded tail of one or more Daintree terminals and extract caller-specified content as plain TEXT with the small model \u2014 the default way to read what an agent said. Over MULTIPLE terminalIds it MERGES every terminal's tail into ONE answer (it does NOT return one answer per terminal); to collect a DISTINCT answer per agent \u2014 each one's fact/vote/draft \u2014 use terminal.extract.json with an array schema keyed by terminalId, or extract a single id at a time. PARALLEL: no-wait terminal.extract/.json calls batched in ONE reply run CONCURRENTLY \u2014 when you need several independent extractions (a different question per terminal, or one answer per agent), emit them ALL as one batch of calls instead of one per turn; the total wait is roughly the slowest single call. Optionally wait (poll) until a condition is met before extracting (a wait-bearing call is a barrier and runs serially). Omit `instruction` to use it as a finished/condition gate (returns booleans, no extraction model call). A wait that observes the agent FINISH also auto-retires that terminal's spawn-attached supervising watcher (watchersRetired in the result) \u2014 the completion is in your hands, so no completion notification will follow. For STRUCTURED output (several named fields, or one entry per terminal) use terminal.extract.json instead. Read-only; requires Daintree MCP.",
+   "description": "Read a bounded tail of one or more Daintree terminals and extract content as plain TEXT with the small model \u2014 the default way to read what an agent said. Over MULTIPLE terminalIds it MERGES every tail into ONE answer. For a distinct answer per agent, or several named fields, use terminal.extract.json with an array schema keyed by terminalId. PARALLEL: no-wait extract/.json calls batched in ONE reply run CONCURRENTLY \u2014 emit several independent extractions as one batch, not one per turn; the wait is roughly the slowest single call. A wait-bearing call is a barrier and runs serially. Omit `instruction` to use it as a finished/condition gate (booleans only, no extraction model call). A wait that observes the agent FINISH auto-retires that terminal's spawn-attached watcher (watchersRetired) \u2014 the completion is in your hands, so no notification follows. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "instruction": {
-      "description": "What to extract, as plain TEXT (a number, a name, a yes/no, the agent's answer to relay). Omit to run a wait/finished gate only (no EXTRACTION model call; a wait:{} settle still uses the cheap small-model finished judge). Need several NAMED fields at once, or one answer PER terminal across a cohort? Use terminal.extract.json \u2014 a plain-TEXT extract over multiple terminalIds MERGES them into ONE answer, it does not return one per agent.",
+      "description": "What to extract, as plain TEXT (a number, a name, a yes/no, an agent's answer). Omit to run a wait gate only. Over several terminalIds this MERGES them into ONE answer \u2014 for named fields, or one answer per terminal, use terminal.extract.json.",
       "type": "string"
      },
      "maxAttempts": {
@@ -501,7 +501,7 @@
      },
      "wait": {
       "additionalProperties": false,
-      "description": "Poll until this condition is met before extracting; omit to read once. A WatchCondition object with EXACTLY ONE of the keys below \u2014 or the empty object {} to wait until the agent has genuinely FINISHED its turn. Prefer {} for 'wait for the agent to finish': a bare stateIs:'waiting' is an unreliable proxy (a pre-start prompt or a backgrounded window also reads as 'waiting'), while {} prefers a real working->waiting transition (or a stable idle past a short grace) and ALWAYS confirms with a small-model check on the tail before it resolves; completed/exited resolve immediately. {} is single-terminal (one agent's state) \u2014 for a COHORT use terminal.awaitAll, then read with a no-wait extract over the same ids. modelJudge is NOT supported here (watcher-only).",
+      "description": "Poll until this holds before extracting; omit to read once. EXACTLY ONE key below, or {} for a genuine FINISH \u2014 prefer {} over stateIs:'waiting', which a pre-start prompt also matches. {} is single-terminal; for a cohort use terminal.awaitAll. No modelJudge here.",
       "maxProperties": 1,
       "properties": {
        "all": {
@@ -580,7 +580,7 @@
   "type": "function",
   "function": {
    "name": "terminal__extract__json",
-   "description": "Read a bounded tail of one or more Daintree terminals and extract STRUCTURED JSON with the small model \u2014 use this when you need several NAMED fields at once, OR one entry PER terminal when reading a COHORT: the multi-terminal tail is labelled by terminalId, so an array schema keyed by terminalId attributes each agent's answer in ONE call (e.g. collecting every agent's fact, or tallying a cohort's votes into one object). Both `instruction` and `jsonSchema` are required. PARALLEL: no-wait terminal.extract/.json calls batched in ONE reply run CONCURRENTLY \u2014 for several INDEPENDENT extractions (a different question per terminal), emit them all as one batch of calls; use the single multi-id call above only when one question spans the whole cohort. Optionally wait (poll) until a condition is met before extracting (a wait-bearing call is a barrier and runs serially); a wait that observes the agent FINISH also auto-retires that terminal's spawn-attached supervising watcher (watchersRetired in the result) \u2014 no completion notification will follow. For a single value or plain text to relay from ONE terminal, use terminal.extract instead. Read-only; requires Daintree MCP.",
+   "description": "Extract STRUCTURED JSON from one or more Daintree terminal tails with the small model. Use it for several NAMED fields at once, or one entry PER terminal across a cohort: the multi-terminal tail is labelled by terminalId, so an array schema keyed by terminalId attributes each agent's answer in ONE call. Both `instruction` and `jsonSchema` are required. Same wait, watcher-retirement and PARALLEL batching rules as terminal.extract \u2014 use that one for a single value or plain text to relay. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -589,7 +589,7 @@
       "type": "string"
      },
      "jsonSchema": {
-      "description": "Required. A REAL JSON Schema object describing the value to extract (the same kind you put under a tool's \"parameters\") \u2014 NOT an example of the value. ONLY these keywords are accepted: type, properties, required, items, enum, const, additionalProperties, anyOf, oneOf, allOf, minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength, maxLength, minItems, maxItems, uniqueItems. Any OTHER key is REJECTED \u2014 in particular no description, title, default, format, examples, $ref, or $schema anywhere in it; put explanation in the instruction argument instead, and there is NO output-size knob (no maxTokens; to make a field optional just leave it out of \"required\"). The small model returns the value under 'result'. For one entry PER terminal across a cohort, make the value an array of objects each carrying its own terminalId. Correct: {\"type\":\"object\",\"properties\":{\"answers\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"terminalId\":{\"type\":\"string\"},\"fact\":{\"type\":\"string\"}},\"required\":[\"terminalId\",\"fact\"]}}},\"required\":[\"answers\"]}. WRONG and REJECTED (a value example, not a schema): {\"answers\":[{\"terminalId\":\"string\",\"fact\":\"string\"}]}.",
+      "description": "Required. A REAL JSON Schema (the kind you put under a tool's \"parameters\"), NOT an example value. Accepted keywords ONLY: type, properties, required, items, enum, const, additionalProperties, anyOf, oneOf, allOf, minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength, maxLength, minItems, maxItems, uniqueItems. Any other key is REJECTED \u2014 no description, title, default, format, examples, $ref or $schema anywhere. Put explanation in instruction. For one entry per terminal, make the value an array of objects each carrying its own terminalId.",
       "type": "string"
      },
      "maxAttempts": {
@@ -632,7 +632,7 @@
      },
      "wait": {
       "additionalProperties": false,
-      "description": "Poll until this condition is met before extracting; omit to read once. A WatchCondition object with EXACTLY ONE of the keys below \u2014 or the empty object {} to wait until the agent has genuinely FINISHED its turn. Prefer {} for 'wait for the agent to finish': a bare stateIs:'waiting' is an unreliable proxy (a pre-start prompt or a backgrounded window also reads as 'waiting'), while {} prefers a real working->waiting transition (or a stable idle past a short grace) and ALWAYS confirms with a small-model check on the tail before it resolves; completed/exited resolve immediately. {} is single-terminal (one agent's state) \u2014 for a COHORT use terminal.awaitAll, then read with a no-wait extract over the same ids. modelJudge is NOT supported here (watcher-only).",
+      "description": "Poll until this holds before extracting; omit to read once. EXACTLY ONE key below, or {} for a genuine FINISH \u2014 prefer {} over stateIs:'waiting', which a pre-start prompt also matches. {} is single-terminal; for a cohort use terminal.awaitAll. No modelJudge here.",
       "maxProperties": 1,
       "properties": {
        "all": {
@@ -713,13 +713,13 @@
   "type": "function",
   "function": {
    "name": "terminal__awaitAll",
-   "description": "Wait (bounded) for a COHORT of agent terminals to all return to an idle prompt. Pure state-machine: it polls agentState only \u2014 NO model call, NO output read \u2014 so it is fast and light. Returns allFinished plus a perTerminal array whose status is exactly one of \"finished\" | \"failed\" | \"question\" | \"working\" \u2014 and NO content. It also returns top-level stillWorking and askingQuestion arrays of terminal IDs, so when the wait budget runs out you can re-await exactly the stillWorking stragglers (and route answers to askingQuestion) without scanning perTerminal. Use this ONCE for the whole cohort instead of one wait per agent. Terminals that settle finished/failed automatically RETIRE their spawn-attached supervising watcher (watchersRetired in the result) \u2014 the completion is in your hands now, so do NOT watcher.cancel them yourself and do NOT expect a later completion notification for those agents. IMPORTANT: a bare 'waiting' is an imperfect signal \u2014 an agent can momentarily read idle while still working. So AFTER awaitAll returns, read each output yourself (a no-wait terminal.extract/read of the last few lines) to confirm the result makes sense; if a terminal reported 'finished' but its tail shows it is still mid-work, re-await just that one or set a watcher on it and poll. Bound the outer loop: re-await stillWorking IDs at most twice (three awaitAll calls total on the same terminal); after that a still-working terminal is hung \u2014 escalate via queue.publish (severity 'blocked') + watcher.terminal.create and end the turn instead of awaiting it again. ENFORCED BUDGET: all awaitAll calls in one turn share a cumulative foreground-wait budget of 120s \u2014 this is enforced, not advisory. When it runs out mid-wait the call returns early with budgetExhausted:true (still-working agents in stillWorking), and every further awaitAll this turn returns immediately with the same marker \u2014 so on budgetExhausted do NOT re-await: hand the stragglers to the async path (watcher.terminal.create + queue.publish) and end the turn. INTERRUPTIBLE: if the user sends a message while you are waiting, awaitAll returns EARLY with interruptedByUser:true plus whatever has settled so far \u2014 their message is already folded into the conversation, so READ IT and adapt (they may want to redirect, e.g. 'that agent errored, re-spawn it') before deciding whether to re-await the stillWorking agents. Read-only; requires Daintree MCP.",
+   "description": "Wait for a COHORT of agent terminals to reach an idle prompt. Polls agentState only \u2014 no model call, no output read. Call ONCE for the whole cohort, not once per agent. Returns allFinished, a perTerminal array whose status is \"finished\" | \"failed\" | \"question\" | \"working\" (no content), plus top-level stillWorking / askingQuestion id arrays. Terminals settling finished/failed RETIRE their spawn-attached watcher (watchersRetired) \u2014 do not watcher.cancel them; expect no later completion notification. An idle reading is imperfect: peek each tail afterwards (no-wait terminal.extract/read) and re-await any 'finished' terminal still looking busy. Re-await stillWorking at most twice (three calls per terminal); past that it is hung \u2014 escalate via queue.publish (severity 'blocked') + watcher.terminal.create and end the turn. ENFORCED: all awaitAll calls in a turn share a cumulative 120s foreground-wait budget. On budgetExhausted:true do NOT re-await \u2014 hand the stragglers to watcher.terminal.create + queue.publish and end the turn. On interruptedByUser:true the user messaged mid-wait \u2014 it is already in the conversation, so read it and adapt before re-awaiting. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "maxAttempts": {
       "default": 30,
-      "description": "Hard cap on poll rounds (default 30 \u2248 60s, max 240 \u2248 480s \u2014 durations assume the default 2s pollIntervalMs). Bounded so it cannot hang. Raise it only for a known-slow cohort whose agents need a single round past 120s \u2014 most waits should leave it at the default. Independent of the cap, the turn's ENFORCED cumulative foreground-wait budget (shared across all awaitAll calls this turn \u2014 see the tool description) can end the wait earlier with budgetExhausted:true.",
+      "description": "Hard cap on poll rounds (default 30 \u2248 60s at the default 2s interval; max 240). Leave it at the default unless the cohort is known-slow. The turn's shared wait budget can still end the wait sooner.",
       "maximum": 240,
       "minimum": 1,
       "type": "integer"
@@ -732,7 +732,7 @@
       "type": "integer"
      },
      "terminalIds": {
-      "description": "All the agent terminals to wait on \u2014 full terminal-<uuid> ids exactly as listed (a unique prefix resolves as a fallback, but never invent or abbreviate ids). Polls their agentState (NO model call, NO output read) and returns when EVERY one has returned to an idle prompt. Each result's status is one of \"finished\" | \"failed\" | \"question\" | \"working\". Use ONE awaitAll for the whole cohort, never one wait per agent. The result also carries top-level stillWorking and askingQuestion arrays of terminal IDs \u2014 re-await stillWorking directly (no need to scan perTerminal) and route answers to askingQuestion. AFTER it returns, peek the tail (a no-wait terminal.extract/read) to confirm \u2014 a terminal can briefly read 'waiting' while still working; if a 'finished' one still looks busy, re-await or watch it. BOUND the re-await loop: re-await stillWorking IDs at most twice (three awaitAll calls total on the same terminal). After that a still-working terminal is HUNG \u2014 escalate (publish a blocked inbox item with queue.publish and attach a watcher with watcher.terminal.create) and end the turn rather than awaiting it again.",
+      "description": "The whole cohort to wait on, as full terminal-<uuid> ids exactly as listed. Never invent or abbreviate an id (a unique prefix resolves only as a fallback).",
       "items": {
        "minLength": 1,
        "type": "string"
@@ -998,7 +998,7 @@
   "type": "function",
   "function": {
    "name": "terminal__close",
-   "description": "Close Daintree terminal(s) \u2014 moves each to the trash and ends the agent or process running in it. ONLY call this when the USER has explicitly asked you to close a terminal or terminals; closing is never your own decision. Do NOT call it to tidy up, to retire agents you spawned, or to recover from a failed/ambiguous/'no terminalId' spawn \u2014 a spawn that returned no terminalId is retried or reported, never 'fixed' by closing terminals. A terminal you did not just spawn yourself may be the user's own live work or another agent mid-task (agentState 'working'/'waiting'), so closing it ends that work irreversibly. Pass a single terminalId, or terminalIds:[...] to close a whole cohort the user asked you to retire in ONE call. Typed wrapper around the Daintree terminal.close MCP tool. (terminal.kill, reachable via daintree.call, deletes PERMANENTLY instead of trashing \u2014 prefer close.)",
+   "description": "Close Daintree terminal(s) \u2014 moves each to the trash and ends the agent or process running in it. ONLY when the USER has explicitly asked; closing is never your own decision. Do NOT call it to tidy up, to retire agents you spawned, or to recover from a failed or 'no terminalId' spawn \u2014 retry or report that instead. A terminal you did not just spawn may be the user's own live work or another agent mid-task, and closing it ends that work irreversibly. Pass one terminalId, or terminalIds:[...] for a cohort, in ONE call. (terminal.kill deletes PERMANENTLY \u2014 prefer close.)",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -1502,12 +1502,54 @@
     "additionalProperties": false,
     "properties": {
      "cwd": {
+      "description": "Legacy alias for worktreePath.",
       "type": "string"
      },
      "prNumber": {
       "description": "The PR number (positive integer).",
       "minimum": 1,
       "type": "integer"
+     },
+     "worktreeId": {
+      "description": "Worktree id (wt_\u2026). Takes precedence over a path.",
+      "type": "string"
+     },
+     "worktreePath": {
+      "description": "Absolute worktree path.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "prNumber"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "forge__getChecks",
+   "description": "Read a pull request's CI check state by PR number. Gate on `conclusive`, NOT on `state`: conclusive=false means the state could not be determined \u2014 the forge returned nothing, or reported ZERO required checks, which it also does when it could not read the required list. That is never evidence a merge is safe, even when state is \"success\". Counts cover REQUIRED checks only. Readings are provider-cached (~1m), so an immediate re-read may return the same value. No per-check breakdown exists, so this cannot say WHICH check failed. PARALLEL: forge.* reads batched in ONE reply run concurrently.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "cwd": {
+      "description": "Legacy alias for worktreePath.",
+      "type": "string"
+     },
+     "prNumber": {
+      "description": "The PR number (positive integer).",
+      "minimum": 1,
+      "type": "integer"
+     },
+     "worktreeId": {
+      "description": "Worktree id (wt_\u2026). Takes precedence over a path.",
+      "type": "string"
+     },
+     "worktreePath": {
+      "description": "Absolute worktree path.",
+      "type": "string"
      }
     },
     "required": [
@@ -1579,85 +1621,6 @@
     },
     "required": [
      "arguments"
-    ],
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
-   "name": "docs__search",
-   "description": "Search Daintree's live documentation to answer a user's how-to or help question (\"how do I\u2026\", \"what is\u2026\", \"how do I configure\u2026\"). Returns ranked doc sections, each with a title, content, and a page PATH (e.g. /docs/worktrees). This is the FIRST tool to reach for when the user asks how to use Daintree \u2014 prefer it over guessing. Cite the pages you use as full URLs by prepending https://daintree.org to the returned path. PARALLEL: docs search/getPage/getRelatedPages calls batched in ONE reply run concurrently \u2014 emit several at once when researching.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {
-     "pathPrefix": {
-      "description": "Optional: restrict results to URL paths under this prefix (e.g. \"/docs\").",
-      "type": "string"
-     },
-     "query": {
-      "description": "What to search the Daintree documentation for. Keywords or natural language (e.g. \"create a worktree from a PR\", \"keybindings\").",
-      "minLength": 1,
-      "type": "string"
-     },
-     "topK": {
-      "description": "Max number of results to return (default 10).",
-      "maximum": 100,
-      "minimum": 1,
-      "type": "integer"
-     }
-    },
-    "required": [
-     "query"
-    ],
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
-   "name": "docs__getPage",
-   "description": "Fetch the full markdown of a specific Daintree documentation page by its URL path. Use AFTER docs.search when the search snippets lack the detail to answer accurately. Not for discovery \u2014 search first to find the page. PARALLEL: docs calls batched in ONE reply run concurrently \u2014 to read several pages, emit one getPage each in one batch.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {
-     "path": {
-      "description": "URL path of the documentation page (e.g. \"/docs/worktrees\"). Use a URL returned by docs.search.",
-      "minLength": 1,
-      "type": "string"
-     }
-    },
-    "required": [
-     "path"
-    ],
-    "type": "object"
-   }
-  }
- },
- {
-  "type": "function",
-  "function": {
-   "name": "docs__getRelatedPages",
-   "description": "Find Daintree documentation pages related to a known page, for suggesting further reading. Use only when you already have a page URL (from docs.search) and want connected content \u2014 not for general search.",
-   "parameters": {
-    "additionalProperties": false,
-    "properties": {
-     "path": {
-      "description": "URL path of the source page (e.g. \"/docs/worktrees\"). Use a URL returned by docs.search.",
-      "minLength": 1,
-      "type": "string"
-     },
-     "topK": {
-      "description": "Max number of related pages to return (default 10).",
-      "maximum": 25,
-      "minimum": 1,
-      "type": "integer"
-     }
-    },
-    "required": [
-     "path"
     ],
     "type": "object"
    }
@@ -1977,7 +1940,7 @@
   "type": "function",
   "function": {
    "name": "user__askMultipleChoice",
-   "description": "Ask the human ONE multiple-choice question and wait for their answer, then continue the same turn using it. Provide a concise `question` and 2\u201326 plain-text `options` (no A/B/C prefixes \u2014 the client assigns the letters). The user answers with the arrow keys + Enter or by typing the option letter. Use this whenever you need a finite decision from the user before proceeding, INSTEAD of asking in prose. Call it ALONE \u2014 never in the same tool batch as any other tool \u2014 and re-plan once the answer comes back. Only works during an interactive session; a watcher, timer, or non-interactive run cannot ask.",
+   "description": "Ask the human ONE multiple-choice question and wait for the answer, then continue the same turn using it. Give a concise `question` and 2\u201326 plain-text `options` (no A/B/C prefixes \u2014 the client assigns letters). Use it whenever you need a finite decision before proceeding, INSTEAD of asking in prose. Call it ALONE \u2014 never in a batch with other tools \u2014 and re-plan once the answer arrives. Interactive sessions only: a watcher, timer or non-interactive run cannot ask.",
    "parameters": {
     "additionalProperties": false,
     "properties": {

@@ -16,8 +16,8 @@
     "skill_body_bytes_total": 222708
   },
   "tools": {
-    "count": 79,
-    "names_sha256": "fde0a97d114b7a2fb2f4af6a91bdfc268273a19a78a3c461f29c5e44467abb51",
-    "tool_inventory_bytes": 101720
+    "count": 77,
+    "names_sha256": "ffa03fb26a2d818c8026ef7f65255ad4bcde157ab5055edc92517d1d3a1b4517",
+    "tool_inventory_bytes": 93145
   }
 }

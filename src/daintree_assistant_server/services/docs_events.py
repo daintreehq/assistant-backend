@@ -26,8 +26,18 @@ from ..contracts.extensions import (
 )
 
 # Wire-safe name for the (server-only, never client-executable) docs search.
-# Deliberately the same spelling the CLI's own docs tool used, so a transcript
-# reads identically whether the lookup happened here or there.
+#
+# It is the spelling the CLI's own docs tool used, chosen when both existed so a
+# transcript read identically whichever side performed the lookup. The CLI has
+# since dropped that tool family entirely — documentation retrieval is server-side
+# now — so the name no longer collides with anything, and it is kept because it is
+# what a client already knows how to render, not for the original reason.
+#
+# NOTE it is deliberately NOT in `validation.RESERVED_TOOL_NAMES`. A client
+# offering a real tool by this name would give the model two routes to the same
+# answer, which `/capabilities` tells clients not to do — but rejecting the
+# request outright is a stricter contract than the skill tools need, and no
+# current client sends it.
 DOCS_SEARCH_WIRE_NAME = "docs__search"
 DOCS_SEARCH_DISPLAY_NAME = "docs.search"
 

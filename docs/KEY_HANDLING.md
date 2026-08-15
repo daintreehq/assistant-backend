@@ -113,9 +113,8 @@ split exists to prevent.
 A client must decode `usable` as **optional**, not as a plain boolean: a backend
 predating the field omits it entirely, and a plain `bool` decodes that absence as
 `false` — declaring every key on every older deployment unusable. Absent means
-"not reported", and the fallback is `limit_remaining`. (The pinned CLI does not
-decode `usable` or `reason` yet; it branches on `valid` and then `limit_remaining`,
-which reaches the same verdict for the exhausted case by its own arithmetic.)
+"not reported", and the fallback is `limit_remaining`. The CLI does exactly this —
+`Usable *bool`, so an omitted field stays distinguishable from a reported `false`.
 
 Failure to *reach* the provider propagates as the usual upstream envelope — 503
 `upstream_unavailable` for an unreachable provider, 504 `upstream_timeout` for a
@@ -136,13 +135,20 @@ lifecycle.
   directories it **creates**, so a pre-existing state root (an older build, an
   installer, a restored backup, a permissive umask) keeps whatever mode it already
   had. The `0700` is a promise about new installs.
-- What closes that gap today is detection, not repair, and only for the FILE:
-  `doctor` re-checks the credential file's own mode and **fails** — not warns — on
-  anything wider than `0600`, because the CLI writes it `0600` by construction, so
-  a wider mode means something else set it and the file spends the user's money.
-  Its containing directory is not covered: doctor's directory check runs against
-  the resolved state dir, which under the normal project-scoped configuration is
-  the per-project subdirectory, while the sign-in lives in the parent root.
+- `Save` therefore repairs it, narrowly: `tightenDirMode` clears the group and
+  world bits before writing — but only on a directory the CLI owns (an
+  `assistant-cli` state root). A custom directory supplied through
+  `DAINTREE_ASSISTANT_STATE_DIR` is left as the user configured it, since chmod-ing
+  an arbitrary path the user chose is not ours to do. Either way, a directory that
+  is group- or world-WRITABLE refuses the save outright: that is a different
+  problem, and no chmod makes it safe.
+- Detection covers the file: `doctor` re-checks the credential file's own mode and
+  **fails** — not warns — on anything wider than `0600`, because the CLI writes it
+  `0600` by construction, so a wider mode means something else set it and the file
+  spends the user's money. Doctor's *directory* check runs against the resolved
+  state dir, which under the normal project-scoped configuration is the per-project
+  subdirectory rather than the parent root the sign-in lives in — so the repair
+  above, not that check, is what covers the credential's own directory.
 - **The stored key is NOT bound to the stored endpoint.** `DAINTREE_BACKEND_URL`
   resolves ahead of the persisted URL while the persisted key still applies, so a
   process-level override sends the caller's own provider credential to whatever
@@ -172,8 +178,8 @@ LOCAL gate that skips in CI rather than a green-build guarantee.
 
 | | Requirement | Status |
 |---|---|---|
-| 1 | On first launch, state plainly that the key is an **OpenRouter** key and that OpenRouter bills it. | ⏳ the pinned `login.go` prompts for "API key" without naming the provider or who is billed; landed upstream, arrives here when the pin moves |
-| 2 | Normalise and display the target backend endpoint *before* asking for the key. | ⏳ the pinned `promptEndpoint` normalises and returns, and the key prompt follows without echoing the resolved value — so what was typed is not necessarily the host the key is about to reach |
+| 1 | On first launch, state plainly that the key is an **OpenRouter** key and that OpenRouter bills it. | ✅ `login.go` names the provider and prints `backend.KeyPurposeNotice` before the key prompt |
+| 2 | Normalise and display the target backend endpoint *before* asking for the key. | ✅ the RESOLVED endpoint is restated ("Signing in to …") ahead of `promptAPIKey` — a custom URL is normalised on the way through, so what was typed is not necessarily the host the key is about to reach |
 | 3 | **Verify the key before persisting it.** Login must not silently persist a rejected key. | ✅ `App.SignIn` runs `backend.CheckSignIn` against a THROWAWAY client, then persists, then swaps the live client |
 | 4 | Show the safe label and remaining limit when the provider reports them. | ◐ the startup login path does, on the no-warning branch; the in-session `App.SignIn` discards the verification object and shows only a generic warning |
 | 5 | Run a tiny streaming smoke after verification. | ⏳ verification is a tokenless key probe, so it proves the credential without proving a turn can stream |

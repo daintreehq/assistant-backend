@@ -9,6 +9,7 @@ requiredTools:
   - worktree.getCurrent
   - forge.listPRs
   - forge.getPR
+  - forge.getChecks
   - forge.listIssues
   - forge.getIssue
   - workflow.prepBranchForReview
@@ -49,7 +50,7 @@ one in step 5; it is an argument there, not a result field.) Do NOT branch on a
 review-decision or CI-status field from a LIST item — neither is guaranteed on a bulk item;
 these summary rows are for duplicate detection, and a field missing here says nothing. (CI and
 review state ARE readable, just not from this call: `reviewDecision` comes from typed
-`forge.getPR` and the CI verdict from `forge.getCIStatus`, both a focused read on ONE PR —
+`forge.getPR` and the CI verdict from `forge.getChecks`, both a focused read on ONE PR —
 daintree.workflow.follow-up-on-issue.) If an open PR's `headRef` is this branch, you are
 updating, not creating — skip the PR-create in step 5 and just push.
 

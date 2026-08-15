@@ -17,9 +17,11 @@ reflow. Wire names use `__` (`worktree__list`), not `.` — that separator is th
 CLI's OpenAI-name projection of its dotted internal tool ids, and several suites
 match on it.
 
-The tool **count** is deliberately not restated in prose anywhere (here,
+The tool **count** is deliberately not restated in prose as a CURRENT fact (here,
 `../fixtures.py`, or `benchmarks/README.md`): the count is data in this file, so
-drift shows up as a measurement change rather than a documentation lie.
+drift shows up as a measurement change rather than a documentation lie. The
+refresh log at the bottom is the one exception, and is dated for that reason — it
+records what a particular capture contained, which is history and cannot go stale.
 `load_tool_inventory()` / `tool_names()` in `../fixtures.py` are the only readers.
 
 ### Regenerating
@@ -65,14 +67,36 @@ each other.
    print(len(tools), 'tools')
    PY
    ```
-4. Re-run the deterministic cost suite and refresh any snapshot numbers the
-   READMEs quote:
+4. Refresh `tests/fixtures/cli_tool_names.txt` **in the same commit**. It must be
+   exactly the sorted name projection of this file, and
+   `tests/unit/test_skill_catalog_hygiene.py` fails if the two disagree. Doing one
+   and forgetting the other is the obvious mistake, and nothing else would notice:
+   both files still parse, and the damage only surfaces as a skill declaring a tool
+   the CLI no longer has.
+
+   ```bash
+   python - <<'PY'
+   import json, pathlib
+   tools = json.loads(pathlib.Path('benchmarks/_harness/fixtures/cli_tool_inventory.json').read_text())
+   dst = pathlib.Path('tests/fixtures/cli_tool_names.txt')
+   lines = dst.read_text(encoding='utf-8').splitlines()
+   head = max(i for i, ln in enumerate(lines) if ln.startswith('#') or not ln.strip())
+   dst.write_text('\n'.join(lines[:head + 1] + sorted(t['function']['name'] for t in tools)) + '\n')
+   PY
+   ```
+5. Re-run the deterministic cost suite, then refresh the baseline and the snapshot
+   numbers the READMEs quote. `test_docs_drift.py` fails on a stale
+   `benchmarks/prompt_cost/README.md` header, so this is a gate, not a courtesy:
 
    ```bash
    python -m benchmarks.prompt_cost.bench run
+   python -m tools.baseline capture > benchmarks/baseline.json
    ```
 
-Last refreshed 2026-07-28 (72 → 85 tools; the previous capture predated the
-`forge.*` issue/PR readers, `recipe.list`/`run`, `git.getProjectPulse`, the
-`workflow.*` entry points, and the `worktree.*` readers — i.e. most of the surface
-the current skills lean on).
+Last refreshed 2026-08-15 (85 → 79 → 77 tools). The 79 → 77 step is the CLI
+dropping its `docs__search` / `docs__getPage` / `docs__getRelatedPages` family:
+the backend classifies documentation questions on the selector call and searches
+the public docs MCP itself, so the client no longer carries a docs tool or a second
+MCP connection. It added `forge__getChecks`, a typed CI-state read. Net effect on
+the wire is larger than the count suggests — the compact tool region fell ~10%,
+84.2 KB → 75.8 KB, and it is 63% of an assembled request.
