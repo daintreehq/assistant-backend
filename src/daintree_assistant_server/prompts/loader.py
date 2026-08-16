@@ -281,6 +281,33 @@ class PromptLoader:
 
     # ---- startup validation --------------------------------------------
 
+    # The markers the response contract SENDS THE MODEL TO. The contract is in the
+    # cache-stable system region and carries no numbers of its own, so these strings
+    # are the other half of a cross-reference, not decoration (issue #38).
+    _DISPLAY_CONTEXT_MARKERS = ("# Display context", "Usable content width:", "Pipe-table cap:")
+
+    def _validate_display_context(self) -> None:
+        """Render the display block and require it to actually carry the geometry.
+
+        Compiling is not enough for this one template. An OVERLAY that blanks it
+        still compiles, renders to "", and assembles into a frame-only tail — while
+        the stable contract goes on telling the model to read a ``# Display context``
+        block that is not there, and the output lint goes on grading against the
+        width it was supposed to state. That is silent, and it is exactly the
+        prompt/lint drift the split was meant to make impossible, so it fails
+        readiness here instead.
+        """
+        rendered = self.render(
+            TEMPLATE_DISPLAY_CONTEXT, content_width=56, is_narrow=True, max_table_columns=3
+        )
+        for marker in self._DISPLAY_CONTEXT_MARKERS:
+            if marker not in rendered:
+                raise PromptError(
+                    f"{TEMPLATE_DISPLAY_CONTEXT} rendered without {marker!r}; the response "
+                    "contract references this block for the terminal geometry it does not "
+                    "state itself"
+                )
+
     def validate(self) -> None:
         """Ensure the base prompt is present and every template parses.
 
@@ -295,6 +322,7 @@ class PromptLoader:
                 self.env.get_template(name)
             except TemplateError as exc:
                 raise PromptError(f"template {name} failed to load: {exc}") from exc
+        self._validate_display_context()
         for prompt in SKILL_LEARNING_PROMPTS:
             self.skill_learning_prompt(prompt)
         # Every REGISTERED task must have its prompt on disk. Without this a task

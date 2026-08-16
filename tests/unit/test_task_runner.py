@@ -575,3 +575,35 @@ def test_readiness_rejects_a_task_whose_prompt_file_is_missing(tmp_path, monkeyp
     (staged / "tasks" / "checkpoint.md").unlink()
     with pytest.raises(PromptError, match="checkpoint"):
         PromptLoader(staged).validate()
+
+
+def test_readiness_rejects_a_blanked_display_context_template(tmp_path) -> None:
+    """A display block that renders without its geometry must fail READINESS.
+
+    Compiling is not enough for this one template (issue #38). The response
+    contract sits in the cache-stable system region and states no width itself —
+    it sends the model to `# Display context`. An overlay that blanks that
+    template still COMPILES, renders to "", and assembles into a frame-only tail:
+    the contract's cross-reference dangles while `lint_output()` keeps grading
+    against the width the block was supposed to state. Silent prompt/lint drift is
+    the exact failure the split exists to prevent, so it fails /readyz instead.
+    """
+    import shutil
+
+    from daintree_assistant_server.prompts.loader import PromptError, PromptLoader
+
+    src = Path(__file__).resolve().parents[2] / "src" / "daintree_assistant_server" / "prompts"
+    staged = tmp_path / "prompts"
+    shutil.copytree(src, staged)
+    PromptLoader(staged).validate()  # baseline: the real prompt set validates
+
+    display = staged / "main" / "display_context.md.j2"
+    display.write_text("   \n", encoding="utf-8")
+    with pytest.raises(PromptError, match="Display context"):
+        PromptLoader(staged).validate()
+
+    # A template that renders prose but drops one of the labelled numbers is the
+    # subtler version of the same break, and must fail too.
+    display.write_text("# Display context\n\nUsable content width: x cells.\n", encoding="utf-8")
+    with pytest.raises(PromptError, match="Pipe-table cap"):
+        PromptLoader(staged).validate()

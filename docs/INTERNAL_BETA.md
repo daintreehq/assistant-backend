@@ -130,8 +130,9 @@ These are load-bearing. Breaking one is a release blocker, not a regression.
     the workflow it actually completed), and the available tool names.
 - The serving provider is built with **no default credential**.
 - Prompt order is cache-critical: stable systems and tools → stable startup user
-  block → visible conversation → one volatile runtime/turn user tail. Never add a
-  volatile system message.
+  block → visible conversation → one volatile runtime/display/turn user tail. Never
+  add a volatile system message — that includes the terminal's own width, which is
+  why the geometry rides the tail and the response contract states no number (#38).
 
 ## 7. Environments
 

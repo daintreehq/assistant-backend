@@ -48,8 +48,10 @@ async def capabilities(
             },
             "system_messages_accepted": False,
             # This backend accepts `runtime.display` — the client's measured
-            # terminal geometry — and shapes the response contract and the output
-            # lint around its `content_width`.
+            # terminal geometry — and shapes the `# Display context` tail block and
+            # the output lint around its `content_width`. It is deliberately NOT in
+            # the response contract: that block is cache-stable system text, and a
+            # per-request width there re-encodes the tool schemas behind it (#38).
             #
             # A GATE, not a nicety. `runtime` is validated with extra="forbid", so
             # sending the block to a deployment that predates it 422s the WHOLE

@@ -22,7 +22,8 @@ or train on data). That is invisible to clients.
   Typed startup/project-instruction fields are bounded, server-framed untrusted data.
 - **Cache-optimized prompt layout.** Stable system layers and tool schemas lead, followed
   by a required session-stable startup block, the append-only visible conversation, and
-  one small volatile runtime/turn tail. See [Prompt assembly](#prompt-assembly--caching).
+  one small volatile runtime/display/turn tail. See
+  [Prompt assembly](#prompt-assembly--caching).
 - **Honest streaming.** Metadata is always the first public SSE event and no private
   speculative model event can precede it. The stream never fabricates a successful
   finish after an upstream failure.
