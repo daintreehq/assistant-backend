@@ -162,8 +162,9 @@ class Settings(BaseSettings):
     )
 
     # ---- Main-model output shape ---------------------------------------
-    # The narrow Daintree terminal is ~56 columns wide; the response contract (the
-    # final system message) and the output linter both reference this width.
+    # The narrow Daintree terminal is ~56 columns wide. The fallback for a client
+    # that reports no width: the display-context tail block and the output linter
+    # both resolve through it.
     main_terminal_width: int = Field(default=56, ge=20, alias="MAIN_TERMINAL_WIDTH")
     # max_tokens policy. The client MAY send generation.max_tokens; when it omits one
     # we apply the default, and either way we clamp to a hard ceiling so a degenerate

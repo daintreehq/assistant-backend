@@ -207,7 +207,7 @@ class RuntimeContext(BaseModel):
     open_terminals: list[OpenTerminal] = Field(default_factory=list)
     # The live render geometry of the surface this reply is drawn in. Republished
     # by the CLI on every resize, so a dragged window lands on the next round.
-    # Read by the response contract and the output lint alike — see
+    # Read by the display-context tail block and the output lint alike — see
     # ``services.output_policy.resolve_content_width``.
     display: DisplayInfo | None = None
 

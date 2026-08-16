@@ -132,11 +132,17 @@ def _transitions(
 
     # 2. runtime-context change: same conversation/skills; the volatile runtime rides
     #    the trailing user-role block, so system+tools must stay byte-identical.
+    #    The display widths straddle WIDE_TERMINAL_WIDTH on purpose (issue #38): a
+    #    resize is the most frequent runtime change there is, and while the geometry
+    #    lived in the response contract this transition read 1.0 only because the
+    #    fixtures never varied it.
     rt1 = {"permission_tier": "operator",
            "worktree": {"current": {"id": "wt-1", "branch": "feature/checkout"}},
+           "display": {"columns": 64, "content_width": 56},
            "open_terminals": [{"id": "t1", "agent_state": "working"}]}
     rt2 = {"permission_tier": "operator",
            "worktree": {"current": {"id": "wt-1", "branch": "feature/checkout-v2"}},
+           "display": {"columns": 180, "content_width": 100},
            "open_terminals": [{"id": "t1", "agent_state": "idle", "exit_code": 0}]}
     before = _body_for(assembler, settings, req([_USER], runtime=rt1), skills)
     after = _body_for(assembler, settings, req([_USER], runtime=rt2), skills)
@@ -219,9 +225,10 @@ def _layer_budget(
     base = loader.base_prompt()
     integrations = assembler.render_integrations(request.runtime)
     skills_block = assembler.render_loaded_skills(skills)
-    contract = assembler.render_response_contract(request.runtime)
+    contract = assembler.render_response_contract()
     startup_block = assembler.render_startup_context(request.startup)
     runtime_block = assembler.render_runtime_context(request.runtime)
+    display_block = assembler.render_display_context(request.runtime)
     footer = assembler.render_turn_footer(request.turn)
     # Conversation bytes from the assembled wire body. EXCLUDE both server-injected
     # user-role blocks: stable startup is counted separately, as is the volatile
@@ -246,6 +253,7 @@ def _layer_budget(
         ("startup_context (stable user block)", startup_block),
         ("conversation", convo),
         ("runtime_context (tail)", runtime_block),
+        ("display_context (tail)", display_block),
         ("turn_footer (tail)", footer),
     ])
     total_bytes = sum(x["bytes"] for x in layers)
@@ -257,7 +265,7 @@ def _layer_budget(
         "total_bytes": total_bytes,
         "total_token_est": total_tok,
         "token_est_note": "chars/4 PROXY (under-counts JSON tool schemas); trend-only. "
-        "Layers are disjoint: the injected runtime/footer tail is counted only once.",
+        "Layers are disjoint: the injected runtime/display/footer tail is counted only once.",
     }
 
 

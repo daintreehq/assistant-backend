@@ -40,13 +40,27 @@ def _messages(built: Any) -> list[dict[str, Any]]:
 
 
 def test_volatile_state_changes_only_the_trailing_tail(assembler, catalog) -> None:
+    """Issue #38: the terminal's own width is volatile state like any other.
+
+    The two requests straddle WIDE_TERMINAL_WIDTH, so both the width and every
+    value derived from it (narrow/wide, the table-column cap) differ. A resize is
+    the common case — the CLI republishes its measured width every round — and
+    while the geometry lived in the response contract it re-encoded the whole
+    system region, the 77 tool schemas behind it, and the conversation.
+    """
     skills = [catalog.skills[0]]
-    a = _messages(_build(assembler, _request(runtime={"permission_tier": "operator"}), skills))
+    a = _messages(
+        _build(
+            assembler,
+            _request(runtime={"permission_tier": "operator", "display": {"content_width": 40}}),
+            skills,
+        )
+    )
     b = _messages(
         _build(
             assembler,
             _request(
-                runtime={"permission_tier": "operator"},
+                runtime={"permission_tier": "operator", "display": {"content_width": 100}},
                 turn={"goal": "a completely different objective this turn"},
             ),
             skills,
@@ -62,6 +76,9 @@ def test_volatile_state_changes_only_the_trailing_tail(assembler, catalog) -> No
         )
     assert a[-1] != b[-1], "the volatile tail should carry the difference"
     assert a[-1]["role"] == "user"
+    # ...and the geometry really is IN that tail, not merely absent from the prefix.
+    assert "Usable content width: 40 terminal cells (narrow)." in a[-1]["content"]
+    assert "Usable content width: 100 terminal cells (wide)." in b[-1]["content"]
 
 
 def test_no_system_message_follows_the_conversation(assembler, catalog) -> None:

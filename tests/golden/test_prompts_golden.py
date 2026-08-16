@@ -278,6 +278,17 @@ def test_response_contract(assembler: PromptAssembler) -> None:
     assert_golden("response_contract.md", assembler.render_response_contract())
 
 
+def test_display_context(assembler: PromptAssembler) -> None:
+    """The volatile geometry block the contract's rules defer to (issue #38).
+
+    Snapshotted at a WIDE measured width: that exercises both derived values
+    (the narrow/wide verdict and the 5-column cap) away from the server default,
+    so a drift in either shows up in the diff.
+    """
+    runtime = RuntimeContext.model_validate({"display": {"columns": 180, "content_width": 100}})
+    assert_golden("display_context.md", assembler.render_display_context(runtime))
+
+
 def test_docs_context(assembler: PromptAssembler) -> None:
     """What the model sees when the server answered a usage question for it.
 
@@ -334,7 +345,13 @@ def test_response_contract_is_final_system_message(assembler: PromptAssembler) -
     system_msgs = [m for m in pr.messages if m["role"] == "system"]
     last_system = system_msgs[-1]
     assert last_system["content"].startswith("# Response contract")
-    assert str(assembler.settings.main_terminal_width) in last_system["content"]
+    # The contract's rules defer to the tail rather than quoting a number, so the
+    # width appears ONLY in the volatile tail (issue #38). A number here would sit
+    # ahead of the tool schemas and re-encode them on every resize.
+    width = str(assembler.settings.main_terminal_width)
+    assert "display context" in last_system["content"]
+    assert width not in last_system["content"]
+    assert width in pr.messages[-1]["content"]
     # And no system message may follow the conversation.
     convo_idx = next(i for i, m in enumerate(pr.messages) if m["content"] == "hi")
     assert all(m["role"] != "system" for m in pr.messages[convo_idx:])

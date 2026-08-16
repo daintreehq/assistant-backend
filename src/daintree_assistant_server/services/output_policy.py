@@ -34,7 +34,7 @@ def resolve_content_width(runtime: RuntimeContext | None, *, fallback: int) -> i
     block means unknown — a pipe, the stdio host, the headless daemon — so the
     server's own default stands rather than a fabricated 80x24.
 
-    One resolver for both consumers on purpose: the response contract the model is
+    One resolver for both consumers on purpose: the display context the model is
     GIVEN and the lint that GRADES what it wrote must quote the same number, or a
     reply gets its tables rewritten for breaking a rule it was never told.
     """
@@ -183,7 +183,7 @@ def lint_output(
     """Lint a final assistant message against the terminal output contract.
 
     ``max_columns`` defaults to the cap for this width, which is the same number
-    the response contract quoted to the model — derived rather than passed so the
+    the display context quoted to the model — derived rather than passed so the
     two cannot drift apart.
     """
     if max_columns is None:

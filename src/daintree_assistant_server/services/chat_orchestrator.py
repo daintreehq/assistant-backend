@@ -1183,7 +1183,7 @@ class ChatOrchestrator:
             text = message.get("content") or ""
             if not text.strip():
                 return []
-            # The SAME width the response contract quoted to the model this turn.
+            # The SAME width the display context quoted to the model this turn.
             # Grading a 100-column reply against a hardcoded 56 is what rewrote
             # perfectly good tables into lists for anyone not in a narrow pane.
             terminal_width = resolve_content_width(
