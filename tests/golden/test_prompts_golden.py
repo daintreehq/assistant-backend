@@ -349,7 +349,7 @@ def test_response_contract_is_final_system_message(assembler: PromptAssembler) -
     # width appears ONLY in the volatile tail (issue #38). A number here would sit
     # ahead of the tool schemas and re-encode them on every resize.
     width = str(assembler.settings.main_terminal_width)
-    assert "display context" in last_system["content"]
+    assert "Display context" in last_system["content"]
     assert width not in last_system["content"]
     assert width in pr.messages[-1]["content"]
     # And no system message may follow the conversation.

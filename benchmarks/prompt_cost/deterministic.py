@@ -232,7 +232,7 @@ def _layer_budget(
     footer = assembler.render_turn_footer(request.turn)
     # Conversation bytes from the assembled wire body. EXCLUDE both server-injected
     # user-role blocks: stable startup is counted separately, as is the volatile
-    # runtime/footer tail, keeping the layer budget disjoint.
+    # runtime/display/footer tail, keeping the layer budget disjoint.
     body = _body_for(assembler, settings, request, skills)
     conv_msgs = [m for m in body["messages"] if m.get("role") != "system"]
     if conv_msgs and str(conv_msgs[0].get("content", "")).startswith(

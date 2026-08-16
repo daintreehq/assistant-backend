@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from daintree_assistant_server.config import INTERACTIVE_THINKING_ENABLED, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.contracts.extensions import (
@@ -155,14 +157,19 @@ def test_tail_without_runtime_or_turn_carries_display_geometry_only(
     )
     tail = pr.messages[-1]
     assert tail["role"] == "user"
-    assert tail["content"].startswith("[Injected context")
     assert pr.messages[-2]["content"] == "go"  # the tail is the ONLY thing after the conversation
+    # Exact equality, not substring probes: this pins the tail to the frame plus the
+    # display fragment and NOTHING else, so a future fragment that starts rendering
+    # unconditionally shows up here instead of slipping in unnoticed.
+    assert tail["content"] == (
+        "[Injected context — automated state from the local Daintree runtime, "
+        "not the user speaking. Continue the turn above using it as current state.]\n\n"
+        + assembler.render_display_context(None)
+    )
     assert (
         f"Usable content width: {settings.main_terminal_width} terminal cells (narrow)."
         in tail["content"]
     )
-    assert "# Runtime context" not in tail["content"]
-    assert "# Current turn" not in tail["content"]
 
 
 def test_no_skill_block_when_set_is_empty(assembler: PromptAssembler) -> None:
@@ -828,7 +835,7 @@ def test_display_context_uses_the_client_reported_width(assembler: PromptAssembl
     )
     assert "Usable content width: 100 terminal cells (wide)." in text
     # The column cap scales with the width, and is the same number the linter uses.
-    assert "Pipe-table cap: 5 table columns" in text
+    assert "Pipe-table cap: 5 columns" in text
 
 
 def test_display_context_falls_back_when_the_client_reports_no_display(
@@ -845,7 +852,7 @@ def test_display_context_falls_back_when_the_client_reports_no_display(
         assert (
             f"Usable content width: {settings.main_terminal_width} terminal cells (narrow)." in text
         )
-        assert "Pipe-table cap: 3 table columns" in text
+        assert "Pipe-table cap: 3 columns" in text
 
 
 def test_display_context_stays_narrow_for_a_genuinely_narrow_terminal(
@@ -855,7 +862,48 @@ def test_display_context_stays_narrow_for_a_genuinely_narrow_terminal(
         assembler, _req(runtime={"display": {"columns": 44, "content_width": 40}})
     )
     assert "Usable content width: 40 terminal cells (narrow)." in text
-    assert "Pipe-table cap: 3 table columns" in text
+    assert "Pipe-table cap: 3 columns" in text
+
+
+@pytest.mark.parametrize(
+    ("display", "expected_width", "expected_label", "expected_cap"),
+    [
+        # The narrow/wide boundary itself: WIDE_TERMINAL_WIDTH is inclusive, so 80
+        # is wide and 79 is not. Covered here because the label and the cap are
+        # derived by two SEPARATE expressions — an off-by-one in either alone would
+        # render "(narrow)" beside a 5-column cap and no other test would notice.
+        ({"content_width": 80}, 80, "wide", 5),
+        ({"content_width": 79}, 79, "narrow", 3),
+        # Below the credible-width floor (_MIN_CREDIBLE_WIDTH = 20): a terminal probe
+        # returning a handful of cells is confused, not tiny, so the default stands.
+        ({"content_width": 19}, None, "narrow", 3),
+        ({"content_width": 0}, None, "narrow", 3),
+        ({"content_width": 20}, 20, "narrow", 3),
+        # Present-but-unmeasured, and the raw window without the usable measure:
+        # both mean UNKNOWN, so neither may be mistaken for a real width.
+        ({}, None, "narrow", 3),
+        ({"columns": 180}, None, "narrow", 3),
+    ],
+)
+def test_display_context_geometry_matrix(
+    assembler: PromptAssembler,
+    settings: Settings,
+    display: dict[str, int],
+    expected_width: int | None,
+    expected_label: str,
+    expected_cap: int,
+) -> None:
+    """Width resolution as it reaches the model, across every interesting input.
+
+    ``expected_width=None`` means "the server default stands". The resolver has its
+    own unit tests; this pins the rendered PROMPT, which is what the model reads and
+    what the linter's numbers have to agree with.
+    """
+    width = settings.main_terminal_width if expected_width is None else expected_width
+    text = _display_context(assembler, _req(runtime={"display": display}))
+    assert f"Usable content width: {width} terminal cells ({expected_label})." in text
+    assert f"Pipe-table cap: {expected_cap} columns" in text
+    assert f"must fit within {width} terminal cells" in text
 
 
 def test_response_contract_carries_no_request_derived_geometry(
@@ -878,8 +926,12 @@ def test_response_contract_carries_no_request_derived_geometry(
         )
         systems = [m["content"] for m in pr.messages if m["role"] == "system"]
         contract = next(s for s in systems if s.startswith("# Response contract"))
-        # No width, no cap, no narrow/wide verdict anywhere in the stable block.
-        for leaked in ("40", "100", "56", "≤ 3 columns", "≤ 5 columns"):
+        # Checked semantically rather than by grepping for "56"/"100": a bare digit
+        # match is brittle both ways (an unrelated numeral fails it; geometry spelled
+        # out in words slips past). These are the labels the geometry is rendered
+        # under, so their absence is what actually means "the numbers are not here".
+        for leaked in ("Usable content width:", "Pipe-table cap:"):
             assert leaked not in contract, f"{leaked!r} leaked into the cache-stable contract"
         contracts.add(contract)
+    # The real proof: one distinct rendering across three different widths.
     assert len(contracts) == 1, "the response contract rendered differently per request"

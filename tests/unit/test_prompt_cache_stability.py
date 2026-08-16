@@ -99,9 +99,10 @@ def test_no_system_message_follows_the_conversation(assembler, catalog) -> None:
 def test_appending_a_turn_preserves_the_previous_prefix(assembler, catalog) -> None:
     """The visible conversation is APPEND-ONLY, so turn N+1 extends turn N's prefix.
 
-    Both requests carry a runtime block so each really HAS a volatile tail to strip;
-    without one, slicing off ``[-1]`` would delete the last conversation message —
-    exactly the message whose preservation this is meant to prove.
+    Both requests carry a runtime block so the tail each strips is the full one. The
+    tail is always present now (the display fragment renders unconditionally), so
+    slicing off ``[-1]`` can no longer eat the last conversation message — but
+    keeping runtime here holds this test on the realistic shape.
     """
     skills = [catalog.skills[0]]
     runtime = {"permission_tier": "operator"}
