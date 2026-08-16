@@ -862,6 +862,25 @@ class OpenRouterProvider:
             if structured:
                 policy = policy.for_structured_call()
             body["provider"] = policy.to_wire()
+        # Cache affinity. OpenRouter keeps a sticky record of which endpoint served
+        # a cached request and routes the next request with the same key back to
+        # it, so a conversation's growing prefix stays on the node that holds it.
+        # Left absent, the key defaults to a hash of the first system message and
+        # the first non-system message — for this assembler that is the invariant
+        # base prompt plus whichever optional row happens to come first (skill
+        # bodies, else the integrations block, else startup), so it changes on
+        # every selector topic shift and differs per machine on a skill-less turn.
+        # Naming the key ourselves replaces that accident with a session.
+        #
+        # A SIBLING of `provider`, deliberately not part of it: the block above is
+        # the endpoint-selection POLICY (filters, sort, fallbacks) and is reused as
+        # a prebuilt module-level dict precisely because it must not vary per
+        # request. Affinity is per-session by definition, so it rides its own
+        # top-level field and leaves that dict untouched. It is likewise not
+        # `provider.order`, which OpenRouter documents as DISABLING sticky routing
+        # — see docs/PROVIDER_POLICY.md section 3.
+        if request.cache_session_id:
+            body["session_id"] = request.cache_session_id
         if stream:
             body["stream"] = True
             if request.include_usage:
@@ -993,6 +1012,11 @@ class OpenRouterProvider:
             # silently downgrade a ZDR request to the default privacy filter on
             # the one path that rebuilds its request from scratch.
             routing=request.routing,
+            # And again: this sub-request carries the parent's whole prompt, so
+            # dropping the affinity key would send the turn's largest call to
+            # whatever endpoint the default hash elects — off the node holding the
+            # prefix, which is the one thing the key exists to prevent.
+            cache_session_id=request.cache_session_id,
         )
         result = await self.complete(sub)
         calls = result.tool_calls

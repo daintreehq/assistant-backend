@@ -46,9 +46,11 @@ prompt prefill, and any reasoning emitted before the first visible token.
 - **`finish_reasons`** — a `length` count on a selector scenario means the model burned
   its whole token cap and the JSON was cut off mid-object. That is a prompt problem,
   not a slow endpoint.
-- **`endpoints`** — OpenRouter re-elects per request across ~24 endpoints. A bimodal
+- **`endpoints`** — these scenarios vary their prompt per trial and send no affinity
+  key, so OpenRouter elects independently across ~24 endpoints. A bimodal
   distribution is usually two different endpoints, not noise, so the endpoint that
-  served each trial is recorded.
+  served each trial is recorded. A served turn behaves differently on purpose — it
+  carries a stable `session_id` and sticks (`docs/PROVIDER_POLICY.md` section 3a).
 - **A discarded warmup trial** runs first: the very first call pays TLS + connection
   setup on a fresh httpx client.
 

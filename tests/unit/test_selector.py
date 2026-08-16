@@ -259,6 +259,10 @@ async def test_selector_uses_json_mode_and_is_hardcoded_non_thinking(
     assert req.thinking_disabled is True
     assert req.reasoning_effort is None
     assert req.max_tokens == settings.selector_max_output_tokens
+    # No upstream cache-affinity key, deliberately: the selector has no growing
+    # per-session prefix to keep warm, and it shares one small structured pool
+    # fleet-wide — a per-session key would only fragment that pool.
+    assert req.cache_session_id is None
 
 
 @pytest.mark.asyncio

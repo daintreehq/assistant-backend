@@ -19,6 +19,7 @@ from daintree_assistant_server.providers.openrouter import (
     OpenRouterProvider,
     _extract_upstream_error,
 )
+from daintree_assistant_server.providers.policy import RoutingPreference
 from daintree_assistant_server.providers.retry import retry_upstream
 
 _BASE = "https://openrouter.ai/api/v1"
@@ -223,6 +224,139 @@ async def test_plain_chat_is_not_tail_bounded() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cache_session_key_rides_as_a_top_level_field() -> None:
+    # OpenRouter's sticky routing keys on a top-level `session_id`, NOT on
+    # anything inside the provider block. Placement is the whole test: a key
+    # nested under `provider` would be an unrecognized preference rather than an
+    # affinity hint, and would fail silently — the request still succeeds, it just
+    # routes as if we had never asked.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(cache_session_id="daintree-main-abc123"))
+    assert captured["body"]["session_id"] == "daintree-main-abc123"
+    assert "session_id" not in captured["body"]["provider"]
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cache_session_key_leaves_the_routing_policy_untouched() -> None:
+    # Affinity must be additive. In particular it must NOT arrive as
+    # `provider.order`, which OpenRouter documents as DISABLING sticky routing and
+    # as taking precedence over `sort` — the exact hand-rolled pin this mechanism
+    # replaces (see docs/PROVIDER_POLICY.md section 3).
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(cache_session_id="daintree-main-abc123"))
+    assert captured["body"]["provider"] == {
+        "sort": "throughput",
+        "data_collection": "deny",
+        "require_parameters": True,
+        "allow_fallbacks": True,
+    }
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_no_cache_session_key_sends_no_field() -> None:
+    # Absent, not null. A caller with no session leaves the router on its own
+    # default keying rather than joining a shared cohort.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req())
+    assert "session_id" not in captured["body"]
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cache_session_key_survives_a_caller_routing_preference() -> None:
+    # The caller-preference branch rebuilds the provider block per request instead
+    # of reusing the prebuilt dict. Affinity is a sibling of that block, so it must
+    # be unaffected — and the caller's own allow/deny list must still be what
+    # filters the pool the sticky endpoint is chosen from.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(
+        _req(
+            cache_session_id="daintree-main-abc123",
+            routing=RoutingPreference(only=("deepinfra",)),
+        )
+    )
+    assert captured["body"]["session_id"] == "daintree-main-abc123"
+    assert captured["body"]["provider"]["only"] == ["deepinfra"]
+    assert "order" not in captured["body"]["provider"]
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cache_session_key_is_sent_on_the_streaming_path() -> None:
+    # open_stream has its own branch through _build_body. A turn streams, so
+    # covering only `complete` would cover the path production never takes.
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=SSE_OK)
+
+    provider = _provider(handler)
+    stream = await provider.open_stream(_req(stream=True, cache_session_id="daintree-main-xyz"))
+    assert captured["body"]["session_id"] == "daintree-main-xyz"
+    await stream.aclose()
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_structured_tool_call_forwards_the_cache_session_key() -> None:
+    # Same trap as the api_key case below: this sub-request is rebuilt field by
+    # field, and it carries the parent's ENTIRE prompt. Dropping the key here
+    # would send the turn's largest call off the node holding its prefix.
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "id": "x",
+                "created": 0,
+                "model": "m",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                                {
+                                    "id": "c1",
+                                    "type": "function",
+                                    "function": {"name": "pick", "arguments": '{"a":1}'},
+                                }
+                            ],
+                        },
+                    }
+                ],
+                "usage": {},
+            },
+        )
+
+    provider = _provider(handler)
+    await provider.structured_tool_call(
+        _req(cache_session_id="daintree-main-abc123"),
+        function_name="pick",
+        function_schema={"type": "object", "properties": {"a": {"type": "integer"}}},
+    )
+    assert captured["body"]["session_id"] == "daintree-main-abc123"
+    await provider.aclose()
+
+
+def test_provider_chat_request_repr_omits_the_cache_session_key() -> None:
+    # A stable per-session correlator, hashed but still a correlator. It rides
+    # `repr=False` beside api_key so a traceback or debug line cannot spread it.
+    text = repr(_req(cache_session_id="daintree-main-abc123"))
+    assert "daintree-main-abc123" not in text
+    assert "cache_session_id" not in text
+
+
+@pytest.mark.asyncio
 async def test_serving_endpoint_is_captured_for_logging() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -256,8 +390,6 @@ async def test_provider_routing_policy_sent_on_streams_too() -> None:
     captured: dict = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        import json as _json
-
         captured["body"] = _json.loads(request.content)
         return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=SSE_OK)
 

@@ -67,6 +67,10 @@ async def test_utility_task_runs_non_thinking_without_headroom(
     profile = task_runner.profiles["terminal_summarize"]
     assert req.max_tokens == profile.max_output_tokens
     assert req.max_tokens < settings.thinking_headroom_tokens
+    # And no upstream cache-affinity key: a utility task is one self-contained
+    # call over text the client supplied, not a turn of a growing conversation,
+    # so there is no per-session prefix for an endpoint to hold.
+    assert req.cache_session_id is None
 
 
 @pytest.mark.asyncio

@@ -193,3 +193,88 @@ def test_live_task_terminal_judge(live_client) -> None:
     out = r.json()["output"]
     assert isinstance(out["matched"], bool)
     assert out["matched"] is True
+
+
+def test_live_cache_affinity_key_is_accepted_and_routes() -> None:
+    # THE HARD ASSERTION — that a request carrying `session_id` still ROUTES.
+    # `require_parameters: true` filters the eligible pool on exactly the parameters
+    # we send. `session_id` is a ROUTER-level field, not a model parameter, so it
+    # should not participate in that filter — but if it ever did, the policy would
+    # match no endpoint and every main turn would 404. Nothing mocked can see that,
+    # because the filter lives at OpenRouter.
+    #
+    # THE OBSERVATION — whether it pins. The two calls differ in their first
+    # non-system message while sharing the large system prefix, so OpenRouter's
+    # DEFAULT key (a hash of the first system and first non-system message) differs
+    # between them. Landing on one endpoint is therefore CONSISTENT with the
+    # explicit key working, where the weaker identical-requests version could not
+    # even show that much.
+    #
+    # It is not proof, and the gap is worth naming: the policy sorts by throughput,
+    # so two independent cold elections tend to pick the same fastest endpoint
+    # anyway, and the compliant pool can be small. A clean causal answer needs a
+    # no-key counterfactual, which is what the paired A/B in
+    # `benchmarks/prompt_cost` exists to run — a paid, multi-call experiment that
+    # does not belong in a contract test.
+    #
+    # So this half is reported as a WARNING, not an assertion. Stickiness is
+    # upstream behaviour we observe rather than a contract we control — it only
+    # activates where cache-read pricing beats prompt pricing — so a hard assert
+    # would make an unrelated OpenRouter pricing change look like a regression
+    # here. A warning survives `pytest -q` on a passing run, which a print does not.
+    import uuid
+    import warnings
+
+    import httpx as _httpx
+
+    from daintree_assistant_server.config import OPENROUTER_MODEL
+    from daintree_assistant_server.providers.base import ProviderChatRequest
+    from daintree_assistant_server.providers.openrouter import OpenRouterProvider
+
+    # Fresh per run: a fixed key would inherit the previous run's sticky record
+    # (they expire after 10 minutes of inactivity) and prove nothing about this one.
+    key = f"daintree-main-livetest-{uuid.uuid4().hex[:12]}"
+    shared_system = "You are terse." + " Answer briefly." * 200
+
+    async def _call() -> list[tuple[str | None, int | None, str]]:
+        client = _httpx.AsyncClient(
+            timeout=_httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
+        )
+        provider = OpenRouterProvider(client, api_key=SecretStr(os.environ["OPENROUTER_API_KEY"]))
+        observed: list[tuple[str | None, int | None, str]] = []
+        try:
+            for turn in ("Say ok.", "Say fine instead."):
+                result = await provider.complete(ProviderChatRequest(
+                    model=OPENROUTER_MODEL,
+                    messages=[
+                        {"role": "system", "content": shared_system},
+                        {"role": "user", "content": turn},
+                    ],
+                    max_tokens=8,
+                    timeout=120.0,
+                    cache_session_id=key,
+                ))
+                observed.append((result.endpoint, result.usage.cached_tokens, result.text))
+        finally:
+            await provider.aclose()
+        return observed
+
+    observed = asyncio.run(_call())
+    # Both calls routed and produced a real completion. `complete` raises on an
+    # unroutable request, so reaching here at all is the routing proof; asserting on
+    # the payload keeps that from degrading into "two exceptions were not raised".
+    assert len(observed) == 2
+    for _endpoint, _cached, text in observed:
+        assert isinstance(text, str)
+    endpoints = [o[0] for o in observed]
+    if None in endpoints:
+        warnings.warn(
+            f"affinity: endpoint not reported, stickiness unobservable ({endpoints})",
+            stacklevel=1,
+        )
+    elif endpoints[0] != endpoints[1]:
+        warnings.warn(
+            f"affinity key did not pin: {endpoints[0]} -> {endpoints[1]} "
+            f"(cached_tokens={[o[1] for o in observed]})",
+            stacklevel=1,
+        )

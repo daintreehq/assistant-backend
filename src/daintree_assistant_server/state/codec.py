@@ -74,7 +74,18 @@ class StateCodec:
 
     # ---- helpers --------------------------------------------------------
 
-    def _session_hash(self, session_id: str | None) -> str:
+    def session_hash(self, session_id: str | None) -> str:
+        """A salted, stable pseudonym for a client session id.
+
+        Public because it has a second consumer beyond token binding: the
+        orchestrator derives the upstream cache-affinity key from it, and that key
+        crosses to a third party, so it must not be the raw client string. Same
+        salt, so the pseudonym is stable across stateless instances without any
+        of them storing it — which is the same property the token binding needs.
+
+        Returns ``""`` for an absent id: a sessionless caller gets no binding and
+        no affinity key rather than one shared pseudonym for everybody.
+        """
         if not session_id:
             return ""
         return hashlib.sha256(session_id.encode("utf-8") + self._salt).hexdigest()
@@ -99,7 +110,7 @@ class StateCodec:
         payload = {
             "v": TOKEN_VERSION,
             "kid": self._current_kid,
-            "session_hash": self._session_hash(session_id),
+            "session_hash": self.session_hash(session_id),
             "active_skills": [{"id": sid} for sid in active_skills],
             "catalog_revision": catalog_revision,
             "last_turn_id": turn_id,
@@ -178,7 +189,7 @@ class StateCodec:
         # hash for the supplied session_id. A session-bound token replayed with a
         # missing/different session (expected hash "") is a mismatch, so it cannot
         # carry one session's active skills into another.
-        if payload.session_hash != self._session_hash(session_id):
+        if payload.session_hash != self.session_hash(session_id):
             return StateVerification(valid=False, payload=payload, reason=REASON_SESSION_MISMATCH)
 
         return StateVerification(valid=True, payload=payload, reason=None)

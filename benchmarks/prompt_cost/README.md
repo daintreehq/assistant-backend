@@ -7,6 +7,7 @@ bytes `OpenRouterProvider` would POST.
 ```bash
 python -m benchmarks.prompt_cost.bench run              # deterministic (free, CI-able)
 python -m benchmarks.prompt_cost.bench run --live        # + live cache/TTFB (paid)
+python -m benchmarks.prompt_cost.bench run --live --affinity-ab   # + cache-affinity A/B (paid)
 python -m benchmarks.prompt_cost.bench report results/<f>.json
 ```
 
@@ -42,6 +43,36 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
 - **Streaming TTFB** and **composed first-byte** through the real orchestrator
   (selector → assembly → main stream) — the latency a selector-firing turn actually
   costs the user.
+
+**Cache-affinity A/B (`--live --affinity-ab`, issue #42):** runs a three-turn
+session twice — once with **no** affinity key (the pre-change baseline, where
+OpenRouter falls back to hashing the first system and first non-system message) and
+once with a stable `session_id` (what the server sends today) — and reports endpoint
+switches plus mean cache ratio after the first turn. The sequence **shifts the
+active skill set between turns on purpose**: the skill block is the first non-system
+message, so a shift is exactly what invalidates the default key while leaving the
+invariant head above it reusable.
+
+The two arms take **disjoint, run-randomized slices of the catalog**, and the
+treatment key is fresh per run. That is what keeps arm order from deciding the
+result *within* a run: the skill block is the only thing below the invariant head
+that the default sticky key hashes, so disjoint slices mean neither arm can warm the
+other's prefix or leave a sticky record the other inherits.
+
+Across runs it is weaker, and worth knowing before you read a delta. The no-key
+arm's key is OpenRouter's default — a hash of the base prompt and the skill block,
+both fixed content — so the offset is the only freshness available and the catalog
+affords only a couple of dozen positions; two runs can draw overlapping slices, and
+served traffic may have used those blocks anyway. **A rerun is not guaranteed
+cold**: space runs beyond the 10-minute sticky idle window if independence matters.
+The invariant head above the skill block stays shared in every case, deliberately —
+every Daintree request shares it, so both arms meeting it warm is the production
+condition, not a confound.
+
+One run is still indicative rather than significant — re-run before concluding.
+Endpoint switch rate is diagnostic only: an endpoint is many GPU workers, so the
+same name is not the same cache, and the count reports `n/a` when any endpoint went
+unreported. See `docs/PROVIDER_POLICY.md` section 3a.
 
 ## Latest deterministic snapshot
 

@@ -190,3 +190,44 @@ def test_non_ascii_body_is_ignored_not_an_error() -> None:
     result = codec.verify("dst1.b\u00f3dy.sig", session_id="s1")
     assert result.valid is False
     assert result.reason == REASON_INVALID
+
+
+def test_session_hash_is_a_stable_salted_pseudonym() -> None:
+    # The orchestrator derives the upstream cache-affinity key from this, and that
+    # key leaves the deployment. Two properties carry that use: the raw client id
+    # must not survive the hash, and two instances sharing the salt must agree —
+    # a per-instance value would give one session a different key per instance and
+    # defeat the affinity it exists to create.
+    clock = [1000.0]
+    digest = _codec(clock).session_hash("ses1")
+    assert digest == _codec(clock).session_hash("ses1")
+    assert len(digest) == 64
+    assert all(c in "0123456789abcdef" for c in digest)
+    assert "ses1" not in digest
+
+
+def test_session_hash_separates_sessions_and_salts() -> None:
+    # Distinct sessions must not collide onto one key (that would be a shared
+    # cohort, not affinity), and the salt must actually participate — an unsalted
+    # digest of a client-supplied id is reversible by anyone who can guess it.
+    clock = [1000.0]
+    a = _codec(clock).session_hash("ses1")
+    b = _codec(clock).session_hash("ses2")
+    assert a != b
+    other_salt = StateCodec(
+        current_key=b"current-key",
+        current_kid="k1",
+        salt=b"different-salt",
+        ttl_seconds=100,
+        clock=lambda: clock[0],
+    )
+    assert other_salt.session_hash("ses1") != a
+
+
+def test_session_hash_of_no_session_is_empty() -> None:
+    # Empty rather than a digest of "": a sessionless caller must get NO affinity
+    # key, not one shared pseudonym that would herd every such caller onto a
+    # single endpoint.
+    codec = _codec([1000.0])
+    assert codec.session_hash(None) == ""
+    assert codec.session_hash("") == ""

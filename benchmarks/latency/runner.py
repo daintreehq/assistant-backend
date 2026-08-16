@@ -35,8 +35,12 @@ scenario's p90 is often a repair rate in disguise.
 
 TRIALS AND WARMUP. Each scenario runs ``--trials`` times with a discarded warmup
 trial, because the very first call pays TLS + connection setup on a fresh httpx
-client. Endpoint choice is recorded per trial: OpenRouter re-elects per request, so
-a bimodal latency distribution is usually two different endpoints rather than noise.
+client. Endpoint choice is recorded per trial: these scenarios vary their prompt
+per trial and send no affinity key, so each trial is elected independently and a
+bimodal latency distribution is usually two different endpoints rather than noise.
+(That is a property of the BENCHMARK, not of the router — a served turn does send
+a stable ``session_id`` and is deliberately sticky. See docs/PROVIDER_POLICY.md
+section 3a.)
 """
 
 from __future__ import annotations

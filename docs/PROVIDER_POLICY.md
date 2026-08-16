@@ -129,6 +129,76 @@ parameter, and with `require_parameters` on, sending an unadvertised parameter c
 empty the eligible pool. Prefix caching is implicit at whichever endpoint serves
 the request.
 
+### 3a. Cache affinity — `session_id`, and why not `provider.order`
+
+Prefix caches are **node-local**. The invariant head of a main request — base
+prompt, response contract, tool schemas — is ~29.5k tokens, and a turn whose
+rounds land on different endpoints re-encodes all of it on every bounce, however
+well the prompt is laid out. Keeping one conversation on one endpoint is
+therefore worth more than any byte-level layout change left to make.
+
+OpenRouter already implements this. After a request that used prompt caching it
+remembers which endpoint served it and routes the next request with the same
+**sticky key** back there; the key expires after 10 minutes of inactivity, and an
+error from the sticky endpoint leaves the record unchanged so the next request
+re-routes. Both of those are failure modes we would otherwise have to build.
+
+**What we send.** Main conversation calls carry a top-level `session_id` — a
+sibling of the `provider` block, not part of it — naming the sticky key
+explicitly:
+
+```json
+{"session_id": "daintree-main-<sha256(session id + salt)>"}
+```
+
+It is a salted digest, never the client's own session id: the field crosses to a
+third party, and a client session id is opaque local text we make no promises
+about. The salt is shared by every instance, so the key is stable across a
+stateless fleet without any instance storing it. A JSON-mode main call gets a
+`daintree-main-json-` namespace instead, because validation rejects
+`response_format` alongside tools — so it carries none of the tool schemas — and
+`response_format` also routes it through the tail-bounded structured pool above.
+Sharing one key across the two shapes would let each evict the other's sticky
+endpoint for a prefix that endpoint does not hold.
+
+**Why name the key rather than let it default.** Left absent, OpenRouter derives
+the key by hashing the first system message and the first non-system message.
+For this assembler the first system message is the invariant base prompt, and the
+first non-system message is whichever optional row happens to exist first — the
+active skill bodies, else the integrations block, else startup context. So the
+default key changes on **every selector topic shift**, exactly when most of the
+prefix is still reusable, and falls through to a per-machine MCP endpoint URL on a
+turn with no active skill. That is not a policy anyone chose; it is a side effect
+of the message layout. Naming the key replaces it with the session.
+
+**Why the selector, utility tasks and skill learning send no key.** They have no
+growing per-session prefix for an endpoint to hold: each is one self-contained
+call, and the structured ones share a single small pool fleet-wide that a
+per-session key would only fragment. Skill learning additionally runs *after* the
+response, so pulling it onto the node serving that user's foreground turns would
+buy nothing.
+
+**Why not `provider.order`.** It is the obvious hand-rolled alternative — carry
+the last serving endpoint and ask for it first — and it is the wrong one on three
+counts. OpenRouter documents that sticky routing **is not used** when a manual
+`provider.order` is present, so the pin would replace the native mechanism rather
+than reinforce it; `order` takes precedence over `sort`, so a session would stay
+pinned to an endpoint that had since gone slow, with none of the 10-minute expiry
+or error-driven re-route above; and the endpoint name we can actually observe is
+the display name OpenRouter reports on a response (`CoreWeave`, `Baidu`), not the
+lowercase request-side slug `order` takes. `session_id` needs none of that: it is
+derived from data already in hand, and the router owns the pin.
+
+**What is *not* claimed.** An endpoint is many GPU workers, so affinity improves
+the odds that a prefix is resident — it does not guarantee it, and whether the
+provider routes prefix-aware *within* an endpoint is invisible to us. Sticky
+routing also only activates where cache-read pricing beats regular prompt
+pricing. And a caller on a non-default routing policy (`zdr`, or their own
+`only`/`ignore`) is filtered to a different pool and therefore sits in its own
+cache cohort regardless — a documented cost of honouring the preference, not
+something to engineer away. `session_id` is additive: it never narrows the pool,
+and the caller's own `only`/`ignore` still decides what that pool is.
+
 ## 4. Privacy — what is and is not promised
 
 > **`data_collection: "deny"` is a no-training guarantee.**

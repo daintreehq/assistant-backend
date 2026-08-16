@@ -122,6 +122,20 @@ class ProviderChatRequest:
     # Already normalized to the typed form by the request boundary; the adapter
     # never sees raw client input here.
     routing: RoutingPreference | None = None
+    # An OPAQUE cache-affinity key for this call, or ``None`` to let the router
+    # pick its own. A router that fronts many hosts for the same weights keeps
+    # prefix caches node-locally, so it needs to know which calls belong to one
+    # growing conversation in order to send them back to the host already holding
+    # that prefix. This is that key — routing metadata, never prompt content.
+    #
+    # It is NOT the client's session id. The value is a pseudonym derived from it
+    # (see ``ChatOrchestrator._cache_session_key``): the field crosses to a third
+    # party, and a raw client identifier has no business doing so. The name says
+    # ``cache_`` precisely so a future caller does not read ``session_id`` and
+    # forward the real one. ``repr=False`` keeps it out of logs alongside
+    # ``api_key`` — it is a stable per-session correlator even though it is
+    # hashed.
+    cache_session_id: str | None = field(default=None, repr=False)
 
 
 @dataclass
