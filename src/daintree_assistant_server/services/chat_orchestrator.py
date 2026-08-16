@@ -123,6 +123,17 @@ class _RespondMeta:
     # rather than a wire field: `cost.complete` is the single flag a client is
     # told to trust, so the fact travels to `turn_cost` and is folded into that.
     selector_cost_complete: bool = True
+    # Which upstream endpoint served the classification, carried here so it can
+    # be logged BESIDE the selector's cache ratio rather than only in the
+    # preparation-latency line. Internal for the same reason as above: the CLI
+    # was never told which of ~24 hosts answered, and this is a diagnosis for
+    # whoever reads the logs. `None` when selection did not run, or when the
+    # provider named no endpoint.
+    #
+    # A repaired selection reports the endpoint that produced the ANSWER; the
+    # discarded first attempt's host is not kept. `selector_calls` (in the
+    # `respond` line, same request_id) is what says the ratio blends two calls.
+    selector_endpoint: str | None = None
 
 
 @dataclass
@@ -493,6 +504,12 @@ class ChatOrchestrator:
             budget=budget,
         )
         result = await self._complete_with_retry(prepared.provider_request, budget=budget)
+        # Snapshot BEFORE the re-roll: it returns the repaired result in `result`'s
+        # place, and only the usage is carried across (`sum_usage` inside). The
+        # first attempt's host would otherwise be unrecoverable — on exactly the
+        # turns worth measuring, since a re-roll is where a routing switch can
+        # blend two caches into one ratio.
+        first_endpoint = result.endpoint
         # A round that only announced a tool call it never emitted would end the turn
         # having performed nothing. Re-roll it once here, before anything is built or
         # sent, so neither the client nor the transcript ever sees the dead draft.
@@ -519,8 +536,17 @@ class ChatOrchestrator:
         log_turn_usage(
             result.usage,
             request_id=request_id,
+            turn_id=request.session.turn_id,
+            session_round=request.session.round,
             stream=False,
             finish_reason=result.finish_reason,
+            endpoint=result.endpoint,
+            # Both attempts, deduped by the sink. Without a re-roll these are the
+            # same value and the count is 1; with one they may differ, which is
+            # the whole signal.
+            observed_endpoints=(first_endpoint, result.endpoint),
+            selector_usage=prepared.meta.skills.selector.usage,
+            selector_endpoint=prepared.meta.selector_endpoint,
             turn_cost=turn_cost,
         )
         body = self._build_nonstream_body(
@@ -1579,6 +1605,7 @@ class ChatOrchestrator:
             selector_cost_complete=(
                 decision.usage.cost_complete if decision.usage is not None else True
             ),
+            selector_endpoint=decision.endpoint,
         )
 
     # ---- response bodies ------------------------------------------------
@@ -1852,6 +1879,16 @@ class ChatOrchestrator:
         # attempt that reported NOTHING looks like, and `sum_usage` has to be
         # able to tell that gap from an accumulator with nothing in it yet.
         carried_usage: ProviderUsage | None = None
+        # Endpoint attribution for the usage accumulating beside it: every host
+        # that contributed tokens to `carried_usage`, and the one that served the
+        # attempt finally accepted. Updated wherever `carried_usage` is, so the
+        # two can never describe different sets of attempts.
+        #
+        # Bounded, not open-ended: this loop runs at most twice (the round, then
+        # one bare-intent re-roll). A tool-continuation round is a NEW request
+        # with its own `turn_usage` line, joined to this one by `turn_id`.
+        main_endpoints: list[str | None] = []
+        main_endpoint: str | None = None
         # The discarded draft, kept only until the re-roll's stream actually opens.
         # Up to that point nothing of the retry is public, so the first attempt is
         # still replay-safe and remains the honest fail-open answer.
@@ -2037,6 +2074,14 @@ class ChatOrchestrator:
                     carried_usage = sum_usage(
                         carried_usage, opened_stream.usage or ProviderUsage()
                     )
+                    # Read at the FOLD, not at the open-timing log: the endpoint is
+                    # named by the first chunk that carries it, so by now it is as
+                    # complete as this attempt will ever make it. Kept as the
+                    # accepted one too — if the re-roll's open then fails, this
+                    # draft is what the turn falls open to, and its host is the
+                    # honest attribution for the tokens being reported.
+                    main_endpoints.append(opened_stream.endpoint)
+                    main_endpoint = opened_stream.endpoint or main_endpoint
                     # Hand off ownership BEFORE tearing anything down: the draft has
                     # to survive a close failure, or a teardown error would cost the
                     # user a reply that is complete and in hand.
@@ -2071,6 +2116,8 @@ class ChatOrchestrator:
                 carried_usage = sum_usage(
                     carried_usage, opened_stream.usage or ProviderUsage()
                 )
+                main_endpoints.append(opened_stream.endpoint)
+                main_endpoint = opened_stream.endpoint or main_endpoint
                 if attempt:
                     self._log_bare_intent(
                         "completed",
@@ -2152,8 +2199,14 @@ class ChatOrchestrator:
             log_turn_usage(
                 final_usage,
                 request_id=meta.request_id,
+                turn_id=request.session.turn_id,
+                session_round=request.session.round,
                 stream=True,
                 finish_reason=finish_reason,
+                endpoint=main_endpoint,
+                observed_endpoints=main_endpoints,
+                selector_usage=meta.skills.selector.usage,
+                selector_endpoint=meta.selector_endpoint,
                 turn_cost=turn_cost_with_speculation(
                     final_usage,
                     meta,

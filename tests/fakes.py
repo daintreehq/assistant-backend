@@ -28,6 +28,7 @@ def make_result(
     finish_reason: str = "stop",
     model: str = "deepseek-v4-flash",
     usage: ProviderUsage | None = None,
+    endpoint: str | None = None,
 ) -> ProviderChatResult:
     message: dict[str, Any] = {"role": "assistant"}
     if content is not None:
@@ -43,6 +44,7 @@ def make_result(
         choices=[{"index": 0, "message": message, "finish_reason": finish_reason}],
         usage=usage or ProviderUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15),
         finish_reason=finish_reason,
+        endpoint=endpoint,
         raw={},
     )
 
@@ -125,10 +127,14 @@ class FakeStream(ProviderStream):
         usage: ProviderUsage | None = None,
         error_at: int | None = None,
         error: Exception | None = None,
+        endpoint: str | None = None,
     ) -> None:
         self._chunks = list(chunks)
         self._index = 0
         self.usage = usage
+        # The real stream reads this off the first chunk naming it; a fake sets it
+        # up front. Consumers only ever read it, so the distinction is invisible.
+        self.endpoint = endpoint
         self._error_at = error_at
         self._error = error
         self.closed = False
@@ -314,6 +320,7 @@ def selection_result(
     task_type: str = "task",
     docs_query: str | None = None,
     usage: ProviderUsage | None = None,
+    endpoint: str | None = None,
 ) -> ProviderChatResult:
     """A selector completion result: the choice as a JSON object in ``content``.
 
@@ -339,4 +346,5 @@ def selection_result(
         or ProviderUsage(
             prompt_tokens=3000, completion_tokens=50, total_tokens=3050, cached_tokens=2800
         ),
+        endpoint=endpoint,
     )

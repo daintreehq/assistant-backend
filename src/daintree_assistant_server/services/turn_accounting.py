@@ -18,9 +18,11 @@ control flow it happens to be called from.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from typing import TYPE_CHECKING
 
 from ..contracts.daintree_api import RespondUsage, TurnCost
+from ..contracts.extensions import SelectorUsage
 from ..observability import get_logger
 from ..providers.base import ProviderUsage
 
@@ -112,12 +114,33 @@ def turn_cost(
         complete=known_complete,
     )
 
+
+def cache_ratio(prompt_tokens: int | None, cached_tokens: int | None) -> float | None:
+    """Share of a prompt that the serving endpoint answered from its prefix cache.
+
+    ``None`` rather than ``0.0`` when the prompt is unreported or empty, for the
+    same reason an unreported cost stays ``None``: a zero here reads as "the
+    cache did nothing", which is a claim about cache health that a missing
+    denominator cannot support.
+    """
+    prompt = prompt_tokens or 0
+    if not prompt:
+        return None
+    return round((cached_tokens or 0) / prompt, 3)
+
+
 def log_turn_usage(
     usage: ProviderUsage,
     *,
     request_id: str,
+    turn_id: str,
+    session_round: int,
     stream: bool,
     finish_reason: str | None,
+    endpoint: str | None,
+    observed_endpoints: Collection[str | None],
+    selector_usage: SelectorUsage | None,
+    selector_endpoint: str | None,
     turn_cost: TurnCost | None = None,
 ) -> None:
     """What this turn cost the caller, as metadata.
@@ -130,23 +153,76 @@ def log_turn_usage(
     the one most worth watching regress: the assembler's whole layout is
     built to keep the tool schemas byte-stable, and a drop here is the first
     symptom that something started re-encoding them.
+
+    A ratio alone cannot say WHY it dropped, which is why the endpoint that
+    produced it is logged beside it. OpenRouter fronts ~24 endpoints for these
+    weights and each keeps its OWN node-local prefix cache, so under
+    throughput-sorted routing with fallbacks a re-rolled round can be answered
+    by a host that has never seen this prefix. Without attribution, a prompt
+    layout regression and a routing switch are the same number.
+
+    ``endpoint`` names the host that served the generation these figures
+    describe. ``distinct_endpoints`` counts how many distinct hosts contributed
+    tokens to them, so a blended ratio identifies itself: ``1`` is the ordinary
+    case, ``>1`` says the ratio averages caches that were never the same cache,
+    and ``0`` says no attempt reported a name.
+
+    Two exclusions from that count are deliberate:
+
+    * the SELECTOR's endpoint, which gets its own ``selector_`` fields. It sends
+      a different prompt prefix, so it shares no cache with the main call and
+      routinely lands elsewhere; folding it in would make ``>1`` fire on nearly
+      every turn and mean nothing;
+    * a LOSING speculative stream, which was billed but whose tokens are not in
+      ``usage``. The count describes the ratio it sits beside, not the bill —
+      ``turn_cost_usd`` is where that spend is already accounted for.
+
+    ``turn_id``/``round`` are what make the count answerable beyond this
+    request. A turn outlives one call: its tool-continuation rounds are separate
+    requests sharing a ``turn_id``, and this server is stateless by design, so
+    it cannot count across them itself. Logging the key hands that job to the
+    query — group by ``turn_id``, count distinct ``endpoint`` — instead of to a
+    counter no Cloud Run instance could hold.
     """
     prompt = usage.prompt_tokens or 0
     logger.info(
         "turn_usage",
         request_id=request_id,
+        turn_id=turn_id,
+        round=session_round,
         stream=stream,
         finish_reason=finish_reason,
         prompt_tokens=prompt,
         completion_tokens=usage.completion_tokens or 0,
         cached_tokens=usage.cached_tokens or 0,
-        cache_ratio=(round((usage.cached_tokens or 0) / prompt, 3) if prompt else None),
+        cache_ratio=cache_ratio(prompt, usage.cached_tokens),
+        # Which of the ~24 hosts produced the ratio above, and whether that
+        # ratio is a single cache's or a blend of several.
+        endpoint=endpoint,
+        distinct_endpoints=len({name for name in observed_endpoints if name}),
         cost_usd=usage.cost,
+        # The selector's own cache health, alongside the main call's. It is a
+        # separate prefix on a separately-routed call, so it regresses (and is
+        # fixed) independently — reading it off the main ratio would be reading
+        # the wrong number.
+        selector_endpoint=selector_endpoint,
+        selector_prompt_tokens=(
+            selector_usage.prompt_tokens if selector_usage is not None else None
+        ),
+        selector_cached_tokens=(
+            selector_usage.cached_tokens if selector_usage is not None else None
+        ),
+        selector_cache_ratio=(
+            cache_ratio(selector_usage.prompt_tokens, selector_usage.cached_tokens)
+            if selector_usage is not None
+            else None
+        ),
         # The figure that answers "what did this request cost me?" — every
         # upstream call the turn made, including the selector.
         turn_cost_usd=turn_cost.total if turn_cost else None,
         selector_cost_usd=turn_cost.selector if turn_cost else None,
     )
+
 
 def response_usage(usage: ProviderUsage) -> RespondUsage:
     return RespondUsage(
