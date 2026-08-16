@@ -369,14 +369,17 @@ def test_selector_system(loader: PromptLoader) -> None:
 
 
 def test_selector_system_cold(loader: PromptLoader) -> None:
-    """The no-active-skills render — a genuinely DIFFERENT prompt, not a trivial case.
+    """The no-active-skills render — the branch every opening message takes.
 
-    The reason budget is conditional on ``active_ids``: with nothing loaded there is no
-    keep-vs-evict judgement to work through, so the prompt asks for a terser reason and
-    the selector emits fewer tokens on the path that gates a cold turn's first byte.
+    The reason budget is still conditional on ``active_ids``: with nothing loaded there
+    is no keep-vs-evict judgement to work through, so the prompt asks for a terser
+    reason and the selector emits fewer tokens on the path that gates a cold turn's
+    first byte. What changed is WHERE that condition renders — it trails the catalog
+    now instead of leading it, so both cohorts share one cacheable prefix (issue #43).
     The warm snapshot above renders the 300-character branch and would stay green
     through any change to the cold one, so this is the only byte-level coverage the
-    cold branch has — and it is the branch every opening message takes.
+    cold branch's wording has. Its POSITION is guarded separately, on bytes, by
+    ``tests/unit/test_prompt_cache_stability.py``.
     """
     catalog = _fixture_catalog()
     rendered = loader.render(

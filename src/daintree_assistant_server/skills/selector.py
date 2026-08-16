@@ -47,7 +47,8 @@ from .catalog import Catalog, CatalogManager
 _REPAIR_INSTRUCTION = (
     "Your previous response was not a valid JSON object. Reply now with ONLY a "
     "JSON object (no prose, no code fence) with these keys in this order: "
-    "task_type (a short string), reason (a SHORT string, well under 300 characters), "
+    "task_type (a short string), reason (a SHORT string, within the per-turn reason "
+    "budget the system prompt gave you), "
     "skill_ids (an array of catalog skill IDs, possibly empty), confidence "
     "(a number between 0 and 1), and docs_query (a short documentation search "
     "string, or null if this turn is not a question about how Daintree itself "
@@ -546,8 +547,8 @@ class Selector:
         routing: RoutingPreference | None = None,
     ) -> SelectionDecision:
         catalog = self.catalog
-        # The catalog block is request-invariant; the active set is rendered ONCE
-        # after it, as a single trailing line. Keeping per-turn state out of the
+        # The catalog block is request-invariant; everything the active set varies
+        # is confined to the two-line tail after it. Keeping per-turn state out of the
         # id-sorted loop is the selector's only prompt-cache lever: this call
         # always sets response_format, and the provider withholds prompt_cache_key
         # whenever it does, so the upstream can only match a shared content prefix —
@@ -580,11 +581,18 @@ class Selector:
         """The selector system prompt, memoised.
 
         The largest render on the turn's first-byte path — the whole catalog as a
-        classification menu, ~28 KB across 26 skills — and a pure function of
-        (catalog revision, active set, cap). The catalog block is deliberately
-        request-invariant, so the only thing that varies between calls is the
-        short trailing active-set line, and consecutive turns in a session
-        usually share even that.
+        classification menu, tens of KB, growing with every skill added (the
+        measured size is in `benchmarks/baseline.json`) — and a pure function of
+        (catalog revision, active set, cap). The active set is the only
+        per-request input, and it is confined to the two trailing lines: the
+        catalog and everything above it render the same bytes for every caller,
+        so the upstream prefix cache sees one prompt rather than one per cohort.
+        Consecutive turns in a session usually share the tail too.
+
+        That confinement is load-bearing, not incidental — prefix caching matches
+        from token 0, so a per-request value spliced in above the catalog would
+        fork everything after it. `tests/unit/test_prompt_cache_stability.py`
+        asserts it on bytes; keep new conditionals in the tail.
 
         Keyed on the catalog REVISION rather than held on the catalog object,
         because skill learning can swap the catalog underneath at any time: a

@@ -318,8 +318,8 @@ def test_the_selector_prompt_is_memoised_per_catalog_and_active_set(
     assert first == second
     assert sel._system_cache.hits >= 1
 
-    # A different active set is a different prompt — the trailing active-set line
-    # is the one part that varies between calls.
+    # A different active set is a different prompt — the trailing active-set and
+    # reason-budget lines are the only part that varies between calls.
     other = sel._render_system(cat, sorted(cat.known_ids)[1:2])
     assert other != first
 
