@@ -11,8 +11,8 @@ state must produce a byte-identical stable prefix, with all the variation confin
 to the single trailing user-role tail.
 
 The same invariant recurs one level DOWN, inside a single message string: the
-selector's system prompt is ~28 KB of catalog rendered as one message, and a
-per-request value spliced into its opening lines forks the prefix hash for
+selector's system prompt is the whole catalog rendered as one message — tens of
+KB — and a per-request value spliced into its opening lines forks the prefix for
 everything after it just as surely as a volatile system message does. Prefix
 caching matches from token 0 with no suffix matching and no realignment, so the
 rule is identical in both places — per-request state rides at the END.
@@ -173,7 +173,6 @@ def test_the_active_set_changes_selector_bytes_only_after_the_catalog(
 
     marker = "\nCurrently active skills: "
     heads: dict[str, list[str]] = {}
-    tails: set[str] = set()
     for active in active_sets:
         rendered = selector._render_system(catalog, active)
         assert rendered.count(marker) == 1, (
@@ -183,28 +182,38 @@ def test_the_active_set_changes_selector_bytes_only_after_the_catalog(
             "(this test would partition the prompt in the wrong place)"
         )
         head, _, tail = rendered.partition(marker)
-        heads.setdefault(head, []).append(",".join(active) or "<empty>")
-        tails.add(tail)
+        heads.setdefault(head, []).append(", ".join(active) or "<empty>")
+        # The tail is where the difference is SUPPOSED to land, so check each one
+        # renders its own active set rather than that the tails merely differ —
+        # id-joining is not injective if an id ever contains the separator.
+        assert tail.startswith(f"{', '.join(active) or 'none'}\n"), (
+            f"the tail does not open with the active set it was rendered for: {tail[:80]!r}"
+        )
 
     assert len(heads) == 1, (
         "the active set changed selector prompt bytes BEFORE the trailing tail, "
         "forking the catalog-scale shared prefix that every call depends on; "
         f"cohorts: {sorted(v[0] for v in heads.values())}"
     )
-    assert len(tails) == len(active_sets), "each active set should render its own tail"
 
     # ...and the marker really does sit after the WHOLE catalog, so the assertion
-    # above is a guarantee about all ~28 KB of it and not about a short preamble.
-    # Every FIELD of every entry, not just the ids: a layout that moved summaries
-    # or whenToUse below the boundary would still pass an id-only check while
-    # leaving catalog-scale bytes exposed to the fork.
+    # above covers all of it and not a short preamble. The exact rendered block per
+    # entry, not its values loose in the text: ids and phrases recur inside other
+    # skills' whenToUse, so a substring search passes on an incidental match, and a
+    # layout that moved summaries below the boundary would slip by an id-only check.
     head = next(iter(heads))
     for entry in catalog.selector_metadata():
-        for field in ("id", "summary", "when_to_use"):
-            assert str(entry[field]) in head, (
-                f"{entry['id']}'s {field} renders AFTER the active-set boundary — "
-                "the shared prefix no longer covers the whole catalog"
-            )
+        foundation = " [foundation]" if entry["foundation"] else ""
+        block = (
+            f"- id: {entry['id']}{foundation}\n"
+            f"  summary: {entry['summary']}\n"
+            f"  whenToUse: {entry['when_to_use']}"
+        )
+        assert block in head, (
+            f"{entry['id']} does not render as a whole entry above the active-set "
+            "boundary — either the shared prefix no longer covers the whole catalog, "
+            "or the catalog block's layout changed (update this test)"
+        )
 
 
 def test_identical_inputs_are_byte_identical(assembler, catalog) -> None:

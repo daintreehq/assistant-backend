@@ -581,7 +581,8 @@ class Selector:
         """The selector system prompt, memoised.
 
         The largest render on the turn's first-byte path — the whole catalog as a
-        classification menu, ~28 KB across 26 skills — and a pure function of
+        classification menu, tens of KB, growing with every skill added (the
+        measured size is in `benchmarks/baseline.json`) — and a pure function of
         (catalog revision, active set, cap). The active set is the only
         per-request input, and it is confined to the two trailing lines: the
         catalog and everything above it render the same bytes for every caller,
