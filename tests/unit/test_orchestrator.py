@@ -2367,11 +2367,7 @@ async def test_stream_turn_usage_names_the_endpoint_that_served_it(
     orchestrator: ChatOrchestrator,
     fake_provider: FakeProvider,
 ) -> None:
-    """The streaming half: the endpoint is read at the usage fold, not at open.
-
-    A stream names its host on the first chunk that carries one, so by the fold
-    the value is as complete as the attempt will ever make it.
-    """
+    """The streaming half: the accepted stream's host reaches the log line."""
     from structlog.testing import capture_logs
 
     fake_provider.selection_result = selection_result(
@@ -2451,6 +2447,183 @@ async def test_a_provider_that_names_no_endpoint_reports_none_not_a_switch(
     assert entry["endpoint"] is None
     assert entry["distinct_endpoints"] == 0
     assert entry["selector_endpoint"] is None
+
+
+@pytest.mark.asyncio
+async def test_an_accepted_reroll_that_named_no_host_does_not_inherit_the_drafts(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The stale-attribution trap on the accepted fold.
+
+    `main_endpoint = opened_stream.endpoint or main_endpoint` reads as harmless
+    and is not: when the accepted re-roll names no host, the OR silently labels
+    the ratio with the DISCARDED draft's endpoint — a node that served none of
+    the tokens being reported. `None` is the honest answer.
+    """
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.stream_factory = lambda request: FakeStream(
+        make_text_chunks("Read five votes; here is the tally.")
+        if _nudged(request)
+        else make_text_chunks(_DEAD_ROUND),
+        endpoint=None if _nudged(request) else "deepinfra",
+    )
+    with capture_logs() as logs:
+        outcome = await orchestrator.complete(
+            _intent_stream_request("bi-endpoint-stale"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+        assert outcome.stream is not None
+        await _drain(outcome.stream)
+    assert len(fake_provider.stream_requests) == 2, "the draft must have been re-rolled"
+    entry = _turn_usage(logs)
+    assert entry["endpoint"] is None, "the accepted attempt named no host"
+    # The draft's host is still KNOWN to have contributed tokens, so it is still
+    # counted — the count and the attribution answer different questions.
+    assert entry["distinct_endpoints"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_reroll_that_never_opened_keeps_the_drafts_endpoint(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The fail-open path, and the reason the discarded fold assigns at all.
+
+    When the re-roll's stream never opens, the turn falls open to the draft
+    already in hand — so the draft's host IS the honest attribution for the
+    tokens being reported, and must survive the loop breaking early.
+    """
+    from structlog.testing import capture_logs
+
+    opens = itertools.count()
+
+    def factory(request: object) -> ProviderStream:
+        if next(opens) > 0:
+            raise upstream_error("the re-roll never opened")
+        return FakeStream(make_text_chunks(_DEAD_ROUND), endpoint="deepinfra")
+
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.stream_factory = factory  # type: ignore[assignment]
+    with capture_logs() as logs:
+        outcome = await orchestrator.complete(
+            _intent_stream_request("bi-endpoint-failopen"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+        assert outcome.stream is not None
+        events = await _drain(outcome.stream)
+    assert any(e.startswith("event: done") for e in events), (
+        "the turn must still answer from the draft it already has"
+    )
+    entry = _turn_usage(logs)
+    assert entry["endpoint"] == "deepinfra"
+    assert entry["distinct_endpoints"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_repaired_selection_that_named_no_host_reports_none(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The same stale-attribution rule, on the selector's own repair.
+
+    A malformed selection is re-asked once. If the repair names no host, the
+    answer's endpoint is unknown — labelling it with the discarded attempt's
+    host would put a node beside a selector cache ratio it did not produce.
+    """
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = [
+        make_result(content="not json at all", endpoint="deepinfra"),
+        selection_result([], usage=ProviderUsage(prompt_tokens=3000, cost=0.0004)),
+    ]
+    fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            _intent_body_request("bi-endpoint-sel-repair"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    assert len(fake_provider.selection_requests) == 2, "the selection must have been repaired"
+    entry = _turn_usage(logs)
+    assert entry["selector_endpoint"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_repaired_selection_reports_the_host_that_answered(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """Positive control: when the repair DOES name a host, that is the answer's
+    attribution — not the discarded first attempt's."""
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = [
+        make_result(content="not json at all", endpoint="deepinfra"),
+        selection_result(
+            [], usage=ProviderUsage(prompt_tokens=3000, cost=0.0004), endpoint="novita"
+        ),
+    ]
+    fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            _intent_body_request("bi-endpoint-sel-repair-ok"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    entry = _turn_usage(logs)
+    assert entry["selector_endpoint"] == "novita"
+
+
+@pytest.mark.asyncio
+async def test_the_turn_key_reaches_the_log_from_a_real_continuation_round(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The key is only useful if the CONTINUATION rounds carry it too.
+
+    Those are the separate requests the grouping has to span, and they are the
+    ones that skip selection — so this also pins that a skipped selector reports
+    no cache figures rather than zeros.
+    """
+    from structlog.testing import capture_logs
+
+    # A state token whose turn matches the request's IS the continuation shape:
+    # selection is skipped, which is exactly why these rounds need the key to be
+    # groupable with the round that did select.
+    state = orchestrator.state_codec.issue(
+        session_id="sess-cont",
+        active_skills=[],
+        catalog_revision=orchestrator.catalog.revision,
+        turn_id="turn-cont",
+        instruction_revision=0,
+    )
+    request = RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": "sess-cont", "turn_id": "turn-cont", "round": 2},
+            "input": {"messages": [{"role": "user", "content": "read the votes"}]},
+            "startup": {},
+            "generation": {"stream": False},
+            "state": state,
+        }
+    )
+    fake_provider.complete_result = make_result(content="Tallied.", endpoint="deepinfra")
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        )
+    entry = _turn_usage(logs)
+    assert entry["session_id"] == "sess-cont"
+    assert entry["turn_id"] == "turn-cont"
+    assert entry["round"] == 2
+    assert entry["endpoint"] == "deepinfra"
+    assert entry["selector_cache_ratio"] is None
+    assert entry["selector_prompt_tokens"] is None
 
 
 @pytest.mark.asyncio

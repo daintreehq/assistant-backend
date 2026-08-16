@@ -536,6 +536,7 @@ class ChatOrchestrator:
         log_turn_usage(
             result.usage,
             request_id=request_id,
+            session_id=request.session.id,
             turn_id=request.session.turn_id,
             session_round=request.session.round,
             stream=False,
@@ -2081,7 +2082,7 @@ class ChatOrchestrator:
                     # draft is what the turn falls open to, and its host is the
                     # honest attribution for the tokens being reported.
                     main_endpoints.append(opened_stream.endpoint)
-                    main_endpoint = opened_stream.endpoint or main_endpoint
+                    main_endpoint = opened_stream.endpoint
                     # Hand off ownership BEFORE tearing anything down: the draft has
                     # to survive a close failure, or a teardown error would cost the
                     # user a reply that is complete and in hand.
@@ -2117,7 +2118,16 @@ class ChatOrchestrator:
                     carried_usage, opened_stream.usage or ProviderUsage()
                 )
                 main_endpoints.append(opened_stream.endpoint)
-                main_endpoint = opened_stream.endpoint or main_endpoint
+                # Assigned, never OR-ed: an accepted attempt that named no host
+                # leaves this `None`, which is the truth. Falling back to the
+                # discarded draft's host would attribute the ratio being logged
+                # to a node that served none of it.
+                #
+                # The fail-open path (the re-roll never opened) is why the fold
+                # above assigns too: it breaks before reaching here, so attempt
+                # 0's host survives as the attribution for the draft the turn
+                # actually falls open to.
+                main_endpoint = opened_stream.endpoint
                 if attempt:
                     self._log_bare_intent(
                         "completed",
@@ -2199,6 +2209,7 @@ class ChatOrchestrator:
             log_turn_usage(
                 final_usage,
                 request_id=meta.request_id,
+                session_id=request.session.id,
                 turn_id=request.session.turn_id,
                 session_round=request.session.round,
                 stream=True,

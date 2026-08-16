@@ -672,7 +672,12 @@ class Selector:
             usage = _sum_usage(usage, repair.usage)
             # The repair may land on a different endpoint than the first attempt;
             # the one that produced the ANSWER is the useful attribution.
-            endpoint = repair.endpoint or endpoint
+            #
+            # Assigned, never OR-ed: a repair that named no host leaves this
+            # `None`, which is what we know. Keeping the discarded attempt's host
+            # would label the answer — and the selector cache ratio logged beside
+            # it — with a node that did not produce it.
+            endpoint = repair.endpoint
             parsed = parse_select_args(
                 repair.text, self.catalog, self.settings.max_active_skills
             )

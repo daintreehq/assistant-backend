@@ -28,6 +28,7 @@ def _log(**overrides: Any) -> dict[str, Any]:
     kwargs: dict[str, Any] = {
         "usage": ProviderUsage(prompt_tokens=1000, completion_tokens=50, cached_tokens=750),
         "request_id": "req_1",
+        "session_id": "sess_1",
         "turn_id": "turn_1",
         "session_round": 0,
         "stream": False,
@@ -60,20 +61,22 @@ def test_cache_ratio_rounds_to_three_places() -> None:
 
 
 def test_an_unmeasurable_ratio_is_none_rather_than_zero() -> None:
-    """A missing denominator cannot support "the cache did nothing".
+    """A missing number cannot support "the cache did nothing".
 
-    Same rule as an unreported cost: zero is a claim about cache health, and a
-    prompt nobody counted is not evidence for it.
+    Same rule as an unreported cost, with a sharper edge: an absent cost merely
+    sits there, but a fabricated 0.0 here lands in whatever average a dashboard
+    takes and drags it down — so the absence of a measurement would MOVE the one
+    number this work exists to watch.
     """
     assert cache_ratio(None, 750) is None
+    assert cache_ratio(1000, None) is None
     assert cache_ratio(0, 0) is None
 
 
 def test_a_genuinely_cold_prompt_still_reports_zero() -> None:
-    """The counterpart: a prompt that WAS counted and cached nothing is a real
-    0.0, and must not be blurred into the "unknown" case above."""
+    """The counterpart: an endpoint that counted its hits and found none is a
+    real 0.0, and must not be blurred into the "unknown" case above."""
     assert cache_ratio(1000, 0) == 0.0
-    assert cache_ratio(1000, None) == 0.0
 
 
 # ---- main-call attribution ----------------------------------------------
@@ -165,6 +168,48 @@ def test_the_turn_key_is_logged_so_rounds_can_be_grouped() -> None:
     entry = _log(turn_id="turn_abc", session_round=3)
     assert entry["turn_id"] == "turn_abc"
     assert entry["round"] == 3
+
+
+def test_the_session_is_logged_because_turn_ids_are_not_globally_unique() -> None:
+    """`turn_id` is a caller-supplied string, unique only WITHIN a session.
+
+    Grouping on it alone would merge unrelated turns from different callers that
+    happened to pick the same name — and then report their two endpoints as an
+    endpoint switch inside one turn, manufacturing exactly the finding this
+    field exists to detect.
+    """
+    first = _log(session_id="sess_alice", turn_id="turn-1", endpoint="deepinfra")
+    second = _log(session_id="sess_bob", turn_id="turn-1", endpoint="novita")
+    assert first["session_id"] == "sess_alice"
+    assert second["session_id"] == "sess_bob"
+    assert first["turn_id"] == second["turn_id"], "the collision this key disambiguates"
+
+
+# ---- honesty about what was not reported --------------------------------
+
+
+def test_a_call_that_reported_no_tokens_declines_to_state_a_ratio() -> None:
+    """An empty usage record is what a real call that told us nothing looks like.
+
+    The token counts fall back to zero (they are counts of what we saw), but the
+    ratio must not: 0.0 would report a stone-cold cache on a turn where nothing
+    was measured at all.
+    """
+    entry = _log(usage=ProviderUsage())
+    assert entry["prompt_tokens"] == 0
+    assert entry["completion_tokens"] == 0
+    assert entry["cached_tokens"] == 0
+    assert entry["cache_ratio"] is None
+
+
+def test_a_counted_prompt_with_uncounted_hits_declines_too() -> None:
+    """The subtler half: the denominator arrived and the numerator did not.
+
+    A ratio here would look perfectly well-formed and be pure invention.
+    """
+    entry = _log(usage=ProviderUsage(prompt_tokens=1000, cached_tokens=None))
+    assert entry["prompt_tokens"] == 1000
+    assert entry["cache_ratio"] is None
 
 
 # ---- what was already there ---------------------------------------------
