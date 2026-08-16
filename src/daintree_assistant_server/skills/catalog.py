@@ -153,8 +153,10 @@ class Catalog:
 
         Nothing here varies per turn, so the rendered catalog block is byte-stable
         across every selector call for a given catalog revision. The active set is
-        passed to the template separately and rendered once after this block; when
-        it was an inline per-skill marker, activating an early-sorting skill
+        passed to the template separately, and everything it varies — the ids
+        themselves and the reason budget they select — renders in the short tail
+        after this block; when it was an inline per-skill marker, activating an
+        early-sorting skill
         invalidated most of the prompt on DeepSeek's content-prefix cache (the
         selector cannot use ``prompt_cache_key`` at all — the provider withholds it
         whenever ``response_format`` is set, which the selector always sets).

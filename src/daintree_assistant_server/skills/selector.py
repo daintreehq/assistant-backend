@@ -47,7 +47,8 @@ from .catalog import Catalog, CatalogManager
 _REPAIR_INSTRUCTION = (
     "Your previous response was not a valid JSON object. Reply now with ONLY a "
     "JSON object (no prose, no code fence) with these keys in this order: "
-    "task_type (a short string), reason (a SHORT string, well under 300 characters), "
+    "task_type (a short string), reason (a SHORT string, within the per-turn reason "
+    "budget the system prompt gave you), "
     "skill_ids (an array of catalog skill IDs, possibly empty), confidence "
     "(a number between 0 and 1), and docs_query (a short documentation search "
     "string, or null if this turn is not a question about how Daintree itself "
@@ -546,8 +547,8 @@ class Selector:
         routing: RoutingPreference | None = None,
     ) -> SelectionDecision:
         catalog = self.catalog
-        # The catalog block is request-invariant; the active set is rendered ONCE
-        # after it, as a single trailing line. Keeping per-turn state out of the
+        # The catalog block is request-invariant; everything the active set varies
+        # is confined to the two-line tail after it. Keeping per-turn state out of the
         # id-sorted loop is the selector's only prompt-cache lever: this call
         # always sets response_format, and the provider withholds prompt_cache_key
         # whenever it does, so the upstream can only match a shared content prefix —

@@ -148,10 +148,17 @@ def test_the_active_set_changes_selector_bytes_only_after_the_catalog(
 
     ``active_ids`` is the only per-request input to this render, and the catalog it
     would fork is the single largest block on the turn's first-byte path. A fork
-    anywhere above the trailing active-set line splits every caller into two
-    cohorts that share no prefix worth caching, for whatever wording nicety
-    prompted it — so this asserts on BYTES rather than on the one phrasing that
-    happened to break it, and fails on ANY future early fork.
+    anywhere above the trailing active-set line splits callers into cohorts that
+    share no prefix worth caching, for whatever wording nicety prompted it — so
+    this asserts on BYTES rather than on the one phrasing that happened to break
+    it, and does not care WHAT the early difference is.
+
+    It sweeps the shapes an active set actually takes — empty, every single id,
+    and each cardinality up to the cap — because a fork does not have to key on
+    emptiness: ``{% if active_ids | length > 1 %}``, or a branch on one specific
+    id, would sail past a single cold-vs-warm pair. What it cannot see is a fork
+    on some FUTURE per-request argument to ``_render_system`` that it never
+    varies; adding one means adding it here too.
 
     Deliberately rendered through ``_render_system`` against the REAL catalog, so
     it guards the bytes production actually sends.
@@ -160,26 +167,44 @@ def test_the_active_set_changes_selector_bytes_only_after_the_catalog(
     selectable = sorted(catalog.selectable_ids)
     assert selectable, "no selectable skills — the test would prove nothing"
 
-    cold = selector._render_system(catalog, [])
-    warm = selector._render_system(catalog, [selectable[0]])
+    cap = selector.settings.max_active_skills
+    active_sets: list[list[str]] = [[], *([sid] for sid in selectable)]
+    active_sets += [selectable[:n] for n in range(2, cap + 1) if len(selectable) >= n]
 
     marker = "\nCurrently active skills: "
-    assert cold.count(marker) == warm.count(marker) == 1, (
-        "the active-set marker is not unique — a skill's summary/whenToUse now "
-        "contains it, so this test would partition the prompt in the wrong place"
-    )
-    cold_head, _, cold_tail = cold.partition(marker)
-    warm_head, _, warm_tail = warm.partition(marker)
+    heads: dict[str, list[str]] = {}
+    tails: set[str] = set()
+    for active in active_sets:
+        rendered = selector._render_system(catalog, active)
+        assert rendered.count(marker) == 1, (
+            f"expected exactly one {marker.strip()!r} boundary, found "
+            f"{rendered.count(marker)} — either the line was renamed/reformatted "
+            "(update this test) or a skill's summary/whenToUse now contains it "
+            "(this test would partition the prompt in the wrong place)"
+        )
+        head, _, tail = rendered.partition(marker)
+        heads.setdefault(head, []).append(",".join(active) or "<empty>")
+        tails.add(tail)
 
-    assert cold_head == warm_head, (
+    assert len(heads) == 1, (
         "the active set changed selector prompt bytes BEFORE the trailing tail, "
-        "forking the catalog-scale shared prefix that every call depends on"
+        "forking the catalog-scale shared prefix that every call depends on; "
+        f"cohorts: {sorted(v[0] for v in heads.values())}"
     )
+    assert len(tails) == len(active_sets), "each active set should render its own tail"
+
     # ...and the marker really does sit after the WHOLE catalog, so the assertion
     # above is a guarantee about all ~28 KB of it and not about a short preamble.
+    # Every FIELD of every entry, not just the ids: a layout that moved summaries
+    # or whenToUse below the boundary would still pass an id-only check while
+    # leaving catalog-scale bytes exposed to the fork.
+    head = next(iter(heads))
     for entry in catalog.selector_metadata():
-        assert f"- id: {entry['id']}" in cold_head
-    assert cold_tail != warm_tail, "the tail should carry the whole difference"
+        for field in ("id", "summary", "when_to_use"):
+            assert str(entry[field]) in head, (
+                f"{entry['id']}'s {field} renders AFTER the active-set boundary — "
+                "the shared prefix no longer covers the whole catalog"
+            )
 
 
 def test_identical_inputs_are_byte_identical(assembler, catalog) -> None:
