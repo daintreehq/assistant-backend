@@ -2239,6 +2239,402 @@ async def test_body_reroll_with_both_attempts_reported_stays_complete(
     assert outcome.body["cost"]["complete"] is True
 
 
+# ---- endpoint attribution for cache_ratio (issue #41) -------------------
+#
+# `cache_ratio` was logged without saying which of OpenRouter's ~24 endpoints
+# produced it. Each keeps its own node-local prefix cache, so a prompt layout
+# regression and a routing switch were the same number. These tests pin the
+# attribution end-to-end through both response paths.
+
+
+def _turn_usage(logs: list[dict[str, Any]]) -> dict[str, Any]:
+    entries = [entry for entry in logs if entry["event"] == "turn_usage"]
+    assert len(entries) == 1, f"expected exactly one turn_usage record, got {len(entries)}"
+    return entries[0]
+
+
+@pytest.mark.asyncio
+async def test_body_turn_usage_names_the_endpoint_that_served_it(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The main and selector ratios each carry their own host.
+
+    They are different prompt prefixes on separately-routed calls, so they share
+    no cache and regress independently — one endpoint field could only ever be
+    right about one of them.
+    """
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = selection_result(
+        [],
+        usage=ProviderUsage(prompt_tokens=3000, cached_tokens=2400, cost=0.0004),
+        endpoint="novita",
+    )
+    fake_provider.complete_result = make_result(
+        content="Read five votes; here is the tally.",
+        usage=ProviderUsage(prompt_tokens=1000, completion_tokens=50, cached_tokens=750),
+        endpoint="deepinfra",
+    )
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            _intent_body_request("bi-endpoint"), upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    entry = _turn_usage(logs)
+    assert entry["endpoint"] == "deepinfra"
+    assert entry["cache_ratio"] == 0.75
+    assert entry["selector_endpoint"] == "novita"
+    assert entry["selector_cache_ratio"] == 0.8
+    # The selector's host is NOT folded into the main count: it lands elsewhere
+    # routinely under throughput sorting, and counting it would make a switch
+    # look like it happened on every turn.
+    assert entry["distinct_endpoints"] == 1
+    # The key that lets a query span the turn's later continuation rounds, which
+    # are separate requests this stateless server cannot count across.
+    assert entry["turn_id"] == "turn-1"
+    assert entry["round"] == 0
+
+
+@pytest.mark.asyncio
+async def test_body_reroll_keeps_the_discarded_drafts_endpoint(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The trap this change exists to avoid.
+
+    `_repair_bare_intent` returns the repaired result in the original's place,
+    carrying only the summed usage across. The discarded draft's host is
+    unrecoverable after that assignment — and a re-roll is exactly where a
+    routing switch blends two caches into the one ratio being logged, so losing
+    it would lose the measurement on the turns that need it most.
+    """
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.complete_result = [
+        make_result(
+            content=_DEAD_ROUND,
+            usage=ProviderUsage(prompt_tokens=1000, cached_tokens=900),
+            endpoint="deepinfra",
+        ),
+        make_result(
+            content="Read five votes; here is the tally.",
+            usage=ProviderUsage(prompt_tokens=1000, cached_tokens=0),
+            endpoint="novita",
+        ),
+    ]
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            _intent_body_request("bi-endpoint-reroll"), upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    assert len(fake_provider.requests) == 2, "the draft must actually have been re-rolled"
+    entry = _turn_usage(logs)
+    assert entry["distinct_endpoints"] == 2
+    # The accepted attempt is the attribution; the count is what says the ratio
+    # beside it averages two caches that were never the same cache.
+    assert entry["endpoint"] == "novita"
+    assert entry["cache_ratio"] == 0.45
+
+
+@pytest.mark.asyncio
+async def test_body_reroll_onto_the_same_endpoint_is_not_a_switch(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """Positive control: a re-roll that landed back on the same host blended
+    nothing, and must not read as a routing switch."""
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.complete_result = [
+        make_result(content=_DEAD_ROUND, endpoint="deepinfra"),
+        make_result(content="Read five votes; here is the tally.", endpoint="deepinfra"),
+    ]
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            _intent_body_request("bi-endpoint-same"), upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    entry = _turn_usage(logs)
+    assert entry["distinct_endpoints"] == 1
+    assert entry["endpoint"] == "deepinfra"
+
+
+@pytest.mark.asyncio
+async def test_stream_turn_usage_names_the_endpoint_that_served_it(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The streaming half: the accepted stream's host reaches the log line."""
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = selection_result(
+        [], usage=ProviderUsage(prompt_tokens=3000, cost=0.0004), endpoint="novita"
+    )
+    fake_provider.stream_factory = lambda _request: FakeStream(
+        make_text_chunks("Read five votes; here is the tally."), endpoint="deepinfra"
+    )
+    with capture_logs() as logs:
+        outcome = await orchestrator.complete(
+            _intent_stream_request("bi-endpoint-stream"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+        assert outcome.stream is not None
+        await _drain(outcome.stream)
+    entry = _turn_usage(logs)
+    assert entry["endpoint"] == "deepinfra"
+    assert entry["distinct_endpoints"] == 1
+    assert entry["selector_endpoint"] == "novita"
+    assert entry["stream"] is True
+
+
+@pytest.mark.asyncio
+async def test_stream_reroll_counts_both_endpoints(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The stream loop's accumulator tracks the same attempts its usage does.
+
+    Both folds update it, so the discarded draft's host survives the re-roll the
+    way its tokens do.
+    """
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.stream_factory = lambda request: FakeStream(
+        make_text_chunks("Read five votes; here is the tally.")
+        if _nudged(request)
+        else make_text_chunks(_DEAD_ROUND),
+        endpoint="novita" if _nudged(request) else "deepinfra",
+    )
+    with capture_logs() as logs:
+        outcome = await orchestrator.complete(
+            _intent_stream_request("bi-endpoint-stream-reroll"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+        assert outcome.stream is not None
+        await _drain(outcome.stream)
+    assert len(fake_provider.stream_requests) == 2, "the draft must have been re-rolled"
+    entry = _turn_usage(logs)
+    assert entry["distinct_endpoints"] == 2
+    assert entry["endpoint"] == "novita"
+
+
+@pytest.mark.asyncio
+async def test_a_provider_that_names_no_endpoint_reports_none_not_a_switch(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """`None` is "not reported", not a host.
+
+    A single-host provider never sets it, and counting the absence would invent
+    a routing switch out of a provider that simply stayed quiet.
+    """
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            _intent_body_request("bi-endpoint-silent"), upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    entry = _turn_usage(logs)
+    assert entry["endpoint"] is None
+    assert entry["distinct_endpoints"] == 0
+    assert entry["selector_endpoint"] is None
+
+
+@pytest.mark.asyncio
+async def test_an_accepted_reroll_that_named_no_host_does_not_inherit_the_drafts(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The stale-attribution trap on the accepted fold.
+
+    `main_endpoint = opened_stream.endpoint or main_endpoint` reads as harmless
+    and is not: when the accepted re-roll names no host, the OR silently labels
+    the ratio with the DISCARDED draft's endpoint — a node that served none of
+    the tokens being reported. `None` is the honest answer.
+    """
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.stream_factory = lambda request: FakeStream(
+        make_text_chunks("Read five votes; here is the tally.")
+        if _nudged(request)
+        else make_text_chunks(_DEAD_ROUND),
+        endpoint=None if _nudged(request) else "deepinfra",
+    )
+    with capture_logs() as logs:
+        outcome = await orchestrator.complete(
+            _intent_stream_request("bi-endpoint-stale"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+        assert outcome.stream is not None
+        await _drain(outcome.stream)
+    assert len(fake_provider.stream_requests) == 2, "the draft must have been re-rolled"
+    entry = _turn_usage(logs)
+    assert entry["endpoint"] is None, "the accepted attempt named no host"
+    # The draft's host is still KNOWN to have contributed tokens, so it is still
+    # counted — the count and the attribution answer different questions.
+    assert entry["distinct_endpoints"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_reroll_that_never_opened_keeps_the_drafts_endpoint(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The fail-open path, and the reason the discarded fold assigns at all.
+
+    When the re-roll's stream never opens, the turn falls open to the draft
+    already in hand — so the draft's host IS the honest attribution for the
+    tokens being reported, and must survive the loop breaking early.
+    """
+    from structlog.testing import capture_logs
+
+    opens = itertools.count()
+
+    def factory(request: object) -> ProviderStream:
+        if next(opens) > 0:
+            raise upstream_error("the re-roll never opened")
+        return FakeStream(make_text_chunks(_DEAD_ROUND), endpoint="deepinfra")
+
+    fake_provider.selection_result = _priced_selection()
+    fake_provider.stream_factory = factory  # type: ignore[assignment]
+    with capture_logs() as logs:
+        outcome = await orchestrator.complete(
+            _intent_stream_request("bi-endpoint-failopen"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+        assert outcome.stream is not None
+        events = await _drain(outcome.stream)
+    assert any(e.startswith("event: done") for e in events), (
+        "the turn must still answer from the draft it already has"
+    )
+    # Pin the branch, not just the outcome: without these the test would still
+    # pass if the re-roll stopped happening at all, which is a different bug
+    # wearing the same log line.
+    assert len(fake_provider.stream_requests) == 2, "the re-roll must have been attempted"
+    assert any(
+        entry["event"] == "main_bare_intent_retry" and entry.get("phase") == "failed_open"
+        for entry in logs
+    ), "the fail-open branch must be the one that ran"
+    entry = _turn_usage(logs)
+    assert entry["endpoint"] == "deepinfra"
+    assert entry["distinct_endpoints"] == 1
+
+
+@pytest.mark.asyncio
+async def test_a_repaired_selection_that_named_no_host_reports_none(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The same stale-attribution rule, on the selector's own repair.
+
+    A malformed selection is re-asked once. If the repair names no host, the
+    answer's endpoint is unknown — labelling it with the discarded attempt's
+    host would put a node beside a selector cache ratio it did not produce.
+    """
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = [
+        make_result(content="not json at all", endpoint="deepinfra"),
+        selection_result([], usage=ProviderUsage(prompt_tokens=3000, cost=0.0004)),
+    ]
+    fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            _intent_body_request("bi-endpoint-sel-repair"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    assert len(fake_provider.selection_requests) == 2, "the selection must have been repaired"
+    entry = _turn_usage(logs)
+    assert entry["selector_endpoint"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_repaired_selection_reports_the_host_that_answered(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """Positive control: when the repair DOES name a host, that is the answer's
+    attribution — not the discarded first attempt's."""
+    from structlog.testing import capture_logs
+
+    fake_provider.selection_result = [
+        make_result(content="not json at all", endpoint="deepinfra"),
+        selection_result(
+            [], usage=ProviderUsage(prompt_tokens=3000, cost=0.0004), endpoint="novita"
+        ),
+    ]
+    fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            _intent_body_request("bi-endpoint-sel-repair-ok"),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    entry = _turn_usage(logs)
+    assert entry["selector_endpoint"] == "novita"
+
+
+@pytest.mark.asyncio
+async def test_the_turn_key_reaches_the_log_from_a_real_continuation_round(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The key is only useful if the CONTINUATION rounds carry it too.
+
+    Those are the separate requests the grouping has to span, and they are the
+    ones that skip selection — so this also pins that a skipped selector reports
+    no cache figures rather than zeros.
+    """
+    from structlog.testing import capture_logs
+
+    # A state token whose turn matches the request's IS the continuation shape:
+    # selection is skipped, which is exactly why these rounds need the key to be
+    # groupable with the round that did select.
+    state = orchestrator.state_codec.issue(
+        session_id="sess-cont",
+        active_skills=[],
+        catalog_revision=orchestrator.catalog.revision,
+        turn_id="turn-cont",
+        instruction_revision=0,
+    )
+    request = RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": "sess-cont", "turn_id": "turn-cont", "round": 2},
+            "input": {"messages": [{"role": "user", "content": "read the votes"}]},
+            "startup": {},
+            "generation": {"stream": False},
+            "state": state,
+        }
+    )
+    fake_provider.complete_result = make_result(content="Tallied.", endpoint="deepinfra")
+    with capture_logs() as logs:
+        await orchestrator.complete(
+            request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        )
+    entry = _turn_usage(logs)
+    assert entry["session_id"] == "sess-cont"
+    assert entry["turn_id"] == "turn-cont"
+    assert entry["round"] == 2
+    assert entry["endpoint"] == "deepinfra"
+    assert entry["selector_ran"] is False
+    assert entry["selector_cache_ratio"] is None
+    assert entry["selector_prompt_tokens"] is None
+
+
 @pytest.mark.asyncio
 async def test_a_repaired_selection_that_half_reported_makes_the_turn_a_floor(
     orchestrator: ChatOrchestrator,
