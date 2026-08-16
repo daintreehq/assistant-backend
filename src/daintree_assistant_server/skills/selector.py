@@ -591,7 +591,7 @@ class Selector:
 
         That confinement is load-bearing, not incidental — prefix caching matches
         from token 0, so a per-request value spliced in above the catalog would
-        fork all ~28 KB after it. `tests/unit/test_prompt_cache_stability.py`
+        fork everything after it. `tests/unit/test_prompt_cache_stability.py`
         asserts it on bytes; keep new conditionals in the tail.
 
         Keyed on the catalog REVISION rather than held on the catalog object,
