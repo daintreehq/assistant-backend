@@ -328,7 +328,9 @@ def test_docs_context_is_empty_without_a_lookup(assembler: PromptAssembler) -> N
     assert assembler.render_docs_context(DocsLookup(query="x", sections=[])) == ""
 
 
-def test_response_contract_is_final_system_message(assembler: PromptAssembler) -> None:
+def test_response_contract_is_final_system_message(
+    assembler: PromptAssembler, catalog: Catalog
+) -> None:
     # The output-shape contract is the FINAL system message — so the tool schemas
     # serialize directly behind it (system content anywhere else in the array is
     # hoisted into DeepSeek's system region and busts the tools+conversation cache).
@@ -338,10 +340,19 @@ def test_response_contract_is_final_system_message(assembler: PromptAssembler) -
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "hi"}]},
             "startup": _startup_payload(),
-            "runtime": {"permission_tier": "operator"},
+            "runtime": {
+                "permission_tier": "operator",
+                "mcp_servers": [{"name": "daintree"}],
+            },
         }
     )
-    pr = assembler.build_main_request(request=req, skills=[], upstream_model="m")
+    # Skills AND integrations are supplied deliberately: with both absent the
+    # count-of-two assertion below holds under the OLD layout too, and would prove
+    # nothing. These are exactly the two blocks issue #39 moved out of the system
+    # region, so the request has to contain them for the check to bite.
+    pr = assembler.build_main_request(
+        request=req, skills=[catalog.skills[0]], upstream_model="m"
+    )
     system_msgs = [m for m in pr.messages if m["role"] == "system"]
     last_system = system_msgs[-1]
     assert last_system["content"].startswith("# Response contract")

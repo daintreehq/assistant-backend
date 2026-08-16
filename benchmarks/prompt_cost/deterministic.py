@@ -83,6 +83,12 @@ def _stability(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     full_b, full_a = cacheable_region_bytes(before), cacheable_region_bytes(after)
     return {
         "system_tools_stable": round(common_prefix_len(st_b, st_a) / len(st_a), 6),
+        # The RATIO alone cannot carry a floor: it divides by len(after), so an
+        # `after` region that is a strict PREFIX of `before` scores 1.0 while the two
+        # differ — a regression that dropped the tool schemas entirely would read as
+        # perfectly stable. The floors gate on this boolean; the ratio is for
+        # reporting, and for seeing how far a genuine drop went.
+        "system_tools_identical": st_b == st_a,
         "system_tools_bytes": len(st_a),
         "full_prefix": round(common_prefix_len(full_b, full_a) / len(full_a), 6),
         "full_region_bytes": len(full_a),
@@ -244,13 +250,14 @@ def _layer_budget(
     # skill and integration bytes into "conversation" and silently misreport both.
     body = _body_for(assembler, settings, request, skills)
     conv_msgs = [m for m in body["messages"] if m.get("role") != "system"]
-    injected_heads = (
-        "[Injected skill context",
-        "[Injected integrations context",
-        "[Injected startup context",
-    )
-    while conv_msgs and str(conv_msgs[0].get("content", "")).startswith(injected_heads):
-        conv_msgs = conv_msgs[1:]
+    # Strip each injected row by EXACT content equality against the block we just
+    # rendered, at most one per block, in assembly order. Prefix-matching on
+    # "[Injected …" would also eat a genuine first conversation message that happened
+    # to open with that marker, and would MISS a block the byte cap truncated,
+    # double-counting it into `conversation`.
+    for block in (skills_block, integrations, startup_block):
+        if block.strip() and conv_msgs and conv_msgs[0].get("content") == block:
+            conv_msgs = conv_msgs[1:]
     if conv_msgs and str(conv_msgs[-1].get("content", "")).startswith("[Injected context"):
         conv_msgs = conv_msgs[:-1]
     convo = "".join(dumps(m).decode("utf-8") for m in conv_msgs)
@@ -341,23 +348,33 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
                       build_respond_request(messages=[_USER]), skills)
     wire_matches = dumps(probe) == wire_bytes(probe)
 
-    continuity = [
-        t for t in transitions
-        if t["transition"]
-        in {
-            "tool_continuation",
-            "runtime_context_change",
-            "startup_context_change",
-            "skill_topic_shift",
-            "new_session",
-        }
-    ]
+    required = {
+        "tool_continuation",
+        "runtime_context_change",
+        "startup_context_change",
+        "skill_topic_shift",
+        "new_session",
+    }
+    continuity = [t for t in transitions if t["transition"] in required]
+    # Every gated transition must actually have RUN. `skill_topic_shift` is emitted
+    # only when two distinct skills are available, so a catalog that shrank below two
+    # would drop it from the list — and `all()` over the survivors would then pass
+    # vacuously, reporting green for a check that never executed. Fail closed.
+    present = {t["transition"] for t in continuity}
+    all_present = present == required
     min_stable = min((t["system_tools_stable"] for t in continuity), default=0.0)
-    # A continuity transition MUST keep the [system+tools] region byte-identical
-    # (floor 1.0). If it drops, the cache-critical layout regressed — fail hard so
-    # the dashboard / CI reddens rather than storing a broken number as "ok".
-    floors_met = all(
-        t["system_tools_stable"] >= t.get("floor_system_tools_stable", 1.0) for t in continuity
+    # A continuity transition MUST keep the [system+tools] region byte-identical. Gate
+    # on the identity BOOLEAN, not the ratio: the ratio divides by len(after), so an
+    # `after` region that is a strict prefix of `before` scores a perfect 1.0 while
+    # the two differ. If identity breaks, the cache-critical layout regressed — fail
+    # hard so the dashboard / CI reddens rather than storing a broken number as "ok".
+    # ...but only where the transition actually claims a 1.0 floor: `new_session`
+    # deliberately relaxes to 0.0 when the tool-inventory fixture is absent, and that
+    # escape hatch must survive the ratio→identity upgrade.
+    floors_met = all_present and all(
+        t["system_tools_identical"]
+        for t in continuity
+        if t.get("floor_system_tools_stable", 1.0) >= 1.0
     )
     summary = {
         "wire_encoder_matches_httpx": wire_matches,

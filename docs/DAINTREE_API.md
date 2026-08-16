@@ -539,9 +539,9 @@ first, so a change to one never re-encodes anything above it:
 | 3 | Tool schemas | top-level `tools` | 77 schemas, 77,258 compact-JSON bytes, ~21.5k tokens (measured 2026-08-16) |
 | 4 | Active skill bodies | user | shared by TASK — any two sessions running the same runbook share the prefix through here. Replaced wholesale on a selector topic shift; omitted when empty |
 | 5 | Integrations (MCP servers) | user | per session and instance — carries the client's MCP endpoint URL. Client tools are NOT listed here; their schemas already ride the function-calling interface |
-| 6 | Injected startup context | user | required, session-stable project/agent/instruction data |
+| 6 | Injected startup context | user | session-stable project/agent/instruction data. The `startup` request field is required; the row is emitted only when it renders non-empty |
 | 7 | Visible `input.messages` conversation | user/assistant/tool | append-only. The learner reads a bounded transcript of it; the selector reads only the newest message plus a small labelled slice of history |
-| 8 | Injected context (runtime + display + turn footer + retrieved docs) | user | per-request tail — the only volatile block. Always present: the display fragment (terminal width, pipe-table cap) renders even when the client sends no runtime |
+| 8 | Injected context (runtime + display + turn footer + retrieved docs) | user | per-request tail — the volatile block, and normally the only row that moves between rounds. Always present: the display fragment (terminal width, pipe-table cap) renders even when the client sends no runtime |
 
 Rows 4 and 5 were system-role until issue #39. That put a per-machine MCP
 endpoint URL and every selector topic shift ahead of all 21.5k tokens of

@@ -8,7 +8,7 @@ would have executed itself — so it is rendered as one, using the same
 This is presentation, not protocol: the CLI never executes the call, and the
 main model is never shown it as a tool call either (the retrieved pages reach it
 as plain context in the injected tail, the same way skill bodies reach it as a
-system block). What the prelude buys is honesty in the transcript — the user
+framed user-role block). What the prelude buys is honesty in the transcript — the user
 sees that their question was answered from the docs, and which query found them,
 rather than watching the assistant produce cited pages from nowhere.
 """

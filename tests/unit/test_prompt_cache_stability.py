@@ -136,11 +136,18 @@ def test_tool_downstream_blocks_follow_cache_scope_order(assembler, catalog) -> 
     assert built.tools
 
     def _find(needle: str) -> int:
-        return next(i for i, m in enumerate(msgs) if needle in str(m.get("content", "")))
+        idx = next((i for i, m in enumerate(msgs) if needle in str(m.get("content", ""))), None)
+        assert idx is not None, (
+            f"no message contains {needle!r} — the block is missing from the assembled "
+            f"array. Roles present: {[m['role'] for m in msgs]}"
+        )
+        return idx
 
     contract = _find("# Response contract")
+    # Match the injected HEADERS, not the body headings: "# Integrations" also
+    # appears in base-prompt prose about not reciting these blocks.
     skill = _find("[Injected skill context")
-    integrations = _find("# Integrations")
+    integrations = _find("[Injected integrations context")
     startup = _find("[Injected startup context")
     convo = next(i for i, m in enumerate(msgs) if m.get("content") == "start the work")
 
