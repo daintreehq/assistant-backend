@@ -405,29 +405,41 @@ def test_resolve_cross_domain_selection_never_returns_a_short_set(catalog) -> No
 # ---- speculation winners are compared on RENDER order -----------------------
 
 
-def test_render_order_makes_foundation_placement_the_same_speculation(
-    catalog, assembler: PromptAssembler
+def test_render_order_makes_every_permutation_the_same_speculation(
+    prompt_loader, settings
 ) -> None:
-    # The loaded-skills block renders foundations first, so [foundation, X] and
-    # [X, foundation] assemble to byte-identical requests — an ordered list compare
-    # threw a live speculative stream away to rebuild an identical payload. Swapping
-    # two SPECIFICS does change the bytes, so a set compare would be wrong.
-    foundation = next((s for s in catalog.skills if s.meta.foundation), None)
-    specifics = [s for s in catalog.skills if not s.meta.foundation]
-    assert foundation is not None, "catalog has no foundation skill"
-    assert len(specifics) >= 2
-    first, second = specifics[0], specifics[1]
+    # The handshake compares CANONICAL render ids. Foundations sort first and ids
+    # sort within each tier, so the selector's rank cannot distinguish one active
+    # set from a reshuffle of itself — every ordering has to assemble to the same
+    # bytes. When it did not, an ordered compare threw a live, already-producing
+    # stream away to rebuild a payload that differed only in which skill section
+    # came first.
+    #
+    # The SYNTHETIC catalog, because it pins TWO foundations: the real one
+    # carries a single root foundation today, and against it a half-fix that
+    # canonicalized specifics while leaving foundations in selector order would
+    # pass every assertion here.
+    catalog = _synthetic_catalog()
+    foundations = [s for s in catalog.skills if s.meta.foundation]
+    specifics = [s for s in catalog.skills if not s.meta.foundation][:2]
+    assert len(foundations) == 2, "synthetic catalog pins two domain foundations"
 
-    assert render_order_ids([foundation, first]) == render_order_ids([first, foundation])
-    assert render_order_ids([first, second]) != render_order_ids([second, first])
+    members = [*foundations, *specifics]
+    # Tier first, id within each tier — foundations lead regardless of how their
+    # ids compare to the specifics'.
+    expected_ids = sorted(s.id for s in foundations) + sorted(s.id for s in specifics)
+    expected_bytes = PromptAssembler(prompt_loader, settings).render_loaded_skills(members)
 
-    # The helper is the assembler's own sort, so equal render ids mean equal bytes.
-    assert assembler.render_loaded_skills(
-        [foundation, first]
-    ) == assembler.render_loaded_skills([first, foundation])
-    assert assembler.render_loaded_skills(
-        [first, second]
-    ) != assembler.render_loaded_skills([second, first])
+    for permutation in itertools.permutations(members):
+        candidate = list(permutation)
+        assert render_order_ids(candidate) == expected_ids, candidate
+        # A FRESH assembler per permutation. Reusing one lets its render cache
+        # answer from the first (canonical) call, which would hide a regression
+        # that canonicalized only the CACHE KEY and still handed Jinja the raw
+        # order — every permutation would hit, while a process whose first call
+        # was a reshuffle rendered different bytes.
+        fresh = PromptAssembler(prompt_loader, settings)
+        assert fresh.render_loaded_skills(candidate) == expected_bytes, candidate
 
 
 def _delta_chunk(delta: dict) -> dict:
@@ -704,6 +716,72 @@ async def test_foundation_reordering_still_reuses_the_speculative_stream(
     assert [s["id"] for s in meta["skills"]["active"]] == [specific, foundation]
 
 
+def _reshuffleable_pair(
+    orchestrator: ChatOrchestrator,
+) -> tuple[list[str], list[str]] | None:
+    """Two specific ids whose two orderings resolve to the SAME active set.
+
+    A reshuffle is only the same request when both orders land on one set, and
+    domain-foundation admission is RANK-sensitive: two specifics from different
+    domains each drag their own foundation in, so under the cap whichever ranks
+    first can decide which unit survives. Derive the pair from the catalog the
+    orchestrator actually loaded rather than assuming the first two ids qualify
+    — that assumption holds only for today's topology and today's cap.
+    """
+    specifics = [s.id for s in orchestrator.catalog.skills if not s.meta.foundation]
+    for first, second in itertools.combinations(specifics, 2):
+        forward, reverse = [first, second], [second, first]
+        forward_active = _resolved(orchestrator, forward)
+        reverse_active = _resolved(orchestrator, reverse)
+        # Same SET so the render is byte-identical, different ORDER so a
+        # reshuffle is genuinely exercised — a pair resolving to one identical
+        # list would pass on the pre-fix code and prove nothing.
+        if set(forward_active) == set(reverse_active) and forward_active != reverse_active:
+            return forward, reverse
+    return None
+
+
+@pytest.mark.asyncio
+async def test_same_tier_reordering_still_reuses_the_speculative_stream(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The classifier ranking the same two skills the other way round is not a
+    changed selection either. Render order is canonical WITHIN a tier as well as
+    across tiers, so the permutation assembles to identical bytes and the live
+    stream must be reused — this used to tear down a producing stream to rebuild
+    a payload differing only in which skill section came first."""
+    pair = _reshuffleable_pair(orchestrator)
+    if pair is None:
+        pytest.skip("catalog topology admits no pair whose orderings resolve alike")
+    prior, selected = pair
+    started, release = _gate_selector(
+        monkeypatch,
+        orchestrator,
+        SelectionDecision(skill_ids=selected, ran=True, degraded=False),
+    )
+    fake_provider.stream_factory = lambda _request: FakeStream(
+        make_text_chunks("speculative winner")
+    )
+    request = _stream_request_with_state(orchestrator, prior)
+    pending = asyncio.create_task(
+        orchestrator.complete(request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY)
+    )
+    await started.wait()
+    await _wait_until(lambda: len(fake_provider.stream_requests) == 1)
+    release.set()
+    outcome = await pending
+    assert outcome.stream is not None
+
+    events = await _drain(outcome.stream)
+    assert _streamed_content(events) == "speculative winner "
+    assert len(fake_provider.stream_requests) == 1  # nothing rebuilt, nothing reopened
+    meta = json.loads(events[0].split("data: ", 1)[1])
+    # The ACTIVE set keeps selector rank order; only the RENDER order is normalized.
+    assert [s["id"] for s in meta["skills"]["active"]] == _resolved(orchestrator, selected)
+
+
 @pytest.mark.asyncio
 async def test_degraded_selector_reuses_speculative_prior_stream(
     orchestrator: ChatOrchestrator,
@@ -737,18 +815,20 @@ async def test_degraded_selector_reuses_speculative_prior_stream(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("selection", ["empty", "reordered", "additional"])
+@pytest.mark.parametrize("selection", ["empty", "additional"])
 async def test_changed_selection_discards_private_stream_and_opens_canonical(
     selection: str,
     orchestrator: ChatOrchestrator,
     fake_provider: FakeProvider,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # A reshuffle is deliberately NOT a case here: render order is canonical, so
+    # the same set in a different order is the same request and must REUSE the
+    # private stream — see the reordering-reuse tests above.
     ids = sorted(orchestrator.catalog.known_ids)
     prior = ids[:2]
     selected = {
         "empty": [],
-        "reordered": list(reversed(prior)),
         "additional": [prior[0], ids[2]],
     }[selection]
     started, release = _gate_selector(

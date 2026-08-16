@@ -101,21 +101,38 @@ _TIER_FALLBACK = "mutating actions require confirmation according to this tier."
 
 
 def skills_in_render_order(skills: Sequence[Skill]) -> list[Skill]:
-    """THE order the loaded-skills block is rendered in.
+    """THE canonical order the loaded-skills block is rendered in.
 
-    Foundations first (stable sort), so a domain's base judgment reads before the
-    workflow steps that build on it. Render order only — the active SET, and the
-    selector's best-match order within each tier, are untouched.
+    Foundations first, so a domain's base judgment reads before the workflow
+    steps that build on it; id order within each tier, so EVERY permutation of
+    the same active set renders identical bytes. The tie-break is what makes
+    that true. Skills arrive in the selector's raw output order, and sorting on
+    the foundation flag alone is a stable sort on one boolean: it passed that
+    order straight through, so the same set classified in a different order
+    re-encoded the whole prompt — a full upstream prefix-cache miss on the tool
+    schemas and the conversation behind them, for zero semantic difference.
+
+    Id order is also catalog order — ``Catalog`` stores its skills id-sorted —
+    so this invents no new convention.
+
+    Render order only — the active LIST keeps selector rank, which is load-
+    bearing for the state token, the response metadata, and the next turn's
+    selection. Nothing here deduplicates: the active set is already unique by
+    construction, and quietly repairing a duplicate would hide that break.
 
     This is the single definition: the orchestrator compares speculative vs
     resolved skill sets through :func:`render_order_ids` so its notion of "the
     same request" cannot drift from the bytes this produces.
     """
-    return sorted(skills, key=lambda s: not s.meta.foundation)
+    return sorted(skills, key=lambda s: (not s.meta.foundation, s.id))
 
 
 def render_order_ids(skills: Sequence[Skill]) -> list[str]:
-    """The render-order id list — equal lists mean byte-identical skill blocks."""
+    """The canonical render-order ids — equal lists mean byte-identical blocks.
+
+    True within one catalog revision: skill learning rewrites a body behind a
+    stable id, so callers pair this with a ``catalog.revision`` check.
+    """
     return [s.id for s in skills_in_render_order(skills)]
 
 
@@ -423,9 +440,11 @@ class PromptAssembler:
         """The active skill bodies, rendered — memoised by content.
 
         This is the largest per-request render in the assembler (skill bodies run
-        to tens of kilobytes), and it is a pure function of which skills are
-        active: the same ordered set always produces the same bytes. Sessions
-        converge on a handful of skill sets, so the hit rate is high.
+        to tens of kilobytes), and it is a pure function of WHICH skills are
+        active: `skills_in_render_order` canonicalizes first, so every
+        permutation of one set produces the same bytes and shares one entry
+        rather than paying for a duplicate. Sessions converge on a handful of
+        skill sets, so the hit rate is high.
 
         Keyed on each skill's CONTENT hash, not its id. Ids are stable across a
         skill-learning rewrite while the body changes underneath, so an id-keyed
