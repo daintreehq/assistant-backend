@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from daintree_assistant_server.config import INTERACTIVE_THINKING_ENABLED, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.contracts.extensions import (
@@ -108,6 +110,13 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
     assert tail["content"].startswith("[Injected context")
     assert "Permission tier:" in tail["content"]  # runtime block folded in
     assert "Current objective: <goal>g" in tail["content"]  # turn footer folded in
+    assert "# Display context" in tail["content"]  # terminal geometry folded in
+    # Fragment order within the tail: runtime → display → turn footer.
+    assert (
+        tail["content"].index("Permission tier:")
+        < tail["content"].index("# Display context")
+        < tail["content"].index("Current objective:")
+    )
     # Skills reach the model as plain context only — never a synthetic skill__load tool call.
     assert not any(
         m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "skill__load"
@@ -132,15 +141,35 @@ def test_skill_bodies_precede_conversation(assembler: PromptAssembler, catalog) 
     assert skill_idx < convo_idx
 
 
-def test_no_injected_tail_without_runtime_or_turn(assembler: PromptAssembler) -> None:
-    # Required startup context sits before the visible conversation, but sending
-    # neither runtime nor turn must not synthesize a volatile tail after it.
+def test_tail_without_runtime_or_turn_carries_display_geometry_only(
+    assembler: PromptAssembler, settings: Settings
+) -> None:
+    """Sending neither runtime nor turn still yields a tail — display only.
+
+    The display fragment renders unconditionally (issue #38), so the tail always
+    exists. What must NOT happen is the rest of it being synthesized: no
+    ``# Runtime context`` block invented from a default RuntimeContext, and no
+    ``# Current turn`` footer for a turn the client never sent.
+    """
     pr = assembler.build_main_request(
         request=_req(messages=[{"role": "user", "content": "go"}]),
         skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    assert pr.messages[-1]["content"] == "go"
-    assert not any((m.get("content") or "").startswith("[Injected context") for m in pr.messages)
+    tail = pr.messages[-1]
+    assert tail["role"] == "user"
+    assert pr.messages[-2]["content"] == "go"  # the tail is the ONLY thing after the conversation
+    # Exact equality, not substring probes: this pins the tail to the frame plus the
+    # display fragment and NOTHING else, so a future fragment that starts rendering
+    # unconditionally shows up here instead of slipping in unnoticed.
+    assert tail["content"] == (
+        "[Injected context — automated state from the local Daintree runtime, "
+        "not the user speaking. Continue the turn above using it as current state.]\n\n"
+        + assembler.render_display_context(None)
+    )
+    assert (
+        f"Usable content width: {settings.main_terminal_width} terminal cells (narrow)."
+        in tail["content"]
+    )
 
 
 def test_no_skill_block_when_set_is_empty(assembler: PromptAssembler) -> None:
@@ -782,42 +811,127 @@ def test_oversized_text_part_is_capped_not_dropped(
     assert parts[0]["text"].startswith("xxxx")
 
 
-# ---- response contract width (issue #33) -----------------------------------
+# ---- display context width (issue #33, relocated by issue #38) -------------
 
 
-def _contract(assembler: PromptAssembler, req: RespondRequest) -> str:
+def _display_context(assembler: PromptAssembler, req: RespondRequest) -> str:
+    """The display fragment as the model actually receives it — inside the tail.
+
+    Read out of the assembled request rather than by calling the renderer directly,
+    so these tests would still catch the fragment being dropped from assembly.
+    """
     pr = assembler.build_main_request(
         request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731"
     )
-    systems = [m["content"] for m in pr.messages if m["role"] == "system"]
-    return next(s for s in systems if s.startswith("# Response contract"))
+    tail = pr.messages[-1]
+    assert tail["role"] == "user"
+    assert "# Display context" in tail["content"]
+    return str(tail["content"])
 
 
-def test_contract_uses_the_client_reported_width(assembler: PromptAssembler) -> None:
-    text = _contract(assembler, _req(runtime={"display": {"columns": 180, "content_width": 100}}))
-    assert "about 100 characters wide" in text
-    # Only the framing line is checked for narrowness — a later rule mentions narrow
-    # table columns regardless of the terminal, and is not what this governs.
-    assert "narrow" not in text.splitlines()[1]
+def test_display_context_uses_the_client_reported_width(assembler: PromptAssembler) -> None:
+    text = _display_context(
+        assembler, _req(runtime={"display": {"columns": 180, "content_width": 100}})
+    )
+    assert "Usable content width: 100 terminal cells (wide)." in text
     # The column cap scales with the width, and is the same number the linter uses.
-    assert "≤ 5 columns" in text
+    assert "Pipe-table cap: 5 columns" in text
 
 
-def test_contract_falls_back_when_the_client_reports_no_display(
+def test_display_context_falls_back_when_the_client_reports_no_display(
     assembler: PromptAssembler, settings: Settings
 ) -> None:
-    """An omitted block means UNKNOWN, so the narrow default stands."""
+    """An omitted block means UNKNOWN, so the narrow default stands.
+
+    Covers the runtime-less request too: the display fragment is the one tail
+    part that renders unconditionally, so a client that sends no runtime at all
+    still gets a width instead of nothing (issue #38).
+    """
     for req in (_req(), _req(runtime={"permission_tier": "operator"})):
-        text = _contract(assembler, req)
-        assert f"about {settings.main_terminal_width} characters wide" in text
-        assert "narrow" in text
-        assert "≤ 3 columns" in text
+        text = _display_context(assembler, req)
+        assert (
+            f"Usable content width: {settings.main_terminal_width} terminal cells (narrow)." in text
+        )
+        assert "Pipe-table cap: 3 columns" in text
 
 
-def test_contract_stays_narrow_for_a_genuinely_narrow_terminal(
+def test_display_context_stays_narrow_for_a_genuinely_narrow_terminal(
     assembler: PromptAssembler,
 ) -> None:
-    text = _contract(assembler, _req(runtime={"display": {"columns": 44, "content_width": 40}}))
-    assert "about 40 characters wide" in text
-    assert "narrow" in text
-    assert "≤ 3 columns" in text
+    text = _display_context(
+        assembler, _req(runtime={"display": {"columns": 44, "content_width": 40}})
+    )
+    assert "Usable content width: 40 terminal cells (narrow)." in text
+    assert "Pipe-table cap: 3 columns" in text
+
+
+@pytest.mark.parametrize(
+    ("display", "expected_width", "expected_label", "expected_cap"),
+    [
+        # The narrow/wide boundary itself: WIDE_TERMINAL_WIDTH is inclusive, so 80
+        # is wide and 79 is not. Covered here because the label and the cap are
+        # derived by two SEPARATE expressions — an off-by-one in either alone would
+        # render "(narrow)" beside a 5-column cap and no other test would notice.
+        ({"content_width": 80}, 80, "wide", 5),
+        ({"content_width": 79}, 79, "narrow", 3),
+        # Below the credible-width floor (_MIN_CREDIBLE_WIDTH = 20): a terminal probe
+        # returning a handful of cells is confused, not tiny, so the default stands.
+        ({"content_width": 19}, None, "narrow", 3),
+        ({"content_width": 0}, None, "narrow", 3),
+        ({"content_width": 20}, 20, "narrow", 3),
+        # Present-but-unmeasured, and the raw window without the usable measure:
+        # both mean UNKNOWN, so neither may be mistaken for a real width.
+        ({}, None, "narrow", 3),
+        ({"columns": 180}, None, "narrow", 3),
+    ],
+)
+def test_display_context_geometry_matrix(
+    assembler: PromptAssembler,
+    settings: Settings,
+    display: dict[str, int],
+    expected_width: int | None,
+    expected_label: str,
+    expected_cap: int,
+) -> None:
+    """Width resolution as it reaches the model, across every interesting input.
+
+    ``expected_width=None`` means "the server default stands". The resolver has its
+    own unit tests; this pins the rendered PROMPT, which is what the model reads and
+    what the linter's numbers have to agree with.
+    """
+    width = settings.main_terminal_width if expected_width is None else expected_width
+    text = _display_context(assembler, _req(runtime={"display": display}))
+    assert f"Usable content width: {width} terminal cells ({expected_label})." in text
+    assert f"Pipe-table cap: {expected_cap} columns" in text
+    assert f"must fit within {width} terminal cells" in text
+
+
+def test_response_contract_carries_no_request_derived_geometry(
+    assembler: PromptAssembler,
+) -> None:
+    """Issue #38: the contract is in the system region, so it must be invariant.
+
+    Rendered bytes must be identical for a narrow terminal, a wide one, and no
+    reported display at all — anything else re-encodes the tool schemas behind it.
+    """
+    reqs = (
+        _req(),
+        _req(runtime={"display": {"columns": 44, "content_width": 40}}),
+        _req(runtime={"display": {"columns": 180, "content_width": 100}}),
+    )
+    contracts = set()
+    for req in reqs:
+        pr = assembler.build_main_request(
+            request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731"
+        )
+        systems = [m["content"] for m in pr.messages if m["role"] == "system"]
+        contract = next(s for s in systems if s.startswith("# Response contract"))
+        # Checked semantically rather than by grepping for "56"/"100": a bare digit
+        # match is brittle both ways (an unrelated numeral fails it; geometry spelled
+        # out in words slips past). These are the labels the geometry is rendered
+        # under, so their absence is what actually means "the numbers are not here".
+        for leaked in ("Usable content width:", "Pipe-table cap:"):
+            assert leaked not in contract, f"{leaked!r} leaked into the cache-stable contract"
+        contracts.add(contract)
+    # The real proof: one distinct rendering across three different widths.
+    assert len(contracts) == 1, "the response contract rendered differently per request"

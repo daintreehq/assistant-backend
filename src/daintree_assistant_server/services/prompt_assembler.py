@@ -8,7 +8,8 @@ API's), so only stable content may use the system role. The effective order is:
 2. tool schemas
 3. stable startup context (one framed user-role data row, omitted when empty)
 4. visible append-only conversation
-5. volatile runtime + turn context (one framed user-role tail, omitted when empty)
+5. volatile runtime + display + turn context (one framed user-role tail; the display
+   fragment always renders, so the tail is always present)
 
 Stable startup facts therefore sit on the cache-friendly side of the conversation without
 masquerading as a user-authored message in the public transcript, selector, or learner.
@@ -38,6 +39,7 @@ from ..contracts.openai import (
     ToolDef,
 )
 from ..prompts.loader import (
+    TEMPLATE_DISPLAY_CONTEXT,
     TEMPLATE_DOCS_CONTEXT,
     TEMPLATE_INTEGRATIONS,
     TEMPLATE_LOADED_SKILLS,
@@ -439,20 +441,40 @@ class PromptAssembler:
         self._loaded_skills_cache.put(key, rendered)
         return rendered
 
-    def render_response_contract(self, runtime: RuntimeContext | None = None) -> str:
-        """The output-shape contract — the final STABLE system block before the
+    def render_response_contract(self) -> str:
+        """The output-shape RULES — the final STABLE system block before the
         conversation (see build_main_request's cache-critical layout).
 
+        Request-independent by signature and by body: identical bytes for every
+        caller, every turn. It used to interpolate the resolved width, the
+        narrow/wide branch and the table-column cap, which put a per-request value
+        in the system region — ahead of ~21.5k tokens of tool schemas — so a window
+        resize re-encoded all of them and two clients on different widths shared
+        nothing past the base prompt (issue #38). The concrete geometry now rides
+        the volatile tail (``render_display_context``); the rules that reference it
+        stay here, phrased without a number so they never move.
+        """
+        return self.prompts.render(TEMPLATE_RESPONSE_CONTRACT)
+
+    def render_display_context(self, runtime: RuntimeContext | None = None) -> str:
+        """This turn's terminal geometry — a VOLATILE tail fragment (issue #38).
+
         Width is the client's measured ``runtime.display.content_width`` when it
-        reported one, else the settings default (~56 columns). This block stays in
-        the STABLE system prefix, so a changed width does re-encode that prefix —
-        but only on an actual terminal resize, and the alternative (a width line in
-        the volatile tail contradicting the contract's own number) is worse.
+        reported one, else the settings default (~56 columns). Rendered
+        UNCONDITIONALLY, unlike the runtime block: ``resolve_content_width`` is
+        null-safe, so a runtime-less client (a pipe, the stdio host, a generic
+        OpenAI-style caller) still gets a real width to shape against — the same
+        one it got while this lived in the contract. Gating it on ``runtime`` would
+        silently drop the number for exactly those callers.
+
+        These are the two numbers ``lint_output`` grades the reply against, read
+        from the same resolver so what the model is TOLD and what it is GRADED on
+        cannot drift.
         """
         width = resolve_content_width(runtime, fallback=self.settings.main_terminal_width)
         return self.prompts.render(
-            TEMPLATE_RESPONSE_CONTRACT,
-            terminal_width=width,
+            TEMPLATE_DISPLAY_CONTEXT,
+            content_width=width,
             is_narrow=width < WIDE_TERMINAL_WIDTH,
             # The same cap the linter will grade this reply against.
             max_table_columns=max_table_columns(width),
@@ -787,8 +809,9 @@ class PromptAssembler:
         # 4. response contract: static output-shape rules → part of the stable
         #    system prefix. (It serialized before the conversation even
         #    when the array placed it last, so this costs no "nearness to
-        #    generation" that ever actually existed.)
-        contract = self.render_response_contract(runtime)
+        #    generation" that ever actually existed.) Genuinely static now — the
+        #    per-request width it used to carry moved to the tail (step 7).
+        contract = self.render_response_contract()
         if contract.strip():
             messages.append({"role": "system", "content": contract})
         # 5. session-stable project/agent/instruction data. It is a user-role
@@ -813,6 +836,11 @@ class PromptAssembler:
             runtime_msg = self.render_runtime_context(runtime)
             if runtime_msg.strip():
                 variable_parts.append(runtime_msg)
+        # This turn's terminal geometry (issue #38). ALWAYS rendered, unlike the
+        # runtime block above: the width resolver falls back to the server default,
+        # so a runtime-less client still gets the number it needs to shape output.
+        # It is the one fragment that guarantees the tail exists at all.
+        variable_parts.append(self.render_display_context(runtime))
         footer = self.render_turn_footer(turn)
         if footer.strip():
             variable_parts.append(footer)

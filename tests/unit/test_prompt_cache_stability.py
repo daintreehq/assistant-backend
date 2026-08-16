@@ -40,13 +40,27 @@ def _messages(built: Any) -> list[dict[str, Any]]:
 
 
 def test_volatile_state_changes_only_the_trailing_tail(assembler, catalog) -> None:
+    """Issue #38: the terminal's own width is volatile state like any other.
+
+    The two requests straddle WIDE_TERMINAL_WIDTH, so both the width and every
+    value derived from it (narrow/wide, the table-column cap) differ. A resize is
+    the common case — the CLI republishes its measured width every round — and
+    while the geometry lived in the response contract it re-encoded the whole
+    system region, the 77 tool schemas behind it, and the conversation.
+    """
     skills = [catalog.skills[0]]
-    a = _messages(_build(assembler, _request(runtime={"permission_tier": "operator"}), skills))
+    a = _messages(
+        _build(
+            assembler,
+            _request(runtime={"permission_tier": "operator", "display": {"content_width": 40}}),
+            skills,
+        )
+    )
     b = _messages(
         _build(
             assembler,
             _request(
-                runtime={"permission_tier": "operator"},
+                runtime={"permission_tier": "operator", "display": {"content_width": 100}},
                 turn={"goal": "a completely different objective this turn"},
             ),
             skills,
@@ -62,6 +76,9 @@ def test_volatile_state_changes_only_the_trailing_tail(assembler, catalog) -> No
         )
     assert a[-1] != b[-1], "the volatile tail should carry the difference"
     assert a[-1]["role"] == "user"
+    # ...and the geometry really is IN that tail, not merely absent from the prefix.
+    assert "Usable content width: 40 terminal cells (narrow)." in a[-1]["content"]
+    assert "Usable content width: 100 terminal cells (wide)." in b[-1]["content"]
 
 
 def test_no_system_message_follows_the_conversation(assembler, catalog) -> None:
@@ -82,9 +99,10 @@ def test_no_system_message_follows_the_conversation(assembler, catalog) -> None:
 def test_appending_a_turn_preserves_the_previous_prefix(assembler, catalog) -> None:
     """The visible conversation is APPEND-ONLY, so turn N+1 extends turn N's prefix.
 
-    Both requests carry a runtime block so each really HAS a volatile tail to strip;
-    without one, slicing off ``[-1]`` would delete the last conversation message —
-    exactly the message whose preservation this is meant to prove.
+    Both requests carry a runtime block so the tail each strips is the full one. The
+    tail is always present now (the display fragment renders unconditionally), so
+    slicing off ``[-1]`` can no longer eat the last conversation message — but
+    keeping runtime here holds this test on the realistic shape.
     """
     skills = [catalog.skills[0]]
     runtime = {"permission_tier": "operator"}

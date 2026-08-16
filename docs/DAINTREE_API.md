@@ -22,7 +22,8 @@ or train on data). That is invisible to clients.
   Typed startup/project-instruction fields are bounded, server-framed untrusted data.
 - **Cache-optimized prompt layout.** Stable system layers and tool schemas lead, followed
   by a required session-stable startup block, the append-only visible conversation, and
-  one small volatile runtime/turn tail. See [Prompt assembly](#prompt-assembly--caching).
+  one small volatile runtime/display/turn tail. See
+  [Prompt assembly](#prompt-assembly--caching).
 - **Honest streaming.** Metadata is always the first public SSE event and no private
   speculative model event can precede it. The stream never fabricates a successful
   finish after an upstream failure.
@@ -299,8 +300,8 @@ Notes:
 - `runtime.display` is the client's live render geometry, both values in terminal cells and
   bounded to 10000. `content_width` is the load-bearing one — the measure the reply is
   actually wrapped at, after the cockpit's inset, gutter and prose cap — and both the
-  response contract handed to the model and the server-side output lint are written against
-  it. An omitted block means UNKNOWN (a piped one-shot, the stdio host, the headless
+  `# Display context` block handed to the model and the server-side output lint are written
+  against it. An omitted block means UNKNOWN (a piped one-shot, the stdio host, the headless
   daemon), not narrow, so `MAIN_TERMINAL_WIDTH` stands. The client republishes on resize.
   Gated on `capabilities.respond.display_context`: `runtime` is `extra="forbid"`, so a
   client must not send the block to a backend that does not advertise it.
@@ -534,7 +535,7 @@ block, where it costs exactly its own tokens.
 | 4 | Response contract | system | static — output-shape rules |
 | 5 | Injected startup context | user | required, session-stable project/agent/instruction data |
 | 6 | Visible `input.messages` conversation | user/assistant/tool | append-only. The learner reads a bounded transcript of it; the selector reads only the newest message plus a small labelled slice of history |
-| 7 | Injected context (runtime + turn footer + retrieved docs) | user | per-request tail — the only volatile block |
+| 7 | Injected context (runtime + display + turn footer + retrieved docs) | user | per-request tail — the only volatile block. Always present: the display fragment (terminal width, pipe-table cap) renders even when the client sends no runtime |
 
 All client-provided context (ids, names, MCP details, project instructions, memories,
 worktrees) is treated as untrusted data. Prose fields collapse whitespace; multiline fields
