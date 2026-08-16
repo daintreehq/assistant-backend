@@ -112,8 +112,8 @@ def skills_in_render_order(skills: Sequence[Skill]) -> list[Skill]:
     re-encoded the whole prompt — a full upstream prefix-cache miss on the tool
     schemas and the conversation behind them, for zero semantic difference.
 
-    Id order is also catalog order (``Catalog`` stores its skills id-sorted and
-    hashes its revision the same way), so this invents no new convention.
+    Id order is also catalog order — ``Catalog`` stores its skills id-sorted —
+    so this invents no new convention.
 
     Render order only — the active LIST keeps selector rank, which is load-
     bearing for the state token, the response metadata, and the next turn's
