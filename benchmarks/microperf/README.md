@@ -34,7 +34,7 @@ python -m benchmarks.microperf.bench report results/<run>.json
    `--concurrency`, default 32). Requests use the captured CLI tool projection and
    distinct session/turn ids, so every round runs the full selector → assemble →
    respond path: the selector prompt render over the live catalog, the unmemoized
-   `base_prompt()` re-read, the ~18k-token tool-schema normalization walk, and
+   `base_prompt()` re-read, the ~21.5k-token tool-schema normalization walk, and
    response assembly. Concurrent latency is measured **from submission to
    completion**, so it includes event-loop queueing behind the other requests' CPU;
    `p99_inflation_ratio = concurrent_p99 / single_call_p50` is the stall/contention

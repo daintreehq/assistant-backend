@@ -40,8 +40,9 @@ def _main_request(provider: FakeProvider):
 
 
 def _loaded_skills_message(provider: FakeProvider) -> str:
-    # Find by content, not a brittle fixed position: optional integrations precede
-    # skill bodies, while the stable startup block and visible conversation follow.
+    # Find by content, not a brittle fixed position: skill bodies lead the injected
+    # user-role rows, with optional integrations, the stable startup block and the
+    # visible conversation following them (issue #39).
     # Match "## Skill 1:" because the base prompt mentions "# Loaded skills" in prose.
     return next(
         m["content"]

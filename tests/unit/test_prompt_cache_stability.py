@@ -1,10 +1,14 @@
 """The prompt-cache invariant, asserted on BYTES.
 
 DeepSeek serializes [all system messages] -> [tools] -> [non-system messages], so
-a volatile value anywhere in the stable region lands before the ~18k-token tool
+a volatile value anywhere in the stable region lands before the ~21.5k-token tool
 schemas and busts their cache (measured: 36% hit on byte-identical turns -> 99%
 after the fix). That invariant was covered only by ORDERING assertions, so a
 refactor that folded a per-turn value into a stable block kept every test green.
+
+Only the base prompt and the response contract are system-role now: "stable" means
+stable for EVERY caller, not merely within one session, so the skill bodies and the
+integration surface ride user-role rows below the schemas (issue #39).
 
 These tests pin it directly: two requests differing ONLY in volatile runtime/turn
 state must produce a byte-identical stable prefix, with all the variation confined
@@ -95,12 +99,58 @@ def test_no_system_message_follows_the_conversation(assembler, catalog) -> None:
     # still be serialized before the tools, silently busting their cache.
     last_system = max(i for i, r in enumerate(roles) if r == "system")
     assert roles[: last_system + 1] == ["system"] * (last_system + 1)
+    # ...and the system region is EXACTLY the two fully-static blocks. The ordering
+    # check above passes just as happily with the skill or integrations block back in
+    # the system region, since they precede the conversation either way — this is the
+    # assertion that actually pins them below the schemas (issue #39).
+    assert roles.count("system") == 2
+    assert str(built[1].get("content", "")).startswith("# Response contract")
     # ...and the stable startup block sits between the systems and the conversation.
     startup = next(
         i for i, m in enumerate(built) if str(m.get("content", "")).startswith("[Injected startup")
     )
     convo = next(i for i, m in enumerate(built) if m.get("content") == "start the work")
     assert last_system < startup < convo
+
+
+def test_tool_downstream_blocks_follow_cache_scope_order(assembler, catalog) -> None:
+    """Issue #39: the rows below the schemas are ordered by how widely each is shared.
+
+    The tool schemas serialize immediately after the system region, so everything
+    below them is ordered widest-shared first — skill bodies (shared by TASK, so any
+    two sessions running the same runbook share the prefix through it), then
+    integrations and startup (per session, instance and project). Reversing that pair
+    still yields "user-role and before the conversation", so a naive layout test would
+    not notice, while the cross-session prefix it buys would quietly disappear.
+    """
+    built = _build(
+        assembler,
+        _request(
+            runtime={"permission_tier": "operator", "mcp_servers": [{"name": "daintree"}]},
+            tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}],
+        ),
+        [catalog.skills[0]],
+    )
+    msgs = _messages(built)
+    # The schemas really are present, so "below the schemas" means something here.
+    assert built.tools
+
+    def _find(needle: str) -> int:
+        return next(i for i, m in enumerate(msgs) if needle in str(m.get("content", "")))
+
+    contract = _find("# Response contract")
+    skill = _find("[Injected skill context")
+    integrations = _find("# Integrations")
+    startup = _find("[Injected startup context")
+    convo = next(i for i, m in enumerate(msgs) if m.get("content") == "start the work")
+
+    assert [i for i, m in enumerate(msgs) if m["role"] == "system"] == [0, contract]
+    assert contract < skill < integrations < startup < convo
+    assert (msgs[skill]["role"], msgs[integrations]["role"], msgs[startup]["role"]) == (
+        "user",
+        "user",
+        "user",
+    )
 
 
 def test_appending_a_turn_preserves_the_previous_prefix(assembler, catalog) -> None:

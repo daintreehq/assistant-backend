@@ -4,7 +4,7 @@ A single immutable :class:`SkillLoadExecution` describes one skill that was just
 activated this turn. It feeds the ``daintree.prelude.tool_executions`` metadata
 the server returns to the CLI, which renders a visible "skill.load" prelude for
 the user. The main model is NOT shown this as a tool call — active skill bodies
-reach it as plain context in the "Loaded skills" system block — so there is no
+reach it as plain context in the "Loaded skills" block — so there is no
 synthetic self-call for it to imitate or narrate.
 """
 

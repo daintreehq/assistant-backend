@@ -717,10 +717,13 @@ class ChatOrchestrator:
         # THE TRADE, STATED PLAINLY. A wrong guess costs one discarded upstream
         # open. A cold turn that does select skills therefore pays for a prefill it
         # throws away — bounded by the concurrency cap, and cheap in practice
-        # because the discarded prompt's cacheable prefix (base prompt + the ~18k
-        # token tool region) is exactly the prefix the real request then reuses, so
-        # the waste is the uncached tail plus a handful of generated tokens, not a
-        # whole second call. Latency is bought with tokens here, deliberately.
+        # because the discarded prompt's cacheable prefix (base prompt + response
+        # contract + the ~21.5k token tool region) is exactly the prefix the real
+        # request then reuses, so the waste is the uncached tail plus a handful of
+        # generated tokens, not a whole second call. Latency is bought with tokens
+        # here, deliberately. That prefix is skill-independent only because issue #39
+        # moved the loaded-skills block BELOW the schemas: while it was system-role, a
+        # wrong empty-skill guess shifted the tool region too and this was optimistic.
         speculation: _SpeculativeStream | None = None
         speculative_request: ProviderChatRequest | None = None
         speculative_active_ids: list[str] = []

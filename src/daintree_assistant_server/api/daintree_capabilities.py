@@ -121,7 +121,7 @@ async def capabilities(
         #
         # NOT a claim that it is visible. The CLI decodes `prelude` and does not
         # render it — a newly-active skill reaches the model as body text in the
-        # loaded-skills system message rather than as a replayed tool call, which
+        # loaded-skills block rather than as a replayed tool call, which
         # left the prelude vestigial on that side. So a server-side docs lookup is
         # currently INVISIBLE to the user; the field says where it would appear if
         # a client chose to show it, not that one does.

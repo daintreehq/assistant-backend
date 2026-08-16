@@ -11,16 +11,17 @@ Measures, over the REAL ``PromptAssembler.build_main_request`` and the EXACT byt
    new session) we build the two consecutive requests and measure how much of the
    cacheable region survives byte-identical:
      - ``system_tools_stable`` — fraction of the [system+tools] region that is a
-       byte prefix of the next turn's. **1.0 is the target** for continuation and
-       runtime-context changes (the layout's core promise); a topic-shift is an
-       EXPECTED drop (only base+integrations stay stable), not a failure.
+       byte prefix of the next turn's. **1.0 is the target for every transition**,
+       including a skill topic-shift: since issue #39 the loaded-skills block is a
+       user-role row BELOW the schemas, so changing it cannot touch that region.
      - ``full_prefix`` — fraction of the whole [system+tools+conversation] region
-       reused (the append-only conversation is the largest cached segment).
+       reused (the append-only conversation is the largest cached segment). A topic
+       shift still drops this from the loaded-skills row down — inherent, not a bug.
 
-2. **Per-layer byte / token budget** — where the request's size lives (base,
-   integrations, skills, the ~18k-token tool schemas, conversation, the volatile
-   tail). ``token_est`` is a bytes/4 PROXY (no tokenizer in the repo); the live
-   cross-check (``live.py``) is what pins real magnitude.
+2. **Per-layer byte / token budget** — where the request's size lives (base, the
+   contract, the ~21.5k-token tool schemas, skills, integrations, startup,
+   conversation, the volatile tail). ``token_est`` is a bytes/4 PROXY (no tokenizer
+   in the repo); the live cross-check (``live.py``) is what pins real magnitude.
 
 3. **State-token size** vs active-skill-set size — the portable, stateless-safe
    token stays tiny (Cloud Run carries no server memory; correctness rides this).
@@ -183,18 +184,23 @@ def _transitions(
         **_stability(before, after),
     })
 
-    # 4. skill topic-shift: the active skill set changes → the loaded-skills system
-    #    message changes → the contract + tools that follow it re-encode. EXPECTED
-    #    drop; only base+integrations stay stable (measured below as the floor).
+    # 4. skill topic-shift: the active skill set changes → the loaded-skills block
+    #    changes. Since issue #39 that block is a USER-role row BELOW the schemas, so
+    #    the whole [system+tools] region survives byte-identical: a skill load costs
+    #    its own bytes and the rows after it, never the ~21.5k tokens of schemas.
+    #    This is the issue's headline claim, so it is GATED at 1.0 rather than
+    #    reported as an expected drop — regressing either block back into the system
+    #    region shows up here as a hard failure.
     if b:
         before = _body_for(assembler, settings, req([_USER]), a)
         after = _body_for(assembler, settings, req([_USER]), b)
         stab = _stability(before, after)
         out.append({
             "transition": "skill_topic_shift",
-            "expect": "EXPECTED cache drop; base+integrations remain stable, "
-                      "loaded-skills+contract+tools re-encode",
-            "note": "not a failure — a topic shift legitimately busts the tool region",
+            "expect": "system_tools_stable == 1.0 (the skill block sits below the schemas)",
+            "floor_system_tools_stable": 1.0,
+            "note": "full_prefix still drops from the loaded-skills row down — that part "
+                    "is inherent and expected",
             **stab,
         })
 
@@ -230,26 +236,34 @@ def _layer_budget(
     runtime_block = assembler.render_runtime_context(request.runtime)
     display_block = assembler.render_display_context(request.runtime)
     footer = assembler.render_turn_footer(request.turn)
-    # Conversation bytes from the assembled wire body. EXCLUDE both server-injected
-    # user-role blocks: stable startup is counted separately, as is the volatile
-    # runtime/display/footer tail, keeping the layer budget disjoint.
+    # Conversation bytes from the assembled wire body. EXCLUDE every server-injected
+    # user-role block: the skills, integrations and startup rows are each counted
+    # separately above, as is the volatile runtime/display/footer tail, keeping the
+    # layer budget disjoint. Since issue #39 there are THREE injected rows ahead of
+    # the conversation, not one — stripping only a leading startup row would fold the
+    # skill and integration bytes into "conversation" and silently misreport both.
     body = _body_for(assembler, settings, request, skills)
     conv_msgs = [m for m in body["messages"] if m.get("role") != "system"]
-    if conv_msgs and str(conv_msgs[0].get("content", "")).startswith(
-        "[Injected startup context"
-    ):
+    injected_heads = (
+        "[Injected skill context",
+        "[Injected integrations context",
+        "[Injected startup context",
+    )
+    while conv_msgs and str(conv_msgs[0].get("content", "")).startswith(injected_heads):
         conv_msgs = conv_msgs[1:]
     if conv_msgs and str(conv_msgs[-1].get("content", "")).startswith("[Injected context"):
         conv_msgs = conv_msgs[:-1]
     convo = "".join(dumps(m).decode("utf-8") for m in conv_msgs)
     tools_str = dumps(tools).decode("utf-8")
 
+    # Listed in SERIALIZED order: the two static system blocks, the schemas, then the
+    # injected rows widest-shared first, the conversation, and the volatile tail.
     layers = layer_segments([
         ("base_prompt", base),
-        ("integrations", integrations),
-        ("loaded_skills", skills_block),
         ("response_contract", contract),
         ("tool_schemas", tools_str),
+        ("loaded_skills (user block)", skills_block),
+        ("integrations (user block)", integrations),
         ("startup_context (stable user block)", startup_block),
         ("conversation", convo),
         ("runtime_context (tail)", runtime_block),
@@ -334,6 +348,7 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
             "tool_continuation",
             "runtime_context_change",
             "startup_context_change",
+            "skill_topic_shift",
             "new_session",
         }
     ]

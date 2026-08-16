@@ -56,7 +56,7 @@ prompt prefill, and any reasoning emitted before the first visible token.
 
 Trials within a scenario replay a byte-identical request, so the upstream prefix cache
 runs hotter (`cache_hit_ratio_p50` near 1.0) than a genuinely cold first-ever session
-would. This is not as artificial as it looks — the base prompt and the ~18k-token tool
+would. This is not as artificial as it looks — the base prompt and the ~21.5k-token tool
 schema region are shared by *every* session in production, so a busy endpoint really
 does hold them. But treat the absolute `cold_*` numbers as a warm-endpoint floor, and
 the **baseline-vs-improved comparison** as the trustworthy output: both runs use the

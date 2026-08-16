@@ -20,9 +20,10 @@ or train on data). That is invisible to clients.
 - **The server owns all system text.** Clients cannot send `system`/`developer`
   messages or a free-form system prompt; the request schema is strict (`extra="forbid"`).
   Typed startup/project-instruction fields are bounded, server-framed untrusted data.
-- **Cache-optimized prompt layout.** Stable system layers and tool schemas lead, followed
-  by a required session-stable startup block, the append-only visible conversation, and
-  one small volatile runtime/display/turn tail. See
+- **Cache-optimized prompt layout.** The two static system layers and the tool schemas
+  lead, followed by the injected data rows ordered widest-shared first (skill bodies,
+  then integrations and a required session-stable startup block), the append-only
+  visible conversation, and one small volatile runtime/display/turn tail. See
   [Prompt assembly](#prompt-assembly--caching).
 - **Honest streaming.** Metadata is always the first public SSE event and no private
   speculative model event can precede it. The stream never fabricates a successful
@@ -448,7 +449,7 @@ Skill selection is removed from the main thread:
    always waits for selection serially. The non-streaming path is unchanged.
 4. **Injection.** Only the active skill *bodies* are injected into the main prompt — never
    the full catalog — and they reach the model as **plain context** (the "Loaded skills"
-   system block), not a tool call. The model is **not** shown a synthetic `skill__load`
+   user-role block), not a tool call. The model is **not** shown a synthetic `skill__load`
    self-call; a `skills.prelude` is still returned for the client to render a visible
    "Skill loaded" card.
 5. **State token.** `state` is an opaque, signed (`HMAC-SHA256`, key-ring/`kid` rotation),
@@ -481,8 +482,8 @@ behind a per-session token.
    costs first-byte latency and never the turn. Redirects are refused rather than followed,
    and the response is read under a size cap.
 3. **Injection.** The top few ranked sections are sanitized, byte-capped, framed as an inert
-   `<daintree_docs>` data block and appended to the **volatile user-role tail** (row 7 above)
-   — never a system message, which would re-encode the tool schemas for content that lives
+   `<daintree_docs>` data block and appended to the **volatile user-role tail** described
+   below — never a system message, which would re-encode the tool schemas for content that lives
    for exactly one turn. Each section carries a complete `URL:` built server-side from a
    validated same-site path; the model cites what it is given rather than assembling a URL.
 3b. **Continuation.** The query is carried in the signed state token, scoped to the
@@ -520,22 +521,34 @@ cover degraded lifecycle paths without logging request content.
 
 The DeepSeek chat template serializes the prompt as **[all system messages, in
 array order] → [tools] → [non-system conversation]** — a system message anywhere in the array
-lands in the leading system region, before the ~19k-token tool schemas
+lands in the leading system region, before the ~21.5k-token tool schemas
 (measured 2026-07-08: volatile system-role runtime context after the
 conversation cut byte-identical turns to a 36% cache hit; 99% after this
-layout). The rule: **only stable content may be system-role**; per-request
-variable context rides ONE trailing user-role "[Injected context …]" data
-block, where it costs exactly its own tokens.
+layout). The rule: **only content that is stable for every caller may be
+system-role**; everything else rides a framed user-role data row below the
+schemas, and per-request variable context rides ONE trailing user-role
+"[Injected context …]" block, where it costs exactly its own tokens.
 
-| # | Message | Role | Stability |
+The segments below are ordered by **how widely each can be shared**, widest
+first, so a change to one never re-encodes anything above it:
+
+| # | Serialized segment | Placement | Stability |
 |---|---------|------|-----------|
 | 1 | Base system prompt | system | static — cached across all sessions |
-| 2 | Integrations (MCP servers) | system | session-stable — client tools are NOT listed here; their schemas already ride the function-calling interface |
-| 3 | Active skill bodies | system | semi-stable — replaced wholesale on a selector topic shift (omitted when empty) |
-| 4 | Response contract | system | static — output-shape rules |
-| 5 | Injected startup context | user | required, session-stable project/agent/instruction data |
-| 6 | Visible `input.messages` conversation | user/assistant/tool | append-only. The learner reads a bounded transcript of it; the selector reads only the newest message plus a small labelled slice of history |
-| 7 | Injected context (runtime + display + turn footer + retrieved docs) | user | per-request tail — the only volatile block. Always present: the display fragment (terminal width, pipe-table cap) renders even when the client sends no runtime |
+| 2 | Response contract | system | static — output-shape rules; the last system block |
+| 3 | Tool schemas | top-level `tools` | 77 schemas, 77,258 compact-JSON bytes, ~21.5k tokens (measured 2026-08-16) |
+| 4 | Active skill bodies | user | shared by TASK — any two sessions running the same runbook share the prefix through here. Replaced wholesale on a selector topic shift; omitted when empty |
+| 5 | Integrations (MCP servers) | user | per session and instance — carries the client's MCP endpoint URL. Client tools are NOT listed here; their schemas already ride the function-calling interface |
+| 6 | Injected startup context | user | required, session-stable project/agent/instruction data |
+| 7 | Visible `input.messages` conversation | user/assistant/tool | append-only. The learner reads a bounded transcript of it; the selector reads only the newest message plus a small labelled slice of history |
+| 8 | Injected context (runtime + display + turn footer + retrieved docs) | user | per-request tail — the only volatile block. Always present: the display fragment (terminal width, pipe-table cap) renders even when the client sends no runtime |
+
+Rows 4 and 5 were system-role until issue #39. That put a per-machine MCP
+endpoint URL and every selector topic shift ahead of all 21.5k tokens of
+schemas; moving them below makes a skill load cost its own bytes instead of the
+tool region. Skill bodies stay ahead of the conversation rather than joining the
+volatile tail — a large runbook in the tail is re-paid uncached on every round of
+every turn, far worse than one conversation re-encode when the set changes.
 
 All client-provided context (ids, names, MCP details, project instructions, memories,
 worktrees) is treated as untrusted data. Prose fields collapse whitespace; multiline fields

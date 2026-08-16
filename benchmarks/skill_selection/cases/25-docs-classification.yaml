@@ -188,7 +188,7 @@ cases:
       The eviction trap, and the reason "a documentation question selects nothing"
       is scoped to an idle turn. Pausing to ask about the product does not
       abandon the workflow: clearing the active set here strands the assistant
-      mid-runbook AND pays a full tools+conversation re-encode when it reloads a
+      mid-runbook AND pays a skill-block+conversation re-encode when it reloads a
       turn later. Both answers are needed — keep the skills, AND set the query.
     active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
     messages:

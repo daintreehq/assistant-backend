@@ -329,9 +329,9 @@ def test_docs_context_is_empty_without_a_lookup(assembler: PromptAssembler) -> N
 
 
 def test_response_contract_is_final_system_message(assembler: PromptAssembler) -> None:
-    # The output-shape contract is the FINAL system message — the last stable block
-    # before the conversation (system content after the conversation would be
-    # hoisted into DeepSeek's system region and bust the tools+conversation cache).
+    # The output-shape contract is the FINAL system message — so the tool schemas
+    # serialize directly behind it (system content anywhere else in the array is
+    # hoisted into DeepSeek's system region and busts the tools+conversation cache).
     req = RespondRequest.model_validate(
         {
             "protocol_version": 2,
@@ -345,6 +345,9 @@ def test_response_contract_is_final_system_message(assembler: PromptAssembler) -
     system_msgs = [m for m in pr.messages if m["role"] == "system"]
     last_system = system_msgs[-1]
     assert last_system["content"].startswith("# Response contract")
+    # Exactly two: base + contract. Anything else in the system region would sit
+    # ahead of the schemas — "last system message" alone would not catch that.
+    assert len(system_msgs) == 2
     # The contract's rules defer to the tail rather than quoting a number, so the
     # width appears ONLY in the volatile tail (issue #38). A number here would sit
     # ahead of the tool schemas and re-encode them on every resize.
