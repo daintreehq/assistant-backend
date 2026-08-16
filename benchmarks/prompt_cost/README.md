@@ -44,16 +44,28 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
   (selector → assembly → main stream) — the latency a selector-firing turn actually
   costs the user.
 
-**Cache-affinity A/B (`--live --affinity-ab`, issue #42):** runs the same
-three-turn session twice — once with no affinity key (today's default, where
-OpenRouter hashes the first system and first non-system message) and once with a
-stable `session_id` — and reports endpoint switches plus mean cache ratio after the
-first turn. The sequence **shifts the active skill set between turns on purpose**:
-the skill block is the first non-system message, so a shift is exactly what
-invalidates the default key while leaving the invariant head above it reusable. One
-sequence per arm is indicative, not significant — re-run before concluding, and
-treat endpoint switch rate as diagnostic only, since an endpoint is many GPU workers
-and the same name is not the same cache. See `docs/PROVIDER_POLICY.md` section 3a.
+**Cache-affinity A/B (`--live --affinity-ab`, issue #42):** runs a three-turn
+session twice — once with **no** affinity key (the pre-change baseline, where
+OpenRouter falls back to hashing the first system and first non-system message) and
+once with a stable `session_id` (what the server sends today) — and reports endpoint
+switches plus mean cache ratio after the first turn. The sequence **shifts the
+active skill set between turns on purpose**: the skill block is the first non-system
+message, so a shift is exactly what invalidates the default key while leaving the
+invariant head above it reusable.
+
+The two arms take **disjoint, run-randomized slices of the catalog**, and the
+treatment key is fresh per run. That is what keeps arm order from deciding the
+result: the skill block is the only thing below the invariant head that the default
+sticky key hashes, so disjoint slices mean neither arm can warm the other's prefix
+or leave a sticky record the other inherits — and a rerun inside OpenRouter's
+10-minute window starts cold in both arms. The invariant head above the skill block
+stays shared, deliberately: every Daintree request shares it, so both arms meeting
+it warm is the production condition, not a confound.
+
+One run is still indicative rather than significant — re-run before concluding.
+Endpoint switch rate is diagnostic only: an endpoint is many GPU workers, so the
+same name is not the same cache, and the count reports `n/a` when any endpoint went
+unreported. See `docs/PROVIDER_POLICY.md` section 3a.
 
 ## Latest deterministic snapshot
 

@@ -195,56 +195,79 @@ def test_live_task_terminal_judge(live_client) -> None:
     assert out["matched"] is True
 
 
-def test_live_cache_affinity_key_is_accepted_and_sticks(live_client) -> None:
-    # Two things a mock cannot prove, both load-bearing for docs/PROVIDER_POLICY.md
-    # section 3a.
+def test_live_cache_affinity_key_is_accepted_and_routes() -> None:
+    # THE HARD ASSERTION — that a request carrying `session_id` still ROUTES.
+    # `require_parameters: true` filters the eligible pool on exactly the parameters
+    # we send. `session_id` is a ROUTER-level field, not a model parameter, so it
+    # should not participate in that filter — but if it ever did, the policy would
+    # match no endpoint and every main turn would 404. Nothing mocked can see that,
+    # because the filter lives at OpenRouter.
     #
-    # 1. THAT IT ROUTES AT ALL. `require_parameters: true` filters the pool on
-    #    exactly the parameters we send. `session_id` is a ROUTER-level field, not a
-    #    model parameter, so it should not participate in that filter — but if it
-    #    ever did, the policy would match no endpoint and every main turn would 404.
-    #    That failure is invisible to every mocked test in the suite.
-    # 2. THAT IT ACTUALLY PINS. Send the same key twice and the second call should
-    #    come back from the same endpoint. Asserted as a warning rather than a hard
-    #    failure: stickiness is upstream behaviour we observe, not a contract we
-    #    control, and it only activates where cache-read pricing beats prompt
-    #    pricing. A hard assert here would make an unrelated pricing change on
-    #    OpenRouter's side look like a regression in this repo.
+    # THE OBSERVATION — whether it actually pins. The two calls differ in their
+    # first non-system message while sharing the large system prefix, so
+    # OpenRouter's DEFAULT key (a hash of the first system and first non-system
+    # message) would differ between them: if they still land on one endpoint, the
+    # explicit key is what did it. That is the causal shape the weaker
+    # identical-requests version could not show.
+    #
+    # It is reported as a WARNING, not an assertion. Stickiness is upstream
+    # behaviour we observe rather than a contract we control — it only activates
+    # where cache-read pricing beats prompt pricing — so a hard assert would make
+    # an unrelated OpenRouter pricing change look like a regression here. A warning
+    # survives `pytest -q` on a passing run, which a bare print does not.
+    import uuid
+    import warnings
+
     import httpx as _httpx
 
     from daintree_assistant_server.config import OPENROUTER_MODEL
     from daintree_assistant_server.providers.base import ProviderChatRequest
     from daintree_assistant_server.providers.openrouter import OpenRouterProvider
 
-    async def _call() -> tuple[list[str | None], list[int | None]]:
+    # Fresh per run: a fixed key would inherit the previous run's sticky record
+    # (they expire after 10 minutes of inactivity) and prove nothing about this one.
+    key = f"daintree-main-livetest-{uuid.uuid4().hex[:12]}"
+    shared_system = "You are terse." + " Answer briefly." * 200
+
+    async def _call() -> list[tuple[str | None, int | None, str]]:
         client = _httpx.AsyncClient(
             timeout=_httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
         )
         provider = OpenRouterProvider(client, api_key=SecretStr(os.environ["OPENROUTER_API_KEY"]))
-        endpoints: list[str | None] = []
-        cached: list[int | None] = []
+        observed: list[tuple[str | None, int | None, str]] = []
         try:
-            request = ProviderChatRequest(
-                model=OPENROUTER_MODEL,
-                messages=[
-                    {"role": "system", "content": "You are terse." + " Answer briefly." * 200},
-                    {"role": "user", "content": "Say ok."},
-                ],
-                max_tokens=8,
-                timeout=120.0,
-                cache_session_id="daintree-main-livetest-affinity",
-            )
-            for _ in range(2):
-                result = await provider.complete(request)
-                endpoints.append(result.endpoint)
-                cached.append(result.usage.cached_tokens)
-            return endpoints, cached
+            for turn in ("Say ok.", "Say fine instead."):
+                result = await provider.complete(ProviderChatRequest(
+                    model=OPENROUTER_MODEL,
+                    messages=[
+                        {"role": "system", "content": shared_system},
+                        {"role": "user", "content": turn},
+                    ],
+                    max_tokens=8,
+                    timeout=120.0,
+                    cache_session_id=key,
+                ))
+                observed.append((result.endpoint, result.usage.cached_tokens, result.text))
         finally:
             await provider.aclose()
+        return observed
 
-    endpoints, cached = asyncio.run(_call())
-    # (1) is the hard assertion: the call routed and answered.
-    assert len(endpoints) == 2
-    # (2) is an observation. Print rather than fail so a run records what happened.
-    if endpoints[0] is not None and endpoints[0] != endpoints[1]:
-        print(f"NOTE: affinity key did not pin: {endpoints[0]} -> {endpoints[1]} (cached={cached})")
+    observed = asyncio.run(_call())
+    # Both calls routed and produced a real completion. `complete` raises on an
+    # unroutable request, so reaching here at all is the routing proof; asserting on
+    # the payload keeps that from degrading into "two exceptions were not raised".
+    assert len(observed) == 2
+    for _endpoint, _cached, text in observed:
+        assert isinstance(text, str)
+    endpoints = [o[0] for o in observed]
+    if None in endpoints:
+        warnings.warn(
+            f"affinity: endpoint not reported, stickiness unobservable ({endpoints})",
+            stacklevel=1,
+        )
+    elif endpoints[0] != endpoints[1]:
+        warnings.warn(
+            f"affinity key did not pin: {endpoints[0]} -> {endpoints[1]} "
+            f"(cached_tokens={[o[1] for o in observed]})",
+            stacklevel=1,
+        )

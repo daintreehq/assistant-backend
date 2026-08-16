@@ -2335,6 +2335,13 @@ async def test_body_reroll_keeps_the_discarded_drafts_endpoint(
             api_key=TEST_API_KEY,
         )
     assert len(fake_provider.requests) == 2, "the draft must actually have been re-rolled"
+    # The re-roll is built with `dataclasses.replace`, so it inherits the affinity
+    # key — and it must. A re-roll that dropped it would send the SAME prompt under
+    # a different sticky key, splitting one turn across two cohorts and evicting the
+    # endpoint that just served the draft: a guaranteed cold prefix on the retry.
+    keys = [r.cache_session_id for r in fake_provider.requests]
+    assert keys[0] is not None
+    assert keys[0] == keys[1]
     entry = _turn_usage(logs)
     assert entry["distinct_endpoints"] == 2
     # The accepted attempt is the attribution; the count is what says the ratio
@@ -2842,8 +2849,9 @@ async def test_main_call_carries_a_pseudonymous_cache_session_key(
     fake_provider.selection_result = selection_result([skill_id])
     fake_provider.complete_result = make_result(content="done")
 
+    request = _affinity_request()
     await orchestrator.complete(
-        _affinity_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
 
     sent = fake_provider.requests[-1]
@@ -2853,6 +2861,10 @@ async def test_main_call_carries_a_pseudonymous_cache_session_key(
     # OpenRouter caps the field at 256 characters; a key it rejects is a key that
     # silently does nothing.
     assert len(sent.cache_session_id) <= 256
+    # And it is the key the derivation actually produces, not merely a
+    # plausibly-shaped string — this is what ties the wire value to
+    # _cache_session_key, so a future edit cannot quietly attach a different one.
+    assert sent.cache_session_id == orchestrator._cache_session_key(request)
 
 
 @pytest.mark.asyncio
@@ -2878,7 +2890,13 @@ async def test_cache_session_key_is_stable_across_turns_and_unique_per_session(
         api_key=TEST_API_KEY,
     )
 
+    # Exactly the three MAIN calls: a configured selector result routes every
+    # json_object call to `selection_requests` instead (tests/fakes.py), so this
+    # list holds no selector traffic. Asserted so a future change to that
+    # discriminator cannot silently shift the indices below.
     keys = [r.cache_session_id for r in fake_provider.requests]
+    assert len(keys) == 3
+    assert keys[0] is not None
     assert keys[0] == keys[1]
     assert keys[-1] != keys[0]
 
@@ -2902,20 +2920,23 @@ async def test_selector_call_carries_no_cache_session_key(
     assert all(r.cache_session_id is None for r in fake_provider.selection_requests)
 
 
-@pytest.mark.asyncio
-async def test_json_mode_main_call_uses_its_own_affinity_namespace(
-    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+def test_json_mode_main_call_uses_its_own_affinity_namespace(
+    orchestrator: ChatOrchestrator,
 ) -> None:
     # A JSON-mode main call carries no tool schemas (validation rejects the
     # combination) and routes through the tail-bounded structured policy into a
     # different pool. Sharing one key across both shapes would let each evict the
     # other's sticky endpoint for a prefix that endpoint does not hold.
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
-    fake_provider.selection_result = selection_result([skill_id])
-    fake_provider.complete_result = make_result(content="done")
-
+    #
+    # Exercises the derivation directly rather than through `complete`: the fake
+    # provider classifies EVERY json_object call as the selector when a selection
+    # result is configured (tests/fakes.py), so a JSON main call cannot be told
+    # apart there. The attach path is pinned separately — the non-JSON test above
+    # asserts the sent key equals exactly what this function returns.
     plain = orchestrator._cache_session_key(_affinity_request())
     json_mode = orchestrator._cache_session_key(_affinity_request(json_mode=True))
     assert plain is not None and json_mode is not None
     assert json_mode != plain
     assert json_mode.startswith("daintree-main-json-")
+    # The longer namespace must still clear OpenRouter's 256-character cap.
+    assert len(json_mode) <= 256

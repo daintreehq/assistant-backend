@@ -54,15 +54,25 @@ def _print(doc: dict[str, Any]) -> None:
         print(f"composed first-byte p50      : {s['composed_first_byte_p50_s']:.3f}s")
         ab = live.get("affinity_ab")
         if ab:
-            print("  cache affinity A/B (issue #42):")
-            for arm in ("control", "treatment"):
-                a = ab[arm]
-                print(f"    {arm:9} switches={a['endpoint_switches']} "
+            # "n/a" wherever an endpoint went unreported: a switch count over
+            # partially-unknown transitions would read as a measurement.
+            def _switches(value: Any, signed: bool = False) -> str:
+                if value is None:
+                    return "n/a"
+                return f"{value:+d}" if signed else str(value)
+
+            print(f"  cache affinity A/B (issue #42, run {ab['run']}):")
+            for arm in ("control (no key)", "treatment"):
+                a = ab[arm.split()[0]]
+                unknown = a["unknown_transitions"]
+                print(f"    {arm:16} switches={_switches(a['endpoint_switches'])} "
                       f"cache_after_first={a['mean_cache_ratio_after_first']:.4f} "
-                      f"endpoints={a['endpoints']}")
+                      f"endpoints={a['endpoints']}"
+                      + (f" (unreported transitions: {unknown})" if unknown else ""))
             d = ab["delta"]
-            print(f"    delta     switches={d['endpoint_switches']:+d} "
-                  f"cache_after_first={d['mean_cache_ratio_after_first']:+.4f}")
+            cache_delta = d["mean_cache_ratio_after_first"]
+            print(f"    {'delta':16} switches={_switches(d['endpoint_switches'], signed=True)} "
+                  f"cache_after_first={cache_delta:+.4f}")
 
 
 def _cmd_run(args: argparse.Namespace) -> int:

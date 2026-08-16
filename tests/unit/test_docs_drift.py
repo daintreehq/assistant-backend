@@ -559,10 +559,18 @@ def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None
         "_build_body no longer emits a top-level session_id. "
         "docs/PROVIDER_POLICY.md section 3a says main calls carry one."
     )
-    text = _read(DOC_PROVIDER)
-    assert "session_id" in text and "provider.order" in text, (
-        "docs/PROVIDER_POLICY.md no longer documents the cache-affinity key and "
-        "why `provider.order` is rejected (section 3a)."
+    # Scoped to section 3a and to the CLAIM, not to the words. A bare substring
+    # scan for "session_id"/"provider.order" would pass a document that said the
+    # exact opposite ("do not send session_id; use provider.order") — both tokens
+    # are present either way, and the prose is what a reader acts on.
+    section = _read(DOC_PROVIDER).split("### 3a.")[-1].split("\n## ")[0]
+    assert "session_id" in section, (
+        "docs/PROVIDER_POLICY.md section 3a no longer documents the affinity key."
+    )
+    assert "Why not `provider.order`" in section, (
+        "docs/PROVIDER_POLICY.md section 3a no longer explains why `provider.order` "
+        "is rejected. That paragraph is the one thing stopping a future reader from "
+        "'fixing' affinity by adding the very field that disables it."
     )
 
 

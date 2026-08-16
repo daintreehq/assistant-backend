@@ -24,6 +24,7 @@ them as a tracked baseline with trials, not an exact constant.
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Any
 
 from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
@@ -35,16 +36,32 @@ from .._harness.stats import latency_summary
 
 
 async def _prompt_request(
-    settings: Settings, *, messages: list[dict[str, Any]], stream: bool, json_mode: bool = False
+    settings: Settings,
+    *,
+    messages: list[dict[str, Any]],
+    stream: bool,
+    json_mode: bool = False,
+    skills: list[Any] | None = None,
 ) -> Any:
     """Assemble a real provider request, then clamp completion to bound cost — the
-    prompt (what we measure) is untouched."""
+    prompt (what we measure) is untouched.
+
+    ``skills`` selects the active set, which is what the affinity A/B varies: the
+    skill block is the first non-system message, so it is what OpenRouter's default
+    sticky key hashes. Passing it through the assembler rather than editing the
+    assembled array afterwards keeps the row identification the assembler's job —
+    surgery on "the first non-system message" would silently target the
+    integrations or startup row if the set were ever empty.
+    """
     from daintree_assistant_server.prompts.loader import PromptLoader
     from daintree_assistant_server.services.prompt_assembler import PromptAssembler
     from daintree_assistant_server.skills.catalog import load_catalog
 
     assembler = PromptAssembler(PromptLoader(), settings)
-    skills = list(load_catalog().skills[:2])
+    if skills is None:
+        skills = list(load_catalog().skills[:2])
+    if not skills:
+        raise ValueError("an empty skill set would move the first non-system row")
     req = build_respond_request(messages=messages, with_tools=not json_mode, stream=stream)
     if json_mode:
         gen = req.generation.model_copy(update={"response_format": "json_object"})
@@ -132,8 +149,15 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
     return {"trials": trials, "first_byte": latency_summary(first_byte)}
 
 
+#: Skills per turn, and turns per arm. Six consecutive skills per arm, so two arms
+#: can take disjoint slices of the catalog (see `_affinity_ab`).
+_AFFINITY_SKILLS_PER_TURN = 2
+_AFFINITY_TURNS = 3
+_AFFINITY_ARM_SPAN = _AFFINITY_SKILLS_PER_TURN * _AFFINITY_TURNS
+
+
 async def _affinity_sequence(
-    provider: Any, settings: Settings, *, cache_session_id: str | None
+    provider: Any, settings: Settings, *, cache_session_id: str | None, offset: int
 ) -> list[dict[str, Any]]:
     """One session's worth of turns, run with or without an affinity key.
 
@@ -144,22 +168,32 @@ async def _affinity_sequence(
     contract, tool schemas) is still perfectly reusable. An arm that sent the same
     request twice would measure nothing, because both keying strategies agree there.
 
-    ``cache_session_id=None`` is the control: exactly today's behaviour.
+    ``cache_session_id=None`` is the NO-KEY baseline — the behaviour before this
+    change, not the behaviour at HEAD, which now always attaches a key.
+
+    ``offset`` picks this arm's slice of the catalog, and it is the ONLY lever that
+    moves the default sticky key: that key hashes the first system message and the
+    first non-system message, which here are the invariant base prompt and the
+    skill block. Nothing further down — not the user message, not the tail — takes
+    part in it. So a per-arm, per-run offset is what stops the no-key arm from
+    inheriting the sticky record and warm prefix of the previous arm or the
+    previous run, which would read as an affinity effect that is really run order.
     """
     from daintree_assistant_server.skills.catalog import load_catalog
 
     catalog = load_catalog()
-    # Three different two-skill windows over the catalog → three different skill
-    # blocks → three different default keys, one stable explicit key.
-    windows = [list(catalog.skills[i : i + 2]) for i in (0, 2, 4)]
+    windows = [
+        list(catalog.skills[i : i + _AFFINITY_SKILLS_PER_TURN])
+        for i in range(offset, offset + _AFFINITY_ARM_SPAN, _AFFINITY_SKILLS_PER_TURN)
+    ]
     calls: list[dict[str, Any]] = []
     for turn, skills in enumerate(windows):
         pr = await _prompt_request(
             settings,
             messages=[{"role": "user", "content": f"Prepare this branch for review ({turn})."}],
             stream=False,
+            skills=skills,
         )
-        pr.messages = _with_skills(settings, pr, skills)
         pr.cache_session_id = cache_session_id
         result = await provider.complete(pr)
         calls.append({
@@ -170,70 +204,85 @@ async def _affinity_sequence(
     return calls
 
 
-def _with_skills(settings: Settings, pr: Any, skills: list[Any]) -> list[dict[str, Any]]:
-    """Swap the assembled request's skill block for a different one.
-
-    Rebuilding through the assembler would also move the conversation and tail;
-    replacing just this row keeps everything above it byte-identical, which is
-    exactly the condition the experiment is about.
-    """
-    from daintree_assistant_server.prompts.loader import PromptLoader
-    from daintree_assistant_server.services.prompt_assembler import PromptAssembler
-
-    block = PromptAssembler(PromptLoader(), settings).render_loaded_skills(skills)
-    messages = list(pr.messages)
-    for i, message in enumerate(messages):
-        if message["role"] != "system":
-            messages[i] = {"role": "user", "content": block}
-            break
-    return messages
+def _summarize_affinity(calls: list[dict[str, Any]]) -> dict[str, Any]:
+    endpoints = [c["endpoint"] for c in calls]
+    pairs = list(zip(endpoints, endpoints[1:], strict=False))
+    # Only KNOWN→KNOWN transitions count. `endpoint` is None when the provider
+    # reported none, and this repo treats that as "not reported", never as a host:
+    # counting [A, None, A] as two switches would invent two cache misses that may
+    # not have happened, and counting it as zero would claim knowledge we lack.
+    known = [(a, b) for a, b in pairs if a is not None and b is not None]
+    # Switches, not distinct count: A→B→A is two switches and two cold prefixes,
+    # which a distinct count of 2 would understate.
+    switches = sum(1 for a, b in known if a != b)
+    # Turn 0 is excluded: it elects an endpoint rather than returning to one, so
+    # neither arm can differ there and averaging it in only dilutes the signal.
+    later = [c["cache_ratio"] for c in calls[1:]]
+    return {
+        "endpoints": endpoints,
+        "endpoint_switches": switches if len(known) == len(pairs) else None,
+        "comparable_transitions": len(known),
+        "unknown_transitions": len(pairs) - len(known),
+        "mean_cache_ratio_after_first": round(sum(later) / len(later), 4) if later else 0.0,
+        "calls": calls,
+    }
 
 
 async def _affinity_ab(settings: Settings) -> dict[str, Any]:
     """The issue #42 A/B: does naming the sticky key keep a session on one endpoint?
 
-    Arms alternate control-first so a warming trend across the run cannot be read as
-    a treatment effect. Both arms are one sequential session at concurrency one, well
-    inside OpenRouter's 10-minute sticky-session idle window.
+    Both arms are one sequential session at concurrency one, well inside
+    OpenRouter's 10-minute sticky-session idle window.
+
+    The two arms take DISJOINT, run-randomized slices of the catalog. That is what
+    makes the comparison fair rather than ordered: the arms then share no skill
+    block, so neither can warm the other's prefix or leave behind a sticky record
+    the other inherits, and a rerun within the sticky window starts cold in both
+    arms. Their skill CONTENT differs as a result, which is noise — the metric is
+    how much of each arm's own prefix survived its own topic shifts — where sharing
+    the slices would have been directional bias in the second arm's favour.
+
+    What remains shared is the invariant head above the skill block (base prompt,
+    response contract, tool schemas). That is not a confound to remove: it is
+    shared by every Daintree request in existence, so both arms meet it warm, which
+    is exactly the condition the served fleet is in.
     """
+    from daintree_assistant_server.skills.catalog import load_catalog
+
+    run = uuid.uuid4().hex[:12]
+    # Two disjoint arms have to fit inside the catalog.
+    span = len(load_catalog().skills) - 2 * _AFFINITY_ARM_SPAN
+    if span < 1:
+        raise ValueError("catalog too small for two disjoint affinity arms")
+    offset = int(run[:8], 16) % span
     provider = make_upstream_provider(settings, timeout=settings.main_timeout_seconds)
     try:
-        control = await _affinity_sequence(provider, settings, cache_session_id=None)
+        control = await _affinity_sequence(
+            provider, settings, cache_session_id=None, offset=offset
+        )
         treatment = await _affinity_sequence(
-            provider, settings, cache_session_id="daintree-main-bench-affinity"
+            provider,
+            settings,
+            cache_session_id=f"daintree-main-bench-{run}",
+            offset=offset + _AFFINITY_ARM_SPAN,
         )
     finally:
         await provider.aclose()
 
-    def summarize(calls: list[dict[str, Any]]) -> dict[str, Any]:
-        endpoints = [c["endpoint"] for c in calls]
-        # Switches, not distinct count: A→B→A is two switches and two cold prefixes,
-        # which a distinct count of 2 would understate.
-        switches = sum(1 for a, b in zip(endpoints, endpoints[1:], strict=False) if a != b)
-        # Turn 0 is excluded: it elects an endpoint rather than returning to one, so
-        # neither arm can differ there and averaging it in only dilutes the signal.
-        later = [c["cache_ratio"] for c in calls[1:]]
-        return {
-            "endpoints": endpoints,
-            "endpoint_switches": switches,
-            "mean_cache_ratio_after_first": round(sum(later) / len(later), 4) if later else 0.0,
-            "calls": calls,
-        }
+    control_summary = _summarize_affinity(control)
+    treatment_summary = _summarize_affinity(treatment)
 
-    control_summary = summarize(control)
-    treatment_summary = summarize(treatment)
+    def delta(key: str) -> Any:
+        lhs, rhs = treatment_summary[key], control_summary[key]
+        return None if lhs is None or rhs is None else round(lhs - rhs, 4)
+
     return {
+        "run": run,
         "control": control_summary,
         "treatment": treatment_summary,
         "delta": {
-            "endpoint_switches": (
-                treatment_summary["endpoint_switches"] - control_summary["endpoint_switches"]
-            ),
-            "mean_cache_ratio_after_first": round(
-                treatment_summary["mean_cache_ratio_after_first"]
-                - control_summary["mean_cache_ratio_after_first"],
-                4,
-            ),
+            "endpoint_switches": delta("endpoint_switches"),
+            "mean_cache_ratio_after_first": delta("mean_cache_ratio_after_first"),
         },
         "note": "one sequence per arm — indicative, not significant. Re-run before "
                 "drawing a conclusion; endpoint switch rate is diagnostic (an endpoint "
