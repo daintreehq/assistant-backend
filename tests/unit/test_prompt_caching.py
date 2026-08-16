@@ -203,12 +203,31 @@ def test_the_cache_evicts_least_recently_USED_not_least_recently_added() -> None
 # ---------------------------------------------------------------------------
 
 
-def test_the_same_skill_set_renders_identical_bytes(assembler, catalog) -> None:  # type: ignore[no-untyped-def]
-    skills = catalog.get_many(list(catalog.known_ids)[:2])
-    first = assembler.render_loaded_skills(skills)
-    second = assembler.render_loaded_skills(skills)
-    assert first == second
-    assert assembler._loaded_skills_cache.hits >= 1
+def test_the_same_skill_set_in_ANY_order_renders_identical_bytes(assembler, catalog) -> None:  # type: ignore[no-untyped-def]
+    """The failure this guards, and why rendering the same list twice missed it.
+
+    The block was rendered in the selector's raw output order, so the same set
+    classified in a different order produced different bytes: a full upstream
+    prefix-cache miss on the tool schemas and the conversation behind them, and
+    a second LRU entry holding text identical to the first. Reversing the input
+    is what makes the assertion bite — repeating one list cannot.
+    """
+    specifics = [s for s in catalog.skills if not s.meta.foundation]
+    assert len(specifics) >= 2
+    canonical = specifics[:2]
+    assert canonical[0].id < canonical[1].id, "catalog order IS canonical id order"
+
+    cache = assembler._loaded_skills_cache
+    first = assembler.render_loaded_skills(canonical)
+    hits_before, misses_before = cache.hits, cache.misses
+    entries_before = len(cache._entries)
+
+    second = assembler.render_loaded_skills(list(reversed(canonical)))
+
+    assert second == first
+    assert cache.hits == hits_before + 1
+    assert cache.misses == misses_before, "the reversed call re-rendered"
+    assert len(cache._entries) == entries_before, "the reversed call earned its own entry"
 
 
 def test_a_different_skill_set_renders_different_bytes(assembler, catalog) -> None:  # type: ignore[no-untyped-def]

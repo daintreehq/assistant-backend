@@ -904,14 +904,17 @@ class ChatOrchestrator:
             if speculation is not None:
                 speculation_stats = speculation.stats()
                 # Compare RENDER order, not list order: the loaded-skills block is
-                # rendered foundations-first (stable), so [foundation, X] and
-                # [X, foundation] assemble to byte-identical requests. An ordered
-                # list comparison threw away a live, already-producing stream and
-                # rebuilt an identical >50 KiB payload — and it fired on exactly the
-                # turn shape pairing creates (the model lists the foundation first
-                # on turn 1, then only the specific on turn 2, with pairing
-                # appending the foundation last). A plain SET comparison would be
-                # wrong: swapping two specifics genuinely changes the bytes.
+                # rendered foundations-first and id-sorted within each tier, so ANY
+                # permutation of one active set assembles to a byte-identical
+                # request. An ordered list comparison threw away a live, already-
+                # producing stream and rebuilt an identical >50 KiB payload — and it
+                # fired on exactly the turn shape pairing creates (the model lists
+                # the foundation first on turn 1, then only the specific on turn 2,
+                # with pairing appending the foundation last). Keep the shared
+                # helper rather than a plain SET comparison: the two agree only
+                # because the active set is deduplicated upstream, and going
+                # through the assembler's own sort keeps "the same request" from
+                # drifting if render policy ever moves again.
                 exact_winner = (
                     resolved_catalog.revision == catalog_at_start.revision
                     and render_order_ids(skills) == speculative_render_ids
