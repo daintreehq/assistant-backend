@@ -30,12 +30,12 @@ You are setting up the supervisor, not doing the work: on the wake you spawn, ve
 
 Procedure:
 
-1. Fix the target, then pick ONE mechanism. Resolve live this turn every id that already exists — full terminal ids, the worktree, the PR number: a watcher built on a stale id waits forever on nothing and never wakes you. Only the terminal deferred in (e) is allowed not to exist yet.
+1. Fix the target, then pick ONE mechanism. Resolve the full terminal ids or PR number live this turn: a watcher built on a stale id waits forever on nothing and never wakes you.
    - (a) A terminal outcome needing goal-based classification ("wake me when it's green", "alert me if it breaks") → `watcher.terminal.create`, step 2.
    - (b) A pass/fail verdict on a terminal → there is no fire-and-forget verdict call. If the work has ALREADY settled, `terminal.extract` reads and judges it once, this turn. If it has not, that is case (a): a `watcher.terminal.create` whose `alertWhen` is a `modelJudge` question ("did the suite pass with zero failures?") publishes the judged answer to the attention queue.
    - (c) A PR reaching a terminal state → `watcher.watchPR {"prNumber":123,"title":"…"}` (optional `cwd`, `stopAfterMs`) — read "What the PR watcher cannot watch" before promising anything about it.
    - (d) A nudge with no terminal to observe → `timer.schedule`, step 4.
-   - (e) The WORK itself starts later, so its terminal does not exist yet ("wait an hour, then run it") — as opposed to (d), where nothing is ever run and the user is only reminded → schedule the START, step 4. Do NOT create the agent now: spawning just to have an id parks it idle on a worktree for the whole wait.
+   - (e) The WORK itself starts later, so its terminal does not exist yet ("wait an hour, THEN run it") — unlike (d), where nothing is ever run and the user is only reminded → read "Work that starts later" below before promising anything. Do NOT spawn now just to have an id: that parks an agent idle on a worktree for the whole wait.
    Spawning the agent right now? The cheapest supervisor is the spawn itself: `agentTask.spawnForEdits` with flat `watch:true` + `watchGoal:"…"` and an `acceptanceCriteria` contract. Its supervisor already confirms completion — add no second watcher.
 
 2. Create the watcher. `watcher.terminal.create` requires `terminalIds` (array of full ids), `title`, and `goal` — plain language for what you are observing, which drives the per-check classification. Optional: `stopWhen` (ends the watcher, status `condition_met`), `alertWhen` (alerts and KEEPS running), `cadenceMs` (default 120000), `modelTier` (`small` | `medium`), `startAfterMs`, `stopAfterMs` (defaults to 24 h — a watcher never runs forever, so set the horizon you mean). Write the conditions with the DSL below: prefer the free deterministic leaves, and set `cadenceMs` to the resolution you genuinely need.
@@ -48,7 +48,7 @@ Procedure:
    - `grant.create`, `grant.revoke` and `daintree.call` can NEVER be granted, so a wrapper-less capability cannot run unattended: do it yourself now, or say plainly that it waits for the user.
 
 4. For a time-based nudge: `timer.schedule {"title":"…","payload":{"type":"enqueue","message":"…"},"delayMs":3600000}`. Use `delayMs` (relative), never `fireAt` — you have no reliable clock, so an invented wall-clock time fires at the wrong hour or never. `payload.type` is `enqueue` (a reminder in the attention queue) or `call_safe_tool` with `payload.toolCall {"toolName":"…","args":{…}}`. A `repeat` requires `everyMs` and must be bounded by `maxRuns` or `until`, or it pings forever. Optional `target` ties it to a `terminalId` / `worktreeId` / `projectId` / `workflowRunId`.
-   `toolName` may name ANY tool in the inventory — the timer adds no allowlist of its own. But a one-shot timer REVOKES its own grants the moment it fires, before the payload runs, so a mutating tool in a one-shot `call_safe_tool` is always blocked no matter how you grant it. To make something mutating happen later — spawning an agent, most of all — `enqueue` the instruction and pre-authorize the wake instead, as below.
+   `toolName` may name any registered tool — the timer adds no allowlist of its own — but the usual tier and confirmation policy still decides what runs. A timer REVOKES its own grants on its terminal fire (every one-shot, and the last fire of a bounded repeat) BEFORE the payload dispatches, so a confirm-required tool there is blocked on exactly the fire you scheduled it for, however you grant it. Read-only payloads are unaffected.
 
 5. Report the ids and END the turn — the setup IS the deliverable, so do not then wait on the same terminal in-turn. Supervision is durable: the background supervisor keeps checking after the assistant is closed, so "I'll wake you when it finishes" is a promise you can actually keep.
 
@@ -90,25 +90,14 @@ THE KEY TRAP: to stop when an AGENT finishes its turn, do NOT use a bare `stopWh
 
 `terminal.await.async` needs none of this DSL — it watches plain agent state and wakes you when every terminal has finished, failed, or asked a question. Reach for the DSL only when the stop or alert depends on what the output SAYS.
 
-## Start work later without parking an agent
+## Work that starts later
 
-The target does not exist yet and must NOT be created now — an agent spawned an hour early holds a worktree and burns its context sitting idle. Schedule the instruction instead, and pre-authorize the wake that will carry it out. Replace every `<…>`; never send a placeholder.
+"Wait an hour, THEN run it" has no unattended path today, so do not promise one. A `call_safe_tool` payload carrying a spawn is blocked by the revocation in step 4, and an `enqueue` payload only lands an inbox reminder — a timer never triggers an autonomous wake turn, since only a terminal watcher or an async completion does. Pick one of these and SAY which you did:
 
-```
-timer.schedule {
-  "title": "<what this starts>",
-  "delayMs": 3600000,
-  "payload": {"type": "enqueue",
-              "message": "<the whole task: what to spawn, in which worktree, and what done looks like>"},
-  "target": {"worktreeId": "<full worktree id>"}
-}
-```
+- The delay was really about not blocking the user → start the work NOW and watch it: spawn with flat `watch:true` + `watchGoal` and an `acceptanceCriteria` contract, per step 1. The user is still free the moment you hand back.
+- The delay is genuinely about the clock → `timer.schedule` an `enqueue` reminder carrying the whole instruction, and tell the user plainly that the spawn itself waits for them. That is the same honest answer step 3 requires for any capability you cannot pre-authorize.
 
-```
-grant.create {"actorType":"wake","actorId":"wake","allowedToolNames":["agentTask.spawnForEdits"],"ttlMs":7200000,"maxUses":1}
-```
-
-Resolve that `worktreeId` NOW — the wake turn has no other way to know which tree you meant, and a spawn left to pick one lands wherever happens to be active an hour from now. Write `message` self-contained for the same reason: the wake turn carries none of this turn's conversation, so an instruction it cannot reconstruct is one it will not follow. Give `ttlMs` room for the delay PLUS the wake, and keep `maxUses` at the number of spawns you actually mean.
+Never pre-spawn an agent now to reserve a terminal id for later. It holds a worktree and burns its context idling, and it is the exact failure branch (e) exists to prevent.
 
 ## What the PR watcher cannot watch
 
