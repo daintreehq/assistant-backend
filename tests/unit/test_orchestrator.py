@@ -731,7 +731,12 @@ def _reshuffleable_pair(
     specifics = [s.id for s in orchestrator.catalog.skills if not s.meta.foundation]
     for first, second in itertools.combinations(specifics, 2):
         forward, reverse = [first, second], [second, first]
-        if set(_resolved(orchestrator, forward)) == set(_resolved(orchestrator, reverse)):
+        forward_active = _resolved(orchestrator, forward)
+        reverse_active = _resolved(orchestrator, reverse)
+        # Same SET so the render is byte-identical, different ORDER so a
+        # reshuffle is genuinely exercised — a pair resolving to one identical
+        # list would pass on the pre-fix code and prove nothing.
+        if set(forward_active) == set(reverse_active) and forward_active != reverse_active:
             return forward, reverse
     return None
 
