@@ -581,10 +581,16 @@ class Selector:
 
         The largest render on the turn's first-byte path — the whole catalog as a
         classification menu, ~28 KB across 26 skills — and a pure function of
-        (catalog revision, active set, cap). The catalog block is deliberately
-        request-invariant, so the only thing that varies between calls is the
-        short trailing active-set line, and consecutive turns in a session
-        usually share even that.
+        (catalog revision, active set, cap). The active set is the only
+        per-request input, and it is confined to the two trailing lines: the
+        catalog and everything above it render the same bytes for every caller,
+        so the upstream prefix cache sees one prompt rather than one per cohort.
+        Consecutive turns in a session usually share the tail too.
+
+        That confinement is load-bearing, not incidental — prefix caching matches
+        from token 0, so a per-request value spliced in above the catalog would
+        fork all ~28 KB after it. `tests/unit/test_prompt_cache_stability.py`
+        asserts it on bytes; keep new conditionals in the tail.
 
         Keyed on the catalog REVISION rather than held on the catalog object,
         because skill learning can swap the catalog underneath at any time: a

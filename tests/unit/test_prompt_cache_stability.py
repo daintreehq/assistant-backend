@@ -9,6 +9,13 @@ refactor that folded a per-turn value into a stable block kept every test green.
 These tests pin it directly: two requests differing ONLY in volatile runtime/turn
 state must produce a byte-identical stable prefix, with all the variation confined
 to the single trailing user-role tail.
+
+The same invariant recurs one level DOWN, inside a single message string: the
+selector's system prompt is ~28 KB of catalog rendered as one message, and a
+per-request value spliced into its opening lines forks the prefix hash for
+everything after it just as surely as a volatile system message does. Prefix
+caching matches from token 0 with no suffix matching and no realignment, so the
+rule is identical in both places — per-request state rides at the END.
 """
 
 from __future__ import annotations
@@ -132,6 +139,47 @@ def test_appending_a_turn_preserves_the_previous_prefix(assembler, catalog) -> N
         assert json.dumps(left, sort_keys=True) == json.dumps(b[i], sort_keys=True), (
             f"message {i} changed when a turn was appended — the prefix is not stable"
         )
+
+
+def test_the_active_set_changes_selector_bytes_only_after_the_catalog(
+    selector, catalog_manager
+) -> None:  # type: ignore[no-untyped-def]
+    """The selector prompt's ONE volatile value must not lead: it must trail.
+
+    ``active_ids`` is the only per-request input to this render, and the catalog it
+    would fork is the single largest block on the turn's first-byte path. A fork
+    anywhere above the trailing active-set line splits every caller into two
+    cohorts that share no prefix worth caching, for whatever wording nicety
+    prompted it — so this asserts on BYTES rather than on the one phrasing that
+    happened to break it, and fails on ANY future early fork.
+
+    Deliberately rendered through ``_render_system`` against the REAL catalog, so
+    it guards the bytes production actually sends.
+    """
+    catalog = catalog_manager.catalog
+    selectable = sorted(catalog.selectable_ids)
+    assert selectable, "no selectable skills — the test would prove nothing"
+
+    cold = selector._render_system(catalog, [])
+    warm = selector._render_system(catalog, [selectable[0]])
+
+    marker = "\nCurrently active skills: "
+    assert cold.count(marker) == warm.count(marker) == 1, (
+        "the active-set marker is not unique — a skill's summary/whenToUse now "
+        "contains it, so this test would partition the prompt in the wrong place"
+    )
+    cold_head, _, cold_tail = cold.partition(marker)
+    warm_head, _, warm_tail = warm.partition(marker)
+
+    assert cold_head == warm_head, (
+        "the active set changed selector prompt bytes BEFORE the trailing tail, "
+        "forking the catalog-scale shared prefix that every call depends on"
+    )
+    # ...and the marker really does sit after the WHOLE catalog, so the assertion
+    # above is a guarantee about all ~28 KB of it and not about a short preamble.
+    for entry in catalog.selector_metadata():
+        assert f"- id: {entry['id']}" in cold_head
+    assert cold_tail != warm_tail, "the tail should carry the whole difference"
 
 
 def test_identical_inputs_are_byte_identical(assembler, catalog) -> None:
