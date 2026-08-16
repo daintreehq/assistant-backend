@@ -22,7 +22,6 @@ from collections.abc import Collection
 from typing import TYPE_CHECKING
 
 from ..contracts.daintree_api import RespondUsage, TurnCost
-from ..contracts.extensions import SelectorUsage
 from ..observability import get_logger
 from ..providers.base import ProviderUsage
 
@@ -151,7 +150,8 @@ def log_turn_usage(
     finish_reason: str | None,
     endpoint: str | None,
     observed_endpoints: Collection[str | None],
-    selector_usage: SelectorUsage | None,
+    selector_ran: bool,
+    selector_usage: ProviderUsage | None,
     selector_endpoint: str | None,
     turn_cost: TurnCost | None = None,
 ) -> None:
@@ -240,6 +240,13 @@ def log_turn_usage(
         # separate prefix on a separately-routed call, so it regresses (and is
         # fixed) independently — reading it off the main ratio would be reading
         # the wrong number.
+        #
+        # Read from the PROVIDER's record, not the wire projection in the
+        # `skills` block: that one floors every count to 0 for the client, which
+        # would resurrect the fabricated cold-cache 0.0 on this side too.
+        # `selector_ran` is what keeps a silent call distinguishable from no call
+        # once those counts are allowed to be `None`.
+        selector_ran=selector_ran,
         selector_endpoint=selector_endpoint,
         selector_prompt_tokens=(
             selector_usage.prompt_tokens if selector_usage is not None else None

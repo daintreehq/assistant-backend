@@ -18,7 +18,6 @@ from typing import Any
 from structlog.testing import capture_logs
 
 from daintree_assistant_server.contracts.daintree_api import TurnCost
-from daintree_assistant_server.contracts.extensions import SelectorUsage
 from daintree_assistant_server.providers.base import ProviderUsage
 from daintree_assistant_server.services.turn_accounting import cache_ratio, log_turn_usage
 
@@ -35,6 +34,7 @@ def _log(**overrides: Any) -> dict[str, Any]:
         "finish_reason": "stop",
         "endpoint": "deepinfra",
         "observed_endpoints": ("deepinfra",),
+        "selector_ran": False,
         "selector_usage": None,
         "selector_endpoint": None,
         "turn_cost": None,
@@ -123,7 +123,8 @@ def test_the_selector_gets_its_own_ratio_and_endpoint() -> None:
     independently, so reading it off the main ratio would read the wrong
     number."""
     entry = _log(
-        selector_usage=SelectorUsage(prompt_tokens=400, cached_tokens=100),
+        selector_ran=True,
+        selector_usage=ProviderUsage(prompt_tokens=400, cached_tokens=100),
         selector_endpoint="novita",
     )
     assert entry["selector_endpoint"] == "novita"
@@ -135,11 +136,40 @@ def test_the_selector_gets_its_own_ratio_and_endpoint() -> None:
 def test_a_turn_that_skipped_selection_reports_nothing_rather_than_zero() -> None:
     """A continuation round runs no selector. Zeros here would read as a
     selector call whose cache did nothing, which is a different fact."""
-    entry = _log(selector_usage=None, selector_endpoint=None)
+    entry = _log(selector_ran=False, selector_usage=None, selector_endpoint=None)
+    assert entry["selector_ran"] is False
     assert entry["selector_prompt_tokens"] is None
     assert entry["selector_cached_tokens"] is None
     assert entry["selector_cache_ratio"] is None
     assert entry["selector_endpoint"] is None
+
+
+def test_a_selector_that_ran_and_reported_nothing_is_not_a_skipped_one() -> None:
+    """The two states that all-`None` counts would otherwise merge.
+
+    Once the counts are allowed to say "not reported", a selector that ran and
+    told us nothing looks exactly like a continuation round that never called
+    one — so the flag has to carry the difference the numbers no longer can.
+    """
+    entry = _log(selector_ran=True, selector_usage=ProviderUsage(), selector_endpoint=None)
+    assert entry["selector_ran"] is True
+    assert entry["selector_prompt_tokens"] is None
+    assert entry["selector_cache_ratio"] is None
+
+
+def test_an_uncounted_selector_cache_does_not_become_a_cold_one() -> None:
+    """The wire model floors these counts to 0 for the client, which cannot say
+    "not reported". Computing the ratio off that floor would report a
+    stone-cold selector prefix on a call that simply never counted its hits.
+    """
+    entry = _log(
+        selector_ran=True,
+        selector_usage=ProviderUsage(prompt_tokens=3000, cached_tokens=None),
+        selector_endpoint="novita",
+    )
+    assert entry["selector_prompt_tokens"] == 3000
+    assert entry["selector_cached_tokens"] is None
+    assert entry["selector_cache_ratio"] is None
 
 
 def test_the_selectors_endpoint_is_excluded_from_the_distinct_count() -> None:
@@ -152,7 +182,8 @@ def test_the_selectors_endpoint_is_excluded_from_the_distinct_count() -> None:
     entry = _log(
         endpoint="deepinfra",
         observed_endpoints=("deepinfra",),
-        selector_usage=SelectorUsage(prompt_tokens=400, cached_tokens=100),
+        selector_ran=True,
+        selector_usage=ProviderUsage(prompt_tokens=400, cached_tokens=100),
         selector_endpoint="novita",
     )
     assert entry["distinct_endpoints"] == 1

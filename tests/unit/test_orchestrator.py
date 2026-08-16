@@ -2519,6 +2519,14 @@ async def test_a_reroll_that_never_opened_keeps_the_drafts_endpoint(
     assert any(e.startswith("event: done") for e in events), (
         "the turn must still answer from the draft it already has"
     )
+    # Pin the branch, not just the outcome: without these the test would still
+    # pass if the re-roll stopped happening at all, which is a different bug
+    # wearing the same log line.
+    assert len(fake_provider.stream_requests) == 2, "the re-roll must have been attempted"
+    assert any(
+        entry["event"] == "main_bare_intent_retry" and entry.get("phase") == "failed_open"
+        for entry in logs
+    ), "the fail-open branch must be the one that ran"
     entry = _turn_usage(logs)
     assert entry["endpoint"] == "deepinfra"
     assert entry["distinct_endpoints"] == 1
@@ -2622,6 +2630,7 @@ async def test_the_turn_key_reaches_the_log_from_a_real_continuation_round(
     assert entry["turn_id"] == "turn-cont"
     assert entry["round"] == 2
     assert entry["endpoint"] == "deepinfra"
+    assert entry["selector_ran"] is False
     assert entry["selector_cache_ratio"] is None
     assert entry["selector_prompt_tokens"] is None
 

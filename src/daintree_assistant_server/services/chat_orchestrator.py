@@ -134,6 +134,12 @@ class _RespondMeta:
     # discarded first attempt's host is not kept. `selector_calls` (in the
     # `respond` line, same request_id) is what says the ratio blends two calls.
     selector_endpoint: str | None = None
+    # The selector's usage as the PROVIDER reported it, kept beside the wire
+    # projection in `skills.selector.usage` rather than instead of it. The wire
+    # model floors every count to 0 for the client, which cannot express "not
+    # reported" — and a cache ratio computed off that floor would claim a
+    # stone-cold prefix on a call that simply never counted its hits.
+    selector_usage: ProviderUsage | None = None
 
 
 @dataclass
@@ -546,7 +552,8 @@ class ChatOrchestrator:
             # same value and the count is 1; with one they may differ, which is
             # the whole signal.
             observed_endpoints=(first_endpoint, result.endpoint),
-            selector_usage=prepared.meta.skills.selector.usage,
+            selector_ran=prepared.meta.skills.selector.ran,
+            selector_usage=prepared.meta.selector_usage,
             selector_endpoint=prepared.meta.selector_endpoint,
             turn_cost=turn_cost,
         )
@@ -1607,6 +1614,7 @@ class ChatOrchestrator:
                 decision.usage.cost_complete if decision.usage is not None else True
             ),
             selector_endpoint=decision.endpoint,
+            selector_usage=decision.usage,
         )
 
     # ---- response bodies ------------------------------------------------
@@ -2216,7 +2224,8 @@ class ChatOrchestrator:
                 finish_reason=finish_reason,
                 endpoint=main_endpoint,
                 observed_endpoints=main_endpoints,
-                selector_usage=meta.skills.selector.usage,
+                selector_ran=meta.skills.selector.ran,
+                selector_usage=meta.selector_usage,
                 selector_endpoint=meta.selector_endpoint,
                 turn_cost=turn_cost_with_speculation(
                     final_usage,
