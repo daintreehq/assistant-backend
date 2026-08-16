@@ -125,7 +125,7 @@ async def test_the_docs_block_is_never_a_system_message(
 ) -> None:
     """The cache rule the whole assembly order exists to protect.
 
-    A system message anywhere in the array serializes ahead of the ~18k-token
+    A system message anywhere in the array serializes ahead of the ~21.5k-token
     tool schemas, so per-turn content placed there re-encodes them. Documentation
     is the most per-turn thing in the prompt.
     """

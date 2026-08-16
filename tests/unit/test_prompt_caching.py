@@ -209,9 +209,10 @@ def test_the_same_skill_set_in_ANY_order_renders_identical_bytes(assembler, cata
     The block was rendered in the selector's raw output order, so the same set
     classified in a different order produced different bytes — the skill
     sections merely swapped places. That cost a full upstream prefix-cache miss
-    on the tool schemas and the conversation behind them, and a second LRU entry
-    for a render that says the same thing. Reversing the input is what makes the
-    assertion bite — repeating one list cannot.
+    on everything behind the block — the integrations, startup and conversation
+    rows — and a second LRU entry for a render that says the same thing. (It cost
+    the tool schemas too until issue #39 moved the block below them.) Reversing the
+    input is what makes the assertion bite — repeating one list cannot.
     """
     specifics = [s for s in catalog.skills if not s.meta.foundation]
     assert len(specifics) >= 2

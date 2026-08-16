@@ -61,9 +61,11 @@ proof that the whole corpus is accurate.
   and starts the authoritative prompt. Empty/untrusted state stays serial, and no
   speculative model event is exposed before the first `meta` event.
 - Skill state is portable across instances via a signed, opaque token.
-- Prompt order is cache-critical: stable systems/tools → stable startup user block → visible
-  conversation → one volatile runtime/display/turn user tail. Runtime worktree state is typed and
-  fresh per request; stable project/agent facts are not duplicated there.
+- Prompt order is cache-critical, and every row below the schemas is ordered widest-shared
+  first: two static system blocks (base prompt → response contract) → tool schemas → user-role
+  skill bodies → user-role integrations → stable startup user block → visible conversation →
+  one volatile runtime/display/turn user tail. Runtime worktree state is typed and fresh per
+  request; stable project/agent facts are not duplicated there.
 
 ## Layout
 

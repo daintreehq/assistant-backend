@@ -15,7 +15,7 @@ CPU floor — no API key, no network:
    fake 0-latency provider, sequentially and at K-way ``asyncio.gather``. With
    an instant provider all measured latency is the server's own per-request CPU
    work (selector prompt render, the unmemoized ``base_prompt()`` re-read, the
-   ~18k-token tool-schema normalization walk, response assembly). Concurrent
+   ~21.5k-token tool-schema normalization walk, response assembly). Concurrent
    latency is measured from SUBMISSION to completion, so it includes event-loop
    queueing behind other requests' CPU — ``p99_inflation_ratio`` is the
    stall/contention proxy.
@@ -424,7 +424,7 @@ async def measure_concurrency(
         "note": (
             "stateless-server concurrency probe: the real ChatOrchestrator.complete "
             "(non-streaming) over an instant provider, so all latency is per-request CPU "
-            "(selector prompt render, unmemoized base_prompt() re-read, ~18k-token "
+            "(selector prompt render, unmemoized base_prompt() re-read, ~21.5k-token "
             "tool-schema normalization, response assembly). There is no shared mutable "
             "state — a regression that adds per-request sync I/O or shared state shows "
             "up here as p99 inflation."

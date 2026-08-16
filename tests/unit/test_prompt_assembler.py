@@ -73,7 +73,7 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
             },
             "project_instructions": "Run checks.",
         },
-        runtime={"permission_tier": "operator"},
+        runtime={"permission_tier": "operator", "mcp_servers": [{"name": "daintree"}]},
         turn={"goal": "g"},
     )
     pr = assembler.build_main_request(
@@ -81,13 +81,18 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
     )
     msgs = pr.messages
     # Cache-critical layout (DeepSeek groups ALL system messages before tools +
-    # conversation): every system message must be stable, so they all precede the
-    # conversation in the array too — base, skills, contract — and the volatile
-    # runtime/turn context rides ONE trailing user-role data block.
+    # conversation). ONLY the two fully-static blocks are system — base and the
+    # response contract — so the tool schemas serialize directly behind them. Every
+    # variable block rides a user-role row BELOW the schemas, ordered widest-shared
+    # first: skills (by task) → integrations → startup (by session/instance/project)
+    # → conversation, with the volatile runtime/turn context as ONE trailing block.
     assert msgs[0]["role"] == "system"  # base prompt
     skill_idx = next(i for i, m in enumerate(msgs) if "## Skill 1:" in (m.get("content") or ""))
     contract_idx = next(
         i for i, m in enumerate(msgs) if (m.get("content") or "").startswith("# Response contract")
+    )
+    integrations_idx = next(
+        i for i, m in enumerate(msgs) if "# Integrations" in (m.get("content") or "")
     )
     first_convo_idx = next(i for i, m in enumerate(msgs) if m["content"] == "go")
     startup_idx = next(
@@ -95,12 +100,17 @@ def test_message_layer_order(assembler: PromptAssembler, catalog) -> None:
         for i, m in enumerate(msgs)
         if (m.get("content") or "").startswith("[Injected startup context")
     )
-    last_system_idx = max(i for i, m in enumerate(msgs) if m["role"] == "system")
-    assert msgs[skill_idx]["role"] == "system"
-    assert msgs[contract_idx]["role"] == "system"
-    assert skill_idx < contract_idx < startup_idx < first_convo_idx
-    assert last_system_idx < startup_idx  # NO system message after injected/user content
-    assert msgs[startup_idx]["role"] == "user"
+    system_indices = [i for i, m in enumerate(msgs) if m["role"] == "system"]
+    # Exactly two system rows, and the contract is the second — anything else means a
+    # variable block regressed into the region that serializes ahead of the schemas.
+    assert system_indices == [0, contract_idx]
+    assert contract_idx == 1
+    assert contract_idx < skill_idx < integrations_idx < startup_idx < first_convo_idx
+    assert (
+        msgs[skill_idx]["role"],
+        msgs[integrations_idx]["role"],
+        msgs[startup_idx]["role"],
+    ) == ("user", "user", "user")
     assert "id \"codex\"" in msgs[startup_idx]["content"]
     assert "Run checks." in msgs[startup_idx]["content"]
     # The volatile runtime/turn context is the FINAL message, role user, framed as
@@ -130,14 +140,16 @@ def test_skill_bodies_precede_conversation(assembler: PromptAssembler, catalog) 
         request=_req(messages=[{"role": "user", "content": "go"}]),
         skills=[skill], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    # Skill bodies are system-role and therefore MUST sit before the conversation
-    # (DeepSeek serializes all system messages first regardless of array order —
-    # the array now matches that reality).
+    # Skill bodies are user-role (issue #39) so they serialize BELOW the tool
+    # schemas, but they stay ahead of the conversation rather than joining the
+    # volatile tail: a large runbook in the tail is re-paid uncached on every round
+    # of every turn, far worse than one conversation re-encode when the set changes.
     skill_idx = next(
         i for i, m in enumerate(pr.messages) if skill.title in (m.get("content") or "")
     )
     convo_idx = next(i for i, m in enumerate(pr.messages) if m["content"] == "go")
-    assert pr.messages[skill_idx]["role"] == "system"
+    assert pr.messages[skill_idx]["role"] == "user"
+    assert pr.messages[skill_idx]["content"].startswith("[Injected skill context")
     assert skill_idx < convo_idx
 
 
@@ -177,7 +189,7 @@ def test_no_skill_block_when_set_is_empty(assembler: PromptAssembler) -> None:
         request=_req(messages=[{"role": "user", "content": "go"}]),
         skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    # Empty active set emits no loaded-skills system message (no rendered skill body).
+    # Empty active set emits no loaded-skills row at all (no rendered skill body).
     assert not any("## Skill 1:" in (m.get("content") or "") for m in pr.messages)
 
 
@@ -298,9 +310,9 @@ def test_integrations_never_lists_client_tools(assembler: PromptAssembler) -> No
     pr = assembler.build_main_request(
         request=req, skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    assert not any(
-        m["role"] == "system" and "# Integrations" in m["content"] for m in pr.messages
-    )
+    # Role-agnostic: a block misplaced back into the system region must not let this
+    # pass vacuously.
+    assert not any("# Integrations" in (m["content"] or "") for m in pr.messages)
     # And a servers-bearing render never mentions the tool names.
     pr = assembler.build_main_request(
         request=_req(
@@ -309,12 +321,11 @@ def test_integrations_never_lists_client_tools(assembler: PromptAssembler) -> No
         ),
         skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    integrations = next(
-        m["content"]
-        for m in pr.messages
-        if m["role"] == "system" and "# Integrations" in m["content"]
+    integrations_msg = next(
+        m for m in pr.messages if "# Integrations" in (m["content"] or "")
     )
-    assert "git__status" not in integrations
+    assert integrations_msg["role"] == "user"
+    assert "git__status" not in integrations_msg["content"]
 
 
 def test_integrations_neutralizes_instruction_injection(assembler: PromptAssembler) -> None:
@@ -332,15 +343,14 @@ def test_integrations_message_inserted_only_when_present(assembler: PromptAssemb
         skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
     assert any(
-        m["role"] == "system" and "# Integrations" in m["content"] for m in with_int.messages
+        m["role"] == "user" and "# Integrations" in m["content"] for m in with_int.messages
     )
     without = assembler.build_main_request(
         request=_req(),
         skills=[], upstream_model="deepseek/deepseek-v4-flash-0731",
     )
-    assert not any(
-        m["role"] == "system" and "# Integrations" in m["content"] for m in without.messages
-    )
+    # Role-agnostic, so a regression back to system role cannot satisfy it vacuously.
+    assert not any("# Integrations" in (m["content"] or "") for m in without.messages)
 
 
 def test_footer_renders_memories(assembler: PromptAssembler) -> None:

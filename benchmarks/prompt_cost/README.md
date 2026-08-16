@@ -18,10 +18,12 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
   `runtime_context_change`, `startup_context_change`, `skill_topic_shift`, and
   `new_session`, the fraction
   of the `[system messages] + [tools]` region that stays a byte prefix of the next
-  turn's. Target is **1.0** for the three continuity transitions (the layout's core
-  promise — the ~19k-token tool region is fully reused); a topic-shift is an
-  **expected** drop (only base+integrations stay stable) and is reported, not
-  failed. Computed over the exact httpx wire bytes — the suite asserts its compact
+  turn's. Target is **1.0** for all of them, topic-shift included (the layout's core
+  promise — the ~21.5k-token tool region is fully reused). Since issue #39 the
+  loaded-skills block is a user-role row *below* the schemas, so changing the active
+  set cannot touch that region and the floor is gated rather than merely reported;
+  `full_prefix` still drops from the skill row down, which is inherent.
+  Computed over the exact httpx wire bytes — the suite asserts its compact
   encoder equals `httpx`'s (`wire_encoder_matches_httpx`), so it can never measure
   a body production doesn't send.
 - **Per-layer byte/token budget** — where the request's size lives. `token_est` is

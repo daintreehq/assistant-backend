@@ -129,10 +129,16 @@ These are load-bearing. Breaking one is a release blocker, not a regression.
   - **learner**: `input.messages`, the just-generated final answer (it learns from
     the workflow it actually completed), and the available tool names.
 - The serving provider is built with **no default credential**.
-- Prompt order is cache-critical: stable systems and tools → stable startup user
-  block → visible conversation → one volatile runtime/display/turn user tail. Never
-  add a volatile system message — that includes the terminal's own width, which is
-  why the geometry rides the tail and the response contract states no number (#38).
+- Prompt order is cache-critical. The base prompt and the response contract are the
+  **only** system messages; everything else the server injects sits below the tool
+  schemas as a framed **user-role** row, ordered by how widely it can be shared,
+  widest first: skill bodies → integrations → the stable startup block → visible
+  conversation → one volatile runtime/display/turn tail. Keeping the integrations
+  row and the skill bodies out of the system region is what stops a per-machine MCP
+  endpoint URL, or a selector topic shift, from re-encoding all 21.5k tokens of tool
+  schemas (#39). Never add a volatile system message — that includes the terminal's
+  own width, which is why the geometry rides the tail and the response contract
+  states no number (#38).
 
 ## 7. Environments
 

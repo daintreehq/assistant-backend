@@ -39,7 +39,8 @@ class McpInfo(BaseModel):
 class McpServer(BaseModel):
     """One MCP server the CLI is connected to, as the CLI reports it.
 
-    Server-rendered into the main system prompt as inert data. The request is
+    Server-rendered into a framed user-role row of the main prompt as inert data,
+    below the tool schemas (issue #39). The request is
     strict (``extra="forbid"``): new MCP fields require a contract/protocol bump,
     not a silent drop.
     """

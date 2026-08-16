@@ -32,7 +32,7 @@ def _print(doc: dict[str, Any]) -> None:
         print(f"min system+tools stable    : {s['min_system_tools_stable_continuity']:.4f} "
               "(continuation/runtime/startup/new-session — target 1.0)")
         print(f"topic-shift system+tools   : {s['topic_shift_system_tools_stable']} "
-              "(expected drop, not a failure)")
+              "(target 1.0 — the skill block sits below the schemas)")
         for t in det["transitions"]:
             print(f"  {t['transition']:24} sys+tools={t['system_tools_stable']:.4f}  "
                   f"full={t['full_prefix']:.4f}")

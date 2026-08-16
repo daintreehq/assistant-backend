@@ -2,14 +2,26 @@
 
 The DeepSeek chat template serializes every system message before tools and non-system
 messages (unchanged by routing through OpenRouter — it is the model's template, not the
-API's), so only stable content may use the system role. The effective order is:
+API's), so the system role is reserved for content that is static for EVERY caller. The
+rows below it are ordered by how widely each can be shared, widest first, so a change to
+one never re-encodes anything above it. The effective order is:
 
-1. base → integrations → active skill bodies → response contract (stable system region)
-2. tool schemas
-3. stable startup context (one framed user-role data row, omitted when empty)
-4. visible append-only conversation
-5. volatile runtime + display + turn context (one framed user-role tail; the display
+1. base prompt → response contract (the stable system region; fully static)
+2. tool schemas (the top-level ``tools`` field, ~21.5k tokens — the largest reusable run)
+3. active skill bodies (one framed user-role data row, omitted when empty) — shared by
+   TASK, so every session running the same runbook shares this much of the prefix
+4. integrations → stable startup context (framed user-role data rows, omitted when empty)
+   — per session, instance and project
+5. visible append-only conversation
+6. volatile runtime + display + turn context (one framed user-role tail; the display
    fragment always renders, so the tail is always present)
+
+Rows 3-5 are non-system precisely so they land AFTER the tool schemas: a selector topic
+shift or a per-machine MCP endpoint URL then costs its own bytes and the rows below it,
+never the 21.5k tokens of schemas above (issue #39). Skill bodies stay ahead of the
+conversation rather than riding the volatile tail — a large runbook in the tail is re-paid
+uncached on every round of every turn, far worse than one conversation re-encode on the
+turns where the active set genuinely changes.
 
 Stable startup facts therefore sit on the cache-friendly side of the conversation without
 masquerading as a user-authored message in the public transcript, selector, or learner.
@@ -109,8 +121,10 @@ def skills_in_render_order(skills: Sequence[Skill]) -> list[Skill]:
     that true. Skills arrive in the selector's raw output order, and sorting on
     the foundation flag alone is a stable sort on one boolean: it passed that
     order straight through, so the same set classified in a different order
-    re-encoded the whole prompt — a full upstream prefix-cache miss on the tool
-    schemas and the conversation behind them, for zero semantic difference.
+    re-encoded everything from the loaded-skills row down — the integrations,
+    startup and conversation rows behind it — for zero semantic difference. (The
+    tool schemas now sit ABOVE that row and survive it; before issue #39 moved the
+    block below them, a bare permutation cost those too.)
 
     Id order is also catalog order — ``Catalog`` stores its skills id-sorted —
     so this invents no new convention.
@@ -171,7 +185,7 @@ class PromptAssembler:
         # active-skill sets a busy instance sees.
         self._loaded_skills_cache = RenderCache(maxsize=64)
 
-    # ---- system message rendering --------------------------------------
+    # ---- prompt fragment rendering --------------------------------------
 
     @staticmethod
     def _startup_agent_row(agent: AgentSnapshot) -> str:
@@ -407,8 +421,13 @@ class PromptAssembler:
         through the function-calling interface, so a name+description index would
         only duplicate them. Returns ``""`` when the client reports no MCP
         servers, so a generic OpenAI client (or a CLI that has not yet started
-        sending its integration surface) produces no integrations system message
-        at all.
+        sending its integration surface) produces no integrations row at all.
+
+        Rides a framed user-role row BELOW the tool schemas (issue #39). The CLI
+        leads each server description with its MCP endpoint URL — a per-machine,
+        per-instance value — so while this was system-role every distinct endpoint
+        re-encoded the ~21.5k tokens of schemas behind it. It sits after the skill
+        bodies too: those are shared by task, this only by session and instance.
         """
         servers: list[dict[str, Any]] = []
         if runtime:
@@ -450,6 +469,14 @@ class PromptAssembler:
         skill-learning rewrite while the body changes underneath, so an id-keyed
         cache would serve the pre-rewrite body until the process restarted — the
         one failure mode a cache here could actually cause.
+
+        Rides a framed user-role row placed directly below the tool schemas and
+        above every other injected row (issue #39). This is the most widely shared
+        of the variable rows — sessions converge on a handful of skill sets, and any
+        two running the same runbook share the prefix through it — so it earns the
+        position nearest the schemas. Role and position are decided at the
+        ``build_main_request`` call site; the cache key here is a pure function of
+        WHICH skills are active and is unaffected by either.
         """
         ordered = skills_in_render_order(skills)
         key = tuple(s.content_hash for s in ordered)
@@ -461,8 +488,8 @@ class PromptAssembler:
         return rendered
 
     def render_response_contract(self) -> str:
-        """The output-shape RULES — the final STABLE system block before the
-        conversation (see build_main_request's cache-critical layout).
+        """The output-shape RULES — the FINAL system block, and so the last thing
+        before the tool schemas (see build_main_request's cache-critical layout).
 
         Request-independent by signature and by body: identical bytes for every
         caller, every turn. It used to interpolate the resolved width, the
@@ -790,14 +817,14 @@ class PromptAssembler:
         docs: DocsLookup | None = None,
     ) -> ProviderChatRequest:
         """Assemble the upstream request so the upstream prefix cache covers the base
-        prompt, the integration surface, the skill bodies, the tool schemas, and the
-        append-only conversation.
+        prompt, the response contract, the tool schemas, and then as much of the
+        task/session/conversation prefix as each caller actually shares.
 
         CACHE-CRITICAL LAYOUT (measured 2026-07-08, latency benchmark, against
         DeepSeek directly; the template is the model's, so it survives the move to
         OpenRouter): the prompt serializes as [ALL system messages, in array order] →
         [tools] → [non-system conversation]. A system message ANYWHERE in the array
-        therefore lands in the leading system region, BEFORE the ~18k-token tool
+        therefore lands in the leading system region, BEFORE the ~21.5k-token tool
         schemas and the conversation. The old layout put the volatile runtime/turn
         context after the conversation as system messages — the template hoisted them
         into the system region, so every new session (and any mid-turn roster change)
@@ -806,6 +833,22 @@ class PromptAssembler:
         rule that follows: ONLY stable content may use role "system"; per-request
         variable context must ride a NON-system role at the very end, where it costs
         exactly its own tokens.
+
+        The corollary the system region is now held to (issue #39): "stable" means
+        stable for EVERY caller, not merely for one session. The integration surface
+        carries a per-machine MCP endpoint URL and the skill bodies change on every
+        selector topic shift, so while both were system-role each of those changes
+        re-encoded all 21.5k tokens of schemas behind them. Both are data the model
+        reads, exactly like the startup block, so both now ride framed user-role rows
+        BELOW the schemas — ordered by shareability, widest first: skill bodies (shared
+        by task) before integrations and startup (per session, instance and project).
+        That grows the invariant prefix from the base prompt alone to base + contract +
+        schemas, and makes a skill load cost its own bytes instead of the tool region.
+
+        Skill bodies stay ahead of the conversation rather than joining the volatile
+        tail: a 5k-token runbook in the tail is re-paid uncached on every round of every
+        turn (~40k tokens across an eight-round turn), which is far worse than one
+        conversation re-encode on the turns where the set genuinely changes.
         """
         runtime = request.runtime
         turn = request.turn
@@ -815,24 +858,32 @@ class PromptAssembler:
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self.prompts.base_prompt()},
         ]
-        # 2. integration surface (MCP servers): session-stable → cacheable.
-        integrations = self.render_integrations(runtime)
-        if integrations.strip():
-            messages.append({"role": "system", "content": integrations})
-        # 3. active skill bodies: semi-stable (changes only on a selector topic
-        #    shift). System-role, so array position == serialized position; a set
-        #    change re-encodes tools + conversation, which is unavoidable for
-        #    system-region content and rare enough to accept.
-        if skills:
-            messages.append({"role": "system", "content": self.render_loaded_skills(skills)})
-        # 4. response contract: static output-shape rules → part of the stable
-        #    system prefix. (It serialized before the conversation even
-        #    when the array placed it last, so this costs no "nearness to
-        #    generation" that ever actually existed.) Genuinely static now — the
-        #    per-request width it used to carry moved to the tail (step 7).
+        # 2. response contract: static output-shape rules, and the LAST system row.
+        #    Genuinely static — the per-request width it used to carry moved to the
+        #    tail (issue #38). Everything appended below must stay non-system, or the
+        #    template hoists it back above the schemas and undoes the whole layout.
         contract = self.render_response_contract()
         if contract.strip():
             messages.append({"role": "system", "content": contract})
+
+        # --- the top-level `tools` field serializes HERE: after the complete system
+        # --- region and before every non-system row below. It is never a message.
+
+        # 3. active skill bodies: shared by TASK, so they sit closest to the schemas —
+        #    many sessions running the same runbook share the prefix up to this point.
+        #    User-role (issue #39), so a selector topic shift re-encodes this row and
+        #    what follows, and leaves the ~21.5k tokens of schemas above it cached.
+        #    Kept ahead of the conversation rather than in the volatile tail: a large
+        #    runbook in the tail is re-paid uncached every round of every turn.
+        if skills:
+            messages.append({"role": "user", "content": self.render_loaded_skills(skills)})
+        # 4. integration surface (MCP servers): client-reported data carrying a
+        #    per-machine endpoint URL, so it is per session and instance — narrower
+        #    than the skill bodies and therefore below them, where a differing MCP
+        #    config cannot split the task-shared prefix above.
+        integrations = self.render_integrations(runtime)
+        if integrations.strip():
+            messages.append({"role": "user", "content": integrations})
         # 5. session-stable project/agent/instruction data. It is a user-role
         #    data row so the template leaves it after tools, but it sits before the
         #    append-only conversation and is structurally absent from selector /
@@ -866,7 +917,7 @@ class PromptAssembler:
         # Retrieved documentation rides the volatile tail with everything else
         # per-request. It is emphatically NOT a system message: it exists for
         # exactly one turn, and a system-role block would land ahead of the tool
-        # schemas and re-encode ~18k tokens of them for a question the next turn
+        # schemas and re-encode ~21.5k tokens of them for a question the next turn
         # will not ask again (see this method's docstring).
         docs_block = self.render_docs_context(docs)
         if docs_block.strip():

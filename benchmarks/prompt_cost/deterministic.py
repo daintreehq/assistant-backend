@@ -11,16 +11,17 @@ Measures, over the REAL ``PromptAssembler.build_main_request`` and the EXACT byt
    new session) we build the two consecutive requests and measure how much of the
    cacheable region survives byte-identical:
      - ``system_tools_stable`` — fraction of the [system+tools] region that is a
-       byte prefix of the next turn's. **1.0 is the target** for continuation and
-       runtime-context changes (the layout's core promise); a topic-shift is an
-       EXPECTED drop (only base+integrations stay stable), not a failure.
+       byte prefix of the next turn's. **1.0 is the target for every transition**,
+       including a skill topic-shift: since issue #39 the loaded-skills block is a
+       user-role row BELOW the schemas, so changing it cannot touch that region.
      - ``full_prefix`` — fraction of the whole [system+tools+conversation] region
-       reused (the append-only conversation is the largest cached segment).
+       reused (the append-only conversation is the largest cached segment). A topic
+       shift still drops this from the loaded-skills row down — inherent, not a bug.
 
-2. **Per-layer byte / token budget** — where the request's size lives (base,
-   integrations, skills, the ~18k-token tool schemas, conversation, the volatile
-   tail). ``token_est`` is a bytes/4 PROXY (no tokenizer in the repo); the live
-   cross-check (``live.py``) is what pins real magnitude.
+2. **Per-layer byte / token budget** — where the request's size lives (base, the
+   contract, the ~21.5k-token tool schemas, skills, integrations, startup,
+   conversation, the volatile tail). ``token_est`` is a bytes/4 PROXY (no tokenizer
+   in the repo); the live cross-check (``live.py``) is what pins real magnitude.
 
 3. **State-token size** vs active-skill-set size — the portable, stateless-safe
    token stays tiny (Cloud Run carries no server memory; correctness rides this).
@@ -82,6 +83,12 @@ def _stability(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     full_b, full_a = cacheable_region_bytes(before), cacheable_region_bytes(after)
     return {
         "system_tools_stable": round(common_prefix_len(st_b, st_a) / len(st_a), 6),
+        # The RATIO alone cannot carry a floor: it divides by len(after), so an
+        # `after` region that is a strict PREFIX of `before` scores 1.0 while the two
+        # differ — a regression that dropped the tool schemas entirely would read as
+        # perfectly stable. The floors gate on this boolean; the ratio is for
+        # reporting, and for seeing how far a genuine drop went.
+        "system_tools_identical": st_b == st_a,
         "system_tools_bytes": len(st_a),
         "full_prefix": round(common_prefix_len(full_b, full_a) / len(full_a), 6),
         "full_region_bytes": len(full_a),
@@ -183,18 +190,23 @@ def _transitions(
         **_stability(before, after),
     })
 
-    # 4. skill topic-shift: the active skill set changes → the loaded-skills system
-    #    message changes → the contract + tools that follow it re-encode. EXPECTED
-    #    drop; only base+integrations stay stable (measured below as the floor).
+    # 4. skill topic-shift: the active skill set changes → the loaded-skills block
+    #    changes. Since issue #39 that block is a USER-role row BELOW the schemas, so
+    #    the whole [system+tools] region survives byte-identical: a skill load costs
+    #    its own bytes and the rows after it, never the ~21.5k tokens of schemas.
+    #    This is the issue's headline claim, so it is GATED at 1.0 rather than
+    #    reported as an expected drop — regressing either block back into the system
+    #    region shows up here as a hard failure.
     if b:
         before = _body_for(assembler, settings, req([_USER]), a)
         after = _body_for(assembler, settings, req([_USER]), b)
         stab = _stability(before, after)
         out.append({
             "transition": "skill_topic_shift",
-            "expect": "EXPECTED cache drop; base+integrations remain stable, "
-                      "loaded-skills+contract+tools re-encode",
-            "note": "not a failure — a topic shift legitimately busts the tool region",
+            "expect": "system_tools_stable == 1.0 (the skill block sits below the schemas)",
+            "floor_system_tools_stable": 1.0,
+            "note": "full_prefix still drops from the loaded-skills row down — that part "
+                    "is inherent and expected",
             **stab,
         })
 
@@ -230,26 +242,35 @@ def _layer_budget(
     runtime_block = assembler.render_runtime_context(request.runtime)
     display_block = assembler.render_display_context(request.runtime)
     footer = assembler.render_turn_footer(request.turn)
-    # Conversation bytes from the assembled wire body. EXCLUDE both server-injected
-    # user-role blocks: stable startup is counted separately, as is the volatile
-    # runtime/display/footer tail, keeping the layer budget disjoint.
+    # Conversation bytes from the assembled wire body. EXCLUDE every server-injected
+    # user-role block: the skills, integrations and startup rows are each counted
+    # separately above, as is the volatile runtime/display/footer tail, keeping the
+    # layer budget disjoint. Since issue #39 there are THREE injected rows ahead of
+    # the conversation, not one — stripping only a leading startup row would fold the
+    # skill and integration bytes into "conversation" and silently misreport both.
     body = _body_for(assembler, settings, request, skills)
     conv_msgs = [m for m in body["messages"] if m.get("role") != "system"]
-    if conv_msgs and str(conv_msgs[0].get("content", "")).startswith(
-        "[Injected startup context"
-    ):
-        conv_msgs = conv_msgs[1:]
+    # Strip each injected row by EXACT content equality against the block we just
+    # rendered, at most one per block, in assembly order. Prefix-matching on
+    # "[Injected …" would also eat a genuine first conversation message that happened
+    # to open with that marker, and would MISS a block the byte cap truncated,
+    # double-counting it into `conversation`.
+    for block in (skills_block, integrations, startup_block):
+        if block.strip() and conv_msgs and conv_msgs[0].get("content") == block:
+            conv_msgs = conv_msgs[1:]
     if conv_msgs and str(conv_msgs[-1].get("content", "")).startswith("[Injected context"):
         conv_msgs = conv_msgs[:-1]
     convo = "".join(dumps(m).decode("utf-8") for m in conv_msgs)
     tools_str = dumps(tools).decode("utf-8")
 
+    # Listed in SERIALIZED order: the two static system blocks, the schemas, then the
+    # injected rows widest-shared first, the conversation, and the volatile tail.
     layers = layer_segments([
         ("base_prompt", base),
-        ("integrations", integrations),
-        ("loaded_skills", skills_block),
         ("response_contract", contract),
         ("tool_schemas", tools_str),
+        ("loaded_skills (user block)", skills_block),
+        ("integrations (user block)", integrations),
         ("startup_context (stable user block)", startup_block),
         ("conversation", convo),
         ("runtime_context (tail)", runtime_block),
@@ -327,22 +348,33 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
                       build_respond_request(messages=[_USER]), skills)
     wire_matches = dumps(probe) == wire_bytes(probe)
 
-    continuity = [
-        t for t in transitions
-        if t["transition"]
-        in {
-            "tool_continuation",
-            "runtime_context_change",
-            "startup_context_change",
-            "new_session",
-        }
-    ]
+    required = {
+        "tool_continuation",
+        "runtime_context_change",
+        "startup_context_change",
+        "skill_topic_shift",
+        "new_session",
+    }
+    continuity = [t for t in transitions if t["transition"] in required]
+    # Every gated transition must actually have RUN. `skill_topic_shift` is emitted
+    # only when two distinct skills are available, so a catalog that shrank below two
+    # would drop it from the list — and `all()` over the survivors would then pass
+    # vacuously, reporting green for a check that never executed. Fail closed.
+    present = {t["transition"] for t in continuity}
+    all_present = present == required
     min_stable = min((t["system_tools_stable"] for t in continuity), default=0.0)
-    # A continuity transition MUST keep the [system+tools] region byte-identical
-    # (floor 1.0). If it drops, the cache-critical layout regressed — fail hard so
-    # the dashboard / CI reddens rather than storing a broken number as "ok".
-    floors_met = all(
-        t["system_tools_stable"] >= t.get("floor_system_tools_stable", 1.0) for t in continuity
+    # A continuity transition MUST keep the [system+tools] region byte-identical. Gate
+    # on the identity BOOLEAN, not the ratio: the ratio divides by len(after), so an
+    # `after` region that is a strict prefix of `before` scores a perfect 1.0 while
+    # the two differ. If identity breaks, the cache-critical layout regressed — fail
+    # hard so the dashboard / CI reddens rather than storing a broken number as "ok".
+    # ...but only where the transition actually claims a 1.0 floor: `new_session`
+    # deliberately relaxes to 0.0 when the tool-inventory fixture is absent, and that
+    # escape hatch must survive the ratio→identity upgrade.
+    floors_met = all_present and all(
+        t["system_tools_identical"]
+        for t in continuity
+        if t.get("floor_system_tools_stable", 1.0) >= 1.0
     )
     summary = {
         "wire_encoder_matches_httpx": wire_matches,
