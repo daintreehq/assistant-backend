@@ -30,11 +30,12 @@ You are setting up the supervisor, not doing the work: on the wake you spawn, ve
 
 Procedure:
 
-1. Fix the target, then pick ONE mechanism. Resolve the full terminal ids or PR number live this turn: a watcher built on a stale id waits forever on nothing and never wakes you.
+1. Fix the target, then pick ONE mechanism. If the target already exists, resolve the full terminal ids or PR number live this turn: a watcher built on a stale id waits forever on nothing and never wakes you.
    - (a) A terminal outcome needing goal-based classification ("wake me when it's green", "alert me if it breaks") → `watcher.terminal.create`, step 2.
    - (b) A pass/fail verdict on a terminal → there is no fire-and-forget verdict call. If the work has ALREADY settled, `terminal.extract` reads and judges it once, this turn. If it has not, that is case (a): a `watcher.terminal.create` whose `alertWhen` is a `modelJudge` question ("did the suite pass with zero failures?") publishes the judged answer to the attention queue.
    - (c) A PR reaching a terminal state → `watcher.watchPR {"prNumber":123,"title":"…"}` (optional `cwd`, `stopAfterMs`) — read "What the PR watcher cannot watch" before promising anything about it.
    - (d) A nudge with no terminal to observe → `timer.schedule`, step 4.
+   - (e) The terminal does not exist yet because the WORK itself starts later ("wait an hour, then run it") → schedule the creation, do not pre-create: a `call_safe_tool` timer carrying `agentTask.spawnForEdits`, step 4. Spawning now just to have an id parks an idle agent on a worktree for the whole wait.
    Spawning the agent right now? The cheapest supervisor is the spawn itself: `agentTask.spawnForEdits` with flat `watch:true` + `watchGoal:"…"` and an `acceptanceCriteria` contract. Its supervisor already confirms completion — add no second watcher.
 
 2. Create the watcher. `watcher.terminal.create` requires `terminalIds` (array of full ids), `title`, and `goal` — plain language for what you are observing, which drives the per-check classification. Optional: `stopWhen` (ends the watcher, status `condition_met`), `alertWhen` (alerts and KEEPS running), `cadenceMs` (default 120000), `modelTier` (`small` | `medium`), `startAfterMs`, `stopAfterMs` (defaults to 24 h — a watcher never runs forever, so set the horizon you mean). Write the conditions with the DSL below: prefer the free deterministic leaves, and set `cadenceMs` to the resolution you genuinely need.
@@ -46,11 +47,45 @@ Procedure:
    - Scope NARROW: an explicit `allowedToolNames` list, a `maxUses` equal to the actions you actually expect, a `ttlMs` covering only the window (8 h for overnight, not the 30-day ceiling). Never hand out a blanket `allowedRiskClasses` entry, and never mint a grant for read-only watching — reads need none.
    - `grant.create`, `grant.revoke` and `daintree.call` can NEVER be granted, so a wrapper-less capability cannot run unattended: do it yourself now, or say plainly that it waits for the user.
 
-4. For a time-based nudge: `timer.schedule {"title":"…","payload":{"type":"enqueue","message":"…"},"delayMs":3600000}`. Use `delayMs` (relative), never `fireAt` — you have no reliable clock, so an invented wall-clock time fires at the wrong hour or never. `payload.type` is `enqueue` (a reminder in the attention queue) or `call_safe_tool` with `payload.toolCall {"toolName":"…","args":{…}}`. A `repeat` requires `everyMs` and must be bounded by `maxRuns` or `until`, or it pings forever. Optional `target` ties it to a `terminalId` / `worktreeId` / `projectId` / `workflowRunId`.
+4. For a time-based nudge: `timer.schedule {"title":"…","payload":{"type":"enqueue","message":"…"},"delayMs":3600000}`. Use `delayMs` (relative), never `fireAt` — you have no reliable clock, so an invented wall-clock time fires at the wrong hour or never. `payload.type` is `enqueue` (a reminder in the attention queue) or `call_safe_tool`, which runs `payload.toolCall {"toolName":"…","args":{…}}` — `toolName` takes ANY tool in the inventory, with no timer allowlist, so `agentTask.spawnForEdits` there creates the agent and hands it the work at fire time. A `repeat` requires `everyMs` and must be bounded by `maxRuns` or `until`, or it pings forever. Optional `target` ties it to a `terminalId` / `worktreeId` / `projectId` / `workflowRunId`.
 
 5. Report the ids and END the turn — the setup IS the deliverable, so do not then wait on the same terminal in-turn. Supervision is durable: the background supervisor keeps checking after the assistant is closed, so "I'll wake you when it finishes" is a promise you can actually keep.
 
 6. Clean up when the window closes. `watcher.list`, `timer.list`, `async.list` and `grant.list` (optional `actorId`) answer "what is still watching". Retire with `watcher.cancel` / `timer.cancel` / `grant.revoke` (each `{"id":"…"}`) or `async.cancel {"asyncId":"asy_…"}` — cancelling an async only stops tracking, nothing is killed or closed. Revoke a wake grant the moment the window is over; never leave standing authority behind.
+
+## Timer that spawns at fire time
+
+Worked example — nothing runs now; in an hour the timer creates the agent and supervises it:
+
+```
+timer.schedule {
+  "title": "start the queued edit",
+  "delayMs": 3600000,
+  "payload": {
+    "type": "call_safe_tool",
+    "toolCall": {
+      "toolName": "agentTask.spawnForEdits",
+      "args": {
+        "title": "queued edit",
+        "taskPrompt": "…the whole task, spelled out…",
+        "acceptanceCriteria": "…what done looks like…",
+        "watch": true,
+        "watchGoal": "surface what the agent reported once it settles"
+      }
+    }
+  }
+}
+```
+
+Write `taskPrompt` out in full: the fire is the agent's first moment of existence and `args` is everything it will ever be told.
+
+Read `timerId` off that result, THEN authorize the one spawn it will make:
+
+```
+grant.create {"actorType":"timer","actorId":"tmr_…","allowedToolNames":["agentTask.spawnForEdits"],"ttlMs":7200000,"maxUses":1}
+```
+
+Order matters: the `tmr_…` id does not exist until `timer.schedule` returns, so schedule first and grant second. `agentTask.spawnForEdits` mutates, so without that grant the fire lands as a blocked approval and the hour is wasted — give `ttlMs` room for the delay PLUS the fire. Omit `worktreeId` to spawn into the active worktree; never pre-create one just for its id.
 
 ## The WatchCondition DSL
 
