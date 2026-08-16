@@ -24,7 +24,7 @@ def _msgs(*texts: str) -> list[ChatMessage]:
 
 
 def test_parse_select_args_valid(catalog) -> None:
-    ids = list(catalog.known_ids)[:1]
+    ids = sorted(catalog.selectable_ids)[:1]
     raw = json.dumps({"skill_ids": ids, "confidence": 0.8, "task_type": "x", "reason": "r"})
     parsed = parse_select_args(raw, catalog, 3)
     assert parsed is not None
