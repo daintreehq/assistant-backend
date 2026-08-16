@@ -235,26 +235,36 @@ async def _affinity_ab(settings: Settings) -> dict[str, Any]:
     OpenRouter's 10-minute sticky-session idle window.
 
     The two arms take DISJOINT, run-randomized slices of the catalog. That is what
-    makes the comparison fair rather than ordered: the arms then share no skill
-    block, so neither can warm the other's prefix or leave behind a sticky record
-    the other inherits, and a rerun within the sticky window starts cold in both
-    arms. Their skill CONTENT differs as a result, which is noise — the metric is
-    how much of each arm's own prefix survived its own topic shifts — where sharing
-    the slices would have been directional bias in the second arm's favour.
+    makes the comparison WITHIN a run fair rather than ordered: the arms share no
+    skill block, so neither can warm the other's prefix or leave behind a sticky
+    record the other inherits. Their skill CONTENT differs as a result, which is
+    noise — the metric is how much of each arm's own prefix survived its own topic
+    shifts — where sharing the slices would have been directional bias in the
+    second arm's favour.
 
-    What remains shared is the invariant head above the skill block (base prompt,
-    response contract, tool schemas). That is not a confound to remove: it is
-    shared by every Daintree request in existence, so both arms meet it warm, which
-    is exactly the condition the served fleet is in.
+    ACROSS runs it is weaker, and the limit is worth stating rather than papering
+    over. The no-key arm's sticky key is OpenRouter's default: a hash of the base
+    prompt and the skill block. Both are fixed content, so the only freshness
+    available is the offset, and the catalog affords a couple of dozen positions —
+    two runs can draw overlapping slices, and ordinary served traffic may have used
+    those same blocks anyway. A rerun is therefore not guaranteed cold. Space runs
+    beyond the 10-minute sticky idle window if independence matters.
+
+    What remains shared in every case is the invariant head above the skill block
+    (base prompt, response contract, tool schemas). That is not a confound to
+    remove: it is shared by every Daintree request in existence, so both arms meet
+    it warm, which is exactly the condition the served fleet is in.
     """
     from daintree_assistant_server.skills.catalog import load_catalog
 
     run = uuid.uuid4().hex[:12]
-    # Two disjoint arms have to fit inside the catalog.
-    span = len(load_catalog().skills) - 2 * _AFFINITY_ARM_SPAN
-    if span < 1:
+    # Two disjoint arms have to fit inside the catalog. `positions` counts valid
+    # STARTS, so it is the slack plus one: a catalog of exactly 2 * span fits, at
+    # the single offset 0.
+    positions = len(load_catalog().skills) - 2 * _AFFINITY_ARM_SPAN + 1
+    if positions < 1:
         raise ValueError("catalog too small for two disjoint affinity arms")
-    offset = int(run[:8], 16) % span
+    offset = int(run[:8], 16) % positions
     provider = make_upstream_provider(settings, timeout=settings.main_timeout_seconds)
     try:
         control = await _affinity_sequence(

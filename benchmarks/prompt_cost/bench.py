@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument(
         "--affinity-ab",
         action="store_true",
-        help="with --live: A/B the cache-affinity key against today's default (paid)",
+        help="with --live: A/B the cache-affinity key against no key (paid)",
     )
     run.add_argument("--env-file", help="path to a .env with OPENROUTER_API_KEY")
     run.add_argument("--out", help="explicit output JSON path")

@@ -2928,11 +2928,8 @@ def test_json_mode_main_call_uses_its_own_affinity_namespace(
     # different pool. Sharing one key across both shapes would let each evict the
     # other's sticky endpoint for a prefix that endpoint does not hold.
     #
-    # Exercises the derivation directly rather than through `complete`: the fake
-    # provider classifies EVERY json_object call as the selector when a selection
-    # result is configured (tests/fakes.py), so a JSON main call cannot be told
-    # apart there. The attach path is pinned separately — the non-JSON test above
-    # asserts the sent key equals exactly what this function returns.
+    # Derivation only; the wire attachment for JSON mode is pinned by the test
+    # below, which has to discriminate main from selector traffic by model id.
     plain = orchestrator._cache_session_key(_affinity_request())
     json_mode = orchestrator._cache_session_key(_affinity_request(json_mode=True))
     assert plain is not None and json_mode is not None
@@ -2940,3 +2937,35 @@ def test_json_mode_main_call_uses_its_own_affinity_namespace(
     assert json_mode.startswith("daintree-main-json-")
     # The longer namespace must still clear OpenRouter's 256-character cap.
     assert len(json_mode) <= 256
+
+
+@pytest.mark.asyncio
+async def test_json_mode_main_request_reaches_the_wire_with_its_key(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    # The derivation test above proves the JSON namespace is COMPUTED; this proves
+    # a JSON main call actually carries it. Without this, a future edit that
+    # attached the key only on the non-JSON branch would pass both the derivation
+    # test and the ordinary-path attachment test while shipping JSON turns unkeyed.
+    #
+    # Selection is left unconfigured on purpose: `FakeProvider` routes a
+    # json_object call to `selection_requests` only when a selection result IS set
+    # (tests/fakes.py), which would swallow the JSON main call too. With it unset
+    # both land in `requests`, and the model id separates them — the selector
+    # always calls OPENROUTER_MODEL, while the main call uses the upstream model
+    # passed to `complete`. The selector then fails to parse "done" and degrades
+    # open, which is its documented posture and does not stop the main call.
+    fake_provider.complete_result = make_result(content="done")
+
+    request = _affinity_request(json_mode=True)
+    await orchestrator.complete(
+        request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+    )
+
+    main_calls = [r for r in fake_provider.requests if r.model == "deepseek-v4-flash"]
+    assert len(main_calls) == 1
+    sent = main_calls[0]
+    assert sent.response_format == {"type": "json_object"}
+    assert sent.cache_session_id == orchestrator._cache_session_key(request)
+    assert sent.cache_session_id is not None
+    assert sent.cache_session_id.startswith("daintree-main-json-")

@@ -203,18 +203,25 @@ def test_live_cache_affinity_key_is_accepted_and_routes() -> None:
     # match no endpoint and every main turn would 404. Nothing mocked can see that,
     # because the filter lives at OpenRouter.
     #
-    # THE OBSERVATION — whether it actually pins. The two calls differ in their
-    # first non-system message while sharing the large system prefix, so
-    # OpenRouter's DEFAULT key (a hash of the first system and first non-system
-    # message) would differ between them: if they still land on one endpoint, the
-    # explicit key is what did it. That is the causal shape the weaker
-    # identical-requests version could not show.
+    # THE OBSERVATION — whether it pins. The two calls differ in their first
+    # non-system message while sharing the large system prefix, so OpenRouter's
+    # DEFAULT key (a hash of the first system and first non-system message) differs
+    # between them. Landing on one endpoint is therefore CONSISTENT with the
+    # explicit key working, where the weaker identical-requests version could not
+    # even show that much.
     #
-    # It is reported as a WARNING, not an assertion. Stickiness is upstream
-    # behaviour we observe rather than a contract we control — it only activates
-    # where cache-read pricing beats prompt pricing — so a hard assert would make
-    # an unrelated OpenRouter pricing change look like a regression here. A warning
-    # survives `pytest -q` on a passing run, which a bare print does not.
+    # It is not proof, and the gap is worth naming: the policy sorts by throughput,
+    # so two independent cold elections tend to pick the same fastest endpoint
+    # anyway, and the compliant pool can be small. A clean causal answer needs a
+    # no-key counterfactual, which is what the paired A/B in
+    # `benchmarks/prompt_cost` exists to run — a paid, multi-call experiment that
+    # does not belong in a contract test.
+    #
+    # So this half is reported as a WARNING, not an assertion. Stickiness is
+    # upstream behaviour we observe rather than a contract we control — it only
+    # activates where cache-read pricing beats prompt pricing — so a hard assert
+    # would make an unrelated OpenRouter pricing change look like a regression
+    # here. A warning survives `pytest -q` on a passing run, which a print does not.
     import uuid
     import warnings
 
