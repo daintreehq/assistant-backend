@@ -531,6 +531,41 @@ def test_documented_routing_policy_matches_the_code_exactly() -> None:
     )
 
 
+def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None:
+    """Section 3a promises affinity is additive and is NOT `provider.order`.
+
+    Both halves are asserted against the code because both are the kind of claim a
+    reader acts on. `order` is the specific danger: OpenRouter documents it as
+    DISABLING the sticky routing this relies on, and as overriding `sort` — so a
+    future edit that "helpfully" pinned the endpoint in the provider block would
+    silently invert the documented behaviour while the prose still described it.
+    """
+    for name, block in (
+        ("_PROVIDER_ROUTING", _PROVIDER_ROUTING),
+        ("_PROVIDER_ROUTING_STRUCTURED", _PROVIDER_ROUTING_STRUCTURED),
+    ):
+        assert "order" not in block, (
+            f"{name} now sends `provider.order`. OpenRouter does not apply sticky "
+            "routing when a manual order is present, so this disables the cache "
+            "affinity docs/PROVIDER_POLICY.md section 3a describes."
+        )
+        assert "session_id" not in block, (
+            f"{name} carries `session_id` inside the provider block. It is a "
+            "TOP-LEVEL sibling of that block; nested it is an unrecognized "
+            "preference and affinity silently stops working."
+        )
+    source = inspect.getsource(OpenRouterProvider._build_body)
+    assert 'body["session_id"]' in source, (
+        "_build_body no longer emits a top-level session_id. "
+        "docs/PROVIDER_POLICY.md section 3a says main calls carry one."
+    )
+    text = _read(DOC_PROVIDER)
+    assert "session_id" in text and "provider.order" in text, (
+        "docs/PROVIDER_POLICY.md no longer documents the cache-affinity key and "
+        "why `provider.order` is rejected (section 3a)."
+    )
+
+
 def test_structured_routing_bound_is_documented() -> None:
     """The structured policy is the base policy plus one key; assert both halves."""
     extra = {

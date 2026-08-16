@@ -52,6 +52,17 @@ def _print(doc: dict[str, Any]) -> None:
         print(f"warm tool-region cache ratio : {s['warm_tool_region_cache_ratio']:.4f}")
         print(f"streaming TTFB p50           : {s['streaming_ttfb_p50_s']:.3f}s")
         print(f"composed first-byte p50      : {s['composed_first_byte_p50_s']:.3f}s")
+        ab = live.get("affinity_ab")
+        if ab:
+            print("  cache affinity A/B (issue #42):")
+            for arm in ("control", "treatment"):
+                a = ab[arm]
+                print(f"    {arm:9} switches={a['endpoint_switches']} "
+                      f"cache_after_first={a['mean_cache_ratio_after_first']:.4f} "
+                      f"endpoints={a['endpoints']}")
+            d = ab["delta"]
+            print(f"    delta     switches={d['endpoint_switches']:+d} "
+                  f"cache_after_first={d['mean_cache_ratio_after_first']:+.4f}")
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
@@ -64,7 +75,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
         require_api_key(settings)  # fail fast before any work
         from .live import run_live
 
-        doc["live"] = asyncio.run(run_live(settings, trials=args.trials))
+        doc["live"] = asyncio.run(
+            run_live(settings, trials=args.trials, affinity_ab=args.affinity_ab)
+        )
     _print(doc)
     if not args.no_save:
         label = "full" if args.live else "deterministic"
@@ -87,6 +100,11 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run the cost/cache benchmark")
     run.add_argument("--live", action="store_true", help="add live cache/TTFB (paid)")
     run.add_argument("--trials", type=int, default=3, help="live latency trials (default 3)")
+    run.add_argument(
+        "--affinity-ab",
+        action="store_true",
+        help="with --live: A/B the cache-affinity key against today's default (paid)",
+    )
     run.add_argument("--env-file", help="path to a .env with OPENROUTER_API_KEY")
     run.add_argument("--out", help="explicit output JSON path")
     run.add_argument("--no-save", action="store_true")

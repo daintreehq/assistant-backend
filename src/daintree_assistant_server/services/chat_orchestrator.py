@@ -177,6 +177,16 @@ _DOCS_MIN_TIMEOUT_SECONDS = 0.5
 # preparation-deadline error — trading the feature's soft failure for a hard one.
 _DOCS_BUDGET_RESERVE_SECONDS = 3.0
 
+# Namespace for the upstream cache-affinity key (see `_cache_session_key`). The
+# key shares a flat keyspace with every other tenant of the upstream account, so
+# it says what it is and which surface produced it: a bare digest would collide
+# in meaning with any other use of the same field, and an unlabelled key is
+# undebuggable from the far side. `main-` because only the main conversation
+# calls carry one — the selector, utility tasks and skill learning deliberately
+# do not (they have no growing per-session prefix to keep warm, and keying them
+# per session would only fragment a pool they share fleet-wide).
+_CACHE_SESSION_PREFIX = "daintree-main-"
+
 
 @dataclass
 class _PreparedTurn:
@@ -621,6 +631,38 @@ class ChatOrchestrator:
             )
             raise turn_deadline_exceeded(phase.value) from exc
 
+    def _cache_session_key(self, request: RespondRequest) -> str | None:
+        """The upstream cache-affinity key for this turn's MAIN calls.
+
+        Derived, never carried: it comes from ``request.session.id``, which is
+        present on every call, rather than from the signed state token. Affinity
+        that only worked while a token was valid would drop out on exactly the
+        turns that most need it — a first turn, an expired token, a client that
+        lost its state — and the key has no reason to be stateful.
+
+        Hashed rather than forwarded. The value goes to a third party, and a
+        client session id is an opaque local string we make no promises about;
+        the salted digest is stable across instances (they share the salt) while
+        being meaningless off this deployment.
+
+        ``json`` gets its own namespace because a JSON-mode main call is a
+        different animal: validation rejects ``response_format`` alongside tools,
+        so it carries none of the ~21.5k tokens of schemas, and
+        ``response_format`` also routes it through the tail-bounded structured
+        policy into a smaller, different endpoint pool. Sharing one key across the
+        two would let each call type evict the other's sticky endpoint for a
+        prefix it does not have.
+
+        Returns ``None`` for a caller with no usable session, which leaves the
+        router on its own default rather than inventing a shared cohort.
+        """
+        digest = self.state_codec.session_hash(request.session.id)
+        if not digest:
+            return None
+        if request.generation.response_format == "json_object":
+            return f"{_CACHE_SESSION_PREFIX}json-{digest}"
+        return f"{_CACHE_SESSION_PREFIX}{digest}"
+
     async def _prepare_inner(
         self,
         request: RespondRequest,
@@ -635,6 +677,7 @@ class ChatOrchestrator:
         budget: RequestBudget | None = None,
     ) -> _PreparedTurn:
         session_id = request.session.id
+        cache_session_id = self._cache_session_key(request)
         t_start = time.perf_counter()
 
         warnings: list[str] = []
@@ -792,7 +835,10 @@ class ChatOrchestrator:
                     # The assembler stays credential-free (it builds PROMPT bytes);
                     # the caller's key is attached here, as on every construction
                     # path — an omission would fail the call, since the provider
-                    # holds no default credential.
+                    # holds no default credential. The cache-affinity key rides
+                    # along for the same reason: it is per-session state the
+                    # assembler has no business deriving, and every main call of a
+                    # session must carry the SAME one or the affinity is nothing.
                     speculative_request = replace(
                         self.assembler.build_main_request(
                             request=request,
@@ -800,6 +846,7 @@ class ChatOrchestrator:
                             upstream_model=upstream_model,
                         ),
                         api_key=api_key,
+                        cache_session_id=cache_session_id,
                     )
                     speculation = _SpeculativeStream(
                         request=speculative_request,
@@ -999,6 +1046,7 @@ class ChatOrchestrator:
                             docs=docs,
                         ),
                         api_key=api_key,
+                        cache_session_id=cache_session_id,
                     )
             else:
                 provider_request = replace(
@@ -1009,6 +1057,7 @@ class ChatOrchestrator:
                         docs=docs,
                     ),
                     api_key=api_key,
+                    cache_session_id=cache_session_id,
                 )
 
             meta = self._build_meta(

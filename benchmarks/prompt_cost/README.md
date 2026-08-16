@@ -7,6 +7,7 @@ bytes `OpenRouterProvider` would POST.
 ```bash
 python -m benchmarks.prompt_cost.bench run              # deterministic (free, CI-able)
 python -m benchmarks.prompt_cost.bench run --live        # + live cache/TTFB (paid)
+python -m benchmarks.prompt_cost.bench run --live --affinity-ab   # + cache-affinity A/B (paid)
 python -m benchmarks.prompt_cost.bench report results/<f>.json
 ```
 
@@ -42,6 +43,17 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
 - **Streaming TTFB** and **composed first-byte** through the real orchestrator
   (selector → assembly → main stream) — the latency a selector-firing turn actually
   costs the user.
+
+**Cache-affinity A/B (`--live --affinity-ab`, issue #42):** runs the same
+three-turn session twice — once with no affinity key (today's default, where
+OpenRouter hashes the first system and first non-system message) and once with a
+stable `session_id` — and reports endpoint switches plus mean cache ratio after the
+first turn. The sequence **shifts the active skill set between turns on purpose**:
+the skill block is the first non-system message, so a shift is exactly what
+invalidates the default key while leaving the invariant head above it reusable. One
+sequence per arm is indicative, not significant — re-run before concluding, and
+treat endpoint switch rate as diagnostic only, since an endpoint is many GPU workers
+and the same name is not the same cache. See `docs/PROVIDER_POLICY.md` section 3a.
 
 ## Latest deterministic snapshot
 

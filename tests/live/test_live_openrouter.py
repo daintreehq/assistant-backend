@@ -193,3 +193,58 @@ def test_live_task_terminal_judge(live_client) -> None:
     out = r.json()["output"]
     assert isinstance(out["matched"], bool)
     assert out["matched"] is True
+
+
+def test_live_cache_affinity_key_is_accepted_and_sticks(live_client) -> None:
+    # Two things a mock cannot prove, both load-bearing for docs/PROVIDER_POLICY.md
+    # section 3a.
+    #
+    # 1. THAT IT ROUTES AT ALL. `require_parameters: true` filters the pool on
+    #    exactly the parameters we send. `session_id` is a ROUTER-level field, not a
+    #    model parameter, so it should not participate in that filter — but if it
+    #    ever did, the policy would match no endpoint and every main turn would 404.
+    #    That failure is invisible to every mocked test in the suite.
+    # 2. THAT IT ACTUALLY PINS. Send the same key twice and the second call should
+    #    come back from the same endpoint. Asserted as a warning rather than a hard
+    #    failure: stickiness is upstream behaviour we observe, not a contract we
+    #    control, and it only activates where cache-read pricing beats prompt
+    #    pricing. A hard assert here would make an unrelated pricing change on
+    #    OpenRouter's side look like a regression in this repo.
+    import httpx as _httpx
+
+    from daintree_assistant_server.config import OPENROUTER_MODEL
+    from daintree_assistant_server.providers.base import ProviderChatRequest
+    from daintree_assistant_server.providers.openrouter import OpenRouterProvider
+
+    async def _call() -> tuple[list[str | None], list[int | None]]:
+        client = _httpx.AsyncClient(
+            timeout=_httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
+        )
+        provider = OpenRouterProvider(client, api_key=SecretStr(os.environ["OPENROUTER_API_KEY"]))
+        endpoints: list[str | None] = []
+        cached: list[int | None] = []
+        try:
+            request = ProviderChatRequest(
+                model=OPENROUTER_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are terse." + " Answer briefly." * 200},
+                    {"role": "user", "content": "Say ok."},
+                ],
+                max_tokens=8,
+                timeout=120.0,
+                cache_session_id="daintree-main-livetest-affinity",
+            )
+            for _ in range(2):
+                result = await provider.complete(request)
+                endpoints.append(result.endpoint)
+                cached.append(result.usage.cached_tokens)
+            return endpoints, cached
+        finally:
+            await provider.aclose()
+
+    endpoints, cached = asyncio.run(_call())
+    # (1) is the hard assertion: the call routed and answered.
+    assert len(endpoints) == 2
+    # (2) is an observation. Print rather than fail so a run records what happened.
+    if endpoints[0] is not None and endpoints[0] != endpoints[1]:
+        print(f"NOTE: affinity key did not pin: {endpoints[0]} -> {endpoints[1]} (cached={cached})")

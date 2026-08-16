@@ -652,11 +652,16 @@ async def test_speculation_starts_during_selector_and_exact_match_reuses_once(
     assert _streamed_content(events) == "speculative winner "
     assert len(assembled) == 1  # no duplicate 100+ KiB assembly/deep comparison
     # The orchestrator wraps the assembled request exactly once with the caller's
-    # key (dataclasses.replace — a shallow copy): the sent request must be that
-    # credentialed copy field-for-field, and the expensive payload objects must be
-    # the SAME objects the assembler built (shallow reuse, not a rebuild).
+    # key and this session's cache-affinity key (dataclasses.replace — a shallow
+    # copy): the sent request must be that copy field-for-field, and the expensive
+    # payload objects must be the SAME objects the assembler built (shallow reuse,
+    # not a rebuild).
     sent = fake_provider.stream_requests[0]
-    assert sent == dataclasses.replace(assembled[0], api_key=TEST_API_KEY)
+    assert sent == dataclasses.replace(
+        assembled[0],
+        api_key=TEST_API_KEY,
+        cache_session_id=orchestrator._cache_session_key(request),
+    )
     assert sent.messages is assembled[0].messages
     assert sent.api_key is TEST_API_KEY
     assert len(fake_provider.stream_requests) == 1  # winner consumed exactly once
@@ -2800,3 +2805,117 @@ async def test_stream_bare_intent_holds_content_until_the_reply_ends(
             assert not event.startswith("event: delta\n")
     content = _streamed_content(emitted)
     assert content.strip() == "Tallied."
+
+
+# ---- upstream cache affinity -------------------------------------------------
+
+
+def _affinity_request(
+    session_id: str = "affinity-session",
+    *,
+    turn_id: str = "turn-1",
+    json_mode: bool = False,
+) -> RespondRequest:
+    generation: dict[str, Any] = {"stream": False}
+    if json_mode:
+        generation["response_format"] = "json_object"
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": session_id, "turn_id": turn_id},
+            "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
+            "startup": {},
+            "generation": generation,
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_main_call_carries_a_pseudonymous_cache_session_key(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    # The key exists to keep a conversation on the endpoint holding its prefix, so
+    # it has to reach the wire at all — and it must NOT be the client's own session
+    # id, which is opaque local text this server makes no promises about and has no
+    # business handing to a third party.
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([skill_id])
+    fake_provider.complete_result = make_result(content="done")
+
+    await orchestrator.complete(
+        _affinity_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+    )
+
+    sent = fake_provider.requests[-1]
+    assert sent.cache_session_id is not None
+    assert sent.cache_session_id.startswith("daintree-main-")
+    assert "affinity-session" not in sent.cache_session_id
+    # OpenRouter caps the field at 256 characters; a key it rejects is a key that
+    # silently does nothing.
+    assert len(sent.cache_session_id) <= 256
+
+
+@pytest.mark.asyncio
+async def test_cache_session_key_is_stable_across_turns_and_unique_per_session(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    # Stability across turns IS the feature: a key that changed per turn would pin
+    # nothing. And it must not be shared, or two conversations would be told they
+    # are one — herding unrelated prefixes onto a single endpoint.
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([skill_id])
+    fake_provider.complete_result = make_result(content="done")
+
+    for turn in ("turn-1", "turn-2"):
+        await orchestrator.complete(
+            _affinity_request(turn_id=turn),
+            upstream_model="deepseek-v4-flash",
+            api_key=TEST_API_KEY,
+        )
+    await orchestrator.complete(
+        _affinity_request("other-session"),
+        upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+
+    keys = [r.cache_session_id for r in fake_provider.requests]
+    assert keys[0] == keys[1]
+    assert keys[-1] != keys[0]
+
+
+@pytest.mark.asyncio
+async def test_selector_call_carries_no_cache_session_key(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    # Deliberate exclusion, asserted so it stays deliberate. The selector has no
+    # growing per-session prefix to keep warm, and it shares a small structured
+    # pool fleet-wide — keying it per session would fragment that pool for nothing.
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([skill_id])
+    fake_provider.complete_result = make_result(content="done")
+
+    await orchestrator.complete(
+        _affinity_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+    )
+
+    assert fake_provider.selection_requests
+    assert all(r.cache_session_id is None for r in fake_provider.selection_requests)
+
+
+@pytest.mark.asyncio
+async def test_json_mode_main_call_uses_its_own_affinity_namespace(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    # A JSON-mode main call carries no tool schemas (validation rejects the
+    # combination) and routes through the tail-bounded structured policy into a
+    # different pool. Sharing one key across both shapes would let each evict the
+    # other's sticky endpoint for a prefix that endpoint does not hold.
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([skill_id])
+    fake_provider.complete_result = make_result(content="done")
+
+    plain = orchestrator._cache_session_key(_affinity_request())
+    json_mode = orchestrator._cache_session_key(_affinity_request(json_mode=True))
+    assert plain is not None and json_mode is not None
+    assert json_mode != plain
+    assert json_mode.startswith("daintree-main-json-")

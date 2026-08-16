@@ -305,6 +305,11 @@ async def test_create_uses_stronger_builder_model_with_reasoning(tmp_path: Path)
     assert all(r.reasoning_effort == "high" for r in gate_reqs)
     assert build_reqs and all(r.thinking_disabled is False for r in build_reqs)
     assert all(r.reasoning_effort == "high" for r in build_reqs)
+    # No upstream cache-affinity key on either: learning runs AFTER the response,
+    # off the turn's latency path, and its prompt is not the conversation prefix
+    # any endpoint is holding. Keying it per session would pull a background call
+    # onto the node serving that user's foreground turns for no cache gain.
+    assert all(r.cache_session_id is None for r in fake.requests)
 
 
 @pytest.mark.asyncio

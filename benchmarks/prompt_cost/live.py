@@ -132,7 +132,118 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
     return {"trials": trials, "first_byte": latency_summary(first_byte)}
 
 
-async def run_live(settings: Settings, *, trials: int = 3) -> dict[str, Any]:
+async def _affinity_sequence(
+    provider: Any, settings: Settings, *, cache_session_id: str | None
+) -> list[dict[str, Any]]:
+    """One session's worth of turns, run with or without an affinity key.
+
+    The sequence deliberately SHIFTS the active skill set between turns. That is
+    the whole experiment: the skill block is the first non-system message, so it is
+    what OpenRouter's default sticky key hashes — a shift changes that key and
+    releases the endpoint, while the invariant head above it (base prompt, response
+    contract, tool schemas) is still perfectly reusable. An arm that sent the same
+    request twice would measure nothing, because both keying strategies agree there.
+
+    ``cache_session_id=None`` is the control: exactly today's behaviour.
+    """
+    from daintree_assistant_server.skills.catalog import load_catalog
+
+    catalog = load_catalog()
+    # Three different two-skill windows over the catalog → three different skill
+    # blocks → three different default keys, one stable explicit key.
+    windows = [list(catalog.skills[i : i + 2]) for i in (0, 2, 4)]
+    calls: list[dict[str, Any]] = []
+    for turn, skills in enumerate(windows):
+        pr = await _prompt_request(
+            settings,
+            messages=[{"role": "user", "content": f"Prepare this branch for review ({turn})."}],
+            stream=False,
+        )
+        pr.messages = _with_skills(settings, pr, skills)
+        pr.cache_session_id = cache_session_id
+        result = await provider.complete(pr)
+        calls.append({
+            "turn": turn,
+            "endpoint": result.endpoint,
+            **_cache_ratio(result.usage),
+        })
+    return calls
+
+
+def _with_skills(settings: Settings, pr: Any, skills: list[Any]) -> list[dict[str, Any]]:
+    """Swap the assembled request's skill block for a different one.
+
+    Rebuilding through the assembler would also move the conversation and tail;
+    replacing just this row keeps everything above it byte-identical, which is
+    exactly the condition the experiment is about.
+    """
+    from daintree_assistant_server.prompts.loader import PromptLoader
+    from daintree_assistant_server.services.prompt_assembler import PromptAssembler
+
+    block = PromptAssembler(PromptLoader(), settings).render_loaded_skills(skills)
+    messages = list(pr.messages)
+    for i, message in enumerate(messages):
+        if message["role"] != "system":
+            messages[i] = {"role": "user", "content": block}
+            break
+    return messages
+
+
+async def _affinity_ab(settings: Settings) -> dict[str, Any]:
+    """The issue #42 A/B: does naming the sticky key keep a session on one endpoint?
+
+    Arms alternate control-first so a warming trend across the run cannot be read as
+    a treatment effect. Both arms are one sequential session at concurrency one, well
+    inside OpenRouter's 10-minute sticky-session idle window.
+    """
+    provider = make_upstream_provider(settings, timeout=settings.main_timeout_seconds)
+    try:
+        control = await _affinity_sequence(provider, settings, cache_session_id=None)
+        treatment = await _affinity_sequence(
+            provider, settings, cache_session_id="daintree-main-bench-affinity"
+        )
+    finally:
+        await provider.aclose()
+
+    def summarize(calls: list[dict[str, Any]]) -> dict[str, Any]:
+        endpoints = [c["endpoint"] for c in calls]
+        # Switches, not distinct count: A→B→A is two switches and two cold prefixes,
+        # which a distinct count of 2 would understate.
+        switches = sum(1 for a, b in zip(endpoints, endpoints[1:], strict=False) if a != b)
+        # Turn 0 is excluded: it elects an endpoint rather than returning to one, so
+        # neither arm can differ there and averaging it in only dilutes the signal.
+        later = [c["cache_ratio"] for c in calls[1:]]
+        return {
+            "endpoints": endpoints,
+            "endpoint_switches": switches,
+            "mean_cache_ratio_after_first": round(sum(later) / len(later), 4) if later else 0.0,
+            "calls": calls,
+        }
+
+    control_summary = summarize(control)
+    treatment_summary = summarize(treatment)
+    return {
+        "control": control_summary,
+        "treatment": treatment_summary,
+        "delta": {
+            "endpoint_switches": (
+                treatment_summary["endpoint_switches"] - control_summary["endpoint_switches"]
+            ),
+            "mean_cache_ratio_after_first": round(
+                treatment_summary["mean_cache_ratio_after_first"]
+                - control_summary["mean_cache_ratio_after_first"],
+                4,
+            ),
+        },
+        "note": "one sequence per arm — indicative, not significant. Re-run before "
+                "drawing a conclusion; endpoint switch rate is diagnostic (an endpoint "
+                "is many GPU workers, so the same name is not the same cache).",
+    }
+
+
+async def run_live(
+    settings: Settings, *, trials: int = 3, affinity_ab: bool = False
+) -> dict[str, Any]:
     from datetime import UTC, datetime
 
     from daintree_assistant_server.observability import configure_logging
@@ -152,9 +263,10 @@ async def run_live(settings: Settings, *, trials: int = 3) -> dict[str, Any]:
         await provider.aclose()
 
     composed = await _composed_first_byte(settings, trials)
+    affinity = await _affinity_ab(settings) if affinity_ab else None
 
     warm_ratios = [c["warm_call"]["cache_ratio"] for c in warm_cases if not c["json_mode"]]
-    return {
+    doc: dict[str, Any] = {
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "live",
@@ -173,3 +285,6 @@ async def run_live(settings: Settings, *, trials: int = 3) -> dict[str, Any]:
         "streaming_ttfb": ttfb,
         "composed_first_byte": composed,
     }
+    if affinity is not None:
+        doc["affinity_ab"] = affinity
+    return doc
