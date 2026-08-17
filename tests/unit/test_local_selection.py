@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from daintree_assistant_server.skills.local.classifier import admit
+from daintree_assistant_server.skills.local.classifier import SkillClassifier, admit
 from daintree_assistant_server.skills.local.documents import (
     query_document,
     skill_document,
@@ -128,9 +128,31 @@ def test_admit_rejected_newcomer_does_not_consume_the_slot() -> None:
 
 
 def test_admit_bonus_rides_above_the_floor_up_to_the_cap() -> None:
-    ranked = [("a", 0.9), ("b", 0.62), ("c", 0.55), ("d", 0.51)]
-    # cardinality said one, but three more clear the 0.5 floor; cap is 3
+    """Every candidate here clears the bonus floor, so the CAP is what stops the
+    scan — not the floor. The earlier fixture used 0.51 for the fourth entry,
+    which fell below the floor once it moved to 0.55: the assertion still passed
+    but for the wrong reason, and a removed cap check would not have failed it.
+    """
+    ranked = [("a", 0.90), ("b", 0.80), ("c", 0.70), ("d", 0.60)]
+    # cardinality said one; all four clear the floor, so only the cap of 3 binds
     assert admit(ranked, set(), 1, 3) == ["a", "b", "c"]
+
+
+def test_admit_bonus_floor_excludes_the_band_below_it() -> None:
+    """Pins the FLOOR'S VALUE, not just the rule.
+
+    Every other test here is written relative to the constant, so reverting
+    BONUS_FLOOR to 0.50 kept the whole suite green while silently restoring the
+    false positive the move exists to stop: "create a new claude code terminal"
+    loading create-plain-worktree at 0.546 alongside a correct, cardinality-1
+    answer. This is the regression that notices.
+    """
+    assert admit([("correct", 0.91), ("marginal", 0.546)], set(), 1, 3) == ["correct"]
+    # ...and the floor still admits what it is meant to admit
+    assert admit([("correct", 0.91), ("worth_it", 0.56)], set(), 1, 3) == [
+        "correct",
+        "worth_it",
+    ]
 
 
 def test_admit_bonus_stops_at_the_first_below_floor_score() -> None:
@@ -153,21 +175,28 @@ def test_admit_bonus_does_not_readmit_an_active_skill_below_the_floor() -> None:
 
 def test_admit_floors_are_inclusive_at_their_exact_boundary() -> None:
     """Both floors are `>=` comparisons, so a score landing exactly on one is
-    admitted. Pinned because the measured misses cluster just under 0.65, which
-    makes the boundary the value most likely to be nudged."""
+    admitted.
+
+    Driven off the constants rather than literals: both floors are tuned values
+    (BONUS_FLOOR moved 0.50 -> 0.55 to stop sub-0.55 noise riding along), and a
+    boundary test written with a hardcoded number stops testing the boundary the
+    moment one moves — it just becomes another mid-band case.
+    """
+    newcomer_floor = SkillClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
+    bonus_floor = SkillClassifier.BONUS_FLOOR
     # a newcomer exactly ON the newcomer floor, with a workflow active
-    assert admit([("running", 0.9), ("newcomer", 0.65)], {"running"}, 2, 3) == [
+    assert admit([("running", 0.9), ("newcomer", newcomer_floor)], {"running"}, 2, 3) == [
         "running",
         "newcomer",
     ]
     # a bonus candidate exactly ON the bonus floor
-    assert admit([("a", 0.9), ("b", 0.50)], set(), 1, 3) == ["a", "b"]
+    assert admit([("a", 0.9), ("b", bonus_floor)], set(), 1, 3) == ["a", "b"]
 
 
 def test_admit_bonus_newcomer_still_owes_the_higher_floor() -> None:
-    """With a workflow active, a 0.55 newcomer clears the bonus floor but not
-    the newcomer floor — it stays out; a 0.55 ACTIVE skill rides."""
-    ranked = [("running", 0.9), ("newcomer", 0.55), ("also_running", 0.52)]
+    """With a workflow active, a 0.60 newcomer clears the bonus floor but not
+    the newcomer floor — it stays out; a 0.58 ACTIVE skill rides."""
+    ranked = [("running", 0.9), ("newcomer", 0.60), ("also_running", 0.58)]
     got = admit(ranked, {"running", "also_running"}, 1, 3)
     assert got == ["running", "also_running"]
 

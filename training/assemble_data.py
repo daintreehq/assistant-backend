@@ -226,21 +226,30 @@ def main() -> int:
     # session-local); admit it through the SAME gates as fresh rows.
     if args.base:
         base_path = Path(args.base)
-        if base_path.exists():
-            base_rows = [
-                json.loads(line)
-                for line in base_path.read_text().splitlines()
-                if line.strip()
-            ]
-            print(f"base corpus: {len(base_rows)} rows from {base_path}")
-            for r in base_rows:
-                emit(
-                    r["query"], list(r["expect_ids"]),
-                    history=r.get("history"), active=r.get("active_ids"),
-                    source=r.get("source", "base"), is_docs=r.get("is_docs"),
-                    hard_negatives=r.get("hard_negatives"),
-                    empty_kind=r.get("empty_kind"),
-                )
+        # FAIL, do not skip. This function's last act is to OVERWRITE
+        # selection.jsonl, so silently treating an unreadable base as "no base"
+        # turns one typo — `--base selection.jsoln` — into a corpus truncated to
+        # whatever the journals happened to carry. The empty string is the only
+        # way to ask for a journals-only rebuild, and it is checked above.
+        if not base_path.is_file():
+            raise SystemExit(
+                f"--base {args.base!r} is not a file. Pass --base '' to rebuild "
+                f"from journals alone; anything else must point at a corpus."
+            )
+        base_rows = [
+            json.loads(line)
+            for line in base_path.read_text().splitlines()
+            if line.strip()
+        ]
+        print(f"base corpus: {len(base_rows)} rows from {base_path}")
+        for r in base_rows:
+            emit(
+                r["query"], list(r["expect_ids"]),
+                history=r.get("history"), active=r.get("active_ids"),
+                source=r.get("source", "base"), is_docs=r.get("is_docs"),
+                hard_negatives=r.get("hard_negatives"),
+                empty_kind=r.get("empty_kind"),
+            )
 
     for bundle in bundles:
         items = bundle["items"]

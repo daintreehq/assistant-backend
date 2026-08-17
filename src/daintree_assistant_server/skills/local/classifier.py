@@ -170,12 +170,41 @@ class SkillClassifier:
     #: outcome available, while carrying one marginal runbook costs prompt
     #: bytes. So beyond the cardinality head's answer, any further skill the
     #: model scores at or above this floor rides along up to the cap. Measured
-    #: on the benchmark: required-skill misses drop 18 -> 6 (recall-pass
-    #: 131 -> 143 of 150, above the upstream selector's bar) for ~0.7 extra
-    #: skill bodies per turn. Applied only when the model picked SOMETHING —
-    #: an empty answer ("thanks!", off-domain chatter) stays empty, because
-    #: polluting a no-task turn is how loading noise becomes the norm.
-    BONUS_FLOOR = 0.5
+    #: when the bonus was introduced: required-skill misses drop 18 -> 6
+    #: (recall-pass 131 -> 143 of 150, above the upstream selector's bar) for
+    #: ~0.7 extra skill bodies per turn. Applied only when the model picked
+    #: SOMETHING — an empty answer ("thanks!", off-domain chatter) stays empty,
+    #: because polluting a no-task turn is how loading noise becomes the norm.
+    #:
+    #: 0.55, raised from 0.50. On the CURRENT shipped int8 artifact and the
+    #: 150-case suite, that move cost no observed recall-pass regression
+    #: (144/150 either way, same 5 misses) and changed the final resolved set on
+    #: 12 cases: final extras 82 -> 71, mean final set 2.29 -> 2.21. Every one of
+    #: the 12 drops a marginal third SPECIFIC, which is the intended effect —
+    #: measure post-``resolve_active_skills``, not raw ids, because a foundation
+    #: dropped here is paired straight back in and the raw count flatters itself
+    #: (100 -> 84 raw against 82 -> 71 final). Real trigger: "create a new claude
+    #: code terminal" has cardinality 1 and spawn-visible-agent at 0.91, and used
+    #: to also load create-plain-worktree at 0.546.
+    #:
+    #: Two honest caveats, because this is a tuned constant and not a discovered
+    #: boundary. (1) 0.60 regresses three cases whose REQUIRED skill is
+    #: bonus-dependent at 0.565-0.596, so 0.55 is the last free step *on this
+    #: evidence* — but the suite has been inspected repeatedly (see
+    #: training/EXPERIMENTS.md) and three positives against ~6 boundary negatives
+    #: does not establish two separable populations. There is no margin here: no
+    #: required skill was observed below 0.55, so the floor sits ON the edge of
+    #: the observed distribution rather than in a gap. (2) It is calibrated to
+    #: THIS artifact's sigmoid. Re-validate after every retrain; a recalibrated
+    #: head can move the whole band without changing a single decision boundary
+    #: you can see from the code.
+    #:
+    #: Note what the floor actually governs on a LOADED turn: a newcomer below
+    #: 0.65 was already excluded by NEWCOMER_FLOOR_WHEN_ACTIVE, so raising this
+    #: only changes whether an ALREADY-ACTIVE skill beyond the cardinality count
+    #: keeps its slot. Nothing in the suite has two active specifics, so that
+    #: retention shape is the least-measured part of this change.
+    BONUS_FLOOR = 0.55
 
     def select(
         self,

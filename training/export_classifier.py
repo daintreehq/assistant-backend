@@ -168,8 +168,9 @@ def main() -> int:
     # Two tiers of disagreement. CORE decisions — the top-ranked skill, whether
     # the answer is empty, and the docs verdict — must be near-identical: a
     # quantisation that changes those changed the model. Bonus-margin extras
-    # flipping in and out around the 0.5 admission floor are EXPECTED int8
-    # noise (the floor sits exactly where quantised logits wobble), so the
+    # flipping in and out around the bonus floor (SkillClassifier.BONUS_FLOOR,
+    # currently 0.55) are EXPECTED int8 noise — the floor sits exactly where
+    # quantised logits wobble — so the
     # secondary gate is outcome parity: the required skill stays present on
     # (almost) exactly the same cases.
     core_diff = sum(
