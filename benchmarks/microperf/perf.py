@@ -363,14 +363,27 @@ async def measure_concurrency(
     orchestrator = container.orchestrator
 
     warning_count = 0
+    # Warnings above the production concurrency cap are DESIGNED behaviour, not
+    # skipped work: the local selector's admission pool matches Cloud Run's
+    # --concurrency=8, so a 32-way burst on one instance refuses the overflow
+    # and degrades those turns open — exactly what production would do, on a
+    # load shape Cloud Run itself prevents. Only warnings at or below the cap
+    # indicate the server failing to do its job.
+    warning_count_at_cap = 0
+    production_cap = 8
 
-    async def one(request: RespondRequest, t_submit: float) -> float:
-        nonlocal warning_count
+    async def one(
+        request: RespondRequest, t_submit: float, *, level: int = 1
+    ) -> float:
+        nonlocal warning_count, warning_count_at_cap
         outcome = await orchestrator.complete(
             request, upstream_model=OPENROUTER_MODEL, api_key=BENCH_CALLER_KEY
         )
         elapsed = time.perf_counter() - t_submit
-        warning_count += len((outcome.body or {}).get("warnings") or [])
+        n_warn = len((outcome.body or {}).get("warnings") or [])
+        warning_count += n_warn
+        if level <= production_cap:
+            warning_count_at_cap += n_warn
         return elapsed
 
     try:
@@ -389,7 +402,7 @@ async def measure_concurrency(
                 # creation, before any request runs, so a request's latency includes
                 # queueing behind the other K-1 requests' CPU on the event loop.
                 tasks = [
-                    asyncio.create_task(one(request, time.perf_counter()))
+                    asyncio.create_task(one(request, time.perf_counter(), level=k))
                     for request in batch
                 ]
                 latencies.extend(await asyncio.gather(*tasks))
@@ -421,13 +434,14 @@ async def measure_concurrency(
         ),
         "selector_calls": provider.selector_calls,
         "warning_count": warning_count,
+        "warning_count_at_production_cap": warning_count_at_cap,
         "note": (
             "stateless-server concurrency probe: the real ChatOrchestrator.complete "
             "(non-streaming) over an instant provider, so all latency is per-request CPU "
-            "(selector prompt render, unmemoized base_prompt() re-read, ~21.5k-token "
-            "tool-schema normalization, response assembly). There is no shared mutable "
-            "state — a regression that adds per-request sync I/O or shared state shows "
-            "up here as p99 inflation."
+            "(the LOCAL skill classifier's ONNX forward pass, ~21.5k-token tool-schema "
+            "normalization, response assembly). Selection shares a bounded worker pool "
+            "sized to Cloud Run's --concurrency=8; above that, refusals degrade open by "
+            "design and are excluded from the warning gate."
         ),
     }
 
@@ -517,6 +531,7 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         "readyz_status": readiness.get("readyz_status"),
         "provider_calls_per_request": concurrency.get("provider_calls_per_request"),
         "concurrency_warnings": concurrency.get("warning_count"),
+        "concurrency_warnings_at_cap": concurrency.get("warning_count_at_production_cap"),
     }
     # Semantic pass: a "faster" run is only meaningful if the server actually did the
     # production work. Guard against a regression that skips the selector/main call,
@@ -527,8 +542,11 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         and summary["healthz_status"] == 200
         and summary["readyz_status"] == 200
         and summary["codec_verify_ops_per_sec"] > 0
-        and summary["provider_calls_per_request"] == 2.0  # exactly selector + main
-        and (summary["concurrency_warnings"] or 0) == 0
+        # Exactly ONE provider call per request — the main completion. Skill
+        # selection is local (in-process ONNX) and never touches the provider;
+        # a 2.0 here would mean the upstream selector came back.
+        and summary["provider_calls_per_request"] == 1.0
+        and (summary["concurrency_warnings_at_cap"] or 0) == 0
     )
     return {
         "meta": {

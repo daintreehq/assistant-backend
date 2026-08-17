@@ -21,7 +21,6 @@ from daintree_assistant_server.services.turn_accounting import (
     response_usage,
     sum_usage,
     turn_cost,
-    turn_cost_with_speculation,
 )
 
 # Captured verbatim from a live deepseek/deepseek-v4-flash-0731 call.
@@ -327,24 +326,6 @@ def test_a_non_finite_cost_is_rejected(raw: float) -> None:
     assert ProviderUsage.from_wire({"cost": raw}).cost is None
 
 
-def test_a_losing_speculation_is_billed_into_the_turn() -> None:
-    """A speculative generation the user never saw was still charged to them.
-
-    When it finished before losing, its cost is known and belongs in the total.
-    """
-    from daintree_assistant_server.contracts.extensions import SelectorUsage
-
-    cost = turn_cost_with_speculation(
-        ProviderUsage(cost=0.002),
-        _meta(SelectorUsage(cost=0.0004)),
-        discarded_usage=ProviderUsage(cost=0.001),
-        speculation_billed=True,
-    )
-    assert cost is not None
-    assert cost.total == pytest.approx(0.0034)
-    assert cost.complete is True
-
-
 def test_a_reported_zero_is_a_measurement_not_a_gap() -> None:
     """`0.0` is falsy, and every check here has to be `is None` rather than truthy.
 
@@ -373,59 +354,3 @@ def test_a_wire_zero_is_parsed_as_a_zero_not_as_absent() -> None:
     assert ProviderUsage.from_wire({"cost": 0}).cost == 0.0
 
 
-def test_a_partial_main_still_clears_complete_when_speculation_reported() -> None:
-    """Two independent reasons to doubt a total; either one alone is enough.
-
-    The speculation arm passes its own `complete=` and could otherwise overwrite
-    what the main sum already knew.
-    """
-    from daintree_assistant_server.contracts.extensions import SelectorUsage
-
-    main = sum_usage(ProviderUsage(cost=0.002), ProviderUsage())
-    cost = turn_cost_with_speculation(
-        main,
-        _meta(SelectorUsage(cost=0.0004)),
-        discarded_usage=ProviderUsage(cost=0.001),
-        speculation_billed=True,
-    )
-    assert cost is not None
-    assert cost.total == pytest.approx(0.0034)
-    assert cost.complete is False
-
-
-def test_no_speculation_does_not_fold_an_empty_record_into_the_total() -> None:
-    """`discarded_usage` defaults to an empty record and must stay unread.
-
-    Summing it when nothing was speculated would look exactly like a call that
-    reported nothing, and mark every ordinary turn a floor.
-    """
-    from daintree_assistant_server.contracts.extensions import SelectorUsage
-
-    cost = turn_cost_with_speculation(
-        ProviderUsage(cost=0.002),
-        _meta(SelectorUsage(cost=0.0004)),
-        discarded_usage=ProviderUsage(),
-        speculation_billed=False,
-    )
-    assert cost is not None
-    assert cost.total == pytest.approx(0.0024)
-    assert cost.complete is True
-
-
-def test_a_speculation_cancelled_before_reporting_makes_the_total_a_floor() -> None:
-    """Real spend that nothing can measure.
-
-    OpenRouter reports usage only in a stream's final chunk, which a cancelled
-    stream never sends. The turn is still billed, so the honest report is a
-    total that admits it is incomplete — not one that pretends the discarded
-    generation was free.
-    """
-    cost = turn_cost_with_speculation(
-        ProviderUsage(cost=0.002),
-        _meta(None),
-        discarded_usage=ProviderUsage(),
-        speculation_billed=True,
-    )
-    assert cost is not None
-    assert cost.total == 0.002
-    assert cost.complete is False

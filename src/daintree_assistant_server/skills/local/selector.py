@@ -17,6 +17,7 @@ second-guessed on.
 from __future__ import annotations
 
 import logging
+from typing import Protocol
 
 from pydantic import SecretStr
 
@@ -30,6 +31,28 @@ from .documents import query_document, routing_revision
 from .runtime import InferencePool
 
 _log = logging.getLogger(__name__)
+
+
+class SkillSelector(Protocol):
+    """What the orchestrator needs from a selector — nothing more.
+
+    Two implementations exist: ``LocalSelector`` (production — the in-process
+    classifier) and the prompt-based ``skills.selector.Selector``, which survives
+    as the scriptable seam for orchestration tests and deterministic benchmarks
+    (its FakeProvider/ReplayProvider scripting is the interface dozens of
+    behavioural assertions are written against).
+    """
+
+    async def select(
+        self,
+        conversation: list[ChatMessage],
+        active_ids: list[str],
+        *,
+        api_key: SecretStr | None = None,
+        turn_context: str | None = None,
+        available_tools: list[str] | None = None,
+        routing: RoutingPreference | None = None,
+    ) -> SelectionDecision: ...
 
 
 class LocalSelector:

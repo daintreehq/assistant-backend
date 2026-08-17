@@ -31,31 +31,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only, no runtime cycle
 logger = get_logger("daintree.respond")
 
 
-def turn_cost_with_speculation(
-    usage: ProviderUsage,
-    meta: _RespondMeta,
-    *,
-    discarded_usage: ProviderUsage,
-    speculation_billed: bool,
-) -> TurnCost | None:
-    """``turn_cost`` with a losing speculation's spend folded in.
-
-    One home for the arithmetic, called identically by both response paths —
-    the streaming path cannot see the ``_PreparedTurn`` itself, so the two
-    pieces it needs are passed explicitly rather than duplicated inline.
-    """
-    if not speculation_billed:
-        return turn_cost(usage, meta)
-    return turn_cost(
-        sum_usage(usage, discarded_usage),
-        meta,
-        # A losing speculation is only fully accounted for if it reported a
-        # cost before we cancelled it. Otherwise real spend happened that
-        # nothing can measure, and the total is a floor.
-        complete=discarded_usage.cost is not None,
-    )
-
-
 def turn_cost(
     main: ProviderUsage, meta: _RespondMeta, *, complete: bool = True
 ) -> TurnCost | None:

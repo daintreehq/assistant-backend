@@ -163,7 +163,7 @@ class TurnTimings(BaseModel):
     ``preparation_ms`` and ``total_ms`` are always present: every turn prepares,
     and every turn ends.
 
-    The phases do NOT sum to ``total_ms``. They overlap by design: a speculative
+    The phases do NOT sum to ``total_ms``. They can overlap: an eagerly-started
     stream opens while the selector is still running, so ``selection_ms`` and
     ``upstream_open_ms`` can cover the same wall clock. Read them as "how long
     did this part take", never as a partition of the turn.
@@ -185,11 +185,8 @@ class TurnTimings(BaseModel):
     preparation_ms: int = 0
     #: Opening the main upstream call: connect, send, and wait for its first
     #: event. Mostly prefill. ``None`` if the turn never reached the model.
-    #:
-    #: A turn served by a winning speculation reports the SPECULATIVE open, which
-    #: began before selection finished — so a small number here alongside a large
-    #: ``selection_ms`` means speculation hid the open, not that the model was
-    #: fast.
+    #: A phase duration (open to first event), not a cumulative mark — it
+    #: composes with ``preparation_ms``, which owns everything before the open.
     upstream_open_ms: int | None = None
     #: First upstream event until the first VISIBLE token: the model's
     #: chain-of-thought. ``None`` when thinking is off, which is the shipped
@@ -209,28 +206,20 @@ class TurnCost(BaseModel):
     """What this whole request charged the caller, in USD.
 
     The caller's own key funds every upstream call a turn makes, so the number
-    that matters to them is the TOTAL — not what any one call cost. A turn can
-    open two upstream calls (the skill selector, then the main completion) and a
-    re-rolled round pays for a generation nobody ever saw; all of it lands on
-    their card, so all of it is counted here.
+    that matters to them is the TOTAL — not what any one call cost. Skill
+    selection is local (in-process, unbilled), so an ordinary turn is ONE billed
+    call — the main completion — and a re-rolled round additionally pays for a
+    generation nobody ever saw; all of it lands on their card, so all of it is
+    counted here.
 
     ``total`` is the headline. The breakdown is kept because it answers the
-    follow-up question — "why was that turn expensive?" — and because
-    ``selector`` is the part that prompt work can actually move.
+    follow-up question — "why was that turn expensive?". ``selector`` remains in
+    the shape for the scripted test seam but is null on production turns: local
+    classification costs nothing upstream.
 
     The whole object is ABSENT when the provider reported no cost at all. That is
     deliberate: a zero would read as "this turn was free", which is a claim about
-    someone's bill that we would have no basis for.
-
-    **``total`` is a lower bound, not a receipt.** One billed generation is
-    structurally uncountable: when skill speculation opens a private upstream
-    stream and the selector then picks a different skill set, that stream is
-    CANCELLED mid-flight. The tokens it produced were billed, but OpenRouter
-    reports usage only in a stream's final chunk — which a cancelled stream never
-    sends — so its cost cannot be observed at any price. It is rare (speculation
-    only runs when a verified, catalog-current active set already exists, and is
-    only abandoned when selection contradicts it) and it is measurable from the
-    ``skill_speculation_fallback`` log, but it is real. The authority on a bill is
+    someone's bill that we would have no basis for. The authority on a bill is
     the OpenRouter dashboard; this field is for proportion and trend.
     """
 

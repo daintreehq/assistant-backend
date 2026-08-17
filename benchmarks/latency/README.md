@@ -31,7 +31,7 @@ prompt prefill, and any reasoning emitted before the first visible token.
 | `cold_greeting` | first turn of a session, no state, trivial message — the worst first-byte case |
 | `cold_work_request` | first turn where the selector has real routing work to do |
 | `warm_continuation` | tool-result round under the **same** `turn_id` — selector must not run |
-| `warm_new_turn` | follow-up instruction with valid state — selector runs, speculation eligible |
+| `warm_new_turn` | follow-up instruction with valid state — selector runs |
 | `cold_greeting_nonstream` | no first-byte escape hatch; shows what streaming buys |
 | `task_*` | utility tasks (`watcher_classify`, `terminal_summarize`, `terminal_extract_text`) |
 | `selector_*` | the selector in isolation, including its `repair_rate` |

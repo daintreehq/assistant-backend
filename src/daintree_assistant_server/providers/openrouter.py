@@ -195,7 +195,7 @@ _PROVIDER_ROUTING: dict[str, Any] = DEFAULT_POLICY.to_wire()
 #
 # Today that is the skill selector and nothing else: ~10.3k prompt tokens for ~90
 # of answer (438 trials, `benchmarks/skill_selection`), sitting on the turn's
-# first-byte path, and with a winning speculation the turn's whole
+# first-byte path, and the turn's whole
 # time-to-first-token IS this call's latency.
 #
 # Generation is not negligible even here — ~90 tokens at ~100 tok/s is ~0.9s of a

@@ -134,20 +134,8 @@ def skills_in_render_order(skills: Sequence[Skill]) -> list[Skill]:
     selection. Nothing here deduplicates: the active set is already unique by
     construction, and quietly repairing a duplicate would hide that break.
 
-    This is the single definition: the orchestrator compares speculative vs
-    resolved skill sets through :func:`render_order_ids` so its notion of "the
-    same request" cannot drift from the bytes this produces.
     """
     return sorted(skills, key=lambda s: (not s.meta.foundation, s.id))
-
-
-def render_order_ids(skills: Sequence[Skill]) -> list[str]:
-    """The canonical render-order ids — equal lists mean byte-identical blocks.
-
-    True within one catalog revision: skill learning rewrites a body behind a
-    stable id, so callers pair this with a ``catalog.revision`` check.
-    """
-    return [s.id for s in skills_in_render_order(skills)]
 
 
 def _cap_list_combined(

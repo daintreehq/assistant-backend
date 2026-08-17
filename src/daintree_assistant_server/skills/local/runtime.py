@@ -62,19 +62,14 @@ QUEUE_DEPTH = 8
 
 # Wall-clock ceiling on one ranking, queue wait included.
 #
-# WAITING IS ALMOST ALWAYS THE RIGHT ANSWER, which is not what the first version
-# of this assumed. The alternative to waiting is failing open, and failing open
-# costs a ~2.0s upstream selector call (p90 2.8s) — so refusing a request after
-# 250ms to "save" it from a queue hands it a 2000ms bill instead of a 300ms one.
-# Any timeout below roughly the upstream p50 makes the fallback the slower path
-# and the circuit breaker actively harmful.
-#
-# 1.5s therefore, not 0.25s: still under the call it replaces, while deep enough
-# that an eight-deep burst on a single vCPU (measured worst case 280ms here,
-# perhaps 1s on a slower server core) rides it out rather than tripping it.
-# This only fires when something is genuinely wrong — a wedged session, a
-# pathological input — and it matters more once the upstream selector is
-# removed, because then there is no fallback at all and this is the only bound.
+# There is no upstream selector to fall back to — failing open means the turn
+# REUSES the prior active set instantly, a fine-but-stale answer. So the timeout
+# is purely a bound on pathology: deep enough that an eight-deep burst on a
+# single vCPU (measured worst case 280ms; allow ~1s for a slower server core)
+# rides it out, short enough that a genuinely wedged session costs a turn 1.5s
+# once rather than hanging it. When it fires, the slot stays held until the
+# thread actually finishes (see ``run``), so a wedged worker drains admission
+# instead of poisoning every later turn with the same wait.
 RANK_TIMEOUT_SECONDS = 1.5
 
 

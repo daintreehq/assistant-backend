@@ -55,11 +55,10 @@ proof that the whole corpus is accurate.
   and folds the matching pages into the volatile prompt tail — the client is not
   handed a docs tool to run. Best-effort: any failure leaves the turn to answer
   without documentation, never to fail.
-- Streamed selector turns with verified, catalog-current active skills race the
-  selector against a private main stream built from the exact ordered prior set.
-  An exact resolved match reuses that stream; any set/revision change closes it
-  and starts the authoritative prompt. Empty/untrusted state stays serial, and no
-  speculative model event is exposed before the first `meta` event.
+- Skill selection is LOCAL: an in-process ONNX classifier (~10ms) picks the
+  active set — no upstream call, no credential spent, and the turn's flow is
+  strictly select → assemble → one main completion. A stale or failing
+  classifier degrades open to the prior active set, never blocks the turn.
 - Skill state is portable across instances via a signed, opaque token.
 - Prompt order is cache-critical, and every row below the schemas is ordered widest-shared
   first: two static system blocks (base prompt → response contract) → tool schemas → user-role

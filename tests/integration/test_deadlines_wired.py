@@ -33,11 +33,15 @@ async def test_a_stalled_preparation_becomes_an_attributable_error(
     from daintree_assistant_server.errors import DaintreeError
     from daintree_assistant_server.main import build_container
 
-    async def _never_returns(request):  # type: ignore[no-untyped-def]
+    container = build_container(settings, fake_provider)
+
+    # Selection is LOCAL now — the provider is never touched during prep, so a
+    # stalled PROVIDER cannot stall preparation. The phase's slow component is
+    # the selector itself; stall that.
+    async def _never_returns(*args, **kwargs):  # type: ignore[no-untyped-def]
         await asyncio.sleep(30)
 
-    fake_provider.complete = _never_returns  # type: ignore[method-assign]
-    container = build_container(settings, fake_provider)
+    container.orchestrator.selector.select = _never_returns  # type: ignore[method-assign]
 
     from daintree_assistant_server.contracts.daintree_api import RespondRequest
 

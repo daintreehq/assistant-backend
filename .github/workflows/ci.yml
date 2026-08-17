@@ -31,6 +31,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+          # The local skill classifier (ONNX graph + tokenizer) is Git LFS.
+          # build_container loads it eagerly, so without real bytes every test
+          # that builds a container feeds ONNX Runtime a 130-byte pointer file.
+          lfs: true
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5

@@ -349,15 +349,27 @@ def test_a_cleared_decision_does_not_claim_a_selector_call() -> None:
 
 @pytest.mark.asyncio
 async def test_selection_force_still_runs_the_selector(settings, fake_provider) -> None:  # type: ignore[no-untyped-def]
-    """A client asking for selection gets selection, whatever the text looks like."""
-    from fakes import selection_result
+    """A client asking for selection gets selection, whatever the text looks like.
+
+    Selection is LOCAL now, so the observable is the selector itself — the
+    provider sees nothing on this path by design (that is the whole point of
+    the local classifier), and asserting on provider traffic would test the
+    architecture this replaced.
+    """
     from pydantic import SecretStr
 
     from daintree_assistant_server.contracts.daintree_api import RespondRequest
     from daintree_assistant_server.main import build_container
 
-    fake_provider.selection_result = selection_result([])
     container = build_container(settings, fake_provider)
+    calls: list[list[str]] = []
+    real_select = container.orchestrator.selector.select
+
+    async def spying_select(messages, active_ids, **kwargs):  # type: ignore[no-untyped-def]
+        calls.append(list(active_ids))
+        return await real_select(messages, active_ids, **kwargs)
+
+    container.orchestrator.selector.select = spying_select  # type: ignore[method-assign]
     body = RespondRequest.model_validate(
         {
             "protocol_version": 2,
@@ -370,5 +382,5 @@ async def test_selection_force_still_runs_the_selector(settings, fake_provider) 
     await container.orchestrator.complete(
         body, upstream_model="m", api_key=SecretStr("k"), request_id="req_fp2"
     )
-    assert fake_provider.selection_requests, "selection.force was ignored"
+    assert calls, "selection.force was ignored"
     await container.aclose()

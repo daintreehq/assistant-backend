@@ -135,6 +135,29 @@ def task_runner(
     )
 
 
+def install_scripted_selector(container: Any, fake_provider: FakeProvider) -> None:
+    """Replace the container's LOCAL selector with the provider-scripted one.
+
+    Production selection is a local ONNX classifier now — it decides for real,
+    which is exactly wrong for orchestration tests that need to SCRIPT the
+    selection ("returns these ids", "fails upstream", "caps at three") to drive
+    a specific orchestrator branch. The prompt-based ``Selector`` class survives
+    as precisely that scriptable test seam: it reads ``FakeProvider``'s
+    ``selection_result``/``selection_error`` and records ``selection_requests``,
+    which is the interface ninety-odd assertions in this suite are written
+    against. The LocalSelector's own contract is tested directly in
+    tests/unit/test_local_selection.py, and the real artifact end-to-end in the
+    same file's skipif-marked tests.
+    """
+    container.orchestrator.selector = Selector(
+        fake_provider,
+        container.prompt_loader,
+        container.catalog_manager,
+        container.settings,
+    )
+    container.selector = container.orchestrator.selector
+
+
 def detach_docs_client(container: Any) -> None:
     """Cut a container's link to the LIVE documentation server.
 
@@ -155,6 +178,7 @@ def app(settings: Settings, fake_provider: FakeProvider) -> Any:
     application = create_app(settings=settings, provider=fake_provider)
     container = build_container(settings, fake_provider)
     detach_docs_client(container)
+    install_scripted_selector(container, fake_provider)
     application.state.container = container
     application.state.ready = True
     return application
@@ -168,6 +192,10 @@ def client(app: Any) -> Iterator[TestClient]:
         # detachment has to be reapplied to the container that actually serves
         # these requests, not the one that was discarded.
         detach_docs_client(app.state.container)
+        # Same story for the scripted selector: the lifespan container built a
+        # real LocalSelector, and these tests need the scriptable seam.
+        fake = app.state.container.provider
+        install_scripted_selector(app.state.container, fake)
         yield test_client
 
 

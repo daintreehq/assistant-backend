@@ -198,6 +198,15 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
     traces = load_traces(id_filter)
     provider = R.ReplayProvider()
     container = build_container(settings, provider=provider)
+    # Selection is LOCAL in production; these traces SCRIPT selector answers
+    # (`selector_pick`) to drive specific cadence/active-set branches, so the
+    # scriptable prompt-based selector is installed as the test seam — the same
+    # substitution tests/conftest.py makes, for the same reason.
+    from daintree_assistant_server.skills.selector import Selector
+
+    container.orchestrator.selector = Selector(
+        provider, container.prompt_loader, container.catalog_manager, settings
+    )
     spy = R.SpyLearner()
     container.orchestrator.learner = spy  # inject the recording spy (default is None)
 

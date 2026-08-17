@@ -970,16 +970,6 @@ def test_stream_close_failure_on_discard_does_not_cost_the_turn(
             return FakeStream(_repair_tool_chunks())
         return ExplodingCloseStream(make_text_chunks(DEAD_ROUND))
 
-    # Speculation wraps the first attempt in a _SpeculativeStream, whose own discard
-    # already swallows close failures — that would make this test pass without
-    # exercising the discard path's teardown at all. Disable it so the orchestrator
-    # holds the raw provider stream and the failing aclose() is the one under test.
-    orchestrator = app.state.container.orchestrator
-    monkeypatch.setattr(
-        orchestrator,
-        "settings",
-        orchestrator.settings.model_copy(update={"skill_speculation_max_concurrency": 0}),
-    )
     fake_provider.selection_result = selection_result([])
     fake_provider.stream_factory = stream_factory
     body = respond_body(

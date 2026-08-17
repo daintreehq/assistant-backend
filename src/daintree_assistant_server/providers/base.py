@@ -41,7 +41,7 @@ class ProviderUsage:
     # A record straight off the wire describes one call, so it is always True:
     # the call either reported a cost or it did not, and ``cost is None`` already
     # says "unknown". The bit only ever matters for an AGGREGATE — a bare-intent
-    # re-roll, a JSON-repair retry, a losing speculation summed into the accepted
+    # re-roll, or a JSON-repair retry summed into the accepted
     # generation. There, if one constituent reported and another did not, `cost`
     # is a non-``None`` number that is nonetheless SHORT of what the caller paid,
     # and nothing about the float itself reveals that. Without this flag the

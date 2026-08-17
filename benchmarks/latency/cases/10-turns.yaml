@@ -69,11 +69,11 @@ cases:
 
   - id: warm_new_turn
     kind: turn
-    title: Warm NEW turn (valid state, selector runs, speculation eligible)
+    title: Warm NEW turn (valid state, selector runs)
     # A follow-up instruction in an established session: the state token is valid and
     # names the current catalog, so the selector DOES run but the orchestrator can
     # speculatively open the main stream against the prior active set in parallel.
-    # This is the shape that shows whether speculation is actually paying off.
+    # This is the shape that shows the full select->assemble->open sequence.
     stream: true
     prime: true
     messages:

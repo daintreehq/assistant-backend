@@ -47,7 +47,11 @@ from .services.prompt_assembler import PromptAssembler
 from .services.skill_learning import SkillLearner
 from .services.task_runner import TaskRunner
 from .skills.catalog import Catalog, CatalogManager, default_skills_dir, load_catalog
-from .skills.selector import Selector
+from .skills.local.classifier import SkillClassifier
+from .skills.local.documents import routing_revision
+from .skills.local.paths_local import classifier_artifact_dir
+from .skills.local.runtime import InferencePool
+from .skills.local.selector import LocalSelector, SkillSelector
 from .state.codec import StateCodec
 
 logger = get_logger("daintree.main")
@@ -203,7 +207,7 @@ class Container:
     catalog_manager: CatalogManager
     provider: ChatProvider
     state_codec: StateCodec
-    selector: Selector
+    selector: SkillSelector
     assembler: PromptAssembler
     orchestrator: ChatOrchestrator
     task_runner: TaskRunner
@@ -213,6 +217,9 @@ class Container:
     # latency profile, and a documentation search must never queue behind a
     # long-lived streaming completion holding a pooled connection.
     docs_http_client: httpx.AsyncClient | None = None
+    # The local selector's worker pool — owned here so lifespan teardown joins
+    # its threads. None when a selector override was injected (tests/benchmarks).
+    inference_pool: InferencePool | None = None
 
     @property
     def catalog(self) -> Catalog:
@@ -235,6 +242,9 @@ class Container:
         if self.docs_http_client is not None:
             with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
                 await self.docs_http_client.aclose()
+        if self.inference_pool is not None:
+            with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
+                self.inference_pool.close()
 
 
 # Structured upstream-timeout components, hardcoded (no env toggles — one
@@ -307,8 +317,18 @@ def _build_state_codec(settings: Settings) -> StateCodec:
     )
 
 
-def build_container(settings: Settings, provider: ChatProvider | None = None) -> Container:
-    """Construct and validate all service components."""
+def build_container(
+    settings: Settings,
+    provider: ChatProvider | None = None,
+    selector: SkillSelector | None = None,
+) -> Container:
+    """Construct and validate all service components.
+
+    ``selector`` override: tests and deterministic benchmarks inject the
+    scriptable prompt-based selector here so the container skips loading the
+    ONNX artifact entirely — production always leaves it None and gets the
+    local classifier.
+    """
     prompt_loader = PromptLoader()
     prompt_loader.validate()
 
@@ -328,7 +348,26 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
 
     state_codec = _build_state_codec(settings)
     chat_provider = provider if provider is not None else _build_provider(settings)
-    selector = Selector(chat_provider, prompt_loader, catalog_manager, settings)
+    inference_pool: InferencePool | None = None
+    if selector is None:
+        # Skill selection is LOCAL: one in-process ONNX forward pass (~10ms),
+        # replacing the upstream model call that used to sit on the turn's
+        # first-byte path (p50 2.0s). Constructed eagerly so a missing or
+        # LFS-pointer artifact fails container validation — readiness, not a
+        # request — exactly like a malformed prompt or skill would. The
+        # classifier's provenance is checked HERE too: a head trained against a
+        # different routing surface would degrade every fresh turn open, and
+        # that belongs to the deploy gate (readiness), not to per-request logs.
+        classifier = SkillClassifier(classifier_artifact_dir())
+        live = routing_revision(catalog_manager.catalog)
+        if classifier.routing_revision != live:
+            raise RuntimeError(
+                "local skill classifier is stale: artifact routing_revision "
+                f"{classifier.routing_revision[:24]!r} != live {live[:24]!r} — "
+                "run the retrain-selector runbook before deploying this catalog"
+            )
+        inference_pool = InferencePool()
+        selector = LocalSelector(classifier, inference_pool, catalog_manager, settings)
     assembler = PromptAssembler(prompt_loader, settings)
 
     skill_learner: SkillLearner | None = None
@@ -373,6 +412,7 @@ def build_container(settings: Settings, provider: ChatProvider | None = None) ->
         task_runner=task_runner,
         skill_learner=skill_learner,
         docs_http_client=docs_http_client,
+        inference_pool=inference_pool,
     )
 
 

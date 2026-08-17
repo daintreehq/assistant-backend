@@ -48,14 +48,14 @@ from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, 
 from ..providers.policy import RoutingPreference, routing_preference
 from ..providers.retry import retry_upstream
 from ..skills.active_set import (
-    filter_dedup_cap,
     merge_active_skills,
     resolve_active_skills,
 )
 from ..skills.catalog import Catalog, CatalogManager
 from ..skills.fast_path import can_skip_selection
 from ..skills.load_events import SkillLoadExecution
-from ..skills.selector import SelectionDecision, Selector
+from ..skills.local.selector import SkillSelector
+from ..skills.selector import SelectionDecision
 from ..skills.tool_projection import ToolProjection, project_tools
 from ..state.codec import StateCodec
 from ..text_utils import sanitize_line
@@ -69,12 +69,8 @@ from .docs_mcp import (
     DocsMcpClient,
 )
 from .output_policy import lint_output, repair_tables, resolve_content_width
-from .prompt_assembler import PromptAssembler, render_order_ids
+from .prompt_assembler import PromptAssembler
 from .skill_learning import SkillLearner
-from .speculation import (
-    _PrepOwnedStream,
-    _SpeculativeStream,
-)
 from .tool_call_repair import (
     ParameterIndex,
     StreamToolCallBuffer,
@@ -85,10 +81,44 @@ from .turn_accounting import (
     log_turn_usage,
     response_usage,
     sum_usage,
-    turn_cost_with_speculation,
+    turn_cost,
 )
 
 logger = get_logger("daintree.respond")
+
+
+class _PrepOwnedStream:
+    """The streaming body, with explicit ownership of the eager prep task.
+
+    The response body may be closed before it is ever polled (an endpoint
+    failure after ``complete()`` returned, or a client that vanished before the
+    body started). Closing an un-started async generator never enters its body,
+    which would leave selection running. This wrapper cancels prep in exactly
+    that window; once iteration has started, closure is delegated to the
+    generator, whose finally-chain already cancels prep and closes the provider.
+    """
+
+    def __init__(
+        self,
+        gen: AsyncGenerator[str, None],
+        prep_task: asyncio.Task[_PreparedTurn],
+    ) -> None:
+        self._gen = gen
+        self._prep_task = prep_task
+        self._started = False
+
+    def __aiter__(self) -> _PrepOwnedStream:
+        return self
+
+    async def __anext__(self) -> str:
+        self._started = True
+        return await self._gen.__anext__()
+
+    async def aclose(self) -> None:
+        if not self._started:
+            self._prep_task.cancel()
+            await asyncio.gather(self._prep_task, return_exceptions=True)
+        await self._gen.aclose()
 
 
 # Sent as the sole addition to a re-rolled round whose first draft announced an
@@ -172,7 +202,7 @@ _CLOSE_GRACE_SECONDS = 5.0
 _DOCS_MIN_TIMEOUT_SECONDS = 0.5
 
 # What the docs lookup may NOT spend, no matter how much is left. Preparation
-# still has to assemble a >50 KiB prompt and, on a losing speculation, wait out a
+# still has to assemble a >50 KiB prompt and wait out a
 # stream teardown after this returns. Handing the lookup every remaining second
 # means a slow docs host turns a turn that would have answered unaided into a
 # preparation-deadline error — trading the feature's soft failure for a hard one.
@@ -253,7 +283,6 @@ class _PreparedTurn:
     provider_request: ProviderChatRequest
     meta: _RespondMeta
     active_ids: list[str]
-    speculation: _SpeculativeStream | None
     # The caller's upstream credential (already attached to provider_request);
     # carried separately so the post-stream learning dispatch can capture it by
     # value without re-narrowing the request's optional field.
@@ -268,12 +297,6 @@ class _PreparedTurn:
     # Wall-clock marks for the phases preparation owns. Continues to be filled in
     # by the response paths, which is why it is mutable and travels with the turn.
     timings: _Timings = field(default_factory=_Timings)
-    # Spend on a speculative generation this turn opened and then threw away.
-    # Billed to the caller either way; see `turn_accounting.turn_cost`.
-    discarded_usage: ProviderUsage = field(default_factory=ProviderUsage)
-    # True when such a generation happened at all, which is what distinguishes
-    # "no speculation" from "speculation whose cost we could not read".
-    speculation_billed: bool = False
 
 
 def _carries_output(chunk: dict[str, Any] | None) -> bool:
@@ -301,7 +324,7 @@ class ChatOrchestrator:
         *,
         settings: Settings,
         catalog_manager: CatalogManager,
-        selector: Selector,
+        selector: SkillSelector,
         state_codec: StateCodec,
         assembler: PromptAssembler,
         provider: ChatProvider,
@@ -324,10 +347,6 @@ class ChatOrchestrator:
         # reference to a bare task, so we keep a strong one here (discarded on done)
         # to stop a learning pass being garbage-collected mid-flight.
         self._background_tasks: set[asyncio.Task[Any]] = set()
-        # This counter is mutated without an ``await`` between check/increment, so
-        # it is an event-loop-local non-blocking capacity gate. A turn that finds
-        # the cap full stays on the serial path; it never queues behind speculation.
-        self._skill_speculations_in_flight = 0
 
     @property
     def catalog(self) -> Catalog:
@@ -474,7 +493,7 @@ class ChatOrchestrator:
             # Return the response scaffold immediately: HTTP headers (and SSE
             # comment heartbeats) reach the client while selection, assembly, and
             # the provider open still run. Prep starts NOW as a concurrent task —
-            # not lazily on first poll — so selection/speculation overlap the
+            # not lazily on first poll — so selection and assembly overlap the
             # response handshake. A prep failure becomes a terminal SSE ``error``
             # event on the stream — never an HTTP error, never a silent hang.
             prep_task = asyncio.create_task(
@@ -813,151 +832,24 @@ class ChatOrchestrator:
             instruction_revision=request.session.instruction_revision,
         )
 
-        # Speculation opens the main stream against a GUESS at what the selector is
-        # about to return, in parallel with the selector call, and keeps it only if
-        # the guess proves exact. It is what decouples the turn's first byte from
-        # selection latency: measured, a winning speculation drops the post-meta
-        # first-event time to ~0ms, so the turn's TTFT becomes the selector's
-        # latency alone rather than selector + upstream open + prefill.
-        #
-        # THE GUESS. With usable state, the prior active set is the guess (a
-        # continuation almost always keeps its skills). With NO usable state — a
-        # cold first turn — the guess is the EMPTY set, because "no skills" is both
-        # the single most likely selector answer and the only one available without
-        # running the selector first. That covers the shape a user judges the
-        # product by: the opening message of a session.
-        #
-        # THE TRADE, STATED PLAINLY. A wrong guess costs one discarded upstream
-        # open. A cold turn that does select skills therefore pays for a prefill it
-        # throws away — bounded by the concurrency cap, and cheap in practice
-        # because the discarded prompt's cacheable prefix (base prompt + response
-        # contract + the ~21.5k token tool region) is exactly the prefix the real
-        # request then reuses, so the waste is the uncached tail plus a handful of
-        # generated tokens, not a whole second call. Latency is bought with tokens
-        # here, deliberately. That prefix is skill-independent only because issue #39
-        # moved the loaded-skills block BELOW the schemas: while it was system-role, a
-        # wrong empty-skill guess shifted the tool region too and this was optimistic.
-        speculation: _SpeculativeStream | None = None
-        speculative_request: ProviderChatRequest | None = None
-        speculative_active_ids: list[str] = []
-        # The RENDER order of the speculative set — the only ordering the assembled
-        # bytes actually depend on (see the winner comparison below).
-        speculative_render_ids: list[str] = []
-        speculation_slot = False
-        speculation_outcome = "non_streaming"
-        # Which guess was made, so a discard rate in the logs is attributable to the
-        # cold empty-set guess or to a prior set that went stale.
-        speculation_basis = "none"
-        speculation_stats: dict[str, Any] | None = None
-        # A losing speculation's spend. `speculation_billed` is the honest half:
-        # it records that a generation WAS paid for, even on the branch where the
-        # amount is unknowable, so the turn's cost can be marked incomplete
-        # instead of quietly reporting less than the caller was charged.
-        discarded_usage = ProviderUsage()
-        speculation_billed = False
-
-        def release_speculation_slot() -> None:
-            nonlocal speculation_slot
-            if speculation_slot:
-                self._skill_speculations_in_flight -= 1
-                speculation_slot = False
-
-        if request.generation.stream:
-            if not run_selector:
-                # Nothing to race: the active set is already known, so the caller
-                # opens the real request directly.
-                speculation_outcome = "selector_not_run"
-            elif self.settings.skill_speculation_max_concurrency == 0:
-                speculation_outcome = "disabled"
-            elif (
-                self._skill_speculations_in_flight
-                >= self.settings.skill_speculation_max_concurrency
-            ):
-                speculation_outcome = "capacity"
-            else:
-                # A token only supplies the guess when it verifies against THIS
-                # session AND names the catalog snapshot being assembled against.
-                # Otherwise its ids may describe skills that no longer resolve the
-                # same way, and the empty guess is the safer one.
-                state_usable = (
-                    verification.valid
-                    and verification.payload is not None
-                    and verification.payload.catalog_revision == catalog_at_start.revision
-                )
-                if state_usable:
-                    speculative_active_ids, _ = filter_dedup_cap(
-                        prior_active_ids,
-                        catalog_at_start,
-                        self.settings.max_active_skills,
-                    )
-                    speculation_basis = "prior_set" if speculative_active_ids else "empty_prior"
-                else:
-                    speculative_active_ids = []
-                    speculation_basis = "cold_empty"
-                speculation_slot = True
-                self._skill_speculations_in_flight += 1
-                speculation_outcome = "eligible"
-                try:
-                    speculative_skills = catalog_at_start.get_many(
-                        speculative_active_ids
-                    )
-                    speculative_render_ids = render_order_ids(speculative_skills)
-                    # The assembler stays credential-free (it builds PROMPT bytes);
-                    # the caller's key is attached here, as on every construction
-                    # path — an omission would fail the call, since the provider
-                    # holds no default credential. The cache-affinity key rides
-                    # along for the same reason: it is per-session state the
-                    # assembler has no business deriving, and every main call of a
-                    # session must carry the SAME one or the affinity is nothing.
-                    speculative_request = replace(
-                        self.assembler.build_main_request(
-                            request=request,
-                            skills=speculative_skills,
-                            upstream_model=upstream_model,
-                        ),
-                        api_key=api_key,
-                        cache_session_id=cache_session_id,
-                    )
-                    speculation = _SpeculativeStream(
-                        request=speculative_request,
-                        open_stream=self._open_stream_with_retry,
-                        max_chunks=self.settings.skill_speculation_buffer_chunks,
-                        max_bytes=self.settings.skill_speculation_buffer_bytes,
-                        claim_timeout_seconds=(
-                            self.settings.skill_speculation_claim_timeout_seconds
-                        ),
-                        request_id=request_id,
-                        release_slot=release_speculation_slot,
-                    )
-                except BaseException:
-                    release_speculation_slot()
-                    raise
-
         selector_ms = 0
         if run_selector:
             t_sel = time.perf_counter()
-            try:
-                decision = await self.selector.select(
-                    request.input.messages,
-                    prior_active_ids,
-                    api_key=api_key,
-                    turn_context=self._selector_turn_context(request),
-                    available_tools=self._available_tool_names(request),
-                    # The selector sends a bounded slice of the conversation
-                    # upstream too, so the caller's routing choice has to reach it
-                    # — otherwise a ZDR turn would honour the request on the
-                    # visible call and quietly route the user's own words under the
-                    # default policy here.
-                    routing=routing_preference(request.routing),
-                )
-                selector_ms = round((time.perf_counter() - t_sel) * 1000)
-                timings.selection_ms = selector_ms
-            except BaseException:
-                if speculation is not None:
-                    speculation_stats = speculation.stats()
-                    await speculation.discard()
-                    speculation_outcome = "selector_exception"
-                raise
+            decision = await self.selector.select(
+                request.input.messages,
+                prior_active_ids,
+                api_key=api_key,
+                turn_context=self._selector_turn_context(request),
+                available_tools=self._available_tool_names(request),
+                # The selector sends a bounded slice of the conversation
+                # upstream too, so the caller's routing choice has to reach it
+                # — otherwise a ZDR turn would honour the request on the
+                # visible call and quietly route the user's own words under the
+                # default policy here.
+                routing=routing_preference(request.routing),
+            )
+            selector_ms = round((time.perf_counter() - t_sel) * 1000)
+            timings.selection_ms = selector_ms
         elif no_task:
             # CLEAR, not reuse. A greeting or acknowledgement has no task, so a
             # workflow skill left loaded would follow a finished workflow into an
@@ -967,192 +859,122 @@ class ChatOrchestrator:
             decision = SelectionDecision.cleared()
         else:
             decision = SelectionDecision.reuse(prior_active_ids)
-        try:
-            warnings.extend(decision.warnings)
+        warnings.extend(decision.warnings)
 
-            # A successful selector run is authoritative (topic-shift replacement); a
-            # no-run continuation round or a degraded selector reuses the prior set.
-            # Pin one post-selection catalog snapshot for active resolution, prompt,
-            # state, and metadata. If learning reloaded the catalog during selection,
-            # the speculative prompt can never win even when its ids happen to match.
-            resolved_catalog = self.catalog
+        # A successful selector run is authoritative (topic-shift replacement); a
+        # no-run continuation round or a degraded selector reuses the prior set.
+        # Pin one post-selection catalog snapshot for active resolution, prompt,
+        # state, and metadata. If learning reloaded the catalog during selection,
+        # the prompt renders against the same skills the state token records.
+        resolved_catalog = self.catalog
 
-            # ORDER MATTERS: the docs query is settled BEFORE the active set, not
-            # after. Both are answers from the same selector call, but the active
-            # set has to know whether this turn is a documentation question so it
-            # can pin the runbook for one — and the query is available on the
-            # decision immediately, while the LOOKUP (below) is the slow part.
-            # Resolving before settling `docs_query` would leave the pin depending
-            # on a value computed later in the same function.
-            #
-            # The carry applies ONLY when this turn did not answer for itself.
-            # Same authority test the active set uses: a successful run and the
-            # no-task fast path each speak for the turn, and their answer stands
-            # even when it is `null` — a re-run selector that says "not a
-            # documentation question" must not be overridden by what the previous
-            # round decided. A continuation or a degraded selector did not answer,
-            # so the turn's own finding holds.
-            authoritative = (decision.ran or decision.authoritative) and not decision.degraded
-            docs_query = decision.docs_query if authoritative else prior_docs_query
+        # ORDER MATTERS: the docs query is settled BEFORE the active set, not
+        # after. Both are answers from the same selector call, but the active
+        # set has to know whether this turn is a documentation question so it
+        # can pin the runbook for one — and the query is available on the
+        # decision immediately, while the LOOKUP (below) is the slow part.
+        # Resolving before settling `docs_query` would leave the pin depending
+        # on a value computed later in the same function.
+        #
+        # The carry applies ONLY when this turn did not answer for itself.
+        # Same authority test the active set uses: a successful run and the
+        # no-task fast path each speak for the turn, and their answer stands
+        # even when it is `null` — a re-run selector that says "not a
+        # documentation question" must not be overridden by what the previous
+        # round decided. A continuation or a degraded selector did not answer,
+        # so the turn's own finding holds.
+        authoritative = (decision.ran or decision.authoritative) and not decision.degraded
+        docs_query = decision.docs_query if authoritative else prior_docs_query
 
-            resolution = resolve_active_skills(
-                decision,
-                prior_active_ids,
-                resolved_catalog,
-                self.settings.max_active_skills,
-                # Pinned on the CLASSIFICATION, not on the lookup succeeding. The
-                # runbook's job includes what to do when no pages arrive — say so
-                # and answer unverified rather than fabricate — and that is exactly
-                # the turn where a fabricated menu path is most likely.
-                pinned_id=DOCS_SKILL_ID if docs_query else None,
+        resolution = resolve_active_skills(
+            decision,
+            prior_active_ids,
+            resolved_catalog,
+            self.settings.max_active_skills,
+            # Pinned on the CLASSIFICATION, not on the lookup succeeding. The
+            # runbook's job includes what to do when no pages arrive — say so
+            # and answer unverified rather than fabricate — and that is exactly
+            # the turn where a fabricated menu path is most likely.
+            pinned_id=DOCS_SKILL_ID if docs_query else None,
+        )
+        active_ids = resolution.active
+        newly_loaded_ids = resolution.newly_loaded
+
+        skills = resolved_catalog.get_many(active_ids)
+        executions: list[SkillLoadExecution | DocsSearchExecution] = [
+            SkillLoadExecution.from_skill(
+                new_call_id(), resolved_catalog.get(sid)  # type: ignore[arg-type]
             )
-            active_ids = resolution.active
-            newly_loaded_ids = resolution.newly_loaded
+            for sid in newly_loaded_ids
+        ]
 
-            skills = resolved_catalog.get_many(active_ids)
-            executions: list[SkillLoadExecution | DocsSearchExecution] = [
-                SkillLoadExecution.from_skill(
-                    new_call_id(), resolved_catalog.get(sid)  # type: ignore[arg-type]
+        # The selector's second answer: this turn asked how Daintree works, so
+        # the documentation is fetched HERE — before the model opens — and
+        # handed to it as context. The alternative is a mid-stream tool loop
+        # (intercept the model's docs call, run it, splice a second provider
+        # stream into the same client connection), which both response paths
+        # are built around not doing.
+        #
+        # `prior_docs_query` (settled above) is what keeps the pages alive
+        # across a tool round: a continuation skips the selector, so
+        # `decision.docs_query` is None there, and the volatile tail carrying
+        # the pages is rebuilt every round. Without the carry, a usage question
+        # that takes one tool call to answer arrives at the answer with its
+        # sources gone.
+        t_docs = time.perf_counter()
+        docs = await self._lookup_docs(
+            docs_query, request_id=request_id, budget=budget
+        )
+        # Recorded even when the lookup returned nothing. A miss still spent
+        # the user's wall clock, and a slow FAILING docs server is exactly the
+        # thing this is meant to expose.
+        timings.docs_ms = round((time.perf_counter() - t_docs) * 1000)
+        if docs is not None:
+            executions.append(
+                DocsSearchExecution(
+                    call_id=new_call_id(),
+                    query=docs.query,
+                    paths=[s.path for s in docs.sections],
                 )
-                for sid in newly_loaded_ids
-            ]
-
-            # The selector's second answer: this turn asked how Daintree works, so
-            # the documentation is fetched HERE — before the model opens — and
-            # handed to it as context. The alternative is a mid-stream tool loop
-            # (intercept the model's docs call, run it, splice a second provider
-            # stream into the same client connection), which both response paths
-            # are built around not doing.
-            #
-            # `prior_docs_query` (settled above) is what keeps the pages alive
-            # across a tool round: a continuation skips the selector, so
-            # `decision.docs_query` is None there, and the volatile tail carrying
-            # the pages is rebuilt every round. Without the carry, a usage question
-            # that takes one tool call to answer arrives at the answer with its
-            # sources gone.
-            t_docs = time.perf_counter()
-            docs = await self._lookup_docs(
-                docs_query, request_id=request_id, budget=budget
-            )
-            # Recorded even when the lookup returned nothing. A miss still spent
-            # the user's wall clock, and a slow FAILING docs server is exactly the
-            # thing this is meant to expose.
-            timings.docs_ms = round((time.perf_counter() - t_docs) * 1000)
-            if docs is not None:
-                executions.append(
-                    DocsSearchExecution(
-                        call_id=new_call_id(),
-                        query=docs.query,
-                        paths=[s.path for s in docs.sections],
-                    )
-                )
-
-            new_state = self.state_codec.issue(
-                session_id=session_id,
-                active_skills=[s.id for s in skills],
-                catalog_revision=resolved_catalog.revision,
-                turn_id=request.session.turn_id,
-                instruction_revision=request.session.instruction_revision,
-                # Carried only when the lookup actually produced pages. Carrying
-                # a query whose search failed would re-attempt it on every
-                # continuation round of the turn, turning a docs host that is
-                # down into a per-round latency tax — and the turn has already
-                # decided to answer without documentation.
-                docs_query=docs_query if docs is not None else None,
             )
 
-            if speculation is not None:
-                speculation_stats = speculation.stats()
-                # Compare RENDER order, not list order: the loaded-skills block is
-                # rendered foundations-first and id-sorted within each tier, so ANY
-                # permutation of one active set assembles to a byte-identical
-                # request. An ordered list comparison threw away a live, already-
-                # producing stream and rebuilt an identical >50 KiB payload — and it
-                # fired on exactly the turn shape pairing creates (the model lists
-                # the foundation first on turn 1, then only the specific on turn 2,
-                # with pairing appending the foundation last). Keep the shared
-                # helper rather than a plain SET comparison: the two agree only
-                # because the active set is deduplicated upstream, and going
-                # through the assembler's own sort keeps "the same request" from
-                # drifting if render policy ever moves again.
-                exact_winner = (
-                    resolved_catalog.revision == catalog_at_start.revision
-                    and render_order_ids(skills) == speculative_render_ids
-                    # Docs are retrieved AFTER the speculative request was built,
-                    # so a lookup means the live stream is generating against a
-                    # prompt that lacks the pages the answer is supposed to come
-                    # from. Matching skill ids do not make it the same request.
-                    and docs is None
-                )
-                if exact_winner:
-                    # The request, settings, and catalog snapshot that produced
-                    # this object are unchanged. Reuse the exact object already
-                    # executing upstream instead of rebuilding/deep-comparing a
-                    # prompt + tool payload that can exceed 100 KiB.
-                    assert speculative_request is not None
-                    provider_request = speculative_request
-                    speculation_outcome = "reused"
-                else:
-                    t_discard = time.perf_counter()
-                    await speculation.discard()
-                    speculation_stats["discard_ms"] = round(
-                        (time.perf_counter() - t_discard) * 1000
-                    )
-                    speculation_outcome = "discarded"
-                    # The caller was billed for this generation whether or not we
-                    # used a byte of it. Read the usage AFTER discard: the
-                    # producer records it in its `finally`, which discard awaits,
-                    # so a speculation that finished before losing still reports
-                    # a real cost here. One cancelled mid-flight reports nothing —
-                    # OpenRouter only sends usage in a stream's final chunk — and
-                    # that unknowable-but-real spend is what clears `complete`
-                    # below rather than being silently treated as zero.
-                    discarded_usage = speculation.usage or ProviderUsage()
-                    # Gated on the OPEN, not on the object existing: a
-                    # speculation whose open never succeeded cost nothing, and
-                    # counting it as unmeasurable spend would turn an exact total
-                    # into a floor on every turn a speculative open failed.
-                    speculation_billed = speculation.upstream_opened
-                    speculation = None
-                    provider_request = replace(
-                        self.assembler.build_main_request(
-                            request=request,
-                            skills=skills,
-                            upstream_model=upstream_model,
-                            docs=docs,
-                        ),
-                        api_key=api_key,
-                        cache_session_id=cache_session_id,
-                    )
-            else:
-                provider_request = replace(
-                    self.assembler.build_main_request(
-                        request=request,
-                        skills=skills,
-                        upstream_model=upstream_model,
-                        docs=docs,
-                    ),
-                    api_key=api_key,
-                    cache_session_id=cache_session_id,
-                )
+        new_state = self.state_codec.issue(
+            session_id=session_id,
+            active_skills=[s.id for s in skills],
+            catalog_revision=resolved_catalog.revision,
+            turn_id=request.session.turn_id,
+            instruction_revision=request.session.instruction_revision,
+            # Carried only when the lookup actually produced pages. Carrying
+            # a query whose search failed would re-attempt it on every
+            # continuation round of the turn, turning a docs host that is
+            # down into a per-round latency tax — and the turn has already
+            # decided to answer without documentation.
+            docs_query=docs_query if docs is not None else None,
+        )
 
-            meta = self._build_meta(
-                request_id=request_id,
-                state=new_state,
-                active_ids=active_ids,
-                newly_loaded_ids=newly_loaded_ids,
-                executions=executions,
-                decision=decision,
-                run_selector=run_selector,
-                warnings=warnings,
-                catalog=resolved_catalog,
-            )
-            if speculation is not None:
-                speculation.commit()
-        except BaseException:
-            if speculation is not None:
-                await speculation.discard()
-            raise
+        provider_request = replace(
+            self.assembler.build_main_request(
+                request=request,
+                skills=skills,
+                upstream_model=upstream_model,
+                docs=docs,
+            ),
+            api_key=api_key,
+            cache_session_id=cache_session_id,
+        )
+
+        meta = self._build_meta(
+            request_id=request_id,
+            state=new_state,
+            active_ids=active_ids,
+            newly_loaded_ids=newly_loaded_ids,
+            executions=executions,
+            decision=decision,
+            run_selector=run_selector,
+            warnings=warnings,
+            catalog=resolved_catalog,
+        )
+
 
         # Shadow measurement only — it must not be able to fail a turn. An empty
         # projection grades as "nothing was withheld", which is the honest
@@ -1191,13 +1013,6 @@ class ChatOrchestrator:
             # with these two alongside it.
             selector_endpoint=decision.endpoint,
             selector_calls=decision.calls,
-            skill_speculation=speculation_outcome,
-            # Which guess was made. `reused` vs `discarded` alone cannot say whether
-            # a discard rate comes from the cold empty-set guess (expected on turns
-            # that do select skills) or from a prior set going stale (a cadence
-            # problem worth chasing).
-            skill_speculation_basis=speculation_basis,
-            skill_speculation_stats=speculation_stats,
             # SHADOW tool projection: what a skill-aware filter WOULD have sent
             # this turn. The full inventory still goes upstream — this is the
             # measurement that decides whether filtering is safe to enable.
@@ -1215,10 +1030,7 @@ class ChatOrchestrator:
             provider_request=provider_request,
             meta=meta,
             active_ids=active_ids,
-            speculation=speculation,
             api_key=api_key,
-            discarded_usage=discarded_usage,
-            speculation_billed=speculation_billed,
         )
 
     # ---- server-side documentation lookup -------------------------------
@@ -1315,18 +1127,8 @@ class ChatOrchestrator:
 
     @staticmethod
     def _turn_cost_for(usage: ProviderUsage, prepared: _PreparedTurn) -> TurnCost | None:
-        """The turn's cost, with this prepared turn's discarded speculation folded in.
-
-        Stays here rather than in ``turn_accounting`` because it is the only
-        piece that needs ``_PreparedTurn`` — keeping it out of that module keeps
-        the accounting arithmetic free of any dependency on how a turn is built.
-        """
-        return turn_cost_with_speculation(
-            usage,
-            prepared.meta,
-            discarded_usage=prepared.discarded_usage,
-            speculation_billed=prepared.speculation_billed,
-        )
+        """The turn's total cost — one home for the arithmetic (turn_accounting)."""
+        return turn_cost(usage, prepared.meta)
 
     def _lint_final_output(
         self, result: Any, *, request: RespondRequest, request_id: str, had_tool_calls: bool
@@ -1882,7 +1684,7 @@ class ChatOrchestrator:
         terminal SSE ``error`` event — never an abrupt EOF, never a fabricated
         ``done``. GeneratorExit/CancelledError (client disconnect, shutdown) pass
         through untouched — except that a disconnect while prep is still running
-        also cancels the prep task, so selection/speculation stop promptly.
+        also cancels the prep task, so selection stops promptly.
         """
         try:
             prepared = await prep_task
@@ -1918,12 +1720,9 @@ class ChatOrchestrator:
             meta=prepared.meta,
             request=request,
             active_ids=prepared.active_ids,
-            speculative_stream=prepared.speculation,
             api_key=prepared.api_key,
             budget=budget,
             projection=prepared.projection,
-            discarded_usage=prepared.discarded_usage,
-            speculation_billed=prepared.speculation_billed,
             timings=prepared.timings,
         )
         try:
@@ -1970,11 +1769,8 @@ class ChatOrchestrator:
         request: RespondRequest,
         active_ids: list[str],
         api_key: SecretStr,
-        speculative_stream: _SpeculativeStream | None = None,
         budget: RequestBudget | None = None,
         projection: ToolProjection,
-        discarded_usage: ProviderUsage,
-        speculation_billed: bool,
         timings: _Timings,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
@@ -2015,7 +1811,6 @@ class ChatOrchestrator:
         param_index = build_parameter_index(request.input.tools)
         tool_call_buffer = StreamToolCallBuffer(param_index)
         stream: ProviderStream | None = None
-        used_speculation = False
         # THE COMMIT GATE (issue #25). A round that announces a tool call and emits
         # none must not reach the client as a finished turn — but on this path the
         # decision can only be made once the reply has ENDED, and content deltas are
@@ -2058,41 +1853,10 @@ class ChatOrchestrator:
         # still replay-safe and remains the honest fail-open answer.
         fallback: tuple[list[StreamDelta], str | None, str] | None = None
         try:
-            if speculative_stream is not None:
-                # Provisional ownership is installed before ``claim`` awaits its
-                # handoff-timer cleanup. If cancellation lands inside that await,
-                # this method's ``finally`` still closes the producer.
-                stream = speculative_stream
-                if await speculative_stream.claim():
-                    used_speculation = True
-                else:
-                    stream = None
-                    # A declined claim throws away a generation that already
-                    # happened — a private post-open failure or a buffer
-                    # overflow, both AFTER the upstream opened and started
-                    # billing. It is the same discarded spend a selection
-                    # mismatch produces, arriving one step later, and nothing
-                    # upstream of here records it: `_prepare_inner` accounts only
-                    # for the mismatch path, and this source passed that check.
-                    # (`upstream_open_exhausted` never reaches this branch — that
-                    # claim succeeds and preserves its error — so the only
-                    # unopened cases here are ones that cost nothing.)
-                    if speculative_stream.upstream_opened:
-                        discarded_usage = speculative_stream.usage or ProviderUsage()
-                        speculation_billed = True
-                    logger.info(
-                        "skill_speculation_fallback",
-                        request_id=meta.request_id,
-                        reason=speculative_stream.claim_failure_reason,
-                        speculation_billed=speculation_billed,
-                        **speculative_stream.stats(),
-                    )
-
             # The metadata event is always first, before any token: the client gets
             # the skill prelude, active set, refreshed state, and selector outcome
-            # as soon as selection finishes. An eligible speculative upstream may
-            # already be privately producing, but none of its status/reasoning/
-            # content/tool/usage events can cross this authoritative boundary.
+            # as soon as selection finishes — local selection is ~10ms, so this
+            # arrives effectively immediately, well before the upstream opens.
             yield self._sse(
                 "meta",
                 StreamMeta(
@@ -2130,50 +1894,27 @@ class ChatOrchestrator:
                         content_parts = [restored]
                         break
                     stream = opened_stream
-                else:
-                    opened_stream = stream
-                    first_event = await opened_stream.prefetch_first_event()
                 # Phase timing for the round's remaining "dead air": upstream
                 # open-to-first-event. It dominates on cache misses (prefill) and on
                 # thinking-heavy rounds (reasoning precedes the event), but no longer
-                # delays the already-emitted skill metadata.
-                # The re-roll is never speculative: its request carries the corrective
-                # message, so no speculation opened against the original can serve it.
-                # Attributing attempt 0's speculation stats to it would make the
-                # speculation hit rate read higher than it is.
-                served_by_speculation = used_speculation and attempt == 0
-                # Wall clock from request in until the model's first event. Read
-                # from the turn budget, not from `t_open`, because on a winning
-                # speculation the open began BEFORE this point — measuring from
-                # here would report the wait the user did not have.
-                if budget is not None and timings.upstream_open_ms is None:
-                    timings.upstream_open_ms = round(budget.elapsed() * 1000)
+                # delays the already-emitted skill metadata. Measured from t_open —
+                # a PHASE duration, matching the wire contract — not from request
+                # start; preparation already owns everything before this point.
+                if timings.upstream_open_ms is None:
+                    timings.upstream_open_ms = round(
+                        (time.perf_counter() - t_open) * 1000
+                    )
                 logger.info(
                     "respond_upstream_open",
                     request_id=meta.request_id,
-                    speculative=served_by_speculation,
                     # Which semantic attempt this open served: 0 is the round itself,
                     # 1 the bare-intent re-roll.
                     semantic_attempt=attempt,
-                    upstream_first_event_ms=(
-                        speculative_stream.open_ms
-                        if (
-                            served_by_speculation
-                            and speculative_stream is not None
-                            and speculative_stream.open_ms is not None
-                        )
-                        else round((time.perf_counter() - t_open) * 1000)
-                    ),
-                    post_meta_first_event_ms=round((time.perf_counter() - t_open) * 1000),
+                    upstream_first_event_ms=round((time.perf_counter() - t_open) * 1000),
                     # The endpoint serving the main generation. Read after the first
                     # event because that is the earliest chunk that names it; still
                     # `None` if the stream ended before yielding one.
                     upstream_endpoint=opened_stream.endpoint,
-                    speculative_prefetched_chunks=(
-                        speculative_stream.stats()["prefetched_chunks"]
-                        if speculative_stream is not None and served_by_speculation
-                        else 0
-                    ),
                 )
 
                 if attempt == 0 and tools_callable:
@@ -2264,10 +2005,9 @@ class ChatOrchestrator:
                     # user a reply that is complete and in hand.
                     fallback = (held, finish_reason, "".join(content_parts))
                     # Close the discarded producer NOW rather than leaving it to the
-                    # outer ``finally``: a speculative stream holds an overlap slot
-                    # until it closes, and the replacement open should not queue
-                    # behind capacity this attempt no longer needs. Best-effort, for
-                    # the same reason the terminal teardown is: a failed close must
+                    # outer ``finally``, so the re-roll's open never contends with a
+                    # connection this attempt no longer needs. Best-effort, for the
+                    # same reason the terminal teardown is: a failed close must
                     # never become the turn's outcome.
                     #
                     # ``stream`` keeps pointing at it ACROSS the await and is cleared
@@ -2338,12 +2078,7 @@ class ChatOrchestrator:
                     usage=response_usage(total_usage),
                     # `total_usage` already sums a discarded re-roll, so this
                     # total covers every generation the caller paid for.
-                    cost=turn_cost_with_speculation(
-                        total_usage,
-                        meta,
-                        discarded_usage=discarded_usage,
-                        speculation_billed=speculation_billed,
-                    ),
+                    cost=turn_cost(total_usage, meta),
                     # Lint what was actually streamed. A round that ended in tool
                     # calls is interstitial and is not linted, matching the
                     # non-streaming rule.
@@ -2359,7 +2094,7 @@ class ChatOrchestrator:
             completed = True
         except DaintreeError as exc:
             # Public provider consumption starts after the meta event. An exhausted
-            # canonical/speculative open and a later stream failure therefore share
+            # canonical open and a later stream failure therefore share
             # one honest terminal SSE shape; never fabricate a successful ``done``.
             logger.warning(
                 "stream_error_after_start",
@@ -2398,12 +2133,7 @@ class ChatOrchestrator:
                 selector_ran=meta.skills.selector.ran,
                 selector_usage=meta.selector_usage,
                 selector_endpoint=meta.selector_endpoint,
-                turn_cost=turn_cost_with_speculation(
-                    final_usage,
-                    meta,
-                    discarded_usage=discarded_usage,
-                    speculation_billed=speculation_billed,
-                ),
+                turn_cost=turn_cost(final_usage, meta),
             )
             # Consolidated names only, and only from the buffer that survived:
             # a re-rolled attempt got a fresh buffer, so its discarded calls are
