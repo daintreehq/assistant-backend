@@ -59,11 +59,14 @@ MODELS = ROOT / "training" / "models"
 
 #: Appended to the query so the classifier can see conversation STATE.
 #:
-#: Same reasoning as the reranker's ``[currently loaded]`` marker: continuation
-#: and topic-shift turns are near-identical in wording and differ only in which
-#: skills are open. Here it goes in the query, because there is no per-candidate
-#: document to attach it to.
-ACTIVE_PREFIX = "[loaded: {}] "
+#: Imported from the SHIPPED package rather than redefined here. Both sides must
+#: format this identically — the trainer builds every training input with it and
+#: the server builds every query with it — and it used to be two equal literals
+#: with nothing checking they stayed equal, so an edit on one side would have
+#: trained a model on a prefix the server never sends.
+from daintree_assistant_server.skills.local.documents import (  # noqa: E402
+    ACTIVE_PREFIX,
+)
 
 
 def _device() -> str:

@@ -113,6 +113,26 @@ def mark_active(document: str, *, active: bool) -> str:
     return f"{ACTIVE_MARKER}{document}" if active else document
 
 
+#: Prefix carrying conversation STATE into the classifier's QUERY text.
+#:
+#: The ``ACTIVE_MARKER`` above is the same idea for a per-candidate document; the
+#: classifier has no per-candidate document to attach it to, so the fact goes in
+#: the query instead. Continuation and topic-shift turns are near-identical in
+#: wording and differ only in which skills are already open, so the model cannot
+#: separate them from the words alone. Measured without it: continuation 9/9 and
+#: topic-shift 1/9 at one history budget, 4/9 and 6/9 at another — a pure trade
+#: with no setting winning both.
+#:
+#: Lives HERE, beside the rest of the render contract, because BOTH sides of the
+#: pipeline must format it identically: the trainer builds every training input
+#: with it and the server builds every query with it. It was previously defined
+#: twice — once here-ish in ``classifier.py`` and once in
+#: ``training/train_classifier.py`` — as equal literals with nothing checking
+#: that they stayed equal, so editing one would have silently trained a model on
+#: a prefix the server never sends.
+ACTIVE_PREFIX = "[loaded: {}] "
+
+
 def _content_text(content: Any) -> str:
     if isinstance(content, str):
         return content

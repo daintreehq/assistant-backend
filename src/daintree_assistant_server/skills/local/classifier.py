@@ -50,14 +50,7 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
-#: Prefix carrying conversation STATE into the query text.
-#:
-#: Continuation and topic-shift turns are near-identical in wording and differ
-#: only in which skills are already open, so the model cannot separate them from
-#: the words alone. Measured without it: continuation 9/9 and topic-shift 1/9 at
-#: one history budget, 4/9 and 6/9 at another — a pure trade with no setting
-#: winning both.
-ACTIVE_PREFIX = "[loaded: {}] "
+from .documents import ACTIVE_PREFIX
 
 #: Sequence cap. Conversation queries measured p90 ~64 tokens on the benchmark;
 #: 256 is generous and costs nothing, since attention cost tracks the ACTUAL

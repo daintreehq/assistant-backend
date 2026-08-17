@@ -86,6 +86,15 @@ def main() -> int:
         nargs="+",
         help="one or more workflow journal.jsonl files (later runs fill gaps in earlier ones)",
     )
+    # Cumulative by DEFAULT. Journals are session-local and not reconstructible
+    # from a fresh clone, so the committed corpus IS the base: a retrain extends
+    # it rather than rebuilding from whatever journals happen to be on disk.
+    # Pass --base '' to rebuild from journals alone.
+    ap.add_argument(
+        "--base",
+        default=str(DATA / "selection.jsonl"),
+        help="committed corpus carried forward and extended (empty string disables)",
+    )
     args = ap.parse_args()
 
     catalog = load_catalog(default_skills_dir())
@@ -146,6 +155,15 @@ def main() -> int:
         # any timers set" trained as foundation AND as watch-outcome. First
         # admission wins; later conflicts are counted so a noisy generator shows
         # up in the stats instead of the gradients.
+        # Validate ids BEFORE the row can claim a dedupe key. Recording the key
+        # first let an unknown-id row poison the input: it reserved the slot,
+        # was then dropped, and the next VALID row for the same rendered input
+        # was discarded as a duplicate/conflict against a label that never
+        # landed in the corpus.
+        bad = [i for i in [*expect, *(active or []), *(hard_negatives or [])] if i not in valid_ids]
+        if bad:
+            stats["dropped_unknown_id"] += 1
+            return
         input_key = (
             _norm(render_training_query(query, history))
             + "|" + ",".join(active or [])
@@ -158,10 +176,6 @@ def main() -> int:
                 stats["dropped_duplicate"] += 1
             return
         seen_inputs[input_key] = tuple(sorted(expect))
-        bad = [i for i in [*expect, *(active or []), *(hard_negatives or [])] if i not in valid_ids]
-        if bad:
-            stats["dropped_unknown_id"] += 1
-            return
         stats[source] += 1
         selection.append({
             "query": query,

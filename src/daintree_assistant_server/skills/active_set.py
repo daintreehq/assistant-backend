@@ -16,10 +16,12 @@ The three rules worth knowing before editing:
   turn late. Front-loading is deterministic here, not left to the classifier.
 * **Reuse never re-pairs.** A prior set already carries its foundation, so a
   continuation round can never surprise the user with a new load.
-* **A PINNED skill is admitted first, on both paths, unpaired.** It carries a need
-  the server has already established rather than one the classifier inferred — the
-  documentation runbook when the turn produced a ``docs_query``. It costs one slot
-  and the rest of the set fills what remains.
+* **A PINNED skill takes the LEFTOVER slot, on both paths, unpaired.** It carries a
+  need the server has already established rather than one the classifier inferred —
+  the documentation runbook when the turn produced a ``docs_query``. It is admitted
+  AFTER the selection, into whatever capacity the selection leaves, and a saturated
+  set displaces it; see the long comment at the admission site for why going last
+  beats reserving it a slot.
 
 ``merge_active_skills`` stays ADDITIVE and is for the explicit ``/skills/resolve``
 ``load`` path only — never for ordinary selection.

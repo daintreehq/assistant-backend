@@ -138,6 +138,32 @@ def test_admit_bonus_stops_at_the_first_below_floor_score() -> None:
     assert admit(ranked, set(), 1, 3) == ["a"]
 
 
+def test_admit_bonus_does_not_readmit_an_active_skill_below_the_floor() -> None:
+    """The bonus floor applies to EVERY candidate, active ones included.
+
+    The rule the code comment calls load-bearing: the bonus exists to rescue a
+    near-miss RANKING, not to re-admit a skill the model scored below a coin flip
+    just because it used to be loaded. The sibling below-floor test drives this
+    with nothing active, so it would still pass a refactor that exempted active
+    skills from the floor — which is exactly the drift this pins.
+    """
+    ranked = [("newcomer", 0.9), ("stale", 0.45)]
+    assert admit(ranked, {"stale"}, 1, 3) == ["newcomer"]
+
+
+def test_admit_floors_are_inclusive_at_their_exact_boundary() -> None:
+    """Both floors are `>=` comparisons, so a score landing exactly on one is
+    admitted. Pinned because the measured misses cluster just under 0.65, which
+    makes the boundary the value most likely to be nudged."""
+    # a newcomer exactly ON the newcomer floor, with a workflow active
+    assert admit([("running", 0.9), ("newcomer", 0.65)], {"running"}, 2, 3) == [
+        "running",
+        "newcomer",
+    ]
+    # a bonus candidate exactly ON the bonus floor
+    assert admit([("a", 0.9), ("b", 0.50)], set(), 1, 3) == ["a", "b"]
+
+
 def test_admit_bonus_newcomer_still_owes_the_higher_floor() -> None:
     """With a workflow active, a 0.55 newcomer clears the bonus floor but not
     the newcomer floor — it stays out; a 0.55 ACTIVE skill rides."""

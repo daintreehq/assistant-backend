@@ -22,7 +22,7 @@ python -m benchmarks.skill_selection.bench compare results/a.json results/b.json
 Only `run` costs money. `list`, `coverage`, `report`, and `compare` are offline
 and free — they work with `OPENROUTER_API_KEY=` blanked.
 
-A full default run is `cases x trials` (currently 146 x 3 = 438) real selector
+A full default run is `cases x trials` (currently 150 x 3 = 450) real selector
 calls per variant — cheap on deepseek-v4-flash, but not free, and it is the bulk
 of what `dashboard qualify-release` spends. Run `bench list` for the current
 count rather than trusting this number.
