@@ -48,7 +48,19 @@ from daintree_assistant_server.skills.catalog import load_catalog
 # the rule have to hold on EVERY turn? It does. That session had no orchestration
 # skill loaded, only the foundation, and a terminal is reachable on any turn — so
 # a skill, which applies only when selected, cannot carry it.
-BASE_PROMPT_CEILING = 29 * 1024
+#
+# Raised again from 29 KiB for the no-task-turn rule in 40-communication.md: a
+# greeting or an off-domain question ("how are you", "capital of France") got a
+# bare answer and nothing else, spending a turn the user waited on without
+# telling them anything about their own workspace.
+#
+# Same question, and this one answers it more strongly than the terminal case
+# did. Those turns load NO skill AT ALL — `can_skip_selection` takes the no-task
+# fast path so the selector never runs, and `daintree.foundation` is paired in
+# only when the selector picks a `daintree.*` skill. There is no skill that could
+# hold this rule, because on precisely the turns it governs, no skill exists. The
+# base prompt is the only text on the wire.
+BASE_PROMPT_CEILING = 30 * 1024
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —
 # tool-discipline is nearly half the prompt on its own, and a rule added there is
@@ -59,7 +71,11 @@ BASE_PARTIAL_CEILINGS = {
     "20-tool-discipline.md": 14 * 1024,
     "30-skills.md": 3 * 1024,
     "35-daintree-docs.md": 3 * 1024,
-    "40-communication.md": 3 * 1024,
+    # Raised from 3 KiB with the base ceiling above, and for the same rule: the
+    # no-task turn is a COMMUNICATION concern (what a reply must contain when the
+    # user hands you nothing to do), so it belongs here rather than in the hard
+    # rules or tool discipline.
+    "40-communication.md": 4 * 1024,
     "50-formatting.md": 3 * 1024,
 }
 # The selector system prompt is the catalog rendered as a classification menu, so it
