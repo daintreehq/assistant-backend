@@ -2982,3 +2982,153 @@ async def test_json_mode_main_request_reaches_the_wire_with_its_key(
     assert sent.cache_session_id == orchestrator._cache_session_key(request)
     assert sent.cache_session_id is not None
     assert sent.cache_session_id.startswith("daintree-main-json-")
+
+
+# ---------------------------------------------------------------------------
+# Phase timings.
+# ---------------------------------------------------------------------------
+
+
+def _timing_request(*, stream: bool) -> RespondRequest:
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": "timing-session", "turn_id": "turn-1"},
+            "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
+            "startup": {},
+            "generation": {"stream": stream},
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_nonstreaming_timings_are_measured_not_merely_present(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """A timing block full of zeroes would pass a shape assertion and be useless.
+
+    So this asserts the numbers RELATE: preparation covers the selector call that
+    happened inside it, first output cannot precede preparation, and the total
+    cannot be less than any phase it contains. Those orderings are what make the
+    block diagnostic rather than decorative.
+    """
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([skill_id])
+    fake_provider.complete_result = make_result(content="done")
+
+    outcome = await orchestrator.complete(
+        _timing_request(stream=False), upstream_model="m", api_key=TEST_API_KEY
+    )
+
+    t = outcome.body["timings"]
+    assert "selection_ms" in t, "the selector ran; its time must be reported"
+    assert t["selection_ms"] <= t["preparation_ms"], (
+        "selection happens inside preparation, so it cannot be the larger number"
+    )
+    assert t["preparation_ms"] <= t["first_output_ms"] <= t["total_ms"]
+    # A non-streamed call cannot separate opening the model from generating with
+    # it, so it reports neither rather than inventing a split. Absent, not zero —
+    # both paths serialize with exclude_none, so "did not happen" is a missing
+    # key and a client can never read it as an instant phase.
+    assert "upstream_open_ms" not in t
+    # Thinking is off across the whole interactive surface.
+    assert "thinking_ms" not in t
+
+
+@pytest.mark.asyncio
+async def test_streaming_timings_ride_the_terminal_event(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """`done`, not `meta` — and the reason is structural.
+
+    `meta` is emitted before the model is opened, which is exactly what makes it
+    useful and exactly why it cannot know how long generation took. A client
+    logging a turn's phases reads the terminal event.
+    """
+    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([skill_id])
+    fake_provider.stream_result = FakeStream(make_text_chunks("hello there"))
+
+    outcome = await orchestrator.complete(
+        _timing_request(stream=True), upstream_model="m", api_key=TEST_API_KEY
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+
+    meta = json.loads(events[0].split("data: ", 1)[1])
+    assert "timings" not in meta
+
+    done = json.loads(events[-1].split("data: ", 1)[1])
+    t = done["timings"]
+    assert "selection_ms" in t
+    assert "upstream_open_ms" in t, "a streamed turn observes its own open"
+    assert t["preparation_ms"] <= t["upstream_open_ms"] <= t["first_output_ms"]
+    assert t["first_output_ms"] <= t["total_ms"]
+    # Generation is derived from the two numbers it sits between, so it can never
+    # contradict them.
+    assert t["generation_ms"] == t["total_ms"] - t["first_output_ms"]
+
+
+@pytest.mark.asyncio
+async def test_a_skipped_selector_reports_no_selection_time(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """`None`, never `0`. A selector that did not run and one that answered
+    instantly are different facts, and a zero would merge them — which is the
+    whole reason someone reading these numbers would be misled."""
+    fake_provider.complete_result = make_result(content="Hello.")
+
+    request = RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": "timing-session", "turn_id": "turn-1"},
+            "input": {"messages": [{"role": "user", "content": "hey"}]},
+            "startup": {},
+            "generation": {"stream": False},
+        }
+    )
+    outcome = await orchestrator.complete(request, upstream_model="m", api_key=TEST_API_KEY)
+
+    assert outcome.body["skills"]["selector"]["ran"] is False
+    assert "selection_ms" not in outcome.body["timings"]
+    # ...while the phases that always happen are always reported.
+    assert outcome.body["timings"]["total_ms"] >= 0
+    assert outcome.body["timings"]["preparation_ms"] >= 0
+
+
+def test_thinking_is_derived_from_marks_not_a_flag() -> None:
+    """The chain-of-thought phase, tested where its arithmetic lives.
+
+    Exercised directly rather than through a fake stream because the derivation
+    is the part that was wrong: an earlier version read a `thinking_signaled`
+    flag, which the bare-intent re-roll resets — so on the one path that HOLDS
+    output back, the flag was already False by the time the held deltas flushed
+    and the attribution vanished. Two marks and a subtraction cannot have that
+    bug, and this pins it.
+    """
+    timings = orchestrator_module._Timings(
+        preparation_ms=100, upstream_open_ms=150, reasoning_at_ms=200, first_output_ms=900
+    )
+    wire = timings.to_wire(None).model_dump()
+    assert wire["thinking_ms"] == 700, "first visible token minus the first CoT fragment"
+
+    # No reasoning streamed — the shipped posture — reports no thinking phase at
+    # all rather than a zero a reader could mistake for a measurement.
+    quiet = orchestrator_module._Timings(preparation_ms=100, first_output_ms=900)
+    assert quiet.to_wire(None).thinking_ms is None
+
+
+def test_generation_cannot_contradict_the_numbers_it_sits_between() -> None:
+    """Derived, not measured, so the three can never disagree on the wire."""
+    timings = orchestrator_module._Timings(first_output_ms=300)
+
+    class _Budget:
+        @staticmethod
+        def elapsed() -> float:
+            return 1.2
+
+    wire = timings.to_wire(_Budget())  # type: ignore[arg-type]
+    assert wire.total_ms == 1200
+    assert wire.generation_ms == 900
+    assert wire.first_output_ms is not None
+    assert wire.first_output_ms + wire.generation_ms == wire.total_ms

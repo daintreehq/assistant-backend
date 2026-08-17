@@ -419,6 +419,66 @@ Guarantees:
 
 ---
 
+## Phase timings
+
+Both response shapes carry a `timings` object: **wall-clock milliseconds**,
+measured server-side with `time.perf_counter()` around real awaits, so every
+figure includes queueing and network exactly as the user experienced it. This is
+deliberately not the provider's own latency accounting, which cannot see the
+round trip it sits inside.
+
+```json
+{
+  "timings": {
+    "selection_ms": 863,
+    "docs_ms": 210,
+    "preparation_ms": 1104,
+    "upstream_open_ms": 1290,
+    "first_output_ms": 1655,
+    "generation_ms": 4120,
+    "total_ms": 5775
+  }
+}
+```
+
+| field | meaning |
+|---|---|
+| `selection_ms` | the skill-selector call, including a parse-repair round trip if one ran |
+| `docs_ms` | the documentation lookup, when the selector asked for one |
+| `preparation_ms` | request in → upstream request built. Selection, docs, state, assembly |
+| `upstream_open_ms` | request in → the model's first event. Mostly prefill |
+| `thinking_ms` | first chain-of-thought fragment → first visible token |
+| `first_output_ms` | request in → first visible token. The headline |
+| `generation_ms` | first visible token → complete |
+| `total_ms` | the whole wait |
+
+Three rules a client must encode:
+
+1. **Absent means the phase did not happen.** Both paths serialize with
+   `exclude_none`, so a field that does not apply is *missing*, never `0`. A
+   selector that did not run and a selector that answered instantly are different
+   facts; reading a missing key as zero merges them. Only `preparation_ms` and
+   `total_ms` are always present — every turn prepares, and every turn ends.
+2. **They do not sum to `total_ms`.** The phases overlap by design: a speculative
+   stream opens while the selector is still running, so `selection_ms` and
+   `upstream_open_ms` can cover the same wall clock. Read each as "how long did
+   this take", never as a partition.
+3. **Streaming carries them on `done`, not `meta`.** `meta` is emitted before the
+   model is opened — which is what makes it useful — so it cannot know generation
+   or total. A client logging a turn reads the terminal event.
+
+Two readings that are normal rather than bugs. A small `upstream_open_ms` beside a
+large `selection_ms` means a **winning speculation** hid the open, not that the
+model was fast. And a non-streaming turn reports **no** `upstream_open_ms`: one
+await covers opening and generating, so the whole upstream wait lands in
+`first_output_ms` rather than being split on a guess.
+
+`thinking_ms` is absent on every normal turn: the whole interactive surface is
+non-thinking ([`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) §2). Seeing it means that
+posture changed.
+
+---
+
 ## Skills
 
 Skill selection is removed from the main thread:

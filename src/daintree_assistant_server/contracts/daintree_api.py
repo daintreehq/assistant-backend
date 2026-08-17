@@ -143,6 +143,68 @@ class RespondUsage(BaseModel):
     cost: float | None = None
 
 
+class TurnTimings(BaseModel):
+    """Wall-clock milliseconds by phase, measured server-side.
+
+    WALL CLOCK, not the provider's accounting. Every figure is measured with
+    ``time.perf_counter()`` around a real await on this server, so it includes
+    queueing, network and upstream time exactly as the user experienced them.
+    That is the point: a provider's own latency number cannot see the round trip
+    it sits inside, and the question these answer is "where did the user's wait
+    actually go".
+
+    A phase that did not happen is ABSENT from the JSON, never ``0``. Both
+    response paths serialize with ``exclude_none``, so an optional field here is
+    simply missing rather than null — and that is the intended contract: a
+    selector that did not run and a selector that answered instantly are
+    different facts, and a zero would merge them. A client reads a missing key as
+    "this phase did not occur on this turn", not as zero milliseconds.
+
+    ``preparation_ms`` and ``total_ms`` are always present: every turn prepares,
+    and every turn ends.
+
+    The phases do NOT sum to ``total_ms``. They overlap by design: a speculative
+    stream opens while the selector is still running, so ``selection_ms`` and
+    ``upstream_open_ms`` can cover the same wall clock. Read them as "how long
+    did this part take", never as a partition of the turn.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: The skill-selector call. ``None`` when selection did not run — a
+    #: tool-continuation round, or the no-task fast path. Includes a parse-repair
+    #: round trip when one happened, which is why a surprising value should be
+    #: read next to ``skills.selector`` rather than alone.
+    selection_ms: int | None = None
+    #: The documentation lookup, when the selector asked for one. ``None`` when
+    #: no query was issued.
+    docs_ms: int | None = None
+    #: Request in until the upstream request is built and ready to open. Covers
+    #: selection, any docs lookup, state verification and prompt assembly. This
+    #: is the part of the wait this server is wholly responsible for.
+    preparation_ms: int = 0
+    #: Opening the main upstream call: connect, send, and wait for its first
+    #: event. Mostly prefill. ``None`` if the turn never reached the model.
+    #:
+    #: A turn served by a winning speculation reports the SPECULATIVE open, which
+    #: began before selection finished — so a small number here alongside a large
+    #: ``selection_ms`` means speculation hid the open, not that the model was
+    #: fast.
+    upstream_open_ms: int | None = None
+    #: First upstream event until the first VISIBLE token: the model's
+    #: chain-of-thought. ``None`` when thinking is off, which is the shipped
+    #: posture for every interactive call (docs/PROVIDER_POLICY.md section 2), so
+    #: a non-null value here on a normal turn means that posture changed.
+    thinking_ms: int | None = None
+    #: Request in until the first visible token reaches the client. The headline
+    #: number, and the one a user calls "it started answering".
+    first_output_ms: int | None = None
+    #: First visible token until the turn completes. Pure generation.
+    generation_ms: int | None = None
+    #: Request in until the response is complete. The whole wait.
+    total_ms: int = 0
+
+
 class TurnCost(BaseModel):
     """What this whole request charged the caller, in USD.
 
@@ -210,6 +272,8 @@ class RespondResponse(BaseModel):
     # What this request cost the caller in total, across every upstream call it
     # made. Absent when the provider reported no cost. See TurnCost.
     cost: TurnCost | None = None
+    # Where the wall clock went, by phase. See TurnTimings.
+    timings: TurnTimings = Field(default_factory=TurnTimings)
     # First-class skill outcome.
     skills: SkillsBlock = Field(default_factory=SkillsBlock)
     state: str | None = None
@@ -267,6 +331,11 @@ class StreamDone(BaseModel):
     # body's. Carried on the terminal event because that is the first moment the
     # main call's usage is known — OpenRouter reports it in the final chunk.
     cost: TurnCost | None = None
+    # Where the wall clock went, by phase. On the TERMINAL event for the same
+    # reason as cost: generation and total are not known until the stream ends.
+    # `meta` cannot carry them — it is emitted before the model is even opened,
+    # which is precisely what makes it useful.
+    timings: TurnTimings = Field(default_factory=TurnTimings)
     # Output-contract findings for the text just streamed (``output_think_leak``,
     # ``output_oversized``, ``output_wide_table``). Advisory only — the bytes are
     # already on the wire, so this is the terminal event's chance to tell the CLI

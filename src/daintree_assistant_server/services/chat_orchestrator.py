@@ -32,6 +32,7 @@ from ..contracts.daintree_api import (
     StreamMeta,
     StreamStatus,
     TurnCost,
+    TurnTimings,
 )
 from ..contracts.extensions import (
     Prelude,
@@ -189,6 +190,63 @@ _CACHE_SESSION_PREFIX = "daintree-main-"
 
 
 @dataclass
+class _Timings:
+    """Mutable wall-clock marks, filled in as a turn progresses.
+
+    The public shape is ``contracts.TurnTimings``; this is the accumulator that
+    reaches it. Kept mutable and separate because the phases are recorded in
+    three different places — preparation, the upstream open, and the terminal
+    event — and threading six optional arguments through those instead would put
+    the measurement further from the thing it measures.
+
+    Total is deliberately NOT stored: it is read from ``RequestBudget``, the one
+    clock started before any work in ``complete()``. A second start time would be
+    a second answer to "when did this turn begin", and the two would drift.
+    """
+
+    selection_ms: int | None = None
+    docs_ms: int | None = None
+    preparation_ms: int = 0
+    upstream_open_ms: int | None = None
+    first_output_ms: int | None = None
+    #: When the first chain-of-thought fragment arrived. A MARK, not a flag,
+    #: because the duration is then derived from two timestamps and does not
+    #: depend on the order two branches happen to run in. The flag version of this
+    #: was subtly wrong: `thinking_signaled` is reset per attempt so a bare-intent
+    #: re-roll can re-announce the phase, and held deltas flush after that reset.
+    reasoning_at_ms: int | None = None
+
+    def to_wire(self, budget: RequestBudget | None) -> TurnTimings:
+        """Render the wire shape, deriving what can only be known at the end."""
+        total_ms = round(budget.elapsed() * 1000) if budget is not None else 0
+        # Generation is the tail after the first visible token. Derived rather
+        # than measured so it cannot disagree with the two numbers it sits
+        # between, and clamped at zero because a turn that produced no visible
+        # output has no generation phase to report rather than a negative one.
+        generation_ms: int | None = None
+        if self.first_output_ms is not None:
+            generation_ms = max(0, total_ms - self.first_output_ms)
+        # Chain-of-thought: from the first reasoning fragment to the first visible
+        # token. Derived from two marks rather than measured with a flag, so it
+        # cannot depend on which branch of the delta loop ran first. Absent when no
+        # reasoning was streamed, which is the shipped posture for every
+        # interactive call.
+        thinking_ms: int | None = None
+        if self.reasoning_at_ms is not None and self.first_output_ms is not None:
+            thinking_ms = max(0, self.first_output_ms - self.reasoning_at_ms)
+        return TurnTimings(
+            selection_ms=self.selection_ms,
+            docs_ms=self.docs_ms,
+            preparation_ms=self.preparation_ms,
+            upstream_open_ms=self.upstream_open_ms,
+            thinking_ms=thinking_ms,
+            first_output_ms=self.first_output_ms,
+            generation_ms=generation_ms,
+            total_ms=total_ms,
+        )
+
+
+@dataclass
 class _PreparedTurn:
     """Everything selection/assembly produces before the provider is consumed."""
 
@@ -207,6 +265,9 @@ class _PreparedTurn:
     # a mutable `reasons` dict, and one instance shared by every default-built
     # turn is a foot-gun waiting for the first caller that writes to it.
     projection: ToolProjection = field(default_factory=ToolProjection)
+    # Wall-clock marks for the phases preparation owns. Continues to be filled in
+    # by the response paths, which is why it is mutable and travels with the turn.
+    timings: _Timings = field(default_factory=_Timings)
     # Spend on a speculative generation this turn opened and then threw away.
     # Billed to the caller either way; see `turn_accounting.turn_cost`.
     discarded_usage: ProviderUsage = field(default_factory=ProviderUsage)
@@ -567,11 +628,17 @@ class ChatOrchestrator:
             selector_endpoint=prepared.meta.selector_endpoint,
             turn_cost=turn_cost,
         )
+        # A non-streamed call cannot separate opening the model from generating
+        # with it — one await covers both — so the whole upstream wait is reported
+        # as time-to-output and `upstream_open_ms` stays absent rather than
+        # guessing at a split that was never observable.
+        prepared.timings.first_output_ms = round(budget.elapsed() * 1000)
         body = self._build_nonstream_body(
             result,
             prepared.meta,
             param_index=build_parameter_index(request.input.tools),
             cost=turn_cost,
+            timings=prepared.timings.to_wire(budget),
         )
         self._maybe_learn_after_turn(
             request=request,
@@ -679,6 +746,9 @@ class ChatOrchestrator:
         session_id = request.session.id
         cache_session_id = self._cache_session_key(request)
         t_start = time.perf_counter()
+        # Phase marks for this turn. Returned on the prepared turn so the
+        # response paths can finish filling it in (see `_Timings`).
+        timings = _Timings()
 
         warnings: list[str] = []
         catalog_at_start = self.catalog
@@ -881,6 +951,7 @@ class ChatOrchestrator:
                     routing=routing_preference(request.routing),
                 )
                 selector_ms = round((time.perf_counter() - t_sel) * 1000)
+                timings.selection_ms = selector_ms
             except BaseException:
                 if speculation is not None:
                     speculation_stats = speculation.stats()
@@ -959,9 +1030,14 @@ class ChatOrchestrator:
             # the pages is rebuilt every round. Without the carry, a usage question
             # that takes one tool call to answer arrives at the answer with its
             # sources gone.
+            t_docs = time.perf_counter()
             docs = await self._lookup_docs(
                 docs_query, request_id=request_id, budget=budget
             )
+            # Recorded even when the lookup returned nothing. A miss still spent
+            # the user's wall clock, and a slow FAILING docs server is exactly the
+            # thing this is meant to expose.
+            timings.docs_ms = round((time.perf_counter() - t_docs) * 1000)
             if docs is not None:
                 executions.append(
                     DocsSearchExecution(
@@ -1093,6 +1169,7 @@ class ChatOrchestrator:
             logger.warning("tool_projection_failed", request_id=request_id)
             projection = ToolProjection()
 
+        timings.preparation_ms = round((time.perf_counter() - t_start) * 1000)
         logger.info(
             "respond",
             request_id=request_id,
@@ -1129,11 +1206,12 @@ class ChatOrchestrator:
             # actually calls tools) is the safety signal.
             tools_offered=len(projection.offered),
             tools_proposed=len(projection.proposed),
-            pre_upstream_ms=round((time.perf_counter() - t_start) * 1000),
+            pre_upstream_ms=timings.preparation_ms,
         )
 
         return _PreparedTurn(
             projection=projection,
+            timings=timings,
             provider_request=provider_request,
             meta=meta,
             active_ids=active_ids,
@@ -1678,6 +1756,7 @@ class ChatOrchestrator:
         *,
         param_index: ParameterIndex,
         cost: TurnCost | None = None,
+        timings: TurnTimings | None = None,
     ) -> dict[str, Any]:
         message = result.message or {}
         response = RespondResponse(
@@ -1696,6 +1775,7 @@ class ChatOrchestrator:
             finish_reason=result.finish_reason,
             usage=response_usage(result.usage),
             cost=cost,
+            timings=timings or TurnTimings(),
             skills=meta.skills,
             state=meta.state,
             catalog_revision=meta.catalog_revision,
@@ -1844,6 +1924,7 @@ class ChatOrchestrator:
             projection=prepared.projection,
             discarded_usage=prepared.discarded_usage,
             speculation_billed=prepared.speculation_billed,
+            timings=prepared.timings,
         )
         try:
             async for event in body:
@@ -1894,9 +1975,31 @@ class ChatOrchestrator:
         projection: ToolProjection,
         discarded_usage: ProviderUsage,
         speculation_billed: bool,
+        timings: _Timings,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
+
+        def _mark_first_output(delta: StreamDelta) -> None:
+            """Stamp the first VISIBLE token, once per turn.
+
+            Called at every point a delta actually reaches the client, rather
+            than where chunks arrive from upstream: a held bare-intent delta has
+            not reached the user yet, and stamping on arrival would report a
+            first-output time the user never experienced.
+
+            Reasoning fragments deliberately do not qualify. They are internal,
+            the client does not render them as an answer, and counting them would
+            let a model that thinks for two minutes report an instant first byte
+            — the same rule `_carries_output` applies to the deadline.
+            """
+            if budget is None or timings.first_output_ms is not None:
+                return
+            if not (delta.content or delta.tool_calls):
+                return
+            timings.first_output_ms = round(budget.elapsed() * 1000)
+
+
         # Accumulate the reply so post-completion learning can see the workflow it
         # just finished. content_parts is joined into the final answer; a tool_calls
         # delta marks this as a continuation round (not a completion boundary).
@@ -2039,6 +2142,12 @@ class ChatOrchestrator:
                 # Attributing attempt 0's speculation stats to it would make the
                 # speculation hit rate read higher than it is.
                 served_by_speculation = used_speculation and attempt == 0
+                # Wall clock from request in until the model's first event. Read
+                # from the turn budget, not from `t_open`, because on a winning
+                # speculation the open began BEFORE this point — measuring from
+                # here would report the wait the user did not have.
+                if budget is not None and timings.upstream_open_ms is None:
+                    timings.upstream_open_ms = round(budget.elapsed() * 1000)
                 logger.info(
                     "respond_upstream_open",
                     request_id=meta.request_id,
@@ -2091,10 +2200,15 @@ class ChatOrchestrator:
                         or not could_still_be_bare_intent("".join(content_parts))
                     ):
                         for pending in held:
+                            _mark_first_output(pending)
                             yield self._sse("delta", pending)
                         held = None
                     # Announce the thinking phase once, the instant the model's
                     # chain-of-thought starts streaming, so the CLI can show it.
+                    if delta.reasoning_content and timings.reasoning_at_ms is None:
+                        timings.reasoning_at_ms = (
+                            round(budget.elapsed() * 1000) if budget is not None else 0
+                        )
                     if delta.reasoning_content and not thinking_signaled:
                         thinking_signaled = True
                         yield self._sse("status", StreamStatus(phase="thinking").model_dump())
@@ -2110,11 +2224,13 @@ class ChatOrchestrator:
                                 ),
                             )
                         if ready:
+                            _mark_first_output(StreamDelta(tool_calls=ready))
                             yield self._sse("delta", StreamDelta(tool_calls=ready))
                         continue
                     if held is not None:
                         held.append(delta)
                         continue
+                    _mark_first_output(delta)
                     yield self._sse("delta", delta)
 
                 # The reply has ended with its content still private. This is the one
@@ -2207,10 +2323,12 @@ class ChatOrchestrator:
             # One terminal event for the whole round, whichever attempt produced it.
             # Anything still held belongs to the accepted attempt and goes out now.
             for pending in held or []:
+                _mark_first_output(pending)
                 yield self._sse("delta", pending)
             held = None
             remaining = tool_call_buffer.flush()
             if remaining:
+                _mark_first_output(StreamDelta(tool_calls=remaining))
                 yield self._sse("delta", StreamDelta(tool_calls=remaining))
             self._log_tool_call_repairs(tool_call_buffer.repairs, request_id=meta.request_id)
             yield self._sse(
@@ -2235,6 +2353,7 @@ class ChatOrchestrator:
                         request_id=meta.request_id,
                         had_tool_calls=saw_tool_calls or finish_reason == "tool_calls",
                     ),
+                    timings=timings.to_wire(budget),
                 ).model_dump(exclude_none=True),
             )
             completed = True
