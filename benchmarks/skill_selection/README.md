@@ -121,6 +121,37 @@ Categories: `single-skill`, `routing-trap` (neighbor-skill confusion),
 specific match), `adversarial` (instruction injection + keyword bait),
 `multi-skill`, `background-wake` (turn_context-driven, no new user message).
 
+## Trying a different model (`--model`)
+
+The pinned model stays hardcoded in `config.py`. `--model` changes only what this
+run sends, so a candidate can be scored on the same 146 cases without editing
+production and remembering to change it back:
+
+```bash
+python -m benchmarks.skill_selection.bench run --out results/pinned.json
+python -m benchmarks.skill_selection.bench run \
+  --model nvidia/nemotron-3.5-lightning --out results/candidate.json
+python -m benchmarks.skill_selection.bench compare results/pinned.json results/candidate.json
+```
+
+Read **accuracy first, latency second**. A faster model that drops `routing-trap`
+or `topic-shift` cases is loading the wrong runbook faster, and `degraded_trials`
+climbing above 0 means it is failing to produce parseable JSON at all — which
+costs a repair round-trip and wipes out the speed it was chosen for.
+
+Two things to check before reading a candidate's numbers as real:
+
+- **Run both arms back to back.** Endpoint load moves through the day, and the
+  two runs are only comparable if they saw similar conditions.
+- **Watch the privacy floor.** Routing sends `data_collection: "deny"`, so a
+  candidate whose only compliant endpoints are slow will look slow here for a
+  reason that has nothing to do with the model. A `:free` variant of a model is
+  usually the wrong thing to benchmark: free endpoints commonly train on request
+  data and would not be routable in production at all.
+
+Switching the pinned model needs more than this one suite — see
+`docs/PROVIDER_POLICY.md` section 9.
+
 ## Prompt variants (`prompts/<name>/selector/system.md.j2`)
 
 `--variant baseline` renders the packaged production template. Any other name

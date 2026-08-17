@@ -39,6 +39,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             concurrency=args.concurrency,
             id_filter=args.filter,
             env_file=args.env_file,
+            model=args.model,
         )
         doc = asyncio.run(run_bench(config))
         print_summary(doc)
@@ -114,6 +115,15 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--concurrency", type=int, default=6, help="parallel calls (default 6)")
     run.add_argument("--filter", help="substring filter on case id/category")
     run.add_argument("--env-file", help="path to a .env with OPENROUTER_API_KEY")
+    run.add_argument(
+        "--model",
+        help=(
+            "score a CANDIDATE model instead of the pinned one (paid). The pinned id "
+            "stays hardcoded in config.py; this only changes what this run sends, and "
+            "the result document records what it actually used. Run the same cases on "
+            "both and `compare` the two files."
+        ),
+    )
     run.add_argument("--out", help="explicit output JSON path (single variant only)")
     run.add_argument("--no-save", action="store_true", help="do not write a results file")
     run.set_defaults(func=_cmd_run)

@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,13 @@ from pydantic import SecretStr
 
 from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
 from daintree_assistant_server.prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
+from daintree_assistant_server.providers.base import (
+    ChatProvider,
+    ProviderChatRequest,
+    ProviderChatResult,
+    ProviderStream,
+    ProviderToolCallResult,
+)
 from daintree_assistant_server.providers.openrouter import OpenRouterProvider
 from daintree_assistant_server.skills.catalog import (
     CatalogManager,
@@ -52,6 +59,66 @@ class BenchConfig:
     id_filter: str | None = None
     env_file: str | None = None
     settings_overrides: dict[str, Any] = field(default_factory=dict)
+    #: Route this run at a DIFFERENT model than the pinned one. ``None`` uses
+    #: ``OPENROUTER_MODEL``, which is what a normal run must always do.
+    #:
+    #: The pinned id is hardcoded in `config.py` on purpose, and trying a
+    #: candidate must not mean editing it: an experiment that starts by changing
+    #: production is one that has to be remembered to change back. The override
+    #: lives here, in the harness that produces the evidence, so a candidate can
+    #: be scored against the same 146 cases before anything is pinned. Section 9
+    #: of docs/PROVIDER_POLICY.md lists what else a real swap needs.
+    model: str | None = None
+
+
+class _ModelOverride:
+    """A provider that rewrites the model id on the way out, and nothing else.
+
+    The selector hardcodes ``OPENROUTER_MODEL`` inside ``_build_request``, which
+    is correct — the pinned model is a product decision, not a parameter. So to
+    score a CANDIDATE model the substitution has to happen below the selector,
+    and this is the narrowest place it can: one field, on the request, in the
+    harness.
+
+    Deliberately a wrapper rather than a patch of `config.OPENROUTER_MODEL`. A
+    module-level monkeypatch would also change the id the results document
+    records and every other read in the process, so a run could report the model
+    it *meant* to use rather than the one it sent. Here the two cannot disagree:
+    `run_bench` records `config.model or OPENROUTER_MODEL`, and this class is the
+    only thing that puts a model id on the wire.
+    """
+
+    def __init__(self, inner: ChatProvider, model: str) -> None:
+        self._inner = inner
+        self._model = model
+
+    def _rewrite(self, request: ProviderChatRequest) -> ProviderChatRequest:
+        return replace(request, model=self._model)
+
+    async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:
+        return await self._inner.complete(self._rewrite(request))
+
+    async def open_stream(self, request: ProviderChatRequest) -> ProviderStream:
+        return await self._inner.open_stream(self._rewrite(request))
+
+    async def structured_tool_call(
+        self,
+        request: ProviderChatRequest,
+        *,
+        function_name: str,
+        function_schema: dict[str, Any],
+    ) -> ProviderToolCallResult:
+        return await self._inner.structured_tool_call(
+            self._rewrite(request),
+            function_name=function_name,
+            function_schema=function_schema,
+        )
+
+    async def verify_key(self, api_key: SecretStr | None = None) -> dict[str, Any]:
+        return await self._inner.verify_key(api_key)
+
+    async def aclose(self) -> None:
+        await self._inner.aclose()
 
 
 def available_variants() -> list[str]:
@@ -151,12 +218,14 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     # for this model advertises the parameter, and sending an unadvertised one can
     # empty the eligible-endpoint pool under require_parameters). This suite predates
     # that move and still passed the removed `deepseek_send_prompt_cache_key`.
-    provider = OpenRouterProvider(
+    provider: ChatProvider = OpenRouterProvider(
         client,
         api_key=settings.openrouter_api_key,
         base_url=settings.openrouter_base_url,
         default_timeout=settings.selector_timeout_seconds,
     )
+    if config.model:
+        provider = _ModelOverride(provider, config.model)
     selector = Selector(provider, loader, manager, settings)
 
     started_at = datetime.now(UTC)
@@ -225,7 +294,7 @@ def build_results_doc(
             ) * config.trials,
             "categories_expected": sorted({c.category for c in whole_corpus}),
             "variant": config.variant,
-            "model": OPENROUTER_MODEL,
+            "model": config.model or OPENROUTER_MODEL,
             "trials": config.trials,
             "concurrency": config.concurrency,
             "filter": config.id_filter,
