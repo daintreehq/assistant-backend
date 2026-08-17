@@ -41,8 +41,7 @@ from daintree_assistant_server.config import (
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.openrouter import (
     _PROVIDER_ROUTING,
-    _PROVIDER_ROUTING_CLASSIFIER,
-    _PROVIDER_ROUTING_STRUCTURED,
+    _PROVIDER_ROUTING_FIRST_BYTE,
     OpenRouterProvider,
 )
 from daintree_assistant_server.providers.policy import DEFAULT_POLICY, PrivacyMode
@@ -509,17 +508,16 @@ def _documented_routing_policy() -> dict[str, object]:
     bidirectional: a changed *value* fails, and so does a key that was deleted
     from the code but left behind in the prose. A substring scan catches neither.
     """
-    # Scoped to section 3's own prose, ABOVE its subsections. Section 3b documents
-    # a second, differently-sorted block that also carries `data_collection`, and
-    # an unscoped scan would happily compare the wrong one the day someone
-    # reorders the file.
+    # Scoped to section 3's own prose, ABOVE its subsections. Section 3a documents
+    # a second block that also carries `data_collection`, and an unscoped scan
+    # would happily compare the wrong one the day someone reorders the file.
     return _documented_policy_block(
         doc_section("## 3. Endpoint-selection policy", ends_at="\n### "),
         where="section 3",
     )
 
 
-def _documented_classifier_policy() -> dict[str, object]:
+def _documented_first_byte_policy() -> dict[str, object]:
     """The ```json block in docs/PROVIDER_POLICY.md section 3b, parsed."""
     return _documented_policy_block(doc_section("### 3b.", ends_at="\n## "), where="section 3b")
 
@@ -573,29 +571,59 @@ def test_documented_routing_policy_matches_the_code_exactly() -> None:
     )
 
 
-def test_documented_classifier_policy_matches_the_code_exactly() -> None:
-    assert _documented_classifier_policy() == _PROVIDER_ROUTING_CLASSIFIER, (
+def test_documented_first_byte_policy_matches_the_code_exactly() -> None:
+    assert _documented_first_byte_policy() == _PROVIDER_ROUTING_FIRST_BYTE, (
         "the provider block in docs/PROVIDER_POLICY.md section 3b has drifted from "
-        "_PROVIDER_ROUTING_CLASSIFIER in providers/openrouter.py."
+        "_PROVIDER_ROUTING_FIRST_BYTE in providers/openrouter.py."
     )
 
 
-def test_the_classifier_policy_only_re_ranks_and_never_relaxes_the_floor() -> None:
-    """It is a ranking change inside the SAME filtered pool.
+def test_the_first_byte_policy_changes_the_ranking_axis_and_nothing_else() -> None:
+    """One policy with one axis flipped — not a second policy.
 
-    Stated that way in section 3b, and worth a gate because the classifier block
-    is the one a future latency push is most likely to reach for: the temptation
-    is to widen the pool to find a faster endpoint, and `data_collection` is what
-    would quietly go.
+    The design claim in section 3b is that ranking, and only ranking, varies
+    between calls. Worth a gate because this block is the one a future latency
+    push reaches for first, and the tempting move is to widen the pool to find a
+    faster endpoint — which is how `data_collection` quietly goes.
     """
-    for key in ("data_collection", "require_parameters", "allow_fallbacks"):
-        assert _PROVIDER_ROUTING_CLASSIFIER[key] == _PROVIDER_ROUTING[key], (
-            f"the classifier policy changed `{key}`. It exists to re-rank the pool "
-            "on time-to-first-token, not to change which endpoints are in it."
+    differing = {
+        key
+        for key in set(_PROVIDER_ROUTING) | set(_PROVIDER_ROUTING_FIRST_BYTE)
+        if _PROVIDER_ROUTING.get(key) != _PROVIDER_ROUTING_FIRST_BYTE.get(key)
+    }
+    assert differing == {"sort"}, (
+        f"the first-byte policy now differs from the default policy in {sorted(differing)}. "
+        "It exists to re-rank one pool on time-to-first-token, not to route a "
+        "different pool; document the new keys in docs/PROVIDER_POLICY.md section 3b."
+    )
+    assert _PROVIDER_ROUTING_FIRST_BYTE["sort"] == "latency"
+    assert _PROVIDER_ROUTING["sort"] == "throughput"
+
+
+def test_every_call_carries_the_first_byte_bound() -> None:
+    """The bound is on the DEFAULT policy, and that is the point.
+
+    It used to arrive via a derivation applied to structured calls, which left the
+    main chat call — the only upstream call a short question makes — elected purely
+    on tokens/second with nothing bounding how long it took to START. Both blocks
+    must carry it, and the doc must say so.
+    """
+    for name, block in (
+        ("_PROVIDER_ROUTING", _PROVIDER_ROUTING),
+        ("_PROVIDER_ROUTING_FIRST_BYTE", _PROVIDER_ROUTING_FIRST_BYTE),
+    ):
+        bound = block.get("preferred_max_latency")
+        assert bound, f"{name} no longer bounds time-to-first-token"
+        assert "p50" in bound, (
+            f"{name} bounds only the tail. An endpoint whose TYPICAL first byte is "
+            "slow has an unremarkable tail and would still win the election."
         )
-    assert _PROVIDER_ROUTING_CLASSIFIER["sort"] == "latency"
-    assert "only" not in _PROVIDER_ROUTING_CLASSIFIER
-    assert "ignore" not in _PROVIDER_ROUTING_CLASSIFIER
+    text = _read(DOC_PROVIDER)
+    for key, value in _PROVIDER_ROUTING["preferred_max_latency"].items():
+        pattern = rf'"{key}"\D{{0,4}}{re.escape(str(value).rstrip("0").rstrip("."))}'
+        assert re.search(pattern, text), (
+            f"docs/PROVIDER_POLICY.md does not document preferred_max_latency {key}={value}"
+        )
 
 
 def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None:
@@ -609,8 +637,7 @@ def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None
     """
     for name, block in (
         ("_PROVIDER_ROUTING", _PROVIDER_ROUTING),
-        ("_PROVIDER_ROUTING_STRUCTURED", _PROVIDER_ROUTING_STRUCTURED),
-        ("_PROVIDER_ROUTING_CLASSIFIER", _PROVIDER_ROUTING_CLASSIFIER),
+        ("_PROVIDER_ROUTING_FIRST_BYTE", _PROVIDER_ROUTING_FIRST_BYTE),
     ):
         assert "order" not in block, (
             f"{name} now sends `provider.order`. OpenRouter does not apply sticky "
@@ -644,29 +671,6 @@ def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None
         "is rejected. That paragraph is the one thing stopping a future reader from "
         "'fixing' affinity by adding the very field that disables it."
     )
-
-
-def test_structured_routing_bound_is_documented() -> None:
-    """The structured policy is the base policy plus one key; assert both halves."""
-    extra = {
-        key: value
-        for key, value in _PROVIDER_ROUTING_STRUCTURED.items()
-        if _PROVIDER_ROUTING.get(key) != value
-    }
-    assert set(extra) == {"preferred_max_latency"}, (
-        "the structured-call policy now differs from the base policy by more than "
-        f"preferred_max_latency ({sorted(extra)}); document the new keys in "
-        "docs/PROVIDER_POLICY.md section 3"
-    )
-    text = _read(DOC_PROVIDER)
-    assert "preferred_max_latency" in text
-    for key, value in extra["preferred_max_latency"].items():
-        # Tolerant of `2.0` vs `2` and of surrounding formatting; strict about the
-        # number, which is the fact that drifts.
-        pattern = rf'"{key}"\D{{0,4}}{re.escape(str(value).rstrip("0").rstrip("."))}'
-        assert re.search(pattern, text), (
-            f"docs/PROVIDER_POLICY.md does not document preferred_max_latency {key}={value}"
-        )
 
 
 def test_reasoning_effort_tiers_are_documented() -> None:

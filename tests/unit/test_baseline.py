@@ -75,9 +75,9 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     # a second sort existed to notice it.
     assert identity["default_endpoint_sort"] == DEFAULT_POLICY.sort.value  # type: ignore[index]
     assert (
-        identity["classifier_endpoint_sort"]  # type: ignore[index]
-        == DEFAULT_POLICY.for_classifier_call().sort.value
+        identity["first_byte_endpoint_sort"]  # type: ignore[index]
+        == DEFAULT_POLICY.ranked_on_first_byte().sort.value
     )
-    # And they differ. If a future edit collapses them, the classifier policy has
+    # And they differ. If a future edit collapses them, the first-byte ranking has
     # stopped doing the one thing it exists to do.
-    assert identity["classifier_endpoint_sort"] != identity["default_endpoint_sort"]  # type: ignore[index]
+    assert identity["first_byte_endpoint_sort"] != identity["default_endpoint_sort"]  # type: ignore[index]

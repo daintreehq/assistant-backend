@@ -142,14 +142,16 @@ class ProviderChatRequest:
     # keys carry no caller-derived data at all, but they ride the same field and
     # inherit the same discipline rather than earning an exception.)
     cache_session_id: str | None = field(default=None, repr=False)
-    # Declares this call's COST SHAPE to the router: a classifier whose answer is
-    # a handful of tokens, so its wall-clock is prefill plus a rounding error.
-    # A router that ranks endpoints has to be told which axis to rank on, and the
-    # right answer differs between a chat turn (tokens/second, because generation
-    # dominates) and this (time-to-first-token, because nothing else exists).
-    # Set it on a call whose output is small AND whose latency a user is waiting
-    # on; see `RoutingPolicy.for_classifier_call`. It changes routing only —
-    # never the prompt, the model, or the parameters.
+    # Flips the endpoint RANKING axis from tokens/second to time-to-first-token
+    # (`RoutingPolicy.ranked_on_first_byte`). Set it on a call whose answer is a
+    # handful of tokens and whose latency a user is waiting on, so that the sort
+    # ranks on the half of its wall-clock that actually varies.
+    #
+    # A CALL-SITE property, never a guess about a request. It says what this call
+    # permanently is, which the code constructing it knows for certain; a rule
+    # that tried to infer it from message content would be a rule waiting to be
+    # wrong. It changes ranking only — never the pool, the prompt, the model, the
+    # parameters, or the privacy floor.
     latency_critical: bool = False
 
 

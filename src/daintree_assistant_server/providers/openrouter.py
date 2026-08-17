@@ -124,23 +124,32 @@ _APP_TITLE = "Daintree Assistant"
 # common with the main model's budget and there is no deployment that wants it long.
 _VERIFY_TIMEOUT_SECONDS = 10.0
 
-# Endpoint-selection policy, sent on EVERY request. The policy OBJECT lives in
-# providers/policy.py (RoutingPolicy / PrivacyMode); these module-level dicts are
-# its rendered wire form, kept here because the surrounding adapter and its tests
-# read them directly.
+# THE endpoint-selection policy, sent on EVERY request. One policy, deliberately:
+# the adapter does not inspect a request to decide how to route it. The policy
+# OBJECT lives in providers/policy.py (RoutingPolicy / PrivacyMode); this
+# module-level dict is its rendered wire form, kept here because the surrounding
+# adapter and its tests read it directly.
 #
 # The shipped defaults are hardcoded like the model ids and the thinking posture
 # (config.py): there is one optimum and the server ships it. A caller may narrow
 # or re-rank it through a validated RoutingPreference, but can never disable the
-# no-training floor. Two product decisions are encoded:
+# no-training floor. Three product decisions are encoded:
 #
-# THROUGHPUT FIRST. ``sort: "throughput"`` ranks the eligible endpoints by
-# measured tokens/second and takes the fastest — explicitly at the cost of price,
-# and it disables OpenRouter's default price-weighted load balancing. This is the
-# right trade for an interactive assistant: the turn's wall-clock is dominated by
-# generation, and this model is cheap enough that a 40% price delta is noise next
-# to a 2x speed one. Selection is automatic and re-evaluated per request, so a
-# newly-faster endpoint is picked up with no code change.
+# FASTEST, ON BOTH AXES. A request's wall-clock is time-to-first-token plus
+# tokens/throughput, and OpenRouter ranks on either but not on the sum. So rank on
+# one and put a floor under the other: ``sort: "throughput"`` takes the fastest
+# generator (explicitly at the cost of price, and it disables OpenRouter's default
+# price-weighted load balancing), while ``preferred_max_latency`` stops that being
+# an endpoint which streams fast and takes seconds to say the first word. Ranking
+# on throughput ALONE is what elected the measured p99 12.6s and 13.9s endpoints.
+#
+# This pair replaced a set of per-call-shape policies, and the generality is the
+# point: a rule that needs to know whether a request is a classifier, a chat turn
+# or a greeting is a rule that will misjudge the next call shape someone adds.
+# Bounding the axis you did not sort on needs no such knowledge and is safe
+# everywhere, because the bound deprioritises rather than filters (see
+# LATENCY_BOUND) and therefore can never empty the pool. Selection stays automatic
+# and per-request, so a newly-faster endpoint is picked up with no code change.
 #
 # PRIVACY FLOOR. ``data_collection: "deny"`` restricts routing to endpoints that
 # do not COLLECT prompt data or train on it — the pool is filtered FIRST, then
@@ -162,71 +171,40 @@ _VERIFY_TIMEOUT_SECONDS = 10.0
 # ``response_format``, and without this they would answer with unconstrained prose
 # that fails our parse. Per-request, so a plain chat turn still reaches them.
 #
+# AND IT IS THE LARGEST REMAINING SPEED COST, which is worth writing down where
+# the flag lives rather than in a document nobody opens. For this model the
+# endpoints it drops from a json_object call include the FASTEST one — CoreWeave,
+# measured p50 361ms TTFT at 101 tok/s, and the endpoint a plain chat turn
+# actually lands on. Pinning it for those calls is not available either:
+# CoreWeave plus ``response_format`` is a hard ``404 No endpoints found``. So every
+# JSON call in this system is routed within a smaller, slower pool, and no amount
+# of sorting or bounding inside that pool recovers what was removed before the
+# sort ran. Getting it back means not sending ``response_format`` at all and
+# parsing tolerantly instead — a real change with a real risk, not a tuning knob.
+# (Measured 2026-07; see docs/PROVIDER_POLICY.md section 8 on dated observations.)
+#
 # ``allow_fallbacks`` keeps the next-fastest compliant endpoint available when the
 # winner is down. With filters this strict, turning it off would make any single
 # outage a hard 404/503 ("No allowed providers are available").
 _PROVIDER_ROUTING: dict[str, Any] = DEFAULT_POLICY.to_wire()
 
-# Routing for STRUCTURED calls — anything carrying ``response_format`` that is not
-# also flagged ``latency_critical``: the utility tasks, the skill-learning gate,
-# the skill builder/improver, and a main call whose client asked for JSON mode.
-# (The selector carries ``response_format`` too, but takes the CLASSIFIER policy
-# below; that flag wins.) Same policy plus a tail bound, because these calls have
-# the opposite cost shape to a chat turn.
+# The same policy with its ranking axis flipped, for a call that declares
+# ``latency_critical``. Everything else — pool, filters, privacy floor, bound — is
+# identical; only ``sort`` differs, and only because this call's shape is known at
+# the call site rather than guessed from a request.
 #
-# WHY A SEPARATE POLICY. ``require_parameters`` drops every endpoint that does not
-# implement ``response_format``, and for this model that includes the fastest one
-# (CoreWeave — measured p50 361ms TTFT, 101 tok/s, and the endpoint a plain chat
-# turn actually lands on). Pinning it here is not an option: CoreWeave plus
-# ``response_format`` is a hard ``404 No endpoints found``. So a structured call is
-# always routed within a DIFFERENT, slower pool, and ``sort: "throughput"`` then
-# ranks that pool by tokens/second — the wrong axis entirely for a call that emits
-# a ~40-token JSON object. It elected endpoints whose medians are fine and whose
-# TAILS are catastrophic: wafer p90 5.4s / p99 12.6s, parasail p99 13.9s, novita
-# p99 5.4s. That is not theoretical — a selector call on the turn's first-byte path
-# was measured at 10.75s, three quarters of a 14.4s time-to-first-token.
-# (Measured 2026-07; see docs/PROVIDER_POLICY.md section 8 on dated observations.)
+# Today that is the skill selector and nothing else: ~10.3k prompt tokens for ~90
+# of answer (438 trials, `benchmarks/skill_selection`), sitting on the turn's
+# first-byte path, and with a winning speculation the turn's whole
+# time-to-first-token IS this call's latency.
 #
-# ``preferred_max_latency`` DEPRIORITIZES (never excludes) endpoints whose measured
-# TTFT percentiles exceed the bound, so it cannot empty the pool the way a filter
-# could — the tail-happy endpoints stay reachable, they just stop winning. The
-# numbers are set to clear the observed tail cluster while leaving several
-# endpoints qualifying, not to name a favourite. Measured over 10 selector-shaped
-# calls: TTFT median 1222ms -> 635ms, worst 1811ms -> 920ms.
-#
-# Throughput stays the sort key here: among endpoints that answer promptly we still
-# want the fastest generator, and the calls left on this policy are the ones where
-# that pays — terminal summarize/extract emit up to 1200 tokens. The selector, which
-# emits ~90, is no longer one of them; it takes the classifier policy below.
-_PROVIDER_ROUTING_STRUCTURED: dict[str, Any] = DEFAULT_POLICY.for_structured_call().to_wire()
-
-# Routing for CLASSIFIER calls — a structured call that declares
-# ``latency_critical`` because its answer is a handful of tokens. Today that is the
-# skill selector, and the selector alone: it emits ~90 completion tokens against
-# ~10.3k of prompt, and a winning speculation makes the turn's whole
-# time-to-first-token equal to this call's latency.
-#
-# WHY IT IS NOT THE STRUCTURED POLICY. That policy sorts by THROUGHPUT and bolts a
-# tail bound on top, which is the right compromise for the utility tasks it also
-# serves — terminal summarize/extract emit up to 1200 tokens, so tokens/second is
-# real money there.
-#
-# BE HONEST ABOUT THE SPLIT, because the easy version of this argument is wrong.
-# Generation is NOT negligible for the selector: ~90 tokens at ~100 tok/s is ~0.9s
-# of a 2.044s p50, call it 45%. Two things still make first-byte the right axis.
-# The first is that the OTHER 55% is the part that scales — it is prefill over
-# 10.3k tokens plus queueing, and it is what an affinity key can drive toward zero
-# while generation stays exactly where it is. The second is the tail: the same run
-# measured p99 9.878s and max 10.723s against a p50 of 2.044s, and a spread like
-# that is a slow first byte, not a slow generator.
-#
-# Note what that means for measuring a change here: the number to compare is the
-# selector call's COMPLETE latency, not its TTFT. An endpoint that answers fast and
-# then dribbles could win a TTFT benchmark and lose the user's turn.
-#
-# The two policies are otherwise identical, privacy floor included — this is a
-# ranking change within the same filtered pool, not a different pool.
-_PROVIDER_ROUTING_CLASSIFIER: dict[str, Any] = DEFAULT_POLICY.for_classifier_call().to_wire()
+# Generation is not negligible even here — ~90 tokens at ~100 tok/s is ~0.9s of a
+# 2.044s p50, call it 45% — so this is a lean, not a landslide. What tips it is
+# that the other ~55% is the half that MOVES: prefill over 10.3k tokens plus
+# queueing, which scales with the catalog and which an affinity key can drive
+# toward zero. The same run measured p99 9.878s against that p50, and a spread
+# like that is a slow first byte, not a slow generator.
+_PROVIDER_ROUTING_FIRST_BYTE: dict[str, Any] = DEFAULT_POLICY.ranked_on_first_byte().to_wire()
 
 
 def _cohort_scoped(
@@ -918,32 +896,22 @@ class OpenRouterProvider:
         # Structured calls route under the tail-bounded policy: `response_format`
         # is exactly the signal that this call sits in the slower JSON-capable pool
         # and cares about time-to-first-token, not tokens/second.
-        structured = request.response_format is not None
         if request.routing is None:
             # The overwhelmingly common path. Reuse the prebuilt module-level dict
             # rather than re-rendering: this block is serialized into every request
             # body, and the prompt cache keys on a byte-identical prefix.
-            if request.latency_critical:
-                body["provider"] = _PROVIDER_ROUTING_CLASSIFIER
-            else:
-                body["provider"] = (
-                    _PROVIDER_ROUTING_STRUCTURED if structured else _PROVIDER_ROUTING
-                )
-        elif request.latency_critical:
-            # Classifier defaults FIRST, then the caller's preference on top. The
-            # order is the whole point: `for_classifier_call` replaces the sort key,
-            # so applying it last would silently overrule a caller who asked for
-            # `price` — and the speed/price trade is legitimately theirs (they hold
-            # the key and pay the bill). The tail bound is additive and survives
-            # either ordering. The privacy floor is not caller-derived at all.
             body["provider"] = (
-                DEFAULT_POLICY.for_classifier_call().merged_with(request.routing).to_wire()
+                _PROVIDER_ROUTING_FIRST_BYTE if request.latency_critical else _PROVIDER_ROUTING
             )
         else:
-            policy = DEFAULT_POLICY.merged_with(request.routing)
-            if structured:
-                policy = policy.for_structured_call()
-            body["provider"] = policy.to_wire()
+            # Server axis FIRST, caller preference on top: `ranked_on_first_byte`
+            # replaces the sort key, so applying it last would silently overrule a
+            # caller who asked for `price`, and that trade is legitimately theirs.
+            # The bound and the privacy floor survive either ordering.
+            policy = DEFAULT_POLICY
+            if request.latency_critical:
+                policy = policy.ranked_on_first_byte()
+            body["provider"] = policy.merged_with(request.routing).to_wire()
         # Cache affinity. OpenRouter keeps a sticky record of which endpoint served
         # a cached request and routes the next request with the same key back to
         # it, so a conversation's growing prefix stays on the node that holds it.

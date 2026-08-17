@@ -94,36 +94,52 @@ field. The shipped default block is:
   "sort": "throughput",
   "data_collection": "deny",
   "require_parameters": true,
-  "allow_fallbacks": true
+  "allow_fallbacks": true,
+  "preferred_max_latency": { "p50": 1.0, "p90": 2.0, "p99": 5.0 }
 }
 ```
 
+**One policy, every call.** There is no per-call-shape routing and there must not
+be: a rule that has to decide whether a request is "a classifier" or "a chat turn"
+or "a greeting" is a rule that will misjudge the next call shape someone adds. The
+only thing that varies is the ranking axis, at one call site, for a reason known
+statically (§3b).
+
+**Why both a sort and a bound.** A request's wall-clock is
+`time-to-first-token + tokens / throughput`, and OpenRouter can rank on either of
+those but not on their sum. Ranking on one alone is how a bad endpoint gets
+elected — sorting purely by tokens/second cheerfully picks a host that streams
+fast and takes four seconds to say the first word. So: rank on one axis, put a
+floor under the other.
+
 - **`sort: "throughput"`** — rank eligible endpoints by measured tokens/second and
-  take the fastest, explicitly at the cost of price. Correct for an interactive
-  assistant: wall-clock is dominated by generation, and this model is cheap enough
-  that a 40% price delta is noise next to a 2x speed one.
+  take the fastest, explicitly at the cost of price. Right for an interactive
+  assistant, where a real answer's wall-clock is mostly generation and this model
+  is cheap enough that a 40% price delta is noise next to a 2x speed one.
+- **`preferred_max_latency`** — the other half, and the reason a short request no
+  longer sits there before it starts. It **deprioritises, never excludes**, so
+  unlike a filter it can never empty the pool or turn into a 404, which is exactly
+  why it is safe to send on every call regardless of shape. p90/p99 are the
+  live-measured pair (TTFT median 1222ms → 635ms, worst 1811ms → 920ms over 10
+  calls) and are known not to empty the pool. **p50 is the load-bearing addition**:
+  without it the bound only describes an endpoint's bad days, and a host whose
+  *typical* first byte is slow still wins the election. The tails this exists to
+  demote were real — p99 12.6s at one endpoint, 13.9s at another, against medians
+  that looked fine.
 - **`data_collection: "deny"`** — the privacy floor. See §4.
 - **`require_parameters: true`** — drop endpoints that would silently ignore
   something we sent. It matters most for `json_object` calls (selector, utility
   tasks): several otherwise-fast endpoints for this model do not implement
   `response_format`, and without this they would answer with unconstrained prose
-  that fails our parse.
+  that fails our parse. **It is also the largest remaining speed cost in this
+  system**: the endpoints it drops from a JSON call include the *fastest* one
+  (CoreWeave, p50 361ms TTFT at 101 tok/s), and no amount of sorting or bounding
+  inside the smaller pool recovers what was removed before the sort ran. Getting
+  it back means not sending `response_format` and parsing tolerantly instead — a
+  real change with real risk, not a knob.
 - **`allow_fallbacks: true`** — keep the next-fastest compliant endpoint available
   when the winner is down. With filters this strict, turning it off makes any
   single outage a hard 404.
-
-**Structured calls** route under the same policy plus a tail bound,
-`preferred_max_latency: {"p90": 2.0, "p99": 5.0}`. The trigger is mechanical —
-any request carrying `response_format` that is not also flagged `latency_critical`
-(§3b takes precedence) — which today means every
-utility task, the skill-learning gate, the skill
-builder/improver, and a main completion whose client asked for JSON mode. `require_parameters`
-already excludes the fastest endpoint for this model from that pool, and sorting
-the remainder by tokens/second is the wrong axis for a call that emits a
-~40-token JSON object: it elected endpoints with acceptable medians and
-catastrophic tails (p99 12.6s, 13.9s). `preferred_max_latency` **deprioritises,
-never excludes**, so it cannot empty the pool. Measured over 10 selector-shaped
-calls: TTFT median 1222ms → 635ms, worst 1811ms → 920ms.
 
 ### 3a. Cache affinity — `session_id`, and why not `provider.order`
 
@@ -152,10 +168,11 @@ third party, and a client session id is opaque local text we make no promises
 about. The salt is shared by every instance, so the key is stable across a
 stateless fleet without any instance storing it. A JSON-mode main call gets a
 `daintree-main-json-` namespace instead, because validation rejects
-`response_format` alongside tools — so it carries none of the tool schemas — and
-`response_format` also routes it through the tail-bounded structured pool above.
-Sharing one key across the two shapes would let each evict the other's sticky
-endpoint for a prefix that endpoint does not hold.
+`response_format` alongside tools, so it carries none of the tool schemas — and
+`require_parameters` then filters it to the smaller pool of endpoints that
+implement `response_format`. Different prefix, different pool: sharing one key
+across the two shapes would let each evict the other's sticky endpoint for a
+prefix that endpoint does not hold.
 
 **Why name the key rather than let it default.** Left absent, OpenRouter derives
 the key by hashing the first system message and the first non-system message.
@@ -275,10 +292,10 @@ practice, the answer is a deliberate rotation term in the key, not removing the
 key; the selector's `endpoint` and `selector_cache_ratio` are already logged per
 turn, which is where the evidence would come from.
 
-### 3b. Classifier calls — ranked on time-to-first-token, not tokens/second
+### 3b. Ranking on first byte — the one thing that varies per call
 
-A **classifier call** declares `latency_critical` on `ProviderChatRequest` and
-routes under a third block: the same filtered pool, ranked differently.
+One call site flips the ranking axis. Everything else — pool, filters, privacy
+floor, bound — is byte-identical to §3:
 
 ```json
 {
@@ -286,52 +303,50 @@ routes under a third block: the same filtered pool, ranked differently.
   "data_collection": "deny",
   "require_parameters": true,
   "allow_fallbacks": true,
-  "preferred_max_latency": { "p50": 0.8, "p90": 2.0, "p99": 4.0 }
+  "preferred_max_latency": { "p50": 1.0, "p90": 2.0, "p99": 5.0 }
 }
 ```
 
-Today exactly one call sets it: the **skill selector**. It is the only call in the
-system whose cost shape is inverted — measured over 438 trials
-(`benchmarks/skill_selection`), **~10.3k prompt tokens in, ~90 completion tokens
-out**, p50 2.044s. Its wall-clock is prefill; generation is under a second of it.
-And with a winning speculation the turn's entire time-to-first-token *is* this
-call's latency (`services/speculation.py`), so it is the single number a user
-experiences as "how fast is this thing".
+It is selected by `latency_critical` on `ProviderChatRequest`, and today exactly
+one call sets it: the **skill selector**.
 
-`sort: "throughput"` ranks endpoints by tokens/second — how fast the ~90 tokens
-arrive *after* prefill. `sort: "latency"` ranks by measured time-to-first-token,
-which for this shape is the whole call. The tail bound is kept underneath and
-tightened, because the two catch different failures: the sort ranks on a central
-tendency, while the bound is what deprioritises an endpoint whose *percentiles*
-are bad. The same run that measured p50 2.044s measured **p99 9.878s** — a sort
-alone would not have caught that, and `preferred_max_latency` still only
-deprioritises, so neither can empty the pool.
+**Why this is not request classification.** The distinction matters, because
+classifying user input into "short" and "long" would be a rule waiting to be
+wrong. Nothing here inspects a request. The selector is a *fixed, server-owned
+call* whose shape is known permanently and cannot vary with what a user types:
+measured over 438 trials (`benchmarks/skill_selection`), **~10.3k prompt tokens in,
+~90 completion tokens out**, p50 2.044s. And with a winning speculation the turn's
+entire time-to-first-token *is* this call's latency
+(`services/speculation.py`), so it is the number a user experiences as "how fast
+is this thing".
+
+**It is a lean, not a landslide, and the honest version is worth keeping.**
+Generation is not negligible even here — ~90 tokens at ~100 tok/s is ~0.9s of that
+2.044s, call it 45%. What tips it is that the other ~55% is the half that *moves*:
+prefill over 10.3k tokens plus queueing, which scales with the catalog and which
+an affinity key (§3a) can drive toward zero. The same run measured **p99 9.878s**
+against that p50, and a spread like that is a slow first byte, not a slow
+generator.
 
 Order of application matters when a caller sends their own `routing` block: the
-classifier defaults are applied **first** and the caller's preference merged on
-**top**, so a caller who names `sort: "price"` gets `sort: "price"` on the wire
-rather than having it silently overruled. Neither ordering can touch
-`data_collection: "deny"` (§4).
+axis is applied **first** and the caller's preference merged on **top**, so a
+caller who names `sort: "price"` gets `sort: "price"` on the wire rather than
+having it silently overruled. Neither ordering can touch `data_collection: "deny"`
+(§4).
 
 Be precise about what that buys them, because "the caller still gets price" is
-half a sentence. The **bound stays** — it is a server-side tail guard, like the
-privacy floor, not part of the speed/price trade — so what they get is cheapest
-*among endpoints that answer promptly*, not cheapest outright. The structured
-policy has always behaved this way; the classifier bound is tighter, so the
-divergence is larger. If a caller ever needs unconditional price, that is a new
-preference to add deliberately, not something to reach by dropping the bound.
+half a sentence. The **bound stays** — it is a server-side floor, like the privacy
+floor, not part of the speed/price trade — so what they get is cheapest *among
+endpoints that answer promptly*, not cheapest outright. If a caller ever needs
+unconditional price, that is a new preference to add deliberately, not something
+to reach by dropping the bound.
 
-Measuring a change to this policy: compare the selector call's **complete**
-latency, not its time-to-first-token. TTFT is what the sort ranks on, not what the
-turn waits for — the turn needs the whole JSON object — so an endpoint that starts
-fast and then dribbles wins a TTFT benchmark while losing the user's turn. Give
-each arm a distinct affinity namespace too, or the sticky record from arm A will
-serve arm B and the comparison measures nothing.
-
-No `prompt_cache_key` is sent: no endpoint for this model advertises the
-parameter, and with `require_parameters` on, sending an unadvertised parameter can
-empty the eligible pool. Prefix caching is implicit at whichever endpoint serves
-the request.
+Measuring a change here: compare the selector call's **complete** latency, not its
+time-to-first-token. TTFT is what the sort ranks on, not what the turn waits for —
+the turn needs the whole JSON object — so an endpoint that starts fast and then
+dribbles wins a TTFT benchmark while losing the user's turn. Give each arm a
+distinct affinity namespace too, or the sticky record from arm A will serve arm B
+and the comparison measures nothing.
 
 ## 4. Privacy — what is and is not promised
 

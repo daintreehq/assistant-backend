@@ -648,10 +648,10 @@ class ChatOrchestrator:
         ``json`` gets its own namespace because a JSON-mode main call is a
         different animal: validation rejects ``response_format`` alongside tools,
         so it carries none of the ~21.5k tokens of schemas, and
-        ``response_format`` also routes it through the tail-bounded structured
-        policy into a smaller, different endpoint pool. Sharing one key across the
-        two would let each call type evict the other's sticky endpoint for a
-        prefix it does not have.
+        ``require_parameters`` then filters it to the smaller pool of endpoints
+        that implement ``response_format``. Different prefix, different pool:
+        sharing one key across the two would let each call type evict the other's
+        sticky endpoint for a prefix it does not have.
 
         Returns ``None`` for a caller with no usable session, which leaves the
         router on its own default rather than inventing a shared cohort.

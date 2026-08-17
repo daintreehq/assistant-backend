@@ -74,46 +74,45 @@ class EndpointSort(StrEnum):
     """Which axis ranks the eligible endpoints once filtering is done."""
 
     #: Fastest measured tokens/second wins, explicitly at the cost of price.
-    #: Correct for an interactive assistant: wall clock is dominated by
-    #: generation, and this model is cheap enough that a price delta is noise
-    #: next to a speed one.
+    #: The server's default, and it is only half an answer on its own — it ranks
+    #: how fast an endpoint STREAMS, saying nothing about how long it takes to
+    #: start. ``LATENCY_BOUND`` supplies the other half; neither is sufficient
+    #: alone, which is the whole design.
     THROUGHPUT = "throughput"
     #: Cheapest wins. For a caller who is paying and not in a hurry.
     PRICE = "price"
-    #: Lowest measured time-to-first-token wins.
+    #: Lowest measured time-to-first-token wins. Available to a caller; not the
+    #: server default, because a turn's visible wall-clock is mostly generation
+    #: once the bound has already removed the slow-to-start endpoints.
     LATENCY = "latency"
 
 
-# The tail bound applied to STRUCTURED calls — anything carrying
-# ``response_format``. Those calls have the opposite cost shape to a chat turn:
-# they emit a ~40-token JSON object, so ranking their (smaller, json-capable)
-# pool by tokens/second optimises the wrong axis entirely. It elected endpoints
-# with acceptable medians and catastrophic tails.
+# The first-byte bound, applied to EVERY call. This is the routing lever that
+# actually answers "why did it take a while to start".
 #
-# ``preferred_max_latency`` DEPRIORITISES rather than excludes, so unlike a
-# filter it can never empty the pool — the tail-happy endpoints stay reachable,
-# they just stop winning.
-STRUCTURED_LATENCY_BOUND: dict[str, float] = {"p90": 2.0, "p99": 5.0}
-
-# The policy applied to CLASSIFIER calls — a structured call whose output is a
-# handful of tokens and whose wall-clock is therefore almost entirely prefill.
-# The skill selector is the case that matters: ~10.3k prompt tokens in, ~90
-# completion tokens out (measured over 438 trials, `benchmarks/skill_selection`),
-# sitting directly on the turn's first-byte path.
+# A request's wall-clock is ``time-to-first-token + tokens / throughput``, and
+# OpenRouter can rank on either of those but not on their sum. Ranking on one
+# alone is what elects a bad endpoint: sorting by tokens/second happily picks a
+# host that streams fast and takes four seconds to say the first word, and the
+# measured tails for this model are exactly that shape — p99 12.6s at one
+# endpoint, 13.9s at another, against medians that look fine.
 #
-# ``sort: "latency"`` ranks the eligible endpoints by measured time-to-first-token.
-# ``sort: "throughput"`` ranks by tokens/second — how fast the ~90 tokens arrive
-# once prefill is done, which at ~100 tok/s is ~0.9s of that 2.044s. That is not
-# nothing, and the case for re-ranking does not pretend it is: the point is that
-# the OTHER ~55% is the half that moves. It is prefill over 10.3k tokens plus
-# queueing, it scales with the catalog, and it is what an affinity key can drive
-# toward zero.
+# So rank on one axis and put a FLOOR under the other. That is a general rule
+# needing no knowledge of what kind of call this is, which is why one policy now
+# serves all of them: ``sort`` picks the fastest generator, and this bound stops
+# it picking one that cannot start promptly.
 #
-# The tail bound is kept and tightened underneath, because the two answer different
-# questions: the sort ranks on central tendency, the bound deprioritises an
-# endpoint whose PERCENTILES are bad. The same run measured p99 9.878s against
-# that p50 — a spread the sort alone would not have caught.
-CLASSIFIER_LATENCY_BOUND: dict[str, float] = {"p50": 0.8, "p90": 2.0, "p99": 4.0}
+# It is safe to apply unconditionally because ``preferred_max_latency``
+# DEPRIORITISES rather than excludes: the tail-happy endpoints stay reachable and
+# merely stop winning, so unlike a filter it can never empty the pool and can
+# never turn into a 404. There is no call shape this is wrong for.
+#
+# The p90/p99 numbers are the live-measured pair introduced with the structured
+# policy (TTFT median 1222ms -> 635ms, worst 1811ms -> 920ms over 10 calls) and
+# are known not to empty the pool. p50 is the addition: without it the bound only
+# describes an endpoint's bad days, and a host whose TYPICAL first byte is slow
+# still wins the election.
+LATENCY_BOUND: dict[str, float] = {"p50": 1.0, "p90": 2.0, "p99": 5.0}
 
 
 @dataclass(frozen=True)
@@ -139,8 +138,14 @@ class RoutingPolicy:
     #: Optional endpoint allowlist / denylist (OpenRouter provider slugs).
     only: tuple[str, ...] = ()
     ignore: tuple[str, ...] = ()
-    #: Percentile TTFT bound, applied to structured calls. Deprioritises only.
-    preferred_max_latency: dict[str, float] | None = field(default=None)
+    #: Percentile time-to-first-token bound. Deprioritises only, never excludes,
+    #: so it applies to every call regardless of shape — see ``LATENCY_BOUND``.
+    #: Defaulted rather than derived: there is no call this should be absent from,
+    #: and an ``Optional`` that some code path forgets to fill is precisely how the
+    #: main chat call ended up as the only unbounded one.
+    preferred_max_latency: dict[str, float] = field(
+        default_factory=lambda: dict(LATENCY_BOUND)
+    )
 
     def to_wire(self) -> dict[str, Any]:
         """Render the OpenRouter ``provider`` block.
@@ -169,30 +174,21 @@ class RoutingPolicy:
             wire["preferred_max_latency"] = dict(self.preferred_max_latency)
         return wire
 
-    def for_structured_call(self) -> RoutingPolicy:
-        """This policy plus the structured-call tail bound."""
-        if self.preferred_max_latency is not None:
-            return self
-        return replace_policy(self, preferred_max_latency=dict(STRUCTURED_LATENCY_BOUND))
+    def ranked_on_first_byte(self) -> RoutingPolicy:
+        """This policy, ranked by time-to-first-token instead of tokens/second.
 
-    def for_classifier_call(self) -> RoutingPolicy:
-        """This policy re-ranked for a tiny-output, prefill-bound call.
+        The ONE thing that varies between calls, and it flips an axis rather than
+        changing the pool: same filters, same privacy floor, same bound. Every
+        other knob is shared, which is what keeps this from growing back into a
+        set of per-call-shape policies.
 
-        Unlike :meth:`for_structured_call` this REPLACES the sort key, so it is
-        applied BEFORE a caller preference rather than after (see
-        ``OpenRouterProvider._build_body``): the latency ranking is the server's
-        default for this call shape, and a caller who names their own ``sort``
-        still overrides it. The bound is additive and survives either way.
+        It is chosen by CALL SITE, never by inspecting a request. The skill
+        selector is a fixed server-owned call whose shape is known permanently —
+        ~10.3k prompt tokens for ~90 of answer — not a request whose kind we
+        guessed at runtime. A rule that tried to classify user input into "short"
+        and "long" would be a rule waiting to be wrong; this one cannot be.
         """
-        return replace_policy(
-            self,
-            sort=EndpointSort.LATENCY,
-            preferred_max_latency=(
-                self.preferred_max_latency
-                if self.preferred_max_latency is not None
-                else dict(CLASSIFIER_LATENCY_BOUND)
-            ),
-        )
+        return replace_policy(self, sort=EndpointSort.LATENCY)
 
     def merged_with(self, preference: RoutingPreference | None) -> RoutingPolicy:
         """Apply a validated caller preference on top of this policy.

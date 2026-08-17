@@ -11,9 +11,8 @@ import pytest
 
 from daintree_assistant_server.contracts.daintree_api import Routing
 from daintree_assistant_server.providers.policy import (
-    CLASSIFIER_LATENCY_BOUND,
     DEFAULT_POLICY,
-    STRUCTURED_LATENCY_BOUND,
+    LATENCY_BOUND,
     EndpointSort,
     PrivacyMode,
     RoutingPolicy,
@@ -39,6 +38,7 @@ def test_the_default_wire_block_is_exactly_what_we_document() -> None:
         "data_collection": "deny",
         "require_parameters": True,
         "allow_fallbacks": True,
+        "preferred_max_latency": {"p50": 1.0, "p90": 2.0, "p99": 5.0},
     }
 
 
@@ -114,101 +114,81 @@ def test_merging_does_not_mutate_the_shared_default() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Structured calls.
+# The first-byte bound, and the one axis that varies.
 # ---------------------------------------------------------------------------
 
 
-def test_structured_calls_add_the_tail_bound() -> None:
-    wire = DEFAULT_POLICY.for_structured_call().to_wire()
-    assert wire["preferred_max_latency"] == STRUCTURED_LATENCY_BOUND
-    # Everything else is the base policy.
-    for key, value in DEFAULT_POLICY.to_wire().items():
-        assert wire[key] == value
+def test_every_call_is_bounded_on_first_byte_by_default() -> None:
+    """The bound is on the DEFAULT policy, not bolted on by a derivation.
 
-
-def test_classifier_calls_are_ranked_on_latency_and_keep_the_privacy_floor() -> None:
-    """The one thing the classifier policy changes is the RANKING.
-
-    Same pool, same filters — a call whose answer is ~90 tokens is ranked on
-    time-to-first-token instead of tokens/second. Asserting the floor here too,
-    because a policy that re-ranks is exactly where a filter gets dropped by
-    accident.
+    This is the fix for the failure that motivated it: the bound used to be added
+    by `for_structured_call()`, so the main chat call — the only upstream call a
+    short question makes — was the one call in the system with no first-byte
+    protection at all, elected purely on tokens/second. A default cannot be
+    forgotten by a code path the way a derivation can.
     """
-    wire = DEFAULT_POLICY.for_classifier_call().to_wire()
-    assert wire["sort"] == "latency"
-    assert wire["preferred_max_latency"] == CLASSIFIER_LATENCY_BOUND
-    assert wire["data_collection"] == "deny"
-    assert wire["require_parameters"] is True
-    assert wire["allow_fallbacks"] is True
+    assert DEFAULT_POLICY.preferred_max_latency == LATENCY_BOUND
+    assert DEFAULT_POLICY.to_wire()["preferred_max_latency"] == LATENCY_BOUND
+    # And on a bare policy too, so a future construction site inherits it.
+    assert RoutingPolicy().to_wire()["preferred_max_latency"] == LATENCY_BOUND
 
 
-def test_the_classifier_bound_is_tighter_than_the_structured_one() -> None:
-    """It exists to beat the structured bound, not to restate it.
+def test_the_bound_constrains_the_typical_case_and_not_only_the_tail() -> None:
+    """p50 is the load-bearing percentile, and the reason is worth pinning.
 
-    Every percentile the structured bound constrains must ALSO be constrained
-    here, and at least as strictly. Comparing only the overlap would let a future
-    edit drop `p99` from the classifier bound entirely and still pass "tighter" —
-    while quietly leaving the first-byte-path call with no tail guard at all,
-    which is the exact failure the bound was introduced for.
+    p90/p99 alone describe an endpoint's bad days. An endpoint whose TYPICAL first
+    byte is slow has an unremarkable tail and would still win the election — which
+    is exactly the "it takes a while to start" symptom this exists to remove.
     """
-    missing = set(STRUCTURED_LATENCY_BOUND) - set(CLASSIFIER_LATENCY_BOUND)
-    assert not missing, (
-        f"the classifier bound stopped constraining {sorted(missing)}, which the "
-        "structured (batch) policy still does — the first-byte-path call must not "
-        "have the looser tail"
-    )
-    for percentile, structured in STRUCTURED_LATENCY_BOUND.items():
-        assert CLASSIFIER_LATENCY_BOUND[percentile] <= structured
+    assert "p50" in LATENCY_BOUND
+    assert LATENCY_BOUND["p50"] <= LATENCY_BOUND["p90"] <= LATENCY_BOUND["p99"]
 
 
-def test_classifier_call_preserves_a_bound_already_set() -> None:
-    """Additive like the structured bound: it fills a gap, it does not overwrite.
+def test_first_byte_ranking_changes_the_axis_and_nothing_else() -> None:
+    """The whole of the per-call variation, asserted as "nothing else moved".
 
-    The branch exists so that composing the two derivations in either order lands
-    on the same policy. Untested, it is also the one line in this module a coverage
-    floor would notice going missing.
+    One policy serves every call; `ranked_on_first_byte` flips `sort` for the one
+    call site whose shape is known to be prefill-dominated. If a future edit makes
+    it change the pool — a filter, an `only`, a different bound — the design has
+    quietly reverted to per-call-shape policies and this fails.
     """
-    already_bounded = DEFAULT_POLICY.for_structured_call()
-    both = already_bounded.for_classifier_call()
-    assert both.preferred_max_latency == STRUCTURED_LATENCY_BOUND
-    # The sort is NOT preserved — replacing it is the whole point of the call.
-    assert both.sort is EndpointSort.LATENCY
+    base = DEFAULT_POLICY.to_wire()
+    ranked = DEFAULT_POLICY.ranked_on_first_byte().to_wire()
+    assert ranked["sort"] == "latency"
+    assert base["sort"] == "throughput"
+    assert {k: v for k, v in ranked.items() if k != "sort"} == {
+        k: v for k, v in base.items() if k != "sort"
+    }
 
 
-def test_a_caller_sort_preference_still_wins_over_the_classifier_default() -> None:
-    """The documented ordering (section 3b), asserted as behaviour.
-
-    `for_classifier_call` REPLACES the sort key, so it must be applied before a
+def test_a_caller_sort_preference_still_wins_over_the_first_byte_axis() -> None:
+    """`ranked_on_first_byte` REPLACES the sort key, so it is applied BEFORE a
     caller preference and never after. A caller who paid for `price` and silently
-    got `latency` would be a preference the server pretends to honour.
-    """
-    policy = DEFAULT_POLICY.for_classifier_call().merged_with(
+    got `latency` would be a preference the server only pretends to honour."""
+    policy = DEFAULT_POLICY.ranked_on_first_byte().merged_with(
         RoutingPreference(sort=EndpointSort.PRICE, privacy=PrivacyMode.ZDR)
     )
     wire = policy.to_wire()
     assert wire["sort"] == "price"
-    # ...while the additive parts of the classifier policy survive the merge.
-    assert wire["preferred_max_latency"] == CLASSIFIER_LATENCY_BOUND
+    # ...while the parts that are not the caller's to trade survive the merge.
+    assert wire["preferred_max_latency"] == LATENCY_BOUND
     assert wire["zdr"] is True
     assert wire["data_collection"] == "deny"
 
 
-def test_classifier_call_does_not_mutate_the_shared_default() -> None:
+def test_deriving_a_policy_does_not_mutate_the_shared_default() -> None:
     before = DEFAULT_POLICY.to_wire()
-    DEFAULT_POLICY.for_classifier_call()
+    DEFAULT_POLICY.ranked_on_first_byte()
     assert DEFAULT_POLICY.to_wire() == before
-    # And each call renders its own bound dict rather than aliasing the constant,
-    # which a later in-place edit would otherwise corrupt for the whole process.
-    first = DEFAULT_POLICY.for_classifier_call()
-    assert first.preferred_max_latency == CLASSIFIER_LATENCY_BOUND
-    assert first.preferred_max_latency is not CLASSIFIER_LATENCY_BOUND
+    # And each policy owns its bound dict rather than aliasing the constant, which
+    # a later in-place edit would otherwise corrupt for the whole process.
+    assert RoutingPolicy().preferred_max_latency is not LATENCY_BOUND
+    assert RoutingPolicy().preferred_max_latency is not RoutingPolicy().preferred_max_latency
 
 
-def test_structured_bound_survives_a_caller_preference() -> None:
-    policy = DEFAULT_POLICY.merged_with(
-        RoutingPreference(sort=EndpointSort.PRICE)
-    ).for_structured_call()
-    assert policy.to_wire()["preferred_max_latency"] == STRUCTURED_LATENCY_BOUND
+def test_the_bound_survives_a_caller_preference() -> None:
+    policy = DEFAULT_POLICY.merged_with(RoutingPreference(sort=EndpointSort.PRICE))
+    assert policy.to_wire()["preferred_max_latency"] == LATENCY_BOUND
     assert policy.to_wire()["sort"] == "price"
 
 
@@ -218,7 +198,17 @@ def test_the_wire_block_key_order_is_stable() -> None:
     otherwise identical turns."""
     a = list(DEFAULT_POLICY.to_wire())
     b = list(RoutingPolicy().to_wire())
-    assert a == b == ["sort", "data_collection", "require_parameters", "allow_fallbacks"]
+    assert (
+        a
+        == b
+        == [
+            "sort",
+            "data_collection",
+            "require_parameters",
+            "allow_fallbacks",
+            "preferred_max_latency",
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------

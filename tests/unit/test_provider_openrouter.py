@@ -192,32 +192,48 @@ async def test_provider_routing_policy_sent_on_every_request() -> None:
         "data_collection": "deny",
         "require_parameters": True,
         "allow_fallbacks": True,
+        "preferred_max_latency": {"p50": 1.0, "p90": 2.0, "p99": 5.0},
     }
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_structured_calls_route_under_the_tail_bounded_policy() -> None:
-    # `require_parameters` excludes the fastest endpoint from every response_format
-    # call (it does not implement the parameter), so a structured call always lands
-    # in a slower pool whose throughput leaders have >10s latency tails. The bound
-    # deprioritizes those. Without it a selector call — on the turn's first-byte
-    # path — was measured at 10.75s.
+@pytest.mark.parametrize(
+    ("label", "kwargs"),
+    [
+        ("plain chat", {}),
+        ("json mode", {"response_format": {"type": "json_object"}}),
+        ("first-byte ranked", {"latency_critical": True}),
+        ("caller preference", {"routing": RoutingPreference(sort=EndpointSort.PRICE)}),
+        ("streaming", {"stream": True}),
+    ],
+)
+async def test_every_call_shape_is_bounded_on_first_byte(label: str, kwargs: dict) -> None:
+    """The invariant that replaced two tests encoding the old design.
+
+    The bound used to be added by a derivation applied to `response_format` calls,
+    which left the plain chat call — the ONLY upstream call a short question makes
+    — elected purely on tokens/second, with nothing bounding how long an endpoint
+    took to say the first word. That was the "it takes a while to start" symptom.
+
+    Parametrised over shapes rather than asserted once, because the failure mode is
+    specifically that ONE path forgets. A shape added later without a bound fails
+    here rather than being discovered by a user waiting on a greeting.
+    """
     captured: dict = {}
     provider = _provider(_capture(captured))
-    await provider.complete(_req(response_format={"type": "json_object"}))
-    routing = captured["body"]["provider"]
-    assert routing["preferred_max_latency"] == {"p90": 2.0, "p99": 5.0}
-    # The privacy floor and the rest of the policy still apply unchanged.
-    assert routing["data_collection"] == "deny"
-    assert routing["sort"] == "throughput"
-    assert routing["require_parameters"] is True
-    assert routing["allow_fallbacks"] is True
+    if kwargs.pop("stream", False):
+        stream = await provider.open_stream(_req(stream=True, **kwargs))
+        await stream.aclose()
+    else:
+        await provider.complete(_req(**kwargs))
+    bound = captured["body"]["provider"].get("preferred_max_latency")
+    assert bound == {"p50": 1.0, "p90": 2.0, "p99": 5.0}, f"{label} routes unbounded"
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_a_classifier_call_is_ranked_on_latency_not_throughput() -> None:
+async def test_the_selector_call_is_ranked_on_first_byte_not_throughput() -> None:
     # The selector: ~10.3k prompt tokens for ~90 of answer, on the turn's
     # first-byte path. Ranking that pool by tokens/second optimises the sliver of
     # the call that is generation. `sort: "latency"` ranks on time-to-first-token,
@@ -229,7 +245,7 @@ async def test_a_classifier_call_is_ranked_on_latency_not_throughput() -> None:
     )
     routing = captured["body"]["provider"]
     assert routing["sort"] == "latency"
-    assert routing["preferred_max_latency"] == {"p50": 0.8, "p90": 2.0, "p99": 4.0}
+    assert routing["preferred_max_latency"] == {"p50": 1.0, "p90": 2.0, "p99": 5.0}
     # Same filtered pool as every other call — this re-ranks, it does not narrow.
     assert routing["data_collection"] == "deny"
     assert routing["require_parameters"] is True
@@ -238,7 +254,7 @@ async def test_a_classifier_call_is_ranked_on_latency_not_throughput() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_caller_routing_preference_outranks_the_classifier_default() -> None:
+async def test_a_caller_routing_preference_outranks_the_first_byte_axis() -> None:
     # The ordering documented in section 3b, asserted on the wire. The classifier
     # policy REPLACES the sort key, so applying it after the caller's preference
     # would silently overrule a caller who asked for price — a trade that is
@@ -254,13 +270,13 @@ async def test_a_caller_routing_preference_outranks_the_classifier_default() -> 
     )
     routing = captured["body"]["provider"]
     assert routing["sort"] == "price"
-    assert routing["preferred_max_latency"] == {"p50": 0.8, "p90": 2.0, "p99": 4.0}
+    assert routing["preferred_max_latency"] == {"p50": 1.0, "p90": 2.0, "p99": 5.0}
     assert routing["data_collection"] == "deny"
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_latency_critical_without_json_mode_still_takes_the_classifier_policy() -> None:
+async def test_latency_critical_without_json_mode_still_flips_the_axis() -> None:
     # `latency_critical` is a statement about the call's COST SHAPE, not about its
     # output format, and the branch treats it as authoritative over `structured`.
     # Pinned because nothing today exercises the combination: the one classifier we
@@ -272,7 +288,7 @@ async def test_latency_critical_without_json_mode_still_takes_the_classifier_pol
     routing = captured["body"]["provider"]
     assert "response_format" not in captured["body"]
     assert routing["sort"] == "latency"
-    assert routing["preferred_max_latency"] == {"p50": 0.8, "p90": 2.0, "p99": 4.0}
+    assert routing["preferred_max_latency"] == {"p50": 1.0, "p90": 2.0, "p99": 5.0}
     assert routing["data_collection"] == "deny"
     await provider.aclose()
 
@@ -387,17 +403,6 @@ async def test_structured_tool_call_preserves_the_latency_classification() -> No
 
 
 @pytest.mark.asyncio
-async def test_plain_chat_is_not_tail_bounded() -> None:
-    # A chat turn reaches the fastest endpoint directly and is dominated by
-    # generation, not first-byte: bounding it there would only shrink the pool.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req())
-    assert "preferred_max_latency" not in captured["body"]["provider"]
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
 async def test_cache_session_key_rides_as_a_top_level_field() -> None:
     # OpenRouter's sticky routing keys on a top-level `session_id`, NOT on
     # anything inside the provider block. Placement is the whole test: a key
@@ -426,6 +431,7 @@ async def test_cache_session_key_leaves_the_routing_policy_untouched() -> None:
         "data_collection": "deny",
         "require_parameters": True,
         "allow_fallbacks": True,
+        "preferred_max_latency": {"p50": 1.0, "p90": 2.0, "p99": 5.0},
     }
     await provider.aclose()
 
