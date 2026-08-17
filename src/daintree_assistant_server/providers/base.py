@@ -128,14 +128,29 @@ class ProviderChatRequest:
     # growing conversation in order to send them back to the host already holding
     # that prefix. This is that key — routing metadata, never prompt content.
     #
-    # It is NOT the client's session id. The value is a pseudonym derived from it
-    # (see ``ChatOrchestrator._cache_session_key``): the field crosses to a third
-    # party, and a raw client identifier has no business doing so. The name says
-    # ``cache_`` precisely so a future caller does not read ``session_id`` and
-    # forward the real one. ``repr=False`` keeps it out of logs alongside
-    # ``api_key`` — it is a stable per-session correlator even though it is
-    # hashed.
+    # WHAT IT NAMES depends on which calls share a prefix, and that is not always a
+    # session. A conversation is keyed per session, the skill selector per catalog
+    # revision, a utility task per task id (docs/PROVIDER_POLICY.md section 3a).
+    #
+    # It is NEVER the client's session id, whatever it names. Where the value does
+    # derive from one, it is a salted pseudonym (see
+    # ``ChatOrchestrator._cache_session_key``): the field crosses to a third party,
+    # and a raw client identifier has no business doing so. The name says ``cache_``
+    # precisely so a future caller does not read ``session_id`` and forward the real
+    # one. ``repr=False`` keeps it out of logs alongside ``api_key`` — a
+    # session-derived key is a stable correlator even hashed. (The selector and task
+    # keys carry no caller-derived data at all, but they ride the same field and
+    # inherit the same discipline rather than earning an exception.)
     cache_session_id: str | None = field(default=None, repr=False)
+    # Declares this call's COST SHAPE to the router: a classifier whose answer is
+    # a handful of tokens, so its wall-clock is prefill plus a rounding error.
+    # A router that ranks endpoints has to be told which axis to rank on, and the
+    # right answer differs between a chat turn (tokens/second, because generation
+    # dominates) and this (time-to-first-token, because nothing else exists).
+    # Set it on a call whose output is small AND whose latency a user is waiting
+    # on; see `RoutingPolicy.for_classifier_call`. It changes routing only —
+    # never the prompt, the model, or the parameters.
+    latency_critical: bool = False
 
 
 @dataclass

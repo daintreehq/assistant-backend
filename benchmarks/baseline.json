@@ -5,7 +5,8 @@
     "skills": 33
   },
   "identity": {
-    "endpoint_sort": "throughput",
+    "classifier_endpoint_sort": "latency",
+    "default_endpoint_sort": "throughput",
     "model": "deepseek/deepseek-v4-flash-0731",
     "privacy_mode": "no_training",
     "public_model": "daintree-assistant"

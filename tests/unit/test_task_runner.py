@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,11 @@ from pydantic import SecretStr
 
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError, upstream_error, upstream_timeout
-from daintree_assistant_server.services.task_runner import TaskRunner, build_profiles
+from daintree_assistant_server.services.task_runner import (
+    TaskRunner,
+    _affinity_key,
+    build_profiles,
+)
 
 TEST_API_KEY = SecretStr("test-caller-key")
 
@@ -67,10 +72,11 @@ async def test_utility_task_runs_non_thinking_without_headroom(
     profile = task_runner.profiles["terminal_summarize"]
     assert req.max_tokens == profile.max_output_tokens
     assert req.max_tokens < settings.thinking_headroom_tokens
-    # And no upstream cache-affinity key: a utility task is one self-contained
-    # call over text the client supplied, not a turn of a growing conversation,
-    # so there is no per-session prefix for an endpoint to hold.
-    assert req.cache_session_id is None
+    # And a cache-affinity key keyed by TASK, not by caller: a utility task is one
+    # self-contained call over text the client supplied, so the calls that share a
+    # prefix are the ones that share a task id. Per task rather than one key for
+    # all of them, so two tasks cannot evict each other's sticky endpoint.
+    assert req.cache_session_id == "daintree-task-terminal_summarize"
 
 
 @pytest.mark.asyncio
@@ -160,6 +166,55 @@ async def test_lenient_json_with_code_fence(task_runner: TaskRunner, fake_provid
 
 
 @pytest.mark.asyncio
+async def test_task_affinity_is_shared_within_a_task_and_distinct_between_tasks(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """The property, not the derivation: what shares a prefix shares a key.
+
+    A task's system prompt is server-owned and identical for everyone who runs it,
+    so the calls that can reuse an endpoint's cached prefix are the ones that share
+    a TASK — not the ones that share a caller. Two tasks must not share, or each
+    evicts the other from an endpoint holding a prefix it does not have.
+    """
+    fake_provider.complete_result = make_result(
+        content=json.dumps({"reason": "r", "confidence": 0.5, "matched": True})
+    )
+    await task_runner.run(
+        TaskRequest(task="terminal_judge", input={"question": "a", "tail": "x"}),
+        api_key=TEST_API_KEY,
+    )
+    await task_runner.run(
+        TaskRequest(task="terminal_judge", input={"question": "totally different", "tail": "y"}),
+        api_key=SecretStr("a-different-callers-key"),
+    )
+    fake_provider.complete_result = make_result(content="Tests are green.")
+    await _run(task_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
+
+    first, second, other_task = (r.cache_session_id for r in fake_provider.requests)
+    assert first is not None
+    assert first == second, "task affinity must not vary with caller or input"
+    assert other_task != first, "two tasks sharing one key would evict each other"
+
+
+def test_every_task_affinity_key_is_safe_to_send_upstream() -> None:
+    """Swept over the whole registry, because the key crosses to a third party.
+
+    A task id reaches the wire verbatim — unhashed, unlike the session-derived key
+    — which is only sound while every id is a server-owned identifier. This is the
+    gate on that: a profile added with a space, a slash or unbounded length would
+    otherwise surface as an inscrutable upstream 400 on that task alone.
+    """
+    for task_id in build_profiles():
+        key = _affinity_key(task_id)
+        assert key.startswith("daintree-task-")
+        assert len(key) <= 256, "OpenRouter caps the affinity key"
+        assert re.fullmatch(r"[A-Za-z0-9._-]+", key), (
+            f"task id {task_id!r} produces an affinity key with characters that are "
+            "not safe to send verbatim as a router-level identifier"
+        )
+
+
+@pytest.mark.asyncio
 async def test_json_repair_path(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     results = iter(
         [
@@ -174,6 +229,12 @@ async def test_json_repair_path(task_runner: TaskRunner, fake_provider: FakeProv
     # The repair retry carries the task-specific hint (not just the generic instruction).
     repair_text = fake_provider.requests[1].messages[-1]["content"]
     assert "matched" in repair_text and "confidence" in repair_text
+    # And the same affinity key. The repair replays the first attempt plus one
+    # instruction, so the endpoint that just prefilled it answers cheapest — and
+    # this request is rebuilt field by field, which is where a key gets dropped.
+    first, repair = fake_provider.requests
+    assert repair.cache_session_id == first.cache_session_id
+    assert repair.cache_session_id == "daintree-task-terminal_judge"
 
 
 @pytest.mark.asyncio

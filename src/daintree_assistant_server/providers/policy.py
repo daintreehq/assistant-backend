@@ -95,6 +95,26 @@ class EndpointSort(StrEnum):
 # they just stop winning.
 STRUCTURED_LATENCY_BOUND: dict[str, float] = {"p90": 2.0, "p99": 5.0}
 
+# The policy applied to CLASSIFIER calls — a structured call whose output is a
+# handful of tokens and whose wall-clock is therefore almost entirely prefill.
+# The skill selector is the case that matters: ~10.3k prompt tokens in, ~90
+# completion tokens out (measured over 438 trials, `benchmarks/skill_selection`),
+# sitting directly on the turn's first-byte path.
+#
+# ``sort: "latency"`` ranks the eligible endpoints by measured time-to-first-token.
+# ``sort: "throughput"`` ranks by tokens/second — how fast the ~90 tokens arrive
+# once prefill is done, which at ~100 tok/s is ~0.9s of that 2.044s. That is not
+# nothing, and the case for re-ranking does not pretend it is: the point is that
+# the OTHER ~55% is the half that moves. It is prefill over 10.3k tokens plus
+# queueing, it scales with the catalog, and it is what an affinity key can drive
+# toward zero.
+#
+# The tail bound is kept and tightened underneath, because the two answer different
+# questions: the sort ranks on central tendency, the bound deprioritises an
+# endpoint whose PERCENTILES are bad. The same run measured p99 9.878s against
+# that p50 — a spread the sort alone would not have caught.
+CLASSIFIER_LATENCY_BOUND: dict[str, float] = {"p50": 0.8, "p90": 2.0, "p99": 4.0}
+
 
 @dataclass(frozen=True)
 class RoutingPolicy:
@@ -154,6 +174,25 @@ class RoutingPolicy:
         if self.preferred_max_latency is not None:
             return self
         return replace_policy(self, preferred_max_latency=dict(STRUCTURED_LATENCY_BOUND))
+
+    def for_classifier_call(self) -> RoutingPolicy:
+        """This policy re-ranked for a tiny-output, prefill-bound call.
+
+        Unlike :meth:`for_structured_call` this REPLACES the sort key, so it is
+        applied BEFORE a caller preference rather than after (see
+        ``OpenRouterProvider._build_body``): the latency ranking is the server's
+        default for this call shape, and a caller who names their own ``sort``
+        still overrides it. The bound is additive and survives either way.
+        """
+        return replace_policy(
+            self,
+            sort=EndpointSort.LATENCY,
+            preferred_max_latency=(
+                self.preferred_max_latency
+                if self.preferred_max_latency is not None
+                else dict(CLASSIFIER_LATENCY_BOUND)
+            ),
+        )
 
     def merged_with(self, preference: RoutingPreference | None) -> RoutingPolicy:
         """Apply a validated caller preference on top of this policy.

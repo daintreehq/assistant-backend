@@ -30,6 +30,7 @@ OpenRouter-specific details separate this from a direct-to-DeepSeek adapter:
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import itertools
 import json
 import os
@@ -61,7 +62,7 @@ from .base import (
     ProviderToolCallResult,
     ProviderUsage,
 )
-from .policy import DEFAULT_POLICY
+from .policy import DEFAULT_POLICY, RoutingPreference
 from .sse import (
     ChunkShapeError,
     SseProtocolError,
@@ -106,6 +107,12 @@ _HEADER_SAFE_MAX = 0x7E
 
 # Cap on the logged serving-endpoint name ("CoreWeave", "Baidu", …).
 _ENDPOINT_NAME_CAP = 64
+
+# Length of the routing-cohort suffix on an affinity key (see `_cohort_scoped`).
+# It separates cohorts, it does not authenticate one: a collision costs two
+# cohorts a shared sticky record, which is the pre-existing behaviour, not a
+# correctness failure. Short enough to keep the key legible upstream.
+_COHORT_DIGEST_CHARS = 8
 
 # Attribution headers. OpenRouter uses them for its public model/app rankings;
 # they carry no auth weight and are safe to send on every call.
@@ -160,11 +167,12 @@ _VERIFY_TIMEOUT_SECONDS = 10.0
 # outage a hard 404/503 ("No allowed providers are available").
 _PROVIDER_ROUTING: dict[str, Any] = DEFAULT_POLICY.to_wire()
 
-# Routing for STRUCTURED calls — anything carrying ``response_format`` (the skill
-# selector, the utility tasks, the skill-learning gate, the skill
-# builder/improver, and a main call whose client asked for JSON mode). Same
-# policy plus a tail bound, because these calls have the opposite cost shape to a
-# chat turn.
+# Routing for STRUCTURED calls — anything carrying ``response_format`` that is not
+# also flagged ``latency_critical``: the utility tasks, the skill-learning gate,
+# the skill builder/improver, and a main call whose client asked for JSON mode.
+# (The selector carries ``response_format`` too, but takes the CLASSIFIER policy
+# below; that flag wins.) Same policy plus a tail bound, because these calls have
+# the opposite cost shape to a chat turn.
 #
 # WHY A SEPARATE POLICY. ``require_parameters`` drops every endpoint that does not
 # implement ``response_format``, and for this model that includes the fastest one
@@ -186,10 +194,71 @@ _PROVIDER_ROUTING: dict[str, Any] = DEFAULT_POLICY.to_wire()
 # endpoints qualifying, not to name a favourite. Measured over 10 selector-shaped
 # calls: TTFT median 1222ms -> 635ms, worst 1811ms -> 920ms.
 #
-# Throughput stays the sort key underneath: among endpoints that answer promptly we
-# still want the fastest generator, which matters for the longer utility tasks
-# (terminal summarize/extract) that share this policy with the tiny selector call.
+# Throughput stays the sort key here: among endpoints that answer promptly we still
+# want the fastest generator, and the calls left on this policy are the ones where
+# that pays — terminal summarize/extract emit up to 1200 tokens. The selector, which
+# emits ~90, is no longer one of them; it takes the classifier policy below.
 _PROVIDER_ROUTING_STRUCTURED: dict[str, Any] = DEFAULT_POLICY.for_structured_call().to_wire()
+
+# Routing for CLASSIFIER calls — a structured call that declares
+# ``latency_critical`` because its answer is a handful of tokens. Today that is the
+# skill selector, and the selector alone: it emits ~90 completion tokens against
+# ~10.3k of prompt, and a winning speculation makes the turn's whole
+# time-to-first-token equal to this call's latency.
+#
+# WHY IT IS NOT THE STRUCTURED POLICY. That policy sorts by THROUGHPUT and bolts a
+# tail bound on top, which is the right compromise for the utility tasks it also
+# serves — terminal summarize/extract emit up to 1200 tokens, so tokens/second is
+# real money there.
+#
+# BE HONEST ABOUT THE SPLIT, because the easy version of this argument is wrong.
+# Generation is NOT negligible for the selector: ~90 tokens at ~100 tok/s is ~0.9s
+# of a 2.044s p50, call it 45%. Two things still make first-byte the right axis.
+# The first is that the OTHER 55% is the part that scales — it is prefill over
+# 10.3k tokens plus queueing, and it is what an affinity key can drive toward zero
+# while generation stays exactly where it is. The second is the tail: the same run
+# measured p99 9.878s and max 10.723s against a p50 of 2.044s, and a spread like
+# that is a slow first byte, not a slow generator.
+#
+# Note what that means for measuring a change here: the number to compare is the
+# selector call's COMPLETE latency, not its TTFT. An endpoint that answers fast and
+# then dribbles could win a TTFT benchmark and lose the user's turn.
+#
+# The two policies are otherwise identical, privacy floor included — this is a
+# ranking change within the same filtered pool, not a different pool.
+_PROVIDER_ROUTING_CLASSIFIER: dict[str, Any] = DEFAULT_POLICY.for_classifier_call().to_wire()
+
+
+def _cohort_scoped(
+    cache_session_id: str, provider_block: dict[str, Any], routing: RoutingPreference | None
+) -> str:
+    """Scope an affinity key to the pool of endpoints the call can actually reach.
+
+    A sticky key names an endpoint, but only endpoints that pass this request's
+    FILTERS are reachable. Two calls that share a key while routing under
+    different filters therefore fight over one record: the stricter call cannot
+    use the endpoint the looser one pinned, so it re-elects, and the looser call
+    then inherits a pin it never asked for. Under a **shared server credential**
+    that is no longer one caller's problem — sticky records are scoped to the API
+    key, so one caller's ``zdr`` or ``only`` would be re-pointing every other
+    caller's selector traffic. Folding the emitted pool into the key gives each
+    routing cohort its own record instead.
+
+    The suffix is derived from the ``provider`` block THIS request sends, not from
+    a re-derivation of the policy, so it cannot drift from what was actually
+    routed. Sorted keys: the block's key ORDER is deliberately fixed for prompt-
+    cache reasons, but two blocks with the same constraints in any order are the
+    same cohort, and the digest should say so.
+
+    The default policy — overwhelmingly the common path — gets **no suffix at
+    all**, so the shared selector and task keys stay short, readable in an upstream
+    dashboard, and stable across a deploy that never touches routing.
+    """
+    if routing is None:
+        return cache_session_id
+    canonical = json.dumps(provider_block, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:_COHORT_DIGEST_CHARS]
+    return f"{cache_session_id}-{digest}"
 
 
 def _extract_upstream_error(
@@ -854,8 +923,21 @@ class OpenRouterProvider:
             # The overwhelmingly common path. Reuse the prebuilt module-level dict
             # rather than re-rendering: this block is serialized into every request
             # body, and the prompt cache keys on a byte-identical prefix.
+            if request.latency_critical:
+                body["provider"] = _PROVIDER_ROUTING_CLASSIFIER
+            else:
+                body["provider"] = (
+                    _PROVIDER_ROUTING_STRUCTURED if structured else _PROVIDER_ROUTING
+                )
+        elif request.latency_critical:
+            # Classifier defaults FIRST, then the caller's preference on top. The
+            # order is the whole point: `for_classifier_call` replaces the sort key,
+            # so applying it last would silently overrule a caller who asked for
+            # `price` — and the speed/price trade is legitimately theirs (they hold
+            # the key and pay the bill). The tail bound is additive and survives
+            # either ordering. The privacy floor is not caller-derived at all.
             body["provider"] = (
-                _PROVIDER_ROUTING_STRUCTURED if structured else _PROVIDER_ROUTING
+                DEFAULT_POLICY.for_classifier_call().merged_with(request.routing).to_wire()
             )
         else:
             policy = DEFAULT_POLICY.merged_with(request.routing)
@@ -870,17 +952,23 @@ class OpenRouterProvider:
         # base prompt plus whichever optional row happens to come first (skill
         # bodies, else the integrations block, else startup), so it changes on
         # every selector topic shift and differs per machine on a skill-less turn.
-        # Naming the key ourselves replaces that accident with a session.
+        # Naming the key ourselves replaces that accident with something meant.
+        #
+        # WHAT THE KEY NAMES varies by call and is chosen by the caller of this
+        # adapter, not here: a session for a conversation, the catalog revision for
+        # the selector, the task id for a utility task (section 3a).
         #
         # A SIBLING of `provider`, deliberately not part of it: the block above is
         # the endpoint-selection POLICY (filters, sort, fallbacks) and is reused as
         # a prebuilt module-level dict precisely because it must not vary per
-        # request. Affinity is per-session by definition, so it rides its own
-        # top-level field and leaves that dict untouched. It is likewise not
-        # `provider.order`, which OpenRouter documents as DISABLING sticky routing
-        # — see docs/PROVIDER_POLICY.md section 3.
+        # request. Affinity varies per cohort, so it rides its own top-level field
+        # and leaves that dict untouched. It is likewise not `provider.order`, which
+        # OpenRouter documents as DISABLING sticky routing — see
+        # docs/PROVIDER_POLICY.md section 3.
         if request.cache_session_id:
-            body["session_id"] = request.cache_session_id
+            body["session_id"] = _cohort_scoped(
+                request.cache_session_id, body["provider"], request.routing
+            )
         if stream:
             body["stream"] = True
             if request.include_usage:
@@ -1017,6 +1105,9 @@ class OpenRouterProvider:
             # whatever endpoint the default hash elects — off the node holding the
             # prefix, which is the one thing the key exists to prevent.
             cache_session_id=request.cache_session_id,
+            # Same class of omission: this sub-request is the parent's call, so it
+            # inherits the parent's cost shape and must be ranked on the same axis.
+            latency_critical=request.latency_critical,
         )
         result = await self.complete(sub)
         calls = result.tool_calls

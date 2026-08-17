@@ -561,6 +561,21 @@ def _p_workflow_resume(raw: str, req: TaskRequest) -> dict[str, Any]:
     return out.model_dump()
 
 
+# Namespace for a task's upstream cache-affinity key. Shared by every caller of a
+# given task on purpose — see the field's comment at the call site.
+_CACHE_AFFINITY_PREFIX = "daintree-task-"
+
+
+def _affinity_key(task_id: str) -> str:
+    """The upstream cache-affinity key for a task call.
+
+    A pure function of the SERVER-owned task id — no caller input reaches it, so
+    it is safe to hand to a third party verbatim, unlike the session-derived key
+    on the main path which is hashed precisely because it is not.
+    """
+    return f"{_CACHE_AFFINITY_PREFIX}{task_id}"
+
+
 # --------------------------------------------------------------------------
 # Profile registry.
 # --------------------------------------------------------------------------
@@ -890,6 +905,16 @@ class TaskRunner:
             # choice honoured only on /respond would be honoured exactly where the
             # user can see it and dropped everywhere else.
             routing=routing,
+            # Cache affinity, keyed by TASK rather than by caller. A task's system
+            # prompt is server-owned and identical for everyone who runs it, so the
+            # calls that share a prefix are the ones that share a task id — not the
+            # ones that share a session. Left absent, OpenRouter would hash the
+            # first system and first non-system message, and the latter is the
+            # caller's terminal tail or transcript: a different key every call, so
+            # affinity would never engage. Per task and not one key for all tasks,
+            # so `terminal_summarize` and `checkpoint` cannot evict each other from
+            # an endpoint holding a prefix the other does not have.
+            cache_session_id=_affinity_key(profile.id),
         )
 
         result = await self._complete_with_retry(provider_request, budget=budget)
@@ -919,6 +944,10 @@ class TaskRunner:
                 # ...and the same routing, so a repair cannot land on an endpoint
                 # the original call was routed away from.
                 routing=routing,
+                # ...and the same affinity key: the repair replays the whole first
+                # attempt plus one instruction, so the endpoint that just prefilled
+                # it is the one that can answer cheapest.
+                cache_session_id=_affinity_key(profile.id),
             )
             repair = await self._complete_with_retry(repair_request, budget=budget)
             usage = _sum_usage(usage, repair.usage)

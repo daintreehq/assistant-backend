@@ -19,7 +19,11 @@ from daintree_assistant_server.providers.openrouter import (
     OpenRouterProvider,
     _extract_upstream_error,
 )
-from daintree_assistant_server.providers.policy import RoutingPreference
+from daintree_assistant_server.providers.policy import (
+    EndpointSort,
+    PrivacyMode,
+    RoutingPreference,
+)
 from daintree_assistant_server.providers.retry import retry_upstream
 
 _BASE = "https://openrouter.ai/api/v1"
@@ -213,6 +217,176 @@ async def test_structured_calls_route_under_the_tail_bounded_policy() -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_classifier_call_is_ranked_on_latency_not_throughput() -> None:
+    # The selector: ~10.3k prompt tokens for ~90 of answer, on the turn's
+    # first-byte path. Ranking that pool by tokens/second optimises the sliver of
+    # the call that is generation. `sort: "latency"` ranks on time-to-first-token,
+    # which is the rest of it (docs/PROVIDER_POLICY.md section 3b).
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(
+        _req(response_format={"type": "json_object"}, latency_critical=True)
+    )
+    routing = captured["body"]["provider"]
+    assert routing["sort"] == "latency"
+    assert routing["preferred_max_latency"] == {"p50": 0.8, "p90": 2.0, "p99": 4.0}
+    # Same filtered pool as every other call — this re-ranks, it does not narrow.
+    assert routing["data_collection"] == "deny"
+    assert routing["require_parameters"] is True
+    assert routing["allow_fallbacks"] is True
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_caller_routing_preference_outranks_the_classifier_default() -> None:
+    # The ordering documented in section 3b, asserted on the wire. The classifier
+    # policy REPLACES the sort key, so applying it after the caller's preference
+    # would silently overrule a caller who asked for price — a trade that is
+    # legitimately theirs. The floor is not theirs, and does not move.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(
+        _req(
+            response_format={"type": "json_object"},
+            latency_critical=True,
+            routing=RoutingPreference(sort=EndpointSort.PRICE),
+        )
+    )
+    routing = captured["body"]["provider"]
+    assert routing["sort"] == "price"
+    assert routing["preferred_max_latency"] == {"p50": 0.8, "p90": 2.0, "p99": 4.0}
+    assert routing["data_collection"] == "deny"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_latency_critical_without_json_mode_still_takes_the_classifier_policy() -> None:
+    # `latency_critical` is a statement about the call's COST SHAPE, not about its
+    # output format, and the branch treats it as authoritative over `structured`.
+    # Pinned because nothing today exercises the combination: the one classifier we
+    # ship also sets response_format, so a refactor that quietly made the flag
+    # conditional on it would break nothing visible.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(latency_critical=True))
+    routing = captured["body"]["provider"]
+    assert "response_format" not in captured["body"]
+    assert routing["sort"] == "latency"
+    assert routing["preferred_max_latency"] == {"p50": 0.8, "p90": 2.0, "p99": 4.0}
+    assert routing["data_collection"] == "deny"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_default_routed_call_keeps_its_affinity_key_unsuffixed() -> None:
+    # The common path, and the reason the cohort suffix is conditional: the shared
+    # selector and task keys are meant to be short, legible upstream, and identical
+    # across every caller on the default policy. A suffix that appeared
+    # unconditionally would still be correct, but it would put a routing digest in
+    # a key that has no routing variation to disambiguate.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(cache_session_id="daintree-selector-abc123"))
+    assert captured["body"]["session_id"] == "daintree-selector-abc123"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_caller_routing_preference_puts_the_call_in_its_own_affinity_cohort() -> None:
+    """THE point of the suffix, and it is about a SHARED credential.
+
+    A sticky key names an endpoint; only endpoints passing this request's filters
+    are reachable. Two calls sharing a key under different filters fight over one
+    record — and once one server-held key funds every caller, that stops being one
+    caller's problem and becomes one caller's `zdr` re-pointing everyone else's
+    selector traffic.
+    """
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    base = "daintree-selector-abc123"
+
+    await provider.complete(_req(cache_session_id=base))
+    default_key = captured["body"]["session_id"]
+
+    await provider.complete(
+        _req(cache_session_id=base, routing=RoutingPreference(privacy=PrivacyMode.ZDR))
+    )
+    zdr_key = captured["body"]["session_id"]
+
+    await provider.complete(
+        _req(cache_session_id=base, routing=RoutingPreference(only=("deepinfra",)))
+    )
+    only_key = captured["body"]["session_id"]
+
+    assert len({default_key, zdr_key, only_key}) == 3, (
+        "two routing cohorts share one sticky record; the stricter one will "
+        "re-elect and the looser one will inherit a pin it never asked for"
+    )
+    # Still recognisably the same key underneath — the suffix scopes it, it does
+    # not replace it, so an upstream dashboard still groups the cohorts together.
+    for key in (zdr_key, only_key):
+        assert key.startswith(f"{base}-")
+    assert len(only_key) <= 256
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_the_cohort_suffix_tracks_the_pool_and_not_the_preference_object() -> None:
+    # Derived from the `provider` block actually emitted, so it cannot drift from
+    # what was really routed. Two preferences that render the SAME pool are the
+    # same cohort and must share a record — splitting them would halve the warmth
+    # for no benefit.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+
+    await provider.complete(
+        _req(cache_session_id="k", routing=RoutingPreference(sort=EndpointSort.THROUGHPUT))
+    )
+    explicit_default = captured["body"]["session_id"]
+    explicit_block = captured["body"]["provider"]
+
+    await provider.complete(
+        _req(
+            cache_session_id="k",
+            routing=RoutingPreference(sort=EndpointSort.THROUGHPUT, privacy=PrivacyMode.NO_TRAINING),
+        )
+    )
+    assert captured["body"]["provider"] == explicit_block
+    assert captured["body"]["session_id"] == explicit_default
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_structured_tool_call_preserves_the_latency_classification() -> None:
+    # Same trap as the api_key and affinity cases: this sub-request is rebuilt
+    # field by field. Dropping the flag would silently re-rank the call by
+    # tokens/second while every comment above it claims otherwise.
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "id": "x",
+                "created": 0,
+                "model": "m",
+                "choices": [{"index": 0, "message": {"role": "assistant", "content": "{}"}}],
+                "usage": {},
+            },
+        )
+
+    provider = _provider(handler)
+    await provider.structured_tool_call(
+        _req(latency_critical=True),
+        function_name="pick",
+        function_schema={"type": "object", "properties": {}},
+    )
+    assert captured["body"]["provider"]["sort"] == "latency"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
 async def test_plain_chat_is_not_tail_bounded() -> None:
     # A chat turn reaches the fastest endpoint directly and is dominated by
     # generation, not first-byte: bounding it there would only shrink the pool.
@@ -270,9 +444,14 @@ async def test_no_cache_session_key_sends_no_field() -> None:
 @pytest.mark.asyncio
 async def test_cache_session_key_survives_a_caller_routing_preference() -> None:
     # The caller-preference branch rebuilds the provider block per request instead
-    # of reusing the prebuilt dict. Affinity is a sibling of that block, so it must
-    # be unaffected — and the caller's own allow/deny list must still be what
-    # filters the pool the sticky endpoint is chosen from.
+    # of reusing the prebuilt dict. Affinity must survive that — it is a SIBLING of
+    # the block, not part of it — and the caller's own allow/deny list must still be
+    # what filters the pool the sticky endpoint is chosen from.
+    #
+    # Survives, not "is byte-identical": the key is now scoped to the routing cohort
+    # (see the cohort tests above), because a caller filtered to a different pool
+    # cannot share a sticky record with one that is not. What must not change is the
+    # session the key names.
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.complete(
@@ -281,9 +460,10 @@ async def test_cache_session_key_survives_a_caller_routing_preference() -> None:
             routing=RoutingPreference(only=("deepinfra",)),
         )
     )
-    assert captured["body"]["session_id"] == "daintree-main-abc123"
+    assert captured["body"]["session_id"].startswith("daintree-main-abc123")
     assert captured["body"]["provider"]["only"] == ["deepinfra"]
     assert "order" not in captured["body"]["provider"]
+    assert "session_id" not in captured["body"]["provider"]
     await provider.aclose()
 
 

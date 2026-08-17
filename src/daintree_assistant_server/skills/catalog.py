@@ -157,9 +157,16 @@ class Catalog:
         themselves and the reason budget they select — renders in the short tail
         after this block; when it was an inline per-skill marker, activating an
         early-sorting skill
-        invalidated most of the prompt on DeepSeek's content-prefix cache (the
-        selector cannot use ``prompt_cache_key`` at all — the provider withholds it
-        whenever ``response_format`` is set, which the selector always sets).
+        invalidated most of the prompt on DeepSeek's content-prefix cache (no call
+        sends ``prompt_cache_key`` — with ``require_parameters`` on, an unadvertised
+        parameter can empty the eligible-endpoint pool — so a shared content prefix
+        is the only thing the upstream can match on).
+
+        Byte-stability is half of what makes that prefix pay. The other half is
+        that selector calls carry a shared cache-affinity key
+        (``selector._affinity_key``), because a prefix cache is node-local: these
+        identical bytes are worth nothing if consecutive calls land on different
+        endpoints.
         """
         return [s.selector_view() for s in self._skills if s.id in self._selectable_ids]
 

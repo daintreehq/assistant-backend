@@ -81,7 +81,14 @@ def capture() -> dict[str, Any]:
             "model": OPENROUTER_MODEL,
             "public_model": PUBLIC_MODEL_ID,
             "privacy_mode": DEFAULT_POLICY.privacy.value,
-            "endpoint_sort": DEFAULT_POLICY.sort.value,
+            # Both sorts, because there are now two answers and the interesting
+            # one is that they DIFFER: an interactive turn is ranked on
+            # tokens/second, a classifier call on time-to-first-token
+            # (docs/PROVIDER_POLICY.md section 3b). Recording only the default
+            # would let the classifier's ranking — the one on the turn's
+            # first-byte path — move without leaving a trace in the diff.
+            "default_endpoint_sort": DEFAULT_POLICY.sort.value,
+            "classifier_endpoint_sort": DEFAULT_POLICY.for_classifier_call().sort.value,
         },
         "prompt": {
             "base_prompt_bytes": len(loader.base_prompt().encode("utf-8")),

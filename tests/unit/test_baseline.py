@@ -69,3 +69,15 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     identity = _baseline()["identity"]
     assert identity["model"] == OPENROUTER_MODEL  # type: ignore[index]
     assert identity["privacy_mode"] == DEFAULT_POLICY.privacy.value  # type: ignore[index]
+    # The sorts are asserted, not merely recorded. `compare()` only checks the
+    # BANDED numeric metrics, so an identity string it captures but nobody asserts
+    # drifts in silence — which is exactly what happened to `endpoint_sort` until
+    # a second sort existed to notice it.
+    assert identity["default_endpoint_sort"] == DEFAULT_POLICY.sort.value  # type: ignore[index]
+    assert (
+        identity["classifier_endpoint_sort"]  # type: ignore[index]
+        == DEFAULT_POLICY.for_classifier_call().sort.value
+    )
+    # And they differ. If a future edit collapses them, the classifier policy has
+    # stopped doing the one thing it exists to do.
+    assert identity["classifier_endpoint_sort"] != identity["default_endpoint_sort"]  # type: ignore[index]

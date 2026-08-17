@@ -2902,22 +2902,35 @@ async def test_cache_session_key_is_stable_across_turns_and_unique_per_session(
 
 
 @pytest.mark.asyncio
-async def test_selector_call_carries_no_cache_session_key(
+async def test_selector_call_is_keyed_by_catalog_not_by_session(
     orchestrator: ChatOrchestrator, fake_provider: FakeProvider
 ) -> None:
-    # Deliberate exclusion, asserted so it stays deliberate. The selector has no
-    # growing per-session prefix to keep warm, and it shares a small structured
-    # pool fleet-wide — keying it per session would fragment that pool for nothing.
+    """The selector's affinity key must not carry the session — asserted from the
+    orchestrator's side, where the session key is in scope and the mistake is
+    therefore available to make.
+
+    Both halves matter. Keyed per session, the selector would splinter a prefix
+    whose entire value is that every caller shares it. Keyed with nothing, the
+    router hashes the user's own words and affinity never engages at all
+    (docs/PROVIDER_POLICY.md section 3a).
+    """
     skill_id = sorted(orchestrator.catalog.known_ids)[0]
     fake_provider.selection_result = selection_result([skill_id])
     fake_provider.complete_result = make_result(content="done")
 
+    request = _affinity_request()
     await orchestrator.complete(
-        _affinity_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
     )
 
+    session_key = orchestrator._cache_session_key(request)
+    assert session_key is not None
     assert fake_provider.selection_requests
-    assert all(r.cache_session_id is None for r in fake_provider.selection_requests)
+    for req in fake_provider.selection_requests:
+        assert req.cache_session_id == "daintree-selector-" + (
+            orchestrator.catalog.revision.rpartition(":")[2][:16]
+        )
+        assert req.cache_session_id != session_key
 
 
 def test_json_mode_main_call_uses_its_own_affinity_namespace(

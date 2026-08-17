@@ -113,9 +113,10 @@ field. The shipped default block is:
   single outage a hard 404.
 
 **Structured calls** route under the same policy plus a tail bound,
-`preferred_max_latency: {"p90": 2.0, "p99": 5.0}`. The trigger is purely
-mechanical — *any* request carrying `response_format` — which today means the
-selector, every utility task, the skill-learning gate, the skill
+`preferred_max_latency: {"p90": 2.0, "p99": 5.0}`. The trigger is mechanical —
+any request carrying `response_format` that is not also flagged `latency_critical`
+(§3b takes precedence) — which today means every
+utility task, the skill-learning gate, the skill
 builder/improver, and a main completion whose client asked for JSON mode. `require_parameters`
 already excludes the fastest endpoint for this model from that pool, and sorting
 the remainder by tokens/second is the wrong axis for a call that emits a
@@ -123,11 +124,6 @@ the remainder by tokens/second is the wrong axis for a call that emits a
 catastrophic tails (p99 12.6s, 13.9s). `preferred_max_latency` **deprioritises,
 never excludes**, so it cannot empty the pool. Measured over 10 selector-shaped
 calls: TTFT median 1222ms → 635ms, worst 1811ms → 920ms.
-
-No `prompt_cache_key` is sent: no endpoint for this model advertises the
-parameter, and with `require_parameters` on, sending an unadvertised parameter can
-empty the eligible pool. Prefix caching is implicit at whichever endpoint serves
-the request.
 
 ### 3a. Cache affinity — `session_id`, and why not `provider.order`
 
@@ -171,12 +167,72 @@ prefix is still reusable, and falls through to a per-machine MCP endpoint URL on
 turn with no active skill. That is not a policy anyone chose; it is a side effect
 of the message layout. Naming the key replaces it with the session.
 
-**Why the selector, utility tasks and skill learning send no key.** They have no
-growing per-session prefix for an endpoint to hold: each is one self-contained
-call, and the structured ones share a single small pool fleet-wide that a
-per-session key would only fragment. Skill learning additionally runs *after* the
-response, so pulling it onto the node serving that user's foreground turns would
-buy nothing.
+**The selector and the utility tasks are keyed the other way — SHARED, not per
+session.** Neither has a growing per-session prefix, so a per-session key would
+splinter them across endpoints for no gain. What they do have is a large prefix
+that is identical for *every* caller, and the right key for that is one key.
+
+| Call | Key | What the key holds warm |
+|---|---|---|
+| Main conversation | `daintree-main-<sha256(session id + salt)>` | that session's growing prefix |
+| Main, JSON mode | `daintree-main-json-<sha256(session id + salt)>` | ditto, minus the tool schemas |
+| Skill selector | `daintree-selector-<catalog revision digest>` | the ~10.3k-token catalog menu, fleet-wide |
+| Utility task | `daintree-task-<task id>` | that task's server-owned system prompt |
+
+**How widely "shared" actually shares is set by the credential, not by us.** A
+sticky record is scoped to the API key, and today every request is funded by the
+*caller's own*, so `daintree-selector-<revision>` gathers **one caller's**
+sessions onto one endpoint. It becomes literally fleet-wide the day a server-held
+key arrives — which is when it pays most, and also when the concentration caveat
+at the end of this section starts to matter. The key is written for that day; it
+is already the right key for today.
+
+The selector is the case worth stating plainly, because it is the largest
+invariant prefix in the system and it was the one call getting no affinity at
+all. `Catalog.selector_metadata` and `Selector._render_system` exist to make the
+catalog block byte-identical for every caller at a given revision — but a prefix
+cache is node-local, so identical bytes scattered across two dozen endpoints hit
+nothing. One shared key concentrates the fleet's selector traffic onto one
+endpoint and keeps the catalog resident there. The **catalog revision** is in the
+key because it is exactly what invalidates that prefix: skill learning can swap
+the catalog in place, and when it does the fleet should re-elect rather than stay
+pinned to a node warm for a catalog that no longer exists.
+
+Sending *no* key was worse than either option, and not by a little. The default
+derivation (below) hashes the first non-system message — for the selector, the
+user's own words; for a task, the caller's terminal tail or transcript. That hash
+differs on **every call**, so affinity never engaged, every call re-elected an
+endpoint, and every call re-paid the prefill. The measured signature is in
+`benchmarks/skill_selection`: 7.711s on a case's first trial, 1.606s on its
+second.
+
+Task keys are per task rather than one key for all of them, on the same logic
+that splits `daintree-main-json-` off `daintree-main-`: `terminal_summarize` and
+`checkpoint` have different prompts, and sharing a key would let each evict the
+other from an endpoint holding a prefix it does not have.
+
+**Skill learning still sends no key.** It runs *after* the response, so pulling it
+onto the node serving that user's foreground turns would buy nothing, and its
+builder/improver calls use a different model entirely.
+
+**A caller who overrides routing gets their own cohort.** A sticky key names an
+endpoint, but only endpoints that pass a request's *filters* are reachable — so
+two calls sharing a key under different filters fight over one record: the
+stricter one cannot use what the looser one pinned, re-elects, and the looser one
+then inherits a pin it never asked for. Harmless while each caller's own key
+scopes the record; corrosive the moment one server credential is shared, because
+then one caller's `zdr` or `only` is re-pointing everybody's selector traffic. So
+any request carrying a `routing` block has a short digest of the `provider` block
+it actually sent appended to its key:
+
+```
+daintree-selector-<catalog revision digest>-<routing cohort digest>
+```
+
+Derived from the emitted block rather than a re-derivation of the policy, so it
+cannot drift from what was really routed. Requests on the default policy — nearly
+all of them — get **no suffix**, which keeps the shared keys short and stable
+across any deploy that does not touch routing.
 
 **Why not `provider.order`.** It is the obvious hand-rolled alternative — carry
 the last serving endpoint and ask for it first — and it is the wrong one on three
@@ -198,6 +254,84 @@ pricing. And a caller on a non-default routing policy (`zdr`, or their own
 cache cohort regardless — a documented cost of honouring the preference, not
 something to engineer away. `session_id` is additive: it never narrows the pool,
 and the caller's own `only`/`ignore` still decides what that pool is.
+
+**The shared keys concentrate load, deliberately, and that is the thing to watch
+as traffic grows.** A sticky record is scoped to the API key, so today — with
+every request funded by the *caller's* own key — a shared selector key
+concentrates one user's selector calls, which is all it can do. On a server-held
+key it would concentrate the whole fleet's onto one endpoint, which is the point
+(that is what keeps the catalog resident) but is also the failure mode to
+monitor. It is not a hard pin: `allow_fallbacks` stays on, an error at the sticky
+endpoint leaves the record unchanged so the next call re-routes, and the record
+expires after 10 minutes idle. If one endpoint ever becomes the bottleneck, the
+fix is to shard the key (`daintree-selector-<revision>-<n>`) and trade some
+warmth for spread — not to drop it and go back to re-electing per call.
+
+The subtler half is **degradation, not saturation**: errors re-route, and idle
+expiry re-elects, but an endpoint that stays up and merely gets slow keeps its
+record — and busy shared traffic may never go idle long enough to expire. So
+`sort: "latency"` ranks the *election*, not the steady state. If that shows up in
+practice, the answer is a deliberate rotation term in the key, not removing the
+key; the selector's `endpoint` and `selector_cache_ratio` are already logged per
+turn, which is where the evidence would come from.
+
+### 3b. Classifier calls — ranked on time-to-first-token, not tokens/second
+
+A **classifier call** declares `latency_critical` on `ProviderChatRequest` and
+routes under a third block: the same filtered pool, ranked differently.
+
+```json
+{
+  "sort": "latency",
+  "data_collection": "deny",
+  "require_parameters": true,
+  "allow_fallbacks": true,
+  "preferred_max_latency": { "p50": 0.8, "p90": 2.0, "p99": 4.0 }
+}
+```
+
+Today exactly one call sets it: the **skill selector**. It is the only call in the
+system whose cost shape is inverted — measured over 438 trials
+(`benchmarks/skill_selection`), **~10.3k prompt tokens in, ~90 completion tokens
+out**, p50 2.044s. Its wall-clock is prefill; generation is under a second of it.
+And with a winning speculation the turn's entire time-to-first-token *is* this
+call's latency (`services/speculation.py`), so it is the single number a user
+experiences as "how fast is this thing".
+
+`sort: "throughput"` ranks endpoints by tokens/second — how fast the ~90 tokens
+arrive *after* prefill. `sort: "latency"` ranks by measured time-to-first-token,
+which for this shape is the whole call. The tail bound is kept underneath and
+tightened, because the two catch different failures: the sort ranks on a central
+tendency, while the bound is what deprioritises an endpoint whose *percentiles*
+are bad. The same run that measured p50 2.044s measured **p99 9.878s** — a sort
+alone would not have caught that, and `preferred_max_latency` still only
+deprioritises, so neither can empty the pool.
+
+Order of application matters when a caller sends their own `routing` block: the
+classifier defaults are applied **first** and the caller's preference merged on
+**top**, so a caller who names `sort: "price"` gets `sort: "price"` on the wire
+rather than having it silently overruled. Neither ordering can touch
+`data_collection: "deny"` (§4).
+
+Be precise about what that buys them, because "the caller still gets price" is
+half a sentence. The **bound stays** — it is a server-side tail guard, like the
+privacy floor, not part of the speed/price trade — so what they get is cheapest
+*among endpoints that answer promptly*, not cheapest outright. The structured
+policy has always behaved this way; the classifier bound is tighter, so the
+divergence is larger. If a caller ever needs unconditional price, that is a new
+preference to add deliberately, not something to reach by dropping the bound.
+
+Measuring a change to this policy: compare the selector call's **complete**
+latency, not its time-to-first-token. TTFT is what the sort ranks on, not what the
+turn waits for — the turn needs the whole JSON object — so an endpoint that starts
+fast and then dribbles wins a TTFT benchmark while losing the user's turn. Give
+each arm a distinct affinity namespace too, or the sticky record from arm A will
+serve arm B and the comparison measures nothing.
+
+No `prompt_cache_key` is sent: no endpoint for this model advertises the
+parameter, and with `require_parameters` on, sending an unadvertised parameter can
+empty the eligible pool. Prefix caching is implicit at whichever endpoint serves
+the request.
 
 ## 4. Privacy — what is and is not promised
 

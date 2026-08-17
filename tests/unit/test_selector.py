@@ -11,6 +11,7 @@ from pydantic import SecretStr
 from daintree_assistant_server.contracts.openai import ChatMessage
 from daintree_assistant_server.skills.selector import (
     Selector,
+    _affinity_key,
     build_selector_user_message,
     parse_select_args,
     sanitize_for_selector,
@@ -259,10 +260,17 @@ async def test_selector_uses_json_mode_and_is_hardcoded_non_thinking(
     assert req.thinking_disabled is True
     assert req.reasoning_effort is None
     assert req.max_tokens == settings.selector_max_output_tokens
-    # No upstream cache-affinity key, deliberately: the selector has no growing
-    # per-session prefix to keep warm, and it shares one small structured pool
-    # fleet-wide — a per-session key would only fragment that pool.
-    assert req.cache_session_id is None
+    # Ranked on time-to-first-token, not tokens/second: ~10.3k prompt tokens buy
+    # ~90 of answer, so throughput ranking optimises a quantity that barely exists
+    # (docs/PROVIDER_POLICY.md section 3b).
+    assert req.latency_critical is True
+    # And a SHARED cache-affinity key naming the catalog revision. Not per session
+    # — the catalog block is byte-identical for every caller, so one key keeps it
+    # resident on one endpoint, where a per-session key would splinter it and no
+    # key at all lets OpenRouter hash the user's own words into a value that
+    # differs on every call (section 3a).
+    digest = catalog.revision.rpartition(":")[2]
+    assert req.cache_session_id == f"daintree-selector-{digest[:16]}"
 
 
 @pytest.mark.asyncio
@@ -291,6 +299,96 @@ async def test_selector_repairs_then_succeeds(selector: Selector, fake_provider:
     decision = await selector.select(_msgs("task"), [], api_key=TEST_API_KEY)
     assert decision.skill_ids == [target]
     assert len(fake_provider.requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_the_repair_attempt_reuses_the_first_attempt_s_affinity_key(
+    selector: Selector, fake_provider: FakeProvider, catalog
+) -> None:
+    """A repair replays the whole first attempt plus one instruction.
+
+    The endpoint that just prefilled ~10.3k tokens of catalog is the one that can
+    answer it cheapest, so the repair must not be allowed to re-elect. This is the
+    path most likely to lose the key in a refactor: it rebuilds the request from
+    scratch rather than copying it.
+    """
+    target = sorted(catalog.known_ids)[0]
+    fake_provider.complete_result = [make_result(content="garbage"), selection_result([target])]
+
+    await selector.select(_msgs("task"), [], api_key=TEST_API_KEY)
+
+    first, repair = fake_provider.requests
+    assert repair.cache_session_id == first.cache_session_id
+    assert repair.cache_session_id is not None
+    assert repair.latency_critical is True
+
+
+@pytest.mark.asyncio
+async def test_a_catalog_swap_mid_call_cannot_invalidate_the_answer_it_asked_for(
+    selector: Selector, fake_provider: FakeProvider, catalog_manager
+) -> None:
+    """One selection, one catalog — prompt, affinity key and validation alike.
+
+    Skill learning reloads the catalog IN PLACE, and it can land while a selector
+    call is in flight. Reading `self.catalog` again after the await would then judge
+    the model's answer against a menu it was never shown: an id that was on offer
+    when the prompt was rendered gets rejected as unknown, the parse fails, and the
+    turn burns a repair round-trip before failing open — with nothing in the logs to
+    say why. The snapshot is pinned in `_run` precisely so this cannot happen.
+    """
+    from daintree_assistant_server.skills.catalog import Catalog
+
+    original = catalog_manager.catalog
+    target = sorted(original.known_ids)[0]
+    # The swap-in catalog is missing the very skill the model is about to pick.
+    reduced = Catalog([s for s in original.skills if s.id != target])
+    assert reduced.revision != original.revision
+
+    def swap_then_answer(_request):
+        catalog_manager._catalog = reduced
+        return selection_result([target])
+
+    fake_provider.complete_result = swap_then_answer
+
+    decision = await selector.select(_msgs("do the task"), [], api_key=TEST_API_KEY)
+
+    assert decision.skill_ids == [target], (
+        "the answer was validated against the post-swap catalog, so a skill that "
+        "WAS on the menu when the prompt was rendered came back unknown"
+    )
+    assert decision.degraded is False
+    assert len(fake_provider.requests) == 1, "no repair should have been provoked"
+    # And the key names the catalog that rendered the prompt, not the one that
+    # replaced it — otherwise the call is pinned to a node warm for other bytes.
+    assert fake_provider.requests[0].cache_session_id == _affinity_key(original.revision)
+
+
+@pytest.mark.asyncio
+async def test_the_affinity_key_is_shared_by_callers_and_tracks_the_catalog(
+    selector: Selector, fake_provider: FakeProvider, catalog
+) -> None:
+    """The two properties the key exists for, asserted as properties.
+
+    SHARED is the whole design: the catalog block is byte-identical for every
+    caller, so every caller must name the same key or the prefix it keeps warm is
+    warm for nobody. REVISION-SCOPED is the other half — skill learning can swap
+    the catalog in place, and a key that outlived the bytes would pin the fleet to
+    an endpoint holding a catalog that no longer exists.
+    """
+    fake_provider.complete_result = selection_result([sorted(catalog.known_ids)[0]])
+
+    await selector.select(_msgs("rename my terminals"), [], api_key=TEST_API_KEY)
+    await selector.select(
+        _msgs("something else entirely"), sorted(catalog.known_ids)[:1], api_key=SecretStr("sk-other")
+    )
+
+    first, second = fake_provider.requests
+    assert first.cache_session_id == second.cache_session_id
+
+    assert first.cache_session_id == _affinity_key(catalog.revision)
+    assert _affinity_key("sha256:" + "a" * 64) != _affinity_key("sha256:" + "b" * 64)
+    # Opaque and bounded: it crosses to a third party and OpenRouter caps the field.
+    assert len(_affinity_key(catalog.revision)) <= 256
 
 
 @pytest.mark.asyncio

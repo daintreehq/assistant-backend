@@ -68,6 +68,41 @@ _REPAIR_INSTRUCTION = (
 # trouble that a third attempt would just prolong.
 _MAX_SELECTOR_RETRIES = 1
 
+# Namespace for the selector's cache-affinity key. Deliberately NOT per session,
+# unlike the conversation key (`ChatOrchestrator._cache_session_key`), because the
+# selector's prefix is the opposite kind of thing: the catalog block is
+# byte-identical for every caller at a given revision — that is what
+# `Catalog.selector_metadata` and `_render_system` exist to guarantee — and it is
+# ~10.3k tokens, the largest invariant prefix in the system.
+#
+# One SHARED key gathers selector calls onto one endpoint and keeps that catalog
+# resident there. A per-session key would do the reverse, splintering a prefix
+# whose whole value is that it is shared; and sending NO key — the state before
+# this — is worse than either, because OpenRouter then derives one by hashing the
+# first system message and the first NON-system message, and the selector's first
+# non-system message contains the user's own words. That hash is different on
+# literally every call, so affinity never engaged at all and each call re-elected
+# an endpoint and re-paid the prefill. The measured signature is in
+# `benchmarks/skill_selection`: 7.711s on a case's first trial, 1.606s on its
+# second.
+#
+# HOW WIDELY IT IS SHARED IS NOT UP TO US. A sticky record is scoped to the API
+# key, and today every request is funded by the CALLER's own — so this key is
+# shared across one caller's sessions, not across callers. It becomes literally
+# fleet-wide on a server-held credential, which is when the concentration caveat
+# in docs/PROVIDER_POLICY.md section 3a starts to bite.
+#
+# The catalog REVISION is in the key because it is exactly what invalidates the
+# prefix. Skill learning can swap the catalog mid-process; when it does, the old
+# endpoint's resident copy is worth nothing and the fleet should re-elect rather
+# than stay pinned to a node warm for a catalog that no longer exists.
+_CACHE_AFFINITY_PREFIX = "daintree-selector-"
+
+# How much of the revision digest rides in the key. It is a cache namespace, not a
+# checksum: enough to make an accidental collision across revisions implausible,
+# short enough to stay readable in an upstream dashboard.
+_CACHE_AFFINITY_REVISION_CHARS = 16
+
 _TOOL_RESULT_CHAR_CAP = 2000
 _MESSAGE_CHAR_CAP = 8000
 
@@ -436,6 +471,24 @@ def _sum_usage(a: ProviderUsage | None, b: ProviderUsage | None) -> ProviderUsag
 _MAX_DOCS_QUERY_CHARS = 120
 
 
+def _affinity_key(catalog_revision: str) -> str:
+    """The upstream cache-affinity key for a selector call.
+
+    Derived purely from the catalog revision — no caller, session or request
+    input reaches it, which is what makes it the SAME key for every caller and
+    therefore what keeps one endpoint warm for all of them (see
+    ``_CACHE_AFFINITY_PREFIX``).
+
+    The revision arrives as ``sha256:<hex>``; the digest is what varies, so the
+    prefix is dropped and the head of the hex kept. A revision in an unexpected
+    shape still yields a usable key rather than raising: this is a routing hint,
+    and failing a turn's selection over the format of a cache namespace would be
+    a poor trade.
+    """
+    digest = catalog_revision.rpartition(":")[2] or catalog_revision
+    return f"{_CACHE_AFFINITY_PREFIX}{digest[:_CACHE_AFFINITY_REVISION_CHARS]}"
+
+
 def _parse_docs_query(value: Any) -> str | None:
     """The selector's second answer: search the docs for this, or don't.
 
@@ -548,12 +601,15 @@ class Selector:
     ) -> SelectionDecision:
         catalog = self.catalog
         # The catalog block is request-invariant; everything the active set varies
-        # is confined to the two-line tail after it. Keeping per-turn state out of the
-        # id-sorted loop is the selector's only prompt-cache lever: this call
-        # always sets response_format, and the provider withholds prompt_cache_key
-        # whenever it does, so the upstream can only match a shared content prefix —
-        # which an inline "(currently active)" marker on an early-sorting skill
-        # used to break for most of the prompt on every turn.
+        # is confined to the two-line tail after it. Keeping per-turn state out of
+        # the id-sorted loop is one of the selector's two prompt-cache levers: this
+        # call sets response_format and sends no prompt_cache_key, so the upstream
+        # can only match a shared CONTENT prefix — which an inline "(currently
+        # active)" marker on an early-sorting skill used to break for most of the
+        # prompt on every turn. The other lever is the affinity key below, and
+        # neither works alone: prefix caches are node-local, so byte-identical
+        # prompts scattered across endpoints hit nothing, and a pinned endpoint
+        # holding a prompt that keeps changing holds nothing worth having.
         # The active-set line names only SELECTABLE skills. A server-pinned skill
         # (config.DOCS_SKILL_ID) is deliberately absent from the catalog menu, and
         # naming it here would put the prompt in contradiction with itself: step 3
@@ -575,7 +631,10 @@ class Selector:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
-        return await self._run(messages, api_key, routing)
+        # The snapshot, not `self.catalog`, from here down: it rendered the prompt,
+        # it names the affinity key, and it is what the answer gets validated
+        # against. See `_run`.
+        return await self._run(messages, api_key, routing, catalog=catalog)
 
     def _render_system(self, catalog: Catalog, active_ids: list[str]) -> str:
         """The selector system prompt, memoised.
@@ -617,6 +676,7 @@ class Selector:
         messages: list[dict[str, Any]],
         api_key: SecretStr,
         routing: RoutingPreference | None,
+        cache_session_id: str | None = None,
     ) -> ProviderChatRequest:
         # HARDCODED non-thinking (see INTERACTIVE_THINKING_ENABLED in config.py):
         # this call gates the turn's first byte, and the prompt's reason-first key
@@ -644,6 +704,13 @@ class Selector:
             # endpoint here: the privacy choice honoured everywhere except where it
             # was invisible.
             routing=routing,
+            # Pin the fleet's selector traffic to one endpoint so the ~10.3k-token
+            # catalog prefix stays resident there (see _CACHE_AFFINITY_PREFIX).
+            cache_session_id=cache_session_id,
+            # Rank endpoints by time-to-first-token, not tokens/second: this call
+            # is ~10.3k tokens of prompt for ~90 of answer, and with a winning
+            # speculation the turn's whole TTFT is this call's latency.
+            latency_critical=True,
         )
 
     async def _run(
@@ -651,8 +718,22 @@ class Selector:
         messages: list[dict[str, Any]],
         api_key: SecretStr,
         routing: RoutingPreference | None = None,
+        *,
+        catalog: Catalog,
     ) -> SelectionDecision:
-        request = self._build_request(messages, api_key, routing)
+        """Run one selection against a PINNED catalog snapshot.
+
+        The snapshot is an argument rather than a read of ``self.catalog`` because
+        every step has to agree on one: the prompt renders from it, the affinity
+        key names its revision, and the answer is validated against it. Skill
+        learning can swap the live catalog at any moment, including while this call
+        is in flight — and a read after the await would then judge the model's
+        answer against a menu it was never shown, rejecting ids that were valid
+        when offered and failing the turn open for no reason the logs would
+        explain.
+        """
+        cache_session_id = _affinity_key(catalog.revision)
+        request = self._build_request(messages, api_key, routing, cache_session_id)
 
         try:
             result = await self._call_once(request)
@@ -662,13 +743,17 @@ class Selector:
         usage: ProviderUsage | None = result.usage
         endpoint = result.endpoint
         calls = 1
-        parsed = parse_select_args(result.text, self.catalog, self.settings.max_active_skills)
+        parsed = parse_select_args(result.text, catalog, self.settings.max_active_skills)
 
         if parsed is None:
             repair_request = self._build_request(
                 [*messages, {"role": "user", "content": _REPAIR_INSTRUCTION}],
                 api_key,
                 routing,
+                # The repair carries the same catalog prefix as the attempt it is
+                # repairing, so it wants the same endpoint — the one that just
+                # prefilled it moments ago.
+                cache_session_id,
             )
             try:
                 repair = await self._call_once(repair_request)
@@ -686,9 +771,7 @@ class Selector:
             # would label the answer — and the selector cache ratio logged beside
             # it — with a node that did not produce it.
             endpoint = repair.endpoint
-            parsed = parse_select_args(
-                repair.text, self.catalog, self.settings.max_active_skills
-            )
+            parsed = parse_select_args(repair.text, catalog, self.settings.max_active_skills)
             if parsed is None:
                 return SelectionDecision.degraded_open(
                     ["skill_selector_failed_open"], usage=usage, endpoint=endpoint, calls=calls

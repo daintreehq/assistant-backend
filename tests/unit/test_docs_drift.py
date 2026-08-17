@@ -41,6 +41,7 @@ from daintree_assistant_server.config import (
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.openrouter import (
     _PROVIDER_ROUTING,
+    _PROVIDER_ROUTING_CLASSIFIER,
     _PROVIDER_ROUTING_STRUCTURED,
     OpenRouterProvider,
 )
@@ -508,19 +509,60 @@ def _documented_routing_policy() -> dict[str, object]:
     bidirectional: a changed *value* fails, and so does a key that was deleted
     from the code but left behind in the prose. A substring scan catches neither.
     """
-    blocks = re.findall(r"```json\n(.*?)```", _read(DOC_PROVIDER), re.DOTALL)
-    for block in blocks:
+    # Scoped to section 3's own prose, ABOVE its subsections. Section 3b documents
+    # a second, differently-sorted block that also carries `data_collection`, and
+    # an unscoped scan would happily compare the wrong one the day someone
+    # reorders the file.
+    return _documented_policy_block(
+        doc_section("## 3. Endpoint-selection policy", ends_at="\n### "),
+        where="section 3",
+    )
+
+
+def _documented_classifier_policy() -> dict[str, object]:
+    """The ```json block in docs/PROVIDER_POLICY.md section 3b, parsed."""
+    return _documented_policy_block(doc_section("### 3b.", ends_at="\n## "), where="section 3b")
+
+
+def doc_section(heading: str, *, ends_at: str, text: str | None = None) -> str:
+    """The slice of PROVIDER_POLICY.md under `heading`, or fail loudly.
+
+    Every gate below reads a section by splitting on its heading, and a bare
+    ``split(...)[-1]`` is the wrong tool for that: a heading that gets renamed or
+    deleted does not fail, it silently yields the WHOLE document, and a gate
+    reading the whole document finds whatever it was looking for somewhere else
+    and passes. A heading that appears twice is the same failure with the opposite
+    cause. Both are asserted here so a doc gate cannot quietly stop gating.
+    """
+    body = _read(DOC_PROVIDER) if text is None else text
+    occurrences = body.count(heading)
+    assert occurrences == 1, (
+        f"docs/PROVIDER_POLICY.md has {occurrences} occurrences of the heading "
+        f"{heading!r}, expected exactly 1. The doc gates locate sections by heading; "
+        "a renamed, deleted or duplicated one makes them read the wrong text and "
+        "pass for the wrong reason."
+    )
+    return body.split(heading)[1].split(ends_at)[0]
+
+
+def _documented_policy_block(section: str, *, where: str) -> dict[str, object]:
+    candidates = []
+    for block in re.findall(r"```json\n(.*?)```", section, re.DOTALL):
         try:
             parsed = json.loads(block)
         except json.JSONDecodeError:  # pragma: no cover - a prose example
             continue
         if isinstance(parsed, dict) and "data_collection" in parsed:
-            return parsed
-    pytest.fail(
-        "docs/PROVIDER_POLICY.md section 3 no longer contains a parseable ```json "
-        "block for the routing policy. That block is the documented contract; keep "
-        "it machine-readable."
+            candidates.append(parsed)
+    # Exactly one, not the first: a section that grew a second policy block is
+    # ambiguous about which one is the contract, and picking the first would let
+    # the other drift from the code unnoticed.
+    assert len(candidates) == 1, (
+        f"docs/PROVIDER_POLICY.md {where} contains {len(candidates)} parseable "
+        "routing-policy ```json blocks, expected exactly 1. That block is the "
+        "documented contract; keep it machine-readable and unambiguous."
     )
+    return candidates[0]
 
 
 def test_documented_routing_policy_matches_the_code_exactly() -> None:
@@ -529,6 +571,31 @@ def test_documented_routing_policy_matches_the_code_exactly() -> None:
         "_PROVIDER_ROUTING in providers/openrouter.py. That block is what a reader "
         "believes the server sends."
     )
+
+
+def test_documented_classifier_policy_matches_the_code_exactly() -> None:
+    assert _documented_classifier_policy() == _PROVIDER_ROUTING_CLASSIFIER, (
+        "the provider block in docs/PROVIDER_POLICY.md section 3b has drifted from "
+        "_PROVIDER_ROUTING_CLASSIFIER in providers/openrouter.py."
+    )
+
+
+def test_the_classifier_policy_only_re_ranks_and_never_relaxes_the_floor() -> None:
+    """It is a ranking change inside the SAME filtered pool.
+
+    Stated that way in section 3b, and worth a gate because the classifier block
+    is the one a future latency push is most likely to reach for: the temptation
+    is to widen the pool to find a faster endpoint, and `data_collection` is what
+    would quietly go.
+    """
+    for key in ("data_collection", "require_parameters", "allow_fallbacks"):
+        assert _PROVIDER_ROUTING_CLASSIFIER[key] == _PROVIDER_ROUTING[key], (
+            f"the classifier policy changed `{key}`. It exists to re-rank the pool "
+            "on time-to-first-token, not to change which endpoints are in it."
+        )
+    assert _PROVIDER_ROUTING_CLASSIFIER["sort"] == "latency"
+    assert "only" not in _PROVIDER_ROUTING_CLASSIFIER
+    assert "ignore" not in _PROVIDER_ROUTING_CLASSIFIER
 
 
 def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None:
@@ -543,6 +610,7 @@ def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None
     for name, block in (
         ("_PROVIDER_ROUTING", _PROVIDER_ROUTING),
         ("_PROVIDER_ROUTING_STRUCTURED", _PROVIDER_ROUTING_STRUCTURED),
+        ("_PROVIDER_ROUTING_CLASSIFIER", _PROVIDER_ROUTING_CLASSIFIER),
     ):
         assert "order" not in block, (
             f"{name} now sends `provider.order`. OpenRouter does not apply sticky "
@@ -563,7 +631,11 @@ def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None
     # scan for "session_id"/"provider.order" would pass a document that said the
     # exact opposite ("do not send session_id; use provider.order") — both tokens
     # are present either way, and the prose is what a reader acts on.
-    section = _read(DOC_PROVIDER).split("### 3a.")[-1].split("\n## ")[0]
+    #
+    # `\n### ` and not `\n## `: 3b now follows 3a, and a slice that ran to the next
+    # top-level heading would swallow it — letting 3b's prose satisfy assertions
+    # about 3a and pass a document where 3a had been gutted.
+    section = doc_section("### 3a.", ends_at="\n### ")
     assert "session_id" in section, (
         "docs/PROVIDER_POLICY.md section 3a no longer documents the affinity key."
     )
