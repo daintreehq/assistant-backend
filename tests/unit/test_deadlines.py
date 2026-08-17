@@ -1,9 +1,14 @@
 """Request-scoped deadlines.
 
-The property that matters: **a turn cannot outlive its total budget**, no matter
-how the phases and retries compose. An `httpx` read timeout bounds inactivity,
-not wall clock, so a response that trickles one byte resets it forever — and one
-provider retry used to double whatever bound did exist.
+Two properties that pull against each other, which is why both are pinned here:
+
+* **A turn cannot outlive its total budget**, no matter how the phases and retries
+  compose. An `httpx` read timeout bounds inactivity, not wall clock, so a
+  response that trickles one byte resets it forever — and one provider retry used
+  to double whatever bound did exist.
+* **A limit may not cut a turn that is merely long**, only one that has stopped.
+  The renewable limits therefore renew, and a stalled open is retryable rather
+  than terminal.
 """
 
 from __future__ import annotations
@@ -24,7 +29,7 @@ from daintree_assistant_server.services.deadlines import (
 
 
 def _budget(**kwargs: float) -> RequestBudget:
-    policy = BudgetPolicy(**{**{"preparation": 10, "first_output": 20, "stream_idle": 30, "total": 60}, **kwargs})
+    policy = BudgetPolicy(**{**{"preparation": 10, "open_stall": 20, "first_output": 40, "stream_idle": 30, "total": 60}, **kwargs})
     return RequestBudget(policy=policy)
 
 
@@ -36,8 +41,8 @@ def _budget(**kwargs: float) -> RequestBudget:
 def test_a_fresh_budget_offers_each_phase_its_own_limit() -> None:
     budget = _budget()
     assert budget.remaining(TurnPhase.PREPARATION) == pytest.approx(10, abs=0.1)
-    assert budget.remaining(TurnPhase.FIRST_OUTPUT) == pytest.approx(20, abs=0.1)
     assert budget.remaining(TurnPhase.TOTAL) == pytest.approx(60, abs=0.1)
+    assert budget.remaining_open_attempt() == pytest.approx(20, abs=0.1)
     assert budget.remaining_idle(time.monotonic()) == pytest.approx(30, abs=0.1)
 
 
@@ -45,59 +50,122 @@ def test_start_relative_phases_do_not_renew() -> None:
     """The bug this replaced.
 
     `remaining()` used to return the full phase limit on every call, so a caller
-    consulting it once per chunk handed out a fresh first-output allowance every
-    time — a model emitting a reasoning fragment every 29s could think forever
-    without tripping the deadline that exists to measure exactly that.
+    consulting it once per chunk handed out a fresh allowance every time. The
+    limits that legitimately renew now say so in their own method names; these two
+    are absolute and must decay with the turn.
     """
     aged = RequestBudget(
         started_at=time.monotonic() - 15,
-        policy=BudgetPolicy(preparation=10, first_output=20, stream_idle=30, total=60),
+        policy=BudgetPolicy(preparation=10, open_stall=20, first_output=40, stream_idle=30, total=60),
     )
-    # 15s of a 20s allowance is gone, and it does not come back.
-    assert aged.remaining(TurnPhase.FIRST_OUTPUT) == pytest.approx(5, abs=0.2)
-    # Preparation is already past its 10s limit.
+    # Preparation is already past its 10s limit, and it does not come back.
     assert aged.remaining(TurnPhase.PREPARATION) == 0.0
+    # The total has decayed by exactly the elapsed time.
+    assert aged.remaining(TurnPhase.TOTAL) == pytest.approx(45, abs=0.2)
 
 
-def test_the_idle_gap_is_the_one_limit_that_legitimately_resets() -> None:
+def test_a_second_open_attempt_gets_a_full_allowance() -> None:
+    """Otherwise the retry is decorative.
+
+    The incident: an upstream accepted the connection and sent no first event, so
+    the first attempt burned the whole open allowance. If that allowance were
+    start-relative, the retry would begin with zero budget and fail instantly —
+    which is exactly the turn-killing behaviour the retry exists to prevent.
+    """
+    aged = RequestBudget(
+        started_at=time.monotonic() - 21,
+        policy=BudgetPolicy(preparation=10, open_stall=20, first_output=40, stream_idle=30, total=60),
+    )
+    assert aged.remaining_open_attempt() == pytest.approx(20, abs=0.2)
+
+
+def test_the_first_visible_allowance_is_anchored_to_the_open_not_the_turn() -> None:
+    """The anchor that makes the open retry safe.
+
+    Measured from the start of the turn, an attempt that stalled for its full
+    allowance would hand the stream that finally opened an already-spent
+    first-output budget, and the chunk loop would cut a healthy generation for
+    arriving late. Measured from the open, the surviving stream gets the same
+    honest allowance it would have had on the first try.
+    """
+    aged = RequestBudget(
+        started_at=time.monotonic() - 50,
+        policy=BudgetPolicy(
+            preparation=10, open_stall=20, first_output=40, stream_idle=30, total=300
+        ),
+    )
+    # 50s into the turn, but only 5s into the stream that is actually being read.
+    assert aged.remaining_first_visible(time.monotonic() - 5) == pytest.approx(35, abs=0.2)
+
+
+def test_the_first_visible_allowance_does_not_renew() -> None:
+    """It is cumulative on purpose.
+
+    A per-gap allowance treats any chunk as progress, so an endpoint emitting a
+    reasoning fragment or a role-only delta just inside every gap keeps a user
+    answerless until the total. Progress the user cannot see is not progress.
+    """
+    budget = _budget()  # first_output=40
+    opened = time.monotonic() - 30
+    assert budget.remaining_first_visible(opened) == pytest.approx(10, abs=0.2)
+    # The same anchor a moment later is smaller, not refreshed.
+    assert budget.remaining_first_visible(opened) <= 10.1
+
+
+def test_the_idle_gap_is_the_limit_that_legitimately_resets() -> None:
     """A chunk arriving IS the evidence the stream is alive, so each new gap gets
     a fresh allowance — that is what distinguishes a slow generation from a dead
-    one."""
+    one. (`open_stall` also renews, but per ATTEMPT rather than per chunk.)"""
     aged = RequestBudget(
         started_at=time.monotonic() - 40,
-        policy=BudgetPolicy(preparation=10, first_output=20, stream_idle=15, total=300),
+        policy=BudgetPolicy(preparation=10, open_stall=20, first_output=40, stream_idle=15, total=300),
     )
     assert aged.remaining_idle(time.monotonic()) == pytest.approx(15, abs=0.2)
     assert aged.remaining_idle(time.monotonic() - 10) == pytest.approx(5, abs=0.2)
 
 
-def test_asking_remaining_for_the_idle_phase_is_a_programming_error() -> None:
-    """Serving it from `remaining()` is precisely how the renewal bug happened;
+@pytest.mark.parametrize(
+    ("phase", "match"),
+    [
+        (TurnPhase.STREAM_IDLE, "per gap"),
+        # Anchored to the successful open, not the turn: measuring it from the
+        # start of the turn is what let a retried open hand the live stream that
+        # followed an already-spent allowance.
+        (TurnPhase.FIRST_OUTPUT, "from the successful open"),
+        (TurnPhase.OPEN_STALL, "per attempt"),
+    ],
+)
+def test_asking_remaining_for_a_later_anchored_phase_is_a_programming_error(
+    phase: TurnPhase, match: str
+) -> None:
+    """Serving these from `remaining()` is precisely how the renewal bug happened;
     make the wrong call impossible rather than merely discouraged."""
-    with pytest.raises(ValueError, match="per gap"):
-        _budget().remaining(TurnPhase.STREAM_IDLE)
+    with pytest.raises(ValueError, match=match):
+        _budget().remaining(phase)
 
 
 def test_a_phase_can_never_outlive_the_turn() -> None:
     """The clamp is the whole point: a 30s idle allowance means nothing when 5s
-    of total budget is left."""
+    of total budget is left — and neither does a fresh 20s open attempt."""
     budget = RequestBudget(
         started_at=time.monotonic() - 55,
-        policy=BudgetPolicy(preparation=10, first_output=20, stream_idle=30, total=60),
+        policy=BudgetPolicy(preparation=10, open_stall=20, first_output=40, stream_idle=30, total=60),
     )
-    for phase in (TurnPhase.PREPARATION, TurnPhase.FIRST_OUTPUT, TurnPhase.TOTAL):
+    for phase in (TurnPhase.PREPARATION, TurnPhase.TOTAL):
         assert budget.remaining(phase) <= 5.1, phase
     assert budget.remaining_idle(time.monotonic()) <= 5.1
+    assert budget.remaining_open_attempt() <= 5.1
 
 
 def test_an_exhausted_budget_reports_zero_not_negative() -> None:
     budget = RequestBudget(
-        started_at=time.monotonic() - 500, policy=BudgetPolicy(total=60)
+        started_at=time.monotonic() - 500, policy=BudgetPolicy(first_output=40, total=60)
     )
     assert budget.expired()
-    for phase in (TurnPhase.PREPARATION, TurnPhase.FIRST_OUTPUT, TurnPhase.TOTAL):
+    for phase in (TurnPhase.PREPARATION, TurnPhase.TOTAL):
         assert budget.remaining(phase) == 0.0
     assert budget.remaining_idle(time.monotonic()) == 0.0
+    assert budget.remaining_open_attempt() == 0.0
 
 
 def test_a_nonsense_policy_is_rejected_at_construction() -> None:
@@ -106,7 +174,7 @@ def test_a_nonsense_policy_is_rejected_at_construction() -> None:
     with pytest.raises(ValueError):
         BudgetPolicy(preparation=-1)
     for kwargs in (
-        {"first_output": 120, "total": 60},
+        {"open_stall": 1200, "total": 60},
         {"preparation": 120, "total": 60},
         {"stream_idle": 120, "total": 60},
     ):
@@ -144,7 +212,7 @@ async def test_retries_stop_when_the_shared_budget_is_nearly_gone() -> None:
             status_code=503, message="transient", code="upstream_unavailable", retryable=True
         )
 
-    spent = RequestBudget(started_at=time.monotonic() - 59.5, policy=BudgetPolicy(total=60))
+    spent = RequestBudget(started_at=time.monotonic() - 59.5, policy=BudgetPolicy(first_output=40, total=60))
     with pytest.raises(DaintreeError):
         await retry_upstream(
             _always_fails,
@@ -171,7 +239,7 @@ async def test_retries_still_happen_when_there_is_budget() -> None:
             )
         return "ok"
 
-    fresh = RequestBudget(policy=BudgetPolicy(total=60))
+    fresh = RequestBudget(policy=BudgetPolicy(first_output=40, total=60))
     result = await retry_upstream(
         _fails_once,
         retries=2,
@@ -202,25 +270,6 @@ async def test_retry_without_a_budget_is_unchanged() -> None:
 
 
 # ---------------------------------------------------------------------------
-# attempt_allowance
-# ---------------------------------------------------------------------------
-
-
-def test_attempt_allowance_refuses_a_hopeless_attempt() -> None:
-    nearly_done = RequestBudget(
-        started_at=time.monotonic() - 59.8, policy=BudgetPolicy(total=60)
-    )
-    assert nearly_done.attempt_allowance(TurnPhase.TOTAL) is None
-
-
-def test_attempt_allowance_grants_what_remains() -> None:
-    budget = _budget()
-    allowance = budget.attempt_allowance(TurnPhase.PREPARATION)
-    assert allowance is not None
-    assert allowance == pytest.approx(10, abs=0.1)
-
-
-# ---------------------------------------------------------------------------
 # DeadlineExceeded carries the diagnosis.
 # ---------------------------------------------------------------------------
 
@@ -241,27 +290,37 @@ def test_the_exception_names_the_phase_and_the_elapsed_time() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_slow_trickle_is_bounded_by_the_total_not_the_idle_gap() -> None:
+async def test_a_slow_trickle_renews_its_gap_and_still_dies_at_the_total() -> None:
     """The exact hole an inactivity timeout leaves open.
 
-    Chunks keep arriving well inside the idle allowance, so an `httpx` read
-    timeout would never fire — but the turn is still over its wall clock, and the
-    total budget is what stops it.
+    Chunks keep arriving well inside the idle allowance, so an `httpx` read timeout
+    would never fire and the per-gap allowance legitimately renews every time — but
+    the turn is still over its wall clock, and the total is what stops it. This
+    drives the real gap loop rather than one `asyncio.timeout`: with a single wait
+    and `stream_idle == total`, "idle expired" and "total expired" are the same
+    event and the test proves neither.
     """
     budget = RequestBudget(
         policy=BudgetPolicy(
-            preparation=0.3, first_output=0.3, stream_idle=0.3, total=0.3
+            preparation=0.3, open_stall=0.3, first_output=0.3, stream_idle=0.15, total=0.3
         )
     )
+    gaps = 0
+    last_chunk_at = time.monotonic()
+    while True:
+        allowance = budget.remaining_idle(last_chunk_at)
+        if allowance <= 0.0:
+            break
+        try:
+            async with asyncio.timeout(allowance):
+                await asyncio.sleep(0.02)  # a chunk, far inside the gap
+        except TimeoutError:
+            break
+        gaps += 1
+        last_chunk_at = time.monotonic()
 
-    async def _trickle() -> None:
-        while True:
-            await asyncio.sleep(0.01)
-
-    with pytest.raises(TimeoutError):
-        async with asyncio.timeout(budget.remaining_idle(time.monotonic())):
-            await _trickle()
-    assert budget.expired()
+    assert gaps > 3, "the per-gap allowance did not renew on arriving chunks"
+    assert budget.expired(), "a trickling stream outlived the total budget"
 
 
 # ---------------------------------------------------------------------------

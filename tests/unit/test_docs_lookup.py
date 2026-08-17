@@ -298,7 +298,9 @@ async def test_a_spent_preparation_budget_skips_the_lookup(
 
     orchestrator.docs_client = _docs_client(handler)
     budget = RequestBudget(
-        policy=BudgetPolicy(preparation=0.2, first_output=0.2, stream_idle=1.0, total=30.0),
+        policy=BudgetPolicy(
+            preparation=0.2, open_stall=0.2, first_output=1.0, stream_idle=1.0, total=30.0
+        ),
         # Started well in the past: preparation has nothing left.
         started_at=time.monotonic() - 10.0,
     )
@@ -339,7 +341,9 @@ async def test_the_lookup_leaves_the_preparation_phase_room_to_finish(
 
     orchestrator.docs_client = _docs_client(handler)
     budget = RequestBudget(
-        policy=BudgetPolicy(preparation=6.0, first_output=6.0, stream_idle=6.0, total=30.0)
+        policy=BudgetPolicy(
+            preparation=6.0, open_stall=6.0, first_output=6.0, stream_idle=6.0, total=30.0
+        )
     )
     await orchestrator._lookup_docs("worktrees", request_id="r", budget=budget)
     assert seen and seen[0] is not None
@@ -366,7 +370,9 @@ async def test_a_docs_host_that_trickles_cannot_outlive_its_slice(
 
     orchestrator.docs_client = _docs_client(handler)
     budget = RequestBudget(
-        policy=BudgetPolicy(preparation=3.6, first_output=3.6, stream_idle=3.6, total=30.0)
+        policy=BudgetPolicy(
+            preparation=3.6, open_stall=3.6, first_output=3.6, stream_idle=3.6, total=30.0
+        )
     )
     started = time.monotonic()
     assert await orchestrator._lookup_docs("worktrees", request_id="r", budget=budget) is None

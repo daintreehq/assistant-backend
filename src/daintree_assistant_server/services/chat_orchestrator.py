@@ -41,7 +41,12 @@ from ..contracts.extensions import (
     SkillRef,
 )
 from ..contracts.openai import ChatMessage
-from ..errors import DaintreeError, internal_error, turn_deadline_exceeded
+from ..errors import (
+    DaintreeError,
+    internal_error,
+    turn_deadline_exceeded,
+    upstream_timeout,
+)
 from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
@@ -304,8 +309,8 @@ def _carries_output(chunk: dict[str, Any] | None) -> bool:
 
     Visible content or a tool call ends the "is it broken?" interval. Reasoning
     fragments deliberately do NOT: they are internal, the client does not render
-    them as an answer, and counting them would let a model that thinks for two
-    minutes escape the first-output deadline entirely.
+    them as an answer, and counting them would let a stream that produces nothing
+    a user can see satisfy the first-output deadline indefinitely.
     """
     if not chunk:
         return False
@@ -1848,6 +1853,14 @@ class ChatOrchestrator:
         # with its own `turn_usage` line, joined to this one by `turn_id`.
         main_endpoints: list[str | None] = []
         main_endpoint: str | None = None
+        # Open attempts abandoned mid-prefetch. An upstream that took the request,
+        # prefilled it and then went quiet may well have BILLED that prefill, and
+        # we will never see the usage trailer that would have told us. So the count
+        # is not a statistic — it clears `cost.complete`, which is exactly the case
+        # turn_accounting documents as "a cost we know was incurred and cannot
+        # observe at all". Reporting the surviving attempt's cost as the whole
+        # turn's would understate a real bill on the caller's own key.
+        abandoned_opens = 0
         # The discarded draft, kept only until the re-roll's stream actually opens.
         # Up to that point nothing of the retry is public, so the first attempt is
         # still replay-safe and remains the honest fail-open answer.
@@ -1874,10 +1887,20 @@ class ChatOrchestrator:
                 t_open = time.perf_counter()
                 if stream is None:
                     try:
-                        opened_stream, first_event = await self._open_stream_with_retry(
-                            active_request, budget=budget
+                        (
+                            opened_stream,
+                            first_event,
+                            abandoned,
+                        ) = await self._open_stream_with_retry(
+                            active_request, budget=budget, request_id=meta.request_id
                         )
+                        abandoned_opens += abandoned
                     except DaintreeError as exc:
+                        # A stalled open that exhausted its retries lands here too,
+                        # which is the point: it is a `DaintreeError` now, so the
+                        # re-roll's fallback below can still save the draft. As a
+                        # `DeadlineExceeded` it flew straight past this handler and
+                        # took a perfectly good held answer down with the turn.
                         if fallback is None:
                             raise
                         # The re-roll never opened, so nothing of it is public and
@@ -2077,8 +2100,10 @@ class ChatOrchestrator:
                     finish_reason=finish_reason,
                     usage=response_usage(total_usage),
                     # `total_usage` already sums a discarded re-roll, so this
-                    # total covers every generation the caller paid for.
-                    cost=turn_cost(total_usage, meta),
+                    # total covers every generation the caller paid for — except
+                    # an open we abandoned before it could report, which is what
+                    # `complete` exists to admit.
+                    cost=turn_cost(total_usage, meta, complete=abandoned_opens == 0),
                     # Lint what was actually streamed. A round that ended in tool
                     # calls is interstitial and is not linted, matching the
                     # non-streaming rule.
@@ -2133,7 +2158,7 @@ class ChatOrchestrator:
                 selector_ran=meta.skills.selector.ran,
                 selector_usage=meta.selector_usage,
                 selector_endpoint=meta.selector_endpoint,
-                turn_cost=turn_cost(final_usage, meta),
+                turn_cost=turn_cost(final_usage, meta, complete=abandoned_opens == 0),
             )
             # Consolidated names only, and only from the buffer that survived:
             # a re-rolled attempt got a fresh buffer, so its discarded calls are
@@ -2165,19 +2190,34 @@ class ChatOrchestrator:
     ) -> AsyncIterator[dict[str, Any]]:
         """The stream's chunks, with the already-prefetched first event back in front.
 
-        Also THE enforcement point for the two streaming deadlines, because it is
-        the single funnel every chunk passes through. Two different limits apply
-        depending on what has happened so far:
+        Also THE enforcement point for the streaming deadlines, because it is the
+        single funnel every chunk passes through. Two limits apply, and which ones
+        depends on whether the user has seen anything yet:
 
-        * **first_output** until the first chunk carrying visible content or a
-          tool call — the interval a user experiences as "is this broken?".
-        * **stream_idle** thereafter, per gap — which distinguishes a slow
-          generation (chunks still arriving) from a dead one (nothing arriving),
-          a distinction an `httpx` read timeout can make but a total budget
-          cannot.
+        * **stream_idle**, always — the per-gap allowance. A chunk arriving is the
+          evidence the stream is alive, so this renews, and a long generation
+          never trips it.
+        * **first_output**, until the first chunk carrying visible content or a
+          tool call — cumulative from THIS stream's open, and deliberately not
+          renewed by arriving chunks. Otherwise an endpoint emitting a role-only
+          delta or a reasoning fragment just inside every gap satisfies
+          `stream_idle` forever while the user waits out the entire total budget
+          for an answer that never starts. Progress they cannot see is not
+          progress.
 
-        Both are clamped by the total budget inside :meth:`RequestBudget.remaining`,
-        so a generous idle allowance cannot outlive the turn.
+        The phase reported answers the question an operator actually has —
+        `first_output` means the user never saw a token, `stream_idle` means the
+        answer was cut off part-way — so it follows whether visible output had
+        arrived, not which of the two allowances happened to be the tighter one.
+
+        `first_output` is measured from the open rather than from the start of the
+        turn — the correction that made the retry above it safe. Turn-relative, an
+        attempt that stalled for its full allowance handed the live stream that
+        replaced it an already-spent budget, and this loop would cut a healthy
+        generation for arriving late.
+
+        Both allowances are clamped by the total inside `RequestBudget`, so neither
+        can outlive the turn.
         """
         if first_event is not None:
             if budget is not None and budget.expired():
@@ -2193,18 +2233,22 @@ class ChatOrchestrator:
 
         saw_output = _carries_output(first_event) if first_event else False
         iterator = stream.__aiter__()
-        last_chunk_at = time.monotonic()
+        # This function is entered immediately after the open succeeded, so "now"
+        # IS the open — the anchor `first_output` is measured from, per stream
+        # rather than per turn.
+        opened_at = time.monotonic()
+        last_chunk_at = opened_at
         while True:
-            # Before output: an ABSOLUTE first-output deadline measured from the
-            # start of the turn, so reasoning fragments cannot renew it.
-            # After output: a per-gap idle allowance, which legitimately resets
-            # because a chunk arriving IS the evidence the stream is alive.
-            if saw_output:
-                phase = TurnPhase.STREAM_IDLE
-                allowance = budget.remaining_idle(last_chunk_at)
-            else:
+            # Before any visible token BOTH limits are in force and the tighter one
+            # governs; after it, only the gap. The phase reported is not "which
+            # allowance expired" but the question an operator actually needs
+            # answered — had the user seen anything yet? — so it follows
+            # `saw_output`, and the two allowances are visible in the log line.
+            allowance = budget.remaining_idle(last_chunk_at)
+            phase = TurnPhase.STREAM_IDLE
+            if not saw_output:
                 phase = TurnPhase.FIRST_OUTPUT
-                allowance = budget.remaining(phase)
+                allowance = min(allowance, budget.remaining_first_visible(opened_at))
             try:
                 async with asyncio.timeout(allowance):
                     chunk = await iterator.__anext__()
@@ -2398,14 +2442,27 @@ class ChatOrchestrator:
         )
 
     async def _open_stream_with_retry(
-        self, request: ProviderChatRequest, *, budget: RequestBudget | None = None
-    ) -> tuple[ProviderStream, dict[str, Any] | None]:
+        self,
+        request: ProviderChatRequest,
+        *,
+        budget: RequestBudget | None = None,
+        request_id: str,
+    ) -> tuple[ProviderStream, dict[str, Any] | None, int]:
+        """Open the stream, retrying a stall. Returns the stream, its first event,
+        and how many attempts were ABANDONED getting there.
+
+        That count is not diagnostics: an abandoned attempt may already have been
+        billed a prefill it never got to report, so the caller owes the user a cost
+        marked incomplete rather than a confident total that omits it.
+        """
         # Opening the stream and reading its first event are one retryable unit:
         # a failure in either is transient and recoverable before model output,
         # even though the public metadata event is already visible. A failed
         # prefetch must close its half-open stream before the attempt unwinds — on
         # ANY exception, including cancellation, so the httpx context never leaks.
         # Only DaintreeError is retried (retry_upstream catches nothing else).
+        abandoned = 0
+
         async def _open() -> tuple[ProviderStream, dict[str, Any] | None]:
             stream = await self.provider.open_stream(request)
             ok = False
@@ -2415,28 +2472,69 @@ class ChatOrchestrator:
                 return stream, first
             finally:
                 if not ok:
-                    await stream.aclose()
+                    # BOUNDED, and that is load-bearing here in a way it is not in
+                    # an ordinary teardown. This `finally` runs while the deadline
+                    # below is cancelling the prefetch, and `asyncio.timeout` waits
+                    # for cleanup to finish before it converts that cancellation
+                    # into `TimeoutError`. A bare `await stream.aclose()` that hung
+                    # on the same dead upstream would therefore never become a
+                    # timeout at all: no retryable error, no retry, no fallback —
+                    # the request simply outliving every budget until Cloud Run
+                    # killed it. The one place a slow close can eat the deadline is
+                    # the place the deadline exists for.
+                    await self._close_quietly(stream, request_id=request_id)
 
         async def _bounded_open() -> tuple[ProviderStream, dict[str, Any] | None]:
             # Open and first-event prefetch were the largest hole in the budget:
             # a provider can send HTTP headers and then never complete an SSE
             # event, which no `httpx` read timeout inside the attempt bounds
-            # usefully and which `_chunk_iter` never sees because it has not
-            # started yet. Bound the pair by the same absolute first-output
-            # deadline the chunk loop uses, so "time until something visible"
-            # means the same thing before and after the stream exists.
+            # usefully (ours is 840s, an inactivity bound) and which `_chunk_iter`
+            # never sees because it has not started yet.
+            #
+            # A stall here is RETRYABLE, and getting that wrong cost a real turn:
+            # this used to raise `DeadlineExceeded`, which `retry_upstream` cannot
+            # catch (it handles `DaintreeError` only), so a provider that accepted
+            # the connection and sent nothing killed the turn on the spot — with
+            # the configured retry unused and the overwhelming majority of the
+            # total budget unspent, while the same request had opened in ~1.2s one
+            # round earlier. Nothing of the turn is public at this point (the
+            # `meta` event carries no model output), so replaying is invisible and
+            # correct. `upstream_timeout` is marked retryable, so this now costs a
+            # pause instead of the workflow.
+            #
+            # Terminal only when the TOTAL is gone: then a retry has nothing to run
+            # in, and the deadline error is the honest report.
+            nonlocal abandoned
             if budget is None:
                 return await _open()
+            allowance = budget.remaining_open_attempt()
             try:
-                async with asyncio.timeout(budget.remaining(TurnPhase.FIRST_OUTPUT)):
+                async with asyncio.timeout(allowance):
                     return await _open()
             except TimeoutError as exc:
-                phase = (
-                    TurnPhase.TOTAL if budget.expired() else TurnPhase.FIRST_OUTPUT
+                abandoned += 1
+                # The incident's own signature, logged at the attempt that caused
+                # it. Without this a recovered stall leaves only an aggregated
+                # `respond_upstream_open` and a terminal one leaves a generic
+                # stream error — in both cases an operator can see the turn was
+                # slow but not that an endpoint went silent, which is the fact
+                # that names the endpoint worth investigating.
+                logger.warning(
+                    "respond_open_stall",
+                    request_id=request_id,
+                    phase=TurnPhase.OPEN_STALL.value,
+                    allowance_ms=round(allowance * 1000),
+                    elapsed_ms=round(budget.elapsed() * 1000),
+                    budget_exhausted=budget.expired(),
                 )
-                raise DeadlineExceeded(phase, budget.elapsed()) from exc
+                if budget.expired():
+                    raise DeadlineExceeded(TurnPhase.TOTAL, budget.elapsed()) from exc
+                raise upstream_timeout(
+                    "The upstream model provider did not send a response within "
+                    f"{allowance:.0f}s of the request."
+                ) from exc
 
-        return await retry_upstream(
+        stream, first_event = await retry_upstream(
             _bounded_open,
             retries=self.settings.max_upstream_retries,
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
@@ -2444,3 +2542,4 @@ class ChatOrchestrator:
             # got a fresh upstream timeout and the retry multiplied the bound.
             remaining_seconds=(budget.remaining_total if budget is not None else None),
         )
+        return stream, first_event, abandoned

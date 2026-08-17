@@ -824,14 +824,19 @@ class TaskRunner:
 
         A task makes at most two upstream calls (first attempt plus one JSON
         repair) and spends a little on backoff and parsing between them, hence a
-        headroom factor rather than the raw timeout. The other three phase limits
-        are irrelevant here — a task is not streamed and has no first-visible-
-        output moment — so they are set to the same value and never consulted.
+        headroom factor rather than the raw timeout. The other phase limits are
+        irrelevant here — a task is not streamed, so it has neither a stream to
+        stall on nor a first-visible-output moment — so they are set to the same
+        value and never consulted.
         """
         per_call = profile.timeout_seconds or self.settings.utility_timeout_seconds
         total = per_call * _TASK_BUDGET_FACTOR
         return BudgetPolicy(
-            preparation=total, first_output=total, stream_idle=total, total=total
+            preparation=total,
+            open_stall=total,
+            first_output=total,
+            stream_idle=total,
+            total=total,
         )
 
     async def _run_inner(

@@ -467,7 +467,7 @@ the SSE path could exclude the deterministic ones too.
 A retry after `meta` adopts that meta's signed `state` token in the next POST, so
 the backend reuses the same selection rather than re-running the selector.
 
-## 5a. Deadlines — a finite end-to-end budget
+## 5a. Deadlines — bounding dead air, not turn length
 
 An `httpx` read timeout is an **inactivity** bound, not a wall-clock one: it
 measures the gap between chunks, so a response that keeps trickling a byte resets
@@ -475,33 +475,60 @@ it forever. Combined with a retry, a stuck turn could approach the Cloud Run
 request ceiling with nothing in the application able to stop it — producing no
 useful error, no phase attribution, and no released capacity.
 
-`services/deadlines.py` adds four limits, because "it took too long" is four
-different bugs:
+`services/deadlines.py` closes that, and the posture matters as much as the
+numbers: **these limits detect a turn that has stopped; they do not cap one that
+is merely long.** A long agentic round is legitimate work someone is waiting on.
+Dead air is the failure.
 
-| Phase | Bounds | Default |
-|---|---|---:|
-| `preparation` | validation, state decode, skill selection — before the model is opened | 25 s |
-| `first_output` | arrival → first visible content or tool call | 30 s |
-| `stream_idle` | longest gap between chunks once generation started | 60 s |
-| `total` | hard wall clock for the whole turn | 300 s |
+| Phase | Bounds | Scope | Default |
+|---|---|---|---:|
+| `preparation` | validation, state decode, skill selection — before the model is opened | absolute | 25 s |
+| `open_stall` | stream open → first upstream event | per attempt, **retryable** | 45 s |
+| `first_output` | successful open → first visible content or tool call | cumulative from the open | 120 s |
+| `stream_idle` | longest gap between chunks once the stream is live | per gap | 60 s |
+| `total` | wall-clock backstop for the whole turn | absolute | 900 s |
 
-Five properties worth knowing:
+Properties worth knowing:
 
-- **`preparation` and `first_output` are absolute**, measured from the start of
-  the turn; only `stream_idle` resets per gap, because a chunk arriving *is* the
-  evidence the stream is alive. An earlier revision recomputed the first-output
-  allowance per chunk, so a reasoning fragment every 29 s renewed a 30 s deadline
-  indefinitely — which is why `RequestBudget.remaining()` now raises rather than
-  serving `stream_idle`.
+- **A pre-output stall is retryable, not fatal.** `open_stall` raises
+  `upstream_timeout` (retryable) rather than a deadline error, so `retry_upstream`
+  actually sees it. Nothing of the turn is public before the first delta — `meta`
+  carries no model output — so replaying is invisible. This was a live incident:
+  an endpoint accepted the connection, sent no first event, and the turn died at
+  30 s with the configured retry unused and 90% of the total budget unspent, one
+  round after the same request opened in 1.2 s.
+- **Only `preparation` and `total` are absolute.** `RequestBudget.remaining()`
+  raises for the others rather than serving them. `open_stall` is per *attempt* (or
+  the retry starts with nothing left and is decorative), `stream_idle` per *gap* (a
+  chunk arriving is the evidence the stream is alive), and `first_output` is
+  cumulative *from the open* — anchored there so a retried open does not hand the
+  stream that replaced it an already-spent allowance, and cumulative so an endpoint
+  emitting a reasoning fragment just inside every gap cannot satisfy it forever.
+  Progress the user cannot see is not progress.
+- **A stalled open is logged where it happens.** `respond_open_stall` names the
+  attempt, its allowance and whether the budget was exhausted, so a recovered stall
+  is still visible to an operator — a turn that merely looks slow is how the
+  original incident hid.
 - **Every phase is clamped by the total.** A 60 s idle allowance means nothing
-  when 5 s of turn budget remains.
-- **Retry attempts share the budget.** `retry_upstream` takes the remaining time
+  when 5 s of turn budget remains, and a per-attempt open allowance cannot outlive
+  the turn either.
+- **Retry attempts share the total.** `retry_upstream` takes the remaining time
   and refuses to start an attempt that cannot finish — without that, N attempts
   at T seconds each cost N×T, which is exactly how a per-attempt timeout composes
   into an unbounded turn. It applies to the stream *open* too, not just chunks.
-- **Reasoning fragments do not satisfy `first_output`.** Only visible content or a
-  tool call does; otherwise a model that thinks for two minutes escapes the
-  deadline that exists to measure user-perceived latency.
+- **`total` must stay under the platform request timeout** (960 s in
+  `cloudbuild.yaml`). Move one and move the other: if Cloud Run wins the race the
+  client gets an untyped 504 with no phase and the slot stays held until it fires.
+- **None of this has to fit inside the CLIENT's idle window, because the heartbeat
+  keeps the stream alive.** The CLI aborts a respond stream after 90 s with no read
+  progress (`sseIdleTimeout`), and `_stream_with_heartbeat` emits a `: hb` comment
+  every 8 s through selection, the open, its retries and any generation gap —
+  comments are invisible to SSE event parsing but do count as read progress. The
+  cadence, not any deadline, is the cross-repo invariant, and
+  `tests/wire/test_stream_silence_budget.py` pins it against the CLI's own source
+  *and* proves a heartbeat actually goes out during a stalled open. Without it the
+  client would kill and replay turns the server was still recovering, charging a
+  second model call for each.
 - **Timing is monotonic.** A clock adjustment mid-turn cannot extend or collapse
   a deadline.
 
