@@ -141,6 +141,19 @@ for s in state-signing-key-current state-salt; do
 done
 ok "granted secretAccessor on state-signing-key-current, state-salt"
 
+# The Developer Connect connection's GitHub OAuth token. The fetch-lfs build
+# step reads it to pull LFS content (the model artifact) from the PRIVATE repo
+# — the v2 checkout leaves no git credential behind. The secret's name carries
+# a random suffix minted by Developer Connect, so it is discovered, not
+# hardcoded; skipped with a warning if the connection is not set up yet.
+GH_TOKEN_SECRET=$(gcloud secrets list --project="$PROJECT"   --filter="name~daintree-github-github-oauthtoken"   --format="value(name)" --limit=1 || true)
+if [ -n "$GH_TOKEN_SECRET" ]; then
+  retry 12 gcloud secrets add-iam-policy-binding "$GH_TOKEN_SECRET"     --member="serviceAccount:${DEPLOY_SA_EMAIL}"     --role=roles/secretmanager.secretAccessor     --project="$PROJECT" --quiet >/dev/null
+  ok "granted deploy SA secretAccessor on $GH_TOKEN_SECRET (LFS fetch)"
+else
+  warn "no daintree-github oauthtoken secret found — LFS fetch will fail until granted"
+fi
+
 # The rotation-overlap secret, granted only if it exists. It is created by hand at
 # the start of a rotation and deleted once the old token TTL has expired, so it is
 # absent most of the time — but a rotating deploy MOUNTS it, and a mount the
