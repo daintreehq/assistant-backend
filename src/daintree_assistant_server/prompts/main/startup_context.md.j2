@@ -7,6 +7,7 @@ Project: {{ project.name or "(unnamed)" }}{% if project.id %} · id {{ project.i
 {% endif %}{% endif %}{% if agent_roster %}
 # Daintree agent registry
 {{ agent_roster.summary }} Main-toolbar membership is a preference signal, not authorization.
+Each row gives a quoted `id` and, where it differs, a display name. Pass the exact quoted id to tools; write the DISPLAY NAME when naming an agent to the user — these are product names, so `Codex` and `Claude`, never `codex` or `claude`.
 {% for row in agent_roster.rows %}{{ row }}
 {% endfor %}{% if agent_roster.omitted %}{{ agent_roster.omitted }} agent row(s) omitted by the catalog size limit; discover again before using an unlisted id.
 {% endif %}{% endif %}{% if project_instructions %}

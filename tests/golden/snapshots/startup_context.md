@@ -7,6 +7,7 @@ Daintree config: present · settings: in-repository
 
 # Daintree agent registry
 Registered direct-agent catalog: complete; showing 2. Main-toolbar membership is a preference signal, not authorization.
+Each row gives a quoted `id` and, where it differs, a display name. Pass the exact quoted id to tools; write the DISPLAY NAME when naming an agent to the user — these are product names, so `Codex` and `Claude`, never `codex` or `claude`.
 - id "claude" — Claude [built-in] · ready · launchable · main toolbar (explicitly pinned)
 - id "plugin:example/custom-agent" — Custom Agent [plugin] · unauthenticated · launchable · toolbar n/a
 
