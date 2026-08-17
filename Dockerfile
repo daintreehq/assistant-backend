@@ -18,6 +18,7 @@ COPY pyproject.toml README.md requirements.lock ./
 COPY src ./src
 RUN pip install . -c requirements.lock
 
+
 # ---- Runtime: minimal, non-root -------------------------------------------
 FROM python:3.12-slim AS runtime
 

@@ -27,6 +27,13 @@ dependencies = [
     "jinja2>=3.1.0",
     "structlog>=24.1.0",
     "pyyaml>=6.0.0",
+    # Local skill selection. These three, and deliberately nothing else — no
+    # torch, no transformers, no sentence-transformers. The training stack is
+    # ~2GB and lives in .venv-train; what ships is an ONNX graph, a tokenizer
+    # vocabulary and the numpy needed to take a dot product against the index.
+    "numpy>=1.26",
+    "onnxruntime>=1.19",
+    "tokenizers>=0.20",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +59,14 @@ daintree_assistant_server = [
     "prompts/tasks/*.md",
     "prompts/skill_learning/*.md",
     "skills/files/*.md",
+    # The local skill-selection classifier — the SHIPPED selector. int8 only:
+    # fp32 is gitignored and exists locally so the export can measure what
+    # quantisation costs. (The abandoned bi-encoder/reranker artifacts are not
+    # packaged or tracked at all; see training/EXPERIMENTS.md.)
+    "skills/local/artifacts/classifier/model_int8.onnx",
+    "skills/local/artifacts/classifier/tokenizer*.json",
+    "skills/local/artifacts/classifier/labels.json",
+    "skills/local/artifacts/classifier/meta.json",
 ]
 
 [tool.ruff]
@@ -80,6 +95,14 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# LocalSelector.select must keep the upstream Selector.select signature exactly —
+# that parity is what lets the orchestrator and the benchmark harness drive
+# either one unchanged, which is the only way the two can be compared on
+# identical evidence. Several of those parameters are meaningless to a local
+# model (there is no credential to spend and no endpoint to route to) and are
+# deliberately accepted and ignored. Same reasoning as the global ARG001 ignore
+# above, which already exempts the plain-function form of this.
+"src/daintree_assistant_server/skills/local/selector.py" = ["ARG002"]
 "tests/**/*.py" = [
     "ARG001",
     "ARG002",
@@ -91,6 +114,15 @@ python_version = "3.12"
 strict = true
 warn_return_any = false
 plugins = ["pydantic.mypy"]
+
+# onnxruntime and tokenizers ship no py.typed marker, so --strict cannot see
+# through them. Scoped to these two modules rather than relaxed globally: every
+# value crossing the boundary is immediately narrowed to a concrete type on our
+# side (np.asarray(..., dtype=np.float32), int(), float()), so the untyped region
+# ends at the call rather than propagating Any into the ranker.
+[[tool.mypy.overrides]]
+module = ["onnxruntime.*", "tokenizers.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

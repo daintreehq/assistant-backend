@@ -8,6 +8,10 @@ env/
 venv/
 ENV/
 .venv
+# The local-selector training environment (torch, transformers, CUDA-less but
+# still ~2GB). Deliberately SEPARATE from .venv: training deps must never leak
+# into the serving dependency set, which takes only numpy/onnxruntime/tokenizers.
+.venv-train/
 
 # Distribution
 build/
@@ -55,3 +59,42 @@ Thumbs.db
 
 # uv (not used by this project; pip + requirements.lock is the source of truth)
 uv.lock
+
+# Local skill selection (training side). The SERVING artifacts under
+# src/daintree_assistant_server/skills/local/artifacts/ are tracked via Git LFS —
+# they ship in the image. Everything here is the machinery that produced them and
+# is reproducible from `training/`, so it stays out of the repo.
+# NOTE: git has no trailing-comment syntax — a "path  # why" line makes the
+# comment part of the pattern and silently matches nothing. Keep these bare.
+# HuggingFace hub / datasets cache:
+training/.cache/
+# Trainer checkpoints + tensorboard logs:
+training/runs/
+# Fine-tuned torch checkpoints, pre-ONNX-export:
+training/models/
+# Training stdout captures:
+training/logs/
+# Per-run result JSONs and the report page. Chunky, regenerable, and the numbers
+# that matter are transcribed into training/EXPERIMENTS.md — which is the record.
+# The report is published as a claude.ai artifact, not carried in the repo.
+training/results/
+# Generated synthetic corpora are NOT ignored: training/data/*.jsonl is checked in
+# as the record of what the shipped weights were trained on.
+
+# Local skill selection (serving side). Model GRAPHS are tracked via Git LFS
+# (.gitattributes); these two are not tracked at all:
+#   - the skill embedding index, which is rebuilt from the live catalog at Docker
+#     build time and on demand in dev, so a committed copy could only ever be
+#     stale against a catalog revision it no longer matches;
+#   - fp32 graphs, which exist only so the exporter can measure what quantisation
+#     costs. Only the served precision ships.
+src/daintree_assistant_server/skills/local/artifacts/**/skill_index.npz
+src/daintree_assistant_server/skills/local/artifacts/index/
+src/daintree_assistant_server/skills/local/artifacts/**/model.onnx
+# Legacy retrieve-then-rerank artifacts. That pipeline was measured and
+# abandoned (training/EXPERIMENTS.md); the classifier is the shipped selector.
+# These are rebuildable from training/export_onnx.py and must not live in the
+# repo — three tokenizer vocabularies alone were ~300k lines in any diff view.
+src/daintree_assistant_server/skills/local/artifacts/bi_encoder/
+src/daintree_assistant_server/skills/local/artifacts/reranker/
+src/daintree_assistant_server/skills/local/artifacts/docs_head.npz

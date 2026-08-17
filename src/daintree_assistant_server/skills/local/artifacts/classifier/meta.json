@@ -1,0 +1,9 @@
+{
+  "labels": 32,
+  "docs_index": 32,
+  "cardinality_classes": 4,
+  "n_out": 37,
+  "base_model": "BAAI/bge-base-en-v1.5",
+  "routing_revision": "routing:e6f6f74a6fcc2ea5a8c933c6a5f164df",
+  "max_length": 256
+}

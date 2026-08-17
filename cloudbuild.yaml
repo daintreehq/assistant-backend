@@ -53,6 +53,37 @@ options:
 timeout: 1800s
 
 steps:
+  # ---- Materialise Git LFS content ----------------------------------------
+  # The skill-selection classifier (skills/local/artifacts/classifier/*.onnx,
+  # tokenizer.json) is stored in Git LFS, and Cloud Build's repository fetch
+  # does NOT bring LFS objects down — it leaves 130-byte pointer files where
+  # the model should be. Without this step the image builds green, deploys
+  # green, and ships a selector whose "model" is three lines of text; the
+  # failure would only surface when the classifier is first loaded.
+  #
+  # The v2-connection clone keeps its authenticated origin in /workspace/.git,
+  # so a plain `git lfs pull` works here. The trailing check turns "LFS quietly
+  # did nothing" into a red build: a real model graph is tens of MB, a pointer
+  # is not.
+  - id: fetch-lfs
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        apt-get update -qq && apt-get install -y -qq git-lfs >/dev/null
+        git lfs install --local
+        git lfs pull
+        MODEL=src/daintree_assistant_server/skills/local/artifacts/classifier/model_int8.onnx
+        SIZE=$$(stat -c%s "$$MODEL")
+        if [ "$$SIZE" -lt 1000000 ]; then
+          echo "ERROR: $$MODEL is $$SIZE bytes — an unfetched LFS pointer, not a model."
+          exit 1
+        fi
+        echo "LFS content fetched ($$MODEL: $$SIZE bytes)."
+
   # ---- Build ---------------------------------------------------------------
   # BUILD_SHA is a Dockerfile ARG that becomes a runtime ENV, so /version reports
   # a real commit rather than an empty string.
@@ -174,8 +205,47 @@ steps:
           --region="${_REGION}"
           --service-account="${_RUNTIME_SA}@$PROJECT_ID.iam.gserviceaccount.com"
           --port=8080
+          # ONE vCPU, with concurrency halved to pay for it.
+          #
+          # Local skill selection adds CPU-bound work this container never did:
+          # a bi-encoder plus a cross-encoder on onnxruntime, ~35ms of compute
+          # per turn that fires the selector. The question was whether that needs
+          # a second core, and it was measured rather than assumed
+          # (benchmarks in training/results/concurrency.json):
+          #
+          #   1 worker, 8 rankings issued simultaneously -> p50 169ms, max 280ms
+          #   2 workers, same burst                      -> p50 100ms, max 138ms
+          #
+          # Even the single-worker worst case is ~7x faster than the 2044ms
+          # upstream call it replaces, and that burst is pessimistic — it assumes
+          # every concurrent turn fires a ranking in the same instant, while a
+          # turn actually spends seconds streaming. So the second core buys tail
+          # headroom, not viability, and min-instances=1 would bill it around the
+          # clock.
+          #
+          # --concurrency stays at 8. Halving it was considered and rejected:
+          # it would buy tail headroom that the numbers above say is not needed,
+          # and pay for it in INSTANCES, which on a paid service is the more
+          # expensive currency than the CPU it was trying to save.
+          #
+          # The burst figures assume all 8 turns rank in the same instant. They
+          # do not: a turn spends seconds streaming the main model's response and
+          # ~35ms ranking, so the selector's duty cycle is low single-digit
+          # percent and genuine collisions are rare. The pool bounds the rare
+          # case (skills/local/runtime.py) and, at worst, waits — which is still
+          # the fastest option available, since the alternative is the 2044ms
+          # call this replaces.
           --cpu=1
-          --memory=1Gi
+          # 2Gi with the classifier counted. Measured RSS for the shipped int8
+          # graph is 300MB (fp32 would be 665MB and was rejected for exactly this
+          # budget); the server's own prompts, catalog and per-request buffers
+          # ride on top, and the catalog is DESIGNED to grow to 100-200 skills —
+          # each new skill costs prompt bytes held resident and another head row.
+          # 1Gi would serve today at ~55% utilisation, which leaves no room for
+          # that growth plus 8 concurrent turns' buffers, and an OOM kill
+          # mid-stream costs more than the ~$7/month the second GiB bills at
+          # min-instances=1. Revisit downward only if measured live RSS says so.
+          --memory=2Gi
           --cpu-boost
           --concurrency=8
           --min-instances=1
