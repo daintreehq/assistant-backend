@@ -14,7 +14,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 `error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** OpenRouter (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek/deepseek-v4-flash-0731` for the main/selector/utility calls and the skill-learning gate, routed to the fastest endpoint that does not collect or train on request data ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, *not* zero data retention <!-- privacy-copy-ok -->); the local skill-learning builder/improver name a stronger model (`openai/gpt-5.6-sol`) on the same provider and the same key
+- **Upstream:** OpenRouter (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek/deepseek-v4-flash-0731` for the main/utility calls and the skill-learning gate (skill selection is LOCAL — an in-process ONNX classifier, no upstream call), routed to the fastest endpoint that does not collect or train on request data ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, *not* zero data retention <!-- privacy-copy-ok -->); the local skill-learning builder/improver name a stronger model (`openai/gpt-5.6-sol`) on the same provider and the same key
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Authoritative documents
@@ -43,7 +43,7 @@ proof that the whole corpus is accurate.
   evidence is sanitized `input.messages` plus bounded turn/workflow hints and tool names;
   the learner's is `input.messages` plus the just-generated final answer and tool names.
 - `skill.find` / `skill.load` are never offered to the main model; selection runs
-  as a separate small-model call before the main completion.
+  server-side as a local classifier forward pass (~10ms) before the main completion.
 - Only the active skill bodies (max 3) are injected — never the full catalog.
 - The selector does **not** re-run on ordinary tool-continuation rounds; it re-runs
   on a new turn, a mid-turn interjection, an invalid/missing state token, a catalog
@@ -97,8 +97,7 @@ mypy src/
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
 # Live provider-contract tests (skipped by default; make real OpenRouter calls).
-# Pins the things mocks can't see — e.g. that the selector's non-thinking
-# json_object call succeeds upstream and doesn't degrade open, and that the
+# Pins the things mocks can't see — e.g. that the
 # endpoint-routing policy matches an endpoint for every parameter mix we send.
 RUN_LIVE_OPENROUTER=1 OPENROUTER_API_KEY=sk-or-v1-... pytest tests/live -q
 ```
@@ -223,9 +222,8 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
 
 Skill/selection metadata is delivered in the response body's `skills` block
 (non-streaming) or as the first SSE `meta` event (streaming). The streaming event
-is emitted as soon as selection completes and always precedes model output. On an
-eligible later turn, the backend may already have privately prefetched the matching
-main stream, so useful output can follow immediately after `meta`.
+is emitted as soon as selection completes — local selection makes that ~10ms in —
+and always precedes model output.
 
 ## Deployment
 

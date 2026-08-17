@@ -43,12 +43,12 @@ BANDS: dict[str, float] = {
     # Every request carries this. 5% is roughly one new rule; more than that
     # should be a decision, not a drift.
     "base_prompt_bytes": 0.05,
-    # Grows with the catalog on purpose — adding a skill is a deliberate act
-    # that moves this. Wide enough not to cry wolf, tight enough to catch a
-    # per-skill metadata blow-up.
-    "selector_prompt_bytes": 0.25,
     # Moves only when the cli/ submodule pin moves, which should be visible.
     "tool_inventory_bytes": 0.10,
+    # The shipped classifier graph. Moves only on a retrain+export, which is a
+    # deliberate act; a silent change here means the artifact was touched
+    # without the runbook.
+    "classifier_onnx_bytes": 0.30,
 }
 
 
@@ -58,21 +58,17 @@ def capture() -> dict[str, Any]:
         OPENROUTER_MODEL,
         PUBLIC_MODEL_ID,
     )
-    from daintree_assistant_server.prompts.loader import (
-        TEMPLATE_SELECTOR_SYSTEM,
-        PromptLoader,
-    )
+    from daintree_assistant_server.prompts.loader import PromptLoader
     from daintree_assistant_server.providers.policy import DEFAULT_POLICY
     from daintree_assistant_server.skills.catalog import load_catalog
+    from daintree_assistant_server.skills.local.documents import routing_revision
+    from daintree_assistant_server.skills.local.paths_local import classifier_artifact_dir
 
     loader = PromptLoader()
     catalog = load_catalog()
-    selector = loader.render(
-        TEMPLATE_SELECTOR_SYSTEM,
-        catalog=catalog.selector_metadata(),
-        active_ids=[],
-        max_active=3,
-    )
+    artifact = classifier_artifact_dir()
+    classifier_meta = json.loads((artifact / "meta.json").read_text())
+    classifier_labels = json.loads((artifact / "labels.json").read_text())
     inventory_raw = INVENTORY_PATH.read_bytes()
     inventory = json.loads(inventory_raw)
 
@@ -81,18 +77,22 @@ def capture() -> dict[str, Any]:
             "model": OPENROUTER_MODEL,
             "public_model": PUBLIC_MODEL_ID,
             "privacy_mode": DEFAULT_POLICY.privacy.value,
-            # Both sorts, because there are two answers and the interesting one
-            # is that they DIFFER: an ordinary call is ranked on tokens/second, the
-            # skill selector on time-to-first-token (docs/PROVIDER_POLICY.md
-            # section 3b). Recording only the default would let the selector's
-            # ranking — the one on the turn's first-byte path — move without
-            # leaving a trace in the diff.
             "default_endpoint_sort": DEFAULT_POLICY.sort.value,
-            "first_byte_endpoint_sort": DEFAULT_POLICY.ranked_on_first_byte().sort.value,
+        },
+        "classifier": {
+            # Selection is LOCAL: these are the facts that describe the shipped
+            # selector — its size, which catalog surface it was trained on, and
+            # that its labels still cover the catalog. A drifted stamp here is
+            # the pre-deploy version of the readiness check.
+            "classifier_onnx_bytes": (artifact / "model_int8.onnx").stat().st_size,
+            "routing_revision": classifier_meta.get("routing_revision", ""),
+            "routing_revision_matches_catalog": (
+                classifier_meta.get("routing_revision") == routing_revision(catalog)
+            ),
+            "labels": len(classifier_labels),
         },
         "prompt": {
             "base_prompt_bytes": len(loader.base_prompt().encode("utf-8")),
-            "selector_prompt_bytes": len(selector.encode("utf-8")),
             "skill_body_bytes_total": sum(
                 len(s.body.encode("utf-8")) for s in catalog.skills
             ),

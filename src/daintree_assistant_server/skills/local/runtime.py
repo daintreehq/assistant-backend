@@ -15,8 +15,8 @@ what converts unbounded concurrency into bounded parallelism.
 
 ``onnxruntime`` releases the GIL inside ``Session.run``, so a *thread* pool gives
 real parallelism here — no processes, no shared-memory marshalling, no second
-copy of the weights per worker. Sessions are shared across workers, which is safe
-(see ``onnx_models``) and keeps resident memory flat as the pool grows.
+copy of the weights per worker. Sessions are thread-safe for concurrent ``run``
+calls, so one shared session keeps resident memory flat as the pool grows.
 
 ## Why it fails open
 

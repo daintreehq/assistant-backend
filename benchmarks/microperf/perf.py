@@ -530,6 +530,9 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         "healthz_status": readiness.get("healthz_status"),
         "readyz_status": readiness.get("readyz_status"),
         "provider_calls_per_request": concurrency.get("provider_calls_per_request"),
+        "provider_calls_total": concurrency.get("provider_calls"),
+        "requests_total": concurrency.get("total_requests"),
+        "selector_provider_calls": concurrency.get("selector_calls"),
         "concurrency_warnings": concurrency.get("warning_count"),
         "concurrency_warnings_at_cap": concurrency.get("warning_count_at_production_cap"),
     }
@@ -542,10 +545,13 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         and summary["healthz_status"] == 200
         and summary["readyz_status"] == 200
         and summary["codec_verify_ops_per_sec"] > 0
-        # Exactly ONE provider call per request — the main completion. Skill
-        # selection is local (in-process ONNX) and never touches the provider;
-        # a 2.0 here would mean the upstream selector came back.
-        and summary["provider_calls_per_request"] == 1.0
+        # Exactly ONE provider call per request — the main completion — gated
+        # on EXACT integers, not a rounded ratio (one extra call across 336
+        # requests rounds to 1.00). Skill selection never touches the provider:
+        # selector_calls must be exactly zero, or the upstream selector came
+        # back without anyone deciding that.
+        and summary["provider_calls_total"] == summary["requests_total"]
+        and summary["selector_provider_calls"] == 0
         and (summary["concurrency_warnings_at_cap"] or 0) == 0
     )
     return {

@@ -90,11 +90,16 @@ only real skill ids; label the specific skill alone (never "specific +
 foundation" — the backend pairs the foundation downstream); `expect_ids: []` is
 a first-class answer.
 
-### 3. Assemble (cumulative — pass the old journals too)
+### 3. Assemble (cumulative by default)
 
 ```bash
-$PY -m training.assemble_data --journal <new-journal.jsonl> <all-old-journals...>
+$PY -m training.assemble_data --journal <new-journal.jsonl>
 ```
+
+The committed `training/data/selection.jsonl` is carried forward automatically
+(`--base`, on by default) — journals are session-local and NOT reconstructible
+from a fresh clone, so the committed corpus IS the base and new journals extend
+it through the same gates. `--base ''` rebuilds from journals alone.
 
 Watch the printed stats: `dropped_contaminated` (benchmark collisions),
 `dropped_conflicting_label` (same rendered input, different labels — a noisy
@@ -113,6 +118,11 @@ Watch: `card_acc` ~0.95 (this is what makes "zero skills" work) and
 `val exact-match` ~0.85. The export **fails** if the fp32 graph changes any
 decision vs torch, and stamps the artifact with the trainer's
 `routing_revision` — it will refuse a checkpoint that lacks one.
+
+**int8 is a lottery**: `quantize_dynamic` is nondeterministic, so each export
+draws a slightly different int8 graph (measured spread: ~2 recall-pass cases).
+The gate scores every draw; if step 5 lands below its floor, just export again
+— and never re-export an already-measured artifact without re-measuring.
 
 ### 5. Score the SHIPPED artifact
 

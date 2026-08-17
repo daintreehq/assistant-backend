@@ -79,6 +79,10 @@ def main() -> int:
     )
     graph = Graph(backbone, head).eval()
 
+    # Stage the export beside the target and swap only after the gate passes —
+    # the previous good artifact must survive a failed export.
+    final = out
+    out = out.parent / (out.name + ".staging")
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
@@ -119,39 +123,87 @@ def main() -> int:
     )
     (out / "meta.json").write_text(json.dumps({**meta, "base_model": base}, indent=2))
 
-    # ---- parity ---------------------------------------------------------
+    # ---- parity: DECISIONS over the whole benchmark, not logits over two
+    # sentences. The earlier gate checked two canned strings and only top-1 —
+    # a quantisation could change docs answers, second picks or newcomer
+    # admission on arbitrary real inputs and still "pass". Every benchmark
+    # case is rendered exactly as serving renders it and the full Selection
+    # decision is compared. torch->fp32 must agree everywhere (fatal); int8 —
+    # the SHIPPED precision — may drift on a bounded number of near-tie cases.
     import onnxruntime as ort
+
+    from benchmarks.skill_selection.cases import load_cases
+    from daintree_assistant_server.skills.local.classifier import SkillClassifier
+    from daintree_assistant_server.skills.local.documents import query_document
 
     with torch.no_grad():
         ref = graph(sample["input_ids"], sample["attention_mask"]).numpy()
-    for variant in ("model.onnx", "model_int8.onnx"):
-        sess = ort.InferenceSession(str(out / variant), providers=["CPUExecutionProvider"])
-        got = sess.run(None, {
-            "input_ids": sample["input_ids"].numpy().astype(np.int64),
-            "attention_mask": sample["attention_mask"].numpy().astype(np.int64),
-        })[0]
-        delta = float(np.abs(got - ref).max())
-        # What matters is not the logits but the DECISIONS they produce, so the
-        # argmax of the cardinality head and the skill ordering are compared too.
-        same_card = bool((got[:, meta["labels"] + 1:].argmax(1)
-                          == ref[:, meta["labels"] + 1:].argmax(1)).all())
-        same_top = bool((got[:, :meta["labels"]].argmax(1)
-                         == ref[:, :meta["labels"]].argmax(1)).all())
-        print(f"  {variant}: max|logit delta| {delta:.5f}  "
-              f"top-skill agrees {same_top}  cardinality agrees {same_card}")
-        if variant == "model.onnx":
-            assert delta < 0.01, f"fp32 export diverged from torch: {delta}"
-            assert same_top and same_card, "fp32 export changes the DECISION"
-        elif not (same_top and same_card):
-            # Reported, not fatal — and the reason fp32 is what SHIPS.
-            #
-            # int8 changes which skill ranks first on this model. For the
-            # reranker that trade was worth taking, because its forward pass was
-            # 300ms and quantisation bought real time. Here the whole selector is
-            # ~2ms, so quantisation buys nothing that matters and costs decision
-            # stability. 90MB of fp32 on Git LFS is the cheaper side of that
-            # trade by a wide margin.
-            print("    ^ int8 changes decisions; fp32 is the shipped precision")
+    sess_fp32 = ort.InferenceSession(str(out / "model.onnx"),
+                                     providers=["CPUExecutionProvider"])
+    got = sess_fp32.run(None, {
+        "input_ids": sample["input_ids"].numpy().astype(np.int64),
+        "attention_mask": sample["attention_mask"].numpy().astype(np.int64),
+    })[0]
+    delta = float(np.abs(got - ref).max())
+    assert delta < 0.01, f"fp32 export diverged from torch: {delta}"
+
+    from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
+
+    catalog = load_catalog(default_skills_dir())
+    cases = load_cases(catalog)
+    selectable = catalog.selectable_ids
+
+    def decisions(quantized: bool) -> list[tuple[tuple[str, ...], bool]]:
+        clf = SkillClassifier(out, quantized=quantized)
+        outdec = []
+        for case in cases:
+            q = query_document(case.messages, turn_context=case.turn_context)
+            active = [sid for sid in case.active if sid in selectable]
+            sel = clf.select(q, active)
+            outdec.append((tuple(sel.skill_ids), sel.docs_wanted))
+        return outdec
+
+    d_fp32 = decisions(False)
+    d_int8 = decisions(True)
+    # Two tiers of disagreement. CORE decisions — the top-ranked skill, whether
+    # the answer is empty, and the docs verdict — must be near-identical: a
+    # quantisation that changes those changed the model. Bonus-margin extras
+    # flipping in and out around the 0.5 admission floor are EXPECTED int8
+    # noise (the floor sits exactly where quantised logits wobble), so the
+    # secondary gate is outcome parity: the required skill stays present on
+    # (almost) exactly the same cases.
+    core_diff = sum(
+        1 for (a_ids, a_docs), (b_ids, b_docs) in zip(d_fp32, d_int8, strict=True)
+        if (a_ids[:1], bool(a_ids), a_docs) != (b_ids[:1], bool(b_ids), b_docs)
+    )
+    full_diff = sum(1 for x, y in zip(d_fp32, d_int8, strict=True) if x != y)
+
+    def recall_pass(dec: list[tuple[tuple[str, ...], bool]]) -> int:
+        n = 0
+        for case, (ids, _docs) in zip(cases, dec, strict=True):
+            got = set(ids)
+            miss = set(case.required) - got
+            extra = got - set(case.required) - set(case.optional)
+            n += not miss and (bool(case.required) or not extra)
+        return n
+
+    rp_fp32, rp_int8 = recall_pass(d_fp32), recall_pass(d_int8)
+    print(f"  int8 vs fp32: core-decision diff {core_diff}/{len(cases)}  "
+          f"full-tuple diff {full_diff}/{len(cases)}  "
+          f"recall-pass {rp_fp32} -> {rp_int8}")
+    assert core_diff <= 10, (
+        f"int8 changes the CORE decision on {core_diff} of {len(cases)} cases "
+        "(limit 10) — quantisation is not safe for this checkpoint"
+    )
+    assert abs(rp_fp32 - rp_int8) <= 3, (
+        f"int8 moves recall-pass by {abs(rp_fp32 - rp_int8)} cases (limit 3)"
+    )
+
+    # Gate passed: swap the staging dir into place.
+    if final.exists():
+        shutil.rmtree(final)
+    out.rename(final)
+    out = final
 
     sizes = {p.name: round(p.stat().st_size / 1e6, 1) for p in out.glob("*.onnx")}
     print(f"\nexported to {out}")

@@ -39,6 +39,7 @@ from daintree_assistant_server.skills.catalog import (  # noqa: E402
     default_skills_dir,
     load_catalog,
 )
+from training.common import render_training_query  # noqa: E402
 
 DATA = ROOT / "training" / "data"
 
@@ -133,14 +134,21 @@ def main() -> int:
         ):
             stats["dropped_contaminated"] += 1
             return
-        # Key on the rendered INPUT (query + history + active), not input+label.
-        # Keying on the label let two contradictory labels for one input both in
-        # — measured: "do i have any timers set" trained as foundation AND as
-        # watch-outcome. First admission wins; later conflicts are counted so a
-        # noisy generator shows up in the stats instead of the gradients.
+        # A skill cannot be both the answer and a counter-example of itself.
+        if hard_negatives and set(expect) & set(hard_negatives):
+            hard_negatives = [h for h in hard_negatives if h not in expect]
+            stats["hard_negative_overlap_stripped"] += 1
+        # Key on the SERVING render of the input — the exact string the model
+        # trains on (render_training_query: role-stripped, history-budgeted) plus
+        # the active set in order — not a hand-rolled concatenation that keeps
+        # untruncated history the model never sees. Keying on input+label let
+        # two contradictory labels for one input both in — measured: "do i have
+        # any timers set" trained as foundation AND as watch-outcome. First
+        # admission wins; later conflicts are counted so a noisy generator shows
+        # up in the stats instead of the gradients.
         input_key = (
-            _norm(query) + "|" + "|".join(_norm(h) for h in (history or []))
-            + "|" + ",".join(sorted(active or []))
+            _norm(render_training_query(query, history))
+            + "|" + ",".join(active or [])
         )
         if input_key in seen_inputs:
             prior = seen_inputs[input_key]
@@ -163,11 +171,10 @@ def main() -> int:
             "is_docs": is_docs,
             "hard_negatives": hard_negatives or [],
             "source": source,
-            # Which empty-set sentinel this example teaches, when it has no skills.
-            # The reranker trains the sentinel documents as ordinary candidates, so
-            # an empty example needs to say WHICH of them should win — an
-            # acknowledgement and a weather question are both empty but they are
-            # not the same lesson (see ranker.EMPTY_SET_DOCUMENTS).
+            # Which KIND of empty this example teaches — an acknowledgement and
+            # a weather question are both empty but not the same lesson. Kept as
+            # corpus metadata for balancing/analysis; the classifier itself
+            # learns "empty" from the zero-cardinality label.
             "empty_kind": empty_kind if not expect else None,
         })
 
@@ -199,6 +206,27 @@ def main() -> int:
                 source="followup",
                 is_docs=False,
             )
+
+
+    # The committed corpus is the reconstructible base (journals are
+    # session-local); admit it through the SAME gates as fresh rows.
+    if args.base:
+        base_path = Path(args.base)
+        if base_path.exists():
+            base_rows = [
+                json.loads(line)
+                for line in base_path.read_text().splitlines()
+                if line.strip()
+            ]
+            print(f"base corpus: {len(base_rows)} rows from {base_path}")
+            for r in base_rows:
+                emit(
+                    r["query"], list(r["expect_ids"]),
+                    history=r.get("history"), active=r.get("active_ids"),
+                    source=r.get("source", "base"), is_docs=r.get("is_docs"),
+                    hard_negatives=r.get("hard_negatives"),
+                    empty_kind=r.get("empty_kind"),
+                )
 
     for bundle in bundles:
         items = bundle["items"]

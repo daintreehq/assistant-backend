@@ -29,10 +29,17 @@ per token, which makes a single known host cheaper than a router. The deferred
 plan to serve the main model directly from Novita is in [`TODO.md`](../TODO.md).
 Nothing below describes anything but OpenRouter today.
 
+> **Skill selection is not an upstream call anymore.** It runs as a LOCAL
+> in-process classifier (`skills/local/`, ~10ms, no credential, no endpoint).
+> Selector-specific policy below — the latency-critical sort, the shared
+> selector affinity key, selector cost lines — describes the prompt-based
+> selector that now exists only as the scripted test seam, and is kept for the
+> record.
+
 | Call | Model | Source of truth |
 |---|---|---|
 | Main completion | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
-| Skill selector | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
+| Skill selection | — local ONNX classifier, no upstream call | `skills/local/classifier.py` |
 | Utility tasks | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
 | Skill-learning gate | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
 | Skill builder / improver | `openai/gpt-5.6-sol` | `config.SKILL_BUILDER_MODEL`, `config.SKILL_IMPROVER_MODEL` |
@@ -315,10 +322,8 @@ classifying user input into "short" and "long" would be a rule waiting to be
 wrong. Nothing here inspects a request. The selector is a *fixed, server-owned
 call* whose shape is known permanently and cannot vary with what a user types:
 measured over 438 trials (`benchmarks/skill_selection`), **~10.3k prompt tokens in,
-~90 completion tokens out**, p50 2.044s. And with a winning speculation the turn's
-entire time-to-first-token *is* this call's latency
-(`services/speculation.py`), so it is the number a user experiences as "how fast
-is this thing".
+~90 completion tokens out**, p50 2.044s — the numbers that justified replacing it
+with the local classifier (~10ms), which is what serves today.
 
 **It is a lean, not a landslide, and the honest version is worth keeping.**
 Generation is not negligible even here — ~90 tokens at ~100 tok/s is ~0.9s of that
@@ -500,9 +505,8 @@ Five properties worth knowing:
 - **Timing is monotonic.** A clock adjustment mid-turn cannot extend or collapse
   a deadline.
 
-The phases do not cleanly mean "before the model was reached": speculation may
-open an upstream stream *during* preparation. `preparation` means "before the
-canonical turn had anything to show", which is what a user experiences.
+`preparation` means "before the turn had anything to show", which is what a
+user experiences.
 
 The failure is `504 turn_deadline_exceeded`, naming the phase. Before headers it
 is an ordinary HTTP error; after the stream has committed a 200 it is a terminal
@@ -529,8 +533,9 @@ The streaming path has no such gap: `GeneratorExit` closes the upstream stream.
 
 ## 5b. Skill selection — the no-task fast path, and why shortlisting waits
 
-The selector is a small-model call on the turn's first-byte path. Two ways to
-make it cheaper; one is shipped, one is deliberately not.
+Selection itself is local now (~10ms), so the fast path below no longer buys
+first-byte latency — it survives because "a greeting clears the active set"
+is a semantic contract, not a latency hack.
 
 **Shipped: the no-task fast path.** A cold opening turn whose message is a
 recognised greeting or acknowledgement skips the call entirely and clears the
@@ -594,15 +599,15 @@ calculated ourselves would be a guess presented as a bill.
 
 A `/respond` request can bill **more calls than are obvious**:
 
-- the skill selector, plus one JSON-repair call if its output was malformed;
-- a speculative main stream that lost, plus the canonical one that replaced it;
 - the main completion;
 - a bare-intent semantic re-roll, whose output the user never saw.
 
-`cost.total` sums every one of those it can observe, because every one of them
-lands on the caller's card. The breakdown is kept because it answers the
-follow-up question ("why was that turn expensive?") and because `selector` is the
-component prompt work can actually move.
+(Skill selection is local and bills nothing; `cost.selector` is null on
+production turns and populated only by the scripted test seam.)
+
+`cost.total` sums every one it can observe, because every one of them lands on
+the caller's card. The breakdown is kept because it answers the follow-up
+question ("why was that turn expensive?").
 
 **Absent means unknown.** When the provider reports no cost, the whole `cost`
 block is omitted rather than filled with zeros. A zero would read as "this turn
@@ -621,19 +626,11 @@ figure. Three things clear it:
   absent-block rule prevents, one level up. Note the distinction: a turn that
   *skipped* selection (continuation round, no-task fast path) has no selector
   usage at all, and its missing cost is a truthful zero rather than a gap.
-- **A losing speculative stream cancelled before it reported.** When speculation
-  opens a private upstream stream and the selector then picks a different skill
-  set, that stream is cancelled. If it *finished* first its cost is known and is
-  included in `total`. If it was cut off mid-flight, OpenRouter never sent the
-  final chunk that carries usage, so the spend is real but unobservable —
-  recovering it would mean a second `/generation?id=` call per turn.
-
-  A speculation can also be thrown away one step later, when the selector picked
-  the SAME skills but the claim is declined (a private post-open failure, or the
-  buffer cap overflowing). That generation was billed exactly as a mismatched one
-  is, so it lands in `total` on the same terms. Both cases are gated on whether
-  the upstream stream actually OPENED: a speculative open that never succeeded
-  cost nothing, and counting it would put a false floor on every turn one failed.
+- **A stream cancelled before it reported.** A stream cut off mid-flight never
+  sends the final chunk that carries usage, so its spend is real but
+  unobservable — recovering it would mean a second `/generation?id=` call.
+  (This was common when speculative streaming existed; with one upstream call
+  per round it is now limited to a discarded bare-intent re-roll.)
 - **A component that is itself a partial sum.** `main` and `selector` are each
   one *number* but not always one *call*: a bare-intent re-roll bills the main
   slot twice, and a malformed selection bills the selector slot twice. If only
@@ -651,11 +648,6 @@ branch of the same rule: a repaired task whose two calls did not both report has
 not a rounding error — a busy orchestration session runs dozens of
 `terminal_summarize` / `terminal_extract` calls, and each silently-low figure
 would compound into the session total.
-
-Speculation only runs on a streamed turn that already has a verified,
-catalog-current, non-empty active skill set, and is only abandoned when selection
-contradicts it. Every occurrence is logged (`skill_speculation_fallback`), so the
-gap is measurable rather than assumed.
 
 **What is not counted at all:** skill learning. It runs fire-and-forget *after*
 the response, on a stronger model (`openai/gpt-5.6-sol`), and can cost more than

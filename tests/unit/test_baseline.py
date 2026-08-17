@@ -74,10 +74,23 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     # drifts in silence — which is exactly what happened to `endpoint_sort` until
     # a second sort existed to notice it.
     assert identity["default_endpoint_sort"] == DEFAULT_POLICY.sort.value  # type: ignore[index]
-    assert (
-        identity["first_byte_endpoint_sort"]  # type: ignore[index]
-        == DEFAULT_POLICY.ranked_on_first_byte().sort.value
-    )
-    # And they differ. If a future edit collapses them, the first-byte ranking has
-    # stopped doing the one thing it exists to do.
-    assert identity["first_byte_endpoint_sort"] != identity["default_endpoint_sort"]  # type: ignore[index]
+    # There is no first-byte endpoint sort anymore: the call that sat on the
+    # first-byte path (the upstream skill selector) was replaced by the LOCAL
+    # classifier, whose release facts are asserted below instead.
+
+
+def test_the_classifier_block_matches_the_shipped_artifact() -> None:
+    """The baseline pins the LOCAL selector's provenance.
+
+    A retrain that forgets the export, or a catalog change that forgets the
+    retrain, shows up here as a failing push instead of a degraded-open
+    selector discovered in production logs.
+    """
+    from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
+    from daintree_assistant_server.skills.local.documents import routing_revision
+
+    clf = _baseline()["classifier"]
+    catalog = load_catalog(default_skills_dir())
+    assert clf["routing_revision_matches_catalog"] is True  # type: ignore[index]
+    assert clf["routing_revision"] == routing_revision(catalog)  # type: ignore[index]
+    assert clf["labels"] == len(catalog.selectable_ids)  # type: ignore[index]

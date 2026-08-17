@@ -37,8 +37,12 @@ async def test_a_stalled_preparation_becomes_an_attributable_error(
 
     # Selection is LOCAL now — the provider is never touched during prep, so a
     # stalled PROVIDER cannot stall preparation. The phase's slow component is
-    # the selector itself; stall that.
+    # the selector itself; stall that — and record that the stall was actually
+    # entered, or an unrelated slow phase could pass this test.
+    entered = asyncio.Event()
+
     async def _never_returns(*args, **kwargs):  # type: ignore[no-untyped-def]
+        entered.set()
         await asyncio.sleep(30)
 
     container.orchestrator.selector.select = _never_returns  # type: ignore[method-assign]
@@ -68,6 +72,7 @@ async def test_a_stalled_preparation_becomes_an_attributable_error(
     assert exc.value.code == "turn_deadline_exceeded"
     assert exc.value.status_code == 504
     assert "preparation" in exc.value.message
+    assert entered.is_set(), "the stalled selector was never reached"
     await container.aclose()
 
 

@@ -121,11 +121,12 @@ LIVE: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     ("workflow_intel", _workflow_intel),
     ("injection_live", _injection_live),
     ("utility_json", _utility_json),
-    # Routing accuracy of the classifier that decides which runbook the main
-    # model gets. It was outside this roll-up entirely and documented as "run
-    # separately" — so a release could qualify without ever asking whether skill
-    # selection still worked, in a system whose whole design is a small model
-    # governed by skills.
+    # UPSTREAM COMPARATOR, not the serving path: this suite drives the
+    # prompt-based DeepSeek selector live (~450 paid calls) to keep a baseline
+    # the LOCAL classifier is compared against. The classifier that actually
+    # serves is scored deterministically and for free by
+    # `training/eval_classifier.py` (recall-pass gate) and its policy is
+    # unit-tested; do not read this row as "the selector's accuracy".
     ("skill_selection", _skill_selection),
 ]
 

@@ -1,20 +1,24 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:36741a700122bb252b078550ceb28fa39e99521e1bd50669f542c2d94dc9d640",
+    "revision": "sha256:5ed81ae4ad8172a807417397868a02431e3f3e86db79d00717a745ad93f49499",
     "skills": 33
+  },
+  "classifier": {
+    "classifier_onnx_bytes": 109710116,
+    "labels": 32,
+    "routing_revision": "routing:e6f6f74a6fcc2ea5a8c933c6a5f164df",
+    "routing_revision_matches_catalog": true
   },
   "identity": {
     "default_endpoint_sort": "throughput",
-    "first_byte_endpoint_sort": "latency",
     "model": "deepseek/deepseek-v4-flash-0731",
     "privacy_mode": "no_training",
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 30373,
-    "selector_prompt_bytes": 45229,
-    "skill_body_bytes_total": 234545
+    "base_prompt_bytes": 30538,
+    "skill_body_bytes_total": 234742
   },
   "tools": {
     "count": 77,

@@ -347,7 +347,9 @@ def build_container(
     catalog_manager = CatalogManager(catalog, primary_dir=primary_dir, overlay_dir=overlay_dir)
 
     state_codec = _build_state_codec(settings)
-    chat_provider = provider if provider is not None else _build_provider(settings)
+    # The classifier is built BEFORE the provider: its stale-head check can
+    # raise, and raising after the provider exists would leave an HTTP client
+    # open in a process that deliberately stays alive (unready, not dead).
     inference_pool: InferencePool | None = None
     if selector is None:
         # Skill selection is LOCAL: one in-process ONNX forward pass (~10ms),
@@ -368,6 +370,7 @@ def build_container(
             )
         inference_pool = InferencePool()
         selector = LocalSelector(classifier, inference_pool, catalog_manager, settings)
+    chat_provider = provider if provider is not None else _build_provider(settings)
     assembler = PromptAssembler(prompt_loader, settings)
 
     skill_learner: SkillLearner | None = None
@@ -420,6 +423,7 @@ def build_container(
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     settings: Settings = app.state.settings
     injected: ChatProvider | None = getattr(app.state, "injected_provider", None)
+    injected_selector: SkillSelector | None = getattr(app.state, "injected_selector", None)
     try:
         # Local-development-only features (skill learning) must never be enabled in
         # production; checked always, even with an injected provider.
@@ -428,7 +432,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
             problems.extend(settings.missing_secrets() + settings.weak_secrets())
         if problems:
             raise RuntimeError(f"configuration problems: {', '.join(problems)}")
-        container = build_container(settings, injected)
+        container = build_container(settings, injected, injected_selector)
         app.state.container = container
         app.state.ready = True
         logger.info(
@@ -453,7 +457,10 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
 
 
 def create_app(
-    *, settings: Settings | None = None, provider: ChatProvider | None = None
+    *,
+    settings: Settings | None = None,
+    provider: ChatProvider | None = None,
+    selector: SkillSelector | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
@@ -468,6 +475,7 @@ def create_app(
     )
     app.state.settings = settings
     app.state.injected_provider = provider
+    app.state.injected_selector = selector
     app.state.ready = False
     app.state.ready_error = None
 

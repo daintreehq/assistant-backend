@@ -27,7 +27,7 @@ from ...providers.policy import RoutingPreference
 from ..catalog import Catalog, CatalogManager
 from ..selector import SelectionDecision
 from .classifier import SkillClassifier
-from .documents import query_document, routing_revision
+from .documents import _content_text, query_document, routing_revision
 from .runtime import InferencePool
 
 _log = logging.getLogger(__name__)
@@ -128,14 +128,17 @@ class LocalSelector:
         # new instruction to classify, so ranking one would be ranking the
         # conversation's past.
         if active_ids and eligible[-1].role != "user":
+            # A REUSE, deliberately not an authoritative answer: authority over
+            # the docs query rides the same flag as authority over the skills,
+            # and a wake has no opinion on either — marking it authoritative
+            # was measured (in review) to drop a carried docs query on a
+            # force/always wake round, losing the pages mid-turn.
             return SelectionDecision(
                 skill_ids=list(active_ids),
-                ran=True,
+                ran=False,
                 degraded=False,
-                confidence=1.0,
                 task_type="background_wake",
                 reason="no new user instruction; continuing the active workflow",
-                authoritative=True,
             )
 
         query = query_document(conversation, turn_context=turn_context)
@@ -172,7 +175,11 @@ class LocalSelector:
         top_scores = ", ".join(
             f"{k.rsplit('.', 1)[-1]}:{v:.2f}" for k, v in list(result.scores.items())[:3]
         )
-        top = next(iter(result.scores.values()), 0.0)
+        # Confidence describes the ANSWER: the first admitted skill's
+        # probability. The top of the raw ranking may have been rejected by a
+        # floor — or cardinality may be zero — and reporting its score would
+        # attach high confidence to a skill the turn never loaded.
+        top = result.scores.get(skill_ids[0], 0.0) if skill_ids else 0.0
         return SelectionDecision(
             skill_ids=skill_ids,
             ran=True,
@@ -202,7 +209,9 @@ def _docs_query(wanted: bool, eligible: list[ChatMessage]) -> str | None:
         return None
     for msg in reversed(eligible):
         if msg.role == "user":
-            content = msg.content if isinstance(msg.content, str) else ""
-            cleaned = " ".join(content.split())[:120].strip()
+            # _content_text, not a str-only read: a validated text+image message
+            # carries typed content PARTS, and reading only strings silently
+            # dropped the retrieval the docs head just asked for.
+            cleaned = " ".join(_content_text(msg.content).split())[:120].strip()
             return cleaned or None
     return None

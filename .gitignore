@@ -93,7 +93,6 @@ src/daintree_assistant_server/skills/local/artifacts/index/
 src/daintree_assistant_server/skills/local/artifacts/**/model.onnx
 # Legacy retrieve-then-rerank artifacts. That pipeline was measured and
 # abandoned (training/EXPERIMENTS.md); the classifier is the shipped selector.
-# These are rebuildable from training/export_onnx.py and must not live in the
 # repo — three tokenizer vocabularies alone were ~300k lines in any diff view.
 src/daintree_assistant_server/skills/local/artifacts/bi_encoder/
 src/daintree_assistant_server/skills/local/artifacts/reranker/

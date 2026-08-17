@@ -1177,20 +1177,16 @@ def test_the_prompt_cost_readme_snapshot_matches_the_live_catalog() -> None:
     )
 
 
-def test_the_prompt_cost_readme_quotes_the_current_selector_size() -> None:
-    """The single number the original staleness got most wrong: it advertised a
-    ~20.3 KB selector prompt against a real 44 KB one, and a reader sizing a
-    change against that is out by a factor of two."""
-    from tools.baseline import capture
-
-    kb = capture()["prompt"]["selector_prompt_bytes"] / 1024
+def test_the_prompt_cost_readme_does_not_sell_a_retired_selector_prompt() -> None:
+    """Selection is local now — zero upstream bytes. The README must not present
+    a selector-prompt size as a CURRENT cost; the retired figure may appear only
+    as explicitly-labelled history."""
     current = _read(DOC_PROMPT_COST).split("### Snapshot history", 1)[0]
-    quoted = re.search(r"selector prompt \|\s*~([\d.]+)\s*KB", current)
-    assert quoted, "the prompt_cost README snapshot no longer quotes a selector prompt size"
-    assert abs(float(quoted.group(1)) - kb) < 1.0, (
-        f"the prompt_cost README says the selector prompt is ~{quoted.group(1)} KB; "
-        f"it is {kb:.1f} KB"
+    assert not re.search(r"\| selector prompt \|\s*~[\d.]+\s*KB", current), (
+        "the prompt_cost README still quotes a live selector prompt size; "
+        "selection is local and sends no prompt upstream"
     )
+    assert "local classifier" in current
 
 
 def test_the_benchmark_readme_ci_claim_matches_the_workflow() -> None:

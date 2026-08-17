@@ -34,10 +34,9 @@ identical shortlist it ranked the correct skill first LESS often than the
 bi-encoder that produced the shortlist (recall@1 0.699 vs 0.779), pushing the
 right answer off rank 1 in 20 cases and pulling it on in 9. Its cost was also the
 whole latency budget — 309ms of a 312ms pipeline. Removing it took the selector
-from 309ms to ~2ms and raised accuracy at the same time.
-
-The bi-encoder survives as an optional fusion signal (it is the better pure
-ranker) and as the zero-shot path for skills added after the last training run.
+from 309ms to ~9ms and raised accuracy at the same time. The whole
+retrieve-then-rerank stack (bi-encoder included) is deleted; git history and
+training/EXPERIMENTS.md hold its scripts and numbers.
 """
 
 from __future__ import annotations
@@ -112,6 +111,10 @@ class SkillClassifier:
         self._card_start = self._n_labels + 1
         self._card_classes = int(meta["cardinality_classes"])
         self._revision: str = meta.get("routing_revision", "")
+        # The tokenizer contract travels WITH the artifact: a 512-token retrain
+        # served at a hardcoded 256 would silently truncate exactly the long
+        # inputs the retrain was meant to help.
+        self._max_tokens: int = int(meta.get("max_length", MAX_TOKENS))
 
         # An artifact is three files that must agree — a labels.json from one
         # export beside a model.onnx from another loads fine and maps every
@@ -134,7 +137,7 @@ class SkillClassifier:
             )
 
         self._tokenizer = Tokenizer.from_file(str(directory / "tokenizer.json"))
-        self._tokenizer.enable_truncation(max_length=MAX_TOKENS)
+        self._tokenizer.enable_truncation(max_length=self._max_tokens)
         pad = self._tokenizer.token_to_id("[PAD]")
         self._tokenizer.enable_padding(pad_id=int(pad or 0), pad_token="[PAD]")
 
@@ -169,6 +172,18 @@ class SkillClassifier:
     #: model's word, busy turns demand real confidence.
     NEWCOMER_FLOOR_WHEN_ACTIVE = 0.65
 
+    #: The recall bonus, the same asymmetry read from the other side: a turn
+    #: that MISSES its skill answers without its runbook, which is the worst
+    #: outcome available, while carrying one marginal runbook costs prompt
+    #: bytes. So beyond the cardinality head's answer, any further skill the
+    #: model scores at or above this floor rides along up to the cap. Measured
+    #: on the benchmark: required-skill misses drop 18 -> 6 (recall-pass
+    #: 131 -> 143 of 150, above the upstream selector's bar) for ~0.7 extra
+    #: skill bodies per turn. Applied only when the model picked SOMETHING —
+    #: an empty answer ("thanks!", off-domain chatter) stays empty, because
+    #: polluting a no-task turn is how loading noise becomes the norm.
+    BONUS_FLOOR = 0.5
+
     def select(
         self,
         query: str,
@@ -190,27 +205,74 @@ class SkillClassifier:
         count = int(np.argmax(logits[self._card_start : self._card_start + self._card_classes]))
         order = np.argsort(-probs)
 
-        active = set(active_ids)
-        picked: list[str] = []
-        for i in order[: max(count, 0)]:
-            sid = self._labels[int(i)]
-            if len(picked) >= max_active:
-                break
-            # The earn-your-place rule: with a workflow already loaded, a skill
-            # that is NOT part of it needs NEWCOMER_FLOOR_WHEN_ACTIVE, while a
-            # skill the conversation is already running rides on the model's
-            # ranking alone. On a fresh turn (nothing active) everything admits
-            # on ranking alone — early in a conversation the cheap mistake is
-            # to include, not to withhold.
-            newcomer = active and sid not in active
-            if newcomer and float(probs[int(i)]) < self.NEWCOMER_FLOOR_WHEN_ACTIVE:
-                continue
-            picked.append(sid)
+        ranked = [(self._labels[int(i)], float(probs[int(i)])) for i in order]
+        picked = admit(ranked, set(active_ids), count, max_active)
 
         docs_p = float(1.0 / (1.0 + np.exp(-logits[self._docs_index])))
         return Selection(
             skill_ids=picked,
             docs_wanted=docs_p >= docs_threshold,
             cardinality=count,
-            scores={self._labels[int(i)]: float(probs[int(i)]) for i in order[:5]},
+            scores=dict(ranked[:5]),
         )
+
+
+def admit(
+    ranked: list[tuple[str, float]],
+    active: set[str],
+    count: int,
+    max_active: int,
+) -> list[str]:
+    """The admission policy: which of the ranked skills the turn actually gets.
+
+    Pure so it is testable without the 110MB graph — every rule below has a
+    unit test driving it with hand-built rankings (``tests/unit``).
+
+    ``ranked`` is (skill id, probability) in DESCENDING probability order;
+    ``count`` is the cardinality head's answer; ``active`` is the prior set as
+    the classifier saw it (selectable ids only).
+    """
+    picked: list[str] = []
+    want = min(max(count, 0), max_active)
+    # Scan the WHOLE ranking until `want` candidates are accepted, not just
+    # the first `count` rows. Bounding the scan to the count made a rejected
+    # newcomer CONSUME its slot: cardinality says one, rank 1 is a filtered
+    # newcomer, rank 2 (the active skill) was never examined — and the turn
+    # came back authoritatively empty, evicting a live workflow.
+    for sid, prob in ranked:
+        if len(picked) >= want:
+            break
+        # The earn-your-place rule: with a workflow already loaded, a skill
+        # that is NOT part of it needs NEWCOMER_FLOOR_WHEN_ACTIVE, while a
+        # skill the conversation is already running rides on the model's
+        # ranking alone. On a fresh turn (nothing active) everything admits
+        # on ranking alone — early in a conversation the cheap mistake is
+        # to include, not to withhold.
+        newcomer = bool(active) and sid not in active
+        if newcomer and prob < SkillClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE:
+            continue
+        picked.append(sid)
+
+    # The recall bonus (see BONUS_FLOOR): with a non-empty answer in hand,
+    # admit any further skill scoring at or above the floor, up to the cap.
+    # Newcomers still owe their higher floor when a workflow is active. The
+    # ranking is descending, so the first below-floor score ends the scan —
+    # deliberately for EVERY candidate, active ones included: the bonus exists
+    # to rescue near-miss rankings, not to re-admit a skill the model scored
+    # below a coin flip just because it used to be loaded.
+    if picked:
+        for sid, prob in ranked:
+            if len(picked) >= max_active:
+                break
+            if sid in picked:
+                continue
+            if prob < SkillClassifier.BONUS_FLOOR:
+                break
+            if (
+                active
+                and sid not in active
+                and prob < SkillClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
+            ):
+                continue
+            picked.append(sid)
+    return picked

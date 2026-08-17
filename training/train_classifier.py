@@ -30,9 +30,8 @@ No shortlist, no sentinel documents, no admission heuristic.
 Zero-shot generalisation to skills that were not in training. The catalog is
 fixed per deploy and retraining is a build step (~2 minutes on MPS), so this is
 affordable — but it is a real change: a skill added at runtime by skill learning
-gets no head until the next build. The bi-encoder stays in the design as the
-zero-shot path for exactly that reason, and because it is what produces the
-ordering when the two disagree.
+gets no head until the next build. Serving guards this with the routing_revision
+provenance stamp: a stale head degrades open instead of serving blind.
 """
 
 from __future__ import annotations
@@ -57,7 +56,6 @@ from training.common import render_training_query  # noqa: E402
 
 DATA = ROOT / "training" / "data"
 MODELS = ROOT / "training" / "models"
-BASE_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 #: Appended to the query so the classifier can see conversation STATE.
 #:
@@ -95,15 +93,9 @@ def main() -> int:
     ap.add_argument("--val-fraction", type=float, default=0.12)
     ap.add_argument("--seed", type=int, default=17)
     ap.add_argument("--max-length", type=int, default=256)
-    # Seeding the head from the retriever's skill embeddings was measured and is
-    # OFF by default: held-out exact-match 0.804 seeded vs 0.830 random, with a
-    # higher final train loss, i.e. the seed constrains rather than helps. Kept as
-    # a flag because it may pay off on a much larger catalog where per-skill
-    # example counts fall further.
+    ap.add_argument("--base-model", default="BAAI/bge-base-en-v1.5")
     # 0.0 = no balancing (natural frequencies), 1.0 = full inverse frequency.
-    ap.add_argument("--base-model", default=BASE_MODEL)
     ap.add_argument("--balance-power", type=float, default=0.5)
-    ap.add_argument("--head-init-from-embeddings", action="store_true")
     ap.add_argument("--out", default=str(MODELS / "classifier"))
     args = ap.parse_args()
 
@@ -137,6 +129,11 @@ def main() -> int:
         for line in (DATA / "selection.jsonl").read_text().splitlines()
         if line.strip()
     ]
+    # Seed EVERY stochastic source, not just the row shuffle — head init,
+    # dropout and the weighted sampler all draw from torch's RNG, and an
+    # unseeded one meant "--seed 41" did not reproduce seed 41.
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
     random.Random(args.seed).shuffle(rows)
     cut = int(len(rows) * (1 - args.val_fraction))
 
@@ -158,38 +155,7 @@ def main() -> int:
             pooled = (hidden * m).sum(1) / m.sum(1).clamp(min=1e-9)
             return self.head(self.drop(pooled))
 
-    model = Model()
-
-    # Initialise the skill rows of the head from the bi-encoder's embedding of
-    # each skill document.
-    #
-    # The head's weight matrix IS a set of 32 skill vectors — logit_i is row i
-    # dotted with the pooled message embedding — so a random init asks each skill
-    # to discover its own vector from as few as 46 examples. Seeding those rows
-    # with the embedding the retriever already learned starts every skill in
-    # roughly the right direction and lets training spend its budget on the
-    # boundaries between neighbours rather than on locating them.
-    #
-    # Scaled down because these are unit-norm vectors and a head initialised at
-    # unit scale produces saturated logits before any learning happens.
-    try:
-        if not args.head_init_from_embeddings:
-            raise RuntimeError("disabled by default")
-        from sentence_transformers import SentenceTransformer
-
-        from daintree_assistant_server.skills.local.documents import skill_document
-
-        bi = SentenceTransformer(str(MODELS / "bi_encoder"), device="cpu")
-        by_id = {sk.meta.id: sk.meta for sk in catalog.skills}
-        seed = bi.encode([skill_document(by_id[sid], variant="full") for sid in labels],
-                         normalize_embeddings=True, show_progress_bar=False)
-        with torch.no_grad():
-            model.head.weight[: len(labels)] = torch.tensor(seed) * 0.1
-        print("head initialised from bi-encoder skill embeddings")
-    except Exception as exc:  # noqa: BLE001 - a random init still trains, just slower
-        print(f"head: random init ({exc})")
-
-    model = model.to(dev)
+    model = Model().to(dev)
 
     def encode(subset: list[dict]) -> tuple[torch.Tensor, ...]:
         texts = [build_query(r) for r in subset]

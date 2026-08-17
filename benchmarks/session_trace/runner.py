@@ -197,16 +197,24 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
     settings = build_settings(env_file)
     traces = load_traces(id_filter)
     provider = R.ReplayProvider()
-    container = build_container(settings, provider=provider)
     # Selection is LOCAL in production; these traces SCRIPT selector answers
     # (`selector_pick`) to drive specific cadence/active-set branches, so the
-    # scriptable prompt-based selector is installed as the test seam — the same
-    # substitution tests/conftest.py makes, for the same reason.
+    # scriptable prompt-based selector is injected at CONSTRUCTION — the same
+    # seam tests/conftest.py uses — and the ONNX artifact is never loaded here.
+    from daintree_assistant_server.prompts.loader import PromptLoader
+    from daintree_assistant_server.skills.catalog import (
+        CatalogManager,
+        default_skills_dir,
+    )
     from daintree_assistant_server.skills.selector import Selector
 
-    container.orchestrator.selector = Selector(
-        provider, container.prompt_loader, container.catalog_manager, settings
+    seam = Selector(
+        provider,
+        PromptLoader(),
+        CatalogManager(load_catalog(default_skills_dir()), primary_dir=default_skills_dir()),
+        settings,
     )
+    container = build_container(settings, provider=provider, selector=seam)
     spy = R.SpyLearner()
     container.orchestrator.learner = spy  # inject the recording spy (default is None)
 

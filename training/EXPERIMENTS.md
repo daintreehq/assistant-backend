@@ -135,7 +135,7 @@ Capacity helps, modestly.
 | DeepSeek selector (network) | 2,044 ms | 1x |
 | cross-encoder pipeline, full docs | 309 ms | 7x |
 | classifier + bi-encoder fusion | 3.1 ms | 661x |
-| **classifier alone (shipped)** | **2.1 ms** | **955x** |
+| **classifier alone** | **2.1 ms** | **955x** | *(MiniLM-era row — the shipped bge-base measures ~9ms int8; see header)* |
 
 Concurrency, through the real worker pool: 1 worker with 8 simultaneous rankings
 peaked at 280ms on the *reranker* design. At 2ms the question is moot.
@@ -157,8 +157,9 @@ peaked at 280ms on the *reranker* design. At 2ms the question is moot.
 4. **Corpus balance shows up directly as category failures.** 272 follow-ups vs
    88 topic-shifts taught "loaded → keep", and the model ranked stale skills at
    0.98 confidence. Generating 135 more topic-shifts moved it 2/9 → 6/9.
-5. **int8 changes decisions on the classifier** (which skill ranks first). Shipped
-   fp32 — at 2ms there is no latency to buy back.
+5. **int8 changes decisions on the classifier** (which skill ranks first).
+   *(MiniLM-era finding — bge-base int8 passes the tiered parity gate and IS
+   the shipped precision; see header.)*
 6. **Synthetic val overstates generalisation by ~10pp** (0.85 vs 0.76). The
    split is row-random over paraphrase families.
 
@@ -200,6 +201,5 @@ seeds — random init per seed — so averaging them is meaningless).
   worth reintroducing a round trip — at ~200ms it would still be ~10x faster
   than the call being replaced.
 - **Much larger local backbone** (bge-base 109M, gte-modernbert-base 149M).
-- **More diverse synthetic data.** The current corpus is ~3.2k examples from
-  whenToUse lines; the generalisation gap suggests diversity, not volume, is the
-  binding constraint.
+- **More diverse synthetic data.** *(Done — the corpus grew to 6,399 across
+  five targeted rounds; see header.)*

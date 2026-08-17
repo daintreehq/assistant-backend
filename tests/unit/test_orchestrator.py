@@ -1995,8 +1995,11 @@ async def test_streaming_timings_ride_the_terminal_event(
     t = done["timings"]
     assert "selection_ms" in t
     assert "upstream_open_ms" in t, "a streamed turn observes its own open"
-    assert t["preparation_ms"] <= t["upstream_open_ms"] <= t["first_output_ms"]
-    assert t["first_output_ms"] <= t["total_ms"]
+    # upstream_open_ms is a PHASE duration (open -> first event), not a
+    # cumulative mark — it cannot be ordered against the cumulative fields,
+    # only bounded by the whole turn.
+    assert 0 <= t["upstream_open_ms"] <= t["total_ms"]
+    assert t["preparation_ms"] <= t["first_output_ms"] <= t["total_ms"]
     # Generation is derived from the two numbers it sits between, so it can never
     # contradict them.
     assert t["generation_ms"] == t["total_ms"] - t["first_output_ms"]

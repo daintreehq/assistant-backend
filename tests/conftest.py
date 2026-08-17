@@ -135,8 +135,8 @@ def task_runner(
     )
 
 
-def install_scripted_selector(container: Any, fake_provider: FakeProvider) -> None:
-    """Replace the container's LOCAL selector with the provider-scripted one.
+def scripted_selector(fake_provider: FakeProvider, settings: Settings) -> Selector:
+    """The provider-scripted selector, injected at CONSTRUCTION time.
 
     Production selection is a local ONNX classifier now — it decides for real,
     which is exactly wrong for orchestration tests that need to SCRIPT the
@@ -145,17 +145,18 @@ def install_scripted_selector(container: Any, fake_provider: FakeProvider) -> No
     as precisely that scriptable test seam: it reads ``FakeProvider``'s
     ``selection_result``/``selection_error`` and records ``selection_requests``,
     which is the interface ninety-odd assertions in this suite are written
-    against. The LocalSelector's own contract is tested directly in
-    tests/unit/test_local_selection.py, and the real artifact end-to-end in the
-    same file's skipif-marked tests.
+    against. Passed INTO build_container/create_app (never swapped in
+    afterwards) so the fixtures skip loading the 110MB ONNX graph entirely — a
+    fresh clone without LFS content runs the suite, and only the explicitly
+    artifact-marked tests skip. The LocalSelector's own contract is tested in
+    tests/unit/test_local_selection.py.
     """
-    container.orchestrator.selector = Selector(
+    return Selector(
         fake_provider,
-        container.prompt_loader,
-        container.catalog_manager,
-        container.settings,
+        PromptLoader(),
+        CatalogManager(load_catalog(default_skills_dir()), primary_dir=default_skills_dir()),
+        settings,
     )
-    container.selector = container.orchestrator.selector
 
 
 def detach_docs_client(container: Any) -> None:
@@ -175,10 +176,10 @@ def detach_docs_client(container: Any) -> None:
 @pytest.fixture
 def app(settings: Settings, fake_provider: FakeProvider) -> Any:
     """A FastAPI app with an injected fake provider, marked ready (no lifespan needed)."""
-    application = create_app(settings=settings, provider=fake_provider)
-    container = build_container(settings, fake_provider)
+    seam = scripted_selector(fake_provider, settings)
+    application = create_app(settings=settings, provider=fake_provider, selector=seam)
+    container = build_container(settings, fake_provider, seam)
     detach_docs_client(container)
-    install_scripted_selector(container, fake_provider)
     application.state.container = container
     application.state.ready = True
     return application
@@ -190,12 +191,10 @@ def client(app: Any) -> Iterator[TestClient]:
         # Entering TestClient runs the app lifespan, which builds its OWN
         # container and replaces the one the `app` fixture installed — so the
         # detachment has to be reapplied to the container that actually serves
-        # these requests, not the one that was discarded.
+        # these requests, not the one that was discarded. (The scripted selector
+        # needs no such reapplication — the lifespan container receives it via
+        # app.state.injected_selector.)
         detach_docs_client(app.state.container)
-        # Same story for the scripted selector: the lifespan container built a
-        # real LocalSelector, and these tests need the scriptable seam.
-        fake = app.state.container.provider
-        install_scripted_selector(app.state.container, fake)
         yield test_client
 
 

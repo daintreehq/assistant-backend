@@ -107,7 +107,7 @@ costs the selector nothing:
 | tool schemas share of request | ~73.5 KB, **62.2%**, ~18.7k tok |
 | base prompt | ~28.4 KB, 24.0%, ~7.2k tok |
 | loaded skills (2 active) | ~11.6 KB, 9.8%, ~3.0k tok |
-| selector prompt | ~43.9 KB, ~11.2k tok / 32 selectable skills (~1.4 KB per skill) |
+| skill selection | **local classifier — 0 upstream bytes** (the ~43.9 KB selector prompt is retired to the test seam) |
 | state token | 389–492 B (0–3 skills; 16 KiB cap) |
 
 The tool region fell ~10% (81.6 → 73.5 KiB, ~20.9k → ~18.8k proxy tokens) when

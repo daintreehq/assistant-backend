@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from daintree_assistant_server.skills.local.classifier import admit
 from daintree_assistant_server.skills.local.documents import (
     query_document,
     skill_document,
@@ -99,6 +100,55 @@ def test_query_document_ignores_system_messages() -> None:
 
 def test_query_document_with_no_eligible_messages_falls_back_to_turn_context() -> None:
     assert query_document([], turn_context="a watcher fired") == "a watcher fired"
+
+
+# --------------------------------------------------------------------------
+# admission policy — pure, no model needed
+# --------------------------------------------------------------------------
+
+
+def test_admit_takes_the_cardinality_count_in_rank_order() -> None:
+    ranked = [("a", 0.9), ("b", 0.8), ("c", 0.2), ("d", 0.1)]
+    assert admit(ranked, set(), 2, 3) == ["a", "b"]
+
+
+def test_admit_zero_count_returns_empty_and_no_bonus_fires() -> None:
+    """The bonus never turns an empty answer into a loaded skill —
+    polluting a no-task turn is how loading noise becomes the norm."""
+    ranked = [("a", 0.9), ("b", 0.6)]
+    assert admit(ranked, set(), 0, 3) == []
+
+
+def test_admit_rejected_newcomer_does_not_consume_the_slot() -> None:
+    """Cardinality says one; rank 1 is a filtered newcomer; rank 2 is the
+    active skill. The scan must continue to rank 2 instead of returning an
+    authoritative empty set that evicts a live workflow."""
+    ranked = [("newcomer", 0.60), ("running", 0.55)]
+    assert admit(ranked, {"running"}, 1, 3) == ["running"]
+
+
+def test_admit_bonus_rides_above_the_floor_up_to_the_cap() -> None:
+    ranked = [("a", 0.9), ("b", 0.62), ("c", 0.55), ("d", 0.51)]
+    # cardinality said one, but three more clear the 0.5 floor; cap is 3
+    assert admit(ranked, set(), 1, 3) == ["a", "b", "c"]
+
+
+def test_admit_bonus_stops_at_the_first_below_floor_score() -> None:
+    ranked = [("a", 0.9), ("b", 0.45), ("c", 0.44)]
+    assert admit(ranked, set(), 1, 3) == ["a"]
+
+
+def test_admit_bonus_newcomer_still_owes_the_higher_floor() -> None:
+    """With a workflow active, a 0.55 newcomer clears the bonus floor but not
+    the newcomer floor — it stays out; a 0.55 ACTIVE skill rides."""
+    ranked = [("running", 0.9), ("newcomer", 0.55), ("also_running", 0.52)]
+    got = admit(ranked, {"running", "also_running"}, 1, 3)
+    assert got == ["running", "also_running"]
+
+
+def test_admit_respects_max_active_over_count() -> None:
+    ranked = [("a", 0.9), ("b", 0.8), ("c", 0.7), ("d", 0.6)]
+    assert admit(ranked, set(), 3, 2) == ["a", "b"]
 
 
 # --------------------------------------------------------------------------

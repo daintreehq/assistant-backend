@@ -72,7 +72,7 @@ cases:
     title: Warm NEW turn (valid state, selector runs)
     # A follow-up instruction in an established session: the state token is valid and
     # names the current catalog, so the selector DOES run but the orchestrator can
-    # speculatively open the main stream against the prior active set in parallel.
+    # eagerly open the main stream against the prior active set in parallel.
     # This is the shape that shows the full select->assemble->open sequence.
     stream: true
     prime: true

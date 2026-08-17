@@ -38,6 +38,10 @@ from daintree_assistant_server.skills.local.documents import (  # noqa: E402
     routing_revision,
 )
 
+#: Release floor for the product metric (required skill present). The shipped
+#: artifact measures 142-143; the family's error bar is ±2-3.
+RECALL_PASS_FLOOR = 138
+
 ARTIFACT = (
     ROOT / "src" / "daintree_assistant_server" / "skills" / "local"
     / "artifacts" / "classifier"
@@ -83,7 +87,8 @@ def main() -> int:
 
     stamped = json.loads((artifact / "meta.json").read_text()).get("routing_revision", "")
     live = routing_revision(catalog)
-    match = "MATCH" if stamped == live else "STALE — serving would degrade open"
+    stale = stamped != live
+    match = "STALE — serving would degrade open" if stale else "MATCH"
     print(f"routing revision: artifact {stamped[:28]}  live {live[:28]}  [{match}]")
 
     outputs = {}
@@ -93,11 +98,25 @@ def main() -> int:
         summary, results, picked, lat = run(clf, catalog, cases)
         outputs[tag] = (summary, results, picked, lat)
         lat.sort()
-        print(f"\n{tag}: {summary['cases_passed']}/{summary['cases_total']} "
-              f"({summary['cases_passed'] / summary['cases_total'] * 100:.1f}%)  "
-              f"miss {summary['recall_miss_trials']} extra {summary['precision_extra_trials']}  "
-              f"docs {summary['docs']['correct_trials']}/{summary['docs']['scored_trials']}  "
-              f"p50 {lat[len(lat) // 2]:.1f} ms  mean {statistics.mean(lat):.1f} ms")
+        # The PRODUCT metric: is every required skill present? A miss answers
+        # without its runbook (the worst outcome); an extra within the cap costs
+        # prompt bytes. Strict stays reported for comparability with the
+        # upstream-selector baseline, which was scored strictly too.
+        recall_pass = sum(
+            1 for c, pk in zip(cases, picked, strict=True)
+            if not (set(c.required) - set(pk))
+            and (c.required or not (set(pk) - set(c.required) - set(c.optional)))
+        )
+        print(
+            f"\n{tag}: recall-pass {recall_pass}/{len(cases)} "
+            f"({recall_pass / len(cases) * 100:.1f}%)  "
+            f"strict {summary['cases_passed']}/{summary['cases_total']}  "
+            f"miss {summary['recall_miss_trials']} "
+            f"extra {summary['precision_extra_trials']}  "
+            f"docs {summary['docs']['correct_trials']}"
+            f"/{summary['docs']['scored_trials']}  "
+            f"p50 {lat[len(lat) // 2]:.1f} ms  mean {statistics.mean(lat):.1f} ms"
+        )
 
     diffs = [
         (c.id, a, b)
@@ -109,13 +128,28 @@ def main() -> int:
         print(f"  {cid}: fp32={[x.rsplit('.', 1)[-1] for x in a]} "
               f"int8={[x.rsplit('.', 1)[-1] for x in b]}")
 
-    print("\nby category (int8, the shipped precision):")
-    by: dict[str, list] = defaultdict(list)
-    for c, r in zip(cases, outputs["int8"][1], strict=True):
-        by[c.category].append(r)
+    print("\nby category (int8, recall-pass — the product metric):")
+    by: dict[str, list[bool]] = defaultdict(list)
+    for c, pk in zip(cases, outputs["int8"][2], strict=True):
+        ok = not (set(c.required) - set(pk)) and (
+            bool(c.required) or not (set(pk) - set(c.required) - set(c.optional))
+        )
+        by[c.category].append(ok)
     for cat in sorted(by):
         rs = by[cat]
-        print(f"  {cat:22} {sum(r.passed for r in rs):3d}/{len(rs)}")
+        print(f"  {cat:22} {sum(rs):3d}/{len(rs)}")
+
+    # Exit gates: this is the release-qualification step, so "always 0" would
+    # let a stale or regressed artifact qualify while looking healthy.
+    failures = []
+    if stale:
+        failures.append("routing revision is stale")
+    int8_rp = sum(sum(v) for v in by.values())
+    if int8_rp < RECALL_PASS_FLOOR:
+        failures.append(f"int8 recall-pass {int8_rp} < floor {RECALL_PASS_FLOOR}")
+    if failures:
+        print("\nFAIL: " + "; ".join(failures))
+        return 1
     return 0
 
 
