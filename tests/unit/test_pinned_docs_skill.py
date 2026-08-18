@@ -154,7 +154,17 @@ def test_at_a_one_cap_the_pin_fills_a_set_that_would_be_empty(catalog: Any) -> N
 def test_a_saturated_selection_displaces_the_pin(catalog: Any) -> None:
     """No leftover slot, no pin. Two specifics sharing a foundation fill the cap,
     and the work keeps its runbooks — the citation rules survive in the base
-    prompt, which is where they live for exactly this reason."""
+    prompt, which is where they live for exactly this reason.
+
+    Reserving a slot for the pin instead was tried and reverted. It cost more than
+    it looked: with the top specific and its foundation taking both remaining slots,
+    what a reservation drops at the shipped cap is the classifier's SECOND pick, not
+    a marginal third. And it does not even buy mid-workflow safety — the selector
+    instructs a mid-workflow documentation question to RE-LIST its active ids, so
+    such a turn is authoritative and a reservation evicts the in-flight runbook on
+    exactly the path that matters. The pin yielding here is the cheap loss: the
+    retrieved pages still reach the model in the volatile tail, and the base prompt
+    still carries the citation invariant the runbook elaborates."""
     result = resolve_active_skills(
         _authoritative([WORKFLOW, OPERATIONAL]), [], catalog, 3, pinned_id=DOCS_SKILL_ID
     )
@@ -187,6 +197,46 @@ def test_it_applies_on_a_reuse_round_too(catalog: Any) -> None:
     )
     assert DOCS_SKILL_ID in result.active
     assert OPERATIONAL in result.active
+
+
+def test_a_saturated_degraded_round_also_displaces_the_pin(catalog: Any) -> None:
+    """Fail-open is `ran=True, degraded=True`, not a reuse decision. Guarding pin
+    admission on `ran` instead of authority would silently treat a degraded round as
+    a fresh selection; this pins the behaviour to the same leftover rule."""
+    prior = [WORKFLOW, FOUNDATION, OPERATIONAL]
+    result = resolve_active_skills(
+        SelectionDecision.degraded_open(["stale head"]),
+        prior,
+        catalog,
+        3,
+        pinned_id=DOCS_SKILL_ID,
+    )
+    assert set(result.active) == set(prior), "a degraded round evicted live work"
+    assert DOCS_SKILL_ID in result.dropped_over_cap
+
+
+def test_a_pin_already_in_a_saturated_prior_set_is_kept_not_dropped(catalog: Any) -> None:
+    """The pin is filtered out of the candidates and re-appended, so a SATURATED prior
+    set that already contains it must not lose it to its own cap — and must not
+    re-announce it. The singleton case alone would not catch an off-by-one here."""
+    prior = [DOCS_SKILL_ID, WORKFLOW, FOUNDATION]
+    result = resolve_active_skills(
+        SelectionDecision.reuse(prior), prior, catalog, 3, pinned_id=DOCS_SKILL_ID
+    )
+    assert set(result.active) == set(prior)
+    assert result.newly_loaded == [], "an already-active pin was re-announced"
+    assert DOCS_SKILL_ID not in result.dropped_over_cap
+
+
+def test_an_unknown_pin_never_costs_a_slot(catalog: Any) -> None:
+    """A pinned id absent from the catalog must not reserve, consume, or leak a slot:
+    the selection keeps the full budget it would have had with no pin at all."""
+    with_pin = resolve_active_skills(
+        _authoritative([WORKFLOW, OPERATIONAL]), [], catalog, 3, pinned_id="daintree.nope"
+    )
+    without = resolve_active_skills(_authoritative([WORKFLOW, OPERATIONAL]), [], catalog, 3)
+    assert with_pin.active == without.active
+    assert "daintree.nope" not in with_pin.active + with_pin.dropped_over_cap
 
 
 def test_it_is_not_reported_as_newly_loaded_twice(catalog: Any) -> None:

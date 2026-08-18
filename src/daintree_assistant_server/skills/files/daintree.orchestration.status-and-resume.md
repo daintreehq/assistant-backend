@@ -22,6 +22,7 @@ requiredTools:
   - forge.listPRs
   - terminal.extract
   - terminal.extract.json
+  - artifact.read
   - audit.export
   - daintree.call
 ---
@@ -54,5 +55,9 @@ Procedure:
 7. Optional forensics for "what happened while I was away". `audit.export({"format":"json","tsFrom":<epoch ms>,"tsTo":<epoch ms>,"limit":200})` with optional `actor` (main, watcher, timer, workflow, system), `toolName` (exact dotted name), and `outcome` (ok, error, denied, dedup, grant_ok). Filters AND-combine and rows return newest-first, so one filtered read answers the question — narrow it with `outcome:"error"` or a single toolName rather than exporting everything. Summarize what it shows; never paste raw rows back.
 
 Confirmation: the sweep and its reads are free. `workflow.update` rewrites durable state — say which rows you are closing and why as you report it, and ask first if a row's outcome is genuinely ambiguous rather than guessing "done". `daintree.call` is the system-risk escape hatch and is confirmed per the active tier. Spawning a resume agent mutates a real worktree — confirm it like any spawn.
+
+## Recovering detail the checkpoint rounded off
+
+Auto-compaction replaces a long transcript with a lossy summary, but it preserves the FULL discarded transcript as an artifact, and the CURRENT [checkpoint] note carries its breadcrumb. When resuming needs an exact detail the checkpoint generalized — the literal id that was spawned, the exact wording of a user decision, which of two branches was chosen — page that artifact surgically: `artifact.read` a few pages from the relevant offset, following `nextOffset`, never a full replay of the transcript you just compacted away. Start ONLY from an artifactId in the current checkpoint note or your latest results; an id remembered from an earlier turn may be pruned, and if it is not found the content is gone — say so and resume from what the checkpoint does carry.
 
 Report back: the ranked standing picture with real ids (what needs the user, what is live and how it is supervised, what is unsupervised and therefore unknown), which ledger rows you closed or back-filled — to what status and on what evidence, which sessions are resumable and the honest caveat that resuming means a fresh agent, and the next checkpoint — what will wake you or what you need from the user.

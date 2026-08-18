@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:0866939507842b27ba1141c0cb1aa715d10d3a43be7b030887bf3c5cd02088ac",
+    "revision": "sha256:9510232eba280ec538035e6b1184abc22e6efa45064a0c20ba35df85e584f61c",
     "skills": 38
   },
   "classifier": {
@@ -17,8 +17,8 @@
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 30538,
-    "skill_body_bytes_total": 266835
+    "base_prompt_bytes": 23632,
+    "skill_body_bytes_total": 276793
   },
   "tools": {
     "count": 77,

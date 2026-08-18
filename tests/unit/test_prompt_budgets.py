@@ -22,25 +22,47 @@ from daintree_assistant_server.skills.catalog import load_catalog
 # should require the same argument as adding a rule — what behaviour needs this,
 # and why does it have to hold on every turn rather than in a skill?
 #
-# Current: ~27.5 KB across seven partials, down from 31.7 KB.
+# Current: ~23 KB across seven partials, down from 31.7 KB.
 #
-# WHY IT STOPPED THERE. The remaining reduction to the 15-20 KB target needs
-# rules MOVED out of the permanent block, not tighter wording — and the two
-# destinations both have a catch:
+# THE MOVE THIS ANTICIPATED HAS NOW LANDED. The reduction from ~27.5 KB came from
+# rules MOVED into `daintree.foundation`, not tighter wording. The earlier note
+# here doubted that destination — "the foundation is only paired in when the
+# selector picks a `daintree.*` skill, so it is absent on a greeting or a plain
+# question" — which is true but was never measured. Running the shipped classifier
+# and `resolve_active_skills` over all 166 routing-benchmark cases gives the rate:
+# the foundation is active on 153 of the 153 cases that load ANY skill (100%), and
+# the 13 that load none are 6 pure-docs questions (which take the pinned docs
+# runbook instead) and 7 genuine greeting/off-domain turns.
 #
-#   * A skill. `daintree.foundation` is only paired in when the selector picks a
-#     `daintree.*` skill, so it is absent on a greeting or a plain question. An
-#     audit of the six bullets trimmed here found the foundation does NOT in fact
-#     restate several of them (per-task supervision scope, the one-agent extract
-#     wait, partial results on an interrupted await, PR-watcher auto-stop), so
-#     those were restored rather than left to a skill that may not load.
-#   * A tool description. Those live in the CLI repository, not here.
+# That rate is a property of the CLASSIFIER, not a runtime guarantee, and the gap
+# matters: `LocalSelector` degrades OPEN on a stale provenance stamp or a runtime
+# failure, falling back to the prior active set — which on a COLD degraded turn is
+# empty. A real operational request served that way gets no foundation and therefore
+# none of the mechanics below. Core irreversible-action safeguards stay in base for
+# exactly this reason; what a degraded cold turn loses is spawn hygiene, supervision
+# and batching detail, which costs a clumsy turn rather than an unsafe one.
 #
-# Both routes change behaviour in ways only a LIVE tool-use benchmark can
-# falsify, and that benchmark needs a paid key. Compressing a safety-critical
-# prompt on faith is exactly the change that looks fine offline and degrades in
-# production, so the byte target waits on the measurement rather than the other
-# way round.
+# So the split is by TRIGGER, and it is what the current partitioning encodes:
+#
+#   * A rule that can fire on a turn loading NO skill stays here. That is every
+#     safety and restraint rule (secrets, untrusted data, terminal.close, the
+#     irreversible class, confirmation), the turn mechanics, the formatting
+#     contract, and `40-communication.md`'s no-task rule — which governs precisely
+#     the 7 zero-skill turns and could not live anywhere else.
+#   * A rule that only means anything once the turn IS Daintree work moved to the
+#     foundation: supervision modes, finish detection, agent-state vocabulary,
+#     batching, spawn hygiene, cheap-vs-capable delegation.
+#   * A rule whose trigger is narrower than "Daintree work" moved to the runbook
+#     that owns it (compaction-artifact recovery -> status-and-resume; docs
+#     citation detail -> the pinned docs runbook).
+#
+# Several rules were COMPRESSED here rather than moved, deliberately: where the
+# foundation elaborates but a zero-skill turn still needs the invariant, the base
+# keeps one tight sentence and the runbook carries the mechanics.
+#
+# What still gates a further cut is unchanged: a LIVE tool-use benchmark on a paid
+# key. This pass only moved rules to destinations proven to co-load, and left the
+# safety surface where it was.
 # Raised from 28 KiB (28,672 B) once, deliberately, for the two terminal-safety
 # rules added after a session where the assistant typed raw git into the user's
 # own shell — moving their checkout onto a new branch and breaking the operation
@@ -60,17 +82,17 @@ from daintree_assistant_server.skills.catalog import load_catalog
 # only when the selector picks a `daintree.*` skill. There is no skill that could
 # hold this rule, because on precisely the turns it governs, no skill exists. The
 # base prompt is the only text on the wire.
-BASE_PROMPT_CEILING = 30 * 1024
+BASE_PROMPT_CEILING = 24 * 1024
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —
 # tool-discipline is nearly half the prompt on its own, and a rule added there is
 # far more likely to be skill-local than one added to the hard rules.
 BASE_PARTIAL_CEILINGS = {
     "00-persona.md": 1024,
-    "10-hard-rules.md": 5 * 1024,
-    "20-tool-discipline.md": 14 * 1024,
+    "10-hard-rules.md": 4 * 1024,
+    "20-tool-discipline.md": 9 * 1024,
     "30-skills.md": 3 * 1024,
-    "35-daintree-docs.md": 3 * 1024,
+    "35-daintree-docs.md": 2304,
     # Raised from 3 KiB with the base ceiling above, and for the same rule: the
     # no-task turn is a COMMUNICATION concern (what a reply must contain when the
     # user hands you nothing to do), so it belongs here rather than in the hard
