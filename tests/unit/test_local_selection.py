@@ -433,6 +433,62 @@ def test_shipped_classifier_head_matches_the_live_catalog() -> None:
     assert clf.routing_revision == routing_revision(catalog)
 
 
+@pytest.mark.skipif(not _artifact_present(), reason="classifier artifact not present (LFS)")
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        (
+            "File a new issue called Login crash and label it bug.",
+            "daintree.forge.manage-issue",
+        ),
+        (
+            "Squash and merge pull request 42 after checking every gate.",
+            "daintree.forge.land-pull-request",
+        ),
+        (
+            "Plan this multi-stage migration with dependencies and track it across restarts.",
+            "daintree.orchestration.execute-durable-workflow",
+        ),
+        (
+            "Pause the remote devbox for this worktree to save cost.",
+            "daintree.worktree.manage-resource",
+        ),
+        (
+            "The existing Daintree Dev Preview is blank; inspect its console error.",
+            "daintree.runtime.debug-web-app",
+        ),
+    ],
+)
+def test_shipped_classifier_routes_each_new_mcp_skill(query: str, expected: str) -> None:
+    """Every newly shipped label must be reachable from a representative request."""
+    clf = SkillClassifier(_ARTIFACT)
+    assert expected in clf.select(query, []).skill_ids
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="classifier artifact not present (LFS)")
+@pytest.mark.parametrize(
+    ("query", "excluded"),
+    [
+        (
+            "Bundle the relevant parser files into one CopyTree reference file.",
+            "daintree.orchestration.execute-durable-workflow",
+        ),
+        (
+            "Explore the React source and explain how routing works; do not change files.",
+            "daintree.runtime.debug-web-app",
+        ),
+        (
+            "Create a plain git worktree for a new feature branch.",
+            "daintree.worktree.manage-resource",
+        ),
+    ],
+)
+def test_shipped_classifier_respects_new_skill_boundaries(query: str, excluded: str) -> None:
+    """Broad MCP runbooks must not displace their common read-only/local neighbours."""
+    clf = SkillClassifier(_ARTIFACT)
+    assert excluded not in clf.select(query, []).skill_ids
+
+
 # --------------------------------------------------------------------------
 # inference pool
 # --------------------------------------------------------------------------

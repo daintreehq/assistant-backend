@@ -9,11 +9,14 @@
   "daintree.diagnostics",
   "daintree.edits.spawn-visible-agent",
   "daintree.explore.repository",
+  "daintree.forge.land-pull-request",
+  "daintree.forge.manage-issue",
   "daintree.foundation",
   "daintree.memory.manage-project-memory",
   "daintree.orchestration.competition",
   "daintree.orchestration.conversation",
   "daintree.orchestration.debate-elimination",
+  "daintree.orchestration.execute-durable-workflow",
   "daintree.orchestration.fan-out-work",
   "daintree.orchestration.interview",
   "daintree.orchestration.multi-agent",
@@ -25,10 +28,12 @@
   "daintree.orchestration.workspace-cleanup",
   "daintree.recipe.run-or-create",
   "daintree.review.review-change",
+  "daintree.runtime.debug-web-app",
   "daintree.terminals.rename",
   "daintree.workflow.find-issue-work",
   "daintree.workflow.follow-up-on-issue",
   "daintree.workflow.prep-branch-for-review",
   "daintree.workflow.start-work-on-issue",
-  "daintree.worktree.create-plain-worktree"
+  "daintree.worktree.create-plain-worktree",
+  "daintree.worktree.manage-resource"
 ]

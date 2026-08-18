@@ -93,20 +93,20 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-08-15, 33 skills / 77 tools (sizes are KiB). The catalog holds 33
-but the selector prompt renders 32 — `daintree.docs.answer-usage-question` is
+Measured 2026-08-17, 38 skills / 77 tools (sizes are KiB). The catalog holds 38
+but the selector prompt renders 37 — `daintree.docs.answer-usage-question` is
 server-pinned off the turn's `docs_query` and hidden from the classifier, so it
 costs the selector nothing:
 
 | metric | value |
 |---|---|
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
-| system+tools stable — topic-shift (expected drop) | 0.2770 |
+| system+tools stable — topic-shift | **1.0000** (enforced floor) |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~118.3 KB, ~30.3k proxy tok |
-| tool schemas share of request | ~73.5 KB, **62.2%**, ~18.7k tok |
-| base prompt | ~28.4 KB, 24.0%, ~7.2k tok |
-| loaded skills (2 active) | ~11.6 KB, 9.8%, ~3.0k tok |
+| total request | ~120.6 KB, ~30.7k proxy tok |
+| tool schemas share of request | ~73.5 KB, **61.0%**, ~18.7k tok |
+| base prompt | ~29.8 KB, 24.7%, ~7.6k tok |
+| loaded skills (2 active) | ~11.8 KB, 9.7%, ~3.0k tok |
 | skill selection | **local classifier — 0 upstream bytes** (the ~43.9 KB selector prompt is retired to the test seam) |
 | state token | 389–492 B (0–3 skills; 16 KiB cap) |
 

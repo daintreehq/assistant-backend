@@ -1,13 +1,13 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:5ed81ae4ad8172a807417397868a02431e3f3e86db79d00717a745ad93f49499",
-    "skills": 33
+    "revision": "sha256:0866939507842b27ba1141c0cb1aa715d10d3a43be7b030887bf3c5cd02088ac",
+    "skills": 38
   },
   "classifier": {
-    "classifier_onnx_bytes": 109710116,
-    "labels": 32,
-    "routing_revision": "routing:e6f6f74a6fcc2ea5a8c933c6a5f164df",
+    "classifier_onnx_bytes": 109706542,
+    "labels": 37,
+    "routing_revision": "routing:ef9f0b1227caaa159299967bdf3268b7",
     "routing_revision_matches_catalog": true
   },
   "identity": {
@@ -18,7 +18,7 @@
   },
   "prompt": {
     "base_prompt_bytes": 30538,
-    "skill_body_bytes_total": 234742
+    "skill_body_bytes_total": 266835
   },
   "tools": {
     "count": 77,

@@ -1,5 +1,4 @@
 # Daintree skill catalog — routing digest
-# This is the EXACT projection the production selector sees: {id, summary, whenToUse, foundation}.
 
 ## daintree.agents.answer-waiting-agent
 title: Answer a waiting agent
@@ -38,8 +37,8 @@ whenToUse: Use when the user asks for a curated CopyTree bundle, context bundle,
 
 ## daintree.diagnostics
 title: Diagnose a broken or misbehaving Daintree
-summary: Work out why Daintree itself is not doing what it should — a dead MCP link, a tool that is not offered, a key that will not sign in — and give the one step that fixes it.
-whenToUse: Use when the question is about DAINTREE'S OWN HEALTH — either something is misbehaving and the user wants to know why ("nothing is responding", "the MCP is disconnected", "I did X and nothing happened", "why can't I…", "why is this tool missing"), or they want their SIGN-IN confirmed before they rely on it ("is my key working", "am I actually signed in", "will this burn credit if it is not"). Nothing has to be broken yet for the sign-in case — `daintree.status` reports the MCP link and does NOT answer it, which is exactly why it needs a runbook. Also when they want diagnostics to paste into a bug report. A plain "is Daintree connected?" with nothing reported wrong is a single status read, not this — that is daintree.foundation. Also when a tool you expected is not offered this turn and you must explain why rather than guess a name. Do NOT use for a plain how-to, concept, setting or keybinding question about Daintree ("how do I create a worktree", "what is a watcher", "where do I change X") — the matching documentation is retrieved for you and arrives with the turn already, so answering needs no skill and loading one only spends tokens. Do not use merely because an ordinary working request names Daintree — "rename my tabs" is daintree.terminals.rename — but DO use it when that operation has failed or the capability is missing, including an imperative "it's broken, get it working again", where it may co-load with the operational skill. Do not use for questions about the user's own codebase (use daintree.explore.repository), when a specific agent or spawn has gone wrong (use daintree.agents.recover-agent), to work out where a paused workflow left off (use daintree.orchestration.status-and-resume), or to investigate a red CI check (use daintree.ci.diagnose-and-fix).
+summary: Diagnose Daintree itself from its MCP status, offered tools, workspace snapshot, recent error log and notification history, then give the concrete recovery step.
+whenToUse: Use when the question is about DAINTREE'S OWN HEALTH — something is misbehaving ("nothing is responding", "the MCP is disconnected", "I did X and nothing happened", "why can't I…", "why is this tool missing"), the user asks to show recent Daintree errors or notifications, wants diagnostics for a bug report, or wants sign-in confirmed before relying on it. Nothing has to be broken for the sign-in case because `daintree.status` reports only the Daintree MCP link, not provider-key validity. A plain "is Daintree connected?" with nothing wrong is daintree.foundation. Do not use for a plain how-to, setting or keybinding question; for ordinary project failures; for a specific broken agent/spawn (use daintree.agents.recover-agent); for paused-workflow reconstruction (use daintree.orchestration.status-and-resume); or for red project CI (use daintree.ci.diagnose-and-fix).
 
 ## daintree.edits.spawn-visible-agent
 title: Spawn a visible agent for edits or exploration
@@ -50,6 +49,16 @@ whenToUse: Use when the user asks for a direct visible agent to change project f
 title: Understand a repository
 summary: Answer "what does this repo do" / "where is X" with a read-only explore agent and cited evidence.
 whenToUse: Use when the user wants to UNDERSTAND the project rather than change it — "what does this repo do", "where is X implemented", "how does the auth flow work", "explain this subsystem", "what would I have to touch to add Y", "find the code that does Z", or orientation before work starts. The deliverable is an explanation with file evidence and nothing on disk changes. Do not use when the user wants files CHANGED (use daintree.edits.spawn-visible-agent, or daintree.workflow.start-work-on-issue for a forge issue), to judge the quality of a specific change or PR (use daintree.review.review-change), to work out why a check is failing (use daintree.ci.diagnose-and-fix), to ask about DAINTREE itself rather than the project (documentation arrives retrieved — no skill needed — or daintree.diagnostics when Daintree is broken), or to pick out files to bundle as context (use daintree.context.curate-copytree-bundle), or when the user names a specific agent to ask and just wants its answer relayed back (use daintree.agents.ask-and-relay).
+
+## daintree.forge.land-pull-request
+title: Review-state and land a pull request
+summary: Apply public PR lifecycle actions and merge only after an exact-target preview, conclusive required-check evidence, review-state checks and a verified forge result.
+whenToUse: Use when the user asks to approve a pull request, request changes or reviewers, mark it ready or draft, dismiss a known review, close or reopen it, or merge, squash or rebase it. Also use for "land this PR", "approve and merge", or "merge it once it is ready". Do not use merely to read PR, CI, review or comment status (use daintree.workflow.follow-up-on-issue), to review code quality and produce findings (use daintree.review.review-change), to fix red CI (use daintree.ci.diagnose-and-fix), to create the PR (use daintree.workflow.prep-branch-for-review), or to watch for a later state transition (use daintree.orchestration.watch-outcome).
+
+## daintree.forge.manage-issue
+title: Create and maintain a forge issue
+summary: Create, edit, reopen, label or assign an issue against the exact repository, then read it back so public forge state is never inferred from a successful call.
+whenToUse: Use when the user asks to file or create an issue, change an issue title or body, reopen an issue, add or remove labels, or assign or unassign an account. Also use for issue intake such as "turn this bug into an issue" or "label and assign this ticket". Do not use to search the backlog for work (use daintree.workflow.find-issue-work), start implementation (use daintree.workflow.start-work-on-issue), read an issue or PR's current status or add a closing comment and close it (use daintree.workflow.follow-up-on-issue), or create a pull request (use daintree.workflow.prep-branch-for-review).
 
 ## daintree.foundation [FOUNDATION]
 title: Daintree orchestration foundation
@@ -75,6 +84,11 @@ whenToUse: Use when the user asks you to facilitate, host, relay, moderate, or k
 title: Run agent debate with elimination vote
 summary: Facilitate a multi-agent debate, collect final positions, run a peer vote to eliminate the weakest position, and report the tally.
 whenToUse: Use when the user asks several agents to debate a topic and then eliminate, vote off, remove, or identify the weakest agent/position after the debate, including when the elimination request arrives mid-debate. Do not use for a collaborative debate that ends in one synthesized answer with no vote-off (use the multi-agent skill), an open-ended visible conversation among agents with no elimination vote (use the conversation skill), a one-shot independent scored contest or best-entry vote (use the competition skill), a simple fleet poll with no debate (use poll-pinned-agents), or a runoff after a tied vote (use runoff-tiebreaker).
+
+## daintree.orchestration.execute-durable-workflow
+title: Execute a durable workflow graph
+summary: Plan and advance dependency-aware work across turns using the optional workflow graph tools, with exact resource links, evidence and reconcile checkpoints.
+whenToUse: Use for a substantial multi-step goal with dependent phases that must survive turns, restarts or asynchronous waits — migrations, delegate-then-verify work, several ordered changes, or "track this plan and resume it later". Use when the user explicitly asks for a durable plan, dependencies, progress tracking, reconciliation or a workflow graph. Do not use for a one-step action, independent parallel fan-out (use daintree.orchestration.fan-out-work), a status-only "where were we" sweep of the flat workflow ledger (use daintree.orchestration.status-and-resume), simple agent supervision (use daintree.orchestration.supervise-fleet), or a single future notification (use daintree.orchestration.watch-outcome).
 
 ## daintree.orchestration.fan-out-work
 title: Fan out disjoint work across parallel agents
@@ -131,6 +145,11 @@ title: Review a change
 summary: Review a diff, branch or PR with independent read-only reviewers, and return de-duplicated findings with file evidence.
 whenToUse: Use when the user wants a change JUDGED on its merits — "review this", "code review the branch", "is this PR any good", "check this for security problems", "what would you change about this diff", "look over what the agent wrote". The deliverable is FINDINGS with severity and file evidence. Do not use to check whether an agent did what it claimed before you trust it (use daintree.orchestration.verify-agent-work — that asks "is the claim true", this asks "is the change good"), to ready a branch or open a PR (use daintree.workflow.prep-branch-for-review), to forward findings you already have to an implementer (use daintree.agents.relay-review-feedback), to explain how existing code works (use daintree.explore.repository), or to fix a failing check (use daintree.ci.diagnose-and-fix), or when the user names a specific agent to ask and just wants its answer relayed back (use daintree.agents.ask-and-relay).
 
+## daintree.runtime.debug-web-app
+title: Debug an existing Daintree dev preview
+summary: Diagnose runtime failures in an already-open dev-preview panel from console evidence, delegate the fix, reload or restart deliberately, and verify only new navigation output.
+whenToUse: Use when the user asks to debug a web app that is already open in Daintree Dev Preview, inspect browser console errors, fix a runtime rendering failure, reload after a frontend fix, or investigate why an existing preview is broken. Also use when the user asks to start or visually inspect a preview so the assistant can state the current MCP limitation accurately. Do not use for ordinary test/build CI failures without a browser runtime symptom (use daintree.ci.diagnose-and-fix), a deployed-site research question, or general code exploration (use daintree.explore.repository).
+
 ## daintree.terminals.rename
 title: Rename terminal tabs
 summary: Give terminals/agents clear tab titles — the fast, direct route (no tool hunting).
@@ -160,3 +179,8 @@ whenToUse: Use when the user asks to start work on ONE forge issue they have alr
 title: Create a plain Daintree worktree
 summary: Create a standalone Daintree worktree for a new or existing branch through the typed worktree wrapper, without launching a recipe or agent.
 whenToUse: Use when the user asks to create, add, or set up a plain worktree for a new branch or an existing branch — "create a worktree", "make a new branch in its own worktree", or "check out this branch as a worktree" — and they do not want a recipe or agent launched. Do not use for a worktree with a workspace recipe (use daintree.recipe.run-or-create), for starting a forge issue with an agent (use daintree.workflow.start-work-on-issue), for spawning an agent into an existing worktree (use daintree.edits.spawn-visible-agent), or for deleting a worktree (use daintree.orchestration.workspace-cleanup).
+
+## daintree.worktree.manage-resource
+title: Manage a worktree remote resource
+summary: Inspect and interactively provision, pause or resume a worktree's configured remote resource, verifying with fresh status and refusing unsafe unattended or unpreviewed lifecycle actions.
+whenToUse: Use when the user asks about a worktree's cloud devbox or remote resource status, wants to provision, pause or resume it, asks to save resource cost, or asks for a future pause/resume. Also use for teardown or connect requests so the assistant can route those unsupported-safe paths honestly. Do not use for creating or deleting an ordinary git worktree (use daintree.worktree.create-plain-worktree or daintree.orchestration.workspace-cleanup), Daintree's own CPU/memory resource profile, or starting a local dev server.

@@ -39,8 +39,12 @@ from daintree_assistant_server.skills.local.documents import (  # noqa: E402
 )
 
 #: Release floor for the product metric (required skill present). The shipped
-#: artifact measures 142-143; the family's error bar is ±2-3.
-RECALL_PASS_FLOOR = 138
+#: artifact measures 157 of 166; the family's error bar is ±2-3.
+#:
+#: This is an absolute count, so it moves whenever the case suite grows — the
+#: 138 it held before `18-new-skill-surfaces.yaml` was a floor under 150 cases
+#: and would have passed a model that lost eleven of them.
+RECALL_PASS_FLOOR = 152
 
 ARTIFACT = (
     ROOT / "src" / "daintree_assistant_server" / "skills" / "local"

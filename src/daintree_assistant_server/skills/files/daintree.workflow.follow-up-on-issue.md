@@ -20,10 +20,12 @@ Use when: the user wants to know where an issue or its PR stands on the forge ri
 or wants it commented on and closed.
 
 CI, review decisions and issue threads ARE readable — that changed, and older habits
-assume otherwise. `forge.getChecks` returns a check roll-up, `forge.getPR` carries
-`reviewDecision`, and `forge.listIssueComments` reads a thread back. You no longer need an
-agent to answer "is it green". What an agent is still for is DETAIL none of them carry:
-check names, job logs, failure output, the text of a review left on the PR.
+assume otherwise. Direct Assistant `forge.getChecks` returns a typed check roll-up,
+`forge.getPR` carries `reviewDecision`, and raw Daintree `forge.listIssueComments` reads a
+thread back. Daintree also has a newer PER-CHECK action named `forge.getChecks`, reached
+only through `daintree.call`; the name collision is easy to miss. You no longer need an
+agent to answer "is it green" or "which check failed". What still needs provider tooling
+in a terminal is the job-log BODY and formal/inline PR review text.
 
 Procedure:
 
@@ -38,8 +40,9 @@ ask rather than guessing — reporting on the wrong PR is worse than a clarifyin
 and `headRef` (the source branch — the field is `headRef`, not `head`) if you must match on
 branch. (`forge.listPRs` accepts no `search` key at all; it is rejected outright.)
 
-## Step 2 — Read the review decision, then the CI verdict
-Two different calls, and they are not interchangeable.
+## Step 2 — Read the review decision and CI verdict
+Two free typed calls, and they are not interchangeable. Emit them in ONE reply so they run
+concurrently.
 
 `forge.getPR` is the TYPED exception on this surface: its args go at the TOP level, not
 nested in `arguments`. It is a free read needing no confirmation, and several typed forge
@@ -58,32 +61,30 @@ so treat empty as absence, not as an error.
 
 Do NOT read CI off this call. `ciStatus` is declared on the PR shape but a provider need
 not populate it on a single-PR fetch, and the common one does not — it is absent here, and
-absent is not `success`. The CI verdict has its own action, reached through the escape
-hatch:
+absent is not `success`. The CI verdict has its own TYPED Assistant tool:
 
 ```
 forge.getChecks({"prNumber": <int>})
 ```
 
-`daintree.call` is the highest-risk tool there is — system tier, ALWAYS confirmed, and it
-does not batch with the typed reads above (it runs on its own). So this is one deliberate
-confirmed call, not part of a free parallel sweep: read the PR first, and only reach for
-the CI roll-up when the CI answer is actually what the user asked for.
+It returns `{prNumber,state,conclusive,reported,...counts}`. Gate on `conclusive`, NOT
+`state`: `conclusive:false` means no status, an unknown state, or ZERO reported required
+checks — including the dangerous `state:"success", total:0` case. Counts cover REQUIRED
+checks only. Values are provider-cached and can lag by around a minute, so a single
+success immediately after a push is not settled. `success` says checks passed, never that
+the work is correct.
 
--> `{ "ciStatus": { "state", "total", "passed", "failed", "pending",
-"requiredChecksPassing"? } | null }`. Read `state` for the answer — it is one of
-`success`, `failure`, `pending`, `neutral`, `unknown`. `neutral` means no required checks
-are configured, and `unknown` means the provider reported states that do not map; neither
-is a pass. The counts are COUNTS — this roll-up carries no check NAMES, so it can tell you
-three checks failed but never which ones. Three traps, all of which produce a confidently
-wrong "it's green":
-- The counts cover REQUIRED checks only, and a `total` of 0 also appears when the
-  required-check list could not be read in full. Zero total is never evidence that
-  nothing gates the merge.
-- Values are provider-cached and can lag by around a minute. A single `success` is not a
-  settled verdict — re-read before you act on it, and never report a just-pushed commit
-  as green off one call.
-- `success` is about checks, not correctness. It does not mean the work is right.
+When the question becomes WHICH check failed, the similarly-named raw Daintree action is
+available, but now the system-risk escape hatch and confirmation are justified:
+
+```
+daintree.call({"name":"forge.getChecks",
+               "arguments":{"worktreeId":"<exact id>","prNumber":<int>}})
+```
+
+It returns `{checks:[{name,status,conclusion?,required?,detailsUrl?}]|null}`. A missing
+`conclusion` is not a pass; `null` means no such PR and `[]` means no checks were reported.
+It gives names and links, not the job-log body.
 
 ## Step 3 — Read the thread when the question is "what did anyone say"
 `forge.getIssue` reports `commentCount` but no comment text. For the text:
@@ -103,12 +104,11 @@ never ambiguous.
 ## Step 4 — Know exactly where the forge stops, and escalate for the rest
 Be precise about what you can and cannot get, because the gap is where confident wrong
 answers come from:
-- The forge gives you the review DECISION, the CI roll-up STATE and its counts, and issue
-  comment BODIES.
-- It does NOT give you check names, check output, job logs, or the bodies of reviews and
-  inline review comments already left on a PR. No READ action returns any of those (the
-  review-WRITE actions echo back the body you just posted, which is not the same thing).
-  A `failure` roll-up says THAT checks failed, never which or why.
+- The forge gives you the review DECISION, the CI roll-up STATE/counts, per-check
+  name/status/conclusion/link, and issue comment BODIES.
+- It does NOT give you job-log bodies or the bodies of formal/inline reviews already left
+  on a PR. A failure roll-up says THAT checks failed; the raw per-check action says WHICH;
+  neither says WHY unless the provider encoded enough in a check name.
 
 So when the user wants the cause, or the actual text of a review left on the PR, that is
 an agent's job: spawn one with `agentTask.spawnForEdits` `mode:"explore"`, picking a
@@ -124,9 +124,10 @@ If an implementer agent is still running on this issue, send it the ACTIONABLE c
 with `terminal.sendCommand` ({"terminalId": "<full id>", "command": "..."}). A bare
 `CHANGES_REQUESTED` is a state, not feedback: relaying it alone tells the agent nothing it
 can act on. Send what you actually hold — the review decision plus the specific asks from
-the issue thread, or the failure counts — and be explicit that the detail is not yours to
-give when it isn't. If the substance lives in PR review bodies or check output, get it via
-step 4 FIRST and relay that; do not dress up a roll-up as feedback. Feedback already
+the issue thread, or the failing check names — and be explicit that the detail is not
+yours to give when it isn't. If the substance lives in PR review bodies or job-log output,
+get it via step 4 FIRST and relay that; do not dress up a roll-up or check-name list as
+feedback. Feedback already
 sitting in a reviewer AGENT's terminal is a different job — that is
 daintree.agents.relay-review-feedback.
 

@@ -3,14 +3,30 @@
 > ## ⭐ SHIPPED CONFIGURATION
 > ```
 > backbone   BAAI/bge-base-en-v1.5  (109M)
-> head       32 skills + 1 docs + 4 cardinality
-> corpus     training/data/selection.jsonl @ 6,399 rows (9 journals, wakes included)
+> head       37 skills + 1 docs + 4 cardinality
+> corpus     training/data/selection.jsonl @ 7,773 rows (five new skills fully served)
 > train      --epochs 10 --lr 5e-5 --batch-size 48 --balance-power 0.0 --seed 41
 > serve      ONNX int8 (300 MB RSS), earn-your-place admission
 > ```
-> **Benchmark: this family measures 129 ± 2 of 150 (~86%) — individual runs 127–131
-> depending on seed and precision, the spread being near-tie cases flipping.
-> p50 ~9 ms, 230x faster than DeepSeek's 2,044 ms.**
+> **Current benchmark: shipped int8 measures 157/166 recall-pass (94.6%),
+> fp32 157/166; int8 p50 9.2 ms. Synthetic held-out exact-match is 0.844.**
+> The suite grew to 166: `18-new-skill-surfaces.yaml` gives the five newest
+> skills the recall and routing-trap cases they landed without. On the ORIGINAL
+> 150 the same artifact measures 142 — i.e. the expansion cost nothing and the
+> new skills route at 15/16 (fp32 16/16) on top.
+>
+> **The lesson of this round: a fence is only learned in the direction it is
+> written.** The five new skills' first full-strength corpus (7,602 rows, ~55
+> positives + ~45 boundary negatives each, generated per-skill) scored 16/16 on
+> the new cases but dropped the original 150 from 141 to 138 — the new forge
+> skills were displacing `prep-branch-for-review`, `find-issue-work` and
+> `start-work-on-issue`. The cause is in the catalog, not the model: a new skill
+> declares carve-outs against the older skills it neighbours, while those older
+> skills predate it and name it nowhere, so every generated boundary row ran
+> new→old and none ran old→new. 174 reverse-direction rows (established skill
+> correct, new skill as the hard negative, catalog-derived) took the original 150
+> to 142 and the total to 157. **Adding a skill means generating boundary data
+> for its neighbours too, not just for itself.**
 >
 > The 3-seed logit ensemble reached 131 but costs 3x memory and latency for +1
 > inside the noise band — not shipped. Weight-soup fails here because each

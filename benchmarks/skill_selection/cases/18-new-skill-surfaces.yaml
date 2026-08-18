@@ -1,0 +1,318 @@
+# Recall and routing coverage for the five skills that landed in the catalog with none:
+# the two forge lifecycle runbooks, the durable workflow graph, the dev-preview debugger,
+# and the worktree remote-resource manager. Until this file existed the selector could
+# have missed every one of them on every conversation in the world and the suite would
+# still have reported a clean run.
+#
+# Five single-skill cases — one per skill, the plainest form of the request — and eleven
+# routing traps. Each trap demands the new skill and leaves EVERY neighbour its whenToUse
+# fences against out of required and optional, so the case asserts the carve-out list
+# rather than merely tolerating a pick from it. The wording is a user's, not the
+# runbook's: echoing a skill's own trigger phrases measures keyword overlap instead of
+# routing. Every note names the clause on disk that decides the case.
+#
+# The collisions measured here:
+#   * authority   — WRITING a PR's public review state is land-pull-request; reading that
+#                   state, judging the diff, and fixing what is red are three other skills
+#   * direction   — reopening and relabelling an issue is manage-issue; commenting on one
+#                   and closing it is follow-up-on-issue
+#   * dependence  — ordered phases that block each other is execute-durable-workflow;
+#                   independent units worked at once is fan-out-work
+#   * symptom     — a browser runtime failure in an open preview is debug-web-app; a red
+#                   check with no runtime symptom is ci.diagnose-and-fix
+#   * target      — a worktree's configured remote resource is manage-resource; the
+#                   worktree itself is create-plain-worktree / workspace-cleanup
+
+cases:
+  - id: land-pr-squash-and-merge
+    category: single-skill
+    note: >-
+      Recall for daintree.forge.land-pull-request in its plainest form — a merge with an
+      explicit method, which is the last item in the skill's own positive clause.
+    messages:
+      - role: user
+        content: PR 318 has been approved and green since this morning. Squash it into main.
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: file-bug-as-issue
+    category: single-skill
+    note: >-
+      Recall for daintree.forge.manage-issue: a defect that exists only as a report, turned
+      into public issue state with a label. Nothing is searched, started or closed.
+    messages:
+      - role: user
+        content: >-
+          One of the testers hit a 500 on the export button when the project has no rows
+          in it. Write that up as a ticket and tag it as a bug.
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: durable-plan-for-migration
+    category: single-skill
+    note: >-
+      Recall for daintree.orchestration.execute-durable-workflow. Substantial, ordered,
+      and explicitly expected to outlive this turn — the three things its whenToUse asks
+      for. Worded as a database upgrade so the request carries no graph vocabulary.
+    messages:
+      - role: user
+        content: >-
+          The Postgres 16 upgrade is about eight steps and most of them are blocked on the
+          one before — schema first, then the backfill, then the read cutover, then the old
+          cluster goes away. Hold it as a proper plan with that ordering in it, because
+          I'll be chipping at it all week.
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  - id: preview-console-blank-page
+    category: single-skill
+    note: >-
+      Recall for daintree.runtime.debug-web-app: an already-open Dev Preview showing a
+      runtime failure, with the browser's own log as the evidence source.
+    messages:
+      - role: user
+        content: The dev preview has gone white. Pull whatever the browser logged and work out what's throwing.
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: devbox-status-then-pause
+    category: single-skill
+    note: >-
+      Recall for daintree.worktree.manage-resource — a status read plus a pause on one
+      worktree's cloud resource, with cost as the stated reason.
+    messages:
+      - role: user
+        content: >-
+          What state is the devbox on the billing-rewrite worktree in? If it's up, pause
+          it — I'm done for the day and I don't want it running all night.
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: merge-it-not-another-status-read
+    category: routing-trap
+    note: >-
+      The two neighbours land-pull-request names first are both baited: the user's whole
+      vocabulary is CI and review status, which is daintree.workflow.follow-up-on-issue's
+      one-off read, and "later" belongs to daintree.orchestration.watch-outcome. Neither is
+      being asked for — the user already holds the evidence and refuses a ping — so what is
+      left is the write. land-pull-request claims it ("merge, squash or rebase it") and
+      fences both neighbours by name ("Do not use merely to read PR, CI, review or comment
+      status ... or to watch for a later state transition"). Every declared neighbour is
+      left out of required AND optional.
+    messages:
+      - role: user
+        content: >-
+          I looked at 318 myself ten minutes ago — green, approved, nothing outstanding. I
+          don't need any of that read back to me and I don't want a ping later. Rebase it
+          onto main and land it.
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: stamp-approval-not-a-code-review
+    category: routing-trap
+    note: >-
+      daintree.review.review-change owns the JUDGMENT, and "been through it line by line"
+      is exactly its register ("look over what the agent wrote"). The deciding clause is its
+      deliverable — "FINDINGS with severity and file evidence" — which the user has already
+      produced for themselves. What remains is a public forge write, the first thing
+      land-pull-request's whenToUse claims ("asks to approve a pull request"), and its
+      runbook draws the same line from the other side: "use daintree.review.review-change
+      when the user asks for that judgment".
+    messages:
+      - role: user
+        content: >-
+          I've been through Sam's changes on 91 line by line and I'm happy with them. Put
+          my approval on it so they're not stuck waiting on me.
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: out-of-draft-with-reviewers-not-branch-prep
+    category: routing-trap
+    note: >-
+      Two baits. "The typecheck job was red" is daintree.ci.diagnose-and-fix's home turf,
+      but its trigger is something FAILING that the user wants working and this one is
+      already fixed. Taking a PR out of draft pulls at
+      daintree.workflow.prep-branch-for-review, which claims "open or ready a PR" — the
+      half of this request that settles it is the REVIEWER REQUEST, which only
+      land-pull-request claims ("request changes or reviewers", "mark it ready or draft"),
+      and prep-branch's own scope is committing, pushing and opening, none of which is left
+      to do here.
+    messages:
+      - role: user
+        content: >-
+          Everything's pushed and 88 has been open for two days — I only left it as a draft
+          so nobody looked early. The typecheck job that was red this morning is fixed now.
+          Flip it out of draft and ask Priya and Dan to review it.
+    expect:
+      required: [daintree.forge.land-pull-request]
+      optional: [daintree.foundation]
+
+  - id: write-the-ticket-dont-start-it
+    category: routing-trap
+    note: >-
+      The bait is daintree.workflow.start-work-on-issue — naming a person and handing them
+      a defect is what "put someone on it" usually means — with the tracker itself pulling
+      at daintree.workflow.find-issue-work. Both are decided by the same fact: the issue
+      does not exist yet, so there is nothing to search and nothing chosen to start, and
+      the user forbids implementation outright. manage-issue's whenToUse claims this exact
+      shape ("file or create an issue ... assign or unassign an account", "turn this bug
+      into an issue") and its runbook restates the boundary: "Creating an issue is not
+      permission to start an agent or implementation".
+    messages:
+      - role: user
+        content: >-
+          Support have hit this twice this week — anything over about 2MB never makes it
+          into the search index and nobody gets an error. Get it onto the tracker properly:
+          a decent description, the bug label, and Dan's name on it. Nobody picks it up
+          today, I just want it recorded.
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: reopen-and-relabel-not-close-out
+    category: routing-trap
+    note: >-
+      Everything about the framing — a closed issue, a fix that supposedly landed, the
+      current state of the thread — reads toward daintree.workflow.follow-up-on-issue,
+      which owns the read and the closing writes. DIRECTION decides it: follow-up-on-issue
+      claims "comment on it and close it", while reopening and label edits are
+      manage-issue's own clause ("reopen an issue, add or remove labels"), and manage-issue
+      restates the seam: "Closing an issue and posting its final comment belong to
+      daintree.workflow.follow-up-on-issue".
+    messages:
+      - role: user
+        content: >-
+          244 was closed off back in June and the same crash turned up in last night's
+          build, so whatever landed didn't hold. Open it back up, take the wontfix label
+          off it and put regression on instead.
+    expect:
+      required: [daintree.forge.manage-issue]
+      optional: [daintree.foundation]
+
+  - id: ordered-phases-not-parallel-fanout
+    category: routing-trap
+    note: >-
+      The plurality is real, which is why daintree.orchestration.fan-out-work baits — but
+      its signal is "PLURALITY plus INDEPENDENCE" and every piece here blocks the next one.
+      execute-durable-workflow claims exactly this ("a substantial multi-step goal with
+      dependent phases that must survive turns") and fences the neighbour by name
+      ("independent parallel fan-out"). A week of work also rules out its one-step
+      exclusion.
+    messages:
+      - role: user
+        content: >-
+          The search rewrite is five separate pieces and they can't overlap — the index
+          schema has to land before we backfill, and the backfill before anything reads
+          from it. I'll be at this for a week and I don't want to re-explain the running
+          order every time I come back.
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  - id: keep-the-plan-not-another-catch-up
+    category: routing-trap
+    note: >-
+      "Every time I come back", "what's left" and "what's finished" are
+      daintree.orchestration.status-and-resume's territory, and a reading of what is
+      running right now would be daintree.orchestration.supervise-fleet's. Both are refused
+      by one word in execute-durable-workflow's carve-out — it disclaims a "status-only
+      'where were we' sweep of the flat workflow ledger", and this is not status-only: the
+      user wants the dependencies and progress HELD and advanced, which is the second half
+      of its positive clause ("Use when the user explicitly asks for a durable plan,
+      dependencies, progress tracking"). daintree.orchestration.watch-outcome is excluded
+      too — nothing here is meant to wake anyone.
+    messages:
+      - role: user
+        content: >-
+          Every time I come back to the billing migration you work out from scratch what's
+          left and get some of it wrong. Can we hold the whole thing somewhere instead —
+          the steps, what each one is waiting on, what's finished — and just move it
+          forward each session?
+    expect:
+      required: [daintree.orchestration.execute-durable-workflow]
+      optional: [daintree.foundation]
+
+  - id: preview-throws-though-tests-are-green
+    category: routing-trap
+    note: >-
+      "Falls over" plus "fix it" puts daintree.ci.diagnose-and-fix in reach — it owns the
+      whole fix-and-verify loop — but its trigger is something FAILING in the project's
+      checks, and the user says the suite is green. debug-web-app's carve-out is written
+      for precisely this split: "Do not use for ordinary test/build CI failures WITHOUT a
+      browser runtime symptom (use daintree.ci.diagnose-and-fix)". The only symptom here is
+      a browser runtime one, in an already-open preview, which is the skill's own
+      precondition.
+    messages:
+      - role: user
+        content: >-
+          Test suite's all green, but the app itself falls over the second I open the
+          settings tab in the preview — the panel just goes blank. Figure out what's
+          blowing up in there and fix it.
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: find-the-mounting-error-not-a-code-tour
+    category: routing-trap
+    note: >-
+      "Which component owns that state" is daintree.explore.repository's exact deliverable
+      — "where is X implemented", an explanation with file evidence and nothing changed on
+      disk. What decides it is that the user wants the page WORKING and the evidence lives
+      in an open preview's console rather than in the source tree; debug-web-app fences the
+      neighbour by name ("or general code exploration (use daintree.explore.repository)").
+      daintree.ci.diagnose-and-fix is excluded as well — no check is red.
+    messages:
+      - role: user
+        content: >-
+          Something on the checkout page throws the moment it mounts — I've got the preview
+          up and it never paints. I can't work out which component owns that bit of state.
+          Dig into it and get the page rendering again.
+    expect:
+      required: [daintree.runtime.debug-web-app]
+      optional: [daintree.foundation]
+
+  - id: pause-the-resource-leave-the-worktree
+    category: routing-trap
+    note: >-
+      Teardown-shaped language over a named worktree is what
+      daintree.orchestration.workspace-cleanup answers to ("close these", "delete that
+      worktree") — and the user rules it out in the same breath, because nothing is being
+      closed or deleted. manage-resource names both worktree neighbours for exactly this
+      ("Do not use for creating or deleting an ordinary git worktree"), while pausing to
+      save money is its own positive clause ("wants to provision, pause or resume it, asks
+      to save resource cost").
+    messages:
+      - role: user
+        content: >-
+          I'm not touching the perf-testing worktree again this week and its cloud box is
+          burning money for nothing. Put it to sleep, but leave the worktree, the branch
+          and the terminals exactly where they are.
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]
+
+  - id: wake-the-box-worktree-already-exists
+    category: routing-trap
+    note: >-
+      Naming a worktree and a branch pulls at daintree.worktree.create-plain-worktree, and
+      "bring it back up" reads like setting a workspace up from scratch. The user settles
+      it: the checkout already exists and is fine, so nothing is being created — the target
+      is the worktree's configured remote resource, and resuming it is manage-resource's
+      own clause ("wants to provision, pause or resume it"). Its carve-out sends worktree
+      creation away by name ("use daintree.worktree.create-plain-worktree").
+    messages:
+      - role: user
+        content: >-
+          The gpu-batching worktree is still sitting there from last month, but whatever it
+          talks to on the cloud side has been parked since then. Bring that side back up
+          before I start — the checkout itself is fine.
+    expect:
+      required: [daintree.worktree.manage-resource]
+      optional: [daintree.foundation]

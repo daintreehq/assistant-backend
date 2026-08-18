@@ -334,6 +334,7 @@ _REVIEWED_UNDECLARED = {
     ("daintree.orchestration.status-and-resume", "watcher.cancel"),
     ("daintree.orchestration.status-and-resume", "workflow.startWorkOnIssue"),
     ("daintree.orchestration.watch-outcome", "daintree.call"),
+    ("daintree.forge.land-pull-request", "watcher.watchPR"),
     ("daintree.terminals.rename", "terminal.extract"),
     # PROHIBITION. This skill exists because a session reached for raw git in the
     # user's own terminal when the typed wrapper's schema gave it no argument
@@ -345,6 +346,11 @@ _REVIEWED_UNDECLARED = {
     # every specific, and projection is shadow-only regardless. The reason is
     # metadata truth, not enforcement.)
     ("daintree.worktree.create-plain-worktree", "daintree.call"),
+    # PROHIBITIONS. The durable-graph runbook says graph operations are CLI-local
+    # and must not be routed through the raw MCP escape hatch. The resource
+    # runbook says that raw MCP lifecycle calls cannot be grant-authorized.
+    ("daintree.orchestration.execute-durable-workflow", "daintree.call"),
+    ("daintree.worktree.manage-resource", "grant.create"),
 }
 
 
