@@ -276,6 +276,61 @@ So state the property precisely, and do not let it drift in the docs:
 competitive.** That is a large operational improvement and not a licence to stop
 retraining. `.claude/skills/retrain-selector` says the same thing.
 
+### Cross-learning: what a shared head does and does not buy
+
+With no per-skill parameters, every training row teaches the SHARED reader —
+"how does a request map onto a whenToUse fence" — rather than filling in one
+skill's row. So competence transfers across skills in a way it structurally
+could not before. Two claims come out of that, and only one of them is measured.
+
+**Proven.** A skill held out of both stages still takes 4 of 14 of its own
+benchmark cases (see the zero-shot section above). Under a per-skill head that
+number is **0 by construction** — there is no output to activate. Every one of
+those 4 is transfer from other skills' data, so the mechanism is real and
+demonstrated, not inferred.
+
+**Not yet measured: that it COMPOUNDS.** The appealing version — each skill
+added makes every other skill route better, so the catalog stabilises as it
+grows — does not follow from the above and is not established here. The one
+adjacent data point is mildly against a large effect: removing 411 rows (three
+skills, ~5% of the corpus) moved the remaining 141 cases by 130 vs 131, i.e.
+nothing outside the noise band.
+
+The experiment that would settle it, when there is a reason to run it: train
+stage 2 on data for N of the catalog's skills for N in {10, 20, 30, all}, and
+each time score the SAME held-out skills. If cross-learning compounds, zero-shot
+performance on the held-out set rises with N even though their own data is never
+present. That is a learning curve over *breadth*, not volume, and it is the only
+version of the question the benchmark can answer.
+
+**And note where transfer is weakest, because it is exactly where the catalog is
+heading.** The zero-shot breakdown is not uniform: `terminals.rename` scored 4/7
+with no training, `manage-issue` 0/4 and `debug-web-app` 0/3. Distinctive
+vocabulary transfers; **discrimination between two subtly different neighbours
+does not**, because that distinction lives in the PAIR and not in either
+document alone. A shared reader can learn "read the fence"; it cannot learn a
+fence nobody wrote. As overlapping skills accumulate, boundary data — in both
+directions — is the thing cross-learning does not give you for free.
+
+### Skill TEXT is now the fast routing lever
+
+A corollary worth using. Editing a `whenToUse` used to move `routing_revision`
+and require a retrain before it took effect, so text tuning was a ~20-minute
+loop. Now the edited skill is re-embedded on catalog load — **one** skill, one
+forward pass — and the change is live. Measured on the shipped artifact: adding
+one clause to `review.review-change`'s whenToUse (that "tell me what you'd push
+back on" is a request for FINDINGS even when framed as pre-push) took the
+benchmark 158 -> 159, one case fixed and none broken, with 1 of 38 skills
+re-embedded and nothing retrained.
+
+`training/try_skill_text.py` scores a proposed edit against the whole suite from
+an in-memory overlay, writing nothing. Use it, and read both columns: a
+locally-correct carve-out that fences on words two skills legitimately share is
+a regression, and this file already records one that shipped and had to be
+reverted. Tuning text against a suite this heavily inspected also fits it — a +1
+inside a ±2 error bar is not evidence on its own, and the edit should be
+defensible as a statement about the skill before the number is consulted.
+
 ### Why brute-force cosine and not an ANN index
 
 At 2,000 skills the table is 2,000 x 384 floats; one normalised matrix-vector

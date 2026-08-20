@@ -113,6 +113,7 @@ skill lands in a crowded neighbourhood, it needs data — in both directions.
 | `assemble_data.py` | journals → validated corpus; contamination gate |
 | `eval_two_stage.py` | **canonical** eval: shipped artifact, shipped policy, fp32+int8+diff |
 | `calibrate_floors.py` | re-derives the admission floors against a fresh export |
+| `try_skill_text.py` | scores a proposed whenToUse/summary edit — no retrain, no writes |
 | `eval_zero_shot.py` | what a retrain actually bought, vs a both-stages holdout |
 | `common.py` | wraps the SERVING renderer for training rows |
 | `EXPERIMENTS.md` | **the log — read first** |
