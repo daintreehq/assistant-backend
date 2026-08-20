@@ -338,6 +338,50 @@ product is ~1.5M FLOPs — microseconds, and **exact**. HNSW/IVF would add a
 dependency, a build step and approximate recall for nothing measurable. The
 crossover is around 10^5 vectors.
 
+### Where the milliseconds actually go (measured, single intra-op thread)
+
+| stage | p50 | share |
+|---|---|---|
+| 1. retriever encode (MiniLM-L6 int8) | 2.20 ms | 16% |
+| 2. cosine search (38 skills) | **0.001 ms** | ~0% |
+| 3. ranking encode (bge-base int8) | **10.52 ms** | **77%** |
+| 4. set-wise head (32 slots) | 0.55 ms | 4% |
+| 5. `sync()` on a cache hit | **0.000 ms** | 0% |
+| whole `select()` | 13.6 ms | |
+
+Two things follow, and they point in the same direction.
+
+**The search is not a cost and never will be.** Scaling the table with random
+unit vectors, the same brute-force `M @ q` + `argpartition`:
+
+| skills | table | search p50 |
+|---|---|---|
+| 38 | 0.1 MiB | 0.004 ms |
+| 2,000 | 2.9 MiB | 0.015 ms |
+| 10,000 | 14.6 MiB | 0.075 ms |
+| 100,000 | 146.5 MiB | 1.22 ms |
+
+At the 2,000-skill target the shortlist costs **0.015 ms — one part in a
+thousand of the turn**. An ANN index would be optimising 0.1% of the budget and
+paying approximate recall for it, when `r@k = 1.000` is the one thing the filter
+must not give up. Brute force is not a placeholder here; it is the answer.
+
+**The only thing worth optimising is the ranking encoder** — 77% of the budget,
+and the one component whose cost does NOT depend on catalog size. The measured
+option is bge-small (34MB, ~3ms) at a cost of 3 benchmark cases; see above.
+
+Nothing about a skill is recomputed per turn: both vectors are cached, and
+`sync()` on an unchanged catalog is a single revision comparison at 0.000 ms.
+The only per-turn encoder work is the CONVERSATION, which is different every
+turn and so is not cacheable at all.
+
+**A deliberate non-optimisation.** With 38 skills and `k=32`, stage 1 spends
+2.2ms to discard six candidates, and since the `blind` ablation showed the head
+does not need the retrieval features, the whole stage could be skipped whenever
+the catalog fits in `k`. That is a special case that deletes itself the moment
+the catalog passes 32, in exchange for a branch, a second feature distribution
+the head never trained on, and a fast path that stops being exercised. Not taken.
+
 ### `k` is a tunable, not a constant
 
 The head is self-attention over candidate slots, so its cost is O(k²) — k=32 is
