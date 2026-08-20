@@ -744,11 +744,20 @@ def test_no_docs_query_is_returned_when_the_head_did_not_ask() -> None:
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
 def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
-    """THE regression. Reproduces session ses_aa9b63b4 turn 2.
+    """THE regression. The shape of session ses_aa9b63b4 turn 2.
 
-    "How do you create a worktree in Daintree?" asked after a loaded skill and a
-    prior exchange. Before the fix this returned docs_wanted=False and the turn
-    answered a product question with no product documentation.
+    A usage question asked after a loaded skill and a prior exchange. Before the
+    fix this returned docs_wanted=False and the turn answered a product question
+    with no product documentation.
+
+    The question is FIRST person on purpose, and this is load-bearing. The live
+    session used the second person, but that phrasing sits so near the decision
+    boundary that it flips on quantisation alone — fp32 and int8 disagree about
+    it on one machine (see DOCS_THRESHOLD in setwise.py). Asserting it here once
+    reddened CI on x86 while passing on arm64. What this test is FOR is the
+    context suppression, so it varies context and holds phrasing far from any
+    boundary; the pronoun gap is a corpus problem, tracked in EXPERIMENTS.md and
+    scored — not asserted — by the benchmark.
     """
     from daintree_assistant_server.skills.local.documents import query_document
 
@@ -756,9 +765,9 @@ def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
     convo = [
         _Msg("user", "Which MCP endpoint are you connected to?"),
         _Msg("assistant", "The Daintree MCP endpoint: http://127.0.0.1:45454/mcp."),
-        _Msg("user", "How do you create a worktree in Daintree?"),
+        _Msg("user", "How do I create a worktree in Daintree?"),
     ]
-    bare = "How do you create a worktree in Daintree?"
+    bare = "How do I create a worktree in Daintree?"
     ranking_query = query_document(convo)
 
     assert clf.select(

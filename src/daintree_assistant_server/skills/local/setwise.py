@@ -112,21 +112,30 @@ FEATURE_NAMES = ("cosine", "active", "rank_norm")
 #: with no product documentation — which reads to a user as the assistant simply
 #: not knowing how its own application works.
 #:
-#: 0.40 rather than 0.5 is bought for nothing, and rather than lower for a
-#: reason. The head is sharply bimodal, so on the corpus the two thresholds are
-#: indistinguishable — 199/207 recall and the SAME 6 false positives at each,
-#: with chatter and no-task turns at 0 false positives all the way down to 0.15.
-#: What lives in the gap between them is one real class: docs questions phrased
-#: in the SECOND person. 66 of the corpus's 207 docs rows contain the token "I"
-#: (76 counting my/me/mine) against 4 mentioning "you", and none is of the form
-#: "how do you <do X>", so those land in
-#: the sparse middle of the sigmoid instead of the top mode — "How do you create
-#: a worktree in Daintree?" at 0.4471 and "how do you rename a terminal" at
-#: 0.4783, while six other second-person phrasings clear 0.5 unaided. 0.40 is
-#: the lowest floor that recovers that class without reaching for anything the
-#: corpus actually labels not-docs; going further buys +1 recall and a 7th false
-#: positive. Re-measure it after any retrain — like the floors on the class
-#: below, it is calibrated to THIS artifact's sigmoid and does not transfer.
+#: 0.40 rather than 0.5 is bought for nothing: the head is sharply bimodal, so on
+#: the corpus the two are indistinguishable — 199/207 recall and the SAME 6 false
+#: positives at each, with chatter and no-task turns at 0 false positives all the
+#: way down to 0.15. It is a cheap standing bias toward retrieving, which is the
+#: posture this decision wants, and it costs nothing measurable to hold.
+#:
+#: DO NOT read it as fixing the class it was first chosen for. Second-person
+#: phrasings ("how do you create a worktree", "how do you rename a terminal")
+#: land in the sparse middle of the sigmoid rather than the top mode, because 66
+#: of the corpus's 207 docs rows contain the token "I" (76 counting my/me/mine)
+#: against 4 mentioning "you", and none is of the form "how do you <do X>". They
+#: were measured at 0.4471 and 0.4783 — above this floor — and that looked like a
+#: fix until the same two queries turned out to DISAGREE BETWEEN fp32 AND int8 on
+#: one machine, and between arm64 and x86-64 on the same artifact. A case decided
+#: by quantisation noise is not recovered by a threshold, wherever the threshold
+#: is put; it is recovered by giving the head training data in that shape. The
+#: corpus work is in EXPERIMENTS.md.
+#:
+#: The general lesson, since this is the second constant in this file to meet it:
+#: anything tuned to within a few hundredths of a borderline case is tuned to the
+#: kernel, not the model. Re-measure after any retrain — like the floors on the
+#: class below, this is calibrated to THIS artifact's sigmoid and does not
+#: transfer — and prefer justifying a value by what it costs, which is stable,
+#: over what single case it rescues, which may not be.
 DOCS_THRESHOLD = 0.40
 
 

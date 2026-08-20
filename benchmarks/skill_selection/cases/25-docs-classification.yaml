@@ -287,10 +287,17 @@ cases:
       "How do you <do X>" is a user asking how the PRODUCT does something, not a
       question about the assistant's own procedure. The corpus has 66 first-person
       docs rows against none of this shape, so these land mid-sigmoid rather than
-      in the top mode — the reason DOCS_THRESHOLD sits at 0.40. This one varies
-      PHRASING, not position: it is a cold single-message turn, twinned against
-      docs-how-do-i-worktree by pronoun alone. Worth keeping because the fix for
-      it is corpus data, and this is what will show that landed.
+      in the top mode. This one varies PHRASING, not position: a cold
+      single-message turn, twinned against docs-how-do-i-worktree by pronoun
+      alone.
+
+      EXPECTED TO FAIL, and unstable when it does not. This query was measured at
+      0.4471 — above DOCS_THRESHOLD — and then found to disagree between fp32 and
+      int8 on one machine, and between arm64 and x86-64. It is decided by
+      quantisation noise, so do not "fix" it by moving the threshold: no
+      threshold owns a case that moves under the kernel. It is here to score the
+      pronoun gap and to show when corpus data finally closes it, which is the
+      only thing that will.
     messages:
       - role: user
         content: How do you create a worktree in Daintree?

@@ -555,15 +555,28 @@ loaded.** Since `query_document` always prepends a 320-char history tail, the
 practical reading is that documentation lookup worked on the FIRST message of a
 conversation and almost nowhere else.
 
-**Shipped mitigation** (`setwise.py`): the docs logit is re-read from a second
-head run whose query vector is the bare newest user message; the shortlist,
-features and mask are reused from the primary pass (measured worth nothing to
-recompute — 113/120 either way) so the cost is one short encode plus one head
-run, +5.6 ms, skipped entirely when the two strings agree. `DOCS_THRESHOLD`
-moved 0.5 → 0.40 at the same time: the head is sharply bimodal, so on the corpus
-the two are indistinguishable (199/207 recall and the SAME 6 false positives at
-each, 0 on chatter down to 0.15), but second-person phrasings land mid-sigmoid
-and only 0.40 recovers them.
+**Shipped mitigation** (`setwise.py`): the docs logit is re-read from a SECOND
+COMPLETE PASS over the bare newest user message — its own retrieval, shortlist,
+cosine/rank features, and an empty active set. Cost is +6.7 ms, skipped entirely
+when the docs string and the ranking query agree.
+
+A cheaper version reused the primary shortlist and swapped only the query
+vector, and the measurement that justified it (113/120 either way) was worthless:
+k is 32 against 38 skills, so any two shortlists must share ≥26 candidates and
+retrieval is nearly a no-op. At 64 skills two top-32 sets can be disjoint, and
+the seam would have opened silently on exactly the topic-shift turns this feature
+exists for. **A measurement taken where the mechanism cannot operate is not
+evidence about the mechanism.**
+
+`DOCS_THRESHOLD` moved 0.5 → 0.40 at the same time, and the honest justification
+is only the cheap half: the head is bimodal, so on the corpus the two are
+indistinguishable (199/207 recall, the SAME 6 false positives, 0 on chatter down
+to 0.15), which makes 0.40 a free standing bias toward retrieving. It was
+originally chosen to rescue second-person phrasings measured at 0.4471/0.4783 —
+**that justification did not survive.** Those same two queries disagree between
+fp32 and int8 on one machine, and between arm64 and x86-64 on the same artifact;
+asserting one of them in a unit test passed locally and reddened CI. A case
+decided by quantisation noise is not owned by any threshold.
 
 **This is a workaround pinned to a data artifact.** It strips context from
 OUTSIDE the message; it cannot strip framing INSIDE one, which is why
@@ -589,6 +602,12 @@ lead-in reads 0.9994.
 
 After that retrain, re-measure `DOCS_THRESHOLD` — like the admission floors it
 is calibrated to one artifact's sigmoid and does not transfer.
+
+**And take the tuning lesson, which is the second time this file has met it:** a
+constant justified by the single case it rescues is only as stable as that case.
+0.4471 sat 0.047 above the floor and moved under quantisation alone. Justify a
+threshold by what it COSTS across the corpus — that is stable — and treat any
+case within a few hundredths of it as unowned until the data moves it.
 
 **Benchmark lesson, worth more than the bug.** Of the 9 docs positives, NONE
 carried more than one message and only one carried an active set. The suite
