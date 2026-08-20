@@ -333,54 +333,45 @@ defensible as a statement about the skill before the number is consulted.
 
 ### Why brute-force cosine and not an ANN index
 
-At 2,000 skills the table is 2,000 x 384 floats; one normalised matrix-vector
-product is ~1.5M FLOPs — microseconds, and **exact**. HNSW/IVF would add a
-dependency, a build step and approximate recall for nothing measurable. The
-crossover is around 10^5 vectors.
+The shortlist's whole contract is `r@k = 1.000`: a candidate that never reaches
+the head cannot be recovered downstream, so a shortlist miss caps the entire
+selector. Approximate search sells exactly the property this stage cannot spend
+— IVF scans only the `nprobe` nearest k-means buckets, so a skill in an unprobed
+bucket is invisible; HNSW's recall is a tunable below 1.
 
-### Where the milliseconds actually go (measured, single intra-op thread)
+And the speed it buys is not needed. `M @ q` + `argpartition` over float32,
+measured (see the latency breakdown above): 0.015 ms at 2,000 skills, 1.22 ms at
+100,000. Where the crossovers actually sit:
 
-| stage | p50 | share |
-|---|---|---|
-| 1. retriever encode (MiniLM-L6 int8) | 2.20 ms | 16% |
-| 2. cosine search (38 skills) | **0.001 ms** | ~0% |
-| 3. ranking encode (bge-base int8) | **10.52 ms** | **77%** |
-| 4. set-wise head (32 slots) | 0.55 ms | 4% |
-| 5. `sync()` on a cache hit | **0.000 ms** | 0% |
-| whole `select()` | 13.6 ms | |
+| skills | tables | search | search as % of turn |
+|---|---|---|---|
+| 2,000 (the design target) | 9 MB | 0.02 ms | 0.2% |
+| 10,000 | 46 MB | 0.12 ms | 0.9% |
+| 100,000 | 461 MB | 1.22 ms | 8.2% |
+| 875,000 | 4 GB | 10.7 ms | 44% |
 
-Two things follow, and they point in the same direction.
+- search reaches **10% of the turn** at ~111,000 skills
+- search reaches parity with the ranking encoder at ~862,000 skills
 
-**The search is not a cost and never will be.** Scaling the table with random
-unit vectors, the same brute-force `M @ q` + `argpartition`:
+At 2,000 skills IVF would be self-defeating anyway: with the usual
+`nlist ~ sqrt(N)` it compares ~45 centroids and then scans ~45 vectors — about 90
+comparisons against our 2,000, saving ~0.013 ms — while adding an index build, a
+large binary dependency, and approximate recall.
 
-| skills | table | search p50 |
-|---|---|---|
-| 38 | 0.1 MiB | 0.004 ms |
-| 2,000 | 2.9 MiB | 0.015 ms |
-| 10,000 | 14.6 MiB | 0.075 ms |
-| 100,000 | 146.5 MiB | 1.22 ms |
+**The axis that binds first is MEMORY, not latency.** The tables are 4.5 KB per
+skill (384-d retrieval + 768-d ranking, float32) and fill 1 GB at ~217,000
+skills, while search does not become meaningful until ~111,000. So if this
+catalog ever reached that scale the lever is **compressing the vectors** —
+float16 halves the tables outright, Matryoshka truncation or PQ goes further —
+not bucketing them for speed. If a vector library ever earns its place here it
+will be for compression, not for approximate search; those are separable, and
+compression is the one that would actually be needed.
 
-At the 2,000-skill target the shortlist costs **0.015 ms — one part in a
-thousand of the turn**. An ANN index would be optimising 0.1% of the budget and
-paying approximate recall for it, when `r@k = 1.000` is the one thing the filter
-must not give up. Brute force is not a placeholder here; it is the answer.
-
-**The only thing worth optimising is the ranking encoder** — 77% of the budget,
-and the one component whose cost does NOT depend on catalog size. The measured
-option is bge-small (34MB, ~3ms) at a cost of 3 benchmark cases; see above.
-
-Nothing about a skill is recomputed per turn: both vectors are cached, and
-`sync()` on an unchanged catalog is a single revision comparison at 0.000 ms.
-The only per-turn encoder work is the CONVERSATION, which is different every
-turn and so is not cacheable at all.
-
-**A deliberate non-optimisation.** With 38 skills and `k=32`, stage 1 spends
-2.2ms to discard six candidates, and since the `blind` ablation showed the head
-does not need the retrieval features, the whole stage could be skipped whenever
-the catalog fits in `k`. That is a special case that deletes itself the moment
-the catalog passes 32, in exchange for a branch, a second feature distribution
-the head never trained on, and a fast path that stops being exercised. Not taken.
+Caveat on the scaling row: it is a synthetic table of random unit vectors, which
+measures the arithmetic honestly but not real embedding geometry. That is fine
+for brute force, whose cost is fixed by shape rather than content — but it is
+another reason not to reach for an ANN index speculatively, since ITS recall
+depends entirely on how clustered the real vectors turn out to be.
 
 ### `k` is a tunable, not a constant
 
