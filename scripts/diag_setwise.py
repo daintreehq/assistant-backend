@@ -1,7 +1,6 @@
-"""Throwaway: dump the selector's intermediate values so two platforms can be compared."""
+"""Throwaway: isolate where the two platforms diverge."""
 from __future__ import annotations
 
-import json
 import platform
 import sys
 from pathlib import Path
@@ -10,36 +9,30 @@ import numpy as np
 import onnxruntime as ort
 
 sys.path.insert(0, "src")
-from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog  # noqa: E402
 from daintree_assistant_server.skills.local import setwise as S  # noqa: E402
 
 ART = Path("src/daintree_assistant_server/skills/local/artifacts/selector")
-QUERIES = [
-    ("rename my terminals so i can tell the agents apart", "daintree.terminals.rename"),
-    ("File a new issue called Login crash and label it bug.", "daintree.forge.manage-issue"),
-    ("Squash and merge pull request 42 after checking every gate.", "daintree.forge.land-pull-request"),
-]
+Q = "File a new issue called Login crash and label it bug."
 
-print("== env ==")
-print("platform :", platform.machine(), platform.system())
-print("ort      :", ort.__version__, "providers:", ort.get_available_providers())
-print("numpy    :", np.__version__)
+print("platform :", platform.machine(), platform.system(), "| ort", ort.__version__)
 
-cat = load_catalog(default_skills_dir())
-clf = S.SetwiseClassifier(ART)
-tbl = clf.sync(cat)
-print("table    : ids=%d retrieval%s ranking%s" % (len(tbl.ids), tbl.retrieval.shape, tbl.ranking.shape))
-print("table checksum: retrieval=%.6f ranking=%.6f" % (float(tbl.retrieval.sum()), float(tbl.ranking.sum())))
+# --- 1. tokenization: is it identical? ---
+tok = S._tokenizer(ART / "ranking", 256)
+enc = tok.encode_batch([Q])[0]
+print("token ids:", enc.ids)
 
-for q, want in QUERIES:
-    print("\n== %s ==" % q[:60])
-    q_ret = S._run_encoder(clf._retriever, clf._retriever_tok, [q], normalize=True)[0]
-    q_rank = S._run_encoder(clf._ranker, clf._ranker_tok, [q], normalize=False)[0]
-    print("  q_ret  : norm=%.6f  head5=%s" % (float(np.linalg.norm(q_ret)), np.round(q_ret[:5], 5).tolist()))
-    print("  q_rank : norm=%.6f  head5=%s" % (float(np.linalg.norm(q_rank)), np.round(q_rank[:5], 5).tolist()))
-    sims = tbl.retrieval @ q_ret
-    order = np.argsort(-sims)[:3]
-    print("  top sims:", [(tbl.ids[int(i)].replace("daintree.", ""), round(float(sims[int(i)]), 5)) for i in order])
-    sel = clf.select(q, [])
-    print("  card=%d picked=%s" % (sel.cardinality, [s.replace('daintree.', '') for s in sel.skill_ids]))
-    print("  want=%s score=%.6f" % (want.replace("daintree.", ""), sel.scores.get(want, float("nan"))))
+# --- 2. FIXED input, no tokenizer. Any difference here is pure kernel. ---
+fixed = np.array([[101, 2054, 2003, 2023, 1029, 102]], dtype=np.int64)
+fmask = np.ones_like(fixed)
+for name in ("retriever", "ranking"):
+    for graph in ("model_int8.onnx", "model.onnx"):
+        p = ART / name / graph
+        if not p.exists():
+            print(f"{name:9} {graph:16} ABSENT")
+            continue
+        sess = ort.InferenceSession(str(p), providers=["CPUExecutionProvider"])
+        out = sess.run(None, {"input_ids": fixed, "attention_mask": fmask})[0]
+        print(
+            f"{name:9} {graph:16} norm={float(np.linalg.norm(out)):.6f} "
+            f"head5={np.round(out[0][:5], 5).tolist()}"
+        )
