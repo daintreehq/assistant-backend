@@ -188,6 +188,26 @@ class Settings(BaseSettings):
     # A final assistant message larger than this many characters is flagged as an
     # oversized dump (the recitation failure mode). Observability only.
     main_output_warn_chars: int = Field(default=8000, ge=1, alias="MAIN_OUTPUT_WARN_CHARS")
+    # The hard stop for the same failure mode, on the STREAMING path where the
+    # lint above is only a post-hoc log. Once a reply with no tool calls has
+    # streamed this many visible characters it is not a long answer, it is a
+    # generation that has stopped converging, and the server cuts the upstream
+    # off rather than paying out the rest of the token ceiling.
+    #
+    # Twice the DEFAULT MAIN_OUTPUT_WARN_CHARS, deliberately: one warn-width is
+    # already the line past which a reply is logged as an oversized dump, so this
+    # is not a judgement call about long answers — it is double an amount the
+    # output contract already considers wrong. Observed runaways reached ~33.5k
+    # characters (the full 8000-token ceiling) before stopping on their own.
+    #
+    # The two settings are INDEPENDENT, not derived: this is where the sizing came
+    # from, not a relationship that is maintained. Moving the warn width does not
+    # move the hard stop, and should not — one governs a log line, the other kills
+    # a live generation, and coupling them would let a logging tweak change when
+    # the server hangs up on a model. 0 disables the guard.
+    main_stream_runaway_chars: int = Field(
+        default=16000, ge=0, alias="MAIN_STREAM_RUNAWAY_CHARS"
+    )
 
     # ---- State signing --------------------------------------------------
     state_signing_key_current: SecretStr = Field(

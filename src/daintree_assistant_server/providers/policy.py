@@ -115,6 +115,39 @@ class EndpointSort(StrEnum):
 LATENCY_BOUND: dict[str, float] = {"p50": 1.0, "p90": 2.0, "p99": 5.0}
 
 
+# Endpoints excluded from routing on measured OUTPUT QUALITY, not on speed,
+# price or privacy — the one axis every other filter here leaves unguarded.
+#
+# `sort: throughput` ranks how fast an endpoint streams and says nothing about
+# whether what it streams is correct. That is tolerable while every endpoint in
+# the pool serves the weights faithfully, and it is not a theoretical risk: a
+# host that quantises too far, serves a mismatched chat template, or has a
+# broken KV cache produces text that starts coherent and degenerates, which no
+# amount of ranking detects. Throughput-sorting makes it WORSE than neutral,
+# because the cheapest way to be fastest is to cut exactly those corners.
+#
+# So this is the quality floor, and it is deliberately a NAMED DENYLIST rather
+# than a `quantizations` filter. The measured evidence supports naming hosts,
+# not banning a number: fp4 endpoints (Relace, Decart) served 35 clean turns in
+# the same window, while the entry below is the only host that ever produced a
+# runaway. A quantization floor would drop those 35 good turns AND DeepSeek's
+# own first-party endpoint (it declares `unknown`) to catch one bad actor.
+#
+# ENTRIES MUST CITE EVIDENCE. This list costs reliability if it grows on a
+# hunch — every removal shrinks the pool that `allow_fallbacks` draws on.
+#
+# - "digitalocean": entered the pool 2026-08-20 and served 5 turns. TWO ran away
+#   to the 8000-token ceiling (`finish_reason=length`, ~33.5k chars) with output
+#   that degenerated into memorised pretraining text; a third miscounted its own
+#   completed tool calls and issued a spurious extra one. Across the same two
+#   weeks the other nine endpoints produced ZERO runaways in 189 turns
+#   (p~0.0005, Fisher exact). Isolated by a natural experiment: the identical
+#   prompt with an identical active-skill set answered correctly on Novita three
+#   minutes after collapsing here, which rules out the prompt and the selector.
+#   Declares `quantization: unknown`. Re-test before removing.
+DENIED_ENDPOINTS: tuple[str, ...] = ("digitalocean",)
+
+
 @dataclass(frozen=True)
 class RoutingPolicy:
     """A complete endpoint-selection policy, renderable to OpenRouter's wire block.
@@ -136,8 +169,11 @@ class RoutingPolicy:
     #: failure.
     allow_fallbacks: bool = True
     #: Optional endpoint allowlist / denylist (OpenRouter provider slugs).
+    #: ``ignore`` defaults to the server's quality denylist (DENIED_ENDPOINTS)
+    #: and a caller's own list is UNIONED onto it, never substituted — see
+    #: :meth:`merged_with`.
     only: tuple[str, ...] = ()
-    ignore: tuple[str, ...] = ()
+    ignore: tuple[str, ...] = DENIED_ENDPOINTS
     #: Percentile time-to-first-token bound. Deprioritises only, never excludes,
     #: so it applies to every call regardless of shape — see ``LATENCY_BOUND``.
     #: Defaulted rather than derived: there is no call this should be absent from,
@@ -197,15 +233,30 @@ class RoutingPolicy:
         it selects among modes the server defines. It cannot disable the
         no-training floor, because `data_collection: "deny"` is not derived from
         any field a caller controls (see :meth:`to_wire`).
+
+        ``ignore`` is UNIONED for the same reason, where every other field is
+        replaced: it is a floor, not a preference. Substituting it would let a
+        caller who sends any ignore list at all silently re-enable an endpoint
+        the server excluded on measured output quality (DENIED_ENDPOINTS) —
+        making routing looser, which is exactly what this method promises is
+        impossible. Order is deterministic (server floor first, caller's
+        additions in their order) so the rendered block stays byte-stable for
+        the prompt cache.
+
+        A caller who names a denied endpoint in ``only`` gets an empty pool and
+        a clean ``upstream_no_compliant_provider``, not a quiet downgrade to it.
         """
         if preference is None:
             return self
+        merged_ignore = self.ignore + tuple(
+            slug for slug in preference.ignore if slug not in self.ignore
+        )
         return replace_policy(
             self,
             privacy=preference.privacy or self.privacy,
             sort=preference.sort or self.sort,
             only=preference.only or self.only,
-            ignore=preference.ignore or self.ignore,
+            ignore=merged_ignore,
         )
 
 

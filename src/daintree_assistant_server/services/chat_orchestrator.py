@@ -45,6 +45,7 @@ from ..errors import (
     DaintreeError,
     internal_error,
     turn_deadline_exceeded,
+    upstream_runaway_output,
     upstream_timeout,
 )
 from ..observability import get_logger, new_call_id, new_request_id
@@ -1805,6 +1806,11 @@ class ChatOrchestrator:
         # just finished. content_parts is joined into the final answer; a tool_calls
         # delta marks this as a continuation round (not a completion boundary).
         content_parts: list[str] = []
+        # Running length of the VISIBLE reply, kept beside content_parts so the
+        # runaway guard costs an int add per chunk instead of a join per chunk.
+        content_chars = 0
+        # Resolved once per turn, not per chunk. 0 disables the guard.
+        runaway_chars = self.settings.main_stream_runaway_chars
         saw_tool_calls = False
         completed = False
         # Tool-call fragments are held per call (never forwarded piecemeal) so the
@@ -1915,6 +1921,12 @@ class ChatOrchestrator:
                         )
                         held, finish_reason, restored = fallback
                         content_parts = [restored]
+                        # Restored together, though this path breaks immediately
+                        # and checks no further chunks: "the counter tracks
+                        # content_parts" is the invariant that makes the guard
+                        # readable, and a single place where it silently does not
+                        # is how the next reader gets it wrong.
+                        content_chars = len(restored)
                         break
                     stream = opened_stream
                 # Phase timing for the round's remaining "dead air": upstream
@@ -1952,6 +1964,40 @@ class ChatOrchestrator:
                         continue
                     if delta.content:
                         content_parts.append(delta.content)
+                        content_chars += len(delta.content)
+                        # RUNAWAY GUARD. A degenerating endpoint does not stop on
+                        # its own: it streams to the token ceiling and reports
+                        # finish_reason=length, which we only learn once the whole
+                        # dump has been delivered and billed (observed twice on
+                        # 2026-08-20, ~33.5k chars each). Cut it off instead.
+                        #
+                        # A ceiling on PROSE, unconditionally — deliberately NOT
+                        # exempted for a round that is also calling tools. The
+                        # exemption is the tempting shape ("a tool-calling round is
+                        # converging") and it is a hole: only `delta.content` is
+                        # counted, so a legitimate multi-spawn batch already costs
+                        # nothing against this limit no matter how large its
+                        # arguments are, while the exemption would let ONE junk
+                        # tool-call fragment — precisely what a degenerating
+                        # endpoint also emits — buy the rest of the token ceiling
+                        # for unbounded prose. Nothing is protected by the gate
+                        # that is not already protected by counting content alone.
+                        #
+                        # The raise unwinds into the DaintreeError handler below,
+                        # which emits the terminal error event and closes the
+                        # upstream in its `finally` — the existing mid-stream
+                        # failure path, not a new one.
+                        if runaway_chars and content_chars > runaway_chars:
+                            logger.warning(
+                                "stream_runaway_stopped",
+                                request_id=meta.request_id,
+                                content_chars=content_chars,
+                                limit=runaway_chars,
+                                upstream_endpoint=opened_stream.endpoint,
+                                semantic_attempt=attempt,
+                                saw_tool_calls=saw_tool_calls,
+                            )
+                            raise upstream_runaway_output()
                     # Release the gate on anything that rules the failure shape out.
                     # Reasoning and tool-call fragments are public model output the
                     # moment they arrive, so an attempt that produces either can no
@@ -2049,6 +2095,7 @@ class ChatOrchestrator:
                     saw_tool_calls = False
                     thinking_signaled = False
                     content_parts = []
+                    content_chars = 0
                     tool_call_buffer = StreamToolCallBuffer(param_index)
                     held = None
                     continue

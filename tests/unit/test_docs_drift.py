@@ -704,6 +704,7 @@ _ERROR_CODES = (
     "upstream_unavailable",
     "upstream_request_rejected",
     "upstream_protocol_error",
+    "upstream_runaway_output",
     "upstream_error",
     "internal_error",
     "request_too_large",

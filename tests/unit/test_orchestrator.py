@@ -2068,3 +2068,306 @@ def test_generation_cannot_contradict_the_numbers_it_sits_between() -> None:
     assert wire.generation_ms == 900
     assert wire.first_output_ms is not None
     assert wire.first_output_ms + wire.generation_ms == wire.total_ms
+
+
+# ---- runaway generations -----------------------------------------------------
+#
+# A degenerating endpoint does not stop on its own: it streams to the token
+# ceiling and only then reports finish_reason=length, by which point the whole
+# dump has been delivered to the user AND billed. Observed twice on 2026-08-20
+# (~33.5k characters each, both on the same upstream endpoint), which is what
+# these gates exist to make impossible.
+
+
+def _plain_stream_request(session_id: str = "runaway-session") -> RespondRequest:
+    """A streaming turn offering NO tools — the shape a runaway reply takes."""
+    return RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "session": {"id": session_id, "turn_id": "turn-1"},
+            "input": {"messages": [{"role": "user", "content": "say something"}]},
+            "startup": {},
+            "generation": {"stream": True},
+        }
+    )
+
+
+def _with_runaway_limit(orchestrator: ChatOrchestrator, limit: int) -> ChatOrchestrator:
+    """The same orchestrator with a different runaway ceiling.
+
+    Settings are frozen, so this rebuilds rather than mutating — which also keeps
+    each test's threshold local instead of leaking into the shared fixture.
+    """
+    return ChatOrchestrator(
+        settings=orchestrator.settings.model_copy(
+            update={"main_stream_runaway_chars": limit}
+        ),
+        catalog_manager=orchestrator.catalog_manager,
+        selector=orchestrator.selector,
+        state_codec=orchestrator.state_codec,
+        assembler=orchestrator.assembler,
+        provider=orchestrator.provider,
+    )
+
+
+def _events_of(events: list[str], kind: str) -> list[dict[str, Any]]:
+    return [
+        json.loads(e.split("data: ", 1)[1]) for e in events if e.startswith(f"event: {kind}\n")
+    ]
+
+
+def _exact_content_chunks(pieces: list[str]) -> list[dict[str, Any]]:
+    """Content chunks carrying EXACTLY the given strings, plus a stop chunk.
+
+    `make_text_chunks` appends a space to every piece, which is fine for tests
+    about behaviour but makes a boundary test off by one per chunk. This one is
+    byte-exact, so an assertion about the character AT the limit means it.
+    """
+    head: list[dict[str, Any]] = [
+        {
+            "id": "chatcmpl-fake",
+            "object": "chat.completion.chunk",
+            "created": 1700000000,
+            "model": "deepseek-v4-flash",
+            "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}],
+        }
+    ]
+    for piece in pieces:
+        head.append(
+            {
+                "id": "chatcmpl-fake",
+                "object": "chat.completion.chunk",
+                "created": 1700000000,
+                "model": "deepseek-v4-flash",
+                "choices": [{"index": 0, "delta": {"content": piece}, "finish_reason": None}],
+            }
+        )
+    head.append(
+        {
+            "id": "chatcmpl-fake",
+            "object": "chat.completion.chunk",
+            "created": 1700000000,
+            "model": "deepseek-v4-flash",
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }
+    )
+    return head
+
+
+def _tool_call_chunk(arguments: str = "{}") -> dict[str, Any]:
+    """One tool-call fragment, in the wire shape the fold expects."""
+    return {
+        "id": "chatcmpl-fake",
+        "object": "chat.completion.chunk",
+        "created": 1700000000,
+        "model": "deepseek-v4-flash",
+        "choices": [
+            {
+                "index": 0,
+                "delta": {
+                    "tool_calls": [
+                        {
+                            "index": 0,
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "terminal__extract",
+                                "arguments": arguments,
+                            },
+                        }
+                    ]
+                },
+                "finish_reason": None,
+            }
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_stream_runaway_is_cut_off_and_reported_as_an_error(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    limit = orchestrator.settings.main_stream_runaway_chars
+    assert limit, "the guard must ship on; a 0 default would make this test vacuous"
+    stream = FakeStream(make_text_chunks("degenerate " * limit))
+    fake_provider.stream_factory = lambda _request: stream
+    outcome = await orchestrator.complete(
+        _plain_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+
+    errors = _events_of(events, "error")
+    assert len(errors) == 1
+    assert errors[0]["error"]["code"] == "upstream_runaway_output"
+    # Terminal, never dressed up as a finished turn: a `done` invites the client
+    # to commit the garbage to history, which is the prefix that degenerates the
+    # NEXT turn too.
+    assert not _events_of(events, "done")
+    # The upstream is hung up on rather than drained — the whole point is not
+    # paying for the rest of the ceiling.
+    assert stream.closed
+    assert stream._index < len(stream._chunks)
+
+
+@pytest.mark.asyncio
+async def test_stream_runaway_delivers_nothing_past_the_limit(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The point of the guard is what it does NOT deliver or pay for."""
+    limit = orchestrator.settings.main_stream_runaway_chars
+    stream = FakeStream(make_text_chunks("degenerate " * limit))  # ~11x the limit
+    fake_provider.stream_factory = lambda _request: stream
+    outcome = await orchestrator.complete(
+        _plain_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+    )
+    assert outcome.stream is not None
+    delivered = _streamed_content(await _drain(outcome.stream))
+    # Nothing past the line reaches the client at all: the guard raises on the
+    # delta that crosses it, BEFORE that delta is yielded. Asserted as an upper
+    # bound only — how much arrives under it depends on chunk sizes, and a single
+    # large crossing delta legitimately delivers nothing.
+    assert len(delivered) <= limit
+    # And the source had far more left to give, so this is the guard stopping it
+    # rather than the stream simply running short.
+    assert stream._index < len(stream._chunks)
+
+
+@pytest.mark.asyncio
+async def test_a_tool_call_does_not_exempt_the_rest_of_the_reply(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """REGRESSION. The guard once skipped any round that had emitted a tool call,
+    on the theory that a tool-calling round is converging.
+
+    That was a hole rather than a safeguard, and it pointed the wrong way: only
+    visible content is counted, so a real multi-spawn batch already costs nothing
+    against this limit however large its arguments are — while the exemption let
+    ONE junk tool-call fragment, which is exactly what a degenerating endpoint
+    also emits, buy unbounded prose for the rest of the token ceiling.
+    """
+    limit = orchestrator.settings.main_stream_runaway_chars
+    chunks = make_text_chunks("degenerate " * limit)
+    chunks.insert(1, _tool_call_chunk())  # a tool call BEFORE the prose
+    fake_provider.stream_factory = lambda _request: FakeStream(chunks)
+    outcome = await orchestrator.complete(
+        _intent_stream_request("runaway-after-tool-call"),
+        upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+    assert [e["error"]["code"] for e in _events_of(events, "error")] == [
+        "upstream_runaway_output"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_large_tool_call_arguments_do_not_count_toward_the_prose_ceiling(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The invariant that makes the unconditional prose ceiling safe.
+
+    A legitimate multi-spawn batch carries its payload in tool-call ARGUMENTS. The
+    counter tracks `delta.content` only, so such a round survives arguments many
+    times the size of the ceiling — which is why exempting tool rounds bought
+    nothing worth the hole it opened.
+    """
+    limit = orchestrator.settings.main_stream_runaway_chars
+    payload = json.dumps({"terminalIds": ["t" * 64 for _ in range(limit // 32)]})
+    assert len(payload) > limit * 1.5
+    chunks = make_text_chunks("Spawning the batch now.")
+    chunks.insert(1, _tool_call_chunk(payload))
+    fake_provider.stream_factory = lambda _request: FakeStream(chunks)
+    outcome = await orchestrator.complete(
+        _intent_stream_request("big-tool-args"),
+        upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+    assert not _events_of(events, "error")
+    assert _events_of(events, "done")
+
+
+@pytest.mark.asyncio
+async def test_an_ordinary_long_reply_is_not_treated_as_a_runaway(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The false-positive gate. The threshold is deliberately well above any real
+    answer, so a merely long one must stream through untouched."""
+    limit = orchestrator.settings.main_stream_runaway_chars
+    body = ("a real answer. " * (limit // 30)).strip()  # ~half the limit
+    fake_provider.stream_factory = lambda _request: FakeStream(make_text_chunks(body))
+    outcome = await orchestrator.complete(
+        _plain_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+    assert not _events_of(events, "error")
+    assert _events_of(events, "done")
+    assert _streamed_content(events).strip() == body
+
+
+@pytest.mark.asyncio
+async def test_the_limit_itself_is_allowed_and_one_character_more_is_not(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """The boundary, asserted on both sides with single-character deltas so the
+    outcome cannot hinge on where a chunk happens to split."""
+    limit = 64
+    small = _with_runaway_limit(orchestrator, limit)
+
+    fake_provider.stream_factory = lambda _request: FakeStream(
+        _exact_content_chunks(["x"] * limit)
+    )
+    at_limit = await small.complete(
+        _plain_stream_request("at-limit"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert at_limit.stream is not None
+    at_limit_events = await _drain(at_limit.stream)
+    assert not _events_of(at_limit_events, "error")
+    assert len(_streamed_content(at_limit_events)) == limit
+
+    fake_provider.stream_factory = lambda _request: FakeStream(
+        _exact_content_chunks(["x"] * (limit + 1))
+    )
+    over = await small.complete(
+        _plain_stream_request("over-limit"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert over.stream is not None
+    over_events = await _drain(over.stream)
+    assert [e["error"]["code"] for e in _events_of(over_events, "error")] == [
+        "upstream_runaway_output"
+    ]
+    # The crossing character is suppressed, not delivered-then-regretted.
+    assert len(_streamed_content(over_events)) == limit
+
+
+@pytest.mark.asyncio
+async def test_a_zero_limit_disables_the_guard(
+    orchestrator: ChatOrchestrator,
+    fake_provider: FakeProvider,
+) -> None:
+    """0 is the off switch, not a ceiling of zero — the distinction a truthiness
+    check gets right and a `>= 0` comparison would get catastrophically wrong."""
+    disabled = _with_runaway_limit(orchestrator, 0)
+    body = "degenerate " * 4000
+    fake_provider.stream_factory = lambda _request: FakeStream(make_text_chunks(body))
+    outcome = await disabled.complete(
+        _plain_stream_request("guard-off"), upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.stream is not None
+    events = await _drain(outcome.stream)
+    assert not _events_of(events, "error")
+    assert _events_of(events, "done")
+    assert len(_streamed_content(events)) > orchestrator.settings.main_stream_runaway_chars

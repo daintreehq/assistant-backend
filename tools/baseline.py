@@ -83,6 +83,13 @@ def capture() -> dict[str, Any]:
             "public_model": PUBLIC_MODEL_ID,
             "privacy_mode": DEFAULT_POLICY.privacy.value,
             "default_endpoint_sort": DEFAULT_POLICY.sort.value,
+            # The output-quality floor. A release fact for the same reason the
+            # privacy mode is: it decides which endpoints may answer at all, and
+            # every entry SHRINKS the pool that `allow_fallbacks` draws on. The
+            # per-file policy tests assert what is on the list; this makes a
+            # change to it show up in a release diff, which is the only place a
+            # silently-growing denylist would otherwise be visible.
+            "denied_endpoints": list(DEFAULT_POLICY.ignore),
         },
         "selector": {
             # Selection is LOCAL and two-stage: these describe the shipped

@@ -192,6 +192,7 @@ async def test_provider_routing_policy_sent_on_every_request() -> None:
         "data_collection": "deny",
         "require_parameters": True,
         "allow_fallbacks": True,
+        "ignore": ["digitalocean"],
         "preferred_max_latency": {"p50": 1.0, "p90": 2.0, "p99": 5.0},
     }
     await provider.aclose()
@@ -431,6 +432,7 @@ async def test_cache_session_key_leaves_the_routing_policy_untouched() -> None:
         "data_collection": "deny",
         "require_parameters": True,
         "allow_fallbacks": True,
+        "ignore": ["digitalocean"],
         "preferred_max_latency": {"p50": 1.0, "p90": 2.0, "p99": 5.0},
     }
     await provider.aclose()

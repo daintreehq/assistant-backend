@@ -334,6 +334,29 @@ def turn_deadline_exceeded(phase: str, message: str | None = None) -> DaintreeEr
     )
 
 
+def upstream_runaway_output(
+    message: str = "The upstream model produced a runaway response and was stopped.",
+) -> DaintreeError:
+    """A generation that ran away and was cut off mid-stream by the server.
+
+    Distinct from ``upstream_protocol_error``: the chunks parsed fine and the
+    endpoint was healthy by every transport measure. What failed is the CONTENT
+    — a degenerating generation that had already produced more visible prose
+    than any real answer to a turn ever does, and showed no sign of stopping.
+
+    Terminal on purpose, rather than closing the stream with a ``done``. The
+    text already delivered is unusable, and a ``done`` would invite the client to
+    commit it to conversation history — where it becomes the prefix that makes
+    the NEXT turn degenerate too. An error lets the client discard the round.
+    """
+    return DaintreeError(
+        status_code=502,
+        message=message,
+        type=TYPE_API,
+        code="upstream_runaway_output",
+    )
+
+
 def upstream_error(
     message: str = "The upstream model provider returned an error.",
     *,

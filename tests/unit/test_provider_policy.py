@@ -12,6 +12,7 @@ import pytest
 from daintree_assistant_server.contracts.daintree_api import Routing
 from daintree_assistant_server.providers.policy import (
     DEFAULT_POLICY,
+    DENIED_ENDPOINTS,
     LATENCY_BOUND,
     EndpointSort,
     PrivacyMode,
@@ -38,6 +39,7 @@ def test_the_default_wire_block_is_exactly_what_we_document() -> None:
         "data_collection": "deny",
         "require_parameters": True,
         "allow_fallbacks": True,
+        "ignore": ["digitalocean"],
         "preferred_max_latency": {"p50": 1.0, "p90": 2.0, "p99": 5.0},
     }
 
@@ -206,6 +208,7 @@ def test_the_wire_block_key_order_is_stable() -> None:
             "data_collection",
             "require_parameters",
             "allow_fallbacks",
+            "ignore",
             "preferred_max_latency",
         ]
     )
@@ -319,3 +322,73 @@ def test_the_forced_tool_call_subrequest_carries_routing() -> None:
 
     source = inspect.getsource(OpenRouterProvider.structured_tool_call)
     assert "routing=request.routing" in source
+
+
+# ---------------------------------------------------------------------------
+# The output-quality denylist.
+# ---------------------------------------------------------------------------
+
+
+def test_the_default_excludes_the_denied_endpoints() -> None:
+    """The quality floor ships on, like the privacy floor.
+
+    Entries are named hosts backed by measured evidence (see DENIED_ENDPOINTS);
+    this asserts only that whatever is on the list actually reaches the wire.
+    """
+    assert DEFAULT_POLICY.ignore == DENIED_ENDPOINTS
+    assert DEFAULT_POLICY.to_wire()["ignore"] == list(DENIED_ENDPOINTS)
+
+
+def test_a_caller_ignore_list_is_unioned_onto_the_floor_not_substituted() -> None:
+    """The asymmetry that makes `ignore` a floor rather than a preference.
+
+    Every other field a caller sends REPLACES the server's. If `ignore` did too,
+    any caller sending an ignore list at all would silently re-enable a host the
+    server excluded on measured output quality — routing getting LOOSER via the
+    block whose whole contract is that it cannot.
+    """
+    merged = DEFAULT_POLICY.merged_with(RoutingPreference(ignore=("someotherhost",)))
+    for slug in DENIED_ENDPOINTS:
+        assert slug in merged.ignore
+    assert "someotherhost" in merged.ignore
+
+
+def test_a_caller_cannot_re_enable_a_denied_endpoint() -> None:
+    """The direct attack: name ONE denied host in your own ignore list and hope
+    the substitution drops the rest of the floor with it.
+
+    Asserted against a synthetic TWO-entry floor on purpose. Against the shipped
+    singleton this test is tautological — a replacing implementation handed
+    ``("digitalocean",)`` also returns ``("digitalocean",)`` and passes — so it
+    would gate nothing until the day someone adds a second entry, which is
+    exactly when they would want it already gating.
+    """
+    floor = RoutingPolicy(ignore=("badhost", "worsehost"))
+    merged = floor.merged_with(RoutingPreference(ignore=("badhost",)))
+    assert merged.ignore == ("badhost", "worsehost")
+    # Deduplicated, not appended twice: this list goes on the wire.
+    assert merged.ignore.count("badhost") == 1
+
+
+def test_only_does_not_override_the_denylist() -> None:
+    """A caller pinning a denied endpoint gets an empty pool and a clean
+    `upstream_no_compliant_provider` from upstream — never a quiet downgrade onto
+    the host the server excluded."""
+    wire = DEFAULT_POLICY.merged_with(RoutingPreference(only=("digitalocean",))).to_wire()
+    assert wire["only"] == ["digitalocean"]
+    assert wire["ignore"] == list(DENIED_ENDPOINTS)
+
+
+def test_the_denylist_survives_every_other_caller_preference() -> None:
+    merged = DEFAULT_POLICY.merged_with(
+        RoutingPreference(privacy=PrivacyMode.ZDR, sort=EndpointSort.PRICE, only=("novita",))
+    )
+    assert merged.to_wire()["ignore"] == list(DENIED_ENDPOINTS)
+
+
+def test_the_merged_ignore_order_is_deterministic() -> None:
+    """The block is serialized into every request body and the prompt cache keys
+    on a byte-identical prefix, so a set-derived order would be a silent miss."""
+    a = DEFAULT_POLICY.merged_with(RoutingPreference(ignore=("b", "a")))
+    b = DEFAULT_POLICY.merged_with(RoutingPreference(ignore=("b", "a")))
+    assert a.ignore == b.ignore == DENIED_ENDPOINTS + ("b", "a")

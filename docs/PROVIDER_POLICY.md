@@ -102,6 +102,7 @@ field. The shipped default block is:
   "data_collection": "deny",
   "require_parameters": true,
   "allow_fallbacks": true,
+  "ignore": ["digitalocean"],
   "preferred_max_latency": { "p50": 1.0, "p90": 2.0, "p99": 5.0 }
 }
 ```
@@ -147,6 +148,26 @@ floor under the other.
 - **`allow_fallbacks: true`** — keep the next-fastest compliant endpoint available
   when the winner is down. With filters this strict, turning it off makes any
   single outage a hard 404.
+- **`ignore`** — the **output-quality floor**, and the only filter here that is
+  about what an endpoint *says* rather than how fast, private or capable it is.
+  Sorting on throughput ranks how fast an endpoint streams and cannot tell that
+  what it streams has stopped making sense; worse, the cheapest way for a host to
+  win a throughput sort is to cut exactly the corners that cause it. Entries are
+  named hosts with **measured evidence**, not a quantization threshold: fp4
+  endpoints in this pool served 35 clean turns in the window that produced the
+  one entry below, and a `quantizations` filter would drop those *and* DeepSeek's
+  own first-party endpoint (it declares `unknown`) to catch a single bad actor.
+
+  | Endpoint | Excluded because |
+  |---|---|
+  | `digitalocean` | Entered the pool 2026-08-20; served 5 turns. Two ran away to the 8000-token ceiling (`finish_reason=length`, ~33.5k chars) with output degenerating into memorised pretraining text; a third miscounted its own completed tool calls. The other nine endpoints: zero runaways in 189 turns over the same fortnight. An identical prompt with an identical active-skill set answered correctly on Novita three minutes after collapsing here. |
+
+  Unlike every other caller-adjustable field, a client's `routing.ignore` is
+  **unioned onto** this list rather than replacing it — otherwise any caller
+  sending an ignore list at all would silently re-enable a host the server
+  excluded, which would make routing *looser*, the one thing the `routing` block
+  promises is impossible. A caller who names a denied endpoint in `only` gets a
+  clean `upstream_no_compliant_provider`, never a quiet downgrade onto it.
 
 ### 3a. Cache affinity — `session_id`, and why not `provider.order`
 
@@ -310,6 +331,7 @@ floor, bound — is byte-identical to §3:
   "data_collection": "deny",
   "require_parameters": true,
   "allow_fallbacks": true,
+  "ignore": ["digitalocean"],
   "preferred_max_latency": { "p50": 1.0, "p90": 2.0, "p99": 5.0 }
 }
 ```

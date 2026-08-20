@@ -76,6 +76,10 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     # drifts in silence — which is exactly what happened to `endpoint_sort` until
     # a second sort existed to notice it.
     assert identity["default_endpoint_sort"] == DEFAULT_POLICY.sort.value  # type: ignore[index]
+    # Asserted for the same reason, and it is the one identity field that is a
+    # LIST: a denylist that grows by accident costs availability, not just
+    # accuracy, because each entry removes a fallback.
+    assert identity["denied_endpoints"] == list(DEFAULT_POLICY.ignore)  # type: ignore[index]
     # There is no first-byte endpoint sort anymore: the call that sat on the
     # first-byte path (the upstream skill selector) was replaced by the LOCAL
     # two-stage selector, whose release facts are asserted below instead.

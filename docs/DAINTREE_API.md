@@ -119,7 +119,7 @@ almost every request does — and the server default applies.
   "privacy": "no_training",        // "no_training" (default) | "zdr"
   "sort": "throughput",            // "throughput" (default) | "price" | "latency"
   "only":   ["deepinfra"],         // optional endpoint allowlist (≤24 slugs)
-  "ignore": ["some-endpoint"]      // optional endpoint denylist  (≤24 slugs)
+  "ignore": ["some-endpoint"]      // ADDED TO the server denylist (≤24 slugs)
 }
 ```
 
@@ -133,11 +133,18 @@ parameter this server has never tested — each failing as an inscrutable upstre
 error rather than a validation one. Unknown fields and unknown values are `400`.
 Slugs must be lowercase alphanumerics with `.`, `-` or `_`.
 
-Two things a caller cannot do:
+Three things a caller cannot do:
 
 - **Weaken privacy.** `data_collection: "deny"` is sent unconditionally and is not
   derived from any field here. `privacy: "zdr"` is *additive* — it adds the
   stricter retention filter on top, it does not replace the no-training one.
+- **Re-enable a denied endpoint.** The server ships a small denylist of endpoints
+  excluded on measured output quality (see
+  [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) §3). Unlike every other field here,
+  `ignore` is **unioned onto** it rather than replacing it — otherwise sending any
+  `ignore` list at all would quietly re-admit those endpoints, which is routing
+  getting *looser* through the block that exists to make it stricter. Naming one
+  in `only` empties the pool instead of overriding the floor.
 - **Guarantee a route.** `zdr`, an `only` list, or an unusual parameter mix can
   empty the eligible pool. That fails closed with `503
   upstream_no_compliant_provider` rather than silently relaxing the policy.
@@ -610,8 +617,10 @@ second), `data_collection: "deny"` (only endpoints that do not collect prompt da
 it — a no-training floor, **not** zero data retention <!-- privacy-copy-ok -->; see
 [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md)), `require_parameters: true` (drop endpoints that would silently ignore something we
 sent — this is what routes a json_object call away from an otherwise-faster endpoint with no
-`response_format` support), and `allow_fallbacks: true` (the next-fastest compliant endpoint
-covers an outage). A policy that matches nothing returns 404 **or** 503 depending on which
+`response_format` support), `allow_fallbacks: true` (the next-fastest compliant endpoint
+covers an outage), and `ignore` (the output-quality denylist — endpoints excluded because they
+were measured producing degenerate output, the one axis none of the other filters watch; a
+caller's own `ignore` is unioned onto it, never substituted). A policy that matches nothing returns 404 **or** 503 depending on which
 filter emptied the pool; both surface as `upstream_no_compliant_provider` rather than a
 generic bad-request.
 
@@ -712,6 +721,7 @@ OpenRouter account — and each one has a different fix. Never retried.
 |------|------|--------|
 | 502  | `upstream_request_rejected` | OpenRouter judged the body **Daintree generated** malformed. Almost always a server bug; report the request id. Carries the provider's own reason. |
 | 502  | `upstream_protocol_error` | An unparseable response: bad JSON, a broken chunk, a stream that ended without `[DONE]`. Provider/compatibility problem. |
+| 502  | `upstream_runaway_output` | The upstream model degenerated: one round streamed more visible prose than the runaway ceiling (`MAIN_STREAM_RUNAWAY_CHARS`, default 16000 characters; tool-call arguments do not count) and the server hung up on it mid-stream rather than pay out the rest of the token budget. **Streaming only** — a buffered response has already been generated and billed by the time the server sees it, so there is nothing left to interrupt. Terminal on purpose rather than a truncated `done`: the text delivered so far is unusable, and committing it to history is what makes the NEXT turn degenerate too, so discard the round's assistant content and tool calls. **Not auto-retried, by design** — visible tokens have necessarily already reached the screen, and the CLI's retry boundary is the first content fragment (replaying would duplicate on-screen text). Re-asking is a fresh turn, which may route to a different endpoint. |
 | 502  | `upstream_error` | Residual/legacy catch-all. Still emitted for a missing or malformed upstream credential and for a non-verdict verification failure. |
 
 Raw upstream bodies are never returned. For a non-auth 4xx a **bounded,
