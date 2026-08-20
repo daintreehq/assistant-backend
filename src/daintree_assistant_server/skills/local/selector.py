@@ -5,13 +5,24 @@ Same ``select()`` signature and same ``SelectionDecision`` return type as
 drive it unchanged and the two can be scored against each other on identical
 evidence.
 
-Selection itself is one forward pass of the multi-label classifier
-(``classifier.SkillClassifier``): 32 skill logits ranked, a cardinality head
-deciding how many to take (zero included), a docs logit deciding whether to
-retrieve documentation. The rules layer here stays deliberately thin — the one
-rule it keeps, the background wake, is a STRUCTURAL fact about the turn (there
-is no new user instruction at all), not a semantic judgment the model should be
-second-guessed on.
+Selection itself is two stages (``setwise.SetwiseClassifier``): a cosine
+shortlist over the embedded catalog, then one set-wise pass that ranks the
+shortlist, predicts how many skills the turn needs (zero included) and decides
+whether to retrieve documentation. The rules layer here stays deliberately thin
+— the one rule it keeps, the background wake, is a STRUCTURAL fact about the
+turn (there is no new user instruction at all), not a semantic judgment the
+model should be second-guessed on.
+
+**There is no staleness gate here any more, and its absence is the point.** The
+previous selector owned one weight row per skill, so a catalog whose routing
+surface had moved left it ranking against documents that no longer existed; it
+had to compare a stamped ``routing_revision`` and degrade every turn open until
+someone retrained. This selector has no per-skill parameters — it reads skill
+EMBEDDINGS — so a changed catalog is just different vectors. ``sync`` re-embeds
+whatever moved, on the turn it moved, and selection carries on. That is what
+makes a skill written by skill learning reachable on the next turn instead of the
+next deploy — reachable, not yet competitive against its trained neighbours; see
+``setwise.py`` for the measurement.
 """
 
 from __future__ import annotations
@@ -26,9 +37,9 @@ from ...contracts.openai import ChatMessage
 from ...providers.policy import RoutingPreference
 from ..catalog import Catalog, CatalogManager
 from ..selector import SelectionDecision
-from .classifier import SkillClassifier
-from .documents import _content_text, query_document, routing_revision
+from .documents import _content_text, query_document
 from .runtime import InferencePool
+from .setwise import SetwiseClassifier
 
 _log = logging.getLogger(__name__)
 
@@ -37,7 +48,7 @@ class SkillSelector(Protocol):
     """What the orchestrator needs from a selector — nothing more.
 
     Two implementations exist: ``LocalSelector`` (production — the in-process
-    classifier) and the prompt-based ``skills.selector.Selector``, which survives
+    two-stage selector) and the prompt-based ``skills.selector.Selector``, which survives
     as the scriptable seam for orchestration tests and deterministic benchmarks
     (its FakeProvider/ReplayProvider scripting is the interface dozens of
     behavioural assertions are written against).
@@ -56,11 +67,11 @@ class SkillSelector(Protocol):
 
 
 class LocalSelector:
-    """Skill selection by a local classifier — no upstream call, no credential."""
+    """Skill selection by a local model — no upstream call, no credential."""
 
     def __init__(
         self,
-        classifier: SkillClassifier,
+        classifier: SetwiseClassifier,
         pool: InferencePool,
         catalog_manager: CatalogManager,
         settings: Settings,
@@ -97,29 +108,11 @@ class LocalSelector:
             return SelectionDecision.reuse(active_ids)
 
         # ONE catalog snapshot for the whole decision. Skill learning can swap
-        # the live catalog at any moment, including while the classifier runs on
-        # a worker thread — every read below uses this snapshot so the guard, the
-        # visible-active projection and the output validation cannot disagree
-        # about which catalog they mean.
+        # the live catalog at any moment, including while the model runs on a
+        # worker thread — every read below uses this snapshot so the embedding
+        # table, the visible-active projection and the output validation cannot
+        # disagree about which catalog they mean.
         catalog = self.catalog
-
-        # STALENESS GUARD. The classifier's skill head is a fixed matrix — one
-        # row per skill it was trained on — so a catalog whose ROUTING surface
-        # has changed since training leaves it ranking against documents that no
-        # longer exist and unable to name the ones that do. That failure is
-        # silent and confident, which is the worst kind. The comparison is on
-        # the routing revision (id/title/summary/whenToUse — see
-        # documents.routing_revision), deliberately NOT the body-inclusive
-        # catalog revision, so a skill-learning body edit does not take the
-        # selector down. A MISSING stamp degrades too: an artifact that cannot
-        # prove what it was trained on does not get trusted by default.
-        trained = self._classifier.routing_revision
-        if not trained or trained != routing_revision(catalog):
-            _log.warning(
-                "local_selector_stale_head",
-                extra={"trained": (trained or "<unstamped>")[:24]},
-            )
-            return SelectionDecision.degraded_open(["local_skill_selector_stale_catalog"])
 
         # A background wake: the turn was started by a watcher firing, an agent
         # exiting or a queue item landing, not by the user saying anything. The
@@ -143,15 +136,22 @@ class LocalSelector:
 
         query = query_document(conversation, turn_context=turn_context)
         max_active = self._settings.max_active_skills
-        # Only SELECTABLE actives reach the classifier. The prior set can carry a
+        # Only SELECTABLE actives reach the model. The prior set can carry a
         # server-pinned skill (the docs runbook) that is hidden from selection
         # and never appeared as an active id in training — measured on the
         # benchmark, injecting that one unseen id into the [loaded: …] prefix
         # changed 49 of 124 answers and emptied 36 of them. The upstream
         # selector projects with catalog.selectable() for the same reason.
         visible_active = [sid for sid in active_ids if sid in catalog.selectable_ids]
+        # The catalog goes in with the query, and the embedding table is
+        # reconciled against it on the worker thread. Cheap and constant in the
+        # common case (a dict comparison over document digests); when skill
+        # learning has just written a runbook it re-embeds that ONE skill and
+        # the turn routes to it immediately.
         result = await self._pool.run(
-            lambda: self._classifier.select(query, visible_active, max_active=max_active)
+            lambda: self._classifier.select(
+                query, visible_active, catalog=catalog, max_active=max_active
+            )
         )
         if result is None:
             # The pool refused or the model failed. Same posture as the upstream
@@ -159,15 +159,16 @@ class LocalSelector:
             # blocking the turn.
             return SelectionDecision.degraded_open(["local_skill_selector_failed_open"])
 
-        # Validate against the SNAPSHOT even though the revision matched above —
-        # these ids are about to drive skill loading, and a guard that costs a
-        # set lookup is cheaper than trusting label files forever.
+        # Validate against the SNAPSHOT even though `sync` built the table from
+        # this very catalog — these ids are about to drive skill loading, and a
+        # guard that costs a set lookup is cheaper than trusting that forever.
         skill_ids = [sid for sid in result.skill_ids if sid in catalog.selectable_ids]
         if result.skill_ids and not skill_ids:
-            # The classifier NAMED skills and none resolved. That is not an
-            # authoritative "clear everything" — it is a head/catalog mismatch
-            # the revision guard somehow missed, and the upstream selector's
-            # parser treats the same shape as malformed for the same reason.
+            # The selector NAMED skills and none resolved. Nothing should be
+            # able to produce that — the ids come from the table ``sync`` built
+            # out of this very catalog snapshot — so it means table and catalog
+            # disagree, and the upstream selector's parser treats the same shape
+            # as malformed for the same reason.
             _log.warning("local_selector_unresolvable_answer",
                          extra={"named": result.skill_ids[:3]})
             return SelectionDecision.degraded_open(["local_skill_selector_unknown_ids"])
@@ -185,7 +186,7 @@ class LocalSelector:
             ran=True,
             degraded=False,
             confidence=float(top),
-            task_type="local_classifier",
+            task_type="local_setwise",
             reason=f"cardinality={result.cardinality} top=[{top_scores}]",
             usage=None,
             endpoint="local",

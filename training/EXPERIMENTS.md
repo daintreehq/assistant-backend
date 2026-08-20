@@ -1,72 +1,57 @@
 # Local skill selection — experiment log
 
-> ## ⭐ SHIPPED CONFIGURATION
+> ## ⭐ SHIPPED CONFIGURATION — two-stage set-wise selector
 > ```
-> backbone   BAAI/bge-base-en-v1.5  (109M)
-> head       37 skills + 1 docs + 4 cardinality
-> corpus     training/data/selection.jsonl @ 8,640 rows (relocate-agents added)
-> train      --epochs 10 --lr 5e-5 --batch-size 48 --balance-power 0.0 --seed 41
-> serve      ONNX int8 (300 MB RSS), earn-your-place admission
+> stage 1    sentence-transformers/all-MiniLM-L6-v2 (22.7M), fine-tuned, k=32
+> stage 2    BAAI/bge-base-en-v1.5 (109M) + set-wise head (2.4M), ordering=equivariant
+> corpus     training/data/selection.jsonl @ 8,640 rows
+> train      stage 1: --epochs 6 --lr 3e-5 --batch-size 48 --seed 41
+>            stage 2: --epochs 10 --ordering equivariant --seed 41
+> serve      ONNX int8 encoders + fp32 head, ~410 MB whole-process RSS,
+>            BONUS_FLOOR 0.45 / NEWCOMER_FLOOR 0.65 (re-calibrated, see below)
 > ```
 > **Current benchmark: shipped int8 measures 158/169 recall-pass (93.5%),
-> fp32 157/169; int8 p50 9.1 ms. Synthetic held-out exact-match is 0.836.**
-> The suite grew to 169 with three cases for `daintree.worktree.relocate-agents`
-> (one recall, two routing traps, in `18-new-skill-surfaces.yaml`). All three
-> pass, and NO remaining miss names the new skill — the head is clean. On the
-> ORIGINAL 166 the artifact measures 155, so the round cost 2 cases of churn
-> among established skills against the ±2 error bar, for one new skill fully
-> served. `single-skill` is 39/39 and `routing-trap` 67/71.
+> fp32 158/169; int8 p50 11.6 ms. Synthetic held-out exact-match 0.910.**
 >
-> The prior head (37 skills, 7,773 rows) measured 157/166; that suite had 166
-> cases, so the two totals are not directly comparable without the split above.
+> That is **parity** with the fixed-head classifier it replaced (158/169, p50
+> 9.0 ms), and parity is the honest headline — the number did not improve and
+> the family's error bar is ±2. What did move is everything around it:
 >
-> **The lesson of this round: a fence is only learned in the direction it is
-> written.** The five new skills' first full-strength corpus (7,602 rows, ~55
-> positives + ~45 boundary negatives each, generated per-skill) scored 16/16 on
-> the new cases but dropped the original 150 from 141 to 138 — the new forge
-> skills were displacing `prep-branch-for-review`, `find-issue-work` and
-> `start-work-on-issue`. The cause is in the catalog, not the model: a new skill
-> declares carve-outs against the older skills it neighbours, while those older
-> skills predate it and name it nowhere, so every generated boundary row ran
-> new→old and none ran old→new. 174 reverse-direction rows (established skill
-> correct, new skill as the hard negative, catalog-derived) took the original 150
-> to 142 and the total to 157. **Adding a skill means generating boundary data
-> for its neighbours too, not just for itself.**
+> | | Architecture B (fixed head) | Architecture C (two-stage) |
+> |---|---|---|
+> | recall-pass (int8) | 158/169 | 158/169 |
+> | strict pass | 74/169 | **132/169** |
+> | precision extras | 94 | **32** |
+> | mean skills loaded/turn | 2.29 | **1.17** |
+> | fp32 ↔ int8 decision diff | 32 cases | **5 cases** |
+> | p50 latency | 9.0 ms | 11.6 ms |
 >
-> **The lesson of THIS round: a new skill's strongest words are stolen from its
-> neighbours.** `relocate-agents` trains on "move", "each" and plurality, and on
-> its first full corpus (575 labelled rows, rank 2 of 38) it absorbed
-> `keep-the-plan-not-another-catch-up` — "hold the whole thing somewhere and just
-> move it forward each session" — off `execute-durable-workflow`. 33 reverse
-> boundary rows (established skill correct, `relocate-agents` as hard negative)
-> aimed at exactly that vocabulary recovered it. This is the same asymmetry the
-> round above recorded, hit from the other side: forward fences alone are not
-> enough, and the direction that needs data is whichever one the new skill's
-> vocabulary overlaps.
+> Same routing accuracy reached by being right rather than by over-loading and
+> letting the recall bonus cover it. Half the skill bodies per turn is a direct
+> saving in prompt bytes on every round of every turn.
 >
-> A separate self-inflicted miss is worth recording because it looked like model
-> drift and was not. Adding "do not use to create a PLAIN worktree with no recipe
-> at all, which is the default reading of 'create a worktree'" to
-> `recipe.run-or-create`'s `whenToUse` cost `worktree-with-recipe-not-plain`:
-> the clause taught the classifier that "create a worktree" points AWAY from
-> recipes, so a request naming a saved layout routed to the plain skill. It was
-> reverted. **A carve-out written against a phrase the neighbour legitimately
-> shares is a routing regression, not a clarification** — fence on the
-> distinguishing condition, never on the shared trigger words.
+> **The reason to switch is structural, not the accuracy.** Neither stage owns a
+> per-skill weight: stage 1 embeds skill documents, stage 2's head consumes those
+> embeddings. So
 >
-> The 3-seed logit ensemble reached 131 but costs 3x memory and latency for +1
-> inside the noise band — not shipped. Weight-soup fails here because each
-> seed's head init is random, so the averaged heads are not aligned.
+> 1. **a skill added at runtime routes without a retrain** — embedded by
+>    `SetwiseClassifier.sync()` on catalog load, competing on equal terms. Under
+>    Architecture B this was structurally impossible (no head row) *and* the
+>    `routing_revision` gate degraded every turn open until someone retrained,
+>    which put the selector in direct conflict with skill learning;
+> 2. **there is no staleness gate at all** — the hash is still stamped, but as a
+>    drift signal for a human, gating nothing;
+> 3. **catalog growth costs one table row (~4.5KB), not a wider head.** The head
+>    always sees `k` candidates, so its job is the same size at 38 skills and at
+>    2,000; only the cosine search grows, and that is a matmul.
 >
 > Rebuild:
 > ```
-> .venv-train/bin/python -m training.train_classifier \
->     --epochs 10 --lr 5e-5 --balance-power 0.0 --seed 41 --base-model BAAI/bge-base-en-v1.5
-> .venv-train/bin/python -m training.export_classifier
+> .venv-train/bin/python -m training.train_retriever
+> .venv-train/bin/python -m training.train_setwise --epochs 10 --ordering equivariant
+> .venv-train/bin/python -m training.export_two_stage
+> .venv-train/bin/python -m training.eval_two_stage --ablate
 > ```
-> Alternates kept: `training/models/BEST_130` (round-3 corpus era),
-> `training/models/r4_seed23`. Corpus snapshot of the 130 run:
-> `training/data/.selection_best_130.jsonl`.
 
 Every configuration tried, what it scored, and what it taught. Kept because the
 path here was not a straight line: the obvious architecture (retrieve then
@@ -124,7 +109,7 @@ error is cardinality, not ranking.
 
 ---
 
-## Architecture B — multi-label classifier (current)
+## Architecture B — multi-label classifier (REPLACED by C)
 
 One encoder, one head: 32 skill logits + 1 docs logit + 4 cardinality logits.
 The head's weight matrix **is** the skill embeddings, so a bigger catalog costs
@@ -170,14 +155,247 @@ Capacity helps, modestly.
 
 ---
 
+## Architecture C — retrieved shortlist + set-wise head (current)
+
+    conversation ─► MiniLM-L6 (fine-tuned) ─► cosine vs the embedded catalog ─► top-32
+    conversation ─► bge-base  (fine-tuned) ─► q ──┐
+    skill table  ────────────────────────────► s_i ┴─► set-wise head ─► 32 logits
+                                                                      + docs + cardinality
+
+The head is 2 transformer layers over `[CLS(q), cand_1 … cand_32]`, where
+`cand_i = W([s_i ; q⊙s_i ; |q−s_i|]) + W_f(features_i)`. It owns **no per-skill
+parameters**, which is the whole point — see the header for what that buys.
+
+This is **not** Architecture A. Nothing re-reads a skill's text at request time;
+skill vectors are computed once and looked up. A's cross-encoder cost 309ms of a
+312ms pipeline scoring (query, document) *pairs*; this head reads cached vectors
+and costs well under a millisecond.
+
+### Stage 1 — how small can the filter be
+
+Stage 1 is a **filter**, not a scorer: its only job is to put the answer inside
+the top `k`. So `r@32` must be 1.000, and among backbones that clear it the
+choice is cost. `r@8` is reported as the scale proxy — 8 of 38 is the same
+*fraction* that `k=32` would be of a 150-skill catalog.
+
+| backbone | params | int8 | p50 | r@3 | r@8 | r@32 |
+|---|---|---|---|---|---|---|
+| prajjwal1/bert-tiny | 4.4M | 4.5MB | 0.25ms | 0.781 | 0.928 | **0.999** ✗ |
+| paraphrase-MiniLM-L3-v2 | 17.4M | 17.4MB | 1.15ms | 0.921 | 0.973 | 1.000 |
+| **all-MiniLM-L6-v2** | **22.7M** | **22.9MB** | **2.23ms** | 0.959 | **0.990** | **1.000** |
+| BAAI/bge-small-en-v1.5 | 33.4M | 33.8MB | 4.46ms | 0.966 | 0.990 | 1.000 |
+
+**MiniLM-L6 strictly dominates bge-small** — identical on both metrics that
+matter, 32% fewer parameters, half the latency. bge-small was the initial pick
+and buys nothing. bert-tiny is 9x cheaper again and is rejected on `r@32`: a
+shortlist that drops the answer caps the entire selector below where it already
+is, and no amount of head quality recovers a candidate that never arrived.
+
+Reproduce with `training/sweep_retriever.py` (5 epochs each, ONNX int8, single
+intra-op thread, a realistic ~35-token query).
+
+### Stage 2 — the encoder does NOT need to be big
+
+| stage-2 backbone | synthetic exact-match | benchmark int8 | int8 size |
+|---|---|---|---|
+| BAAI/bge-base-en-v1.5 | 0.904 | **158/169** | 110MB |
+| BAAI/bge-small-en-v1.5 | **0.911** | 155/169 | 34MB |
+
+bge-small scored **better on synthetic val and worse on the benchmark** — the
+clearest instance yet of finding 6 below (synthetic val overstates). It is a
+genuine 76MB / ~6ms option if 3 cases are ever worth trading; it is not shipped
+because parity with Architecture B was the bar.
+
+### The ordering question — settled by measurement
+
+Does the shortlist's ORDER carry information the head should use? Three arms,
+same shortlist, same corpus, each read at its own calibrated floor:
+
+| arm | recall-pass | extras | mean set | order ablation |
+|---|---|---|---|---|
+| **equivariant** (no position; cosine+rank as features) | **158/169** | **32** | **1.17** | **0/165 changed** |
+| positional (cosine order + learned rank embedding) | 154/169 | 34 | 1.11 | **151/165 changed** |
+| positional at its own best floor (0.25) | 159/169 | 65 | 1.34 | 151/165 changed |
+| blind (equivariant, retrieval features zeroed) | 158/169 | 33 | — | 0/165 changed |
+
+**Shuffle, do not order.** At matched precision the equivariant head wins
+outright (158 vs 154); positional only reaches 159 by loading roughly twice the
+extras. And the ablation shows what it learned to get there: reversing the
+shortlist changes **151 of 165** answers, i.e. it is leaning on "rank 0 usually
+wins" rather than on content. That prior is exactly wrong for the skill this
+architecture exists to serve — one added after training, whose cosine rank the
+head never trained against.
+
+The `blind` arm is the one to read carefully, because it is easy to misread.
+It zeroes the cosine/rank **features fed into the head**; both arms get the
+IDENTICAL shortlist, so it says nothing about the filter. What it shows is that
+the head decides from the embeddings alone, and its accuracy is **independent of
+stage 1's scores**. That is a property worth having rather than a defect: when
+the catalog reaches thousands and the filter's scores get noisier, only `r@k`
+degrades — accuracy does not ride on the scores. The features are kept because
+they cost 3 floats and the path stays trained, not because they are currently
+earning anything measurable at 38 skills.
+
+### Zero-shot: what "no retrain needed" actually buys — MEASURED
+
+The architecture's headline claim is that a skill added after the build routes
+without a retrain. It is true in the sense that matters operationally, and it is
+much weaker than it sounds. Measured by holding three skills out of **both**
+stages' training data and scoring only the benchmark cases that require them
+(`training/eval_zero_shot.py`):
+
+| | zero-shot | same recipe, trained |
+|---|---|---|
+| cases requiring a held-out skill | **4/14** | 13/14 |
+| the other 141 cases | 130 | 131 |
+
+Per skill, the pattern is the whole finding:
+
+- `daintree.terminals.rename` — **4 of 7**. Distinctive vocabulary ("rename",
+  "titles", "tabs") that no neighbour claims, so its document wins on content.
+- `daintree.forge.manage-issue` — **0 of 4**. Loses every case to
+  `start-work-on-issue` / `find-issue-work`.
+- `daintree.runtime.debug-web-app` — **0 of 3**. Loses every case to
+  `diagnose-and-fix`.
+
+This is the asymmetry recorded at the top of this file, hit from the third
+direction: **a new skill's strongest words are stolen from its neighbours**, and
+here the neighbours are trained while the newcomer is not, so the newcomer loses
+every *contested* turn and wins only the unambiguous ones.
+
+So state the property precisely, and do not let it drift in the docs:
+
+- Before (Architecture B): a new skill was **structurally unselectable** — no
+  head row — *and* it moved `routing_revision`, so the selector degraded EVERY
+  turn open until someone retrained. The catalog broke, not just the new skill.
+- Now: the catalog keeps working, and the new skill is reachable and wins
+  requests only it plausibly answers. It will still lose to established
+  neighbours until it has boundary data of its own.
+
+**A retrain is no longer what makes a skill possible; it is what makes it
+competitive.** That is a large operational improvement and not a licence to stop
+retraining. `.claude/skills/retrain-selector` says the same thing.
+
+### Cross-learning: what a shared head does and does not buy
+
+With no per-skill parameters, every training row teaches the SHARED reader —
+"how does a request map onto a whenToUse fence" — rather than filling in one
+skill's row. So competence transfers across skills in a way it structurally
+could not before. Two claims come out of that, and only one of them is measured.
+
+**Proven.** A skill held out of both stages still takes 4 of 14 of its own
+benchmark cases (see the zero-shot section above). Under a per-skill head that
+number is **0 by construction** — there is no output to activate. Every one of
+those 4 is transfer from other skills' data, so the mechanism is real and
+demonstrated, not inferred.
+
+**Not yet measured: that it COMPOUNDS.** The appealing version — each skill
+added makes every other skill route better, so the catalog stabilises as it
+grows — does not follow from the above and is not established here. The one
+adjacent data point is mildly against a large effect: removing 411 rows (three
+skills, ~5% of the corpus) moved the remaining 141 cases by 130 vs 131, i.e.
+nothing outside the noise band.
+
+The experiment that would settle it, when there is a reason to run it: train
+stage 2 on data for N of the catalog's skills for N in {10, 20, 30, all}, and
+each time score the SAME held-out skills. If cross-learning compounds, zero-shot
+performance on the held-out set rises with N even though their own data is never
+present. That is a learning curve over *breadth*, not volume, and it is the only
+version of the question the benchmark can answer.
+
+**And note where transfer is weakest, because it is exactly where the catalog is
+heading.** The zero-shot breakdown is not uniform: `terminals.rename` scored 4/7
+with no training, `manage-issue` 0/4 and `debug-web-app` 0/3. Distinctive
+vocabulary transfers; **discrimination between two subtly different neighbours
+does not**, because that distinction lives in the PAIR and not in either
+document alone. A shared reader can learn "read the fence"; it cannot learn a
+fence nobody wrote. As overlapping skills accumulate, boundary data — in both
+directions — is the thing cross-learning does not give you for free.
+
+### Skill TEXT is now the fast routing lever
+
+A corollary worth using. Editing a `whenToUse` used to move `routing_revision`
+and require a retrain before it took effect, so text tuning was a ~20-minute
+loop. Now the edited skill is re-embedded on catalog load — **one** skill, one
+forward pass — and the change is live. Measured on the shipped artifact: adding
+one clause to `review.review-change`'s whenToUse (that "tell me what you'd push
+back on" is a request for FINDINGS even when framed as pre-push) took the
+benchmark 158 -> 159, one case fixed and none broken, with 1 of 38 skills
+re-embedded and nothing retrained.
+
+`training/try_skill_text.py` scores a proposed edit against the whole suite from
+an in-memory overlay, writing nothing. Use it, and read both columns: a
+locally-correct carve-out that fences on words two skills legitimately share is
+a regression, and this file already records one that shipped and had to be
+reverted. Tuning text against a suite this heavily inspected also fits it — a +1
+inside a ±2 error bar is not evidence on its own, and the edit should be
+defensible as a statement about the skill before the number is consulted.
+
+### Why brute-force cosine and not an ANN index
+
+At 2,000 skills the table is 2,000 x 384 floats; one normalised matrix-vector
+product is ~1.5M FLOPs — microseconds, and **exact**. HNSW/IVF would add a
+dependency, a build step and approximate recall for nothing measurable. The
+crossover is around 10^5 vectors.
+
+### `k` is a tunable, not a constant
+
+The head is self-attention over candidate slots, so its cost is O(k²) — k=32 is
+~1k pairs and sub-millisecond. Scoring *all* N candidates would be more accurate
+in principle, but at N=2,000 that is 4M attention pairs plus a 2,000x768 gather,
+and it moves the trained distribution hard (the head learned "about one positive
+among 32"). The scalable response to a bigger catalog is to **raise k** — 64 or
+128 are still cheap — not to abandon the filter. Note the exported head graph is
+STATIC in k (see below), so changing it means re-exporting.
+
+### Traps hit while building this, all of which failed silently
+
+1. **`nn.MultiheadAttention` bakes the sequence length into its traced
+   reshapes.** Exporting the head with a "dynamic" candidate axis produces a
+   graph that loads happily and throws at run time on any k but the traced one.
+   The head is therefore exported FULLY STATIC and serving pads to k with
+   `mask=0`. Caught only by running a k=12 input against a k=32 export.
+2. **Skill documents are longer than they look**: p50 262 tokens, max 368. A
+   192-token cap — a reasonable-looking number borrowed from the query side —
+   truncates exactly the `whenToUse` exclusion clauses that carry the routing
+   signal. `doc_max_length` is 384 and the exporter asserts both stages agree.
+3. **A vector table must be built by the same precision that queries it.**
+   `vectors.npz` was built with int8 encoders and reused by an fp32 session, so
+   documents and queries came from two different functions. It moved the
+   benchmark by 2 cases between otherwise identical exports and read as run
+   noise. `SkillTable` now carries a `precision` stamp and a mismatch re-embeds.
+4. **Per-tensor int8 is not enough for two stacked encoders.** Per-tensor
+   quantisation moved the CORE decision on 14/169 cases and cost 5 recall-pass;
+   `per_channel=True` — same size, same speed — took that to 1/169.
+5. **A rare head needs its own `pos_weight`.** Only 2.4% of the corpus wants a
+   docs lookup, so unweighted BCE answers "no" to everything and scores 97.6%
+   accuracy while the benchmark docs flag falls 12/16 → 9/16. Weighted: 11/16.
+6. **Admission floors do not survive an architecture change.**
+   `BONUS_FLOOR` was 0.55 under Architecture B and is 0.45 here: this head is
+   trained with a slot-level BCE over k candidates rather than a 38-way
+   per-label one, which compresses its probabilities downward. Measured on the
+   shipped artifact, recall-pass is FLAT at 158 for every floor from 0.20 to
+   0.45 and only extras move (55 → 41); 0.55 gives up a case. 0.45 is the knee —
+   the lowest floor still buying recall — deliberately not the benchmark's peak.
+   `training/calibrate_floors.py` exists so this is re-derived, not remembered.
+
+---
+
 ## Latency (single thread, matching a 1-vCPU container)
 
 | approach | p50 | vs DeepSeek |
 |---|---|---|
 | DeepSeek selector (network) | 2,044 ms | 1x |
-| cross-encoder pipeline, full docs | 309 ms | 7x |
-| classifier + bi-encoder fusion | 3.1 ms | 661x |
-| **classifier alone** | **2.1 ms** | **955x** | *(MiniLM-era row — the shipped bge-base measures ~9ms int8; see header)* |
+| cross-encoder pipeline, full docs (Arch A) | 309 ms | 7x |
+| classifier + bi-encoder fusion (Arch B era) | 3.1 ms | 661x |
+| classifier alone, MiniLM (Arch B era) | 2.1 ms | 955x |
+| fixed-head classifier, bge-base int8 (Arch B, shipped before) | 9.0 ms | 227x |
+| **two-stage set-wise, shipped (Arch C)** | **11.6 ms** | **176x** |
+
+Architecture C costs ~2.6ms more than the fixed head it replaced: a second
+encoder pass over the conversation (MiniLM-L6, 2.2ms) plus the cosine search and
+the head (both sub-millisecond). Against the 2,044ms call this whole line of work
+replaced, the difference is not worth a decision. |
 
 Concurrency, through the real worker pool: 1 worker with 8 simultaneous rankings
 peaked at 280ms on the *reranker* design. At 2ms the question is moot.
@@ -203,7 +421,14 @@ peaked at 280ms on the *reranker* design. At 2ms the question is moot.
    *(MiniLM-era finding — bge-base int8 passes the tiered parity gate and IS
    the shipped precision; see header.)*
 6. **Synthetic val overstates generalisation by ~10pp** (0.85 vs 0.76). The
-   split is row-random over paraphrase families.
+   split is row-random over paraphrase families. Confirmed again under
+   Architecture C from the other direction: bge-small scored HIGHER on synthetic
+   val than bge-base (0.911 vs 0.904) and 3 cases LOWER on the benchmark. When
+   the two disagree, the benchmark decides.
+7. **A cheap filter does not need to be an accurate ranker.** Stage 1 is scored
+   on `r@32` alone; its `r@1` (0.835) is irrelevant, because the head re-decides
+   from content. Choosing a retriever on ranking quality would have bought
+   bge-small's extra layers for nothing.
 
 ---
 
@@ -219,13 +444,15 @@ seeds — random init per seed — so averaging them is meaningless).
 
 ## Serving-policy decisions (measured, settled)
 
-- **int8 is the shipped precision for bge-base**: 300MB RSS vs 665MB fp32 —
-  fp32 does not fit a 1GiB container beside the server. bge-base int8 PASSES the
-  decision-parity check (MiniLM-L6 int8 did not).
+- **int8 encoders, fp32 head.** The encoders carry ~99% of the parameters and
+  all of the memory pressure; the head is 2.4M parameters (9.5MB fp32), so
+  quantising it would trade numerical slack for memory nobody is short of.
+  Quantisation must be PER-CHANNEL — see Architecture C trap 4. Measured
+  whole-process RSS with both encoders loaded: ~410MB.
 - **Cloud Run: --cpu=1 --memory=2Gi --concurrency=8.** 1Gi would run today at
   ~55% but leaves no headroom for the 100-200 skill catalog target plus
   concurrent turn buffers; the second GiB costs ~$7/mo at min-instances=1.
-- **Earn-your-place admission** (classifier.py NEWCOMER_FLOOR_WHEN_ACTIVE=0.65):
+- **Earn-your-place admission** (setwise.py NEWCOMER_FLOOR_WHEN_ACTIVE=0.65):
   with skills already loaded, a skill NOT in the active set needs p>=0.65 to
   join; active skills and fresh-turn picks ride on the model's ranking alone.
   Encodes the asymmetric cost of adding mid-conversation (re-encodes the skill
@@ -242,6 +469,13 @@ seeds — random init per seed — so averaging them is meaningless).
   much stronger representation. The question is whether the accuracy gain is
   worth reintroducing a round trip — at ~200ms it would still be ~10x faster
   than the call being replaced.
-- **Much larger local backbone** (bge-base 109M, gte-modernbert-base 149M).
-- **More diverse synthetic data.** *(Done — the corpus grew to 6,399 across
-  five targeted rounds; see header.)*
+- **A bigger `k` as the catalog grows.** Untested above 32. The head is O(k²) in
+  its attention, so 64 and 128 are cheap; the open question is whether a head
+  trained at one `k` transfers to another or needs retraining at the target.
+- **Stage 2 on bge-small** to save 76MB and ~6ms, at a measured cost of 3
+  benchmark cases. Worth revisiting if the memory ever binds.
+- **A genuinely fresh holdout suite.** The caveat at the top of this file now
+  applies to Architecture C's numbers too: the 169-case benchmark has been
+  inspected across many iterations and has drifted toward a dev set. The
+  measured claims here are honest, but a final generalisation claim needs ~50
+  cases written blind.

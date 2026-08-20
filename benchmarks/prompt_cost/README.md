@@ -95,7 +95,7 @@ reasoning from a stale figure.
 
 Measured 2026-08-20, 39 skills / 77 tools (sizes are KiB). The catalog holds 39
 but the selector prompt renders 38 — `daintree.docs.answer-usage-question` is
-server-pinned off the turn's `docs_query` and hidden from the classifier, so it
+server-pinned off the turn's `docs_query` and hidden from the selector, so it
 costs the selector nothing:
 
 | metric | value |
@@ -107,7 +107,7 @@ costs the selector nothing:
 | tool schemas share of request | ~73.5 KB, **64.4%**, ~18.7k tok |
 | base prompt | ~23.3 KB, 20.4%, ~5.9k tok |
 | loaded skills (2 active) | ~11.8 KB, 10.3%, ~3.0k tok |
-| skill selection | **local classifier — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
+| skill selection | **local two-stage selector — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
 | state token | 389–492 B (0–3 skills; 16 KiB cap) |
 
 The tool region fell ~10% (81.6 → 73.5 KiB, ~20.9k → ~18.8k proxy tokens) when

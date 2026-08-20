@@ -138,16 +138,16 @@ def task_runner(
 def scripted_selector(fake_provider: FakeProvider, settings: Settings) -> Selector:
     """The provider-scripted selector, injected at CONSTRUCTION time.
 
-    Production selection is a local ONNX classifier now — it decides for real,
-    which is exactly wrong for orchestration tests that need to SCRIPT the
+    Production selection is a local two-stage ONNX selector now — it decides for
+    real, which is exactly wrong for orchestration tests that need to SCRIPT the
     selection ("returns these ids", "fails upstream", "caps at three") to drive
     a specific orchestrator branch. The prompt-based ``Selector`` class survives
     as precisely that scriptable test seam: it reads ``FakeProvider``'s
     ``selection_result``/``selection_error`` and records ``selection_requests``,
     which is the interface ninety-odd assertions in this suite are written
     against. Passed INTO build_container/create_app (never swapped in
-    afterwards) so the fixtures skip loading the 110MB ONNX graph entirely — a
-    fresh clone without LFS content runs the suite, and only the explicitly
+    afterwards) so the fixtures skip loading the ONNX graphs entirely — a fresh
+    clone without LFS content runs the suite, and only the explicitly
     artifact-marked tests skip. The LocalSelector's own contract is tested in
     tests/unit/test_local_selection.py.
     """

@@ -45,10 +45,10 @@ BANDS: dict[str, float] = {
     "base_prompt_bytes": 0.05,
     # Moves only when the cli/ submodule pin moves, which should be visible.
     "tool_inventory_bytes": 0.10,
-    # The shipped classifier graph. Moves only on a retrain+export, which is a
-    # deliberate act; a silent change here means the artifact was touched
-    # without the runbook.
-    "classifier_onnx_bytes": 0.30,
+    # The shipped selector graphs (both encoders + the set-wise head). Moves
+    # only on a retrain+export, which is a deliberate act; a silent change here
+    # means the artifact was touched without the runbook.
+    "selector_onnx_bytes": 0.30,
 }
 
 
@@ -62,13 +62,18 @@ def capture() -> dict[str, Any]:
     from daintree_assistant_server.providers.policy import DEFAULT_POLICY
     from daintree_assistant_server.skills.catalog import load_catalog
     from daintree_assistant_server.skills.local.documents import routing_revision
-    from daintree_assistant_server.skills.local.paths_local import classifier_artifact_dir
+    from daintree_assistant_server.skills.local.paths_local import selector_artifact_dir
 
     loader = PromptLoader()
     catalog = load_catalog()
-    artifact = classifier_artifact_dir()
-    classifier_meta = json.loads((artifact / "meta.json").read_text())
-    classifier_labels = json.loads((artifact / "labels.json").read_text())
+    artifact = selector_artifact_dir()
+    selector_meta = json.loads((artifact / "meta.json").read_text())
+    selector_labels = json.loads((artifact / "labels.json").read_text())
+    graphs = [
+        artifact / "retriever" / "model_int8.onnx",
+        artifact / "ranking" / "model_int8.onnx",
+        artifact / "head.onnx",
+    ]
     inventory_raw = INVENTORY_PATH.read_bytes()
     inventory = json.loads(inventory_raw)
 
@@ -79,17 +84,27 @@ def capture() -> dict[str, Any]:
             "privacy_mode": DEFAULT_POLICY.privacy.value,
             "default_endpoint_sort": DEFAULT_POLICY.sort.value,
         },
-        "classifier": {
-            # Selection is LOCAL: these are the facts that describe the shipped
-            # selector — its size, which catalog surface it was trained on, and
-            # that its labels still cover the catalog. A drifted stamp here is
-            # the pre-deploy version of the readiness check.
-            "classifier_onnx_bytes": (artifact / "model_int8.onnx").stat().st_size,
-            "routing_revision": classifier_meta.get("routing_revision", ""),
-            "routing_revision_matches_catalog": (
-                classifier_meta.get("routing_revision") == routing_revision(catalog)
+        "selector": {
+            # Selection is LOCAL and two-stage: these describe the shipped
+            # artifact — total graph size, the shortlist width, and how the
+            # shortlist's order is treated.
+            "selector_onnx_bytes": sum(g.stat().st_size for g in graphs),
+            "candidates": selector_meta.get("candidates", 0),
+            "ordering": selector_meta.get("ordering", ""),
+            "trained_skills": len(selector_labels),
+            # RECORDED, NOT ENFORCED, and the difference is the architecture.
+            # The set-wise head has no per-skill weights, so a catalog that has
+            # moved since training is answered normally rather than degrading
+            # open — this is a "how far has the corpus drifted from the live
+            # catalog" quality signal for a human reading a release, not a
+            # correctness gate. Under the previous fixed head it was a gate.
+            "routing_revision_at_train": selector_meta.get(
+                "routing_revision_at_train", ""
             ),
-            "labels": len(classifier_labels),
+            "routing_revision_matches_catalog": (
+                selector_meta.get("routing_revision_at_train")
+                == routing_revision(catalog)
+            ),
         },
         "prompt": {
             "base_prompt_bytes": len(loader.base_prompt().encode("utf-8")),

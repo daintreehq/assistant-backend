@@ -1,38 +1,51 @@
 # Local skill selection — training pipeline
 
-Everything here produces the classifier the server ships in
-`src/daintree_assistant_server/skills/local/artifacts/classifier/`. None of it
+Everything here produces the selector the server ships in
+`src/daintree_assistant_server/skills/local/artifacts/selector/`. None of it
 runs in production, ships in the image, or is importable by the server.
 
-The goal is **latency**. The prompt-based selector (`skills/selector.py`) is a
-DeepSeek call on the turn's first-byte path: measured p50 2.04s, p90 2.81s.
-The local classifier answers the same question in ~9ms.
+The goal was latency, and that is settled: the prompt-based selector
+(`skills/selector.py`) is a DeepSeek call on the turn's first-byte path
+(measured p50 2.04s, p90 2.81s); the local selector answers the same question in
+milliseconds. The goal **now** is scale — a catalog of 200 to 1,000 skills, with
+skills appearing between builds.
 
-**Read `EXPERIMENTS.md` first** — it pins the best-known configuration at the
-top and records every architecture tried, including the retrieve-then-rerank
-design that was built in full and abandoned on evidence. Do not re-try things
-it already scores.
+**Read `EXPERIMENTS.md` first** — it pins the best-known configuration at the top
+and records every architecture tried, including two that were built in full and
+abandoned on evidence. Do not re-try things it already scores.
 
 ## The shipped architecture
 
 ```
-conversation text ──► bge-base encoder (109M, fine-tuned) ──► pooled vector
-                                          │
-                    ┌─────────────────────┼─────────────────────┐
-              32 skill logits        1 docs logit        4 cardinality logits
-               (which skills)      (retrieve docs?)       (how many: 0–3)
+                      ┌─ retriever encoder (MiniLM-L6, fine-tuned) ─┐
+conversation ─────────┤                                             ├─► cosine vs
+                      └─ ranking  encoder (bge-base,  fine-tuned) ──┘   skill table
+                                            │                              │
+                                            │                        top-k candidates
+                                            ▼                              │
+                                     set-wise head  ◄──── cached skill embeddings
+                                            │
+                    ┌───────────────────────┼────────────────────────┐
+                k skill logits         1 docs logit         4 cardinality logits
 ```
 
-- The skill head's weight matrix **is** the skill embeddings — one row per
-  skill. Adding a skill = one new row + retrain (~2 min).
+- **No stage owns per-skill weights.** The head reads a skill's *embedding*, so a
+  skill added after the build is embedded on catalog load and can be selected
+  that turn — no retrain to unblock it, and no staleness gate degrading every
+  OTHER turn open behind it. It is not yet as good as a trained skill (4/14 vs
+  13/14; see "Retraining when skills change" below), but the catalog keeps
+  working, which is the part that used to break.
+- **Catalog size does not reach the head.** It always sees `k` (32) candidates.
+  Growth costs one table row (~4.5KB) and one cosine, not a wider head.
+- **The shortlist's order is not information.** The head has no positional
+  encoding, so it is permutation-equivariant; retrieval evidence arrives as
+  per-candidate features (cosine, normalised rank) instead. `--ordering
+  positional` is the measured alternative, not the default.
 - The cardinality head makes "zero skills" a first-class prediction; there is no
   tuned threshold to go stale.
-- Conversation state (already-loaded skills) enters as a `[loaded: …]` text
-  prefix — measured to be the only thing that resolves continuation vs
-  topic-shift.
-- Served as ONNX **int8** (300MB RSS; fp32 is 665MB and does not fit the memory
-  budget). The export gate (`export_classifier.py`) fails any export whose int8
-  changes a *decision* — same top skill, same cardinality — not just its logits.
+- Served as ONNX **int8** for both encoders and fp32 for the head (~2.4M
+  parameters — 1% of the weights, so quantising it buys nothing). The export
+  gate fails any export whose int8 changes a *decision*, not just its logits.
 
 ## Environment
 
@@ -55,16 +68,18 @@ training; inference stays CPU/ONNX regardless).
 #    validates every id against the live catalog, unpairs foundation labels.
 .venv-train/bin/python -m training.assemble_data --journal <journal.jsonl> [...]
 
-# 3. Train (the shipped recipe; see EXPERIMENTS.md header).
-.venv-train/bin/python -m training.train_classifier \
-    --epochs 10 --lr 5e-5 --batch-size 48 --balance-power 0.0 \
-    --base-model BAAI/bge-base-en-v1.5 --seed 41
+# 3. Train stage 1, THEN stage 2. The order is load-bearing: stage 2 trains
+#    against shortlists from a FROZEN stage 1, so retraining stage 1 afterwards
+#    invalidates stage 2's training distribution.
+.venv-train/bin/python -m training.train_retriever
+.venv-train/bin/python -m training.train_setwise --epochs 10 --ordering equivariant
 
-# 4. Export to ONNX with the decision-parity gate.
-.venv-train/bin/python -m training.export_classifier
+# 4. Export both encoders + the head to ONNX, with the decision-parity gate.
+.venv-train/bin/python -m training.export_two_stage
 
-# 5. Score the SHIPPED artifact under the SHIPPED policy (fp32 + int8 + diff).
-.venv-train/bin/python -m training.eval_classifier
+# 5. Score the SHIPPED artifact under the SHIPPED policy (fp32 + int8 + diff),
+#    and check the equivariance claim against the real graph.
+.venv-train/bin/python -m training.eval_two_stage --ablate
 ```
 
 ## The one rule that matters
@@ -78,26 +93,32 @@ blind.
 
 ## Retraining when skills change
 
-`/.claude/skills/retrain-selector` is the runbook. Short version: the classifier
-head has one row per skill, so a new skill cannot be selected until a retrain;
-the intended workflow is batched (accumulate 10–20 skills, regenerate their
-data, retrain once). The trainer stamps `routing_revision` — a hash of every
-selectable skill's id/title/summary/whenToUse — into the artifact, and
-`LocalSelector` refuses to serve on mismatch (degrading open), so a stale head
-fails safe instead of silently. Body-only skill edits do not move it.
+`.claude/skills/retrain-selector` is the runbook, and the first thing it says is
+that **a retrain is no longer what makes a skill selectable**. A new skill is
+embedded on load and can be selected that turn. What a retrain buys is that the
+skill becomes *competitive*: measured against a both-stages holdout, a
+never-trained skill takes 4 of 14 of its own benchmark cases against 13 of 14
+trained, because it wins only the requests no neighbour also claims. If a new
+skill lands in a crowded neighbourhood, it needs data — in both directions.
 
 ## Files
 
 | file | role |
 |---|---|
-| `train_classifier.py` | the trainer (multi-label + docs + cardinality heads) |
-| `export_classifier.py` | ONNX export + decision-parity gate |
+| `train_retriever.py` | stage 1: the contrastive bi-encoder that shortlists |
+| `sweep_retriever.py` | how small stage 1 can be — trains each backbone and measures |
+| `setwise_model.py` | stage 2's architecture, shared by trainer and exporter |
+| `train_setwise.py` | stage 2: the set-wise head over a frozen shortlist |
+| `export_two_stage.py` | ONNX export (both encoders + head) + decision-parity gate |
 | `assemble_data.py` | journals → validated corpus; contamination gate |
-| `eval_classifier.py` | **canonical** eval: shipped ONNX artifact under the shipped serving policy, fp32+int8+decision diff |
+| `eval_two_stage.py` | **canonical** eval: shipped artifact, shipped policy, fp32+int8+diff |
+| `calibrate_floors.py` | re-derives the admission floors against a fresh export |
+| `try_skill_text.py` | scores a proposed whenToUse/summary edit — no retrain, no writes |
+| `eval_zero_shot.py` | what a retrain actually bought, vs a both-stages holdout |
 | `common.py` | wraps the SERVING renderer for training rows |
-
 | `EXPERIMENTS.md` | **the log — read first** |
 
-The abandoned pipelines (bi-encoder+reranker; hosted embeddings) were deleted
-after measurement — their scripts, modules and artifacts live in git history,
-and every number they produced is transcribed in `EXPERIMENTS.md`.
+The abandoned pipelines (bi-encoder + **cross-encoder** reranker; hosted
+embeddings) and the single fixed-head classifier that shipped before this one
+were deleted after measurement — their scripts, modules and artifacts live in git
+history, and every number they produced is transcribed in `EXPERIMENTS.md`.

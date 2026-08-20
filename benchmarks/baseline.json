@@ -4,12 +4,6 @@
     "revision": "sha256:7acf72cde7d7bdc5caa381bd7ccbebbbb30044de8083726139bc01a2d82b818c",
     "skills": 39
   },
-  "classifier": {
-    "classifier_onnx_bytes": 109707314,
-    "labels": 38,
-    "routing_revision": "routing:90c62db067044a8b5fd5339dcb043bd2",
-    "routing_revision_matches_catalog": true
-  },
   "identity": {
     "default_endpoint_sort": "throughput",
     "model": "deepseek/deepseek-v4-flash-0731",
@@ -19,6 +13,14 @@
   "prompt": {
     "base_prompt_bytes": 23888,
     "skill_body_bytes_total": 284937
+  },
+  "selector": {
+    "candidates": 32,
+    "ordering": "equivariant",
+    "routing_revision_at_train": "routing:90c62db067044a8b5fd5339dcb043bd2",
+    "routing_revision_matches_catalog": true,
+    "selector_onnx_bytes": 142587320,
+    "trained_skills": 38
   },
   "tools": {
     "count": 77,

@@ -438,7 +438,7 @@ async def measure_concurrency(
         "note": (
             "stateless-server concurrency probe: the real ChatOrchestrator.complete "
             "(non-streaming) over an instant provider, so all latency is per-request CPU "
-            "(the LOCAL skill classifier's ONNX forward pass, ~21.5k-token tool-schema "
+            "(the LOCAL two-stage skill selector's ONNX forward passes, ~21.5k-token tool-schema "
             "normalization, response assembly). Selection shares a bounded worker pool "
             "sized to Cloud Run's --concurrency=8; above that, refusals degrade open by "
             "design and are excluded from the warning gate."

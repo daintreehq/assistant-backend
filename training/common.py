@@ -10,7 +10,10 @@ silently degrades accuracy without producing an error anywhere.
 
 from __future__ import annotations
 
-from daintree_assistant_server.skills.local.documents import query_document
+import json
+from pathlib import Path
+
+from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX, query_document
 
 
 class _Msg:
@@ -40,3 +43,37 @@ def render_training_query(query: str, history: list[str] | None = None) -> str:
         )
     messages.append(_Msg("user", query))
     return query_document(messages)
+
+
+def build_query(row: dict[str, object]) -> str:
+    """Render one corpus row into the exact string a ranker will embed.
+
+    Both stages and every evaluator go through this, so the ``[loaded: …]``
+    state prefix can never be applied by one and forgotten by another. It was
+    previously a private helper in the classifier trainer, which meant the
+    retriever and the set-wise head each had to re-derive it correctly.
+    """
+    query = render_training_query(str(row["query"]), row.get("history"))  # type: ignore[arg-type]
+    active = row.get("active_ids") or []
+    if active:
+        return ACTIVE_PREFIX.format(", ".join(active)) + query  # type: ignore[arg-type]
+    return query
+
+
+def corpus_rows(path: Path) -> list[dict]:
+    """Load a jsonl corpus, skipping blank lines."""
+    return [
+        json.loads(line) for line in path.read_text().splitlines() if line.strip()
+    ]
+
+
+def device() -> str:
+    """MPS when the Mac has it, else CPU. Training only — serving is ONNX."""
+    try:
+        import torch
+
+        if torch.backends.mps.is_available():
+            return "mps"
+    except Exception:  # noqa: BLE001
+        pass
+    return "cpu"

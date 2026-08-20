@@ -47,11 +47,10 @@ from .services.prompt_assembler import PromptAssembler
 from .services.skill_learning import SkillLearner
 from .services.task_runner import TaskRunner
 from .skills.catalog import Catalog, CatalogManager, default_skills_dir, load_catalog
-from .skills.local.classifier import SkillClassifier
-from .skills.local.documents import routing_revision
-from .skills.local.paths_local import classifier_artifact_dir
+from .skills.local.paths_local import selector_artifact_dir
 from .skills.local.runtime import InferencePool
 from .skills.local.selector import LocalSelector, SkillSelector
+from .skills.local.setwise import SetwiseClassifier
 from .state.codec import StateCodec
 
 logger = get_logger("daintree.main")
@@ -347,27 +346,24 @@ def build_container(
     catalog_manager = CatalogManager(catalog, primary_dir=primary_dir, overlay_dir=overlay_dir)
 
     state_codec = _build_state_codec(settings)
-    # The classifier is built BEFORE the provider: its stale-head check can
-    # raise, and raising after the provider exists would leave an HTTP client
-    # open in a process that deliberately stays alive (unready, not dead).
+    # The selector is built BEFORE the provider: loading it can raise, and
+    # raising after the provider exists would leave an HTTP client open in a
+    # process that deliberately stays alive (unready, not dead).
     inference_pool: InferencePool | None = None
     if selector is None:
-        # Skill selection is LOCAL: one in-process ONNX forward pass (~10ms),
-        # replacing the upstream model call that used to sit on the turn's
-        # first-byte path (p50 2.0s). Constructed eagerly so a missing or
+        # Skill selection is LOCAL: a cosine shortlist plus one set-wise pass,
+        # in process, replacing the upstream model call that used to sit on the
+        # turn's first-byte path (p50 2.0s). Constructed eagerly so a missing or
         # LFS-pointer artifact fails container validation — readiness, not a
-        # request — exactly like a malformed prompt or skill would. The
-        # classifier's provenance is checked HERE too: a head trained against a
-        # different routing surface would degrade every fresh turn open, and
-        # that belongs to the deploy gate (readiness), not to per-request logs.
-        classifier = SkillClassifier(classifier_artifact_dir())
-        live = routing_revision(catalog_manager.catalog)
-        if classifier.routing_revision != live:
-            raise RuntimeError(
-                "local skill classifier is stale: artifact routing_revision "
-                f"{classifier.routing_revision[:24]!r} != live {live[:24]!r} — "
-                "run the retrain-selector runbook before deploying this catalog"
-            )
+        # request — exactly like a malformed prompt or skill would.
+        classifier = SetwiseClassifier(selector_artifact_dir())
+        # Embed the live catalog now rather than on the first turn: it validates
+        # the artifact against a real catalog at startup, and it means the first
+        # request does not pay for whatever drifted since the image was built.
+        # There is deliberately no staleness GATE — the head has no per-skill
+        # weights, so a catalog the artifact never saw is answered normally
+        # instead of degrading every turn open until someone retrains.
+        classifier.sync(catalog_manager.catalog)
         inference_pool = InferencePool()
         selector = LocalSelector(classifier, inference_pool, catalog_manager, settings)
     chat_provider = provider if provider is not None else _build_provider(settings)

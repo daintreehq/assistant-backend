@@ -67,12 +67,12 @@ timeout: 1800s
 
 steps:
   # ---- Materialise Git LFS content ----------------------------------------
-  # The skill-selection classifier (skills/local/artifacts/classifier/*.onnx,
-  # tokenizer.json) is stored in Git LFS, and Cloud Build's repository fetch
-  # does NOT bring LFS objects down — it leaves 130-byte pointer files where
-  # the model should be. Without this step the image builds green, deploys
-  # green, and ships a selector whose "model" is three lines of text; the
-  # failure would only surface when the classifier is first loaded.
+  # The skill selector (skills/local/artifacts/selector/**/*.onnx, tokenizer.json,
+  # vectors.npz) is stored in Git LFS, and Cloud Build's repository fetch does
+  # NOT bring LFS objects down — it leaves 130-byte pointer files where the
+  # models should be. Without this step the image builds green, deploys green,
+  # and ships a selector whose "model" is three lines of text; the failure would
+  # only surface when the selector is first loaded.
   #
   # The v2-connection clone keeps its authenticated origin in /workspace/.git,
   # so a plain `git lfs pull` works here. The trailing check turns "LFS quietly
@@ -95,13 +95,18 @@ steps:
         git config credential.helper \
           '!f() { echo "username=x-access-token"; echo "password=$$GITHUB_TOKEN"; }; f'
         git lfs pull
-        MODEL=src/daintree_assistant_server/skills/local/artifacts/classifier/model_int8.onnx
-        SIZE=$$(stat -c%s "$$MODEL")
-        if [ "$$SIZE" -lt 1000000 ]; then
-          echo "ERROR: $$MODEL is $$SIZE bytes — an unfetched LFS pointer, not a model."
-          exit 1
-        fi
-        echo "LFS content fetched ($$MODEL: $$SIZE bytes)."
+        # BOTH encoders are checked. Checking one would let a pointer ship as
+        # the other: the two stages are separate graphs and LFS can fetch them
+        # independently, so a per-file check is the only one that means anything.
+        ART=src/daintree_assistant_server/skills/local/artifacts/selector
+        for MODEL in "$$ART/retriever/model_int8.onnx" "$$ART/ranking/model_int8.onnx"; do
+          SIZE=$$(stat -c%s "$$MODEL")
+          if [ "$$SIZE" -lt 1000000 ]; then
+            echo "ERROR: $$MODEL is $$SIZE bytes — an unfetched LFS pointer, not a model."
+            exit 1
+          fi
+          echo "LFS content fetched ($$MODEL: $$SIZE bytes)."
+        done
 
   # ---- Build ---------------------------------------------------------------
   # BUILD_SHA is a Dockerfile ARG that becomes a runtime ENV, so /version reports
@@ -270,15 +275,16 @@ steps:
           # the fastest option available, since the alternative is the 2044ms
           # call this replaces.
           --cpu=1
-          # 2Gi with the classifier counted. Measured RSS for the shipped int8
-          # graph is 300MB (fp32 would be 665MB and was rejected for exactly this
-          # budget); the server's own prompts, catalog and per-request buffers
-          # ride on top, and the catalog is DESIGNED to grow to 100-200 skills —
-          # each new skill costs prompt bytes held resident and another head row.
-          # 1Gi would serve today at ~55% utilisation, which leaves no room for
-          # that growth plus 8 concurrent turns' buffers, and an OOM kill
-          # mid-stream costs more than the ~$7/month the second GiB bills at
-          # min-instances=1. Revisit downward only if measured live RSS says so.
+          # 2Gi. Measured whole-process RSS with both selector encoders loaded
+          # (int8; fp32 is neither shipped nor packaged) plus prompts, catalog
+          # and the app: ~410MB idle on a dev machine. The catalog is DESIGNED to
+          # grow to 100-200 skills, and under the two-stage selector that growth
+          # is far cheaper than it was — a skill costs one row in the embedding
+          # table (~4.5KB) instead of a wider head — but each one still costs
+          # prompt bytes held resident, and 8 concurrent turns carry their own
+          # buffers. An OOM kill mid-stream costs more than the ~$7/month the
+          # second GiB bills at min-instances=1. Revisit downward only if
+          # measured live RSS says so.
           --memory=2Gi
           --cpu-boost
           --concurrency=8

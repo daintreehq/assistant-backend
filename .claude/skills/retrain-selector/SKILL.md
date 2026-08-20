@@ -1,6 +1,6 @@
 ---
 name: retrain-selector
-description: "Retrain the local skill-selection classifier after adding, removing or renaming skills, or after editing any skill's title/summary/whenToUse. Generates synthetic training data for the new skills, retrains, exports ONNX with a decision-parity gate, and scores the shipped artifact against the held-out benchmark. Use when skills change in skills/files/, when the server logs local_selector_stale_head, or when the user says retrain the selector."
+description: "Retrain the local two-stage skill selector to make new or edited skills route COMPETITIVELY. Not required to make a skill selectable at all — the set-wise head has no per-skill weights, so a skill added to skills/files/ is embedded on load and reachable that turn — but a never-trained skill loses contested requests to established neighbours (measured 4/14 vs 13/14), so a skill sharing vocabulary with an existing one still needs data. Run when a new skill routes badly, when the benchmark regresses, or when the user says retrain the selector."
 argument-hint: "(optional) space-separated skill ids that are NEW, so data generation focuses there"
 allowed-tools:
   - Bash
@@ -14,60 +14,72 @@ allowed-tools:
 
 # Retrain the local skill selector
 
-The selector is a **multi-label classifier**: one bge-base encoder (109M), one
-head with a row per skill plus a docs output plus four cardinality outputs
-(`skills/local/classifier.py`). The head's weight matrix IS the skill
-embeddings, so **a skill that was not in the training run has no row and can
-never be selected**. Serving guards this with a provenance stamp: the trainer
-records `routing_revision` (a hash of every selectable skill's
-id/title/summary/whenToUse) and `LocalSelector` refuses to serve — degrading
-open to the prior active set — whenever the live catalog's routing surface no
-longer matches.
+## Read this first: a retrain is a QUALITY step, not an unblocking step
 
-## When a retrain is needed
+The selector is **two stages** (`skills/local/setwise.py`):
 
-- A skill was added, removed or renamed in `src/daintree_assistant_server/skills/files/`.
-- A skill's `title`, `summary` or `whenToUse` changed **at all** — these are the
-  classifier's training text, and any edit moves `routing_revision`.
-- The server logs `local_selector_stale_head` (it is already degrading open).
+1. a small bi-encoder that embeds the conversation and takes the `k` nearest
+   skills by cosine from a table of embedded skill documents;
+2. a set-wise head that reads the conversation embedding and the `k` cached
+   skill embeddings together, and returns a logit per candidate plus the docs
+   and cardinality decisions.
 
-A **body-only** edit does NOT need a retrain: `routing_revision` deliberately
-excludes bodies, so skill-learning's usual edits leave the selector serving.
+**Neither stage has per-skill parameters.** A skill added to `skills/files/` is
+embedded by `SetwiseClassifier.sync()` the moment the catalog loads it, gets a
+row in the table, and can be selected that turn — no provenance gate, no
+degraded window. Under the fixed-head classifier that preceded it, a new skill
+could never be selected at all AND the whole selector degraded open until
+someone ran this runbook.
 
-## The shipped recipe (do not improvise — measured in training/EXPERIMENTS.md)
+**But "reachable" is not "competitive", and the gap is measured.** Holding three
+skills out of both stages and scoring only their benchmark cases:
+**4/14 zero-shot against 13/14 trained** (`training/EXPERIMENTS.md`). A new skill
+wins requests that only it plausibly answers, and loses contested ones to
+established neighbours — whose training data names them and not it.
+
+So: adding a skill is no longer *urgent*, because nothing breaks and the skill
+works on unambiguous requests. It is still *worth doing*, and the trigger below
+tells you when.
+
+## When a retrain is actually warranted
+
+- The benchmark (`training.eval_two_stage`) drops below its floor, or a
+  category regresses.
+- **A skill was added and shares vocabulary with an existing one.** This is the
+  common case and the measured weakness: `manage-issue` held out scored 0/4
+  against `start-work-on-issue`, `debug-web-app` 0/3 against `diagnose-and-fix`,
+  while `terminals.rename` — whose words nothing else claims — scored 4/7 with no
+  training at all. If a new skill sits in a crowded neighbourhood, assume it
+  needs data. See the asymmetry lesson in `training/EXPERIMENTS.md`: fences are
+  only learned in the direction they are written, and a new skill's strongest
+  words are stolen from its neighbours.
+- The corpus has grown enough that the encoders are meaningfully behind it.
+
+A **body-only** skill edit never warrants one: only `title`/`summary`/
+`whenToUse` are embedded.
+
+## Check where you actually stand, before training anything
 
 ```bash
 PY=.venv-train/bin/python
 export HF_HUB_DISABLE_PROGRESS_BARS=1 TQDM_DISABLE=1
+$PY -m training.eval_two_stage --ablate
 ```
 
-### 1. Confirm the gap
+That loads the shipped ONNX artifact, applies the production decision procedure,
+prints per-category recall-pass and every miss by name, and reports the
+shortlist-order ablation. If the skill you are worried about is not in the miss
+list, there is nothing to retrain for.
 
-```bash
-$PY - <<'EOF'
-import json, sys; sys.path.insert(0, 'src')
-from pathlib import Path
-from daintree_assistant_server.skills.catalog import load_catalog, default_skills_dir
-from daintree_assistant_server.skills.local.documents import routing_revision
-cat = load_catalog(default_skills_dir())
-art = Path("src/daintree_assistant_server/skills/local/artifacts/classifier")
-meta = json.loads((art / "meta.json").read_text())
-trained = set(json.loads((art / "labels.json").read_text()))
-live = set(cat.selectable_ids)
-print("live routing   :", routing_revision(cat)[:32])
-print("artifact stamp :", meta.get("routing_revision", "<missing>")[:32])
-print("no head row for:", sorted(live - trained) or "none")
-print("orphan rows for:", sorted(trained - live) or "none")
-EOF
-```
+## The shipped recipe (do not improvise — measured in training/EXPERIMENTS.md)
 
-### 2. Generate data for the new skills
+### 1. Generate data for the new skills
 
-Regenerate the digest, then run one Workflow agent per new skill. The agent
-prompts and JSON schemas are in the session history of the original build and
-follow one pattern: read `training/data/catalog_digest.md` + the skill's own
-file; return `positives` (situation-invented, NOT whenToUse paraphrase),
-`boundary_negatives` mined from the "do not use for X" clauses, and `followups`.
+Refresh the digest, then run one Workflow agent per new skill. The agent prompts
+and JSON schemas follow one pattern: read `training/data/catalog_digest.md` plus
+the skill's own file; return `positives` (situation-invented, NOT a whenToUse
+paraphrase), `boundary_negatives` mined from the "do not use for X" clauses, and
+`followups`.
 
 ```bash
 $PY - <<'EOF'
@@ -85,12 +97,15 @@ print("digest refreshed:", len(sel), "skills")
 EOF
 ```
 
-**Hard rules for generating agents:** never read `benchmarks/` or `tests/`;
-only real skill ids; label the specific skill alone (never "specific +
-foundation" — the backend pairs the foundation downstream); `expect_ids: []` is
-a first-class answer.
+**Hard rules for generating agents:** never read `benchmarks/` or `tests/`; only
+real skill ids; label the specific skill alone (never "specific + foundation" —
+the backend pairs the foundation downstream); `expect_ids: []` is a first-class
+answer. And generate **reverse-direction** boundary rows too: rows where an
+ESTABLISHED skill is correct and the new one is the hard negative. The new
+skill's whenToUse fences against its neighbours, but their whenToUse predates it
+and names it nowhere, so without those rows every fence runs one way only.
 
-### 3. Assemble (cumulative by default)
+### 2. Assemble (cumulative by default)
 
 ```bash
 $PY -m training.assemble_data --journal <new-journal.jsonl>
@@ -101,57 +116,95 @@ The committed `training/data/selection.jsonl` is carried forward automatically
 from a fresh clone, so the committed corpus IS the base and new journals extend
 it through the same gates. `--base ''` rebuilds from journals alone.
 
-Watch the printed stats: `dropped_contaminated` (benchmark collisions),
+Watch `dropped_contaminated` (benchmark collisions) and
 `dropped_conflicting_label` (same rendered input, different labels — a noisy
-generator), and the per-source counts.
+generator).
 
-### 4. Train + export
+### 3. Train stage 1, then stage 2
+
+**Order matters and the stages are not interchangeable.** Stage 2 trains against
+shortlists produced by a FROZEN stage 1, so stage 1 must be finished first;
+retraining stage 1 afterwards invalidates stage 2's training distribution.
 
 ```bash
-$PY -m training.train_classifier \
-    --epochs 10 --lr 5e-5 --batch-size 48 --balance-power 0.0 \
-    --base-model BAAI/bge-base-en-v1.5 --seed 41
-$PY -m training.export_classifier
+$PY -m training.train_retriever          # ~15 min: watch r@32 stay at 1.000
+$PY -m training.train_setwise --epochs 10 --ordering equivariant
 ```
 
-Watch: `card_acc` ~0.95 (this is what makes "zero skills" work) and
-`val exact-match` ~0.85. The export **fails** if the fp32 graph changes any
-decision vs torch, and stamps the artifact with the trainer's
-`routing_revision` — it will refuse a checkpoint that lacks one.
+Watch on stage 1: `r@32` (the shortlist must not be the thing that loses a
+skill) and `r@8` as the early warning that will matter at 200 skills. Watch on
+stage 2: `card` ~0.95 — this is what makes "zero skills" work — and
+`val exact-match`.
+
+Keep `--ordering equivariant`. `positional` and `blind` exist so the choice stays
+measured rather than assumed, and both were scored (see `EXPERIMENTS.md`):
+`positional` is worse at matched precision (154 vs 158) and gives up
+permutation-equivariance — reversing its shortlist changes 151 of 165 answers,
+which is a slot prior that would penalise any newly added skill. `blind` ties,
+and is the ablation showing the head does not depend on stage 1's scores.
+
+### 4. Export
+
+```bash
+$PY -m training.export_two_stage
+```
+
+Exports both encoders (fp32 + int8) and the head, rebuilds `vectors.npz` through
+the **shipped** `sync()` path, and gates on decision parity across the whole
+benchmark.
 
 **int8 is a lottery**: `quantize_dynamic` is nondeterministic, so each export
-draws a slightly different int8 graph (measured spread: ~2 recall-pass cases).
-The gate scores every draw; if step 5 lands below its floor, just export again
-— and never re-export an already-measured artifact without re-measuring.
+draws a slightly different int8 graph (measured spread ~2 recall-pass cases).
+The gate scores every draw; if step 5 lands below its floor, export again — and
+never re-export an already-measured artifact without re-measuring.
 
 ### 5. Score the SHIPPED artifact
 
 ```bash
-$PY -m training.eval_classifier
+$PY -m training.eval_two_stage --ablate
 ```
 
-This is the canonical evaluator: it loads `SkillClassifier` from the exported
-ONNX (both precisions), applies the production decision procedure, verifies the
-provenance stamp against the live catalog, and prints the fp32-vs-int8
-**decision diff**. int8 is the shipped precision. Compare per-category numbers
-against `training/EXPERIMENTS.md`; the family's honest error bar is ±2 cases.
+The canonical evaluator: the exported ONNX at both precisions, under the
+production decision procedure, with the fp32-vs-int8 decision diff. int8 is the
+shipped precision. Compare per-category numbers against `EXPERIMENTS.md`; the
+family's honest error bar is ±2 cases.
 
-### 6. Commit
+`--ablate` reverses the shortlist and re-scores. With `equivariant` this must
+report **0 cases changed** — that is the permutation-equivariance claim being
+checked against the real graph rather than trusted from the architecture.
 
-Model graphs and the tokenizer are Git LFS. Verify before committing:
+If the round was about a new skill, also re-measure what a retrain actually
+bought. Train a probe with the new skills held out of BOTH stages and score only
+their cases:
 
 ```bash
+$PY -m training.train_retriever --holdout-skills <ids> --out training/models/retriever_probe
+$PY -m training.train_setwise --epochs 10 --holdout-skills <ids> \
+     --retriever training/models/retriever_probe --out training/models/sw_probe
+$PY -m training.export_two_stage --setwise training/models/sw_probe --out .tmp/art_probe
+$PY -m training.eval_zero_shot --artifact .tmp/art_probe
+```
+
+### 6. Refresh the baseline and commit
+
+```bash
+$PY -m tools.baseline capture > benchmarks/baseline.json
 git add -A .
 git diff --cached --numstat | awk '{a+=$1} END {print a" staged lines"}'  # thousands, not 100k+
 ```
 
-Commit the regenerated `training/data/*.jsonl` with the weights — the corpus is
-the record of what the shipped model was trained on.
+Model graphs, tokenizers and `vectors.npz` are Git LFS. Commit the regenerated
+`training/data/*.jsonl` with the weights — the corpus is the record of what the
+shipped encoders were trained on.
 
 ## Scaling
 
-One new skill costs one 768-float head row; retraining costs ~8 minutes on an
-M4 (MPS). The intended workflow is batched: accumulate 10-20 skills, generate
-their data, retrain once. There is no incremental path, and adding one skill
-costs the same as adding twenty. The design target of 100-200 skills changes
-inference cost by microseconds.
+Adding a skill costs **one row in the embedding table** (~4.5KB) and one
+embedding pass at catalog load. It costs nothing at inference: the head sees `k`
+candidates whatever the catalog size, and the cosine search over 1,000 skills is
+a single 1000x384 matrix-vector product — microseconds, and exact, which is why
+there is no ANN index here.
+
+What still costs a retrain is *quality*: the encoders only know the vocabulary
+they were trained on. The intended workflow is batched — let skills accumulate,
+generate their data (both directions), retrain once.
