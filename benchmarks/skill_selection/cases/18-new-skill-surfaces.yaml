@@ -316,3 +316,63 @@ cases:
     expect:
       required: [daintree.worktree.manage-resource]
       optional: [daintree.foundation]
+
+  # daintree.worktree.relocate-agents — landed with no coverage, from a real session
+  # where the assistant could not route the request and improvised its way through
+  # five invented action names and four duplicate agents.
+
+  - id: relocate-running-agents-into-fresh-worktrees
+    category: single-skill
+    note: >-
+      The plainest form of the request, in the user's own words from the session that
+      prompted the skill. All three beats of the runbook are present: create the
+      worktrees, move the terminals that already exist, tell each agent where it now
+      lives. relocate-agents claims exactly this ("create four worktrees and move the
+      agents into them").
+    messages:
+      - role: user
+        content: >-
+          Actually create four worktrees and then move each of those agents into its
+          own one. Just quickly tell each of them that it's working in the new folder
+          now.
+    expect:
+      required: [daintree.worktree.relocate-agents]
+      optional: [daintree.foundation]
+
+  - id: separate-existing-agents-not-fan-out
+    category: routing-trap
+    note: >-
+      fan-out-work baits hard here: its trigger list carries "parallelise this across
+      worktrees" and "for each of those worktrees create/open/spawn a new coding-agent",
+      and three agents on three branches is textbook plurality-plus-independence. The
+      decider is that nothing is being spawned. The terminals already exist and are
+      mid-task, which is relocate-agents' own tell ("the terminals ALREADY EXIST and are
+      mid-task; the user wants them relocated, not replaced"), and fan-out-work's
+      carve-out now hands that case over by name.
+    messages:
+      - role: user
+        content: >-
+          These three keep stepping on each other in the same checkout. Can you give
+          each one its own branch directory and let them carry on from where they
+          already are?
+    expect:
+      required: [daintree.worktree.relocate-agents]
+      optional: [daintree.foundation]
+
+  - id: plain-worktree-has-nothing-to-relocate
+    category: routing-trap
+    note: >-
+      The precision direction of the same fence, guarding against the new skill
+      swallowing ordinary worktree creation. "Set me up a worktree" with no terminal in
+      the picture is create-plain-worktree's whole claim, and relocate-agents fences
+      itself out of it by name ("to create a worktree with no agent involved, use
+      daintree.worktree.create-plain-worktree"). Nothing is running, so there is no
+      agent to tell anything to.
+    messages:
+      - role: user
+        content: >-
+          Set me up a worktree off main for the billing rewrite. I'm not ready to put
+          anything in it yet, I just want the branch checked out somewhere.
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]

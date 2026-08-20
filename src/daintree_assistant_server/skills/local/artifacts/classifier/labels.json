@@ -35,5 +35,6 @@
   "daintree.workflow.prep-branch-for-review",
   "daintree.workflow.start-work-on-issue",
   "daintree.worktree.create-plain-worktree",
-  "daintree.worktree.manage-resource"
+  "daintree.worktree.manage-resource",
+  "daintree.worktree.relocate-agents"
 ]

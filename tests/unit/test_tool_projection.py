@@ -351,6 +351,11 @@ _REVIEWED_UNDECLARED = {
     # runbook says that raw MCP lifecycle calls cannot be grant-authorized.
     ("daintree.orchestration.execute-durable-workflow", "daintree.call"),
     ("daintree.worktree.manage-resource", "grant.create"),
+    # PROHIBITION. The relocate runbook's step 10 forbids closing the very
+    # terminals it was asked to preserve, including as a fallback when the
+    # cross-worktree move is refused. Declaring it would offer the model the one
+    # tool the runbook exists to keep it away from.
+    ("daintree.worktree.relocate-agents", "terminal.close"),
 }
 
 

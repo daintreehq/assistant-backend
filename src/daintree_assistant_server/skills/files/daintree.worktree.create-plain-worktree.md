@@ -2,7 +2,7 @@
 id: daintree.worktree.create-plain-worktree
 title: Create a plain Daintree worktree
 summary: Create a standalone Daintree worktree for a new or existing branch through the typed worktree wrapper, without launching a recipe or agent.
-whenToUse: Use when the user asks to create, add, or set up a plain worktree for a new branch or an existing branch — "create a worktree", "make a new branch in its own worktree", or "check out this branch as a worktree" — and they do not want a recipe or agent launched. Do not use for a worktree with a workspace recipe (use daintree.recipe.run-or-create), for starting a forge issue with an agent (use daintree.workflow.start-work-on-issue), for spawning an agent into an existing worktree (use daintree.edits.spawn-visible-agent), or for deleting a worktree (use daintree.orchestration.workspace-cleanup).
+whenToUse: Use when the user asks to create, add, or set up a plain worktree for a new branch or an existing branch — "create a worktree", "make a new branch in its own worktree", or "check out this branch as a worktree" — and they do not want a recipe or agent launched. Do not use for a worktree with a workspace recipe (use daintree.recipe.run-or-create), for starting a forge issue with an agent (use daintree.workflow.start-work-on-issue), for spawning an agent into an existing worktree (use daintree.edits.spawn-visible-agent), for giving agents that are ALREADY RUNNING one worktree each (use daintree.worktree.relocate-agents), or for deleting a worktree (use daintree.orchestration.workspace-cleanup).
 risk: project
 requiredTools:
   - context.snapshot
@@ -48,8 +48,11 @@ Procedure:
          "requestKey": "<stable-id-for-this-request>"
        })
 
-   Omit `recipeId`; do not list or inspect recipes for a plain worktree. Pass a
-   `requestKey` so a retry after a timeout cannot create a second worktree.
+   Omit `recipeId`; do not list or inspect recipes for a plain worktree. It is not a
+   cosmetic omission: a `recipeId` makes this same call spawn that recipe's terminals,
+   and it also elevates the dispatch to confirmation-gated, so the user gets a modal and
+   a workspace they did not ask for. Pass a `requestKey` so a retry after a timeout
+   cannot create a second worktree.
 
 5. Use the typed `worktree.createWithRecipe` tool directly. Do NOT send this action through `daintree.call`, and do NOT improvise `git checkout`, `git branch`, or `git worktree add` in the main terminal. A raw checkout can move the main worktree onto the new branch, making the subsequent worktree creation fail because that branch is already in use.
 

@@ -93,8 +93,8 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-08-17, 38 skills / 77 tools (sizes are KiB). The catalog holds 38
-but the selector prompt renders 37 — `daintree.docs.answer-usage-question` is
+Measured 2026-08-20, 39 skills / 77 tools (sizes are KiB). The catalog holds 39
+but the selector prompt renders 38 — `daintree.docs.answer-usage-question` is
 server-pinned off the turn's `docs_query` and hidden from the classifier, so it
 costs the selector nothing:
 
@@ -103,17 +103,23 @@ costs the selector nothing:
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
 | system+tools stable — topic-shift | **1.0000** (enforced floor) |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~120.6 KB, ~30.7k proxy tok |
-| tool schemas share of request | ~73.5 KB, **61.0%**, ~18.7k tok |
-| base prompt | ~29.8 KB, 24.7%, ~7.6k tok |
-| loaded skills (2 active) | ~11.8 KB, 9.7%, ~3.0k tok |
-| skill selection | **local classifier — 0 upstream bytes** (the ~43.9 KB selector prompt is retired to the test seam) |
+| total request | ~113.9 KB, ~29.0k proxy tok |
+| tool schemas share of request | ~73.5 KB, **64.4%**, ~18.7k tok |
+| base prompt | ~23.3 KB, 20.4%, ~5.9k tok |
+| loaded skills (2 active) | ~11.8 KB, 10.3%, ~3.0k tok |
+| skill selection | **local classifier — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
 | state token | 389–492 B (0–3 skills; 16 KiB cap) |
 
 The tool region fell ~10% (81.6 → 73.5 KiB, ~20.9k → ~18.8k proxy tokens) when
 the CLI dropped its `docs__*` family — the backend retrieves documentation itself
 now, so the client no longer needs a docs tool or a second MCP connection. It is
-still 63% of the request, and still the largest remaining lever.
+still the largest single region of the request by a wide margin, and still the
+largest remaining lever.
+
+The base-prompt row is the one that moved most against the previous snapshot,
+and it moved because the 2026-08-17 reading was already stale rather than because
+anything shrank this week: the rules relocated into `daintree.foundation` had
+landed before that table was written and were never re-measured into it.
 
 Live rows below are **older and not re-measured here** (they cost money); treat
 them as an order-of-magnitude reference only. Measured 2026-07-10 against the

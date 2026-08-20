@@ -1,13 +1,13 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:9510232eba280ec538035e6b1184abc22e6efa45064a0c20ba35df85e584f61c",
-    "skills": 38
+    "revision": "sha256:7acf72cde7d7bdc5caa381bd7ccbebbbb30044de8083726139bc01a2d82b818c",
+    "skills": 39
   },
   "classifier": {
-    "classifier_onnx_bytes": 109706542,
-    "labels": 37,
-    "routing_revision": "routing:ef9f0b1227caaa159299967bdf3268b7",
+    "classifier_onnx_bytes": 109707314,
+    "labels": 38,
+    "routing_revision": "routing:90c62db067044a8b5fd5339dcb043bd2",
     "routing_revision_matches_catalog": true
   },
   "identity": {
@@ -17,8 +17,8 @@
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 23632,
-    "skill_body_bytes_total": 276793
+    "base_prompt_bytes": 23888,
+    "skill_body_bytes_total": 284937
   },
   "tools": {
     "count": 77,

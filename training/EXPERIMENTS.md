@@ -4,16 +4,21 @@
 > ```
 > backbone   BAAI/bge-base-en-v1.5  (109M)
 > head       37 skills + 1 docs + 4 cardinality
-> corpus     training/data/selection.jsonl @ 7,773 rows (five new skills fully served)
+> corpus     training/data/selection.jsonl @ 8,640 rows (relocate-agents added)
 > train      --epochs 10 --lr 5e-5 --batch-size 48 --balance-power 0.0 --seed 41
 > serve      ONNX int8 (300 MB RSS), earn-your-place admission
 > ```
-> **Current benchmark: shipped int8 measures 157/166 recall-pass (94.6%),
-> fp32 157/166; int8 p50 9.2 ms. Synthetic held-out exact-match is 0.844.**
-> The suite grew to 166: `18-new-skill-surfaces.yaml` gives the five newest
-> skills the recall and routing-trap cases they landed without. On the ORIGINAL
-> 150 the same artifact measures 142 — i.e. the expansion cost nothing and the
-> new skills route at 15/16 (fp32 16/16) on top.
+> **Current benchmark: shipped int8 measures 158/169 recall-pass (93.5%),
+> fp32 157/169; int8 p50 9.1 ms. Synthetic held-out exact-match is 0.836.**
+> The suite grew to 169 with three cases for `daintree.worktree.relocate-agents`
+> (one recall, two routing traps, in `18-new-skill-surfaces.yaml`). All three
+> pass, and NO remaining miss names the new skill — the head is clean. On the
+> ORIGINAL 166 the artifact measures 155, so the round cost 2 cases of churn
+> among established skills against the ±2 error bar, for one new skill fully
+> served. `single-skill` is 39/39 and `routing-trap` 67/71.
+>
+> The prior head (37 skills, 7,773 rows) measured 157/166; that suite had 166
+> cases, so the two totals are not directly comparable without the split above.
 >
 > **The lesson of this round: a fence is only learned in the direction it is
 > written.** The five new skills' first full-strength corpus (7,602 rows, ~55
@@ -27,6 +32,27 @@
 > correct, new skill as the hard negative, catalog-derived) took the original 150
 > to 142 and the total to 157. **Adding a skill means generating boundary data
 > for its neighbours too, not just for itself.**
+>
+> **The lesson of THIS round: a new skill's strongest words are stolen from its
+> neighbours.** `relocate-agents` trains on "move", "each" and plurality, and on
+> its first full corpus (575 labelled rows, rank 2 of 38) it absorbed
+> `keep-the-plan-not-another-catch-up` — "hold the whole thing somewhere and just
+> move it forward each session" — off `execute-durable-workflow`. 33 reverse
+> boundary rows (established skill correct, `relocate-agents` as hard negative)
+> aimed at exactly that vocabulary recovered it. This is the same asymmetry the
+> round above recorded, hit from the other side: forward fences alone are not
+> enough, and the direction that needs data is whichever one the new skill's
+> vocabulary overlaps.
+>
+> A separate self-inflicted miss is worth recording because it looked like model
+> drift and was not. Adding "do not use to create a PLAIN worktree with no recipe
+> at all, which is the default reading of 'create a worktree'" to
+> `recipe.run-or-create`'s `whenToUse` cost `worktree-with-recipe-not-plain`:
+> the clause taught the classifier that "create a worktree" points AWAY from
+> recipes, so a request naming a saved layout routed to the plain skill. It was
+> reverted. **A carve-out written against a phrase the neighbour legitimately
+> shares is a routing regression, not a clarification** — fence on the
+> distinguishing condition, never on the shared trigger words.
 >
 > The 3-seed logit ensemble reached 131 but costs 3x memory and latency for +1
 > inside the noise band — not shipped. Weight-soup fails here because each
