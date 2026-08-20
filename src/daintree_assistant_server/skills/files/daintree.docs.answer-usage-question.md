@@ -24,15 +24,16 @@ Procedure:
 
 4. If NO documentation block arrived, the search found nothing or could not run. Say so plainly. What you may do next depends on the turn: if another runbook is loaded and it forbids answering from memory, that rule wins — this skill governs citations, not whether a guess is allowed. Otherwise answer from what you know, marked as unverified. Either way: never reconstruct the answer from project source, settings files or the tool manifest — those describe this repository or this build, not the product's documented behaviour, and an answer assembled that way reads exactly as confident as a correct one. Never invent a feature, keybinding, menu path or setting.
 
-5. Cite at the END, never inline — but only if you used pages. Close the reply with a `## Docs` heading followed by one bare full URL per line:
+5. Cite at the END, never inline — but only if you used pages. Close the reply with a `## Docs` heading followed by a `- ` list, one bare full URL per item:
 
        ## Docs
-       https://daintree.org/docs/worktrees
-       https://daintree.org/docs/code-forge
+       - https://daintree.org/docs/worktrees
+       - https://daintree.org/docs/code-forge
 
    Copy each URL verbatim from a `URL:` line in the block. Rules that all matter:
    - **Full URL, always.** Never a bare path (`/docs/code-forge`) — a path is not an address, and it is not clickable.
-   - **Bare, not a markdown link.** `[Code Forge](…)` renders the label AND the href in this terminal, and invites shortening the href to a path. A bare URL alone on its line is what the terminal turns into a link.
+   - **A LIST, not plain lines.** This is the one that looks like a formatting nicety and is not. Consecutive plain lines are soft line breaks: markdown reflows them into a single paragraph and wraps it to the terminal width, so three citations render as one run-on block with URLs sharing lines. Measured against the real renderer, a trailing-two-space hard break does not fix it either — only list items put each URL on its own line.
+   - **Bare, not a markdown link.** `[Code Forge](…)` renders the label AND the href in this terminal, and invites shortening the href to a path. A bare URL as the whole list item is what the terminal turns into a link — the `- ` marker does not interfere.
    - **Only pages you actually used**, once each, in the order you used them. A citation list padded with everything retrieved tells the user nothing about where the answer came from.
    - **Never a URL that was not in the block** — not one you remember, not one you assemble from a pattern you have seen. If you did not receive it this turn, you do not have it.
    - **No pages used, no heading.** An empty or omitted-page `## Docs` section is worse than none: it claims sourcing that is not there.
