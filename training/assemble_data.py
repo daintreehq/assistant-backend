@@ -170,12 +170,17 @@ def main() -> int:
         )
         if input_key in seen_inputs:
             prior = seen_inputs[input_key]
-            if prior != tuple(sorted(expect)):
+            if prior != (*sorted(expect), f"docs={bool(is_docs)}"):
                 stats["dropped_conflicting_label"] += 1
             else:
                 stats["dropped_duplicate"] += 1
             return
-        seen_inputs[input_key] = tuple(sorted(expect))
+        # The signature carries the DOCS label as well as the skills. Without
+        # it, two identical rendered inputs that agree on skills but disagree on
+        # `is_docs` are counted as a duplicate — first admission silently wins —
+        # and the contradiction this corpus was just repaired for could be
+        # reintroduced without showing up in the stats.
+        seen_inputs[input_key] = (*sorted(expect), f"docs={bool(is_docs)}")
         stats[source] += 1
         selection.append({
             "query": query,
@@ -278,7 +283,16 @@ def main() -> int:
                 # the no-task sentinel, not the off-domain one — an off-domain
                 # sentinel firing on a product question would suppress the
                 # documentation lookup along with the skill.
+                # History and an active set ride through where the generator
+                # supplies them. Every one of the original 207 docs positives
+                # carried NEITHER, and the separation was perfect enough for the
+                # head to take it as a shortcut — "anything in the context means
+                # this is not a docs turn" — which measured 5/120 recall on docs
+                # turns with a skill loaded. A docs row that cannot express
+                # context cannot teach its way out of that.
                 emit(it["query"], list(it.get("skill_ids", [])),
+                     history=list(it.get("history", [])),
+                     active=list(it.get("active_ids", [])),
                      source="docs", is_docs=bool(it["is_docs"]), empty_kind="no_task")
         elif "active_ids" in shape:
             # Three generators share this schema; they are separated by what the

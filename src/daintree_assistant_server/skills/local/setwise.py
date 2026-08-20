@@ -115,14 +115,19 @@ FEATURE_NAMES = ("cosine", "active", "rank_norm")
 #: 0.40 rather than 0.5 is bought for nothing: the head is sharply bimodal, so on
 #: the corpus the two are indistinguishable — 199/207 recall and the SAME 6 false
 #: positives at each, with chatter and no-task turns at 0 false positives all the
-#: way down to 0.15. It is a cheap standing bias toward retrieving, which is the
-#: posture this decision wants, and it costs nothing measurable to hold.
+#: way down to 0.15. NOTE those figures were measured against the 207-positive
+#: corpus and have NOT been re-measured since the context augmentation took it to
+#: 499; the sweep is owed (training/EXPERIMENTS.md, "Still open"). It is a cheap
+#: standing bias toward retrieving, which is the posture this decision wants, and
+#: it costs nothing measurable to hold.
 #:
 #: DO NOT read it as fixing the class it was first chosen for. Second-person
 #: phrasings ("how do you create a worktree", "how do you rename a terminal")
-#: land in the sparse middle of the sigmoid rather than the top mode, because 66
-#: of the corpus's 207 docs rows contain the token "I" (76 counting my/me/mine)
-#: against 4 mentioning "you", and none is of the form "how do you <do X>". They
+#: landed in the sparse middle of the sigmoid rather than the top mode, because
+#: 66 of the corpus's then-207 docs rows contained the token "I" (76 counting
+#: my/me/mine) against 4 mentioning "you", and NONE was of the form "how do you
+#: <do X>". The corpus now carries 39 of that shape, so this paragraph describes
+#: why the floor was chosen, not the corpus it now runs on. They
 #: were measured at 0.4471 and 0.4783 — above this floor — and that looked like a
 #: fix until the same two queries turned out to DISAGREE BETWEEN fp32 AND int8 on
 #: one machine, and between arm64 and x86-64 on the same artifact. A case decided
@@ -474,13 +479,24 @@ class SetwiseClassifier:
         #   ...same question, one skill loaded       docs_p = 0.0020
         #   ...same question, one turn of history    docs_p = 0.00017
         #
-        # The cause is in the corpus, not the architecture. Of 8,640 training
-        # rows, all 207 docs positives carry an empty active set AND no history,
-        # while all 1,956 rows that carry an active set are labelled not-docs.
-        # The separation is perfect and never once contradicted, so the head got
-        # a lossless shortcut — "anything in the context means this is not a docs
-        # turn" — and took it. Measured over 120 docs positives with a skill
-        # loaded, that is 5/120 recall; on the bare question it is 113/120.
+        # The cause is in the corpus, not the architecture. In the 8,640-row
+        # corpus this mitigation was written against, all 207 docs positives
+        # carried an empty active set AND no history, while all 1,956 rows with
+        # an active set were labelled not-docs. Worse than that separation being
+        # perfect, 64 of those not-docs rows WERE documentation questions — the
+        # same question labelled both ways, contradiction rather than absence —
+        # so the head got a lossless shortcut, "anything in the context means
+        # this is not a docs turn", and took it. Measured over 120 docs positives
+        # with a skill loaded, 5/120 recall; on the bare question, 113/120.
+        #
+        # The corpus has since moved (9,774 rows, 499 docs positives, 246 of them
+        # carrying history, contradictions repaired and asserted against in
+        # tests/unit/test_training_corpus_guards.py). THIS PASS STAYS ANYWAY:
+        # the docs loss is still trained on the contextual render, so the bare
+        # question remains the input distribution this logit is read from, and
+        # the retrain moved the docs flag 14/19 -> 19/21 with it in place. Making
+        # the second pass unnecessary means training the docs head on its own
+        # bare view; that is the next step, not a completed one.
         #
         # So the docs logit is re-read from a SECOND COMPLETE PASS over the bare
         # user question — its own retrieval, its own shortlist, its own cosine

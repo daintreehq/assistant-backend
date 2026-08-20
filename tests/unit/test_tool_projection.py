@@ -336,6 +336,11 @@ _REVIEWED_UNDECLARED = {
     ("daintree.orchestration.watch-outcome", "daintree.call"),
     ("daintree.forge.land-pull-request", "watcher.watchPR"),
     ("daintree.terminals.rename", "terminal.extract"),
+    # EXPLANATORY + handoff. The find runbook names the CI read only to forbid
+    # trusting `ciStatus` on a searched PR row and to say where the real verdict
+    # comes from (daintree.workflow.follow-up-on-issue, which declares it). This
+    # runbook selects work; it never reads CI itself.
+    ("daintree.workflow.find-issue-work", "forge.getChecks"),
     # PROHIBITION. This skill exists because a session reached for raw git in the
     # user's own terminal when the typed wrapper's schema gave it no argument
     # names; its step 5 forbids both the raw `daintree.call` and improvised

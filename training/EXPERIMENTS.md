@@ -4,22 +4,22 @@
 > ```
 > stage 1    sentence-transformers/all-MiniLM-L6-v2 (22.7M), fine-tuned, k=32
 > stage 2    BAAI/bge-base-en-v1.5 (109M) + set-wise head (2.4M), ordering=equivariant
-> corpus     training/data/selection.jsonl @ 8,640 rows
+> corpus     training/data/selection.jsonl @ 9,774 rows
 > train      stage 1: --epochs 6 --lr 3e-5 --batch-size 48 --seed 41
 >            stage 2: --epochs 10 --ordering equivariant --seed 41
 > serve      ONNX int8 encoders + fp32 head, ~410 MB whole-process RSS,
 >            BONUS_FLOOR 0.45 / NEWCOMER_FLOOR 0.65 (re-calibrated, see below)
 > ```
-> **Current benchmark: shipped int8 measures 158/172 recall-pass (91.9%),
-> fp32 160/172; int8 p50 11.9 ms. Synthetic held-out exact-match 0.910.**
+> **Current benchmark: shipped int8 measures 164/177 recall-pass (92.7%),
+> fp32 163/177; docs flag 19/21; int8 p50 11.5 ms. Synthetic held-out
+> exact-match 0.931.**
 >
-> The denominator moved 169 → 172 on 2026-08-20, when three docs cases were
-> added to cover a failure the suite could not see (see the docs-head section at
-> the foot of this file). The percentage fell because the suite grew, not because
-> the model changed: the same artifact scored 158 before and after. The added
-> cases exist for the docs flag (11/19 → 14/19, scored separately), but they are
-> not routing-free — `required: []` still demands an empty answer, and one of
-> them records a skill extra.
+> The denominator moved 169 → 172 → 177 across two rounds on 2026-08-20, as docs
+> and context cases were added to cover failures the suite could not see (see the
+> two docs sections at the foot of this file). Compare artifacts on ONE suite,
+> never a number against a number recorded under a different denominator: the
+> previous artifact re-scored on this 177-case suite measures 161/177 with the
+> docs flag at 14/21, so the context retrain is **+3 recall-pass and +5 docs**.
 >
 > That is **parity** with the fixed-head classifier it replaced (158/169, p50
 > 9.0 ms), and parity is the honest headline — the number did not improve and
@@ -628,3 +628,228 @@ extra it should not pick.
 
 When a benchmark is generated from the same assumptions as the training data,
 agreement between them is not evidence.
+
+---
+
+# Context-bearing turns: a greeting erased the task (2026-08-20)
+
+Reported from session `ses_3a3cd1e7`. Two turns in — "How are you?", then "How do
+I create worktrees in this app?" — the server loaded **no skill and retrieved no
+documentation**, and the model answered from the tool schemas alone. Since the
+only worktree-creation tool the CLI exposes is `worktree__createWithRecipe`,
+whose description is entirely about recipes, the answer confidently explained
+that worktrees are made from recipes. The correcting sentence ("omit `recipeId`
+and it creates only the worktree") lives in `create-plain-worktree`'s body — the
+skill that did not load.
+
+The selector logged `ran=true, degraded=false, cardinality=0`. Nothing failed.
+It answered, and the answer was "no task, no docs".
+
+## Two independent causes, both in the corpus
+
+**1. A social lead-in is under-represented, and the conversational ones absent.**
+
+An earlier draft of this section said the corpus held no greeting histories at
+all. **That was wrong, and the correction is worth more than the claim was.** Of
+2,116 history-bearing rows, 43 DO open on a greeting — but every one is terse and
+answered in a single clause: `user: hey` / `assistant: Hi — workspace is idle,
+nothing running.` That is 2.0%, and it does not contain the shape that failed: a
+conversational opener answered with a real status paragraph.
+
+The error came from a regex sweep that looked for "hi there" and "hey there" and
+never for bare "hey" or "hi", and from writing off its 26 hits as incidental
+without reading them. It was caught by the double-application guard in
+`augment_context.py`, which used a greeting as its signature and reported 43
+false positives against a corpus it should have called pristine — a check written
+for something else entirely. The measurement below was always right; the
+explanation attached to it was not. Measured on the pre-retrain artifact:
+
+| history in front of "How do I create worktrees in this app?" | top skill | cardinality |
+|---|---|---|
+| none | 1.000 | 1 |
+| `check on the fleet` / `Four running…` (task) | 1.000 | 1 |
+| 105 chars of meaningless padding | 0.998 | 1 |
+| `How are you?` / `Good — thanks. Everything's quiet…` | **0.248** | **0** |
+| `How are you?` / `Good, thanks. How can I help?` | **0.005** | **0** |
+
+**It is not dilution.** Padding of the same length in the same slot leaves the
+score at 0.998. It is the pleasantry, and the head answered it with the
+zero-cardinality prior it had learned for chatter — a prior 43 terse examples
+were never going to move, and which nothing in the corpus contradicted at the
+length and register real sessions actually open with.
+
+**2. Sixty-four documentation questions were labelled `is_docs=False`.** They sat
+in `no_task_stateful`, whose `assemble_data` branch hardcodes the flag, so every
+usage question that arrived with history or an active set trained as NOT a docs
+turn: "what actually is a watcher", "where does daintree put worktrees on disk",
+"how do i change which coding agent daintree uses by default".
+
+This is a sharper diagnosis than the one recorded above it. The previous entry
+read the 113/120-cold vs 5/120-loaded split as *absence* — docs positives never
+carrying context. It was worse than absence: the same question was in the corpus
+labelled both ways, and the contradictions all sat on the contextful side. A
+perfect correlation the head can exploit is bad; a perfect correlation that is
+also **wrong** is what produced a confident 'no'.
+
+Deixis was the third: `"in this app"` appeared in **0 of 207** docs rows, and
+`"how do you …"` in **0 of 207**. Cold, "How do I create a worktree?" answered
+docs=true while "How do I create worktrees in this app?" answered false.
+
+## What was done
+
+`training/augment_context.py` — deterministic, every row a transformation of a
+row already in the corpus, so a label can only be as wrong as its source. It
+relabels the 60 curated contradictions (4 of the 64 excluded: a pasta recipe that
+matched only on the word "recipe", and three general-git concept questions the
+product documentation does not own), then propagates the docs bundle's label to
+every matching query and ASSERTS that no query is left carrying both — curation
+is a list, and three contradictions survived it, one of them in a `topic_shift`
+row that no source-specific gate could ever have reached.
+`assemble_data`'s docs branch now carries `history`; a docs row that cannot
+express context cannot teach its way out of a context shortcut, and its dedupe
+signature now includes `is_docs`, so two identical inputs disagreeing on the flag
+are a conflict rather than a silent duplicate.
+
+Corpus 8,640 → 9,774. Docs positives 207 → 499. `"this app"` 0 → 38,
+`"how do you"` 0 → 39.
+
+**Four rules the generator has to follow, each of which it broke first.** They
+are the transferable part of this round; the row counts are not.
+
+1. **Carry the source row's answer, never `[]`.** 21 of the 207 docs positives
+   legitimately require skills — a docs turn and an operational turn are not
+   exclusive, which is the entire premise of the pinned docs runbook arriving
+   *alongside* another one. The first draft hardcoded `skill_ids: []` in every
+   family and generated 25 rows training "answer with nothing" for requests whose
+   own source row demands `diagnostics` or `watch-outcome`.
+2. **Never emit into a bundle that cannot express the label you need.** The
+   routing families go through the branch that hardcodes `is_docs=False`, so
+   sampling a docs positive into them produced a row contradicting its own
+   source — the exact defect being repaired, reintroduced by the repair.
+3. **A borrowed history must not move the referent.** "where are the logs kept"
+   after a walk through five monorepo services is a question about those
+   services. Task histories are now grafted only onto questions that NAME the
+   product; social lead-ins carry no referent and can go anywhere.
+4. **Rephrase questions, not statements.** `_deixis` suffixed free text into
+   "the mcp says disconnected, what now in this app", and a `_compound` tail
+   built "…pinned and configured agents, and when would I want one?". Both
+   transforms now require a question-shaped opener.
+
+**No active-set docs family**, though the previous round's notes called for one.
+It was built (60 rows) and removed on two independent grounds: serving takes the
+docs decision from a second pass with the active set EMPTIED, so those rows could
+never reach the path they were meant to teach; and an active set with an empty
+answer trains eviction, because an authoritative empty result CLEARS the active
+set. The corpus already holds 318 rows of that shape under `no_task_stateful`,
+and this round declines to add 60 more to a convention it has not measured.
+
+`can i …` is deliberately NOT converted to second person. "can you pin an agent"
+is a request to pin one at least as often as a question about whether pinning
+exists, and a docs positive that reads as an imperative teaches the head to raise
+the docs flag on ordinary work.
+
+## An augmentation is not free of the balance it lands in
+
+The first pass added 320 routing rows against ~570 zero-cardinality ones and was
+exported and scored before the skew was noticed. It moved the corpus from 13.8%
+zero-answer to 17.5% and thinned the two-skill class from 3.3% to 3.0%, and the
+cardinality head followed the prior it was given: **docs 20/21 with multi-skill
+at 2/5**, against 4/5 before. Pass 2 raised the routing families to 600
+single-skill rows and added 95 two-skill lead-in rows, landing the two-skill
+class at 3.8%, and took multi-skill back to 4/5 for one docs case.
+
+**Adding rows to fix one head moves the prior of another.** The two are trained
+from one corpus, and nothing but the per-category table showed it — the headline
+recall-pass moved by one case while a fifth of the multi-skill category fell out.
+
+## Result
+
+int8 **164/177 (92.7%)**, docs flag **19/21**, `card` 0.969, val exact-match
+0.931, r@32 1.000, shortlist-order ablation 0/173.
+
+Scored against the PREVIOUS artifact re-run on the SAME 177-case suite, rather
+than against its own smaller one:
+
+| | recall-pass | docs flag |
+|---|---|---|
+| previous artifact | 161/177 | 14/21 |
+| this artifact | **164/177** | **19/21** |
+
+The two numbers measure different heads, and only one of them can see this
+round's point: `recall_pass_flags` scores skill ids and ignores `expect.docs`
+entirely, so the docs gain is invisible to the routing figure and vice versa.
+
+Seven cases fixed, four broken:
+
+```
++ status-overview                              - wake-the-box-worktree-already-exists
++ recover-spawn-no-terminal-id                 - plain-worktree-not-an-agent-spawn
++ explore-not-docs                             - search-closed-prs-is-find-work
++ docs-negative-continuation-work              - issue-plus-poll
++ docs-usage-question-after-unrelated-exchange
++ docs-deictic-product-reference
++ novel-resolve-one-queue-item
+```
+
+`docs-usage-question-after-unrelated-exchange` is the case the PREVIOUS round
+added and could not pass. `search-closed-prs-is-find-work` is not a casualty of
+the augmentation: `find-issue-work` gained its pull-request vocabulary in a skill
+edit that landed AFTER both stages had trained, so the encoders never saw the
+words the case is about and the corpus has no PR-search rows at all. Its own note
+asks for a retrain, which is the follow-up, not this round.
+
+Every phrasing from the reported session now answers docs=true — including "in
+this app" behind a greeting, and with the user's original typo — and every
+operational instruction routes identically with or without a pleasantry in front
+of it.
+
+## What the benchmark could and could not do
+
+Three cases were added, and one of them was worthless when first written. An
+early draft of `docs-usage-question-after-greeting` reused the canonical cold
+question, which the BROKEN artifact already answered docs=true on and already
+returned no skills for: it passed on both artifacts and scored the mitigation
+rather than the bug. A regression case has to be a question the old artifact gets
+WRONG, and checking that requires actually running the old artifact — which is
+why the old one was kept and re-scored rather than trusted from its recorded
+numbers. It is now the deictic question, twinned against
+`docs-deictic-product-reference`, and the two differ only by the greeting.
+
+Note also what these cases are and are not. The augmentation deliberately
+generates `"in this app"` rows, so these are targeted regression guards, not
+independent generalization evidence — the same warning this file already records
+about benchmarks generated from the training data's assumptions. Their value is
+provenance: the wording is a real session's, not invented to match the corpus.
+
+And they carry a booby trap for whoever adds the next one. `assemble_data`'s
+contamination gate drops any training row whose query **or history** collides
+with a benchmark string, and the social lead-in rows carry their greeting in the
+history — so wording a benchmark greeting like a corpus one silently deletes the
+rows that teach the lesson, leaving the case failing for a reason invisible in
+the diff. `tests/unit/test_training_corpus_guards.py` now asserts the two
+vocabularies stay disjoint, and asserts the no-contradictory-docs-label
+invariant alongside it.
+
+**`routing_revision_matches_catalog` is now `false` in the baseline**, and that
+is the drift signal working rather than a fault. The stamp is taken at TRAIN
+time; two skills' `whenToUse` lines moved after stage 2 finished. Nothing gates
+on it — the head has no per-skill weights and `sync()` re-embeds the moved
+documents on load — but it is the honest record that the next retrain has
+PR-search vocabulary to pick up.
+
+**Still open.**
+
+1. **The docs loss is trained on the wrong render.** `train_setwise` computes all
+   three losses on the contextual `build_query()`, while serving reads the docs
+   logit from a second pass over the BARE question with an empty active set. So
+   the contextful docs rows added here cannot directly teach the path that is
+   actually served — the gain measured above comes from the bare rows. Training
+   the docs loss on its own bare view is the change that would make the second
+   pass unnecessary, and it deserves its own measured round.
+2. **`DOCS_THRESHOLD` is calibrated against a corpus that no longer exists** —
+   199/207 recall and 6 false positives were measured at 207 positives, and there
+   are now 499. The sweep is owed; the stale figures in `setwise.py` are marked
+   as historical rather than current.
+3. `docs-question-mid-workflow` still misses its skill: the mitigation strips
+   context from OUTSIDE the message and cannot strip framing INSIDE one.
+   `docs-negative-do-the-thing` remains.

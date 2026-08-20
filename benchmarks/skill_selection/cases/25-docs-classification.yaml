@@ -304,3 +304,64 @@ cases:
     expect:
       required: []
       docs: true
+
+  - id: docs-deictic-product-reference
+    category: docs-classification
+    note: >-
+      "in this app" instead of "in Daintree" — the user pointing at the product
+      they are already inside rather than naming it. Zero of the original 207
+      docs rows contained the phrase, and it cost the whole classification:
+      measured cold on the pre-retrain artifact, "How do I create a worktree?"
+      answered docs=true while this wording answered false, with nothing else
+      changed.
+
+      The wording is the user's own from ses_3a3cd1e7, typo repaired — the typo
+      is not the bug and a case that carried it would be scoring the tokenizer.
+
+      This is the COLD half of a twin: docs-usage-question-after-greeting is the
+      identical string behind a social exchange. Read the pair together and the
+      only variable between them is the history. It is deliberately NOT twinned
+      against docs-how-do-i-worktree — that one asks about a pull request and
+      this one does not, so the deixis comparison is a MEASUREMENT (recorded in
+      EXPERIMENTS.md), not something this file can claim by construction.
+    messages:
+      - role: user
+        content: How do I create worktrees in this app?
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-usage-question-after-greeting
+    category: docs-classification
+    note: >-
+      Reproduces session ses_3a3cd1e7, and it is a DIFFERENT failure from
+      docs-usage-question-after-unrelated-exchange even though both put history
+      in front of the question. There the lead-in is a real exchange about a real
+      thing; here it is pure pleasantry carrying no task at all — the shape every
+      session starts with and the shape the corpus barely has. Of 2,116
+      history-bearing rows only 43 open on a greeting, all of them terse and
+      answered in one clause — 2.0%, and none at the length a real session
+      opens with.
+
+      The question is docs-deictic-product-reference's string verbatim, so the
+      ONLY variable is the pleasantry.
+
+      It must be a question the artifact can get WRONG cold, or the case proves
+      nothing: an earlier draft used the docs-how-do-i-worktree string, which the
+      broken artifact already answered docs=true on and already returned no
+      skills for — it passed on the old artifact and the new one alike, scoring
+      the mitigation rather than the bug. The greeting is worded differently from
+      every greeting in the corpus on purpose; see the contamination note in
+      50-topic-shift.yaml.
+    messages:
+      - role: user
+        content: afternoon — all well with you?
+      - role: assistant
+        content: >-
+          All well, thanks. Nothing running at the moment: one worktree on
+          develop and a single idle terminal. What would you like to do?
+      - role: user
+        content: How do I create worktrees in this app?
+    expect:
+      required: []
+      docs: true

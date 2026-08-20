@@ -38,7 +38,10 @@ PR was reported, not that none exists. If neither ties them and the user named o
 ask rather than guessing — reporting on the wrong PR is worse than a clarifying question.
 `forge.listPRs({"arguments": {"state": "open"}})` lists open PRs carrying `number`, `url`
 and `headRef` (the source branch — the field is `headRef`, not `head`) if you must match on
-branch. (`forge.listPRs` accepts no `search` key at all; it is rejected outright.)
+branch. It also takes a `search` fragment (`head:<branch>` narrows to one branch directly),
+which beats paging when the PR is old or closed; searching for the right PR to READ is
+fine here, but a request to survey or triage a SET of them is
+daintree.workflow.find-issue-work.
 
 ## Step 2 — Read the review decision and CI verdict
 Two free typed calls, and they are not interchangeable. Emit them in ONE reply so they run

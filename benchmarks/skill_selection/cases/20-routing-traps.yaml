@@ -320,3 +320,32 @@ cases:
     expect:
       required: [daintree.worktree.create-plain-worktree]
       optional: [daintree.foundation]
+
+  - id: search-closed-prs-is-find-work
+    category: routing-trap
+    note: >-
+      Added when forge.listPRs gained a `search` key. Finding a SET of past PRs by
+      topic is a search-and-shortlist job, so it belongs with the runbook that owns
+      the provider query dialect; follow-up-on-issue is the bait because it owns PRs
+      generally, but its scope is reading ONE known PR's state. Currently a MISS at
+      selection time: the artifact predates the PR-search vocabulary and answers
+      follow-up-on-issue. Scored, not asserted — the corpus fix is a retrain.
+    messages:
+      - role: user
+        content: Find the closed PRs about the theme work.
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: one-known-pr-state-is-follow-up
+    category: routing-trap
+    note: >-
+      The other direction of the same boundary, and the one that must not regress
+      now that find-issue-work advertises pull requests in its whenToUse. A single
+      named PR with a state question is a read, not a search.
+    messages:
+      - role: user
+        content: Is PR #11892 green? Did the reviewer sign it off?
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]

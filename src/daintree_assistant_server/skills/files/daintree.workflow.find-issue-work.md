@@ -1,8 +1,8 @@
 ---
 id: daintree.workflow.find-issue-work
 title: Find forge issue work
-summary: Search the issue tracker with a provider-native query, then screen the hits against work already in flight so the shortlist only contains issues nobody has started.
-whenToUse: Use when the user wants to FIND issues rather than start one — search or filter the tracker, triage the backlog, "what should I pick up next", "anything unassigned", "find me a small bug nobody's on" — or to check whether an issue is already being worked before committing to it. The deliverable is a shortlist or one chosen issue, NOT a launched agent. Do not use once the issue is chosen and the user wants it started (use daintree.workflow.start-work-on-issue); to launch a batch of issues in parallel, one agent each (use daintree.orchestration.fan-out-work); to reconstruct what was already running across earlier sessions (use daintree.orchestration.status-and-resume); or to read an existing PR's CI, review state or issue thread (use daintree.workflow.follow-up-on-issue).
+summary: Search issues or pull requests with a provider-native query, then screen the hits against work already in flight so the shortlist only contains work nobody has started.
+whenToUse: Use when the user wants to FIND issues or pull requests rather than start one — search or filter the tracker, triage the backlog, "what should I pick up next", "anything unassigned", "find me a small bug nobody's on" — or to locate past pull requests by text, "find the closed PRs about X", "which PRs touched Y", "did we ever ship Z" — or to check whether an issue is already being worked before committing to it. The deliverable is a shortlist or one chosen issue, NOT a launched agent. Do not use once the issue is chosen and the user wants it started (use daintree.workflow.start-work-on-issue); to launch a batch of issues in parallel, one agent each (use daintree.orchestration.fan-out-work); to reconstruct what was already running across earlier sessions (use daintree.orchestration.status-and-resume); or to read an existing PR's CI, review state or issue thread (use daintree.workflow.follow-up-on-issue).
 risk: read
 requiredTools:
   - context.snapshot
@@ -73,9 +73,24 @@ Two gotchas worth remembering: `-no:assignee` is INVALID — negation does not c
 API that CAPS result depth, so a big query is a sample, not a census — say so rather than
 claiming you swept the whole backlog.
 
-There is no `search` on `forge.listPRs`. No provider on the roster can query PRs, so the
-key is rejected outright rather than quietly returning an unfiltered page — filter PRs
-with `state` and read the ones you need.
+`forge.listPRs` takes `search` on the same terms — same nesting, same key set, same
+generated prefix and 256-character budget — with one addition: its `state` also accepts
+`merged`. Merged-ness is a STATE, so ask for it as `"state": "merged"` rather than writing
+it into the fragment. The dialect shifts where PRs differ from issues: `is:draft`,
+`review:approved`, `review:changes_requested`, `head:<branch>` and `base:<branch>` are the
+qualifiers worth knowing, alongside the `author:` / `label:` / `created:` ones that carry
+over. Free text is keyword-matched against titles, so "the theme PRs we closed" is a
+`search` of `theme` at `"state": "closed"` — not a walk through the whole closed list.
+
+```
+forge.listPRs({"arguments": {"state": "closed", "search": "theme", "perPage": 30}})
+```
+
+Two things do NOT carry over. Result depth is capped the same way, so a PR search is a
+sample and worth saying so. And never read `ciStatus` off a searched PR row: it is not
+guaranteed on any bulk item, and a searched row is the least enriched of them, so a green
+there may only be the coarse roll-up rather than the required-check verdict. CI comes from
+`forge.getChecks` on the number (daintree.workflow.follow-up-on-issue).
 
 ## Step 3 — Page only as far as you need
 The result is `{ items, nextCursor, hasMore }`. To continue, pass the PREVIOUS response's
