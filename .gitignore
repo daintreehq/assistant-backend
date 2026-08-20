@@ -78,6 +78,11 @@ training/logs/
 # that matter are transcribed into training/EXPERIMENTS.md — which is the record.
 # The report is published as a claude.ai artifact, not carried in the repo.
 training/results/
+# Per-run generator journals (the raw agent output a retrain assembles from).
+# Session-local by design and not reconstructible from a fresh clone, so they are
+# not the record — assemble_data folds them into training/data/selection.jsonl,
+# which is. Ignored so a retrain does not leave untracked clutter behind.
+training/journals/
 # Generated synthetic corpora are NOT ignored: training/data/*.jsonl is checked in
 # as the record of what the shipped weights were trained on.
 
