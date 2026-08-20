@@ -38,25 +38,18 @@ def split_when_to_use(when: str) -> tuple[str, str]:
 def skill_document(meta: Any, *, variant: str = "full") -> str:
     """Render one skill as the document a ranker scores against.
 
-    The two models pay for document length in different currencies, so they get
-    different documents:
+    Both selector stages embed a skill ONCE — at build time, or on catalog load
+    for a skill that appeared afterwards — and read the vector thereafter. Length
+    is therefore free at request time, which is why the shipped variant is
+    ``full``: the exclusion clauses ("do not use for X") are the routing signal,
+    and they sit at the END of a whenToUse line. Measured on the real catalog,
+    skill documents run to a p50 of 262 tokens and a max of 368, so a document
+    cap set for the conversation side would silently cut exactly the clauses that
+    separate neighbouring skills.
 
-    - The **bi-encoder** embeds each skill ONCE, into a stored index. Length is
-      free at request time, so it gets everything — the exclusion clauses
-      included, since their vocabulary genuinely helps pull the right
-      neighbourhood.
-    - The **cross-encoder** re-reads its documents on EVERY request and its cost
-      is linear in sequence length. Measured on the real catalog: a pool of 10 at
-      the ``full`` variant (mean 237 tokens) costs ~90ms, the same pool at
-      ``short`` (mean 45 tokens) costs ~20ms. Handing it the exclusion clauses
-      would more than quadruple the single number this whole path exists to cut.
-
-    That trade is only safe because the reranker is FINE-TUNED: boundary
-    negatives mined from the exclusion clauses are in its training set, so it
-    learns "this query belongs to Y, not X" as weights instead of needing to
-    re-read the rule at inference. The knowledge moves from the prompt into the
-    parameters — which is the entire reason a small local model can replace a
-    large prompted one here.
+    The narrower variants remain because the trainers can select one, and because
+    ``trigger``/``short`` are the ablation: they answer "how much of the routing
+    is the positive description doing, and how much is the fence".
     """
     title = (getattr(meta, "title", "") or "").strip()
     summary = (getattr(meta, "summary", "") or "").strip()
@@ -76,52 +69,23 @@ def skill_document(meta: Any, *, variant: str = "full") -> str:
     raise ValueError(f"unknown skill document variant: {variant!r}")
 
 
-#: Which rendering the bi-encoder's stored index uses. Free at request time — the
-#: index is built once — so it gets everything, exclusion clauses included.
+#: Which rendering the skill embedding table uses. Free at request time — a skill
+#: is embedded once and looked up thereafter — so it gets everything, exclusion
+#: clauses included.
 INDEX_DOC_VARIANT = "full"
 
-#: Which rendering the cross-encoder scores at request time.
+#: Prefix carrying conversation STATE into the selector's QUERY text.
 #:
-#: Set from training/sweep_reranker.py, and it is a genuine latency/accuracy
-#: trade rather than a free choice: cost is linear in sequence length, measured
-#: at ~20ms for a pool of 10 at `short` (~45 tokens) against ~90ms at `full`
-#: (~237 tokens). `full` is affordable here only because the call being replaced
-#: costs 2044ms — in a normal reranking setting it would not be.
-SERVING_DOC_VARIANT = "full"
-
-#: Prefix marking a candidate that is ALREADY LOADED for this conversation.
+#: Continuation and topic-shift turns are near-identical in wording and differ
+#: only in which skills are already open, so the model cannot separate them from
+#: the words alone. Measured without it: continuation 9/9 and topic-shift 1/9 at
+#: one history budget, 4/9 and 6/9 at another — a pure trade with no setting
+#: winning both.
 #:
-#: The prompted selector is handed a "Currently active skills:" line and an
-#: explicit instruction that omitting one EVICTS it mid-runbook. The local ranker
-#: had no equivalent, and the cost of that was measurable and specific: with
-#: enough conversation history in the query it scored continuation 9/9 and
-#: topic-shift 1/9; with none it scored 4/9 and 6/9. Every history budget in
-#: between traded one against the other and none won both, because a single
-#: query vector cannot separate "this continues the loaded work" from "this
-#: leaves it behind" — the two turns look almost identical, and what
-#: distinguishes them is a fact about STATE, not about the words.
-#:
-#: Marking the candidate instead of the query puts that fact where the
-#: cross-encoder can weigh it per skill: it sees "this specific runbook is the
-#: one already open" and learns, from continuation and topic-shift examples
-#: alike, when that earns the slot and when it does not.
-ACTIVE_MARKER = "[currently loaded] "
-
-
-def mark_active(document: str, *, active: bool) -> str:
-    """Prefix a candidate document when that skill is already loaded."""
-    return f"{ACTIVE_MARKER}{document}" if active else document
-
-
-#: Prefix carrying conversation STATE into the classifier's QUERY text.
-#:
-#: The ``ACTIVE_MARKER`` above is the same idea for a per-candidate document; the
-#: classifier has no per-candidate document to attach it to, so the fact goes in
-#: the query instead. Continuation and topic-shift turns are near-identical in
-#: wording and differ only in which skills are already open, so the model cannot
-#: separate them from the words alone. Measured without it: continuation 9/9 and
-#: topic-shift 1/9 at one history budget, 4/9 and 6/9 at another — a pure trade
-#: with no setting winning both.
+#: The set-wise head ALSO gets the same fact per candidate, as the ``active``
+#: feature: the prefix tells the encoder that a workflow is running, the feature
+#: tells the head which specific slot is the one already open. Both, because they
+#: answer different halves of the question.
 #:
 #: Lives HERE, beside the rest of the render contract, because BOTH sides of the
 #: pipeline must format it identically: the trainer builds every training input
@@ -209,16 +173,22 @@ def query_document(
 
 
 def routing_revision(catalog: Any) -> str:
-    """Hash of the catalog's ROUTING surface — what the classifier trains on.
+    """Hash of the catalog's ROUTING surface — the text the selector trains on.
 
     Deliberately narrower than ``catalog.revision``, which hashes whole skill
-    BODIES: the classifier reads only id/title/summary/whenToUse, so a body-only
-    edit (the common skill-learning case) must not invalidate the head. The
-    trainer stamps this into the artifact at TRAIN time; the export copies it
-    verbatim; serving recomputes it from the live catalog and refuses to serve
-    on mismatch. Stamping at export was measured to be a false-provenance trap:
-    retraining nothing and re-exporting would have blessed stale weights with a
-    fresh revision.
+    BODIES: the selector reads only id/title/summary/whenToUse, so a body-only
+    edit (the common skill-learning case) leaves it untouched.
+
+    **This no longer gates anything at request time.** Under the fixed-head
+    classifier it did: a head with one weight row per skill could not name a
+    skill it had not trained on, so a mismatch had to degrade every turn open.
+    The two-stage selector has no per-skill weights, so a moved catalog is
+    answered rather than refused, and this hash survives as a DRIFT SIGNAL — the
+    trainer stamps it, the baseline records it, and a human reading a release can
+    see how far the corpus has fallen behind the catalog. Stamping it at export
+    rather than at train time was measured to be a false-provenance trap:
+    retraining nothing and re-exporting would bless stale weights with a fresh
+    revision.
     """
     import hashlib
 

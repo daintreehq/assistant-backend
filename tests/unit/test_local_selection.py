@@ -15,13 +15,13 @@ from pathlib import Path
 
 import pytest
 
-from daintree_assistant_server.skills.local.classifier import SkillClassifier, admit
 from daintree_assistant_server.skills.local.documents import (
     query_document,
     skill_document,
     split_when_to_use,
 )
 from daintree_assistant_server.skills.local.runtime import InferencePool
+from daintree_assistant_server.skills.local.setwise import SetwiseClassifier, admit
 
 
 @dataclass
@@ -133,30 +133,36 @@ def test_admit_bonus_rides_above_the_floor_up_to_the_cap() -> None:
     which fell below the floor once it moved to 0.55: the assertion still passed
     but for the wrong reason, and a removed cap check would not have failed it.
     """
-    ranked = [("a", 0.90), ("b", 0.80), ("c", 0.70), ("d", 0.60)]
+    ranked = [("a", 0.90), ("b", 0.80), ("c", 0.70), ("d", 0.69)]
+    assert all(p > SetwiseClassifier.BONUS_FLOOR for _, p in ranked)
     # cardinality said one; all four clear the floor, so only the cap of 3 binds
     assert admit(ranked, set(), 1, 3) == ["a", "b", "c"]
 
 
 def test_admit_bonus_floor_excludes_the_band_below_it() -> None:
-    """Pins the FLOOR'S VALUE, not just the rule.
+    """The band immediately BELOW the floor is excluded, immediately above rides.
 
-    Every other test here is written relative to the constant, so reverting
-    BONUS_FLOOR to 0.50 kept the whole suite green while silently restoring the
-    false positive the move exists to stop: "create a new claude code terminal"
-    loading create-plain-worktree at 0.546 alongside a correct, cardinality-1
-    answer. This is the regression that notices.
+    Written as an epsilon either side of the constant rather than as two
+    literals. The floor is a calibrated value — it is re-derived against each
+    exported artifact's sigmoid by ``training/calibrate_floors.py`` and has
+    already moved once (0.55 under the fixed-head classifier, 0.45 under the
+    set-wise head) — so hardcoded scores stop testing the boundary the moment it
+    moves and quietly become mid-band cases that pass for the wrong reason.
     """
-    assert admit([("correct", 0.91), ("marginal", 0.546)], set(), 1, 3) == ["correct"]
+    floor = SetwiseClassifier.BONUS_FLOOR
+    assert admit([("correct", 0.91), ("marginal", floor - 0.01)], set(), 1, 3) == [
+        "correct"
+    ]
     # ...and the floor still admits what it is meant to admit
-    assert admit([("correct", 0.91), ("worth_it", 0.56)], set(), 1, 3) == [
+    assert admit([("correct", 0.91), ("worth_it", floor + 0.01)], set(), 1, 3) == [
         "correct",
         "worth_it",
     ]
 
 
 def test_admit_bonus_stops_at_the_first_below_floor_score() -> None:
-    ranked = [("a", 0.9), ("b", 0.45), ("c", 0.44)]
+    floor = SetwiseClassifier.BONUS_FLOOR
+    ranked = [("a", 0.9), ("b", floor - 0.01), ("c", floor - 0.02)]
     assert admit(ranked, set(), 1, 3) == ["a"]
 
 
@@ -169,7 +175,7 @@ def test_admit_bonus_does_not_readmit_an_active_skill_below_the_floor() -> None:
     with nothing active, so it would still pass a refactor that exempted active
     skills from the floor — which is exactly the drift this pins.
     """
-    ranked = [("newcomer", 0.9), ("stale", 0.45)]
+    ranked = [("newcomer", 0.9), ("stale", SetwiseClassifier.BONUS_FLOOR - 0.01)]
     assert admit(ranked, {"stale"}, 1, 3) == ["newcomer"]
 
 
@@ -182,8 +188,8 @@ def test_admit_floors_are_inclusive_at_their_exact_boundary() -> None:
     boundary test written with a hardcoded number stops testing the boundary the
     moment one moves — it just becomes another mid-band case.
     """
-    newcomer_floor = SkillClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
-    bonus_floor = SkillClassifier.BONUS_FLOOR
+    newcomer_floor = SetwiseClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
+    bonus_floor = SetwiseClassifier.BONUS_FLOOR
     # a newcomer exactly ON the newcomer floor, with a workflow active
     assert admit([("running", 0.9), ("newcomer", newcomer_floor)], {"running"}, 2, 3) == [
         "running",
@@ -194,9 +200,14 @@ def test_admit_floors_are_inclusive_at_their_exact_boundary() -> None:
 
 
 def test_admit_bonus_newcomer_still_owes_the_higher_floor() -> None:
-    """With a workflow active, a 0.60 newcomer clears the bonus floor but not
-    the newcomer floor — it stays out; a 0.58 ACTIVE skill rides."""
-    ranked = [("running", 0.9), ("newcomer", 0.60), ("also_running", 0.58)]
+    """A score BETWEEN the two floors clears the bonus floor but not the
+    newcomer floor: a newcomer at it stays out, an ACTIVE skill at it rides."""
+    between = (
+        SetwiseClassifier.BONUS_FLOOR + SetwiseClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
+    ) / 2
+    assert between > SetwiseClassifier.BONUS_FLOOR
+    assert between < SetwiseClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
+    ranked = [("running", 0.9), ("newcomer", between), ("also_running", between)]
     got = admit(ranked, {"running", "also_running"}, 1, 3)
     assert got == ["running", "also_running"]
 
@@ -212,24 +223,25 @@ def test_admit_respects_max_active_over_count() -> None:
 
 
 class _StubClassifier:
-    """Duck-typed SkillClassifier: fixed answer, recorded inputs."""
+    """Duck-typed SetwiseClassifier: fixed answer, recorded inputs."""
 
-    def __init__(self, revision: str | None = None, skill_ids: list[str] | None = None,
+    def __init__(self, skill_ids: list[str] | None = None,
                  docs: bool = False, fail: bool = False) -> None:
-        # None -> "match whatever catalog the selector holds"; the fixture fills
-        # it in with the real routing hash of the stub catalog.
-        self.routing_revision = revision or ""
         self._ids = skill_ids if skill_ids is not None else ["daintree.terminals.rename"]
         self._docs = docs
         self._fail = fail
         self.calls: list[tuple[str, list[str]]] = []
+        #: Every catalog handed to select(), so a test can assert the selector
+        #: passes the SNAPSHOT it validated against and not a re-read of live state.
+        self.catalogs: list[object] = []
 
-    def select(self, query: str, active_ids=(), *, max_active: int = 3,
+    def select(self, query: str, active_ids=(), *, catalog=None, max_active: int = 3,
                docs_threshold: float = 0.5):
         if self._fail:
             raise RuntimeError("bad graph")
         self.calls.append((query, list(active_ids)))
-        from daintree_assistant_server.skills.local.classifier import Selection
+        self.catalogs.append(catalog)
+        from daintree_assistant_server.skills.local.setwise import Selection
 
         return Selection(skill_ids=list(self._ids), docs_wanted=self._docs,
                          cardinality=len(self._ids),
@@ -256,15 +268,10 @@ class _StubSettings:
     max_active_skills = 3
 
 
-def _local_selector(classifier: _StubClassifier, *, stale: bool = False):
-    from daintree_assistant_server.skills.local.documents import routing_revision
+def _local_selector(classifier: _StubClassifier):
     from daintree_assistant_server.skills.local.selector import LocalSelector
 
     catalog = _StubCatalog({"daintree.terminals.rename", "daintree.foundation"})
-    if not classifier.routing_revision:
-        classifier.routing_revision = (
-            "routing:STALE" if stale else routing_revision(catalog)
-        )
     pool = InferencePool(workers=1, queue_depth=2, timeout_seconds=5.0)
     return LocalSelector(classifier, pool, _StubManager(catalog), _StubSettings()), pool  # type: ignore[arg-type]
 
@@ -282,20 +289,36 @@ def test_local_selector_returns_the_classifier_answer() -> None:
     asyncio.run(go())
 
 
-def test_local_selector_degrades_open_on_a_stale_head() -> None:
-    """A head trained against a different catalog must never serve its answer.
+def test_local_selector_serves_a_catalog_the_artifact_never_saw() -> None:
+    """A changed catalog is answered, not degraded — the architecture's point.
 
-    Its skill rows point at documents that no longer exist, and the failure
-    would otherwise be silent and confident — the worst kind.
+    The previous selector owned one weight row per skill, so it had to compare a
+    stamped routing revision and degrade every turn open until a human
+    retrained. This one reads skill EMBEDDINGS, so an unfamiliar catalog is just
+    unfamiliar vectors: it is passed through to the model and answered.
     """
 
     async def go() -> None:
         clf = _StubClassifier()
-        sel, pool = _local_selector(clf, stale=True)
+        sel, pool = _local_selector(clf)
         decision = await sel.select([_Msg("user", "rename my terminals")], ["prior.skill"])
-        assert decision.degraded
-        assert decision.warnings == ["local_skill_selector_stale_catalog"]
-        assert clf.calls == [], "a stale head must not be consulted at all"
+        assert not decision.degraded
+        assert decision.ran and decision.authoritative
+        assert clf.calls, "the model must be consulted for an unfamiliar catalog"
+        pool.close()
+
+    asyncio.run(go())
+
+
+def test_local_selector_passes_the_catalog_snapshot_to_the_model() -> None:
+    """The embedding table is reconciled against the SAME snapshot the decision
+    used — a re-read could reconcile against a catalog the guards never saw."""
+
+    async def go() -> None:
+        clf = _StubClassifier()
+        sel, pool = _local_selector(clf)
+        await sel.select([_Msg("user", "rename my terminals")], [])
+        assert clf.catalogs[0] is sel.catalog
         pool.close()
 
     asyncio.run(go())
@@ -386,54 +409,142 @@ def test_local_selector_docs_query_is_the_cleaned_last_user_message() -> None:
 
 
 # --------------------------------------------------------------------------
-# SkillClassifier — against the real shipped artifact (skips without LFS)
+# SetwiseClassifier — against the real shipped artifact (skips without LFS)
 # --------------------------------------------------------------------------
 
 _ARTIFACT = (
     Path(__file__).resolve().parents[2]
-    / "src/daintree_assistant_server/skills/local/artifacts/classifier"
+    / "src/daintree_assistant_server/skills/local/artifacts/selector"
 )
 
 
 def _artifact_present() -> bool:
-    """True when the int8 graph is real bytes, not an unfetched LFS pointer."""
-    graph = _ARTIFACT / "model_int8.onnx"
-    return graph.is_file() and graph.stat().st_size > 1_000_000
+    """True when both int8 graphs are real bytes, not unfetched LFS pointers."""
+    graphs = [
+        _ARTIFACT / "retriever" / "model_int8.onnx",
+        _ARTIFACT / "ranking" / "model_int8.onnx",
+        _ARTIFACT / "head.onnx",
+    ]
+    return all(g.is_file() and g.stat().st_size > 1_000_000 for g in graphs[:2]) and (
+        graphs[2].is_file() and graphs[2].stat().st_size > 1_000
+    )
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="classifier artifact not present (LFS)")
+def _live_selector():  # type: ignore[no-untyped-def]
+    from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
+    from daintree_assistant_server.skills.local.setwise import SetwiseClassifier
+
+    catalog = load_catalog(default_skills_dir())
+    clf = SetwiseClassifier(_ARTIFACT)
+    clf.sync(catalog)
+    return clf, catalog
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
 def test_shipped_classifier_selects_a_plausible_skill() -> None:
-    from daintree_assistant_server.skills.local.classifier import SkillClassifier
-
-    clf = SkillClassifier(_ARTIFACT)
+    clf, _ = _live_selector()
     sel = clf.select("rename my terminals so i can tell the agents apart", [])
     assert "daintree.terminals.rename" in sel.skill_ids
     assert 0 < sel.cardinality <= 3
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="classifier artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
 def test_shipped_classifier_returns_empty_on_chatter() -> None:
-    from daintree_assistant_server.skills.local.classifier import SkillClassifier
-
-    clf = SkillClassifier(_ARTIFACT)
+    clf, _ = _live_selector()
     assert clf.select("thanks, that's perfect", []).skill_ids == []
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="classifier artifact not present (LFS)")
-def test_shipped_classifier_head_matches_the_live_catalog() -> None:
-    """Every label row must be a skill the live catalog can actually load —
-    and the recorded revision must match, or the retrain runbook is overdue."""
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_shipped_table_covers_exactly_the_selectable_catalog() -> None:
+    """The table is built FROM the live catalog, so it can only ever match it.
+
+    Asserted anyway because the ids in it are what the selector may return, and
+    a table built from a stale ``vectors.npz`` that ``sync`` failed to reconcile
+    would offer skills the catalog cannot load.
+    """
+    clf, catalog = _live_selector()
+    table = clf.table
+    assert table is not None
+    assert set(table.ids) == set(catalog.selectable_ids)
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_skill_added_after_training_is_routable_without_retraining() -> None:
+    """The property the whole two-stage design exists for.
+
+    A skill the artifact has never seen — no weight row, no training row, not in
+    ``vectors.npz`` — is embedded on ``sync`` and can win a turn. Under the
+    previous fixed-head selector this was structurally impossible: there was no
+    output for it, and the routing-revision gate degraded every turn open until
+    someone retrained.
+
+    Note what this does and does not pin. The invented skill is deliberately
+    UNCONTESTED — nothing else in the catalog claims credential rotation — which
+    is the case zero-shot routing actually handles. Measured against skills that
+    share vocabulary with a trained neighbour it is much weaker (4/14 vs 13/14;
+    training/EXPERIMENTS.md), so this asserts "reachable", never "as good as
+    trained".
+    """
     from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
-    from daintree_assistant_server.skills.local.classifier import SkillClassifier
-    from daintree_assistant_server.skills.local.documents import routing_revision
+    from daintree_assistant_server.skills.local.setwise import SetwiseClassifier
 
     catalog = load_catalog(default_skills_dir())
-    clf = SkillClassifier(_ARTIFACT)
-    assert set(clf.labels) == set(catalog.selectable_ids)
-    assert clf.routing_revision == routing_revision(catalog)
+    clf = SetwiseClassifier(_ARTIFACT)
+    before = clf.sync(catalog)
+    invented = "daintree.secrets.rotate-credentials"
+    assert invented not in before.ids
+
+    # Deliberately IN-DOMAIN and unclaimed. An off-domain invention (the first
+    # draft of this test used piano tuning) tests the wrong thing: the
+    # cardinality head would rightly answer "this turn needs no skill", and the
+    # test would fail for a correct reason.
+    grown = _CatalogPlusOne(
+        catalog,
+        _StubSkill2(
+            invented,
+            "Rotate service credentials",
+            "Rotate, revoke and reissue API keys and tokens for a service, then "
+            "update everything that consumes them.",
+            "Use when the user wants credentials rotated, an API key reissued, or "
+            "a leaked token revoked and replaced.",
+        ),
+    )
+    after = clf.sync(grown)
+    assert invented in after.ids
+    # Not merely present — reachable. It must win its own obvious request.
+    sel = clf.select(
+        "rotate the api keys for the staging service and revoke the old ones",
+        [],
+        catalog=grown,
+    )
+    assert invented in sel.skill_ids
+    # And every other vector was REUSED rather than recomputed: the digest keys
+    # the row to the document it was built from, so a one-skill change costs one
+    # embedding, not a full rebuild.
+    kept = [sid for sid in before.ids if sid in after.ids]
+    for sid in kept:
+        assert before.digests[sid] == after.digests[sid]
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="classifier artifact not present (LFS)")
+class _StubSkill2:
+    def __init__(self, sid: str, title: str, summary: str, when: str) -> None:
+        self.id = sid
+        self.meta = _Meta(sid, title, summary, when)
+
+
+class _CatalogPlusOne:
+    """The live catalog with one extra skill, as a catalog-shaped duck type."""
+
+    def __init__(self, base, extra) -> None:  # type: ignore[no-untyped-def]
+        self._base = base
+        self._extra = extra
+        self.selectable_ids = set(base.selectable_ids) | {extra.id}
+
+    def get(self, sid: str):  # type: ignore[no-untyped-def]
+        return self._extra if sid == self._extra.id else self._base.get(sid)
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
 @pytest.mark.parametrize(
     ("query", "expected"),
     [
@@ -460,12 +571,12 @@ def test_shipped_classifier_head_matches_the_live_catalog() -> None:
     ],
 )
 def test_shipped_classifier_routes_each_new_mcp_skill(query: str, expected: str) -> None:
-    """Every newly shipped label must be reachable from a representative request."""
-    clf = SkillClassifier(_ARTIFACT)
+    """Every shipped skill must be reachable from a representative request."""
+    clf, _ = _live_selector()
     assert expected in clf.select(query, []).skill_ids
 
 
-@pytest.mark.skipif(not _artifact_present(), reason="classifier artifact not present (LFS)")
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
 @pytest.mark.parametrize(
     ("query", "excluded"),
     [
@@ -485,7 +596,7 @@ def test_shipped_classifier_routes_each_new_mcp_skill(query: str, expected: str)
 )
 def test_shipped_classifier_respects_new_skill_boundaries(query: str, excluded: str) -> None:
     """Broad MCP runbooks must not displace their common read-only/local neighbours."""
-    clf = SkillClassifier(_ARTIFACT)
+    clf, _ = _live_selector()
     assert excluded not in clf.select(query, []).skill_ids
 
 

@@ -59,14 +59,21 @@ daintree_assistant_server = [
     "prompts/tasks/*.md",
     "prompts/skill_learning/*.md",
     "skills/files/*.md",
-    # The local skill-selection classifier — the SHIPPED selector. int8 only:
-    # fp32 is gitignored and exists locally so the export can measure what
-    # quantisation costs. (The abandoned bi-encoder/reranker artifacts are not
-    # packaged or tracked at all; see training/EXPERIMENTS.md.)
-    "skills/local/artifacts/classifier/model_int8.onnx",
-    "skills/local/artifacts/classifier/tokenizer*.json",
-    "skills/local/artifacts/classifier/labels.json",
-    "skills/local/artifacts/classifier/meta.json",
+    # The local two-stage skill selector — the SHIPPED selector. Both encoders
+    # ship int8 only: fp32 is gitignored and exists locally so the export can
+    # measure what quantisation costs. The head is fp32 (~10MB) because it is
+    # 1% of the parameters and quantising it would trade numerical slack for
+    # memory nobody is short of. vectors.npz is a build-time CACHE of the
+    # catalog's embeddings — serving re-derives it from the live catalog, so a
+    # stale copy costs milliseconds, not correctness.
+    "skills/local/artifacts/selector/meta.json",
+    "skills/local/artifacts/selector/labels.json",
+    "skills/local/artifacts/selector/head.onnx",
+    "skills/local/artifacts/selector/vectors.npz",
+    "skills/local/artifacts/selector/retriever/model_int8.onnx",
+    "skills/local/artifacts/selector/retriever/tokenizer*.json",
+    "skills/local/artifacts/selector/ranking/model_int8.onnx",
+    "skills/local/artifacts/selector/ranking/tokenizer*.json",
 ]
 
 [tool.ruff]

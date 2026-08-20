@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from tools.baseline import BANDS, BASELINE_PATH, capture, compare
 
 
@@ -76,21 +78,42 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     assert identity["default_endpoint_sort"] == DEFAULT_POLICY.sort.value  # type: ignore[index]
     # There is no first-byte endpoint sort anymore: the call that sat on the
     # first-byte path (the upstream skill selector) was replaced by the LOCAL
-    # classifier, whose release facts are asserted below instead.
+    # two-stage selector, whose release facts are asserted below instead.
 
 
-def test_the_classifier_block_matches_the_shipped_artifact() -> None:
-    """The baseline pins the LOCAL selector's provenance.
+def test_the_selector_block_describes_the_shipped_artifact() -> None:
+    """The baseline pins the LOCAL selector's shape.
 
-    A retrain that forgets the export, or a catalog change that forgets the
-    retrain, shows up here as a failing push instead of a degraded-open
-    selector discovered in production logs.
+    Deliberately NOT a provenance gate any more. The set-wise head has no
+    per-skill weights, so a catalog that moved since training is served rather
+    than degraded — ``routing_revision_matches_catalog`` is captured as a
+    drift signal for a human, and asserting it would re-impose exactly the
+    coupling this architecture removed. What IS asserted is the shape the
+    serving code depends on.
+    """
+    from daintree_assistant_server.skills.local.setwise import FEATURE_NAMES
+
+    sel = _baseline()["selector"]
+    assert sel["selector_onnx_bytes"] > 1_000_000  # type: ignore[index]
+    assert sel["candidates"] >= 8  # type: ignore[index]
+    assert sel["ordering"] in {"equivariant", "positional", "blind"}  # type: ignore[index]
+    assert len(FEATURE_NAMES) == 3
+
+
+def test_the_shipped_table_covers_the_live_catalog() -> None:
+    """Every selectable skill must have a vector, or it can never be shortlisted.
+
+    This is the check that replaced the routing-revision gate: not "was the head
+    trained on this catalog" (it need not have been) but "can every skill in the
+    catalog be reached at all".
     """
     from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
-    from daintree_assistant_server.skills.local.documents import routing_revision
+    from daintree_assistant_server.skills.local.paths_local import selector_artifact_dir
+    from daintree_assistant_server.skills.local.setwise import SetwiseClassifier
 
-    clf = _baseline()["classifier"]
+    artifact = selector_artifact_dir()
+    if not (artifact / "head.onnx").is_file():
+        pytest.skip("selector artifact not present (LFS)")
     catalog = load_catalog(default_skills_dir())
-    assert clf["routing_revision_matches_catalog"] is True  # type: ignore[index]
-    assert clf["routing_revision"] == routing_revision(catalog)  # type: ignore[index]
-    assert clf["labels"] == len(catalog.selectable_ids)  # type: ignore[index]
+    table = SetwiseClassifier(artifact).sync(catalog)
+    assert set(table.ids) == set(catalog.selectable_ids)

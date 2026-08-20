@@ -30,7 +30,7 @@ plan to serve the main model directly from Novita is in [`TODO.md`](../TODO.md).
 Nothing below describes anything but OpenRouter today.
 
 > **Skill selection is not an upstream call anymore.** It runs as a LOCAL
-> in-process classifier (`skills/local/`, ~10ms, no credential, no endpoint).
+> in-process two-stage selector (`skills/local/`, no credential, no endpoint).
 > Selector-specific policy below — the latency-critical sort, the shared
 > selector affinity key, selector cost lines — describes the prompt-based
 > selector that now exists only as the scripted test seam, and is kept for the
@@ -39,7 +39,7 @@ Nothing below describes anything but OpenRouter today.
 | Call | Model | Source of truth |
 |---|---|---|
 | Main completion | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
-| Skill selection | — local ONNX classifier, no upstream call | `skills/local/classifier.py` |
+| Skill selection | — local two-stage ONNX selector, no upstream call | `skills/local/setwise.py` |
 | Utility tasks | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
 | Skill-learning gate | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
 | Skill builder / improver | `openai/gpt-5.6-sol` | `config.SKILL_BUILDER_MODEL`, `config.SKILL_IMPROVER_MODEL` |
@@ -323,7 +323,7 @@ wrong. Nothing here inspects a request. The selector is a *fixed, server-owned
 call* whose shape is known permanently and cannot vary with what a user types:
 measured over 438 trials (`benchmarks/skill_selection`), **~10.3k prompt tokens in,
 ~90 completion tokens out**, p50 2.044s — the numbers that justified replacing it
-with the local classifier (~10ms), which is what serves today.
+with the local two-stage selector, which is what serves today.
 
 **It is a lean, not a landslide, and the honest version is worth keeping.**
 Generation is not negligible even here — ~90 tokens at ~100 tok/s is ~0.9s of that

@@ -1,0 +1,19 @@
+{
+  "base_model": "BAAI/bge-base-en-v1.5",
+  "hidden_size": 768,
+  "d_model": 256,
+  "layers": 2,
+  "candidates": 32,
+  "ordering": "equivariant",
+  "rank_positions": 0,
+  "cardinality_classes": 4,
+  "max_length": 256,
+  "doc_max_length": 384,
+  "doc_variant": "full",
+  "doc_refresh": 20,
+  "routing_revision_at_train": "routing:90c62db067044a8b5fd5339dcb043bd2",
+  "holdout_skills": [],
+  "retriever_base_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "retriever_max_length": 256,
+  "retriever_hidden_size": 384
+}

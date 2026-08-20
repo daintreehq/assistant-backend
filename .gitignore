@@ -82,23 +82,25 @@ training/results/
 # as the record of what the shipped weights were trained on.
 
 # Local skill selection (serving side). Model GRAPHS are tracked via Git LFS
-# (.gitattributes); these two are not tracked at all:
-#   - the skill embedding index, which is rebuilt from the live catalog at Docker
-#     build time and on demand in dev, so a committed copy could only ever be
-#     stale against a catalog revision it no longer matches;
-#   - fp32 graphs, which exist only so the exporter can measure what quantisation
-#     costs. Only the served precision ships.
-src/daintree_assistant_server/skills/local/artifacts/**/skill_index.npz
-src/daintree_assistant_server/skills/local/artifacts/index/
+# (.gitattributes). fp32 graphs are NOT tracked: they exist only so the exporter
+# can measure what quantisation costs, and only the served precision ships.
+#
+# vectors.npz IS tracked — unlike the index the abandoned bi-encoder design kept,
+# it cannot go stale in a way that matters. Every row is keyed by the digest of
+# the document it was built from, so serving re-embeds exactly what moved and
+# reuses the rest; committing it just means the first turn after a deploy does
+# not pay for embedding a catalog that usually has not changed.
 src/daintree_assistant_server/skills/local/artifacts/**/model.onnx
 # Tokenizer side-files the exporter emits alongside tokenizer.json, which is the
-# one the served classifier actually loads. vocab.txt is ~30k lines on its own and
+# one the served selector actually loads. vocab.txt is ~30k lines on its own and
 # says nothing tokenizer.json does not already carry.
 src/daintree_assistant_server/skills/local/artifacts/**/vocab.txt
 src/daintree_assistant_server/skills/local/artifacts/**/special_tokens_map.json
-# Legacy retrieve-then-rerank artifacts. That pipeline was measured and
-# abandoned (training/EXPERIMENTS.md); the classifier is the shipped selector.
-# repo — three tokenizer vocabularies alone were ~300k lines in any diff view.
+# Superseded artifact layouts. The single fixed-head classifier is torn out (this
+# branch); the retrieve-then-rerank pipeline before it was measured and abandoned
+# (training/EXPERIMENTS.md). Kept as ignores so a stale local export cannot land.
+src/daintree_assistant_server/skills/local/artifacts/classifier/
+src/daintree_assistant_server/skills/local/artifacts/index/
 src/daintree_assistant_server/skills/local/artifacts/bi_encoder/
 src/daintree_assistant_server/skills/local/artifacts/reranker/
 src/daintree_assistant_server/skills/local/artifacts/docs_head.npz

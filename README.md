@@ -14,7 +14,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 `error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** OpenRouter (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek/deepseek-v4-flash-0731` for the main/utility calls and the skill-learning gate (skill selection is LOCAL — an in-process ONNX classifier, no upstream call), routed to the fastest endpoint that does not collect or train on request data ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, *not* zero data retention <!-- privacy-copy-ok -->); the local skill-learning builder/improver name a stronger model (`openai/gpt-5.6-sol`) on the same provider and the same key
+- **Upstream:** OpenRouter (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek/deepseek-v4-flash-0731` for the main/utility calls and the skill-learning gate (skill selection is LOCAL — an in-process two-stage ONNX selector, no upstream call), routed to the fastest endpoint that does not collect or train on request data ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, *not* zero data retention <!-- privacy-copy-ok -->); the local skill-learning builder/improver name a stronger model (`openai/gpt-5.6-sol`) on the same provider and the same key
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Authoritative documents
@@ -43,7 +43,7 @@ proof that the whole corpus is accurate.
   evidence is sanitized `input.messages` plus bounded turn/workflow hints and tool names;
   the learner's is `input.messages` plus the just-generated final answer and tool names.
 - `skill.find` / `skill.load` are never offered to the main model; selection runs
-  server-side as a local classifier forward pass (~10ms) before the main completion.
+  server-side as a local two-stage forward pass before the main completion.
 - Only the active skill bodies (max 3) are injected — never the full catalog.
 - The selector does **not** re-run on ordinary tool-continuation rounds; it re-runs
   on a new turn, a mid-turn interjection, an invalid/missing state token, a catalog
@@ -55,10 +55,17 @@ proof that the whole corpus is accurate.
   and folds the matching pages into the volatile prompt tail — the client is not
   handed a docs tool to run. Best-effort: any failure leaves the turn to answer
   without documentation, never to fail.
-- Skill selection is LOCAL: an in-process ONNX classifier (~10ms) picks the
-  active set — no upstream call, no credential spent, and the turn's flow is
-  strictly select → assemble → one main completion. A stale or failing
-  classifier degrades open to the prior active set, never blocks the turn.
+- Skill selection is LOCAL and two-stage: a bi-encoder shortlists the catalog by
+  cosine, then a set-wise head judges those candidates together. No upstream
+  call, no credential spent, and the turn's flow is strictly select → assemble →
+  one main completion. A failing selector degrades open to the prior active set,
+  never blocks the turn.
+- Neither stage owns per-skill weights — the head reads skill *embeddings* — so a
+  skill added to the catalog is embedded on load and reachable on the next turn,
+  with no retrain and no degraded window. Measured, a never-trained skill wins
+  requests only it plausibly answers and still loses contested ones to trained
+  neighbours, so retraining is what makes a skill *competitive*, not what makes
+  it *selectable*.
 - Skill state is portable across instances via a signed, opaque token.
 - Prompt order is cache-critical, and every row below the schemas is ordered widest-shared
   first: two static system blocks (base prompt → response contract) → tool schemas → user-role

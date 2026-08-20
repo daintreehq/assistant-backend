@@ -1186,7 +1186,7 @@ def test_the_prompt_cost_readme_does_not_sell_a_retired_selector_prompt() -> Non
         "the prompt_cost README still quotes a live selector prompt size; "
         "selection is local and sends no prompt upstream"
     )
-    assert "local classifier" in current
+    assert "local two-stage selector" in current
 
 
 def test_the_benchmark_readme_ci_claim_matches_the_workflow() -> None:

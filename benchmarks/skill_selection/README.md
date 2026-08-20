@@ -209,25 +209,31 @@ What moved the needle:
   that. The non-thinking model needs the verbal workspace; rules don't
   substitute for it. `prompts/lean-reason/` is kept as the best latency
   candidate if that trade is ever wanted.
-- **Two-stage lexical retrieval was measured and rejected — do not re-propose it.**
-  The idea (BM25-shortlist the catalog, send only the top-K to the classifier, so
-  the selector prompt stops growing with the catalog) was scored over the exact
-  metadata the selector sees: `recall@3 = 67%`, `recall@5 = 81%`,
+- **LEXICAL shortlisting was measured and rejected — do not re-propose it.** The
+  idea (BM25-shortlist the catalog, send only the top-K onward) was scored over
+  the exact metadata the selector sees: `recall@3 = 67%`, `recall@5 = 81%`,
   `recall@10 = 85%`, and it **never reaches 100% short of shipping the full
-  catalog** — so any shortlist silently caps the selector's ceiling below where it
-  already is. The cause is structural, not a tuning problem: routing in this
+  catalog**. The cause is structural, not a tuning problem: routing in this
   catalog is carried by **negative** clauses ("do not use for X — use the Y
   skill"), which lexical scoring reads as strong *positive* evidence for exactly
   the wrong skill. On the `foundation-only` cases the required foundation ranked
   **dead last**. Anything bag-of-words inherits this, whatever the weighting.
-- **Revisit trigger for shortlisting:** a **measured** `bench run` regression that
-  is **attributable to catalog size** — not a token-budget estimate, not "the
-  catalog feels big". Absent that, the selector prompt growing is a cost, not a
-  defect. And the first lever to reach for would be **deterministic namespace
-  routing** (the dotted id hierarchy the catalog already carries, used the way
-  `Catalog.domain_foundation` already walks it), not lexical scoring — a
-  deterministic filter fails predictably and is auditable, where BM25 fails
-  exactly on the cases the negative clauses were written to fix.
+
+  A **learned** shortlist does not: the shipped selector's stage 1 is a
+  fine-tuned bi-encoder and it measures `recall@32 = 1.000` on held-out synthetic
+  rows, precisely because training teaches it to read "do not use for X" as
+  evidence AGAINST X rather than for it. The rejection above is about lexical
+  scoring, not about shortlisting — do not read it as an argument against the
+  architecture that shipped.
+- **Shortlisting SHIPPED** (see `training/EXPERIMENTS.md`, Architecture C), which
+  supersedes the "revisit trigger" this bullet used to carry. The trigger asked
+  for a measured, catalog-size-attributable regression before shortlisting was
+  worth it; what actually motivated it was not accuracy but the fixed head's
+  coupling to the catalog — a skill added between builds could not be selected at
+  all. The shortlist is a **learned** bi-encoder, and its job is filtering, not
+  ranking: it is scored on `recall@32` alone (1.000), because the set-wise head
+  re-decides from content afterwards. Deterministic namespace routing was never
+  needed.
 - Non-thinking baseline latency (p50 ~1.75s, p90 ~2.1s, max <3s over 660 calls)
   is near the floor for this output length; the remaining levers are output
   tokens (accuracy-coupled, see above) or a faster model.
