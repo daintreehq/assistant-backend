@@ -1,6 +1,7 @@
 name: diag-selector
 on:
-  workflow_dispatch:
+  push:
+    branches: [fix/setwise-linux-divergence]
 jobs:
   diag:
     runs-on: ubuntu-latest
@@ -13,5 +14,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]" -c requirements.lock
-      - run: lscpu | grep -iE "model name|flags" | head -2
+      - run: lscpu | grep -iE "model name|^Flags" | head -2
       - run: python scripts/diag_setwise.py
