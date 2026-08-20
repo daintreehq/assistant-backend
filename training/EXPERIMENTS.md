@@ -10,8 +10,16 @@
 > serve      ONNX int8 encoders + fp32 head, ~410 MB whole-process RSS,
 >            BONUS_FLOOR 0.45 / NEWCOMER_FLOOR 0.65 (re-calibrated, see below)
 > ```
-> **Current benchmark: shipped int8 measures 158/169 recall-pass (93.5%),
-> fp32 158/169; int8 p50 11.6 ms. Synthetic held-out exact-match 0.910.**
+> **Current benchmark: shipped int8 measures 158/172 recall-pass (91.9%),
+> fp32 160/172; int8 p50 11.9 ms. Synthetic held-out exact-match 0.910.**
+>
+> The denominator moved 169 → 172 on 2026-08-20, when three docs cases were
+> added to cover a failure the suite could not see (see the docs-head section at
+> the foot of this file). The percentage fell because the suite grew, not because
+> the model changed: the same artifact scored 158 before and after. The added
+> cases exist for the docs flag (11/19 → 14/19, scored separately), but they are
+> not routing-free — `required: []` still demands an empty answer, and one of
+> them records a skill extra.
 >
 > That is **parity** with the fixed-head classifier it replaced (158/169, p50
 > 9.0 ms), and parity is the honest headline — the number did not improve and
@@ -510,7 +518,94 @@ seeds — random init per seed — so averaging them is meaningless).
 - **Stage 2 on bge-small** to save 76MB and ~6ms, at a measured cost of 3
   benchmark cases. Worth revisiting if the memory ever binds.
 - **A genuinely fresh holdout suite.** The caveat at the top of this file now
-  applies to Architecture C's numbers too: the 169-case benchmark has been
+  applies to Architecture C's numbers too: the benchmark (172 cases) has been
   inspected across many iterations and has drifted toward a dev set. The
   measured claims here are honest, but a final generalisation claim needs ~50
-  cases written blind.
+  cases written blind. The docs-head bug at the foot of this file is the sharp
+  argument for it — the suite mirrored the corpus's assumptions, so it scored a
+  broken feature as healthy for as long as both were wrong the same way.
+
+## The docs head learned "is anything in the context?" (2026-08-20)
+
+Found by diagnosing a live session, not by the benchmark — which had the same
+blind spot and reported the feature healthy throughout.
+
+**Symptom.** A plain usage question ("How do you create a worktree in
+Daintree?") asked as the second turn of a conversation retrieved no
+documentation, and the turn answered a product question with no product
+documentation. The selector ran clean: `ran=true`, `degraded=false`, zero skills,
+no docs query.
+
+**Cause — a lossless shortcut in the corpus, not the architecture.** Of 8,640
+rows, all 207 `is_docs=true` positives carry an empty active set AND no history,
+while all 1,956 rows carrying an active set are labelled `is_docs=false`. The
+separation is perfect and never once contradicted, so "anything in the context
+means this is not a docs turn" is free accuracy and the head took it. Every
+context channel triggers it independently:
+
+| the same question, plus… | docs_p |
+|---|---|
+| nothing (as trained) | 0.9998 |
+| `[loaded: daintree.foundation]` | 0.0020 |
+| one turn of ordinary history | 0.00017 |
+| a conversational lead-in inside the message | 0.001 |
+
+Measured over 120 docs positives: **113/120 asked cold, 5/120 with a skill
+loaded.** Since `query_document` always prepends a 320-char history tail, the
+practical reading is that documentation lookup worked on the FIRST message of a
+conversation and almost nowhere else.
+
+**Shipped mitigation** (`setwise.py`): the docs logit is re-read from a second
+head run whose query vector is the bare newest user message; the shortlist,
+features and mask are reused from the primary pass (measured worth nothing to
+recompute — 113/120 either way) so the cost is one short encode plus one head
+run, +5.6 ms, skipped entirely when the two strings agree. `DOCS_THRESHOLD`
+moved 0.5 → 0.40 at the same time: the head is sharply bimodal, so on the corpus
+the two are indistinguishable (199/207 recall and the SAME 6 false positives at
+each, 0 on chatter down to 0.15), but second-person phrasings land mid-sigmoid
+and only 0.40 recovers them.
+
+**This is a workaround pinned to a data artifact.** It strips context from
+OUTSIDE the message; it cannot strip framing INSIDE one, which is why
+`docs-question-mid-workflow` ("Hang on, before you push — what does Daintree
+actually do with…") still reads 0.001 where the same question without the
+lead-in reads 0.9994.
+
+**The durable fix is corpus, and it is the next retrain's main job:**
+
+1. **Docs positives carrying context.** Every one currently has neither history
+   nor an active set. They need both, in the proportions real turns have them.
+   Until then the head is only in-distribution on a bare question.
+2. **Second-person phrasing.** 66 of the 207 docs rows contain the token "I"
+   (76 counting my/me/mine) against 4 mentioning "you", and none is of the form
+   "how do you <do X>" — a user asking how the PRODUCT does something, which is
+   one of the commonest ways the question is actually asked.
+3. **Conversational framing.** Lead-ins, hedges and mid-sentence questions
+   ("hang on —", "quick q,", "before you push"). Exactly ONE of the 207 rows
+   opens with a lead-in and one is compound — near-total absence, which is what
+   makes "Hang on, before you push — what does Daintree…" read as 0.001.
+4. **Compound questions.** "What actually is a watcher, and when would I want
+   one?" reads 0.0142 cold, against 0.9997 for "what is a watcher".
+
+After that retrain, re-measure `DOCS_THRESHOLD` — like the admission floors it
+is calibrated to one artifact's sigmoid and does not transfer.
+
+**Benchmark lesson, worth more than the bug.** Of the 9 docs positives, NONE
+carried more than one message and only one carried an active set. The suite
+mirrored the corpus, so it could not see a failure the corpus had caused: it
+scored 11/16 on the docs flag while the feature was dead in the field. Three
+cases were added that put an ordinary usage question somewhere other than the
+opening message — after an unrelated exchange, with a skill loaded, and in the
+second person. All three fail their DOCS EXPECTATION before the mitigation and
+meet it after; the docs flag goes 11/19 → 14/19.
+
+Be precise about what that does and does not say. `recall_pass_flags` scores
+skill ids only and ignores `expect.docs` entirely, so the routing headline
+(158/172) is not evidence for this fix and never could be — the docs score is
+the separate 14/19. Nor are the added cases free of routing content: `required:
+[]` means the selector must come back empty, and
+`docs-usage-question-after-unrelated-exchange` deliberately records a skill
+extra it should not pick.
+
+When a benchmark is generated from the same assumptions as the training data,
+agreement between them is not evidence.

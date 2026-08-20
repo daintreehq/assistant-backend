@@ -36,7 +36,10 @@ from daintree_assistant_server.skills.catalog import (  # noqa: E402
     default_skills_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.local.documents import query_document  # noqa: E402
+from daintree_assistant_server.skills.local.documents import (  # noqa: E402
+    last_user_text,
+    query_document,
+)
 from daintree_assistant_server.skills.local.setwise import SetwiseClassifier  # noqa: E402
 
 #: Release floor for the product metric (every required skill present). The
@@ -65,7 +68,15 @@ def run(clf: SetwiseClassifier, catalog, cases):  # type: ignore[no-untyped-def]
             docs_q = None
         else:
             visible = [sid for sid in case.active if sid in selectable]
-            sel = clf.select(query, visible)
+            # Mirror the SERVER via the SHARED renderer: the docs decision is
+            # taken on the bare newest user message, not the context-laden
+            # ranking query. Scoring it any other way measures a behaviour that
+            # does not ship — and the docs flag is exactly where that mattered,
+            # since the head reads ~0 through an ACTIVE_PREFIX or a history tail.
+            # `last_user_text` rather than a local re-implementation so a typed
+            # or whitespace-heavy case cannot be scored on a string the server
+            # would never build.
+            sel = clf.select(query, visible, docs_query=last_user_text(case.messages))
             picked = [sid for sid in sel.skill_ids if sid in selectable]
             docs_q = "q" if sel.docs_wanted else None
         latencies.append((time.perf_counter() - started) * 1000)

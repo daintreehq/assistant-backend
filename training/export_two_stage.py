@@ -266,7 +266,10 @@ def main() -> int:
 
     # ---- parity: DECISIONS over the whole benchmark ------------------------
     from benchmarks.skill_selection.cases import load_cases
-    from daintree_assistant_server.skills.local.documents import query_document
+    from daintree_assistant_server.skills.local.documents import (
+        last_user_text,
+        query_document,
+    )
 
     cases = load_cases(catalog)
     selectable = catalog.selectable_ids
@@ -278,7 +281,10 @@ def main() -> int:
         for case in cases:
             q = query_document(case.messages, turn_context=case.turn_context)
             active = [sid for sid in case.active if sid in selectable]
-            sel = clf_local.select(q, active)
+            # docs_query, because this gate scores `docs_wanted`. Serving decides
+            # that on the bare last user message via a second pass; omitting it
+            # here would compare two artifacts on a code path neither ships.
+            sel = clf_local.select(q, active, docs_query=last_user_text(case.messages))
             result.append((tuple(sel.skill_ids), sel.docs_wanted))
         return result
 

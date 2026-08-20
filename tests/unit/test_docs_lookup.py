@@ -675,3 +675,52 @@ async def test_the_prompt_tells_the_model_how_to_cite(
     await _run(orchestrator)
     tail = _sent_messages(fake_provider)[-1]["content"]
     assert "https://daintree.org" in tail
+
+
+# --------------------------------------------------------------------------
+# Failure severity: a dead integration is louder than a bad turn
+# --------------------------------------------------------------------------
+#
+# Pinned at the ORCHESTRATOR, not on DocsLookupError. Asserting only that the
+# exception knows it is permanent would leave a revert to always-info green, and
+# the log level is the whole point: on 2026-08-20 the docs endpoint answered 401
+# to every method for hours and the only trace was an `info` line that read
+# exactly like a search matching nothing.
+
+
+@pytest.mark.asyncio
+async def test_a_rejected_docs_server_is_logged_as_a_warning(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    import structlog
+
+    orchestrator.docs_client = _docs_client(lambda _r: httpx.Response(401, json={}))
+    _asking(fake_provider)
+    with structlog.testing.capture_logs() as logs:
+        outcome = await _run(orchestrator)
+
+    failures = [e for e in logs if e.get("event") == "docs_lookup_failed"]
+    assert len(failures) == 1, logs
+    assert failures[0]["log_level"] == "warning"
+    assert failures[0]["status"] == 401
+    assert failures[0]["permanent"] is True
+    # ...and it still fails open. The volume changed, the posture did not.
+    assert outcome.body["message"]["content"] == "Use the Create Worktree button."
+
+
+@pytest.mark.asyncio
+async def test_a_transient_docs_failure_stays_at_info(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """A 5xx may well succeed next turn, so it must not page anyone."""
+    import structlog
+
+    orchestrator.docs_client = _docs_client(lambda _r: httpx.Response(503, json={}))
+    _asking(fake_provider)
+    with structlog.testing.capture_logs() as logs:
+        await _run(orchestrator)
+
+    failures = [e for e in logs if e.get("event") == "docs_lookup_failed"]
+    assert len(failures) == 1, logs
+    assert failures[0]["log_level"] == "info"
+    assert failures[0]["permanent"] is False

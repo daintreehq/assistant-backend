@@ -172,6 +172,31 @@ def query_document(
     return " ".join(p for p in parts if p).strip()
 
 
+def last_user_text(messages: Sequence[Any]) -> str | None:
+    """The newest user message, whitespace-collapsed. The DOCS decision's input.
+
+    Lives here beside :func:`query_document` for the same reason that one does:
+    this is a render contract, and both sides of the pipeline must apply it
+    identically. The serving selector, the canonical evaluation and the export
+    parity gate all call this, so a benchmark number cannot be produced from a
+    string the server would never build.
+
+    Deliberately NOT truncated. It used to be, back when its only consumer was
+    the docs MCP's search box and 120 characters was plenty for a keyword query.
+    It now also feeds the classifier, and a cap there is a different thing
+    entirely: it can slice away the actual question in a long compound message,
+    or cut mid-word and hand the tokenizer a fragment. The ranker's own 256-token
+    bound is the right limit for a model input; the search string is capped
+    separately, at its own call site, where the cap means what it says.
+    """
+    for msg in reversed(list(messages)):
+        if getattr(msg, "role", None) != "user":
+            continue
+        cleaned = " ".join(_content_text(getattr(msg, "content", "")).split()).strip()
+        return cleaned or None
+    return None
+
+
 def routing_revision(catalog: Any) -> str:
     """Hash of the catalog's ROUTING surface — the text the selector trains on.
 

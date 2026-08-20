@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -234,13 +235,18 @@ class _StubClassifier:
         #: Every catalog handed to select(), so a test can assert the selector
         #: passes the SNAPSHOT it validated against and not a re-read of live state.
         self.catalogs: list[object] = []
+        #: Every docs_query handed to select(). The docs decision is taken on a
+        #: DIFFERENT string from the skill decision, and a test that cannot see
+        #: which string arrived cannot tell the two apart.
+        self.docs_queries: list[str | None] = []
 
     def select(self, query: str, active_ids=(), *, catalog=None, max_active: int = 3,
-               docs_threshold: float = 0.5):
+               docs_query: str | None = None, docs_threshold: float = 0.4):
         if self._fail:
             raise RuntimeError("bad graph")
         self.calls.append((query, list(active_ids)))
         self.catalogs.append(catalog)
+        self.docs_queries.append(docs_query)
         from daintree_assistant_server.skills.local.setwise import Selection
 
         return Selection(skill_ids=list(self._ids), docs_wanted=self._docs,
@@ -668,3 +674,206 @@ def test_pool_rejects_when_every_admission_slot_is_taken() -> None:
         pool.close()
 
     asyncio.run(go())
+
+
+# --------------------------------------------------------------------------
+# The docs decision reads a different string from the skill decision
+# --------------------------------------------------------------------------
+#
+# Regression cover for a silent, near-total outage of documentation lookup. The
+# skill query carries an ACTIVE_PREFIX and a tail of prior turns; the docs head
+# was trained only on bare standalone questions, so either one drove its
+# probability to ~0 and a mid-conversation usage question never retrieved. The
+# fix classifies docs on the bare newest user message. See the note at the docs
+# decision in ``setwise.py`` for the corpus measurements behind it.
+
+
+def test_the_docs_decision_gets_the_bare_question_not_the_ranking_query() -> None:
+    """The ranking query is context-laden by design; the docs one must not be."""
+
+    async def go() -> None:
+        clf = _StubClassifier(docs=True)
+        sel, pool = _local_selector(clf)
+        await sel.select(
+            [
+                _Msg("user", "rename my terminals"),
+                _Msg("assistant", "Renamed all four."),
+                _Msg("user", "how do I create a worktree"),
+            ],
+            ["daintree.foundation"],
+        )
+        ranking_query, _ = clf.calls[0]
+        docs_query = clf.docs_queries[0]
+        assert docs_query == "how do I create a worktree"
+        # The ranking query carries the history the docs query must not.
+        assert "rename my terminals" in ranking_query
+        assert "rename my terminals" not in (docs_query or "")
+        pool.close()
+
+    asyncio.run(go())
+
+
+def test_the_string_classified_is_the_string_searched_with() -> None:
+    """One string, so the head's decision and the MCP search cannot drift apart."""
+
+    async def go() -> None:
+        clf = _StubClassifier(docs=True)
+        sel, pool = _local_selector(clf)
+        decision = await sel.select([_Msg("user", "what is a watcher?")], [])
+        assert decision.docs_query == "what is a watcher?"
+        assert decision.docs_query == clf.docs_queries[0]
+        pool.close()
+
+    asyncio.run(go())
+
+
+def test_no_docs_query_is_returned_when_the_head_did_not_ask() -> None:
+    """The string is always computed; it is only SURFACED when docs are wanted."""
+
+    async def go() -> None:
+        clf = _StubClassifier(docs=False)
+        sel, pool = _local_selector(clf)
+        decision = await sel.select([_Msg("user", "what is a watcher?")], [])
+        assert decision.docs_query is None
+        # ...but the classifier still received it, or it could not have decided.
+        assert clf.docs_queries[0] == "what is a watcher?"
+        pool.close()
+
+    asyncio.run(go())
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
+    """THE regression. Reproduces session ses_aa9b63b4 turn 2.
+
+    "How do you create a worktree in Daintree?" asked after a loaded skill and a
+    prior exchange. Before the fix this returned docs_wanted=False and the turn
+    answered a product question with no product documentation.
+    """
+    from daintree_assistant_server.skills.local.documents import query_document
+
+    clf, catalog = _live_selector()
+    convo = [
+        _Msg("user", "Which MCP endpoint are you connected to?"),
+        _Msg("assistant", "The Daintree MCP endpoint: http://127.0.0.1:45454/mcp."),
+        _Msg("user", "How do you create a worktree in Daintree?"),
+    ]
+    bare = "How do you create a worktree in Daintree?"
+    ranking_query = query_document(convo)
+
+    assert clf.select(
+        ranking_query, ["daintree.foundation"], catalog=catalog, docs_query=bare
+    ).docs_wanted, "a usage question must retrieve docs with a skill already loaded"
+
+    # Deliberately NOT also asserting that docs_query=None still answers False.
+    # That is characterisation of THIS artifact's defect, not a contract: a
+    # retrain with contextual docs positives should make the context-laden path
+    # answer correctly too, and an assertion that fails on that improvement is a
+    # trap for whoever runs it. The contract is the line above — the question
+    # gets its documentation — and it holds under both artifacts.
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_conversation_context_no_longer_suppresses_documentation() -> None:
+    """Recall must not depend on how far into a conversation the question lands."""
+    clf, catalog = _live_selector()
+    questions = [
+        "what is a watcher",
+        "how do I create a worktree",
+        "how do recipes work in Daintree",
+        "where do I change the keybinding for the terminal",
+    ]
+    from daintree_assistant_server.skills.local.documents import query_document
+
+    for q in questions:
+        cold = clf.select(q, [], catalog=catalog, docs_query=q)
+        # A real conversation, rendered by the real renderer: the ACTIVE_PREFIX
+        # is the classifier's job and must not be hand-written here, or the
+        # model is fed two of them and the test measures a shape serving never
+        # produces.
+        convo = [
+            _Msg("user", "rename my terminals so I can tell the agents apart"),
+            _Msg("assistant", "Renamed all four."),
+            _Msg("user", q),
+        ]
+        loaded = clf.select(
+            query_document(convo, turn_context=f"current goal: {q}"),
+            ["daintree.worktree.create-plain-worktree"],
+            catalog=catalog,
+            docs_query=q,
+        )
+        assert cold.docs_wanted, q
+        assert loaded.docs_wanted, f"{q!r} lost its docs lookup mid-conversation"
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_chatter_still_does_not_retrieve_documentation() -> None:
+    """The threshold sits below 0.5; the no-task side must not have moved.
+
+    Measured at 0 false positives on 169 chatter/no-task corpus queries for every
+    threshold down to 0.15, so this is the cheap standing guard on that.
+    """
+    clf, catalog = _live_selector()
+    for q in ("thanks, that's perfect", "ok cool", "close all the terminals"):
+        assert not clf.select(q, [], catalog=catalog, docs_query=q).docs_wanted, q
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_the_docs_pass_does_not_disturb_skill_selection() -> None:
+    """Only the docs logit is re-read; the ranking answer must be untouched."""
+    clf, catalog = _live_selector()
+    q = "rename my terminals so i can tell the agents apart"
+    without = clf.select(q, [], catalog=catalog, docs_query=None)
+    with_docs = clf.select(q, [], catalog=catalog, docs_query="what is a watcher")
+    assert without.skill_ids == with_docs.skill_ids
+    assert without.cardinality == with_docs.cardinality
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_the_second_pass_is_skipped_when_the_strings_already_agree() -> None:
+    """A cold opening turn pays nothing — asserted by COUNTING the work.
+
+    Comparing outputs would not do it: an implementation that always ran the
+    second pass would return the same answer and pass. So count head runs, which
+    is the cost the skip exists to avoid.
+    """
+    clf, catalog = _live_selector()
+    q = "what is a watcher"
+    runs: list[int] = []
+    real_run = clf._head.run
+
+    def counting_run(*args, **kwargs):  # type: ignore[no-untyped-def]
+        runs.append(1)
+        return real_run(*args, **kwargs)
+
+    clf._head = _Counting(clf._head, counting_run)  # type: ignore[assignment]
+    try:
+        clf.select(q, [], catalog=catalog, docs_query=q)
+        assert sum(runs) == 1, "identical strings must not buy a second head run"
+        runs.clear()
+        clf.select(q, ["daintree.foundation"], catalog=catalog, docs_query=q)
+        assert sum(runs) == 2, "a context-laden query must take the docs pass"
+    finally:
+        clf._head = clf._head.inner  # type: ignore[attr-defined]
+
+
+class _Counting:
+    """Wraps an ONNX session so ``run`` can be counted without touching select()."""
+
+    def __init__(self, inner: Any, run: Any) -> None:
+        self.inner = inner
+        self.run = run
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.inner, name)
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_an_empty_docs_query_behaves_like_no_docs_query() -> None:
+    """"" is not a question. It must not be embedded and rated as one."""
+    clf, catalog = _live_selector()
+    q = "rename my terminals"
+    assert (
+        clf.select(q, [], catalog=catalog, docs_query="").docs_wanted
+        == clf.select(q, [], catalog=catalog, docs_query=None).docs_wanted
+    )

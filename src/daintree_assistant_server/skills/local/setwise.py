@@ -21,6 +21,12 @@ layers over k+1 vectors of width 256. The skills themselves are never re-read at
 request time — their vectors are computed once, when the catalog is loaded, and
 looked up thereafter.
 
+A turn whose docs question differs from its ranking query runs that whole path a
+SECOND time, on the bare question, purely to re-read the docs logit — see the
+long note at the docs decision in ``select`` for why the head cannot be trusted
+to read it off a context-laden query. That doubles the request-time encoder work
+on those turns (~+7 ms) and is skipped entirely when the two strings agree.
+
 ## Why not the single fixed head this replaced
 
 The previous selector was one encoder with a 38-row output layer: one weight row
@@ -96,6 +102,32 @@ MAX_TOKENS = 256
 #: ``training/setwise_model.py``'s ``FEATURE_NAMES`` — the two must agree or the
 #: head is served a permutation of the meanings it trained on, silently.
 FEATURE_NAMES = ("cosine", "active", "rank_norm")
+
+#: Probability the docs head must clear for the turn to retrieve documentation.
+#:
+#: Below 0.5 on purpose: retrieval is the cheapest thing this classifier can ask
+#: for and the most expensive thing for it to miss. A false positive costs one
+#: best-effort HTTP call inside an existing budget and some volatile-tail bytes,
+#: and the turn answers regardless. A false negative answers a product question
+#: with no product documentation — which reads to a user as the assistant simply
+#: not knowing how its own application works.
+#:
+#: 0.40 rather than 0.5 is bought for nothing, and rather than lower for a
+#: reason. The head is sharply bimodal, so on the corpus the two thresholds are
+#: indistinguishable — 199/207 recall and the SAME 6 false positives at each,
+#: with chatter and no-task turns at 0 false positives all the way down to 0.15.
+#: What lives in the gap between them is one real class: docs questions phrased
+#: in the SECOND person. 66 of the corpus's 207 docs rows contain the token "I"
+#: (76 counting my/me/mine) against 4 mentioning "you", and none is of the form
+#: "how do you <do X>", so those land in
+#: the sparse middle of the sigmoid instead of the top mode — "How do you create
+#: a worktree in Daintree?" at 0.4471 and "how do you rename a terminal" at
+#: 0.4783, while six other second-person phrasings clear 0.5 unaided. 0.40 is
+#: the lowest floor that recovers that class without reaching for anything the
+#: corpus actually labels not-docs; going further buys +1 recall and a 7th false
+#: positive. Re-measure it after any retrain — like the floors on the class
+#: below, it is calibrated to THIS artifact's sigmoid and does not transfer.
+DOCS_THRESHOLD = 0.40
 
 
 @dataclass(frozen=True)
@@ -335,6 +367,53 @@ class SetwiseClassifier:
 
     # ---------------------------------------------------------------- select
 
+    def _encode_pass(
+        self, table: SkillTable, text: str, active: set[str]
+    ) -> tuple[np.ndarray, int, dict[str, np.ndarray]]:
+        """Build one complete, self-consistent set of head inputs for ``text``.
+
+        Extracted so the docs pass CANNOT be built half from another query's
+        evidence. Every tensor here is derived from this one string: the
+        shortlist, each candidate's cosine to it, each candidate's rank within
+        it. Mixing those across two different queries hands the head a
+        combination it never saw in training — the trainer always rendered the
+        shortlist and the ranker query from the same text — so the seam is closed
+        by construction rather than by a comment asking the next reader to be
+        careful.
+        """
+        # normalize=True is redundant — the retriever graph L2-normalises
+        # internally — and kept because it is idempotent and makes the cosine
+        # contract local: `sims` below is a plain dot product only if BOTH sides
+        # are unit vectors, and that should not depend on reading the exporter.
+        q_ret = _run_encoder(self._retriever, self._retriever_tok, [text], normalize=True)[0]
+        sims = table.retrieval @ q_ret
+        n = min(self._k, len(table.ids))
+        # argpartition, not a full sort: O(n) rather than O(n log n), which is
+        # the difference that matters at the catalog sizes this design is for.
+        top = np.argpartition(-sims, n - 1)[:n] if n < len(sims) else np.arange(len(sims))
+        top = top[np.argsort(-sims[top])]
+
+        q_rank = _run_encoder(self._ranker, self._ranker_tok, [text], normalize=False)[0]
+        # Exactly ``self._k`` slots, always. The head's graph is static (see
+        # export_two_stage: MultiheadAttention bakes the sequence length into its
+        # reshapes), so a catalog smaller than k is served by padding with zeros
+        # and mask 0 rather than by a shorter tensor.
+        k = self._k
+        cand = np.zeros((1, k, table.ranking.shape[1]), dtype=np.float32)
+        cand[0, :n] = table.ranking[top]
+        feats = np.zeros((1, k, len(FEATURE_NAMES)), dtype=np.float32)
+        feats[0, :n, 0] = sims[top]
+        feats[0, :n, 1] = [1.0 if table.ids[i] in active else 0.0 for i in top]
+        feats[0, :n, 2] = np.arange(n, dtype=np.float32) / max(k - 1, 1)
+        mask = np.zeros((1, k), dtype=np.float32)
+        mask[0, :n] = 1.0
+        return top, n, {
+            "query": q_rank[None, :].astype(np.float32),
+            "candidates": cand,
+            "features": feats,
+            "mask": mask,
+        }
+
     def select(
         self,
         query: str,
@@ -342,7 +421,8 @@ class SetwiseClassifier:
         *,
         catalog: Any = None,
         max_active: int = 3,
-        docs_threshold: float = 0.5,
+        docs_query: str | None = None,
+        docs_threshold: float = DOCS_THRESHOLD,
     ) -> Selection:
         table = self.sync(catalog) if catalog is not None else self.table
         if table is None or not table.ids:
@@ -361,39 +441,9 @@ class SetwiseClassifier:
         # internally — and kept because it is idempotent and makes the cosine
         # contract local: `sims` below is a plain dot product only if BOTH sides
         # are unit vectors, and that should not depend on reading the exporter.
-        q_ret = _run_encoder(self._retriever, self._retriever_tok, [text], normalize=True)[0]
-        sims = table.retrieval @ q_ret
-        n = min(self._k, len(table.ids))
-        # argpartition, not a full sort: O(n) rather than O(n log n), which is
-        # the difference that matters at the catalog sizes this design is for.
-        top = np.argpartition(-sims, n - 1)[:n] if n < len(sims) else np.arange(len(sims))
-        top = top[np.argsort(-sims[top])]
-
-        q_rank = _run_encoder(self._ranker, self._ranker_tok, [text], normalize=False)[0]
         active = set(active_ids)
-        # Exactly ``self._k`` slots, always. The head's graph is static (see
-        # export_two_stage: MultiheadAttention bakes the sequence length into its
-        # reshapes), so a catalog smaller than k is served by padding with zeros
-        # and mask 0 rather than by a shorter tensor.
-        k = self._k
-        cand = np.zeros((1, k, table.ranking.shape[1]), dtype=np.float32)
-        cand[0, :n] = table.ranking[top]
-        feats = np.zeros((1, k, len(FEATURE_NAMES)), dtype=np.float32)
-        feats[0, :n, 0] = sims[top]
-        feats[0, :n, 1] = [1.0 if table.ids[i] in active else 0.0 for i in top]
-        feats[0, :n, 2] = np.arange(n, dtype=np.float32) / max(k - 1, 1)
-        mask = np.zeros((1, k), dtype=np.float32)
-        mask[0, :n] = 1.0
-
-        skill_logits, docs_logit, card_logits = self._head.run(
-            None,
-            {
-                "query": q_rank[None, :].astype(np.float32),
-                "candidates": cand,
-                "features": feats,
-                "mask": mask,
-            },
-        )
+        top, n, feed = self._encode_pass(table, text, active)
+        skill_logits, docs_logit, card_logits = self._head.run(None, feed)
         # Padded slots are already driven to -1e4 inside the graph, but they are
         # dropped here as well rather than trusted: a ranking is about to decide
         # what the turn loads, and a padding slot has no skill id to name.
@@ -402,6 +452,59 @@ class SetwiseClassifier:
         order = np.argsort(-probs)
         ranked = [(table.ids[int(top[int(j)])], float(probs[int(j)])) for j in order]
         picked = admit(ranked, active, count, max_active)
+
+        # THE DOCS DECISION IS TAKEN ON A DIFFERENT STRING FROM THE SKILL ONE.
+        #
+        # The skill query is deliberately context-laden: an ACTIVE_PREFIX naming
+        # the loaded set, plus a 320-char tail of prior turns. Both are what let
+        # the head separate a continuation from a topic shift. Neither belongs in
+        # the docs decision, and shipping them there was a silent, near-total
+        # outage of documentation lookup:
+        #
+        #   "what is a watcher?"                     docs_p = 0.9998
+        #   ...same question, one skill loaded       docs_p = 0.0020
+        #   ...same question, one turn of history    docs_p = 0.00017
+        #
+        # The cause is in the corpus, not the architecture. Of 8,640 training
+        # rows, all 207 docs positives carry an empty active set AND no history,
+        # while all 1,956 rows that carry an active set are labelled not-docs.
+        # The separation is perfect and never once contradicted, so the head got
+        # a lossless shortcut — "anything in the context means this is not a docs
+        # turn" — and took it. Measured over 120 docs positives with a skill
+        # loaded, that is 5/120 recall; on the bare question it is 113/120.
+        #
+        # So the docs logit is re-read from a SECOND COMPLETE PASS over the bare
+        # user question — its own retrieval, its own shortlist, its own cosine
+        # and rank features, and no active skills. A cheaper version of this
+        # reused the primary pass's candidates and features and swapped only the
+        # query vector; that is rejected deliberately, because it hands the head
+        # a combination that cannot occur in training (a bare docs question
+        # scored against another query's shortlist, carrying that query's
+        # cosines and an `active` bit no docs positive ever had). The measurement
+        # that made reuse look free — equal recall either way — could not have
+        # detected the problem: k is 32 against 38 skills, so any two shortlists
+        # must share at least 26 candidates and retrieval is nearly a no-op. At
+        # 64 skills two top-32 sets can be disjoint, and the seam would open
+        # silently on exactly the topic-shift turns this feature is for.
+        #
+        # `active` is empty on purpose rather than passed through: every docs
+        # positive in the corpus has an empty active set, so a set bit is as
+        # out-of-distribution for this head as the prefix was.
+        #
+        # Cost is one retriever encode plus one ranker encode of one short
+        # string plus one head run, and it is skipped entirely when the two
+        # strings already agree — the cold opening turn, where the bug never bit.
+        #
+        # This is a workaround pinned to a data artifact, not a principle. The
+        # durable fix is docs rows carrying history and active sets; until the
+        # corpus has them, the head is only in-distribution on the bare question.
+        # Truthiness, not `is not None`: an empty docs query is not a question to
+        # classify, and running the pass on "" would ask the head to rate the
+        # embedding of nothing. Same outcome as omitting it — keep the primary
+        # logit — which is what a caller passing "" means.
+        if docs_query and docs_query != text:
+            _, _, docs_feed = self._encode_pass(table, docs_query, set())
+            _, docs_logit, _ = self._head.run(None, docs_feed)
         docs_p = float(1.0 / (1.0 + np.exp(-float(docs_logit[0]))))
         return Selection(
             skill_ids=picked,

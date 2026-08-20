@@ -1094,10 +1094,17 @@ class ChatOrchestrator:
             )
             return None
         except DocsLookupError as exc:
-            logger.info(
+            # WARNING for a rejection, INFO for weather. A 401/403/404 will fail
+            # the same way on every turn until someone acts, so it is an operator
+            # signal; a timeout or a bad payload is one turn's bad luck. Both
+            # still fail open — the volume changes, the posture does not.
+            log = logger.warning if exc.is_permanent else logger.info
+            log(
                 "docs_lookup_failed",
                 request_id=request_id,
                 reason=str(exc),
+                status=exc.status,
+                permanent=exc.is_permanent,
                 elapsed_ms=round((time.perf_counter() - started) * 1000),
             )
             return None

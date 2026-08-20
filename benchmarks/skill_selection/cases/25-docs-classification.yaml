@@ -220,3 +220,80 @@ cases:
       optional: [daintree.foundation]
       docs: true
 
+
+  # ---- context and phrasing must not suppress the lookup -------------------
+  #
+  # Every positive above is a single message on an idle turn. That is exactly the
+  # shape of the training corpus too — all 207 docs rows carry no history and no
+  # active set — so both the model and this suite shared one blind spot, and a
+  # near-total outage of documentation lookup sat behind it unmeasured: measured
+  # on 120 docs positives, recall was 113/120 asked cold and 5/120 asked with a
+  # skill loaded.
+  #
+  # The three below are the standing guard, and they vary ONE thing each against
+  # a cold twin already in this file — history, then active set, then pronoun.
+  # The first two are the context guard; the third is a phrasing guard and is
+  # listed here because it has the same cause (a corpus that only ever saw one
+  # shape of docs question) and the same symptom (a confident 'no').
+
+  - id: docs-usage-question-after-unrelated-exchange
+    category: docs-classification
+    note: >-
+      Reproduces session ses_aa9b63b4. The same question that passes as
+      docs-how-do-i-worktree, asked as the second turn of a conversation. The
+      question is copied verbatim from that case so the ONLY difference is the
+      exchange in front of it — an inexact twin would leave a failure ambiguous
+      between "context suppressed it" and "this wording is harder".
+
+      This case currently records an EXTRA (the worktree runbook), and that is
+      deliberate — asking how to create a worktree is not asking to have one
+      created, which is the same position docs-how-do-i-worktree takes. Do not
+      quiet it by adding `optional`; the pick is the imperfection, not the case.
+    messages:
+      - role: user
+        content: Which MCP endpoint are you connected to?
+      - role: assistant
+        content: The Daintree MCP endpoint is http://127.0.0.1:45454/mcp (streamable-http).
+      - role: user
+        content: How do I create a worktree from a pull request?
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-usage-question-with-a-skill-loaded
+    category: docs-classification
+    note: >-
+      A plain usage question on a turn that already has a runbook open. The
+      active set is evidence about the WORKFLOW, never about whether the user's
+      question needs the manual — and the docs runbook is designed to arrive
+      alongside an operational one rather than replace it.
+
+      The wording is deliberately the plainest in the file, and deliberately not
+      the richer phrasing docs-what-is-a-watcher uses. This case exists to vary
+      ONE thing — the active set — so it must not also carry a hard phrasing, or
+      a failure cannot be read.
+    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
+    messages:
+      - role: user
+        content: what is a watcher
+    expect:
+      required: []
+      optional: [daintree.worktree.create-plain-worktree, daintree.foundation]
+      docs: true
+
+  - id: docs-second-person-phrasing
+    category: docs-classification
+    note: >-
+      "How do you <do X>" is a user asking how the PRODUCT does something, not a
+      question about the assistant's own procedure. The corpus has 66 first-person
+      docs rows against none of this shape, so these land mid-sigmoid rather than
+      in the top mode — the reason DOCS_THRESHOLD sits at 0.40. This one varies
+      PHRASING, not position: it is a cold single-message turn, twinned against
+      docs-how-do-i-worktree by pronoun alone. Worth keeping because the fix for
+      it is corpus data, and this is what will show that landed.
+    messages:
+      - role: user
+        content: How do you create a worktree in Daintree?
+    expect:
+      required: []
+      docs: true

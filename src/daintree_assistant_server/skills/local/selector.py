@@ -6,9 +6,11 @@ drive it unchanged and the two can be scored against each other on identical
 evidence.
 
 Selection itself is two stages (``setwise.SetwiseClassifier``): a cosine
-shortlist over the embedded catalog, then one set-wise pass that ranks the
-shortlist, predicts how many skills the turn needs (zero included) and decides
-whether to retrieve documentation. The rules layer here stays deliberately thin
+shortlist over the embedded catalog, then a set-wise pass that ranks the
+shortlist and predicts how many skills the turn needs (zero included). Whether
+to retrieve documentation is decided by a SECOND pass over the bare user
+question, because the head reads that decision off a context-laden query as a
+flat no (``setwise.py``). The rules layer here stays deliberately thin
 — the one rule it keeps, the background wake, is a STRUCTURAL fact about the
 turn (there is no new user instruction at all), not a semantic judgment the
 model should be second-guessed on.
@@ -37,7 +39,7 @@ from ...contracts.openai import ChatMessage
 from ...providers.policy import RoutingPreference
 from ..catalog import Catalog, CatalogManager
 from ..selector import SelectionDecision
-from .documents import _content_text, query_document
+from .documents import last_user_text, query_document
 from .runtime import InferencePool
 from .setwise import SetwiseClassifier
 
@@ -148,9 +150,20 @@ class LocalSelector:
         # common case (a dict comparison over document digests); when skill
         # learning has just written a runbook it re-embeds that ONE skill and
         # the turn routes to it immediately.
+        # ONE source question, two bounds. The docs head is only in-distribution
+        # on the bare user question (see the long note at the docs decision in
+        # ``setwise.py``), so it reads this untruncated; the docs MCP gets the
+        # same question trimmed to a search box's worth. Same string underneath,
+        # so the decision and the search cannot be about different questions,
+        # but the model's input is not shortened to suit a search endpoint.
+        docs_text = last_user_text(eligible)
         result = await self._pool.run(
             lambda: self._classifier.select(
-                query, visible_active, catalog=catalog, max_active=max_active
+                query,
+                visible_active,
+                catalog=catalog,
+                max_active=max_active,
+                docs_query=docs_text,
             )
         )
         if result is None:
@@ -193,26 +206,28 @@ class LocalSelector:
             calls=0,
             warnings=[],
             authoritative=True,
-            docs_query=_docs_query(result.docs_wanted, eligible),
+            docs_query=_docs_search_query(docs_text) if result.docs_wanted else None,
         )
 
 
-def _docs_query(wanted: bool, eligible: list[ChatMessage]) -> str | None:
-    """The docs search string, when the docs head asked for a lookup.
+#: Cap on the string handed to the docs MCP's search box.
+#:
+#: A SEARCH bound, and nothing else. The classifier reads the untruncated
+#: question (``last_user_text``) because a cap there can slice off the actual
+#: question in a long compound message; the search endpoint ranks keywords and
+#: has no use for a paragraph, so it gets a short one. Cut on a word boundary —
+#: a keyword index gains nothing from a severed final token.
+DOCS_SEARCH_QUERY_MAX_CHARS = 120
 
-    The classifier answers WHETHER to search; the query string is the cleaned
-    last user message. The docs MCP is a search endpoint that ranks keywords, so
-    the raw sentence works — the upstream selector's rewritten query was a
-    nicety, not a requirement, and synthesising one here would need exactly the
-    generative model this path exists to avoid.
-    """
-    if not wanted:
+
+def _docs_search_query(text: str | None) -> str | None:
+    """``text`` trimmed to something worth putting in a search box."""
+    if not text:
         return None
-    for msg in reversed(eligible):
-        if msg.role == "user":
-            # _content_text, not a str-only read: a validated text+image message
-            # carries typed content PARTS, and reading only strings silently
-            # dropped the retrieval the docs head just asked for.
-            cleaned = " ".join(_content_text(msg.content).split())[:120].strip()
-            return cleaned or None
-    return None
+    if len(text) <= DOCS_SEARCH_QUERY_MAX_CHARS:
+        return text
+    clipped = text[:DOCS_SEARCH_QUERY_MAX_CHARS]
+    head, _, _tail = clipped.rpartition(" ")
+    # `head` is empty only for a single word longer than the cap, where the hard
+    # cut is the only option left.
+    return (head or clipped).strip() or None

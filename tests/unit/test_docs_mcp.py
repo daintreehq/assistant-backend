@@ -429,3 +429,63 @@ def test_a_huge_result_set_is_capped_before_it_reaches_the_prompt() -> None:
         for i in range(10)
     ]
     assert len(render_docs_sections(huge).encode("utf-8")) <= DOCS_BLOCK_MAX_BYTES
+
+
+# --------------------------------------------------------------------------
+# Permanent vs transient failure
+# --------------------------------------------------------------------------
+#
+# Both fail open — the difference is only how loudly the server says so. Added
+# after 2026-08-20, when the endpoint began answering 401 to every method and
+# every docs lookup in production failed silently for hours: the failure WAS
+# logged, at the same `info` level as a search that matched nothing, so nothing
+# distinguished a dead integration from ordinary weather.
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 405, 406, 410, 415, 501])
+@pytest.mark.asyncio
+async def test_a_rejected_lookup_is_marked_permanent(status: int) -> None:
+    handler = lambda _r: httpx.Response(status, json={})  # noqa: E731
+    with pytest.raises(DocsLookupError) as caught:
+        await _client(handler).search("worktrees", timeout=2.0)
+    assert caught.value.status == status
+    assert caught.value.is_permanent, (
+        "auth/permission/gone will fail identically on every turn until a human "
+        "acts, which is an operator signal rather than one turn's bad luck"
+    )
+
+
+@pytest.mark.parametrize("status", [500, 502, 503, 429])
+@pytest.mark.asyncio
+async def test_a_server_side_failure_is_not_permanent(status: int) -> None:
+    """A 5xx or a rate limit is weather: the next turn may well succeed."""
+    handler = lambda _r: httpx.Response(status, json={})  # noqa: E731
+    with pytest.raises(DocsLookupError) as caught:
+        await _client(handler).search("worktrees", timeout=2.0)
+    assert caught.value.status == status
+    assert not caught.value.is_permanent
+
+
+@pytest.mark.asyncio
+async def test_a_redirect_is_permanent_because_this_client_refuses_to_follow() -> None:
+    """Not following redirects is the security posture, so a redirecting server
+    is one this client can never read — no retry changes that."""
+    handler = lambda _r: httpx.Response(302, headers={"location": "https://x/"})  # noqa: E731
+    with pytest.raises(DocsLookupError) as caught:
+        await _client(handler).search("worktrees", timeout=2.0)
+    assert caught.value.status == 302
+    assert caught.value.is_permanent
+
+
+@pytest.mark.asyncio
+async def test_a_failure_that_was_not_a_status_carries_none() -> None:
+    """A 200 that fails to parse did not fail BECAUSE of a status.
+
+    `status` is the non-success status that caused the failure, not the response
+    status — recording 200 here would imply the HTTP call was the problem.
+    """
+    handler = lambda _r: httpx.Response(200, text="not json")  # noqa: E731
+    with pytest.raises(DocsLookupError) as caught:
+        await _client(handler).search("worktrees", timeout=2.0)
+    assert caught.value.status is None
+    assert not caught.value.is_permanent

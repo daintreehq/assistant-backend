@@ -101,7 +101,42 @@ class DocsLookupError(Exception):
 
     Always caught: a docs lookup is an enhancement to the turn, never a
     precondition for it.
+
+    ``status`` is the NON-SUCCESS HTTP status that caused the failure, or
+    ``None`` when the failure was not a status at all — a parse error, an
+    oversized body, a JSON-RPC error inside a 200. It is deliberately not "the
+    status of the response", which for those cases is 200 and would say nothing
+    about what went wrong.
+
+    It exists because not every failure deserves the same volume. A timeout, a
+    5xx or an unparseable body is ordinary weather on a third-party call. A 401
+    is not: it means the integration is rejected and will fail identically on
+    every turn until a human acts. Logging the two at the same level is how a
+    TOTAL outage hides — on 2026-08-20 this endpoint began answering 401 to every
+    method, every docs lookup in production failed for hours, and the only signal
+    was an `info` line indistinguishable from a search that matched nothing.
     """
+
+    def __init__(self, message: str, *, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+    @property
+    def is_permanent(self) -> bool:
+        """Whether retrying the same request unchanged cannot succeed.
+
+        Auth and permission (401/403), gone or wrong address (404/410), and the
+        protocol-level refusals (405/406/415/501) — those last say the server
+        will not speak the shape this client speaks, which no retry alters. A
+        redirect counts too: this client refuses to follow one as a security
+        posture, so a server that insists on redirecting is one we will never
+        read. 5xx and 429 are excluded on purpose; they are the cases where the
+        next turn genuinely may succeed.
+        """
+        status = self.status
+        if status is None:
+            return False
+        return status in (401, 403, 404, 405, 406, 410, 415, 501) or 300 <= status < 400
 
 
 @dataclass(frozen=True)
@@ -194,9 +229,15 @@ class DocsMcpClient:
             raise DocsLookupError(f"docs request failed: {type(exc).__name__}") from exc
         try:
             if response.status_code >= 400:
-                raise DocsLookupError(f"docs server returned {response.status_code}")
+                raise DocsLookupError(
+                    f"docs server returned {response.status_code}",
+                    status=response.status_code,
+                )
             if response.status_code >= 300:
-                raise DocsLookupError(f"docs server redirected ({response.status_code})")
+                raise DocsLookupError(
+                    f"docs server redirected ({response.status_code})",
+                    status=response.status_code,
+                )
             body = await _read_bounded(response)
         finally:
             await response.aclose()

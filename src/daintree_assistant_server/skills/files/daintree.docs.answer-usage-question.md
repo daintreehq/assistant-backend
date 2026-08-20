@@ -18,6 +18,8 @@ Procedure:
 
 2. Answer the question that was asked, from the pages. Quote the specific step, setting name or key rather than paraphrasing it into something vaguer. If two pages disagree, prefer the more specific one and say which you followed.
 
+   **Answer in the user's terms, not yours.** A "how do I …" question asks what THEY do in Daintree — the click path, the menu item, the command, the keybinding. Give them that, and prefer the documentation's own wording for it. Never answer by listing the tool calls you would make: those are your interface to the app, not the user's, and they cannot invoke them. When the pages describe the user-facing steps and you also have a tool that does it, the steps are the answer — doing it for them is an offer you make afterwards.
+
 3. Say what the pages do not cover. If they are a near miss, name the gap in one line and answer the rest — do not stretch a page about an adjacent feature into a confident answer. A near miss is worse than an admission, because the user acts on it.
 
 4. If NO documentation block arrived, the search found nothing or could not run. Say so plainly. What you may do next depends on the turn: if another runbook is loaded and it forbids answering from memory, that rule wins — this skill governs citations, not whether a guess is allowed. Otherwise answer from what you know, marked as unverified. Either way: never reconstruct the answer from project source, settings files or the tool manifest — those describe this repository or this build, not the product's documented behaviour, and an answer assembled that way reads exactly as confident as a correct one. Never invent a feature, keybinding, menu path or setting.
