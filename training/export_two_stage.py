@@ -83,11 +83,25 @@ def _export_encoder(
     # every narrow one its precision. Measured here: per-tensor int8 across the
     # two encoders moved the CORE decision on 14 of 169 benchmark cases and cost
     # 5 recall-pass; per-channel is the same size and the same speed.
+    #
+    # REDUCE_RANGE is not optional, and the reason is that this gate cannot see
+    # it. 7-bit weights cost a little precision on paper; what they buy is the
+    # x86 accumulation path. ONNX Runtime's AVX2 int8 kernels (no VNNI) saturate
+    # on full-range s8 weights, and arm64's do not — so an export validated on an
+    # Apple-silicon dev machine can be badly wrong on the linux/amd64 that CI and
+    # Cloud Run actually run. Measured: the ranking encoder, fed IDENTICAL token
+    # ids, returned a materially different embedding on x86 than on arm64
+    # (component 3 of the pooled vector: 0.066 vs 0.251), which collapsed the
+    # head's calibration and drove the cardinality argmax to 0 — the selector
+    # returned NO skills for every request, while /health and /readyz stayed
+    # green. The parity gate below compares int8 against fp32 on whichever
+    # machine exports, so it is structurally blind to this. Keep the flag.
     quantize_dynamic(
         model_input=str(fp32),
         model_output=str(out / "model_int8.onnx"),
         weight_type=QuantType.QInt8,
         per_channel=True,
+        reduce_range=True,
         extra_options={"MatMulConstBOnly": True},
     )
     tok.save_pretrained(out)

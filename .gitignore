@@ -96,11 +96,17 @@ training/journals/
 # reuses the rest; committing it just means the first turn after a deploy does
 # not pay for embedding a catalog that usually has not changed.
 src/daintree_assistant_server/skills/local/artifacts/**/model.onnx
-# Tokenizer side-files the exporter emits alongside tokenizer.json, which is the
-# one the served selector actually loads. vocab.txt is ~30k lines on its own and
-# says nothing tokenizer.json does not already carry.
+# vocab.txt is a ~30k-line side-file the exporter emits beside tokenizer.json,
+# which is self-contained and is what `_tokenizer` actually loads
+# (Tokenizer.from_file). Verified by removing both from a checkout: the token ids
+# come out identical.
+# NOTE the scope. This is deliberately NOT widened back over the rest of the
+# tokenizer directory: special_tokens_map.json is 695 bytes and belongs to a
+# HuggingFace tokenizer dir, and an artifact that ships minus files its own
+# exporter wrote is a trap for whoever debugs it next. This glob was written for
+# the old classifier/ layout and silently swallowed the selector/ tokenizers when
+# that landed, which cost real time to rule out.
 src/daintree_assistant_server/skills/local/artifacts/**/vocab.txt
-src/daintree_assistant_server/skills/local/artifacts/**/special_tokens_map.json
 # Superseded artifact layouts. The single fixed-head classifier is torn out (this
 # branch); the retrieve-then-rerank pipeline before it was measured and abandoned
 # (training/EXPERIMENTS.md). Kept as ignores so a stale local export cannot land.

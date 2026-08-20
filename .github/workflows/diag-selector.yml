@@ -7,12 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
-          lfs: true
+        with: { submodules: true, lfs: true }
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+        with: { python-version: "3.12" }
       - run: pip install -e ".[dev]" -c requirements.lock
-      - run: lscpu | grep -iE "model name|^Flags" | head -2
       - run: python scripts/diag_setwise.py
+      - run: python -m pytest tests/unit/test_local_selection.py -q
