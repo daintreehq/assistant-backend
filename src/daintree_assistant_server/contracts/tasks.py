@@ -226,20 +226,40 @@ class CompactedAgentOut(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    # Every cap here is sized against what the profile's token budget can
-    # actually emit, not against what the type could theoretically hold. A cap far
-    # above the budget is not free: it reads as permission, and the output that
-    # tries to use it is truncated at the token ceiling mid-JSON, which fails the
-    # parse and costs a repair. These are ceilings on a pathological output, and
-    # they sit near enough to the budget to stay honest about it.
+    # These caps bound a pathological output; the profile's token budget is what
+    # binds a realistic one, and it binds first. They were brought DOWN from far
+    # larger values because a cap wildly above the budget is not free — it reads
+    # as permission, and an output that tries to use it is cut off at the token
+    # ceiling mid-JSON, which fails the parse and costs a repair. Filling every
+    # cap here would still exceed the budget; the point is that nothing realistic
+    # comes close to either.
+    # IDENTIFIERS REJECT, PROSE TRUNCATES — the split that matters in this model.
+    #
+    # A `max_length` on a pydantic str REJECTS, which is right for the two fields
+    # that name things: a clipped agent id or worktree path is not a degraded
+    # answer, it is a wrong one that points at nothing, and failing the parse buys
+    # a repair retry. For prose it is the wrong trade — a brief 100 characters
+    # over its cap would sink the whole compaction, and losing the tail of a
+    # sentence is survivable in a way that losing an id is not.
     agent_id: str = Field(min_length=1, max_length=128)
     # Real worktree paths are well under 200 characters. PATH_MAX would be 4096,
     # but nothing legitimate is near it and the cap exists to bound a runaway.
     worktree_path: str | None = Field(default=None, max_length=1024)
     # A delegation brief is a paragraph, not a document — it is what an agent was
-    # TOLD to do. Kept verbatim, so the cap has to fit a real one intact.
-    brief: str = Field(default="", max_length=1500)
-    status: str = Field(default="", max_length=300)
+    # TOLD to do, kept close to the words it was given. Truncated rather than
+    # rejected: see above.
+    brief: str = ""
+    status: str = ""
+
+    @field_validator("brief")
+    @classmethod
+    def _bound_brief(cls, v: str) -> str:
+        return v[:1500]
+
+    @field_validator("status")
+    @classmethod
+    def _bound_status(cls, v: str) -> str:
+        return v[:300]
 
 
 class ContextCompactOutput(BaseModel):
@@ -302,11 +322,15 @@ class ContextCompactOutput(BaseModel):
         #
         # What makes that survivable HERE is the entry format the prompt pins:
         # every entry leads with its identifier and follows with prose, so a
-        # per-item slice trims the description and leaves the id intact. The
-        # ITEM bound is the one that could genuinely lose an identifier, so it
-        # sits far above anything the profile's 4k-token output cap can emit —
-        # the model runs out of tokens long before it runs out of slots.
-        return _truncate_items(v, max_items=100, max_chars=300)
+        # per-item slice trims the description and leaves the id intact.
+        #
+        # The ITEM bound is the one that could genuinely lose a whole identifier.
+        # It is set high rather than safe — 200 short entries fit inside the 4k
+        # output budget, so this is reachable in principle, unlike the character
+        # bound. It stays a silent truncation because that is the house posture
+        # for model-produced lists, and because a compaction that returns 200 ids
+        # and drops the 201st is still worth having.
+        return _truncate_items(v, max_items=200, max_chars=300)
 
 
 class WatcherClassifyOutput(BaseModel):

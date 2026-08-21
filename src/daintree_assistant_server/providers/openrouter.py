@@ -431,11 +431,12 @@ def _map_status(status: int, *, retry_after: str | None, detail: str | None) -> 
     carried. OpenRouter genuinely IS a router, so that branch was once meaningful
     — but it only ever fired because this server sent a routing policy whose
     filters could empty the eligible pool. Nothing sends one now (no ``provider``
-    block, no caller-facing preference), so a 404 on a fixed, correct
-    chat-completion path can only mean the MODEL id is wrong — a server-side bug
-    in what we sent — and it falls through to ``upstream_request_rejected`` with
-    the upstream's own "Model does not exist" attached. Reviving the branch would
-    mean reviving the policy that made it necessary.
+    block, no caller-facing preference), so a 404 can no longer mean "the filters
+    emptied the pool". What remains — a wrong model id, a misconfigured base URL,
+    an intermediary that does not have the route — is in every case a server-side
+    bug in what we sent rather than anything a caller can act on, which is
+    exactly ``upstream_request_rejected``, carrying the upstream's own reason.
+    Reviving the branch would mean reviving the policy that made it necessary.
     """
     if status == 429:
         return upstream_rate_limited(retry_after=retry_after)

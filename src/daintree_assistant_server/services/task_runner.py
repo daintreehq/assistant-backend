@@ -1052,10 +1052,11 @@ class TaskRunner:
                 thinking_disabled=not thinking_enabled,
                 reasoning_effort=reasoning_effort,
                 timeout=timeout,
-                # Same credential as the first attempt, scoped the same way — an
-                # omission here would fail the repair call outright on the
-                # default provider, and a blind forward would misdirect it on
-                # any other.
+                # Same credential as the first attempt, scoped the same way. The
+                # repair rebuilds this request field by field, so an omission
+                # here would silently swap the caller's key for the provider's
+                # configured default midway through a task, and a blind forward
+                # would misdirect it to another vendor.
                 api_key=api_key if profile.provider_id == "cerebras" else None,
                 # ...and the same affinity key: the repair replays the whole first
                 # attempt plus one instruction, so it is the same prefix and should

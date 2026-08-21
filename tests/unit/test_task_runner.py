@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from fakes import FakeProvider, make_result
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from daintree_assistant_server.config import CEREBRAS_MODEL
 from daintree_assistant_server.contracts.tasks import (
@@ -931,7 +931,9 @@ def test_no_declared_cap_can_truncate_an_identifier() -> None:
     )
     assert agent.agent_id == longest_real_id
 
-    out = ContextCompactOutput(preserved_ids=[f"{longest_real_id} — the build terminal"])
+    out = ContextCompactOutput(
+        original_ask="ship it", preserved_ids=[f"{longest_real_id} — the build terminal"]
+    )
     assert longest_real_id in out.preserved_ids[0]
     assert out.terminals == []
 
@@ -978,3 +980,47 @@ async def test_the_repair_call_scopes_the_credential_the_same_way(
     await _run(dual_runner, "context_compact", {"transcript": "x"})
     assert len(openrouter_provider.requests) == 2
     assert all(r.api_key is None for r in openrouter_provider.requests)
+
+
+def test_oversized_prose_truncates_but_an_oversized_identifier_is_rejected() -> None:
+    """The asymmetry the output model is built around.
+
+    A clipped identifier points at nothing, so it must fail the parse and buy a
+    repair retry rather than be quietly stored. Prose is the opposite trade: a
+    brief a hundred characters over its bound would otherwise sink an entire
+    compaction over the tail of a sentence.
+    """
+    # Prose: truncated, and the compaction survives.
+    agent = CompactedAgentOut(
+        agent_id="agt_1234",
+        brief="b" * 5000,
+        status="s" * 5000,
+    )
+    assert len(agent.brief) == 1500
+    assert len(agent.status) == 300
+
+    # Identifiers: rejected, so the repair retry can fire.
+    with pytest.raises(ValidationError):
+        CompactedAgentOut(agent_id="a" * 500)
+    with pytest.raises(ValidationError):
+        CompactedAgentOut(agent_id="agt_1234", worktree_path="/" + "p" * 2000)
+
+
+def test_a_hollow_compaction_fails_the_parse_so_the_repair_can_fire() -> None:
+    """Output missing the user's ask is malformed, not merely empty.
+
+    Without this, `{"agents": [...]}` validates into a compaction with no ask, no
+    decisions and no blockers — the parse SUCCEEDS, so the repair retry that
+    exists for exactly this case never runs, and the caller gets a confidently
+    empty answer.
+    """
+    with pytest.raises(ValidationError):
+        ContextCompactOutput(agents=[CompactedAgentOut(agent_id="agt_1")])
+    with pytest.raises(ValidationError):
+        ContextCompactOutput(original_ask="")
+
+    # An otherwise-empty compaction WITH an ask is legitimate: a span in which
+    # nothing was delegated and nothing decided genuinely has empty lists.
+    out = ContextCompactOutput(original_ask="look into the flaky test")
+    assert out.agents == []
+    assert out.blockers == []

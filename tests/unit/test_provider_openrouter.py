@@ -865,13 +865,24 @@ def test_the_credential_is_scrubbed_before_the_detail_is_capped() -> None:
     cap were applied before the scrub, a recognisable head of the credential
     would survive in the returned text.
     """
-    prefix = "x" * (_ERROR_DETAIL_CAP - len(_DEFAULT_KEY) // 2)
+    # Place the key so that exactly `surviving` of its characters would fall
+    # inside the cap. The assertion then looks for precisely that fragment: under
+    # correct behaviour the whole key is replaced before any slicing, so it is
+    # absent; under cap-first it is present verbatim. Asserting a LONGER fragment
+    # would pass either way, which is the bug this arithmetic exists to avoid.
+    surviving = len(_DEFAULT_KEY) // 2
+    prefix = "x" * (_ERROR_DETAIL_CAP - surviving)
     body = _json.dumps({"error": {"message": f"{prefix}{_DEFAULT_KEY}"}})
+
+    # Guard the guard: if cap-first would leave nothing of the key, the test
+    # below proves nothing.
+    assert (prefix + _DEFAULT_KEY)[:_ERROR_DETAIL_CAP].endswith(_DEFAULT_KEY[:surviving])
+
     detail = _extract_upstream_error(body, secret=SecretStr(_DEFAULT_KEY))
     assert detail is not None
     assert len(detail) <= _ERROR_DETAIL_CAP
-    # No fragment of the key long enough to be recognisable survived.
-    assert _DEFAULT_KEY[:16] not in detail
+    assert _DEFAULT_KEY[:surviving] not in detail
+    assert _REDACTED in detail
 
 
 def test_a_unicode_escaped_credential_is_caught_by_scrubbing_after_extraction() -> None:
