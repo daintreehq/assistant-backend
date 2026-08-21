@@ -65,3 +65,40 @@ re-decided:
    `benchmarks/baseline.json` are sized against this model's context window and
    its behaviour under the current prompts. Refresh the baseline deliberately
    (`python -m tools.baseline capture`) and explain the move.
+
+---
+
+## Retrain the selector so a reserved candidate can actually be kept
+
+**Trigger: the next selector retrain — this rides along with it, and should not
+be a retrain of its own.**
+
+`skills/local/candidates.py` now guarantees that an active skill dense retrieval
+missed still reaches the set-wise head. That is a policy change and it is
+complete. Whether the head then RETAINS such a candidate is a weights question,
+and the shipped artifact was trained before reservation existed, so today it does
+not. Measured by blending one active skill's retrieval vector toward a target
+cosine and re-running the selection ("how is that going?", that skill loaded):
+
+    cosine   p(skill)   cardinality   admitted
+     0.40      0.994         1         yes
+     0.30      0.989         0         no
+     0.10      0.613         0         no
+
+The per-candidate probability tracks the cosine feature hard, and the
+CARDINALITY head calls the turn empty from 0.30 down even while the skill still
+scores 0.989. So a genuinely low-cosine reserved candidate is seated, scored, and
+then dropped by a count of zero.
+
+Nothing is broken by this. Reservation never fires on the live 38-skill catalog
+(`test_reservation_stays_dormant_on_ordinary_follow_ups_today` pins that) and the
+canonical evaluation is unchanged at 164/177. It is inert, not wrong.
+
+**The training half is already done.** `training/train_setwise.py` builds its
+ballots with the same `assemble_candidates`, so reserved candidates now appear in
+training rows carrying `active=1`, `rank_norm=1.0` and a real low cosine — the
+exact combination the current weights have never seen. A retrain picks it up with
+no further code change. What to check afterwards: active-skill retention on
+continuation rows where the ballot reserved, against topic-shift eviction on rows
+where it also reserved. Those two move in opposite directions and the point is to
+buy the first without paying for the second.

@@ -92,6 +92,7 @@ import numpy as np
 import onnxruntime as ort
 from tokenizers import Tokenizer
 
+from .candidates import CandidateSet, assemble_candidates
 from .documents import INDEX_DOC_VARIANT, skill_document
 
 #: Sequence cap for a conversation query. Measured p90 ~64 tokens on the
@@ -155,6 +156,11 @@ class Selection:
     cardinality: int
     #: Per-skill probability, for logging and diagnostics.
     scores: dict[str, float]
+    #: Active skills the cosine shortlist missed and ``candidates.py`` seated
+    #: anyway. Diagnostics only — nothing branches on it — but it is the one
+    #: number that says how close the catalog is to the scale where the old
+    #: top-k-only ballot would have started evicting live workflows.
+    reserved_ids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -439,7 +445,7 @@ class SetwiseClassifier:
 
     def _encode_pass(
         self, table: SkillTable, text: str, active: set[str]
-    ) -> tuple[np.ndarray, int, dict[str, np.ndarray]]:
+    ) -> tuple[CandidateSet, dict[str, np.ndarray]]:
         """Build one complete, self-consistent set of head inputs for ``text``.
 
         Extracted so the docs pass CANNOT be built half from another query's
@@ -450,6 +456,12 @@ class SetwiseClassifier:
         shortlist and the ranker query from the same text — so the seam is closed
         by construction rather than by a comment asking the next reader to be
         careful.
+
+        Which skills end up on the ballot is ``candidates.assemble_candidates``,
+        not a top-k slice: an active skill dense retrieval missed is placed there
+        anyway, because the head cannot keep a runbook it never sees and a
+        successful selection is authoritative enough to evict one. Read that
+        module for why, and for what it deliberately does not promise.
         """
         # normalize=True is redundant — the retriever graph L2-normalises
         # internally — and kept because it is idempotent and makes the cosine
@@ -457,11 +469,8 @@ class SetwiseClassifier:
         # are unit vectors, and that should not depend on reading the exporter.
         q_ret = _run_encoder(self._retriever, self._retriever_tok, [text], normalize=True)[0]
         sims = table.retrieval @ q_ret
-        n = min(self._k, len(table.ids))
-        # argpartition, not a full sort: O(n) rather than O(n log n), which is
-        # the difference that matters at the catalog sizes this design is for.
-        top = np.argpartition(-sims, n - 1)[:n] if n < len(sims) else np.arange(len(sims))
-        top = top[np.argsort(-sims[top])]
+        chosen = assemble_candidates(sims, table.ids, active, self._k)
+        n = len(chosen)
 
         q_rank = _run_encoder(self._ranker, self._ranker_tok, [text], normalize=False)[0]
         # Exactly ``self._k`` slots, always. The head's graph is static (see
@@ -470,14 +479,14 @@ class SetwiseClassifier:
         # and mask 0 rather than by a shorter tensor.
         k = self._k
         cand = np.zeros((1, k, table.ranking.shape[1]), dtype=np.float32)
-        cand[0, :n] = table.ranking[top]
+        cand[0, :n] = table.ranking[chosen.indices]
         feats = np.zeros((1, k, len(FEATURE_NAMES)), dtype=np.float32)
-        feats[0, :n, 0] = sims[top]
-        feats[0, :n, 1] = [1.0 if table.ids[i] in active else 0.0 for i in top]
-        feats[0, :n, 2] = np.arange(n, dtype=np.float32) / max(k - 1, 1)
+        feats[0, :n, 0] = chosen.cosine
+        feats[0, :n, 1] = [1.0 if table.ids[i] in active else 0.0 for i in chosen.indices]
+        feats[0, :n, 2] = chosen.rank_norm
         mask = np.zeros((1, k), dtype=np.float32)
         mask[0, :n] = 1.0
-        return top, n, {
+        return chosen, {
             "query": q_rank[None, :].astype(np.float32),
             "candidates": cand,
             "features": feats,
@@ -512,7 +521,8 @@ class SetwiseClassifier:
         # contract local: `sims` below is a plain dot product only if BOTH sides
         # are unit vectors, and that should not depend on reading the exporter.
         active = set(active_ids)
-        top, n, feed = self._encode_pass(table, text, active)
+        chosen, feed = self._encode_pass(table, text, active)
+        n = len(chosen)
         skill_logits, docs_logit, card_logits = self._head.run(None, feed)
         # Padded slots are already driven to -1e4 inside the graph, but they are
         # dropped here as well rather than trusted: a ranking is about to decide
@@ -520,8 +530,19 @@ class SetwiseClassifier:
         probs = 1.0 / (1.0 + np.exp(-skill_logits[0][:n]))
         count = int(np.argmax(card_logits[0]))
         order = np.argsort(-probs)
-        ranked = [(table.ids[int(top[int(j)])], float(probs[int(j)])) for j in order]
+        ranked = [
+            (table.ids[int(chosen.indices[int(j)])], float(probs[int(j)])) for j in order
+        ]
         picked = admit(ranked, active, count, max_active)
+        # Which actives dense retrieval missed and this turn had to seat by hand.
+        # Empty on almost every turn today (32 of 38 skills are on the ballot
+        # anyway) and the number to watch as the catalog grows: it is the rate at
+        # which the old top-k-only policy would have been silently evicting
+        # in-progress workflows.
+        reserved_ids = tuple(
+            table.ids[int(i)] for i, was in zip(chosen.indices, chosen.reserved, strict=True)
+            if was
+        )
 
         # THE DOCS DECISION IS TAKEN ON A DIFFERENT STRING FROM THE SKILL ONE.
         #
@@ -584,7 +605,7 @@ class SetwiseClassifier:
         # embedding of nothing. Same outcome as omitting it — keep the primary
         # logit — which is what a caller passing "" means.
         if docs_query and docs_query != text:
-            _, _, docs_feed = self._encode_pass(table, docs_query, set())
+            _, docs_feed = self._encode_pass(table, docs_query, set())
             _, docs_logit, _ = self._head.run(None, docs_feed)
         docs_p = float(1.0 / (1.0 + np.exp(-float(docs_logit[0]))))
         return Selection(
@@ -592,6 +613,7 @@ class SetwiseClassifier:
             docs_wanted=docs_p >= docs_threshold,
             cardinality=count,
             scores=dict(ranked[:5]),
+            reserved_ids=reserved_ids,
         )
 
     #: Probability a skill must clear to displace or join an already-loaded set.

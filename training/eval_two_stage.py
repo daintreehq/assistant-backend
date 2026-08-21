@@ -216,7 +216,14 @@ def _ablate(artifact: Path, catalog, cases, baseline_picked) -> None:  # type: i
 
 
 def _select_reversed(clf, query, active_ids, np):  # type: ignore[no-untyped-def]
-    """Re-run one selection with the shortlist handed over in reverse order."""
+    """Re-run one selection with the ballot handed over in reverse order.
+
+    The BALLOT is the serving one — ``assemble_candidates``, actives seated —
+    with only its slot order reversed, features carried along. Rebuilding a
+    plain top-k here instead would make the ablation measure a policy the server
+    does not run, and would silently drop any reserved candidate from the probe.
+    """
+    from daintree_assistant_server.skills.local.candidates import assemble_candidates
     from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX
     from daintree_assistant_server.skills.local.setwise import (
         FEATURE_NAMES,
@@ -228,17 +235,17 @@ def _select_reversed(clf, query, active_ids, np):  # type: ignore[no-untyped-def
     text = ACTIVE_PREFIX.format(", ".join(active_ids)) + query if active_ids else query
     q_ret = _run_encoder(clf._retriever, clf._retriever_tok, [text], normalize=True)[0]
     sims = table.retrieval @ q_ret
-    k = min(clf._k, len(table.ids))
-    top = np.argpartition(-sims, k - 1)[:k] if k < len(sims) else np.arange(len(sims))
-    top = top[np.argsort(-sims[top])][::-1]
+    active = set(active_ids)
+    chosen = assemble_candidates(sims, table.ids, active, clf._k)
+    k = len(chosen)
+    top = chosen.indices[::-1]
 
     q_rank = _run_encoder(clf._ranker, clf._ranker_tok, [text], normalize=False)[0]
     cand = table.ranking[top][None, :, :].astype(np.float32)
-    active = set(active_ids)
     feats = np.zeros((1, k, len(FEATURE_NAMES)), dtype=np.float32)
-    feats[0, :, 0] = sims[top]
+    feats[0, :, 0] = chosen.cosine[::-1]
     feats[0, :, 1] = [1.0 if table.ids[i] in active else 0.0 for i in top]
-    feats[0, :, 2] = (np.arange(k, dtype=np.float32) / max(clf._k - 1, 1))[::-1]
+    feats[0, :, 2] = chosen.rank_norm[::-1]
     skill_logits, _docs, card_logits = clf._head.run(
         None,
         {

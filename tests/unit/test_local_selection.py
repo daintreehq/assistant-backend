@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pytest
 
 from daintree_assistant_server.skills.local.documents import (
@@ -239,6 +240,8 @@ class _StubClassifier:
         #: DIFFERENT string from the skill decision, and a test that cannot see
         #: which string arrived cannot tell the two apart.
         self.docs_queries: list[str | None] = []
+        #: What the stub should report as force-included, for the telemetry test.
+        self.reserved: tuple[str, ...] = ()
 
     def select(self, query: str, active_ids=(), *, catalog=None, max_active: int = 3,
                docs_query: str | None = None, docs_threshold: float = 0.4):
@@ -251,7 +254,8 @@ class _StubClassifier:
 
         return Selection(skill_ids=list(self._ids), docs_wanted=self._docs,
                          cardinality=len(self._ids),
-                         scores=dict.fromkeys(self._ids, 0.9))
+                         scores=dict.fromkeys(self._ids, 0.9),
+                         reserved_ids=self.reserved)
 
 
 class _StubSkill:
@@ -399,6 +403,55 @@ def test_local_selector_hides_pinned_actives_from_the_classifier() -> None:
         pool.close()
 
     asyncio.run(go())
+
+
+def test_local_selector_logs_a_reservation_without_conversation_text(caplog) -> None:  # type: ignore[no-untyped-def]
+    """The one number worth watching as the catalog grows, and nothing else.
+
+    Reservation firing is how often the pre-reservation ballot would have been
+    evicting a live workflow, so it is logged — but skill ids only. This
+    codebase never logs user text, and a selector log line is one of the easier
+    places to leak it by accident.
+    """
+    import logging
+
+    async def go() -> None:
+        clf = _StubClassifier(["daintree.terminals.rename"])
+        clf.reserved = ("daintree.terminals.rename",)
+        sel, pool = _local_selector(clf)
+        with caplog.at_level(logging.INFO):
+            await sel.select([_Msg("user", "PRIVATE-USER-TEXT")], ["daintree.terminals.rename"])
+        pool.close()
+
+    asyncio.run(go())
+    records = [r for r in caplog.records if r.message == "local_selector_reserved_active"]
+    assert len(records) == 1
+    assert records[0].reserved == ["daintree.terminals.rename"]
+    assert records[0].retained == ["daintree.terminals.rename"]
+    assert "PRIVATE-USER-TEXT" not in caplog.text
+
+
+def test_local_selector_does_not_log_when_nothing_was_reserved() -> None:
+    """The common path stays silent — this is a rate to watch, not a heartbeat."""
+
+    async def go() -> tuple[object, ...]:
+        import logging
+
+        clf = _StubClassifier()
+        sel, pool = _local_selector(clf)
+        logger = logging.getLogger("daintree_assistant_server.skills.local.selector")
+        seen: list[str] = []
+        handler = logging.Handler()
+        handler.emit = lambda record: seen.append(record.getMessage())  # type: ignore[method-assign]
+        logger.addHandler(handler)
+        try:
+            await sel.select([_Msg("user", "rename my terminals")], [])
+        finally:
+            logger.removeHandler(handler)
+            pool.close()
+        return tuple(seen)
+
+    assert "local_selector_reserved_active" not in asyncio.run(go())
 
 
 def test_local_selector_docs_query_is_the_cleaned_last_user_message() -> None:
@@ -929,3 +982,255 @@ def test_a_narrowed_catalog_does_not_evict_the_full_catalog_s_vectors() -> None:
         f"alternating profiles re-embedded ({calls} encoder runs); every vector "
         "was already computed by the initial full sync"
     )
+
+
+# --------------------------------------------------------------------------
+# candidate reservation, end to end through the real graphs
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_an_active_skill_reaches_the_head_even_when_retrieval_ranks_it_last() -> None:
+    """The reservation guarantee, measured against the real retriever.
+
+    The evidence used here is a genuine turn, not a synthetic similarity row:
+    three loaded runbooks and a long message about something else, which is the
+    worst case the ``ACTIVE_PREFIX`` mitigation measures at (ranks 8/10/11 of 38;
+    see ``candidates.py``). The shortlist is then narrowed to 4 so that a rank the
+    live catalog is too small to punish becomes the miss it will be at 200 skills.
+
+    At the shipped ``k=32`` against 38 selectable skills this is unobservable —
+    84% of the catalog is on the ballot regardless — which is exactly why it
+    needs pinning before the catalog grows into the regime where it bites.
+    """
+    clf, _ = _live_selector()
+    active = {
+        "daintree.terminals.rename",
+        "daintree.foundation",
+        "daintree.worktree.create-plain-worktree",
+    }
+    query = (
+        "The test run came back with three failures in the integration suite and I "
+        "want to understand whether they are flaky or real, so please dig through "
+        "the recent commit history, look at what changed in the database layer, and "
+        "give me a written summary of the likely root cause."
+    )
+
+    table = clf.table
+    assert table is not None
+    from daintree_assistant_server.skills.local.candidates import assemble_candidates
+    from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX
+    from daintree_assistant_server.skills.local.setwise import _run_encoder
+
+    text = ACTIVE_PREFIX.format(", ".join(sorted(active))) + query
+    q = _run_encoder(clf._retriever, clf._retriever_tok, [text], normalize=True)[0]
+    sims = table.retrieval @ q
+
+    plain = {table.ids[int(i)] for i in assemble_candidates(sims, table.ids, set(), 4).indices}
+    assert not (active & plain), (
+        f"fixture is not exercising reservation: retrieval already returns "
+        f"{active & plain} inside a four-slot shortlist"
+    )
+
+    chosen = assemble_candidates(sims, table.ids, active, 4)
+    assert active <= {table.ids[int(i)] for i in chosen.indices}
+    assert int(chosen.reserved.sum()) == 3
+    # Three seats taken by reservation, one still earned by retrieval: the
+    # ballot is not handed over to the active set, only guaranteed to include it.
+    assert len(chosen) == 4
+
+
+def _table_hiding(clf: Any, skill_id: str, text: str):  # type: ignore[no-untyped-def]
+    """The live table with ``skill_id``'s RETRIEVAL vector pointed away from ``text``.
+
+    The only way to observe reservation end to end on a 38-skill catalog: at
+    ``k=32`` an active skill has to be beaten by 32 others to fall off the
+    ballot, and the ``ACTIVE_PREFIX`` naming its own id makes that essentially
+    impossible for a real query. So retrieval is made to miss it by construction
+    — cosine driven to the floor — while its RANKING vector, the one the head
+    actually reads, stays exactly as the catalog built it.
+
+    That is the combination worth pinning: a real skill embedding arriving with
+    ``active=1``, ``rank_norm=1.0`` and a true cosine at the bottom, which is
+    precisely what a 500-skill catalog will hand the head on an ordinary vague
+    follow-up.
+    """
+    from daintree_assistant_server.skills.local.setwise import SkillTable, _run_encoder
+
+    table = clf.table
+    assert table is not None
+    row = table.ids.index(skill_id)
+    q = _run_encoder(clf._retriever, clf._retriever_tok, [text], normalize=True)[0]
+    retrieval = table.retrieval.copy()
+    retrieval[row] = -q
+    return SkillTable(
+        ids=table.ids,
+        retrieval=retrieval,
+        ranking=table.ranking,
+        digests=table.digests,
+        precision=table.precision,
+    )
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None:
+    """The tensor the head is actually fed, on a turn that really did reserve.
+
+    Everything else here checks the assembler in isolation or the classifier on
+    a turn where retrieval happened to succeed anyway. This is the one that would
+    fail if ``_encode_pass`` were reverted to a plain top-k: the active skill is
+    unreachable by cosine, so its presence in the feed can only come from
+    reservation, and its feature row is asserted rather than assumed.
+    """
+    from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX
+    from daintree_assistant_server.skills.local.setwise import FEATURE_NAMES
+
+    clf, _ = _live_selector()
+    active = "daintree.terminals.rename"
+    text = ACTIVE_PREFIX.format(active) + "how is that going?"
+    table = _table_hiding(clf, active, text)
+
+    chosen, feed = clf._encode_pass(table, text, {active})
+
+    ids = [table.ids[int(i)] for i in chosen.indices]
+    assert active in ids, "reservation did not seat an unreachable active skill"
+    slot = ids.index(active)
+    assert bool(chosen.reserved[slot])
+
+    feats = feed["features"][0]
+    cosine, is_active, rank_norm = (FEATURE_NAMES.index(f) for f in FEATURE_NAMES)
+    # Its real cosine — driven to the floor by the fixture, and reported as such
+    # rather than dressed up.
+    assert feats[slot][cosine] == pytest.approx(-1.0, abs=1e-3)
+    assert feats[slot][is_active] == 1.0
+    assert feats[slot][rank_norm] == 1.0
+    assert feed["mask"][0][slot] == 1.0
+    # And the embedding the head reads is the skill's own, not a zero pad.
+    row = table.ids.index(active)
+    assert np.allclose(feed["candidates"][0][slot], table.ranking[row])
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
+    """The promise reservation makes, end to end: a hearing.
+
+    The head returns a probability for the unreachable active skill instead of
+    never seeing it. What the head then DOES with that probability is a property
+    of the weights, not of this policy — and on this artifact, which was trained
+    before reservation existed, it scores it down (see the sweep recorded in
+    ``candidates.py``). Asserting retention here would be asserting something
+    the shipped weights do not yet do.
+    """
+    from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX
+
+    clf, _ = _live_selector()
+    active = "daintree.terminals.rename"
+    query = "how is that going?"
+    table = _table_hiding(clf, active, ACTIVE_PREFIX.format(active) + query)
+    clf._cached = (None, table)
+
+    sel = clf.select(query, [active])
+    assert active in sel.reserved_ids, "fixture did not actually reserve"
+
+    # Scored: the id reaches `admit` as a ranked candidate. Read off the head
+    # directly rather than off `scores`, which reports only the top five.
+    chosen, feed = clf._encode_pass(table, ACTIVE_PREFIX.format(active) + query, {active})
+    logits, _docs, _card = clf._head.run(None, feed)
+    slot = [table.ids[int(i)] for i in chosen.indices].index(active)
+    assert np.isfinite(logits[0][slot])
+    assert feed["mask"][0][slot] == 1.0
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_topic_shift_evicts_the_prior_runbook() -> None:
+    """The same rule on the UNMODIFIED catalog, where retrieval works normally.
+
+    Not a reservation test — here the rename skill is retrieved on its own merits
+    — but the eviction it checks is the property reservation must not break.
+    """
+    clf, _ = _live_selector()
+    sel = clf.select(
+        "forget that — I need to create a git worktree for the new feature branch",
+        ["daintree.terminals.rename"],
+    )
+    assert "daintree.terminals.rename" not in sel.skill_ids
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_reservation_stays_dormant_on_ordinary_follow_ups_today() -> None:
+    """At 38 skills the change is inert in practice, and that is worth pinning.
+
+    Not because 38 < 32 — it is not, and six skills genuinely do sit off every
+    dense ballot — but because the ``ACTIVE_PREFIX`` names the active id in the
+    query, which keeps a single loaded runbook at or near rank 0 (measured in
+    ``candidates.py``). So reservation never fires on these turns, and the
+    canonical evaluation is unchanged at 164/177.
+
+    Pinned so that a future ``k``, catalog or evidence change that starts
+    reserving on everyday turns surfaces here, where it is attributable, rather
+    than as unexplained benchmark drift.
+    """
+    clf, _ = _live_selector()
+    active = ["daintree.terminals.rename"]
+    for query in (
+        "how is that going?",
+        "try again with the other approach",
+        "now rename the second one too",
+        "that failed, fix the error",
+    ):
+        sel = clf.select(query, active)
+        assert sel.reserved_ids == (), (
+            f"{query!r} reserved {sel.reserved_ids}; the loaded-skill prefix "
+            "should keep a single active runbook inside the shortlist at this "
+            "catalog size"
+        )
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_pinned_nonselectable_skill_is_never_seated_as_a_candidate() -> None:
+    """The docs runbook is server-pinned and hidden from selection.
+
+    It legitimately appears in a prior active set, so the reservation path has
+    to treat it as an id with no table row — nothing to seat — rather than
+    forcing a skill the classifier was never trained to see. Injecting it as an
+    active id was previously measured to change 49 of 124 benchmark answers.
+    """
+    from daintree_assistant_server.config import DOCS_SKILL_ID
+
+    clf, catalog = _live_selector()
+    assert DOCS_SKILL_ID not in catalog.selectable_ids
+
+    table = clf.table
+    assert table is not None
+    from daintree_assistant_server.skills.local.candidates import assemble_candidates
+
+    sims = np.zeros(len(table.ids), dtype=np.float32)
+    chosen = assemble_candidates(sims, table.ids, {DOCS_SKILL_ID}, 32)
+    assert not chosen.reserved.any()
+    assert DOCS_SKILL_ID not in [table.ids[int(i)] for i in chosen.indices]
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_narrowed_profile_cannot_seat_a_skill_outside_its_menu() -> None:
+    """Reservation reads the table, and the table is the profile's own catalog.
+
+    A sub-agent carrying an orchestration runbook in its prior active set must
+    not have that runbook forced onto a ballot drawn from its narrowed menu —
+    the whole point of the narrowed menu is that it cannot execute it.
+    """
+    from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
+    from daintree_assistant_server.skills.local.candidates import assemble_candidates
+    from daintree_assistant_server.skills.local.setwise import SetwiseClassifier
+
+    catalog = load_catalog(default_skills_dir())
+    clf = SetwiseClassifier(_ARTIFACT)
+    narrow = catalog.executable_with(["fs.read", "fs.list"])
+    table = clf.sync(narrow)
+
+    outside = sorted(set(catalog.selectable_ids) - set(narrow.selectable_ids))
+    assert outside, "fixture must actually narrow the catalog"
+
+    sims = np.zeros(len(table.ids), dtype=np.float32)
+    chosen = assemble_candidates(sims, table.ids, set(outside), 32)
+    assert not chosen.reserved.any()
+    assert {table.ids[int(i)] for i in chosen.indices} <= set(narrow.selectable_ids)

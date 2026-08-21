@@ -193,6 +193,22 @@ class LocalSelector:
                          extra={"named": result.skill_ids[:3]})
             return SelectionDecision.degraded_open(["local_skill_selector_unknown_ids"])
 
+        if result.reserved_ids:
+            # Dense retrieval did not return a runbook this conversation is
+            # already running, and ``candidates.py`` seated it anyway. Harmless
+            # here and the leading indicator for the whole catalog: it is how
+            # often the pre-reservation ballot would have evicted a live
+            # workflow on a vague follow-up. Watch the rate, not the event.
+            _log.info(
+                "local_selector_reserved_active",
+                extra={
+                    "reserved": list(result.reserved_ids),
+                    "retained": [
+                        sid for sid in result.reserved_ids if sid in result.skill_ids
+                    ],
+                },
+            )
+
         top_scores = ", ".join(
             f"{k.rsplit('.', 1)[-1]}:{v:.2f}" for k, v in list(result.scores.items())[:3]
         )

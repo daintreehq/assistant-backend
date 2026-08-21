@@ -66,6 +66,9 @@ from daintree_assistant_server.skills.catalog import (  # noqa: E402
     default_skills_dir,
     load_catalog,
 )
+from daintree_assistant_server.skills.local.candidates import (  # noqa: E402
+    assemble_candidates,
+)
 from daintree_assistant_server.skills.local.documents import (  # noqa: E402
     INDEX_DOC_VARIANT,
     routing_revision,
@@ -158,7 +161,7 @@ def main() -> int:
     print(f"embedding corpus with frozen retriever ({args.retriever}) …")
     r_meta = json.loads((Path(args.retriever) / "meta.json").read_text())
 
-    def stage1_shortlists() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def stage1_shortlists() -> tuple[np.ndarray, ...]:
         """Every row's shortlist, computed once. Stage 1 is frozen.
 
         Scoped as a function so the retriever's weights are unreachable — and
@@ -192,21 +195,60 @@ def main() -> int:
 
         doc_vecs = r_embed(docs, r_meta["doc_max_length"])
 
-        def shortlist(subset: list[dict]) -> tuple[np.ndarray, np.ndarray]:
-            out_idx, out_cos = [], []
+        def shortlist(subset: list[dict]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+            """Rows' candidate ballots, built by the SERVING assembler.
+
+            Not a top-k slice. ``assemble_candidates`` is the shipped policy —
+            it seats an active skill the cosine shortlist missed — and if
+            training slices instead, the head learns on a ballot the server
+            never builds. Every row's active set is right here in the corpus, so
+            there is no reason for the two to differ.
+
+            ``rank_norm`` comes back per row as well, because a reserved
+            candidate carries 1.0 rather than its slot index.
+            """
+            out_idx, out_cos, out_rank, out_sim, out_dense = [], [], [], [], []
             for start in range(0, len(subset), 128):
                 batch = subset[start : start + 128]
-                sim = r_embed([build_query(r) for r in batch], r_meta["max_length"]) @ doc_vecs.T
-                order = np.argsort(-sim, axis=1)[:, :k]
-                out_idx.append(order)
-                out_cos.append(np.take_along_axis(sim, order, axis=1))
-            return np.concatenate(out_idx), np.concatenate(out_cos)
+                sim = r_embed(
+                    [build_query(r) for r in batch], r_meta["max_length"]
+                ).astype(np.float32) @ doc_vecs.T.astype(np.float32)
+                idx = np.zeros((len(batch), k), dtype=np.int64)
+                cos = np.zeros((len(batch), k), dtype=np.float32)
+                rank = np.zeros((len(batch), k), dtype=np.float32)
+                dense = np.zeros((len(batch), k), dtype=np.int64)
+                for i, row in enumerate(batch):
+                    chosen = assemble_candidates(
+                        sim[i], labels, set(row.get("active_ids") or ()), k
+                    )
+                    idx[i] = chosen.indices
+                    cos[i] = chosen.cosine
+                    rank[i] = chosen.rank_norm
+                    # The same row with reservation switched OFF. Kept only so
+                    # the two recalls below can be reported apart; it never
+                    # reaches the head.
+                    dense[i] = assemble_candidates(sim[i], labels, (), k).indices
+                out_idx.append(idx)
+                out_cos.append(cos)
+                out_rank.append(rank)
+                out_sim.append(sim.astype(np.float32))
+                out_dense.append(dense)
+            return (
+                np.concatenate(out_idx),
+                np.concatenate(out_cos),
+                np.concatenate(out_rank),
+                np.concatenate(out_sim),
+                np.concatenate(out_dense),
+            )
 
-        a, b = shortlist(train_rows)
-        c, d = shortlist(val_rows)
-        return a, b, c, d
+        a = shortlist(train_rows)
+        c = shortlist(val_rows)
+        return (*a, *c)
 
-    tr_cand, tr_cos, va_cand, va_cos = stage1_shortlists()
+    (
+        tr_cand, tr_cos, tr_rank, tr_sim, tr_dense,
+        va_cand, va_cos, va_rank, va_sim, va_dense,
+    ) = stage1_shortlists()
     if dev == "mps":
         torch.mps.empty_cache()
 
@@ -221,9 +263,26 @@ def main() -> int:
             hit += want <= set(row_cand.tolist())
         return hit / max(need, 1)
 
+    def reserved_rate(cand: np.ndarray, dense: np.ndarray) -> float:
+        """Share of rows where reservation actually seated something."""
+        moved = [set(a.tolist()) != set(b.tolist()) for a, b in zip(cand, dense, strict=True)]
+        return sum(moved) / max(len(moved), 1)
+
+    # DENSE recall and BALLOT recall, apart. Reporting only the second would
+    # count a positive that reservation rescued as a stage-1 hit, and hide the
+    # retrieval degradation reservation exists to compensate for — which is
+    # precisely the number that decides whether k is still big enough.
     print(
-        f"stage-1 shortlist recall@{k}: train {recall_at_k(train_rows, tr_cand):.4f}  "
+        f"stage-1 recall@{k} (dense only):  train {recall_at_k(train_rows, tr_dense):.4f}  "
+        f"val {recall_at_k(val_rows, va_dense):.4f}"
+    )
+    print(
+        f"stage-1 recall@{k} (ballot):      train {recall_at_k(train_rows, tr_cand):.4f}  "
         f"val {recall_at_k(val_rows, va_cand):.4f}"
+    )
+    print(
+        f"rows with a reserved active:      train {reserved_rate(tr_cand, tr_dense):.4f}  "
+        f"val {reserved_rate(va_cand, va_dense):.4f}"
     )
 
     # ---------------------------------------------------------------- stage 2
@@ -286,19 +345,33 @@ def main() -> int:
             backbone.train()
 
     def make_batch(
-        subset: list[dict], cand: np.ndarray, cos: np.ndarray, *, train: bool
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        subset: list[dict],
+        cand: np.ndarray,
+        cos: np.ndarray,
+        rank: np.ndarray,
+        sim: np.ndarray,
+        *,
+        train: bool,
+    ) -> tuple[np.ndarray, ...]:
         """Assemble one batch's candidate slots, features and targets.
 
-        At TRAIN time a positive missing from the shortlist is swapped in over
-        the weakest candidate: a row whose answer is absent teaches the head only
-        to say "none of these", which is a stage-1 failure being blamed on
-        stage 2. At VAL time nothing is swapped — a retrieval miss must be
+        The ballot arriving here is already the SERVING one — built by
+        ``assemble_candidates``, actives seated. What this adds is a training-only
+        device about LABELS: a positive missing from the ballot is swapped in over
+        the weakest candidate, because a row whose answer is absent teaches the
+        head only to say "none of these", which is a stage-1 failure being blamed
+        on stage 2. At VAL time nothing is swapped — a retrieval miss must be
         visible as a miss, which is what makes the reported number honest.
+
+        The two must not fight. A swap steps over any slot holding a positive
+        (as it always has) AND any slot holding an active skill, because evicting
+        a reserved candidate to seat a positive would train the head on a ballot
+        the server cannot produce.
         """
         b = len(subset)
         idx = cand.copy()
         cs = cos.copy()
+        rk = rank.copy()
         y = np.zeros((b, k), dtype=np.float32)
         card = np.zeros(b, dtype=np.int64)
         docs_y = np.zeros(b, dtype=np.float32)
@@ -308,31 +381,54 @@ def main() -> int:
             docs_y[i] = 1.0 if row.get("is_docs") else 0.0
             present = set(idx[i].tolist())
             if train:
+                protected = set(want) | {
+                    index[s] for s in (row.get("active_ids") or ()) if s in index
+                }
                 free = k - 1
                 for w in want:
                     if w in present:
                         continue
-                    # Overwrite from the weakest end, but never evict another
-                    # positive that is already in the shortlist.
-                    while free >= 0 and int(idx[i, free]) in want:
+                    while free >= 0 and int(idx[i, free]) in protected:
                         free -= 1
                     if free < 0:
                         break
                     idx[i, free] = w
-                    cs[i, free] = float(cos[i].min())
+                    # The swapped positive's TRUE cosine, read out of the full
+                    # similarity row. This used to be `cos[i].min()` — the
+                    # ballot's weakest score — which was a fair stand-in only
+                    # while the ballot was a pure top-k, where an off-ballot
+                    # skill is below the minimum by definition. Reservation
+                    # broke that: a deeply-ranked active seated on this ballot
+                    # can BE the minimum, and a positive ranked just outside k
+                    # would then be handed a cosine far below its own, teaching
+                    # the head a feature value the server never sends.
+                    cs[i, free] = float(sim[i, w])
+                    rk[i, free] = 1.0
                     present.add(w)
                     free -= 1
             for j, sid_idx in enumerate(idx[i].tolist()):
                 if sid_idx in want:
                     y[i, j] = 1.0
-        return idx, cs, y, card, docs_y
+        return idx, cs, rk, y, card, docs_y
 
     def features(
-        subset: list[dict], idx: np.ndarray, cs: np.ndarray, *, rng: random.Random | None
+        subset: list[dict],
+        idx: np.ndarray,
+        cs: np.ndarray,
+        rank_norm: np.ndarray,
+        *,
+        rng: random.Random | None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Per-candidate scalars, plus the optional shuffle. See FEATURE_NAMES."""
+        """Per-candidate scalars, plus the optional shuffle. See FEATURE_NAMES.
+
+        ``rank_norm`` is passed in rather than re-derived from slot position:
+        the serving assembler writes 1.0 for a reserved candidate, and
+        recomputing ``arange(k)`` here would quietly overwrite that with the
+        slot's own rank — training the head on retrieval evidence the server
+        does not send.
+        """
         b = len(subset)
-        rank_norm = np.tile(np.arange(k, dtype=np.float32) / max(k - 1, 1), (b, 1))
+        rank_norm = rank_norm.astype(np.float32, copy=True)
         active = np.zeros((b, k), dtype=np.float32)
         for i, row in enumerate(subset):
             actives = {index[s] for s in (row.get("active_ids") or []) if s in index}
@@ -355,10 +451,11 @@ def main() -> int:
         subset: list[dict],
         idx: np.ndarray,
         cs: np.ndarray,
+        rk: np.ndarray,
         y: np.ndarray,
         rng: random.Random | None,
     ):  # type: ignore[no-untyped-def]
-        feats, perm, _ = features(subset, idx, cs, rng=rng)
+        feats, perm, _ = features(subset, idx, cs, rk, rng=rng)
         idx_p = np.take_along_axis(idx, perm, axis=1)
         y_p = np.take_along_axis(y, perm, axis=1)
         feats_p = np.take_along_axis(feats, perm[:, :, None], axis=1)
@@ -463,10 +560,12 @@ def main() -> int:
             for start in range(0, len(val_rows), 64):
                 sl = slice(start, start + 64)
                 subset = val_rows[sl]
-                idx, cs, y, card, docs_y = make_batch(
-                    subset, va_cand[sl], va_cos[sl], train=False
+                idx, cs, rk, y, card, docs_y = make_batch(
+                    subset, va_cand[sl], va_cos[sl], va_rank[sl], va_sim[sl], train=False
                 )
-                logits, dlogit, clogits, y_t, idx_p = run_batch(subset, idx, cs, y, None)
+                logits, dlogit, clogits, y_t, idx_p = run_batch(
+                    subset, idx, cs, rk, y, None
+                )
                 counts = clogits.argmax(1).cpu().numpy()
                 probs = torch.sigmoid(logits).cpu().numpy()
                 for i, row in enumerate(subset):
@@ -494,11 +593,12 @@ def main() -> int:
                 refresh_docs()
             picks = order[start : start + args.batch_size]
             subset = [train_rows[p] for p in picks]
-            idx, cs, y, card, docs_y = make_batch(
-                subset, tr_cand[picks], tr_cos[picks], train=True
+            idx, cs, rk, y, card, docs_y = make_batch(
+                subset, tr_cand[picks], tr_cos[picks], tr_rank[picks], tr_sim[picks],
+                train=True,
             )
             opt.zero_grad()
-            logits, dlogit, clogits, y_t, _ = run_batch(subset, idx, cs, y, rng)
+            logits, dlogit, clogits, y_t, _ = run_batch(subset, idx, cs, rk, y, rng)
             loss = (
                 slot_loss(logits, y_t)
                 + card_loss(clogits, torch.tensor(card, device=dev))
