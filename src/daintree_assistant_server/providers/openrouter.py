@@ -427,11 +427,15 @@ def _map_status(status: int, *, retry_after: str | None, detail: str | None) -> 
     deterministic, and replaying it burns the CLI's retry budget to arrive at the
     same answer more slowly.
 
-    Note what is NOT here any more: the 404-means-routing-dead-end branch. Against
-    a single-host provider a 404 on a fixed, correct chat-completion path can only
-    mean the MODEL id is wrong — a server-side bug in what we sent, not a pool the
-    filters emptied — so it falls through to ``upstream_request_rejected`` with the
-    upstream's own "Model does not exist" attached.
+    Note what is NOT here: the 404-means-routing-dead-end branch the old adapter
+    carried. OpenRouter genuinely IS a router, so that branch was once meaningful
+    — but it only ever fired because this server sent a routing policy whose
+    filters could empty the eligible pool. Nothing sends one now (no ``provider``
+    block, no caller-facing preference), so a 404 on a fixed, correct
+    chat-completion path can only mean the MODEL id is wrong — a server-side bug
+    in what we sent — and it falls through to ``upstream_request_rejected`` with
+    the upstream's own "Model does not exist" attached. Reviving the branch would
+    mean reviving the policy that made it necessary.
     """
     if status == 429:
         return upstream_rate_limited(retry_after=retry_after)
@@ -708,9 +712,17 @@ class OpenRouterProvider:
             # positive this endpoint exists to prevent — so it is an error, not a
             # default.
             raise upstream_protocol_error("The provider returned no key record.")
-        # Pass the record through rather than projecting fields out of it: the
-        # caller is a diagnostic (the doctor endpoint), and usage/limit/free-tier
-        # detail is the useful part of an answer to "is my key usable?".
+        # Pass the record through rather than projecting fields out of it: this
+        # is a diagnostic, and usage/limit/free-tier detail is the useful part of
+        # an answer to "is my key usable?".
+        #
+        # Nothing calls this today — the doctor endpoint probes
+        # ``container.provider``, which is the SERVING adapter — so the record
+        # reaches no response body. It is implemented because `verify_key` is
+        # part of the protocol and a half-built one would fail at the moment
+        # someone finally needed it. A future caller that DOES surface this must
+        # allowlist fields on the way out, the way the existing diagnostic
+        # endpoints already do, rather than forwarding an account record whole.
         record: dict[str, Any] = payload["data"]
         return record
 

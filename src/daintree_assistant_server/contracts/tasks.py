@@ -226,9 +226,19 @@ class CompactedAgentOut(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    # Every cap here is sized against what the profile's token budget can
+    # actually emit, not against what the type could theoretically hold. A cap far
+    # above the budget is not free: it reads as permission, and the output that
+    # tries to use it is truncated at the token ceiling mid-JSON, which fails the
+    # parse and costs a repair. These are ceilings on a pathological output, and
+    # they sit near enough to the budget to stay honest about it.
     agent_id: str = Field(min_length=1, max_length=128)
-    worktree_path: str | None = Field(default=None, max_length=4096)
-    brief: str = Field(default="", max_length=4000)
+    # Real worktree paths are well under 200 characters. PATH_MAX would be 4096,
+    # but nothing legitimate is near it and the cap exists to bound a runaway.
+    worktree_path: str | None = Field(default=None, max_length=1024)
+    # A delegation brief is a paragraph, not a document — it is what an agent was
+    # TOLD to do. Kept verbatim, so the cap has to fit a real one intact.
+    brief: str = Field(default="", max_length=1500)
     status: str = Field(default="", max_length=300)
 
 
@@ -257,8 +267,18 @@ class ContextCompactOutput(BaseModel):
     # The user's own words, carried verbatim. First field because it is the one
     # whose loss is least recoverable: everything else in a conversation can be
     # re-derived from the world, but what the user actually asked for cannot.
-    original_ask: str = Field(default="", max_length=4000)
-    agents: list[CompactedAgentOut] = Field(default_factory=list, max_length=50)
+    #
+    # REQUIRED, and the only field here that is — the deliberate asymmetry with
+    # its siblings and with CheckpointOutput, whose fields all default. Those
+    # defaults are right for the lists: a session with no agents genuinely has
+    # `agents: []`, and forcing a value would only invite an invented one. But
+    # every real conversation has an ask, so its ABSENCE is not an empty result,
+    # it is a malformed one. Without this, `{"agents": [...]}` validates into a
+    # hollow compaction — no ask, no decisions, nothing — the parse SUCCEEDS, and
+    # the repair retry that exists for exactly this never fires. Requiring the
+    # one always-present field is what keeps that path reachable.
+    original_ask: str = Field(min_length=1, max_length=2000)
+    agents: list[CompactedAgentOut] = Field(default_factory=list, max_length=25)
     terminals: list[str] = Field(default_factory=list)
     decisions: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
@@ -276,9 +296,16 @@ class ContextCompactOutput(BaseModel):
     @field_validator("preserved_ids")
     @classmethod
     def _bound_ids(cls, v: list[str]) -> list[str]:
-        # Longer per-item cap than a prose list and no aggressive item bound: each
-        # entry is an identifier plus a few words of what it is, and truncating an
-        # identifier is the one failure mode this whole task exists to prevent.
+        # These bounds are a guard against a runaway output, NOT a safe place to
+        # lose data: `_truncate_items` slices and drops silently, which is the
+        # house posture for model-produced lists (tolerate, never reject).
+        #
+        # What makes that survivable HERE is the entry format the prompt pins:
+        # every entry leads with its identifier and follows with prose, so a
+        # per-item slice trims the description and leaves the id intact. The
+        # ITEM bound is the one that could genuinely lose an identifier, so it
+        # sits far above anything the profile's 4k-token output cap can emit —
+        # the model runs out of tokens long before it runs out of slots.
         return _truncate_items(v, max_items=100, max_chars=300)
 
 

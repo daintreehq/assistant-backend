@@ -20,6 +20,7 @@ from pydantic import SecretStr
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
 from daintree_assistant_server.providers.openrouter import (
+    _CREDENTIAL_ECHOED,
     _ERROR_DETAIL_CAP,
     _REDACTED,
     OpenRouterProvider,
@@ -233,11 +234,14 @@ async def test_no_routing_or_affinity_field_is_ever_sent(field: str) -> None:
 def test_a_nested_error_body_is_read_first() -> None:
     """OpenRouter wraps the reason; Cerebras puts it at the top level.
 
-    Both shapes are read by both adapters — only the priority differs — so this
-    pins the priority rather than the capability.
+    Both shapes are read by both adapters — only the PRIORITY differs — so the
+    body has to carry BOTH for the assertion to mean anything. With only a
+    nested message present, flat-first code would fall through to it and pass.
     """
-    body = _json.dumps({"error": {"message": "the real reason", "code": 400}})
-    assert _extract_upstream_error(body) == "the real reason"
+    body = _json.dumps(
+        {"error": {"message": "the nested reason"}, "message": "the flat reason"}
+    )
+    assert _extract_upstream_error(body) == "the nested reason"
 
 
 def test_a_flat_error_body_still_works() -> None:
@@ -257,11 +261,17 @@ def test_an_echoed_credential_is_scrubbed() -> None:
 
 
 def test_a_doubly_encoded_credential_drops_the_whole_detail() -> None:
-    """The backstop: one decode pass hides the key from an exact match."""
+    """The backstop: one decode pass hides the key from an exact match.
+
+    Asserts the SENTINEL, not merely the absence of the plaintext. Absence is
+    satisfied by the escaped form on its own, so a version of this test that
+    only checked `_DEFAULT_KEY not in detail` would still pass with
+    `_still_reveals` deleted — pinning nothing.
+    """
     escaped = "".join(f"\\u{ord(c):04x}" for c in _DEFAULT_KEY)
     body = _json.dumps({"error": {"message": f"bad key {escaped}"}})
     detail = _extract_upstream_error(body, secret=SecretStr(_DEFAULT_KEY))
-    assert detail is not None
+    assert detail == _CREDENTIAL_ECHOED
     assert _DEFAULT_KEY not in detail
 
 
@@ -513,7 +523,10 @@ async def test_verify_key_never_reports_an_unknown_as_invalid() -> None:
     provider = _provider(handler)
     with pytest.raises(DaintreeError) as exc:
         await provider.verify_key()
-    assert exc.value.status_code != 401
+    # The exact code, not merely "not 401": a mapping that turned this into a
+    # 400 or a 402 would also satisfy the weaker assertion while telling the
+    # user something false about their key.
+    assert exc.value.code == "upstream_unavailable"
     await provider.aclose()
 
 
@@ -842,4 +855,94 @@ async def test_the_request_body_can_be_dumped_for_cache_forensics(tmp_path: Any)
     assert dumped["model"] == _MODEL
     # The disable rides along, so a dump is a faithful record of the wire body.
     assert dumped["reasoning"] == {"enabled": False}
+    await provider.aclose()
+
+
+def test_the_credential_is_scrubbed_before_the_detail_is_capped() -> None:
+    """Order matters: capping first can slice a key and leave a usable prefix.
+
+    The key is placed so that the cap boundary falls in the middle of it. If the
+    cap were applied before the scrub, a recognisable head of the credential
+    would survive in the returned text.
+    """
+    prefix = "x" * (_ERROR_DETAIL_CAP - len(_DEFAULT_KEY) // 2)
+    body = _json.dumps({"error": {"message": f"{prefix}{_DEFAULT_KEY}"}})
+    detail = _extract_upstream_error(body, secret=SecretStr(_DEFAULT_KEY))
+    assert detail is not None
+    assert len(detail) <= _ERROR_DETAIL_CAP
+    # No fragment of the key long enough to be recognisable survived.
+    assert _DEFAULT_KEY[:16] not in detail
+
+
+def test_a_unicode_escaped_credential_is_caught_by_scrubbing_after_extraction() -> None:
+    """JSON can encode an ordinary key as \\u0073\\u006b…
+
+    No literal match on the undecoded bytes would find it, but `json.loads`
+    faithfully restores the plaintext — which is why the scrub runs on EXTRACTED
+    text rather than on the raw body.
+    """
+    escaped = "".join(f"\\u{ord(c):04x}" for c in _DEFAULT_KEY)
+    body = '{"error": {"message": "rejected ' + escaped + '"}}'
+    detail = _extract_upstream_error(body, secret=SecretStr(_DEFAULT_KEY))
+    assert detail is not None
+    assert _DEFAULT_KEY not in detail
+    assert _REDACTED in detail
+
+
+@pytest.mark.asyncio
+async def test_a_404_is_a_rejected_request_not_a_routing_dead_end() -> None:
+    """Guards against reviving the deleted routing taxonomy.
+
+    The old adapter mapped 404 to `upstream_no_compliant_provider` — "the policy
+    filters emptied the pool". Nothing sends a routing policy now, so a 404 on a
+    fixed, correct path can only mean the model id is wrong: our bug, reported
+    with the upstream's own reason attached.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"error": {"message": "Model does not exist"}})
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert exc.value.code == "upstream_request_rejected"
+    assert "Model does not exist" in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_verify_key_rejects_a_redirect_rather_than_following_it() -> None:
+    """EXACTLY 200 or we have no answer.
+
+    The client does not follow redirects, so a 3xx arrives here as-is. A
+    body-shaped 302 would read as a successful verification under a `>= 400`
+    check — reporting a key as usable on the strength of a redirect.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, json={"data": {"label": "nope"}})
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError):
+        await provider.verify_key()
+    await provider.aclose()
+
+
+@pytest.mark.parametrize("include_usage", [True, False])
+@pytest.mark.asyncio
+async def test_stream_options_ride_the_include_usage_flag(include_usage: bool) -> None:
+    """A stream reports usage only when asked; cost accounting depends on it."""
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = _json.loads(request.content)
+        return httpx.Response(200, text=SSE_OK, headers={"content-type": "text/event-stream"})
+
+    provider = _provider(handler)
+    stream = await provider.open_stream(_req(stream=True, include_usage=include_usage))
+    if include_usage:
+        assert captured["body"]["stream_options"] == {"include_usage": True}
+    else:
+        assert "stream_options" not in captured["body"]
+    await stream.aclose()
     await provider.aclose()

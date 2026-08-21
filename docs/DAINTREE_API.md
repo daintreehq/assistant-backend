@@ -791,6 +791,7 @@ OpenRouter account — and each one has a different fix. Never retried.
 | 429  | `upstream_rate_limited` | OpenRouter is rate limiting. Honour `Retry-After`. Retryable. |
 | 503  | `upstream_no_compliant_provider` | No endpoint matched the active routing policy (see [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md)). **Not** retried — the policy is deterministic, so an immediate replay re-derives the same empty pool. Relax the request's `routing` block, or report a routing-policy problem. |
 | 503  | `upstream_unavailable` | Provider outage or no capacity. Retryable. |
+| 503  | `provider_not_configured` | The task requires an optional second provider whose credential this deployment never set. **Not** retryable — no amount of waiting configures a key. Every other task and every turn is unaffected; set the named provider's key to enable it. |
 | 504  | `upstream_timeout` | Upstream inactivity/deadline. Retryable. |
 
 ### Faults on our side of the upstream call

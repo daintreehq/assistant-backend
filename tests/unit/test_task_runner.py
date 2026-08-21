@@ -11,7 +11,11 @@ from fakes import FakeProvider, make_result
 from pydantic import SecretStr
 
 from daintree_assistant_server.config import CEREBRAS_MODEL
-from daintree_assistant_server.contracts.tasks import TaskRequest
+from daintree_assistant_server.contracts.tasks import (
+    CompactedAgentOut,
+    ContextCompactOutput,
+    TaskRequest,
+)
 from daintree_assistant_server.errors import DaintreeError, upstream_error, upstream_timeout
 from daintree_assistant_server.providers.base import ProviderUsage
 from daintree_assistant_server.services.task_runner import (
@@ -863,3 +867,114 @@ def test_only_the_compaction_profile_leaves_the_serving_provider() -> None:
     for profile in profiles.values():
         if profile.id != "context_compact":
             assert profile.model == CEREBRAS_MODEL, profile.id
+
+
+def test_the_compaction_budget_fits_a_busy_orchestration_session() -> None:
+    """The output cap must cover the sessions actually worth compacting.
+
+    A compaction that truncates at the token ceiling does not degrade gracefully:
+    the JSON never closes, the parse fails, the repair replays into the same
+    ceiling, and the task 502s — on precisely the long, agent-heavy sessions the
+    feature exists for. Worse, the content lost at the truncation point is
+    identifiers, which are unrecoverable.
+
+    So this pins the budget against a REALISTIC busy session rather than against
+    the declared caps (which are ceilings on a pathological output and are
+    deliberately unreachable). Twelve live agents with real briefs is a plausible
+    Daintree session, not a stress test.
+    """
+    profile = build_profiles()["context_compact"]
+    busy = ContextCompactOutput(
+        original_ask="get the auth refactor merged across all three services",
+        agents=[
+            CompactedAgentOut(
+                agent_id=f"agt_{i:04x}",
+                worktree_path=f"/Users/dev/worktrees/service-{i}/auth-refactor",
+                brief=(
+                    "Refactor the token validation path to use HMAC, keep the "
+                    "existing test suite green, and open a PR against develop."
+                ),
+                status="running — 4 of 7 tests passing",
+            )
+            for i in range(12)
+        ],
+        terminals=[f"terminal-{i:08x}-3d11-424c-90cb-136f24046295 — pytest, green" for i in range(6)],
+        decisions=["use HMAC not RSA, because the CLI already ships the shared secret"] * 8,
+        blockers=["CI is red on service-2 for an unrelated flake"] * 4,
+        next_actions=["review the service-1 diff", "rerun service-2 CI"] * 3,
+        preserved_ids=[f"wfr_{i:04x} — the release workflow for service-{i}" for i in range(10)],
+    )
+    serialized = json.dumps(busy.model_dump())
+    # ~4 characters per token is the standard rough conversion; deliberately
+    # pessimistic here, since JSON punctuation and ids tokenize worse than prose.
+    estimated_tokens = len(serialized) / 3.5
+    assert estimated_tokens < profile.max_output_tokens, (
+        f"a realistic busy session serializes to ~{estimated_tokens:.0f} tokens, "
+        f"over the profile's {profile.max_output_tokens}-token output cap — it "
+        "would truncate mid-JSON and fail the parse"
+    )
+
+
+def test_no_declared_cap_can_truncate_an_identifier() -> None:
+    """Identifier fields must comfortably fit the real thing.
+
+    A terminal id is 45 characters; the failure this whole task guards against is
+    a shortened one, which matches no terminal. These caps bound a runaway, and
+    must never be the thing that clips a genuine id.
+    """
+    longest_real_id = "terminal-5284bfef-3d11-424c-90cb-136f24046295"
+    agent = CompactedAgentOut(
+        agent_id=longest_real_id,
+        worktree_path="/Users/dev/Projects/very/deeply/nested/worktrees/" + "x" * 200,
+        brief="do the thing",
+        status="running",
+    )
+    assert agent.agent_id == longest_real_id
+
+    out = ContextCompactOutput(preserved_ids=[f"{longest_real_id} — the build terminal"])
+    assert longest_real_id in out.preserved_ids[0]
+    assert out.terminals == []
+
+
+@pytest.mark.asyncio
+async def test_a_caller_credential_never_reaches_a_different_vendor(
+    dual_runner: TaskRunner,
+    fake_provider: FakeProvider,
+    openrouter_provider: FakeProvider,
+) -> None:
+    """A key issued by one vendor must not be sent to another.
+
+    ``TaskRunner.run`` threads a caller credential into every request. On the
+    serving path it is always None today (auth.py ignores the Authorization
+    header), which is what makes this latent and worth pinning: the utility-task
+    BENCHMARKS pass ``caller_api_key(settings)`` — literally CEREBRAS_API_KEY —
+    and an unscoped forward would put it in an Authorization header addressed to
+    OpenRouter. The provider's own configured key is the right credential there,
+    which is what ``api_key=None`` selects.
+
+    ``FakeProvider`` ignores credentials entirely, so nothing else in the suite
+    would notice this regress.
+    """
+    openrouter_provider.complete_result = make_result(content=json.dumps(_COMPACT_OUTPUT))
+    await _run(dual_runner, "context_compact", {"transcript": "x"})
+    assert openrouter_provider.requests[0].api_key is None
+
+    # ...while the default provider still receives it, or every task that relies
+    # on a caller-supplied key breaks.
+    fake_provider.complete_result = make_result(content="Tests are green.")
+    await _run(dual_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
+    assert fake_provider.requests[0].api_key == TEST_API_KEY
+
+
+@pytest.mark.asyncio
+async def test_the_repair_call_scopes_the_credential_the_same_way(
+    dual_runner: TaskRunner, openrouter_provider: FakeProvider
+) -> None:
+    """The repair rebuilds the request field by field, so it can drift alone."""
+    openrouter_provider.complete_result = [
+        make_result(content="not json"),
+        make_result(content=json.dumps(_COMPACT_OUTPUT)),
+    ]
+    await _run(dual_runner, "context_compact", {"transcript": "x"})
+    assert len(openrouter_provider.requests) == 2
+    assert all(r.api_key is None for r in openrouter_provider.requests)

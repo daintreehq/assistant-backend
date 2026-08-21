@@ -680,7 +680,16 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 _p_context_compact,
                 # Same heavy budget as the other whole-transcript tasks: it reads
                 # a full span of history, not a tail.
-                max_output_tokens=2000, timeout_seconds=heavy_timeout,
+                #
+                # The OUTPUT cap is larger than any sibling's because this task is
+                # the only one that emits a nested array whose length tracks how
+                # busy the session was. A real orchestration session with a
+                # dozen live agents serializes to ~2.4k tokens of state, so the
+                # obvious 1200-2000 would truncate mid-JSON exactly on the
+                # sessions worth compacting — and a truncated identifier is
+                # unrecoverable. Output is ~$0.17/M here, so the headroom costs
+                # well under a hundredth of a cent per call.
+                max_output_tokens=4000, timeout_seconds=heavy_timeout,
                 sensitive_fields=frozenset({"transcript"}),
                 provider_id="openrouter", model=OPENROUTER_COMPACTION_MODEL,
                 repair_hint="Return a single JSON object with exactly these keys: "
@@ -1000,8 +1009,19 @@ class TaskRunner:
             thinking_disabled=not thinking_enabled,
             reasoning_effort=reasoning_effort,
             timeout=timeout,
-            # The caller's own credential (threaded from the route handler).
-            api_key=api_key,
+            # The caller's own credential (threaded from the route handler), and
+            # ONLY for the default provider. A credential is issued by one vendor
+            # and is meaningless — or worse, leaked — at another, so a task
+            # routed elsewhere falls back to that provider's own configured key
+            # by passing None.
+            #
+            # Latent on the serving path, where the route passes no key at all
+            # (auth.py ignores the Authorization header). Not latent for
+            # benchmarks: `benchmarks/_harness/env.py::caller_api_key` returns
+            # CEREBRAS_API_KEY and the utility-task benchmarks thread it into
+            # `TaskRunner.run`, so an unscoped forward would put the Cerebras key
+            # in an Authorization header bound for OpenRouter.
+            api_key=api_key if profile.provider_id == "cerebras" else None,
             # Cache affinity, keyed by TASK rather than by caller. A task's system
             # prompt is server-owned and identical for everyone who runs it, so the
             # calls that share a prefix are the ones that share a task id — not the
@@ -1032,9 +1052,11 @@ class TaskRunner:
                 thinking_disabled=not thinking_enabled,
                 reasoning_effort=reasoning_effort,
                 timeout=timeout,
-                # Same caller credential as the first attempt — an omission here
-                # would fail the repair call outright (no provider default).
-                api_key=api_key,
+                # Same credential as the first attempt, scoped the same way — an
+                # omission here would fail the repair call outright on the
+                # default provider, and a blind forward would misdirect it on
+                # any other.
+                api_key=api_key if profile.provider_id == "cerebras" else None,
                 # ...and the same affinity key: the repair replays the whole first
                 # attempt plus one instruction, so it is the same prefix and should
                 # say so.

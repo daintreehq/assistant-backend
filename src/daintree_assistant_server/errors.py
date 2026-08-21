@@ -262,9 +262,15 @@ def provider_not_configured(provider: str) -> DaintreeError:
     Distinct from :func:`upstream_unavailable`, which shares the 503 but means an
     outage — transient, and retryable. This one is a deployment fact: the
     credential for a SECOND, optional provider was never set, so the provider was
-    never constructed (see ``main._build_openrouter_provider``). Retrying cannot
-    change that, and marking it retryable would burn the CLI's retry budget to
-    arrive at the same answer more slowly.
+    never constructed (see ``main._build_openrouter_provider``).
+
+    ``retryable=False`` governs OUR retry loop (``providers/retry.py``), which is
+    the only consumer of the flag — it is deliberately not serialized, so
+    ``ErrorDetail`` carries message/type/param/code and nothing else. What
+    reaches a client is the distinct ``code``, which is the whole reason to mint
+    one rather than reuse ``upstream_unavailable``: a client that retried this
+    503 the way it should retry that one would replay a deterministic failure
+    until its budget ran out.
 
     It is deliberately NOT a readiness failure. The optional provider funds one
     utility task; a deployment without it answers every turn and every other task

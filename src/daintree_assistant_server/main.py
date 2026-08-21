@@ -315,13 +315,16 @@ def _build_openrouter_provider(settings: Settings) -> ChatProvider | None:
     state the task runner can see and report as itself
     (``provider_not_configured``, naming the provider).
 
-    It gets its OWN client rather than sharing the Cerebras one. Two reasons, and
-    the first is enough: a client carries a base URL and a connection pool for one
-    host, so sharing is not even possible without unpicking both. The second is
-    the same argument the docs client already makes here — a background
-    compaction must never queue behind a live turn holding a pooled connection.
-    The pool is small because at most one utility task calls this at a time,
-    against the ~100 the serving path sizes for.
+    It gets its OWN client rather than sharing the Cerebras one — for isolation,
+    which is the same argument the docs client already makes here: a compaction
+    call must never queue behind a live turn holding a pooled connection, and a
+    misbehaving second vendor must not be able to exhaust the pool the serving
+    path depends on. (Sharing would be technically possible — neither client is
+    given a ``base_url`` and the adapters build absolute URLs — so this is a
+    deliberate choice, not a constraint.) The pool is small because compaction is
+    an occasional background task rather than the serving path, against the ~100
+    connections that one sizes for; it is not a concurrency limit, and nothing
+    gates how many compactions may run at once.
     """
     if not settings.openrouter_api_key.get_secret_value():
         return None
