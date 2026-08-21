@@ -110,6 +110,12 @@ BASE_PROMPT_CEILING = 25 * 1024
 BASE_PARTIAL_CEILINGS = {
     "00-persona.md": 1024,
     "10-hard-rules.md": 4 * 1024,
+    # The turn-finality control line (issue #61). It fires on EVERY reply — a
+    # zero-skill turn included — and the backend strips it before the client sees
+    # a byte, so it is base by the split rule and cannot live anywhere else. Sized
+    # to the measured 750B; note the AGGREGATE ceiling binds well before this one
+    # does, which is the correct precedence for a partial this close to the line.
+    "15-response-declaration.md": 1024,
     # Raised with BASE_PROMPT_CEILING above (see the argument there) — the
     # delegation bullet lands in this partial.
     "20-tool-discipline.md": 10 * 1024,

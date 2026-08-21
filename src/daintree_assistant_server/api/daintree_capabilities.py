@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
 from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
+from ..contracts.daintree_api import COMPACTION_BLOCK_NAME
 from ..services.docs_events import DOCS_SEARCH_WIRE_NAME
 from .deps import require_ready
 
@@ -37,7 +38,13 @@ async def capabilities(
             "endpoint": "/v1/daintree/respond",
             "model": PUBLIC_MODEL_ID,
             "streaming": True,
-            "stream_events": ["meta", "status", "delta", "done", "error"],
+            # The full event vocabulary a client's parser must handle. `compaction`
+            # is listed even where no producer is configured: it is OPTIONAL on
+            # every turn anyway (most turns emit none), so a parser that handles
+            # it is correct against every deployment, and one that does not would
+            # break the day a producer is switched on. Read `context_compaction`
+            # below for whether this instance can actually emit it.
+            "stream_events": ["meta", "status", "delta", "compaction", "done", "error"],
             # The main call's thinking posture is hardcoded OFF (a product decision,
             # like the model ids — see INTERACTIVE_THINKING_ENABLED in config.py), so
             # responses do not carry reasoning_content and the stream emits no
@@ -157,6 +164,38 @@ async def capabilities(
             "source": "https://daintree.org",
             "prelude_tool": DOCS_SEARCH_WIRE_NAME,
             "best_effort": True,
+        },
+        # Context compaction: the model declares on its first line whether the
+        # reply ends the turn, the server strips that line before any byte reaches
+        # the client, and on a final reply it reconciles settled history into one
+        # block while the rest of the message is still streaming.
+        #
+        # `enabled` is the honest answer for THIS instance, read from the compactor
+        # the container actually holds — false while no producer is configured,
+        # which is every deployment until the second provider lands. The stripping
+        # happens either way; only the block does not.
+        #
+        # `delivery` is the load-bearing field. The event arrives BEFORE `done`,
+        # never after: `done` stays terminal so a reader that stops on it loses
+        # nothing. A client applies the splice only when `turn_id` matches the turn
+        # it asked about, and applies it exactly as
+        # `messages[:start_index] + [block] + messages[end_index:]`.
+        #
+        # Best-effort, like the docs lookup: a client seeing this block is never
+        # promised a block on any given turn, only told what to do with one.
+        "context_compaction": {
+            "enabled": container.compactor.available,
+            "stream_event": "compaction",
+            "delivery": "before_done",
+            "best_effort": True,
+            "append_only": True,
+            # The reserved `name` the spliced message carries. Sending it back
+            # verbatim is what lets the next turn recognise already-frozen history
+            # without any server-side state — and what stops it being compacted a
+            # second time.
+            "block_message_name": COMPACTION_BLOCK_NAME,
+            "span": {"collection": "input.messages", "end_exclusive": True},
+            "max_block_bytes": settings.cap_compaction_block_bytes,
         },
         "tasks": container.task_runner.task_ids(),
         # Workflow intelligence: the CLI owns the durable execution graphs; the

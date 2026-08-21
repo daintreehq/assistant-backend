@@ -7,6 +7,7 @@ every request is recorded for assertions.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable
 from typing import Any
@@ -17,6 +18,10 @@ from daintree_assistant_server.providers.base import (
     ProviderStream,
     ProviderToolCallResult,
     ProviderUsage,
+)
+from daintree_assistant_server.services.compaction import (
+    CompactionRequest,
+    CompactionResult,
 )
 
 
@@ -348,3 +353,49 @@ def selection_result(
         ),
         endpoint=endpoint,
     )
+
+
+class FakeCompactor:
+    """A scriptable :class:`Compactor` for the declaration/delivery path.
+
+    Deliberately NOT a fake OpenRouter provider. The producer half is issue #60;
+    what this stands in for is the seam, so the transport — marker detection, the
+    speculative start, the delivery gate, the wire shape — is testable before any
+    of that exists.
+    """
+
+    def __init__(
+        self,
+        *,
+        content: str | None = "agent-1 at /w/a; blocked on review",
+        available: bool = True,
+        error: Exception | None = None,
+        delay: float = 0.0,
+        observer: Callable[[], Any] | None = None,
+    ) -> None:
+        self.available = available
+        self.content = content
+        self.error = error
+        self.delay = delay
+        self._observer = observer
+        self.calls: list[CompactionRequest] = []
+        #: What ``observer`` returned at the moment ``compact`` was ENTERED —
+        #: how a test proves the call started while generation was still running.
+        self.observed: list[Any] = []
+        self.cancellations = 0
+
+    async def compact(self, request: CompactionRequest) -> CompactionResult | None:
+        self.calls.append(request)
+        if self._observer is not None:
+            self.observed.append(self._observer())
+        try:
+            if self.delay:
+                await asyncio.sleep(self.delay)
+        except asyncio.CancelledError:
+            self.cancellations += 1
+            raise
+        if self.error is not None:
+            raise self.error
+        if self.content is None:
+            return None
+        return CompactionResult(content=self.content)

@@ -13,7 +13,7 @@ and the response/stream serialization are Daintree-native.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -343,6 +343,79 @@ class StreamDone(BaseModel):
     # rather than dangerous — and killing the stream would cost the user a reply
     # they are already reading in exchange for nothing.
     warnings: list[str] = Field(default_factory=list)
+
+
+# The reserved ``ChatMessage.name`` a compacted block wears once the client has
+# spliced it back into the conversation. It is how the NEXT turn recognises
+# already-frozen history without any server-side state: compaction is append-only,
+# and a block fed back through the compactor is a game of telephone whose loss
+# compounds silently. Reserved rather than merely conventional — the assembler
+# drops the name on the way upstream so it never reaches the model as a speaker
+# identity, and the span selector resumes strictly after the last one it sees.
+COMPACTION_BLOCK_NAME: Final = "daintree_compaction"
+
+
+class CompactionSpan(BaseModel):
+    """Which messages the block stands in for, as a half-open index range.
+
+    The indices address ``input.messages`` of the request that opened THIS
+    stream — the array the client itself just sent, not some server-side view of
+    it — so the splice needs no negotiation and no guessing::
+
+        messages[:start_index] + [block] + messages[end_index:]
+
+    The assistant reply currently streaming is not in that array and is appended
+    afterwards as usual.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    start_index: int = Field(ge=0)
+    #: Exclusive. Always greater than ``start_index`` — an empty span is never
+    #: emitted, because there would be nothing for the block to replace.
+    end_index: int = Field(gt=0)
+
+
+class CompactionBlock(BaseModel):
+    """The replacement message, ready to splice in verbatim.
+
+    Delivered as a whole message rather than as bare text so the client does no
+    shaping of its own: role and name are fixed, and the only variable is the
+    content. A client that invents its own framing is a client whose next turn
+    the server cannot recognise as already compacted.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    role: Literal["user"] = "user"
+    name: Literal["daintree_compaction"] = COMPACTION_BLOCK_NAME
+    #: Bounded here in CODE POINTS, which is only half the job — the orchestrator
+    #: additionally discards a block whose UTF-8 length exceeds
+    #: ``cap_compaction_block_bytes``, because prompt cost is paid in bytes.
+    content: str = Field(min_length=1, max_length=262_144)
+
+
+class StreamCompaction(BaseModel):
+    """The ``compaction`` event: reconciled state standing in for old history.
+
+    Emitted at most once per turn, immediately BEFORE ``done`` and never after
+    it. ``done`` staying terminal is a deliberate contract choice: SSE readers
+    modelled on the ``data: [DONE]`` convention routinely break their read loop
+    on the terminal event, so anything following it is silently dropped by
+    exactly the kind of hand-written parser a CLI has.
+
+    Entirely optional. A turn that produced no block simply has no such event,
+    and the client keeps the raw history it already holds.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    #: The turn this block belongs to. A client applies the splice only when it
+    #: matches the turn it asked about — a block is a statement about one
+    #: conversation prefix at one moment, not a durable fact.
+    turn_id: str = Field(min_length=1, max_length=256)
+    replaces: CompactionSpan
+    block: CompactionBlock
 
 
 class StreamError(BaseModel):

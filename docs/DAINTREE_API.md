@@ -391,6 +391,11 @@ data: { "phase": "thinking" }                    // once, when thinking-mode CoT
 event: delta
 data: { "content": "Hel" }                      // repeated; may carry "reasoning_content" or "tool_calls" fragments
 
+event: compaction                                // optional, at most once, immediately before `done`
+data: { "turn_id":"turn-7",
+        "replaces": { "start_index":0, "end_index":12 },
+        "block": { "role":"user", "name":"daintree_compaction", "content":"…" } }
+
 event: done
 data: { "finish_reason": "stop",
         "usage": { "prompt_tokens":0, "completion_tokens":0, "total_tokens":0, "cached_tokens":0 } }
@@ -422,6 +427,48 @@ Guarantees:
 - A later mid-stream upstream failure likewise emits a terminal `error` event and stops.
   The stream **never** emits `done` it did not earn (a truncated upstream stream is an error).
 - `done` replaces any `[DONE]` sentinel; there is no OpenAI framing.
+- `done` is **terminal**: nothing is ever emitted after it. `compaction`, when present,
+  arrives immediately before it. That ordering is deliberate — a reader modelled on the
+  `data: [DONE]` convention breaks its loop on the terminal event, so a block placed after
+  `done` would be silently dropped by exactly the kind of parser a client hand-writes.
+
+---
+
+### Context compaction
+
+Long orchestration sessions resend their whole history every round at full input price.
+Most of that history is a stale snapshot of a mutable world, so the server may replace a
+settled prefix of the conversation with one block of reconciled **current state**.
+
+The model declares on the first line of every reply whether the reply ends the turn. The
+server strips that line before any byte reaches the client — it never appears in a `delta` —
+and on a final reply starts the compaction call while the rest of the message is still
+streaming, which is what makes it nearly free.
+
+`compaction` is **optional on every turn**. Most turns emit none, and a client that receives
+none simply keeps the history it already holds. Handle it or ignore it; never wait for it.
+
+Applying a block, exactly:
+
+```js
+messages = messages.slice(0, replaces.start_index)
+          .concat([block])
+          .concat(messages.slice(replaces.end_index))
+```
+
+- The indices address the `input.messages` array **of the request that opened this stream**.
+  The assistant reply now streaming is not in that array and is appended afterwards as usual.
+- Apply only when `turn_id` matches the turn you asked about.
+- Send `block` back **verbatim**, `name` included. That reserved name is how the next turn
+  recognises already-frozen history: compaction is append-only, and a block fed back through
+  the compactor loses a little more each time with nothing in the output to say so. The name
+  is stripped before the conversation reaches the model, so it costs nothing upstream.
+- Nothing about a block is stored server-side, and none of it rides the state token.
+
+`/v1/daintree/capabilities` carries a `context_compaction` block: `enabled` is whether THIS
+deployment can actually produce one, `max_block_bytes` the largest it will send. The
+`compaction` event is listed in `stream_events` regardless, because a parser that handles it
+is correct against every deployment.
 
 ---
 
