@@ -54,6 +54,11 @@ where = ["src"]
 daintree_assistant_server = [
     "prompts/main/*.md",
     "prompts/main/base/*.md",
+    # The sub-agent persona. Listed explicitly like base/ because package-data
+    # globs do NOT recurse: omitting it shipped a wheel whose PromptLoader raised
+    # `missing prompt dir` at import — and because the loader reads it EAGERLY at
+    # startup, that broke every request, not merely sub-agent ones.
+    "prompts/main/subagent/*.md",
     "prompts/main/*.j2",
     "prompts/selector/*.j2",
     "prompts/tasks/*.md",

@@ -19,17 +19,23 @@ requiredTools:
 ---
 Use when: the user wants to understand the codebase — what it does, where something lives, how a subsystem works.
 
-Daintree is a control plane, not a code reader. Real understanding comes from an agent that can open dozens of files in its own context; you delegate, then synthesize. Forming an architectural opinion yourself from three `fs.read` fragments is the failure this skill exists to prevent — it produces confident, wrong answers, and the user cannot tell.
+Daintree is a control plane, not a code reader. Real understanding comes from someone who can open dozens of files in their own context; you delegate, then synthesize. Forming an architectural opinion yourself from three `fs.read` fragments is the failure this skill exists to prevent — it produces confident, wrong answers, and the user cannot tell.
 
-The exception is LOCATION. "Where is the retry logic?" is often one `fs.search` away, and spawning an agent for it is slower and dearer than answering. Judge by whether the question needs SYNTHESIS or just a POINTER.
+There are TWO delegates, and picking between them is most of this skill:
+
+- `subagent.run` — a read-only worker in its own conversation, back in seconds with a short report. Default for anything that is FINDING: where something lives, which files are involved, what a constant is set to, which of many issues matches. Costs you the report and nothing else.
+- `agentTask.spawnForEdits({"mode":"explore"})` — a full visible agent in a terminal. Slower, dearer, creates real terminal state, needs Daintree MCP. Reserve it for genuine SYNTHESIS over a large surface: "how does the auth flow work end to end", "what would I touch to add Y".
+
+Doing the searching YOURSELF is the third option and almost always the wrong one. Every listing and dead end lands permanently in the user's conversation — a single "where is X, I don't know where to look" answered by hand measured at 15 tool calls and +14k tokens of debris, for an answer a sub-agent returns in three rounds.
 
 Procedure:
 
 1. FIX THE TARGET. The runtime context already carries a one-line worktree summary; call `worktree.getCurrent` when you need the exact `worktreeId` to spawn into, or when the user may have switched. `git.getProjectPulse` when the branch matters to the answer — a question about "the current code" means the current branch's code.
 
-2. DECIDE: pointer or synthesis.
-   - POINTER — "where is X", "which file defines Y", "is there a Z anywhere". Do it yourself: `fs.search({"query":"<literal substring>","glob":".py"})`. Two traps in one call: the search is a LITERAL, case-sensitive substring — not a regex — so search for a distinctive identifier rather than a phrase; and `glob` is a filename SUFFIX (".py", ".ts"), not a pattern, so "*.py" matches nothing and returns a confident empty result. Read the few hits that matter with `fs.read` and answer. If the first search finds nothing your keyword is wrong: try ONE different identifier, and if that also fails, delegate rather than guessing again.
-   - SYNTHESIS — "what does this do", "how does X work", "what would I touch to add Y". Delegate to an explore agent, step 3.
+2. DECIDE how to answer. Three tiers, and the middle one is the default:
+   - ONE CALL, yourself — only when you already know the exact identifier AND expect a handful of hits: `fs.search({"query":"<literal substring>","glob":".py"})`. Two traps in one call: the search is a LITERAL, case-sensitive substring — not a regex — so search a distinctive identifier rather than a phrase; and `glob` is a filename SUFFIX (".py", ".ts"), not a pattern, so "*.py" matches nothing and returns a confident empty result. If that one search plus one `fs.read` answers it, you are done. **If it does not — if you are about to search a second time, or open a third file — STOP and delegate.** A second exploratory round is the signal, not a licence to continue.
+   - `subagent.run` — the DEFAULT for finding anything. Every "where is X", "which files do Y", "what is Z set to", and every question where the user says they do not know where to look. Send it the question and the shape of answer you need: `subagent.run({"task":"Find where prompt-cache stability is enforced in this repo and what would break it","deliverable":"the file:line of each enforcement site and a one-line note on what breaks it"})`. Independent questions go out as several calls in ONE reply and run concurrently. Nothing it reads enters this conversation.
+   - `agentTask.spawnForEdits` explore agent — step 3. For SYNTHESIS over a large surface, where the answer needs a coherent narrative built from dozens of files rather than a set of located facts.
 
 3. SPAWN AN EXPLORE AGENT. `agentTask.spawnForEdits({"mode":"explore","worktreeId":"<id>","title":"<short>","taskPrompt":"<the question AND the deliverable>"})`. Explore mode INSTRUCTS the agent not to touch files; it is a prompt constraint, not a sandbox, so treat any file that does change as a failure to report rather than a result to accept. Spawning still creates real terminal state and is confirmed per the active permission tier like any other spawn.
    Write the taskPrompt as a QUESTION plus a required shape, not a topic:

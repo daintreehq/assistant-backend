@@ -27,6 +27,19 @@ class StatePayload(BaseModel):
     last_instruction_revision: int = 0
     issued_at: int = 0
     expires_at: int = 0
+    # The profile that RESOLVED the active set this token carries. A sub-agent
+    # chooses from a menu narrowed to what it can execute, so the two profiles do
+    # not agree about which sets are legal: a sub-agent's set can hold a specific
+    # whose domain foundation was filtered out of its menu, and reuse deliberately
+    # does not re-pair foundations, so an assistant round reusing that token would
+    # run a workflow skill with its base judgment layer silently missing.
+    #
+    # Distinct session ids make the crossover unreachable for today's client, but
+    # that is the CLIENT's property, not this server's. Everything else about the
+    # skill boundary is enforced here at the request boundary; this makes the
+    # profile match the rest. Absent on assistant tokens so their bytes are
+    # unchanged.
+    profile: str = "assistant"
     # The documentation search this TURN ran, carried so its pages survive the
     # turn's tool-continuation rounds.
     #

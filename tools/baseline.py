@@ -43,6 +43,10 @@ BANDS: dict[str, float] = {
     # Every request carries this. 5% is roughly one new rule; more than that
     # should be a decision, not a drift.
     "base_prompt_bytes": 0.05,
+    # The second persona, on the same terms. It is smaller, so the same 5% is a
+    # tighter absolute bound — which is right: this is the profile with the least
+    # context to spare.
+    "subagent_prompt_bytes": 0.05,
     # Moves only when the cli/ submodule pin moves, which should be visible.
     "tool_inventory_bytes": 0.10,
     # The shipped selector graphs (both encoders + the set-wise head). Moves
@@ -115,6 +119,7 @@ def capture() -> dict[str, Any]:
         },
         "prompt": {
             "base_prompt_bytes": len(loader.base_prompt().encode("utf-8")),
+            "subagent_prompt_bytes": len(loader.subagent_prompt().encode("utf-8")),
             "skill_body_bytes_total": sum(
                 len(s.body.encode("utf-8")) for s in catalog.skills
             ),

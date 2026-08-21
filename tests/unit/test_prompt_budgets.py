@@ -82,7 +82,27 @@ from daintree_assistant_server.skills.catalog import load_catalog
 # only when the selector picks a `daintree.*` skill. There is no skill that could
 # hold this rule, because on precisely the turns it governs, no skill exists. The
 # base prompt is the only text on the wire.
-BASE_PROMPT_CEILING = 24 * 1024
+# RAISED 2026-08-21, 24 KB -> 25 KB, for the delegation rule in
+# `20-tool-discipline.md`. The argument this ratchet asks for:
+#
+#   What behaviour needs this?  `subagent.run` — delegating an expensive SEARCH to
+#   a read-only worker in its own conversation — is a new first-class primitive,
+#   and its value is entirely in being reached for BEFORE the expensive search
+#   happens. A tool the model discovers only after three fruitless rounds has
+#   already cost what it exists to save, so the bias has to be prompt-level, not
+#   schema-level.
+#
+#   Why every turn rather than a skill?  Because a research request is exactly the
+#   kind of turn that can load NO skill — a cold degraded selector falls back to an
+#   empty active set — and that turn is the one where searching in the main thread
+#   does the most damage. By this file's own split rule ("a rule that can fire on a
+#   turn loading NO skill stays here"), the core bias belongs in base.
+#
+#   What stayed OUT?  The elaboration — fan-out batching, brief-writing, how to
+#   relay a finding — lives in `daintree.foundation`, where the cheap-vs-capable
+#   delegation guidance already sits. Base carries one bullet: when to delegate,
+#   what never to delegate, and to relay a partial as partial.
+BASE_PROMPT_CEILING = 25 * 1024
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —
 # tool-discipline is nearly half the prompt on its own, and a rule added there is
@@ -90,7 +110,9 @@ BASE_PROMPT_CEILING = 24 * 1024
 BASE_PARTIAL_CEILINGS = {
     "00-persona.md": 1024,
     "10-hard-rules.md": 4 * 1024,
-    "20-tool-discipline.md": 9 * 1024,
+    # Raised with BASE_PROMPT_CEILING above (see the argument there) — the
+    # delegation bullet lands in this partial.
+    "20-tool-discipline.md": 10 * 1024,
     "30-skills.md": 3 * 1024,
     "35-daintree-docs.md": 2304,
     # Raised from 3 KiB with the base ceiling above, and for the same rule: the
@@ -166,6 +188,59 @@ def test_every_base_partial_has_a_ceiling() -> None:
     assert on_disk == set(BASE_PARTIAL_CEILINGS), (
         "base partials and BASE_PARTIAL_CEILINGS disagree: "
         f"{sorted(on_disk ^ set(BASE_PARTIAL_CEILINGS))}"
+    )
+
+
+# The sub-agent persona, budgeted separately from the base prompt because it is a
+# separate prompt on a separate path: it ships on every DELEGATED turn, and the
+# sub-agent is the profile least able to absorb prompt bytes — it runs to a hard
+# round budget in a context it will spend on tool results. Sized to the measured
+# 5,373B at introduction, rounded up per partial, so this can only ratchet.
+#
+# Note the split rule differs from base's. Base asks "does this rule fire on a turn
+# with no skill loaded"; here that is every turn — a sub-agent's menu is 2 skills
+# wide today and most delegated turns load none — so the question is instead
+# whether the rule is about being a BOUNDED READ-ONLY WORKER. If it is about how to
+# do one particular kind of research, it belongs in a skill.
+SUBAGENT_PROMPT_CEILING = 6 * 1024
+
+SUBAGENT_PARTIAL_CEILINGS = {
+    "00-persona.md": 1024,
+    "10-hard-rules.md": 2 * 1024,
+    "20-method.md": 2 * 1024,
+    "30-report.md": 2 * 1024,
+}
+
+
+def _subagent_dir() -> Path:
+    return PromptLoader().dir / "main" / "subagent"
+
+
+def test_subagent_prompt_under_ceiling() -> None:
+    size = len(PromptLoader().subagent_prompt().encode("utf-8"))
+    assert size <= SUBAGENT_PROMPT_CEILING, (
+        f"sub-agent prompt {size}B exceeds the {SUBAGENT_PROMPT_CEILING}B ratchet. "
+        "A sub-agent spends its context on tool results, not on instructions — "
+        "before raising this, ask whether the rule is about being a bounded "
+        "read-only worker at all, or whether it belongs in a skill."
+    )
+
+
+@pytest.mark.parametrize("name", sorted(SUBAGENT_PARTIAL_CEILINGS))
+def test_each_subagent_partial_under_its_ceiling(name: str) -> None:
+    path = _subagent_dir() / name
+    assert path.is_file(), f"{name} is missing; update SUBAGENT_PARTIAL_CEILINGS"
+    size = len(path.read_bytes())
+    ceiling = SUBAGENT_PARTIAL_CEILINGS[name]
+    assert size <= ceiling, f"{name} is {size}B, over its {ceiling}B ceiling"
+
+
+def test_every_subagent_partial_has_a_ceiling() -> None:
+    """Same rule as the base prompt: a new partial is budgeted, never unbounded."""
+    on_disk = {p.name for p in _subagent_dir().glob("*.md")}
+    assert on_disk == set(SUBAGENT_PARTIAL_CEILINGS), (
+        "sub-agent partials and SUBAGENT_PARTIAL_CEILINGS disagree: "
+        f"{sorted(on_disk ^ set(SUBAGENT_PARTIAL_CEILINGS))}"
     )
 
 

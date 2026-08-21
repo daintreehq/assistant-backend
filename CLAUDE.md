@@ -287,3 +287,51 @@ Output posture: **structural defects** (cycle, duplicate/unknown node id, moving
 - Pydantic v2 for wire/config models; `extra="forbid"` and `frozen=True` are used deliberately (reject unknown fields, keep things immutable).
 - Fail-open (selector) vs fail-closed (oversized body, malformed skill) choices are intentional — preserve the existing posture when editing those paths.
 - Runtime deps are pinned in `requirements.lock` (a constraints file the Docker build and CI install against).
+
+## Sub-agent profile (`profile: "subagent"`)
+
+`RespondRequest.profile` selects which persona answers a request. Omitted (the CLI
+default on every ordinary turn) means `"assistant"` — the orchestrator. The CLI's
+delegation loop (`internal/subagent` in the cli repo) sends `"subagent"`: a bounded,
+READ-ONLY worker running in its own isolated conversation so the main thread can
+learn one answer without paying the context cost of finding it.
+
+It is not a hint — it selects which of two assembly paths runs:
+
+|                        | `assistant`                     | `subagent`                                  |
+|------------------------|---------------------------------|---------------------------------------------|
+| System prompt          | `prompts/main/base/`            | `prompts/main/subagent/` (4 partials)        |
+| Skill selection        | full catalog                    | menu narrowed by `Catalog.executable_with`   |
+| Active-set cap         | `settings.max_active_skills`    | `min(that, 2)`                               |
+| Docs lookup            | on                              | off (it researches the PROJECT)              |
+| Integrations / runtime / turn footer / display | rendered   | dropped                                      |
+| Startup block          | yes                             | yes (it must know which project it is in)    |
+
+**The narrowed menu is the load-bearing part.** A skill is a PROCEDURE, and one
+whose steps call tools the caller does not hold is worse than no skill: it spends
+context and then steers the model toward calls that can only fail. A sub-agent is
+offered ~36 read-only tools while most of this catalog drives spawning, worktrees
+and terminals, so `Catalog.executable_with(tools)` keeps only skills whose declared
+`requiredTools` the caller actually has. That reuses metadata skills already
+declare, so a research-shaped skill written tomorrow reaches sub-agents the day it
+lands with no second list to maintain. Today 2 of 39 skills pass — an honest
+statement about the catalog, not the filter.
+
+Both selector implementations honour a caller-supplied catalog. `LocalSelector`
+must NOT ignore it: ignoring it would let a locally-selected run load an
+orchestration runbook the sub-agent cannot follow, and the two implementations
+would disagree about what a profile may see.
+
+`profile` is `omitempty` on the CLI's wire and defaults to `"assistant"` here, so
+an ordinary turn stays byte-identical and the prompt cache does not split.
+
+**Biasing the orchestrator toward delegating.** A delegation primitive reached for
+only after the expensive search has happened is worth nothing, so the bias lives in
+three places, split by the base prompt's own trigger rule: one bullet in
+`main/base/20-tool-discipline.md` (fires even on a zero-skill turn), the
+elaboration as item 8 of `daintree.foundation`, and — the one that actually moved
+behaviour — a rewritten decision step in `daintree.explore.repository`, which
+previously said "POINTER — do it yourself" and knew no delegate but the heavyweight
+visible agent.
+
+Full design, bounds and the CLI side: `docs/SUBAGENTS.md` in the cli repo.

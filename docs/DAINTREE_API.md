@@ -202,6 +202,8 @@ The single generation endpoint. Returns a native JSON body, or — when
 
   "state": "dst1.<payload>.<sig>",             // nullable signed skill-state token (see Skills)
 
+  "profile": "assistant",                      // default "assistant" | "subagent" (see Profiles)
+
   "input": {
     "messages": [                              // required, ≥1; roles: user | assistant | tool
       { "role": "user", "content": "…" },
@@ -519,6 +521,33 @@ Skill selection is removed from the main thread:
 reserved and rejected if a client offers them as tools or replays them in history.
 
 ---
+
+## Profiles
+
+`profile` selects which persona answers a request. Omitted means `"assistant"` — the
+orchestrator the human is talking to, and the shape every ordinary turn takes.
+
+`"subagent"` is a bounded, **read-only** worker the CLI runs in its own isolated
+conversation so the main thread can learn one answer without paying the context cost
+of finding it. It is not a hint: it selects a different assembly path.
+
+|                                | `assistant`                   | `subagent`                                |
+|--------------------------------|-------------------------------|-------------------------------------------|
+| System prompt                  | orchestrator persona          | sub-agent persona                         |
+| Skill selection                | full catalog                  | menu narrowed to skills the caller's tools can execute |
+| Active-set cap                 | `max_active_skills`           | `min(that, 2)`                            |
+| Documentation lookup           | on                            | off — it researches the caller's PROJECT  |
+| Integrations / runtime / turn footer / display | rendered      | dropped                                   |
+| Startup block                  | yes                           | yes — it must know which project it is in |
+
+The narrowed menu is filtered on each skill's declared `requiredTools`: a runbook whose
+steps call tools the caller does not hold is worse than no runbook, because it spends
+context and then steers the model toward calls that can only fail.
+
+The signed `state` token records the profile that resolved its active set. A token issued
+under one profile forces a fresh selection under the other rather than being reused — the
+two profiles choose from different menus, so a set that is legal for one can be illegal
+for the other.
 
 ## Documentation lookup
 

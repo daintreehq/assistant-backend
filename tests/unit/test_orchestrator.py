@@ -625,10 +625,14 @@ def _cadence(
     state_instruction_revision: int | None = 0,
     turn_id: str = "t1",
     instruction_revision: int = 0,
+    state_profile: str = "assistant",
+    profile: str = "assistant",
 ) -> bool:
     if state_catalog_revision is None:
         state_catalog_revision = orch.catalog.revision
     return orch._should_run_selector(
+        state_profile=state_profile,
+        profile=profile,
         force=force,
         policy=policy,
         state_valid=state_valid,

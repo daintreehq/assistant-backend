@@ -598,8 +598,15 @@ class Selector:
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
         routing: RoutingPreference | None = None,
+        catalog: Catalog | None = None,
     ) -> SelectionDecision:
-        catalog = self.catalog
+        # An explicit catalog narrows the MENU for a caller that cannot run the
+        # whole of it — today the read-only sub-agent profile, which is offered a
+        # subset of the tools and must not be handed a runbook whose steps it
+        # cannot execute (see Catalog.executable_with). It is threaded rather than
+        # read from self so the object that renders the prompt is the same one the
+        # answer is validated against, exactly as the default path guarantees.
+        catalog = catalog if catalog is not None else self.catalog
         # The catalog block is request-invariant; everything the active set varies
         # is confined to the two-line tail after it. Keeping per-turn state out of
         # the id-sorted loop is one of the selector's two prompt-cache levers: this

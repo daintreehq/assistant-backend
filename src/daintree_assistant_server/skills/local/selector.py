@@ -65,6 +65,7 @@ class SkillSelector(Protocol):
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
         routing: RoutingPreference | None = None,
+        catalog: Catalog | None = None,
     ) -> SelectionDecision: ...
 
 
@@ -96,6 +97,7 @@ class LocalSelector:
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
         routing: RoutingPreference | None = None,
+        catalog: Catalog | None = None,
     ) -> SelectionDecision:
         """Classify this turn. Never raises; degrades to the prior active set.
 
@@ -104,6 +106,13 @@ class LocalSelector:
         Nothing leaves the process here, which is the entire point: no credential
         is spent, no endpoint is chosen, and the caller's conversation does not
         cross the network for a routing decision.
+
+        ``catalog`` is NOT ignored. It narrows the menu for a caller that cannot
+        run the whole catalog (the read-only sub-agent profile), and honouring it
+        is a correctness requirement rather than a nicety: ignoring it here would
+        let a locally-selected run load an orchestration runbook the sub-agent
+        has no tools to follow, and the two selector implementations would
+        disagree about what a profile is allowed to see.
         """
         eligible = [m for m in conversation if m.role in ("user", "assistant", "tool")]
         if not eligible:
@@ -113,8 +122,9 @@ class LocalSelector:
         # the live catalog at any moment, including while the model runs on a
         # worker thread — every read below uses this snapshot so the embedding
         # table, the visible-active projection and the output validation cannot
-        # disagree about which catalog they mean.
-        catalog = self.catalog
+        # disagree about which catalog they mean. A caller-supplied catalog is
+        # already such a snapshot (and already narrowed), so it is used as-is.
+        catalog = catalog if catalog is not None else self.catalog
 
         # A background wake: the turn was started by a watcher firing, an agent
         # exiting or a queue item landing, not by the user saying anything. The

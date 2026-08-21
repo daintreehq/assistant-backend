@@ -82,6 +82,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -182,6 +183,12 @@ def document_digest(document: str) -> str:
     return hashlib.sha256(document.encode()).hexdigest()
 
 
+#: Distinct skill documents whose vectors are held across table replacements.
+#: Sized for a catalog an order of magnitude larger than today's 39 plus room for
+#: skill-learning rewrites; at ~3 KB a pair this is single-digit megabytes.
+_VEC_MEMO_MAX = 2048
+
+
 class SetwiseClassifier:
     """Two-stage skill selection: cosine shortlist, then one set-wise judgement."""
 
@@ -267,6 +274,13 @@ class SetwiseClassifier:
         #: changed at all: microseconds at 38 skills, milliseconds at 1,000, and
         #: this sits on the first-byte path.
         self._cached: tuple[str | None, SkillTable] | None = None
+        #: Vector pairs by document digest, surviving every table replacement.
+        #: See the note in ``sync``: ``_cached`` is one slot, and a profile that
+        #: syncs a NARROWED catalog evicts the rest of the catalog's vectors from
+        #: it. LRU-bounded because it is the one structure here that is not a pure
+        #: function of the live catalog — skill learning rewrites bodies, and each
+        #: rewrite mints a digest the old one no longer matches.
+        self._vec_memo: OrderedDict[str, tuple[np.ndarray, np.ndarray]] = OrderedDict()
         preload = directory / "vectors.npz"
         if preload.exists():
             table = _load_table(preload)
@@ -324,6 +338,7 @@ class SetwiseClassifier:
                 # edit, which is the common skill-learning case. Nothing to
                 # re-embed; just remember the new revision so the next turn takes
                 # the fast path.
+                self._remember(current)
                 self._cached = (revision, current)
                 return current
 
@@ -333,16 +348,32 @@ class SetwiseClassifier:
                 for i, sid in enumerate(current.ids if current else ())
                 if keep.get(sid) == digests.get(sid)
             }
-            stale = [sid for sid in ids if sid not in reuse]
 
             retrieval = np.zeros(
                 (len(ids), self._retrieval_dim(current)), dtype=np.float32
             )
             ranking = np.zeros((len(ids), self._ranking_dim(current)), dtype=np.float32)
+            # Anything the CURRENT table cannot supply is looked up in the digest
+            # memo before it is sent to the encoders. `_cached` holds exactly one
+            # table, so a narrower catalog — the sub-agent profile's filtered menu
+            # — replaces it and takes the vectors for every excluded skill with
+            # it. The memo is what makes that recoverable: measured at 39 skills,
+            # a single sub-agent turn used to cost the NEXT orchestrator turn
+            # 5.3s of re-embedding, on the first-byte path, for a table it had
+            # already built. Keyed by document digest rather than id so a
+            # rewritten skill misses and is re-embedded, exactly as before.
+            stale: list[str] = []
             for i, sid in enumerate(ids):
                 if sid in reuse and current is not None:
                     retrieval[i] = current.retrieval[reuse[sid]]
                     ranking[i] = current.ranking[reuse[sid]]
+                    continue
+                remembered = self._vec_memo.get(digests[sid])
+                if remembered is not None:
+                    retrieval[i], ranking[i] = remembered
+                    self._vec_memo.move_to_end(digests[sid])
+                    continue
+                stale.append(sid)
             if stale:
                 fresh_docs = [wanted[sid] for sid in stale]
                 r_vecs = _run_encoder(
@@ -363,8 +394,33 @@ class SetwiseClassifier:
                 digests=digests,
                 precision=self._precision,
             )
+            self._remember(table)
             self._cached = (revision, table)
             return table
+
+    def _remember(self, table: SkillTable) -> None:
+        """Hold every row of ``table`` in the digest memo.
+
+        EVERY row, not just freshly encoded ones — the memo's whole job is to
+        outlive the table it came from, and a row carried over from a previous
+        table is about to become unreachable if the next sync is for a narrower
+        catalog. Called on both sync paths, including the early return: the
+        shipped ``vectors.npz`` reaches the process through that path, so
+        skipping it there left the memo empty until the first re-embed and made
+        the first profile alternation pay the full cost anyway.
+
+        Caller holds ``self._lock``, or is the constructor.
+        """
+        for i, sid in enumerate(table.ids):
+            digest = table.digests[sid]
+            if digest in self._vec_memo:
+                self._vec_memo.move_to_end(digest)
+                continue
+            # Copies, not row views: a view keeps the whole 2-D array alive,
+            # which would pin every table the memo ever touched.
+            self._vec_memo[digest] = (table.retrieval[i].copy(), table.ranking[i].copy())
+        while len(self._vec_memo) > _VEC_MEMO_MAX:
+            self._vec_memo.popitem(last=False)
 
     def _retrieval_dim(self, current: SkillTable | None) -> int:
         if current is not None and current.retrieval.size:

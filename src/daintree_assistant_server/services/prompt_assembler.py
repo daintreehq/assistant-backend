@@ -443,7 +443,7 @@ class PromptAssembler:
         capped, _ = cap_bytes(rendered, self.settings.cap_mcp_block_bytes)
         return capped
 
-    def render_loaded_skills(self, skills: list[Skill]) -> str:
+    def render_loaded_skills(self, skills: list[Skill], *, step_tracking: bool = True) -> str:
         """The active skill bodies, rendered — memoised by content.
 
         This is the largest per-request render in the assembler (skill bodies run
@@ -467,11 +467,17 @@ class PromptAssembler:
         WHICH skills are active and is unaffected by either.
         """
         ordered = skills_in_render_order(skills)
-        key = tuple(s.content_hash for s in ordered)
+        # Flat tuple of strings, which is what RenderCache is keyed on. The
+        # step_tracking marker leads: it is part of the KEY, not just the render,
+        # and a key that ignored it would serve whichever variant was rendered
+        # first to both profiles.
+        key = ("step" if step_tracking else "nostep", *(s.content_hash for s in ordered))
         cached = self._loaded_skills_cache.get(key)
         if cached is not None:
             return cached
-        rendered = self.prompts.render(TEMPLATE_LOADED_SKILLS, loaded_skills=ordered)
+        rendered = self.prompts.render(
+            TEMPLATE_LOADED_SKILLS, loaded_skills=ordered, step_tracking=step_tracking
+        )
         self._loaded_skills_cache.put(key, rendered)
         return rendered
 
@@ -796,6 +802,91 @@ class PromptAssembler:
 
     # ---- assembly -------------------------------------------------------
 
+    def _build_subagent_request(
+        self,
+        *,
+        request: RespondRequest,
+        skills: list[Skill],
+        upstream_model: str,
+    ) -> ProviderChatRequest:
+        """Assemble the upstream request for a read-only sub-agent turn.
+
+        Deliberately the SHORT prompt. A sub-agent answers one question with
+        read-only tools and reports back to a machine, so every block the
+        orchestrator needs is either irrelevant to it or actively misleading:
+
+        * **integrations / runtime roster / turn footer** — memories, workflow
+          runs, async operations, and the open-terminal list describe work the
+          orchestrator owns and the sub-agent cannot touch.
+        * **display context** — the report is read by the orchestrator, not
+          rendered in anyone's terminal, so a wrap width is noise.
+        * **response contract** — the orchestrator's output rules are written for
+          a human reading a cockpit; the sub-agent's report contract lives in its
+          own persona prompt instead.
+
+        Skills DO reach a sub-agent, from a menu narrowed to the ones it can
+        actually execute (``Catalog.executable_with``). They are the reason the
+        profile has a real tool inventory at all: a sub-agent sent to find one
+        issue among thousands should get the runbook for searching issues, not
+        rediscover it every run.
+
+        The cache layout rule from :meth:`build_main_request` still holds, and
+        the ordering below is the same one, minus the layers this profile drops:
+        the ONLY system row is the static persona, so every sub-agent in the
+        fleet shares a prefix of persona + its own narrow tool schemas, and the
+        skill bodies sit below the schemas (user-role) where a menu shift
+        re-encodes its own bytes instead of theirs. The startup block stays and
+        sits last before the conversation, because a sub-agent sent to find a
+        file needs to know which project it is standing in.
+        """
+        gen = request.generation
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": self.prompts.subagent_prompt()},
+        ]
+        if skills:
+            # step_tracking OFF: the paragraph instructs `skill.step.advance` and
+            # `skill.run.get`, both of which are denylisted from a sub-agent's
+            # inventory. Shipping it would spend context telling a read-only worker
+            # to make a call that can only come back TOOL_NOT_OFFERED — and a
+            # sub-agent has no turn boundary to checkpoint across anyway; it runs to
+            # completion or reports partial.
+            messages.append(
+                {"role": "user", "content": self.render_loaded_skills(skills, step_tracking=False)}
+            )
+        startup = self.render_startup_context(request.startup)
+        if startup.strip():
+            messages.append({"role": "user", "content": startup})
+        messages.extend(self._message_to_wire(m) for m in request.input.messages)
+
+        max_tokens = gen.max_tokens or self.settings.main_default_max_tokens
+        max_tokens = min(max_tokens, self.settings.main_max_tokens_ceiling)
+
+        return ProviderChatRequest(
+            model=upstream_model,
+            messages=messages,
+            tools=self._project_tools(request.input.tools),
+            tool_choice=self._project_tool_choice(request.input.tool_choice),
+            temperature=gen.temperature,
+            max_tokens=max_tokens,
+            # Same rule as the assistant path rather than a hardcoded None: "text"
+            # is the upstream default so forwarding it is a no-op, and validation
+            # already rejects json_object alongside tools. Dropping a param the
+            # validator ACCEPTED would leave a caller asking for JSON and quietly
+            # getting prose.
+            response_format=(
+                {"type": "json_object"} if gen.response_format == "json_object" else None
+            ),
+            stop=gen.stop,
+            stream=gen.stream,
+            include_usage=gen.stream,
+            # Same posture as the main call: this workload searches and reports,
+            # and reasoning bought nothing measurable for the seconds it costs.
+            thinking_disabled=True,
+            reasoning_effort=None,
+            timeout=self.settings.main_timeout_seconds,
+            routing=routing_preference(request.routing),
+        )
+
     def build_main_request(
         self,
         *,
@@ -841,6 +932,11 @@ class PromptAssembler:
         runtime = request.runtime
         turn = request.turn
         gen = request.generation
+
+        if request.profile == "subagent":
+            return self._build_subagent_request(
+                request=request, skills=skills, upstream_model=upstream_model
+            )
 
         # 1. static base prompt → cacheable across all sessions.
         messages: list[dict[str, Any]] = [

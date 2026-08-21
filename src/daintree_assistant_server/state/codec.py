@@ -105,6 +105,7 @@ class StateCodec:
         turn_id: str | None,
         instruction_revision: int,
         docs_query: str | None = None,
+        profile: str = "assistant",
     ) -> str:
         now = int(self._clock())
         payload = {
@@ -118,6 +119,11 @@ class StateCodec:
             "issued_at": now,
             "expires_at": now + self._ttl,
         }
+        # Same omit-when-default rule as `docs_query` below, and for a second
+        # reason too: an assistant token keeps exactly the bytes it had before the
+        # profile existed.
+        if profile != "assistant":
+            payload["profile"] = profile
         # Omitted when absent rather than written as null: the overwhelming
         # majority of turns are not documentation questions, and a key present on
         # every token would grow every token for the rare case.

@@ -185,6 +185,7 @@ class PromptLoader:
         # and the loader is a process-wide singleton, so the only thing per-request
         # reads bought was latency.
         self._base_prompt = self._load_base()
+        self._subagent_prompt = self._load_parts("main/subagent")
         self._task_prompts = self._load_dir("tasks")
         self._learning_prompts = self._load_dir("skill_learning")
 
@@ -198,15 +199,21 @@ class PromptLoader:
     # ---- eager loading --------------------------------------------------
 
     def _load_base(self) -> str:
-        # The permanent base prompt is authored as ordered section partials
-        # (``main/base/NN-*.md``) and assembled here into one stable block;
+        return self._load_parts("main/base")
+
+    def _load_parts(self, relative: str) -> str:
+        # A persona prompt is authored as ordered section partials
+        # (``<relative>/NN-*.md``) and assembled here into one stable block;
         # filename order is load-bearing, so partials are read sorted by name.
-        base_dir = self._resolve("main/base")
-        if not base_dir.is_dir():
-            raise PromptError(f"missing base prompt dir: {base_dir}")
-        parts = sorted(base_dir.glob("*.md"))
+        # Both personas — the orchestrator (``main/base``) and the read-only
+        # sub-agent (``main/subagent``) — are built this way, so an overlay can
+        # replace either one partial-by-partial.
+        parts_dir = self._resolve(relative)
+        if not parts_dir.is_dir():
+            raise PromptError(f"missing prompt dir: {parts_dir}")
+        parts = sorted(parts_dir.glob("*.md"))
         if not parts:
-            raise PromptError(f"no base prompt parts in {base_dir}")
+            raise PromptError(f"no prompt parts in {parts_dir}")
         return "\n\n".join(_read(p).strip("\n") for p in parts)
 
     def _load_dir(self, name: str) -> dict[str, str]:
@@ -226,6 +233,18 @@ class PromptLoader:
 
     def base_prompt(self) -> str:
         return self._base_prompt
+
+    def subagent_prompt(self) -> str:
+        """The read-only sub-agent persona (``profile="subagent"``).
+
+        A separate prompt rather than a modifier on the base one: the sub-agent
+        has a different job (answer one question), a different audience (the
+        orchestrator, not a human), and a different output contract (the final
+        message IS the deliverable). Layering that onto the orchestrator prompt
+        would mean shipping ~8 KB of terminal, worktree, and spawn discipline to
+        a worker that cannot do any of it, and then contradicting it line by line.
+        """
+        return self._subagent_prompt
 
     def task_system_prompt(self, task_id: str) -> str:
         try:
@@ -257,7 +276,10 @@ class PromptLoader:
         def digest(text: str) -> str:
             return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
-        hashes = {"base": digest(self._base_prompt)}
+        hashes = {
+            "base": digest(self._base_prompt),
+            "subagent": digest(self._subagent_prompt),
+        }
         for task_id, body in self._task_prompts.items():
             hashes[f"task:{task_id}"] = digest(body)
         for name, body in self._learning_prompts.items():
@@ -317,6 +339,8 @@ class PromptLoader:
         """
         if not self._base_prompt.strip():
             raise PromptError("base prompt is empty")
+        if not self._subagent_prompt.strip():
+            raise PromptError("subagent prompt is empty")
         for name in _ALL_TEMPLATES:
             try:
                 self.env.get_template(name)

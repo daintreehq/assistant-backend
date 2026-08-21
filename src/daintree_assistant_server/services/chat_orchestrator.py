@@ -324,6 +324,17 @@ def _carries_output(chunk: dict[str, Any] | None) -> bool:
     return bool(delta.get("content")) or bool(delta.get("tool_calls"))
 
 
+def _full_tool_names(request: RespondRequest) -> list[str]:
+    """Every tool name the request carries, UNCAPPED.
+
+    The complete inventory is what `Catalog.executable_with` has to see: it asks
+    "does the caller hold every tool this skill declares", and a truncated view
+    answers "no" for a skill whose last required tool happened to be listed late.
+    Tool ORDER would then decide the menu, which is neither intended nor stable.
+    """
+    return [tool.function.name for tool in (request.input.tools or [])]
+
+
 class ChatOrchestrator:
     def __init__(
         self,
@@ -372,10 +383,17 @@ class ChatOrchestrator:
         state_instruction_revision: int | None,
         turn_id: str,
         instruction_revision: int,
+        state_profile: str,
+        profile: str,
     ) -> bool:
         if force or policy == "always":
             return True
         if not state_valid:
+            return True
+        # A set resolved under the other profile is not reusable: the profiles
+        # choose from different menus, so the prior set can be illegal here rather
+        # than merely stale (see StatePayload.profile). Reselect instead.
+        if state_profile != profile:
             return True
         if state_catalog_revision != self.catalog.revision:
             return True
@@ -469,10 +487,14 @@ class ChatOrchestrator:
 
     @staticmethod
     def _available_tool_names(request: RespondRequest, cap: int = 100) -> list[str]:
-        """The assistant's tool names, so the selector won't load a skill for a
-        task the base function list already covers. Names are already validated."""
-        names = [tool.function.name for tool in (request.input.tools or [])]
-        return names[:cap]
+        """The caller's tool names, BOUNDED — selector prompt evidence only.
+
+        The cap exists to keep the selector's user message small. Do NOT use this
+        for anything that must be COMPLETE: a request may legally carry up to
+        `max_tools` (128) entries, so a skill whose last required tool sits at
+        position 101 would look unsatisfiable. Use `_full_tool_names` for filtering.
+        """
+        return _full_tool_names(request)[:cap]
 
     # ---- main entry -----------------------------------------------------
 
@@ -815,7 +837,46 @@ class ChatOrchestrator:
         #
         # `selection.force` and `policy == "always"` still win — a client asking
         # for selection gets selection.
-        no_task = can_skip_selection(request, prior_active_ids=prior_active_ids)
+        # A sub-agent selects skills too — that is the point of giving it a real
+        # tool inventory — but it chooses from a NARROWED menu.
+        #
+        # Most of this catalog is orchestration: spawning agents, driving
+        # worktrees, supervising terminals. Handing one of those to a read-only
+        # worker is worse than handing it nothing, because it spends context and
+        # then instructs the model toward calls that can only fail. So the menu is
+        # filtered to skills whose declared `requiredTools` the caller actually
+        # holds (Catalog.executable_with), which also means a research-shaped skill
+        # written tomorrow becomes available to sub-agents the day it lands, with
+        # no second list to maintain.
+        #
+        # The docs lookup is switched off for the profile: a sub-agent researches
+        # the user's PROJECT, and Daintree's own usage documentation answers a
+        # question it was not sent to ask.
+        subagent = request.profile == "subagent"
+        # UNCAPPED for the menu filter (see _full_tool_names); the selector's own
+        # evidence list stays bounded via _available_tool_names below.
+        available_tools = _full_tool_names(request)
+        selection_catalog = catalog_at_start
+        if subagent:
+            selection_catalog = catalog_at_start.executable_with(available_tools)
+            # `selectable`, not `filter_known`: a server-pinned skill is hidden from
+            # selection but still "known", and the docs runbook declares no required
+            # tools so it survives every narrowing. Without this, a caller replaying
+            # an assistant turn's signed state under profile="subagent" would carry
+            # the docs runbook into a profile whose docs lookup is switched off —
+            # injecting a runbook about reading documentation that was never fetched.
+            prior_active_ids = selection_catalog.selectable(prior_active_ids)
+            prior_docs_query = None
+            logger.info(
+                "subagent_selection_menu",
+                request_id=request_id,
+                offered_skills=len(selection_catalog),
+                catalog_skills=len(catalog_at_start),
+            )
+
+        no_task = not subagent and can_skip_selection(
+            request, prior_active_ids=prior_active_ids
+        )
         if no_task:
             logger.info(
                 "selector_fast_path",
@@ -823,6 +884,22 @@ class ChatOrchestrator:
                 reason="no_task",
             )
 
+        # With an empty menu there is nothing to decide, so skip the call rather
+        # than pay for a classification whose only possible answer is "none".
+        # Counted over SELECTABLE ids, not len(): the server-pinned docs runbook
+        # declares no required tools, so it survives every narrowing and would make
+        # len() >= 1 forever — this branch would then never fire and every sub-agent
+        # would pay for a selector call against a menu it cannot choose from.
+        # `force`/`policy=="always"` still win, as everywhere else in this cadence:
+        # a client that explicitly asked for selection gets a selector run and an
+        # honest `ran=true`, even though an empty menu can only answer "none".
+        if (
+            subagent
+            and not selection_catalog.selectable_ids
+            and not request.selection.force
+            and request.selection.policy != "always"
+        ):
+            no_task = True
         run_selector = not no_task and self._should_run_selector(
             force=request.selection.force,
             policy=request.selection.policy,
@@ -836,6 +913,10 @@ class ChatOrchestrator:
             ),
             turn_id=request.session.turn_id,
             instruction_revision=request.session.instruction_revision,
+            state_profile=(
+                verification.payload.profile if verification.payload else "assistant"
+            ),
+            profile=request.profile,
         )
 
         selector_ms = 0
@@ -846,7 +927,10 @@ class ChatOrchestrator:
                 prior_active_ids,
                 api_key=api_key,
                 turn_context=self._selector_turn_context(request),
+                # Bounded: this rides the selector's user message. The uncapped
+                # list is used for the menu filter above, not here.
                 available_tools=self._available_tool_names(request),
+                catalog=selection_catalog,
                 # The selector sends a bounded slice of the conversation
                 # upstream too, so the caller's routing choice has to reach it
                 # — otherwise a ZDR turn would honour the request on the
@@ -873,6 +957,38 @@ class ChatOrchestrator:
         # state, and metadata. If learning reloaded the catalog during selection,
         # the prompt renders against the same skills the state token records.
         resolved_catalog = self.catalog
+        # Resolution and body lookup follow the same NARROWING the decision was made
+        # under, so a sub-agent can never end up holding a skill that was not on its
+        # menu.
+        #
+        # Derived from `resolved_catalog` (the post-selection snapshot), NOT from
+        # `selection_catalog` (the pre-selection one). Skill learning can swap the
+        # live catalog while the selector is awaiting, and the assistant path already
+        # resolves bodies from the post-await snapshot so that bodies, response
+        # metadata and the state token all describe ONE generation. Deriving the
+        # sub-agent's from the pre-await snapshot would have handed it generation A's
+        # runbook while stamping generation B's revision — the next round would then
+        # see a matching revision and never reselect. The narrowing is a pure function
+        # of (catalog, tools), so re-deriving it here is cheap and cached.
+        #
+        # The state token records the FULL catalog's revision (below): the narrowed
+        # catalog is derived deterministically from it, and stamping the derived
+        # revision would make every round's check mismatch and re-run selection for
+        # the whole run.
+        #
+        # That revision therefore identifies the CATALOG, not the narrowed MENU — so
+        # in principle a caller could change its tool inventory mid-session, shrink
+        # its own menu, and have selection skipped because the catalog revision still
+        # matches. Deliberately not defended against: a sub-agent projects its
+        # inventory ONCE before its loop starts (internal/subagent Runner.Run) and
+        # every run gets a fresh session id with no prior state, so the inventory is
+        # constant for the lifetime of the only session this profile ever has. If a
+        # future caller reuses one sub-agent session across differing inventories,
+        # the fix is to fold the profile and a normalized menu digest into the
+        # selection identity — not to stamp the derived revision.
+        skills_catalog = (
+            resolved_catalog.executable_with(available_tools) if subagent else resolved_catalog
+        )
 
         # ORDER MATTERS: the docs query is settled BEFORE the active set, not
         # after. Both are answers from the same selector call, but the active
@@ -891,12 +1007,28 @@ class ChatOrchestrator:
         # so the turn's own finding holds.
         authoritative = (decision.ran or decision.authoritative) and not decision.degraded
         docs_query = decision.docs_query if authoritative else prior_docs_query
+        if subagent:
+            # See the profile note above: a sub-agent researches the project, not
+            # Daintree's own usage documentation.
+            docs_query = None
 
         resolution = resolve_active_skills(
             decision,
             prior_active_ids,
-            resolved_catalog,
-            self.settings.max_active_skills,
+            skills_catalog,
+            # A tighter cap for a sub-agent. It works to a hard round budget in a
+            # context it will exhaust on tool results, so two 5k-token runbooks
+            # would cost it more than they buy — and a narrowed menu rarely has a
+            # third worth loading anyway.
+            # NOTE: this caps RESOLUTION only; the selectors still render and parse
+            # against the global cap. The outcome is correct either way (resolution
+            # drops the excess), and the cost is at most one over-broad
+            # classification against a menu that is currently 2 skills wide. If the
+            # sub-agent menu ever grows enough for that to matter, thread a
+            # max_active override alongside the catalog override into both selectors.
+            min(self.settings.max_active_skills, 2)
+            if subagent
+            else self.settings.max_active_skills,
             # Pinned on the CLASSIFICATION, not on the lookup succeeding. The
             # runbook's job includes what to do when no pages arrive — say so
             # and answer unverified rather than fabricate — and that is exactly
@@ -906,10 +1038,10 @@ class ChatOrchestrator:
         active_ids = resolution.active
         newly_loaded_ids = resolution.newly_loaded
 
-        skills = resolved_catalog.get_many(active_ids)
+        skills = skills_catalog.get_many(active_ids)
         executions: list[SkillLoadExecution | DocsSearchExecution] = [
             SkillLoadExecution.from_skill(
-                new_call_id(), resolved_catalog.get(sid)  # type: ignore[arg-type]
+                new_call_id(), skills_catalog.get(sid)  # type: ignore[arg-type]
             )
             for sid in newly_loaded_ids
         ]
@@ -950,6 +1082,7 @@ class ChatOrchestrator:
             catalog_revision=resolved_catalog.revision,
             turn_id=request.session.turn_id,
             instruction_revision=request.session.instruction_revision,
+            profile=request.profile,
             # Carried only when the lookup actually produced pages. Carrying
             # a query whose search failed would re-attempt it on every
             # continuation round of the turn, turning a docs host that is
@@ -989,7 +1122,11 @@ class ChatOrchestrator:
             projection = project_tools(
                 offered=request.input.tools,
                 active_skills=skills,
-                catalog=resolved_catalog,
+                # The catalog the caller actually selected from. With the full one, a
+                # foundation filtered OUT of a sub-agent's menu is rediscovered here
+                # and its tools counted as proposed — understating `outside_proposed`,
+                # which is the one metric this measurement exists to produce.
+                catalog=skills_catalog,
                 messages=request.input.messages,
                 forced_tool=self._forced_tool_name(request.input.tool_choice),
             )
@@ -1313,6 +1450,19 @@ class ChatOrchestrator:
         internally. Invisible to the CLI — no wire fields, no feedback tool.
         """
         if self.learner is None or not self.learner.enabled:
+            return
+        if request.profile == "subagent":
+            # A sub-agent transcript is not a workflow. It is a FRAGMENT of one —
+            # somebody else's, seen through a read-only tool set, ending in a
+            # report to a machine rather than a completed task. Learning from it
+            # would mine the search for the answer instead of the work the answer
+            # was for, and the gate's strongest create signal (a cleanly completed
+            # repeatable workflow) is exactly what a sub-agent's shape counterfeits:
+            # every run ends in a final answer with no pending tool calls.
+            #
+            # It is also a fan-out multiplier — three concurrent sub-agents would
+            # fire three GPT-5.6-Sol thinking passes against the caller's key for
+            # one user turn, none of them about a workflow the user ran.
             return
         if had_tool_calls or not assistant_text.strip():
             return

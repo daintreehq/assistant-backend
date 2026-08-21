@@ -131,6 +131,17 @@ def test_base_prompt(loader: PromptLoader) -> None:
     assert_golden("base_prompt.md", loader.base_prompt())
 
 
+def test_subagent_prompt(loader: PromptLoader) -> None:
+    """The second persona gets the same reviewable record as the first.
+
+    It is a whole system prompt that ships on every delegated turn, assembled
+    from ordered partials exactly like the base one — so a reordered or dropped
+    partial has to show up as a snapshot diff here, not as behaviour someone
+    notices later in a run.
+    """
+    assert_golden("subagent_prompt.md", loader.subagent_prompt())
+
+
 def test_runtime_context(assembler: PromptAssembler) -> None:
     rc = RuntimeContext(
         permission_tier="operator",
@@ -479,6 +490,53 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     )
     snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
     assert_golden("upstream_messages.json", snapshot)
+
+
+def test_full_upstream_messages_subagent(assembler: PromptAssembler) -> None:
+    """The sub-agent profile's assembled array — the layout, not just its pieces.
+
+    This is the assertion the unit tests cannot make: that the ONLY system row is
+    the persona (anything else would hoist above the tool schemas and bust their
+    cache), that the skill body and startup rows sit below it in that order, and
+    that the orchestrator's integrations, runtime, turn-footer and response-contract
+    rows are absent rather than merely untested. Same request shape as the
+    assistant snapshot above, so the two diff against each other by eye.
+    """
+    skill = _fixture_catalog().get("daintree.example.alpha")
+    req = RespondRequest.model_validate(
+        {
+            "protocol_version": 2,
+            "profile": "subagent",
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {
+                "messages": [
+                    {"role": "user", "content": "Find where the retry budget is enforced."}
+                ]
+            },
+            "startup": _startup_payload(),
+            "runtime": {
+                "permission_tier": "operator",
+                "worktree": {
+                    "current": {
+                        "id": "wt-review",
+                        "path": "/home/user/project/.worktrees/review",
+                        "branch": "feature/review",
+                        "is_main": False,
+                        "status": "clean",
+                        "last_commit": "def5678 Prepare branch",
+                    }
+                },
+            },
+            "turn": {"goal": "Find where the retry budget is enforced."},
+        }
+    )
+    pr = assembler.build_main_request(
+        request=req,
+        skills=[skill],
+        upstream_model="deepseek-v4-flash",
+    )
+    snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
+    assert_golden("upstream_messages_subagent.json", snapshot)
 
 
 def test_full_upstream_messages_with_open_terminals(assembler: PromptAssembler) -> None:

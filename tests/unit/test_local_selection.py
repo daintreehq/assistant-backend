@@ -886,3 +886,46 @@ def test_an_empty_docs_query_behaves_like_no_docs_query() -> None:
         clf.select(q, [], catalog=catalog, docs_query="").docs_wanted
         == clf.select(q, [], catalog=catalog, docs_query=None).docs_wanted
     )
+
+
+@pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
+def test_a_narrowed_catalog_does_not_evict_the_full_catalog_s_vectors() -> None:
+    """A sub-agent turn must not make the NEXT orchestrator turn re-embed.
+
+    `_cached` is one slot. The sub-agent profile syncs a catalog narrowed by
+    `Catalog.executable_with` (2 of 39 skills today), which replaces that slot —
+    and before the digest memo existed, the next full-catalog turn re-encoded
+    every evicted skill on the first-byte path. Measured at 5.3s for 37 skills,
+    once per alternation, against a ~10ms selection budget. Fan-out is the
+    designed usage, so this fired on every delegation.
+
+    Asserted as encoder CALLS rather than wall-clock: the cost is the ONNX runs,
+    and a timing assertion on a shared CI box is a flake waiting to happen.
+    """
+    from daintree_assistant_server.skills.local import setwise as setwise_mod
+
+    clf, catalog = _live_selector()
+    narrow = catalog.executable_with(["fs.read", "fs.list"])
+    assert 0 < len(narrow) < len(catalog), "fixture must actually narrow the catalog"
+
+    calls = 0
+    real = setwise_mod._run_encoder
+
+    def counting(*args: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        return real(*args, **kwargs)
+
+    setwise_mod._run_encoder = counting  # type: ignore[assignment]
+    try:
+        clf.sync(narrow)
+        clf.sync(catalog)
+        clf.sync(narrow)
+        clf.sync(catalog)
+    finally:
+        setwise_mod._run_encoder = real  # type: ignore[assignment]
+
+    assert calls == 0, (
+        f"alternating profiles re-embedded ({calls} encoder runs); every vector "
+        "was already computed by the initial full sync"
+    )

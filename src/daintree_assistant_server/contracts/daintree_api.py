@@ -90,6 +90,17 @@ class RespondRequest(BaseModel):
     protocol_version: int
     session: RespondSession
     state: str | None = Field(default=None, max_length=16384)
+    # Which persona answers this request. "assistant" is the orchestrator the
+    # human talks to. "subagent" is a bounded, read-only worker the CLI runs in
+    # its own isolated conversation to burn context the main thread must not
+    # pay for — exploring a tree, finding one issue among thousands — and which
+    # reports back a compact answer. The two differ in prompt, in the MENU skill
+    # selection chooses from (both profiles select; a sub-agent's catalog is
+    # narrowed to what its tools can execute), and in what context blocks are
+    # worth assembling, so the profile has to arrive with the request rather than
+    # be guessed from its shape. Defaulting to "assistant" keeps every existing
+    # client byte-identical on the wire.
+    profile: Literal["assistant", "subagent"] = "assistant"
     input: RespondInput
     # Required even when empty. Keeping stable local context outside
     # ``input.messages`` makes the conversation semantically pure and lets the
