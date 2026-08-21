@@ -260,3 +260,63 @@ def test_max_active_skills_rejects_a_cap_below_two() -> None:
 
 def test_max_active_skills_accepts_the_floor() -> None:
     assert _settings(MAX_ACTIVE_SKILLS=2).max_active_skills == 2
+
+
+# ---------------------------------------------------------------------------
+# Tool-projection rollout controls.
+# ---------------------------------------------------------------------------
+
+
+def test_tool_projection_defaults_to_shadow() -> None:
+    """A deployment that configures nothing keeps behaving as it did.
+
+    `shadow` is the safe default because it is the CURRENT behaviour: measure,
+    send everything. A default of `enforced` would make this feature ship itself
+    on the next deploy, which is the opposite of a staged rollout.
+    """
+    settings = _settings()
+    assert settings.tool_projection_mode == "shadow"
+    # 100 rather than 0 so that `enforced` means enforced. A mode that silently
+    # enforces nothing is a worse trap than one needing a second variable set.
+    assert settings.tool_projection_rollout_percent == 100
+
+
+@pytest.mark.parametrize("mode", ["disabled", "shadow", "enforced"])
+def test_every_documented_mode_is_accepted(mode: str) -> None:
+    assert _settings(TOOL_PROJECTION_MODE=mode).tool_projection_mode == mode
+
+
+def test_an_unknown_mode_is_rejected_rather_than_defaulted() -> None:
+    """A typo must fail readiness, not silently pick a posture.
+
+    Falling back to a default here would let `TOOL_PROJECTION_MODE=enfoced`
+    read as shadow — an operator believing enforcement is on while it is not,
+    or (worse, on the way back) believing it is off while it is not.
+    """
+    with pytest.raises(ValidationError):
+        _settings(TOOL_PROJECTION_MODE="enfoced")
+
+
+@pytest.mark.parametrize("percent", [0, 1, 50, 100])
+def test_the_rollout_percentage_spans_its_whole_range(percent: int) -> None:
+    assert _settings(TOOL_PROJECTION_ROLLOUT_PERCENT=percent).tool_projection_rollout_percent == (
+        percent
+    )
+
+
+@pytest.mark.parametrize("percent", [-1, 101])
+def test_a_percentage_outside_zero_to_one_hundred_is_rejected(percent: int) -> None:
+    with pytest.raises(ValidationError):
+        _settings(TOOL_PROJECTION_ROLLOUT_PERCENT=percent)
+
+
+def test_the_rollout_controls_do_not_gate_readiness() -> None:
+    """They are operational switches, not secrets or dev-only escape hatches.
+
+    Neither value can make a deployment unsafe — the worst either does is send
+    more tools than necessary — so neither belongs in the readiness gates, which
+    exist for things that make the server unable or unfit to answer.
+    """
+    settings = _settings(TOOL_PROJECTION_MODE="enforced", TOOL_PROJECTION_ROLLOUT_PERCENT=100)
+    assert settings.missing_secrets() == []
+    assert settings.local_only_problems() == []

@@ -1,49 +1,65 @@
-"""Skill-aware tool projection — computed every turn, applied to nothing yet.
+"""Skill-aware tool projection — computed every turn, enforced under a flag.
 
 Tool schemas are ~61% of a representative request, and most of them are
 irrelevant to what the turn is doing: a rename-terminals turn does not need the
 forge, git or recipe families. Filtering them to the active skills' declared
-needs is the single largest prompt saving available.
+needs is the single largest prompt saving available (a measured ~79.3 KiB
+inventory against a ~34.9 KiB median projection).
 
-**It runs in shadow mode.** Every turn computes the set it *would* send and logs
-how that compares to the set it *does* send, but the request still carries the
-full inventory.
+**Three modes, one switch.** ``TOOL_PROJECTION_MODE`` is ``disabled`` (compute
+nothing, send everything), ``shadow`` (compute and log, send everything) or
+``enforced`` (send the projection when every safety gate passes). ``shadow`` is
+the default, so a deployment that sets nothing behaves exactly as it did while
+this was measurement-only. Enforcement additionally rides a session-stable
+percentage (``TOOL_PROJECTION_ROLLOUT_PERCENT``) so the first production traffic
+is a cohort rather than everything at once. Flipping the mode back to
+``disabled`` is a Cloud Run environment update — a new revision, no image
+rebuild — which is what "roll back without a code deployment" means here.
 
-The reason is not that ``requiredTools`` is known to be wrong — an offline audit
-(``tests/unit/test_tool_projection.py``) now finds no skill whose body instructs
-a call it fails to declare. It is that the audit cannot see far enough to
-authorize withholding. It reads backticked registry names out of skill bodies,
-which catches a runbook naming a call site and misses everything else: a tool the
-model reaches for on its own judgment, one the base prompt implies, one named in
-prose the scanner does not recognise as a call. ``requiredTools`` was written as
-documentation. It now *looks* like a correct allowlist, and that is exactly the
-state in which turning it into one is most tempting and least justified.
-
-So the order is: measure in production first. The number to watch is
-``outside_proposed`` — the calls a turn made that the projection would have
-withheld. Filtering is safe to enable when that is durably empty across real
-usage, and not before. A round the grader could not fully read is logged
-``measured=False`` rather than as a clean zero, because an unmeasured turn
-counted as evidence of safety is worse than no evidence at all.
+``outside_proposed`` is the number that authorized this. It names the calls a
+turn made that the projection would have withheld, and it is still logged under
+enforcement — but read it from the SHADOW window when deciding to promote: an
+enforced turn cannot call a tool it was never offered, so enforced traffic
+grades itself clean by construction and cannot authorize its own expansion.
 
 **What the proposed set always contains**, beyond the active skills' declared
 tools:
 
-* a small always-on core, so a turn can orient, search for a capability and talk
-  to the user even with no skill loaded;
+* the always-on core — every tool the ALWAYS-PRESENT base prompt instructs, so
+  a turn can orient, read the workspace, delegate, page an artifact and talk to
+  the user whatever is loaded. This set is not a judgment call: withholding a
+  tool the server's own permanent prompt commands is a contradiction the model
+  cannot resolve, and ``tests/unit/test_prompt_hygiene_tools.py`` fails if the
+  prompt ever names one this set is missing;
+* the skill-run scaffold (``skill.step.advance``, ``skill.run.get``) whenever a
+  skill is active, because the loaded-skills block instructs them and no skill
+  declares them — they belong to the template, not to any runbook;
 * every domain foundation's tools for the domains in play — a foundation is the
   base judgment under its specifics and its tools are what that judgment uses;
 * any tool named by a forced ``tool_choice``, because withholding one the client
   pinned would be an immediate hard error;
 * every tool named by an unresolved assistant tool call earlier in the
   conversation, so a continuation round can always answer for work already
-  started.
+  started;
+* any offered tool NO skill in the catalog declares. Withholding is an argument
+  from metadata, and there is no metadata about a tool the catalog has never
+  heard of — a client-side addition, or an integration's. Silence is not
+  evidence that a turn does not need it.
+
+Withholding is final for the turn. The CLI reports an unoffered tool to the
+model as ``callable: false`` — "calling them would do nothing" — and dynamic
+invocation of a withheld tool does not exist, so the escape hatch discovers
+names rather than recovering capability.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
+from typing import Any
 
+from ..config import ToolProjectionMode
 from ..contracts.openai import ChatMessage, ToolDef
 from .catalog import Catalog
 from .models import Skill
@@ -62,23 +78,79 @@ def wire_name(dotted: str) -> str:
     return dotted.replace(".", _WIRE_SEP)
 
 
-# Tools that must stay callable whatever is loaded. A turn with no skill still
-# has to be able to see the workspace, find a capability it was not given, and
-# ask the user a question — and the base prompt instructs it to do all three.
-# Deliberately tiny: every entry here is a permanent cost on every request.
+# Tools that must stay callable whatever is loaded — the ALWAYS-PRESENT base
+# prompt (``prompts/main/base/*.md``) instructs every one of them, on every turn,
+# with no skill involved. That is what makes this list derived rather than
+# chosen: a projection that withholds a tool the permanent prompt commands hands
+# the model an instruction it cannot follow, and no runbook is loaded to explain
+# the absence. `tests/unit/test_prompt_hygiene_tools.py` re-derives the set from
+# the prompt text and fails when the two drift.
+#
+# It is not free — every entry is a permanent cost on every request — but the
+# alternative is not a smaller core, it is a smaller BASE PROMPT. Drop the
+# instruction first; the tool follows it out.
 ALWAYS_AVAILABLE: frozenset[str] = frozenset(
     {
         # Orient.
         "context.snapshot",
         "daintree.status",
-        # Find a capability that was not projected — the escape hatch that makes
-        # filtering recoverable rather than a dead end.
+        # Read the workspace. A turn the classifier answered with NO skill is a
+        # first-class outcome (the cardinality head makes it one), and it is
+        # still expected to be able to look at the project.
+        "fs.read",
+        "fs.list",
+        "fs.search",
+        # Page a large result. `20-tool-discipline.md` says any result too big to
+        # inline arrives as an artifact to be read one page at a time — so this is
+        # reachable from ANY tool call, not from a particular family.
+        "artifact.read",
+        # Delegate the search. The base prompt tells the model to reach for this
+        # BEFORE the first exploratory round, and CLAUDE.md calls the bias toward
+        # delegating the point of three separate prompt edits.
+        "subagent.run",
+        # A HARD rule, not a preference: `10-hard-rules.md` says file changes are
+        # made by spawning a visible agent and that EVERY spawn goes through this
+        # one call. A turn told it may not edit files itself and then denied the
+        # only sanctioned way to have them edited has no legal move left.
+        "agentTask.spawnForEdits",
+        # Find a capability that was not projected, and reach an MCP tool that has
+        # no typed wrapper. `daintree.call` is what makes `daintree.listTools`
+        # more than a catalogue — without it the model can see a tool and not
+        # invoke it.
         "tool.search",
         "daintree.listTools",
-        # Talk to the user. `user.askMultipleChoice` is how the base prompt says
-        # to ask a finite question; without it the model asks in prose instead,
-        # which the CLI cannot render as choices.
+        "daintree.call",
+        # Talk to the user and close the loop. `user.askMultipleChoice` is how the
+        # base prompt says to ask a finite question; without it the model asks in
+        # prose instead, which the CLI cannot render as choices. `queue.resolve`
+        # is how it retires an inbox item it has actually reported.
         "user.askMultipleChoice",
+        "queue.resolve",
+        # Speak to work already running. The base prompt advertises these as
+        # always there; a turn that cannot answer a waiting agent or retire a
+        # finished terminal strands the cohort it started.
+        "terminal.sendCommand",
+        "terminal.close",
+        # See what is already watching. Listing is read-only and the base prompt
+        # names all three as the way to check standing supervision.
+        "watcher.list",
+        "timer.list",
+        "worktree.list",
+        # Remember. `memory.save` is instructed in the base prompt and belongs to
+        # no domain.
+        "memory.save",
+    }
+)
+
+
+# The loaded-skills scaffold (``prompts/main/loaded_skills.md.j2``) instructs
+# these whenever a skill is active, and NO skill declares them — they belong to
+# the template, so no `requiredTools` audit could ever see them. Admitted exactly
+# when the block that instructs them renders: when the active set is non-empty.
+SKILL_SCAFFOLD_TOOLS: frozenset[str] = frozenset(
+    {
+        "skill.step.advance",
+        "skill.run.get",
     }
 )
 
@@ -141,6 +213,13 @@ def project_tools(
     for name in ALWAYS_AVAILABLE:
         admit(name, "core")
 
+    # The loaded-skills block renders only when something is active, and it is
+    # what instructs the run scaffold. Admitting these unconditionally would
+    # charge every skill-less turn for two tools its prompt never mentions.
+    if active_skills:
+        for name in SKILL_SCAFFOLD_TOOLS:
+            admit(name, "skill_scaffold")
+
     # The active skills' declared needs, plus their domain foundations'. A
     # foundation carries the base judgment its specifics build on, so a turn that
     # loaded a specific needs the foundation's tools even when the foundation
@@ -165,6 +244,18 @@ def project_tools(
     for name in _unresolved_tool_calls(messages):
         admit(name, "unresolved_call")  # already a wire name; wire_name is idempotent
 
+    # Anything the CATALOG has never heard of. Withholding is an argument from
+    # metadata — "no active skill needs this" — and that argument cannot be made
+    # about a tool no skill declares at all. A CLI release that adds a tool ahead
+    # of the skill that uses it, or an integration contributing its own, would
+    # otherwise be withheld by silence and stay withheld until someone noticed.
+    # Filtering has to be safe by default when the metadata is incomplete, which
+    # is exactly the state it is always in.
+    declared = catalog.declared_tools
+    for name in offered_names:
+        if name not in declared and name not in reasons:
+            reasons[name] = "unclassified"
+
     return ToolProjection(proposed=frozenset(reasons), offered=offered_names, reasons=reasons)
 
 
@@ -187,3 +278,200 @@ def _unresolved_tool_calls(messages: list[ChatMessage]) -> set[str]:
         elif message.role == "tool" and message.tool_call_id:
             pending.pop(message.tool_call_id.strip(), None)
     return set(pending.values())
+
+
+# ---- enforcement -----------------------------------------------------------
+
+# Dispositions that are NOT failures. A turn that sent the full inventory because
+# nobody asked it not to is not evidence of anything going wrong, and counting it
+# as a fail-open would bury the reasons that matter under the ones that don't.
+REASON_DISABLED = "disabled"
+REASON_SHADOW = "shadow"
+REASON_PROFILE_EXCLUDED = "profile_excluded"
+REASON_COHORT_EXCLUDED = "cohort_excluded"
+REASON_NO_OFFERED_TOOLS = "no_offered_tools"
+REASON_ENFORCED = "enforced"
+
+# Genuine fail-open reasons: enforcement was asked for, and something about this
+# turn made withholding unsafe. Every one of these should be ZERO in a healthy
+# rollout except `selector_degraded`, which is a fact about the selector rather
+# than about projection and has its own (nonzero) expected rate.
+REASON_SELECTOR_DEGRADED = "selector_degraded"
+REASON_PROJECTION_ERROR = "projection_error"
+REASON_EMPTY_PROJECTION = "empty_projection"
+REASON_INVALID_PROJECTION = "invalid_projection"
+REASON_FORCED_TOOL_MISSING = "forced_tool_missing"
+REASON_UNRESOLVED_TOOL_MISSING = "unresolved_tool_missing"
+REASON_INVENTORY_MISMATCH = "inventory_mismatch"
+REASON_FILTER_ERROR = "filter_error"
+
+_FAIL_OPEN_REASONS: frozenset[str] = frozenset(
+    {
+        REASON_SELECTOR_DEGRADED,
+        REASON_PROJECTION_ERROR,
+        REASON_EMPTY_PROJECTION,
+        REASON_INVALID_PROJECTION,
+        REASON_FORCED_TOOL_MISSING,
+        REASON_UNRESOLVED_TOOL_MISSING,
+        REASON_INVENTORY_MISMATCH,
+        REASON_FILTER_ERROR,
+    }
+)
+
+
+@dataclass(frozen=True)
+class EnforcementDecision:
+    """Whether to send the projection this turn, and the one reason why not.
+
+    ``fail_open`` is deliberately narrower than ``not enforce``: shadow mode,
+    the unselected cohort and a sub-agent turn all decline to enforce without
+    anything having gone wrong. Only the reasons in ``_FAIL_OPEN_REASONS`` mean
+    "enforcement was asked for and this turn could not safely have it", and that
+    is the rate a rollback triggers on.
+    """
+
+    enforce: bool
+    reason: str
+    cohort_selected: bool = False
+    cohort_bucket: int | None = None
+
+    @property
+    def fail_open(self) -> bool:
+        return self.reason in _FAIL_OPEN_REASONS
+
+
+def session_bucket(session_id: str) -> int:
+    """A stable 0-99 bucket for a session.
+
+    Bucketed on the SESSION, never the request: a percentage that re-rolled per
+    request would move a conversation between arms mid-turn, so a continuation
+    round could be offered a different inventory than the round that started the
+    work. Hashed rather than taken from the id's bytes so that ids sharing a
+    prefix (a client that stamps a machine or date into them) do not land in one
+    arm together.
+
+    Monotonic in the percentage by construction: raising the threshold only ever
+    adds sessions, so a promotion never drops a session that was already enrolled.
+    """
+    digest = hashlib.sha256(b"tool-projection\x00" + session_id.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") % 100
+
+
+def decide_enforcement(
+    *,
+    mode: ToolProjectionMode,
+    rollout_percent: int,
+    session_id: str,
+    profile: str,
+    selector_degraded: bool,
+    projection: ToolProjection | None,
+    messages: list[ChatMessage],
+    forced_tool: str | None = None,
+) -> EnforcementDecision:
+    """Decide whether this turn may send the projected inventory.
+
+    Pure: it reads the turn's facts and returns a verdict. It takes no settings
+    object, no orchestrator and no request id, so every branch below is reachable
+    from a unit test without building an app.
+
+    ``projection=None`` means the projection could not be computed. That is a
+    DIFFERENT fact from an empty projection, and conflating them is how a bug
+    that returns nothing becomes a request that offers nothing — so the caller
+    passes ``None`` on failure rather than a default-constructed instance.
+
+    Order matters below: the cheap categorical answers (mode, profile, cohort)
+    come first so a disabled deployment never pays for the checks, and the
+    correctness gates come last so their reasons are never masked by one of them.
+    """
+    if mode == "disabled":
+        return EnforcementDecision(enforce=False, reason=REASON_DISABLED)
+    if mode == "shadow":
+        return EnforcementDecision(enforce=False, reason=REASON_SHADOW)
+
+    # Sub-agents are held out of the first rollout. Their menu is already narrowed
+    # to what they can execute and only a couple of skills survive that filter, so
+    # most of their turns are skill-less — which is exactly the shape where a core
+    # tuned for the ASSISTANT base prompt is the wrong core. Little to win, and the
+    # failure would be silent: a research worker that cannot read.
+    if profile != "assistant":
+        return EnforcementDecision(enforce=False, reason=REASON_PROFILE_EXCLUDED)
+
+    bucket = session_bucket(session_id)
+    selected = bucket < rollout_percent
+    if not selected:
+        return EnforcementDecision(
+            enforce=False,
+            reason=REASON_COHORT_EXCLUDED,
+            cohort_selected=False,
+            cohort_bucket=bucket,
+        )
+
+    def verdict(enforce: bool, reason: str) -> EnforcementDecision:
+        return EnforcementDecision(
+            enforce=enforce, reason=reason, cohort_selected=True, cohort_bucket=bucket
+        )
+
+    if selector_degraded:
+        return verdict(False, REASON_SELECTOR_DEGRADED)
+    if projection is None:
+        return verdict(False, REASON_PROJECTION_ERROR)
+    # Nothing was offered, so there is nothing to withhold. Not a failure — a
+    # request with no tools is already as small as it gets.
+    if not projection.offered:
+        return verdict(False, REASON_NO_OFFERED_TOOLS)
+    # Tools WERE offered and the projection kept none of them. The core alone
+    # guarantees a non-empty proposal whenever the inventory contains any of it,
+    # so this means either an inventory sharing no name with the catalog or a
+    # projection bug — and both are answered by sending everything.
+    if not projection.proposed:
+        return verdict(False, REASON_EMPTY_PROJECTION)
+    if not projection.proposed <= projection.offered or set(projection.reasons) != set(
+        projection.proposed
+    ):
+        return verdict(False, REASON_INVALID_PROJECTION)
+
+    # The last two are true by construction — `project_tools` admits both. They
+    # are re-checked because construction is exactly what a regression breaks, and
+    # the failure mode is not a smaller prompt: a pinned `tool_choice` the request
+    # does not carry is an immediate provider 400, and a stranded continuation is
+    # a turn that can never finish the work it started.
+    if forced_tool and wire_name(forced_tool) not in projection.proposed:
+        return verdict(False, REASON_FORCED_TOOL_MISSING)
+    if any(name not in projection.proposed for name in _unresolved_tool_calls(messages)):
+        return verdict(False, REASON_UNRESOLVED_TOOL_MISSING)
+
+    return verdict(True, REASON_ENFORCED)
+
+
+def filter_provider_tools(
+    tools: list[dict[str, Any]] | None, projection: ToolProjection
+) -> list[dict[str, Any]]:
+    """The assembled tool array narrowed to the projection, in the original order.
+
+    Order is preserved because the tool region is cached on its literal bytes: a
+    reordering that changed nothing about which tools are present would still
+    read upstream as a different prefix.
+
+    Raises rather than skipping a malformed entry. A tool the caller cannot name
+    is one it cannot decide about, and dropping it silently is the single
+    failure this whole design is arranged to avoid — the caller turns the raise
+    into a fail-open with a reason attached.
+    """
+    kept: list[dict[str, Any]] = []
+    for tool in tools or []:
+        name = tool["function"]["name"]
+        if not isinstance(name, str):
+            raise TypeError(f"tool name is not a string: {name!r}")
+        if name in projection.proposed:
+            kept.append(tool)
+    return kept
+
+
+def tools_bytes(tools: list[dict[str, Any]] | None) -> int:
+    """Compact serialized size of a tool array, as the wire would carry it.
+
+    Measures the tool ARRAY, not the request: the rest of the body is unaffected
+    by projection, and serializing it a second time to learn nothing would be the
+    most expensive part of the measurement.
+    """
+    return len(json.dumps(tools or [], ensure_ascii=False, separators=(",", ":")).encode("utf-8"))

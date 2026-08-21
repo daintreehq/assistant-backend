@@ -80,6 +80,12 @@ INTERACTIVE_REASONING_EFFORT = "high"
 DEFAULT_STATE_SALT = "daintree-state-salt"
 
 
+#: The three tool-projection postures. Declared HERE rather than beside the
+#: projector because config sits below skills in the import graph — the
+#: catalog reads DOCS_SKILL_ID from this module, so the arrow cannot reverse.
+ToolProjectionMode = Literal["disabled", "shadow", "enforced"]
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -110,9 +116,7 @@ class Settings(BaseSettings):
     # ---- Upstream provider (Cerebras, OpenAI-compatible) -----------------
     # Models are hardcoded (see the constants above). Only the key and base URL
     # come from the environment.
-    cerebras_base_url: str = Field(
-        default="https://api.cerebras.ai/v1", alias="CEREBRAS_BASE_URL"
-    )
+    cerebras_base_url: str = Field(default="https://api.cerebras.ai/v1", alias="CEREBRAS_BASE_URL")
     # THE server's upstream credential, and the only one there is. Daintree funds
     # every turn from this key: callers no longer supply their own (see auth.py),
     # so this is required for the server to answer anything and is gated by
@@ -162,9 +166,7 @@ class Settings(BaseSettings):
     # (MAIN_DEFAULT_MAX_TOKENS == MAIN_MAX_TOKENS_CEILING, clamped for runaway
     # containment), and a client MAY request its own main max_tokens — so headroom
     # there would fight the ceiling rather than help.
-    thinking_headroom_tokens: int = Field(
-        default=4000, ge=0, alias="THINKING_HEADROOM_TOKENS"
-    )
+    thinking_headroom_tokens: int = Field(default=4000, ge=0, alias="THINKING_HEADROOM_TOKENS")
 
     # ---- Main-model output shape ---------------------------------------
     # The narrow Daintree terminal is ~56 columns wide. The fallback for a client
@@ -210,9 +212,7 @@ class Settings(BaseSettings):
     # move the hard stop, and should not — one governs a log line, the other kills
     # a live generation, and coupling them would let a logging tweak change when
     # the server hangs up on a model. 0 disables the guard.
-    main_stream_runaway_chars: int = Field(
-        default=16000, ge=0, alias="MAIN_STREAM_RUNAWAY_CHARS"
-    )
+    main_stream_runaway_chars: int = Field(default=16000, ge=0, alias="MAIN_STREAM_RUNAWAY_CHARS")
 
     # ---- State signing --------------------------------------------------
     state_signing_key_current: SecretStr = Field(
@@ -323,6 +323,28 @@ class Settings(BaseSettings):
         default=0.25, ge=0.0, alias="RETRY_BACKOFF_BASE_SECONDS"
     )
 
+    # ---- Skill-aware tool projection ------------------------------------
+    # The one exception to "no env toggles, the server ships one optimum": this
+    # is not a product decision being deferred to config, it is the kill switch
+    # for a behaviour that withholds capability from the model. Model identity
+    # and thinking posture are hardcoded because there IS one right answer;
+    # here the right answer is whatever production says this week, and the value
+    # of being able to answer "turn it off" in the time it takes Cloud Run to
+    # roll a config-only revision is the whole point.
+    #
+    # `shadow` is the default, so a deployment that sets nothing behaves exactly
+    # as it did while projection was measurement-only. Set the PERCENT before
+    # flipping the mode: `enforced` at the default 100 is every session at once.
+    tool_projection_mode: ToolProjectionMode = Field(default="shadow", alias="TOOL_PROJECTION_MODE")
+    # Session-stable, so a conversation stays in one arm for its whole life —
+    # a percentage re-rolled per request would offer a continuation round a
+    # different inventory than the round that started the work. 100 rather than
+    # 0 so that `enforced` means enforced: a mode that silently enforces nothing
+    # is a worse default than one that needs a second variable set alongside it.
+    tool_projection_rollout_percent: int = Field(
+        default=100, ge=0, le=100, alias="TOOL_PROJECTION_ROLLOUT_PERCENT"
+    )
+
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")
@@ -352,9 +374,7 @@ class Settings(BaseSettings):
     # Rows are admitted whole so an exact agent id is never truncated into a
     # different, unusable identifier.
     cap_startup_agents: int = Field(default=512, alias="CAP_STARTUP_AGENTS")
-    cap_startup_agent_bytes: int = Field(
-        default=16 * 1024, alias="CAP_STARTUP_AGENT_BYTES"
-    )
+    cap_startup_agent_bytes: int = Field(default=16 * 1024, alias="CAP_STARTUP_AGENT_BYTES")
     cap_project_instructions: int = Field(default=16 * 1024, alias="CAP_PROJECT_INSTRUCTIONS")
     cap_goal: int = Field(default=8 * 1024, alias="CAP_GOAL")
     cap_workflow_runs: int = Field(default=24 * 1024, alias="CAP_WORKFLOW_RUNS")
@@ -369,9 +389,7 @@ class Settings(BaseSettings):
     # per turn, and the total byte budget for the rendered block. Every digest
     # line is additionally collapsed/capped to a single 512-byte line.
     cap_workflow_digests: int = Field(default=5, alias="CAP_WORKFLOW_DIGESTS")
-    cap_workflow_state_bytes: int = Field(
-        default=16 * 1024, alias="CAP_WORKFLOW_STATE_BYTES"
-    )
+    cap_workflow_state_bytes: int = Field(default=16 * 1024, alias="CAP_WORKFLOW_STATE_BYTES")
     cap_message_text_part: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT_PART")
     cap_message_text: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT")
 

@@ -93,6 +93,18 @@ class Catalog:
         self._selectable_ids = frozenset(
             s.id for s in self._skills if s.id not in _HIDDEN_FROM_SELECTOR
         )
+        # Every tool ANY skill declares, in WIRE form — the set the catalog can be
+        # said to have an opinion about. Tool projection withholds on the argument
+        # "no active skill needs this", and that argument is only available for a
+        # tool some skill mentions; anything outside this set is passed through
+        # rather than judged by silence. Precomputed for the same reason as
+        # `_selectable_ids`: it is the same answer for every request at a given
+        # revision, and the alternative is walking the whole catalog per turn.
+        self._declared_tools = frozenset(
+            tool.replace(".", "__")
+            for skill in self._skills
+            for tool in (skill.meta.required_tools or ())
+        )
 
     @staticmethod
     def _domain_of(skill_id: str) -> str:
@@ -147,6 +159,17 @@ class Catalog:
     @property
     def known_ids(self) -> frozenset[str]:
         return frozenset(self._by_id)
+
+    @property
+    def declared_tools(self) -> frozenset[str]:
+        """Wire names of every tool some skill in this catalog declares.
+
+        Note this is the NARROWED catalog's answer when a sub-agent narrowed it:
+        a tool only orchestration skills declare reads as undeclared to a menu
+        that holds none of them, and is passed through rather than withheld. That
+        is the safe direction — a narrowed menu knows less, so it withholds less.
+        """
+        return self._declared_tools
 
     def __len__(self) -> int:
         return len(self._skills)
@@ -254,9 +277,7 @@ class Catalog:
         return subset
 
 
-def load_catalog(
-    primary_dir: Path | None = None, overlay_dir: Path | None = None
-) -> Catalog:
+def load_catalog(primary_dir: Path | None = None, overlay_dir: Path | None = None) -> Catalog:
     """Load and validate the catalog from disk.
 
     ``primary_dir`` is the packaged skills directory. ``overlay_dir`` (local
@@ -344,4 +365,3 @@ class CatalogManager:
             new = await asyncio.to_thread(load_catalog, self._primary_dir, self._overlay_dir)
             self._catalog = new
             return previous, new
-

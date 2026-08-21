@@ -31,6 +31,7 @@ All deterministic: no API key, no network, safe in CI.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
@@ -42,6 +43,10 @@ from daintree_assistant_server.prompts.loader import (
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from daintree_assistant_server.skills.catalog import load_catalog
 from daintree_assistant_server.skills.models import Skill
+from daintree_assistant_server.skills.tool_projection import (
+    filter_provider_tools,
+    project_tools,
+)
 from daintree_assistant_server.state.codec import StateCodec
 from daintree_assistant_server.text_utils import estimate_tokens
 
@@ -66,15 +71,44 @@ def _system_tools_bytes(body: dict[str, Any]) -> bytes:
     return b"\x1e".join(units)
 
 
+def _system_messages_bytes(body: dict[str, Any]) -> bytes:
+    """The system messages alone, with the tool region excluded.
+
+    Under enforcement the tool region is SUPPOSED to move on a topic shift, so
+    the layout invariant has to be asserted on what must not move: a system
+    message drifting below the schemas would otherwise hide inside an expected
+    tool-region change.
+    """
+    messages = body.get("messages") or []
+    return b"\x1e".join(dumps(m) for m in messages if m.get("role") == "system")
+
+
+def _tool_region_bytes(body: dict[str, Any]) -> int:
+    return len(dumps(body.get("tools") or []))
+
+
 def _body_for(
     assembler: PromptAssembler,
     settings: Settings,
     request: RespondRequest,
     skills: list[Skill],
+    *,
+    enforced: bool = False,
 ) -> dict[str, Any]:
     pr = assembler.build_main_request(
         request=request, skills=skills, upstream_model=CEREBRAS_MODEL
     )
+    if enforced:
+        # The PRODUCTION filter, not a re-implementation of it. A benchmark that
+        # modelled enforcement separately would keep measuring its own model long
+        # after the orchestrator stopped agreeing with it.
+        projection = project_tools(
+            offered=request.input.tools,
+            active_skills=skills,
+            catalog=load_catalog(),
+            messages=request.input.messages,
+        )
+        pr = replace(pr, tools=filter_provider_tools(pr.tools, projection) or None)
     return build_provider_body(pr, settings)
 
 
@@ -208,6 +242,62 @@ def _transitions(
             "note": "full_prefix still drops from the loaded-skills row down — that part "
                     "is inherent and expected",
             **stab,
+        })
+
+    # 4b. THE SAME SHIFT, ENFORCED. Transition 4 is measured against the full
+    #    inventory, and it stays honest about the LAYOUT invariant issue #39 won:
+    #    the skill block is below the schemas, so moving it cannot touch them.
+    #
+    #    But under `TOOL_PROJECTION_MODE=enforced` the tools array is a FUNCTION of
+    #    the active skill set, so a topic shift changes the schemas themselves and
+    #    transition 4's 1.0 stops describing production traffic. Measuring only
+    #    the full-inventory track would leave CI reporting a guarantee that no
+    #    longer holds for the requests users actually get.
+    #
+    #    So the cost is measured rather than avoided. It is a ONE-TIME miss on a
+    #    region the projection has already made ~56% smaller, paid at a topic
+    #    shift, against a saving taken on every round in between — and the array
+    #    is stable for exactly as long as the active set is, which is most rounds.
+    #    `projected_tool_continuation` is the assertion that carries: a
+    #    continuation round must stay byte-identical, or enforcement is re-cutting
+    #    the tools mid-turn and the trade above is not the trade being made.
+    if b:
+        before = _body_for(assembler, settings, req([_USER]), a, enforced=True)
+        after = _body_for(assembler, settings, req([_USER, _ASSIST_TOOL, _TOOL_RESULT]),
+                          a, enforced=True)
+        out.append({
+            "transition": "projected_tool_continuation",
+            "expect": "system_tools_stable == 1.0 (the active set is unchanged, so the "
+                      "projected tools are too)",
+            "floor_system_tools_stable": 1.0,
+            **_stability(before, after),
+        })
+
+        before = _body_for(assembler, settings, req([_USER]), a, enforced=True)
+        after = _body_for(assembler, settings, req([_USER]), b, enforced=True)
+        stab = _stability(before, after)
+        out.append({
+            "transition": "projected_skill_topic_shift",
+            "expect": "system messages identical; the tool region INTENTIONALLY differs "
+                      "— this is the cost of enforcement, measured not assumed",
+            # Deliberately NOT floored at 1.0: under enforcement it cannot be, and
+            # a floor that a correct implementation fails is a floor that gets
+            # deleted. What IS asserted is that the change is confined to the
+            # tools — a system message moving here would still be the issue #39
+            # regression, and transition 4 would not see it under enforcement.
+            "floor_system_messages_identical": True,
+            "system_messages_identical": _system_messages_bytes(before)
+                                         == _system_messages_bytes(after),
+            "note": "the one-time cost of a topic shift, against a tool region "
+                    "enforcement has already made ~56% smaller",
+            **stab,
+        })
+        out.append({
+            "transition": "projected_size",
+            "expect": "the projected tool region is materially smaller than the full one",
+            "full_tool_bytes": _tool_region_bytes(
+                _body_for(assembler, settings, req([_USER]), a)),
+            "projected_tool_bytes": _tool_region_bytes(before),
         })
 
     # 5. new session: different conversation, identical tools/skills/runtime — the
@@ -353,6 +443,12 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         "runtime_context_change",
         "startup_context_change",
         "skill_topic_shift",
+        # The enforced twin. Gated for the same reason its full-inventory sibling
+        # is: under enforcement the tools array follows the ACTIVE SET, so a
+        # continuation round changing it would mean the filter is re-cutting the
+        # inventory mid-turn — and the whole cache argument for enforcement rests
+        # on that not happening.
+        "projected_tool_continuation",
         "new_session",
     }
     continuity = [t for t in transitions if t["transition"] in required]
@@ -376,13 +472,31 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         for t in continuity
         if t.get("floor_system_tools_stable", 1.0) >= 1.0
     )
+    # The enforced topic shift is the one transition that MUST move: its tool
+    # region is a function of the active set. So it is gated on what must NOT
+    # move — the system messages. Without this it would be the only transition in
+    # the file asserting nothing, and a system message drifting below the schemas
+    # would hide inside a tool-region change that reads as expected.
+    projected_shift = next(
+        (t for t in transitions if t["transition"] == "projected_skill_topic_shift"), None
+    )
+    layout_held = projected_shift is None or bool(projected_shift["system_messages_identical"])
+    projected_size = next(
+        (t for t in transitions if t["transition"] == "projected_size"), None
+    )
     summary = {
         "wire_encoder_matches_httpx": wire_matches,
         "min_system_tools_stable_continuity": min_stable,
         "topic_shift_system_tools_stable": next(
             (t["system_tools_stable"] for t in transitions
              if t["transition"] == "skill_topic_shift"), None),
-        "passed": bool(wire_matches and floors_met),
+        # What enforcement is FOR, on the same dashboard as what it costs.
+        "projected_tool_bytes": (
+            projected_size["projected_tool_bytes"] if projected_size else None
+        ),
+        "full_tool_bytes": projected_size["full_tool_bytes"] if projected_size else None,
+        "projected_system_messages_identical": layout_held,
+        "passed": bool(wire_matches and floors_met and layout_held),
     }
     return {
         "meta": {
