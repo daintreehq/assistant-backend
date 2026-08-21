@@ -1081,52 +1081,78 @@ def _require_cli_submodule() -> None:
         pytest.skip("cli/ submodule is not populated (git submodule update --init cli)")
 
 
-def _cli_credentials_path() -> str:
-    """The credential path the vendored CLI actually resolves.
-
-    Raises rather than returning None on a parse failure. Returning None and
-    skipping would turn any Go-side change this regex does not understand — a
-    switch to `path.Join`, a renamed constant, a computed filename — into a green
-    build, and the whole point is to notice when the CLI moves the file.
-    """
-    config = (CLI_ROOT / "internal" / "config" / "config.go").read_text(encoding="utf-8")
-    credentials = (
-        CLI_ROOT / "internal" / "credentials" / "credentials.go"
-    ).read_text(encoding="utf-8")
-    root = re.search(r'stateRootSubpath\s*=\s*filepath\.Join\(([^)]*)\)', config)
-    name = re.search(r'FileName\s*=\s*"([^"]+)"', credentials)
-    assert root, (
-        "cannot find `stateRootSubpath = filepath.Join(...)` in the vendored "
-        "config.go — the CLI changed how it resolves the state root, so the "
-        "credential path in docs/ can no longer be checked and may be wrong"
-    )
-    assert name, (
-        "cannot find `FileName = \"...\"` in the vendored credentials.go — the "
-        "CLI changed how it names the credential file"
-    )
-    parts = [p.strip().strip('"') for p in root.group(1).split(",")]
-    return "~/" + "/".join(parts) + "/" + name.group(1)
+# The CLI's key lifecycle was REMOVED, and these guard that removal rather than
+# the flow it replaced. `feat: drop the API-key requirement` deleted the
+# credentials package, the sign-in path and the login/logout commands outright,
+# which is why docs/KEY_HANDLING.md §5 now says there is no client-side storage.
+#
+# The direction of the check is inverted on purpose. Nothing can assert that a
+# deleted flow still behaves correctly, but the doc DOES make a falsifiable claim
+# — that no key is stored — and the way that claim goes stale is the CLI growing
+# the feature back while §5 still says it has none.
+_REMOVED_CREDENTIAL_SOURCES = (
+    Path("internal") / "credentials" / "credentials.go",
+    Path("internal") / "cli" / "login.go",
+    Path("internal") / "app" / "signin.go",
+)
 
 
-@pytest.mark.parametrize("doc", [DOC_BETA, DOC_KEYS])
-def test_the_documented_credential_path_is_the_one_the_cli_writes(doc: Path) -> None:
+@pytest.mark.parametrize("relative", _REMOVED_CREDENTIAL_SOURCES, ids=lambda p: p.name)
+def test_the_cli_still_stores_no_credential(relative: Path) -> None:
     _require_cli_submodule()
-    path = _cli_credentials_path()
-    assert path in _read(doc), (
-        f"{doc.relative_to(REPO_ROOT)} does not name {path}, which is where the "
-        f"CLI actually stores the sign-in. A tester told to delete the wrong file "
-        f"believes they have signed out."
+    assert not (CLI_ROOT / relative).exists(), (
+        f"cli/{relative} is back, so the CLI may store a key again — but "
+        f"docs/KEY_HANDLING.md §5 says it stores none. Rewrite §5 against whatever "
+        f"the flow now is; a doc claiming 'no credential on disk' while one exists "
+        f"is the worst direction for this particular claim to be wrong in."
+    )
+
+
+def test_an_unset_key_sends_no_authorization_header() -> None:
+    """The one live claim §5 makes about the wire.
+
+    §5 says an empty `DAINTREE_API_KEY` sends no header at all. That is what lets
+    the server ignore the header without a mid-migration client being blamed for
+    one it was right to still be sending.
+    """
+    _require_cli_submodule()
+    source = (CLI_ROOT / "internal" / "backend" / "client.go").read_text(encoding="utf-8")
+    guarded = re.search(
+        r'if\s+c\.apiKey\s*!=\s*""\s*\{\s*req\.Header\.Set\(\s*"Authorization"',
+        source,
+    )
+    assert guarded, (
+        "internal/backend/client.go no longer guards the Authorization header on a "
+        "non-empty key. docs/KEY_HANDLING.md §5 claims an unset DAINTREE_API_KEY "
+        "sends no header."
+    )
+
+
+def test_the_key_is_registered_for_redaction_when_it_is_set() -> None:
+    """§5's other live claim. Registration is unconditional in the CLI, which is
+    what covers the rare install that exports the variable."""
+    _require_cli_submodule()
+    source = (CLI_ROOT / "internal" / "app" / "app.go").read_text(encoding="utf-8")
+    assert "redact.RegisterSecret(cfg.APIKey)" in source, (
+        "internal/app/app.go no longer registers cfg.APIKey for redaction, which "
+        "docs/KEY_HANDLING.md §5 claims it does"
     )
 
 
 @pytest.mark.parametrize("doc", [DOC_BETA, DOC_KEYS])
-def test_no_document_names_the_old_credential_path(doc: Path) -> None:
-    """The pre-move path, which is a real directory that will simply contain no
-    credentials file — so the mistake reads as "already signed out"."""
+def test_no_document_tells_a_reader_the_cli_stores_a_key(doc: Path) -> None:
+    """Widened from the pre-move-path check it replaces.
+
+    That test guarded against naming the WRONG credentials file. The CLI now
+    writes NO credentials file, so naming any of them is the error: a tester told
+    to delete a path that cannot exist believes they have signed out, and a
+    reviewer reading it believes there is a key on disk to protect.
+    """
     text = _read(doc)
-    stale = re.compile(r"~/\.daintree/credentials\.json")
+    stale = re.compile(r"credentials\.json")
     assert not stale.search(text), (
-        f"{doc.relative_to(REPO_ROOT)} names the pre-move credential path"
+        f"{doc.relative_to(REPO_ROOT)} names a credentials.json path, but the CLI "
+        f"stores no credential (docs/KEY_HANDLING.md §5)"
     )
 
 
@@ -1215,129 +1241,4 @@ def test_the_benchmark_readme_ci_claim_matches_the_workflow() -> None:
     assert re.search(r"CI runs the\s+deterministic dashboard", text), (
         "benchmarks/README.md no longer states that CI runs the deterministic "
         "dashboard — check it has not reverted to claiming benchmarks are outside CI"
-    )
-
-
-# ---------------------------------------------------------------------------
-# The credential-lifecycle table, checked against the vendored CLI.
-#
-# That table is the reason this whole section exists: it read "the CLI accepts a
-# pasted token and persists it immediately: it has no caller of
-# /v1/daintree/auth/verify ... and no credential-clear path" while the CLI had
-# been doing all three for some time. A status table nobody checks becomes an
-# inventory of what USED to be missing.
-#
-# Each row is pinned to the symbol that implements it. These are necessarily
-# coarse — the presence of a call is not proof of its ordering — so the one
-# ordering that actually matters (verify BEFORE persist; a typo must never reach
-# disk) is checked positionally.
-# ---------------------------------------------------------------------------
-
-# Each entry is `row number -> (file, symbol)`. The row number matters: the test
-# reads the table row too, so a requirement whose CODE has landed while its STATUS
-# still says ⏳ fails. Without that, the map proved only that a symbol exists
-# somewhere in the CLI — which is true of a row nobody updated.
-CLI_LIFECYCLE_EVIDENCE = {
-    "states the key is an OpenRouter key that OpenRouter bills": (
-        CLI_ROOT / "internal" / "cli" / "login.go", "KeyPurposeNotice",
-    ),
-    "repairs a group- or world-readable credential directory on save": (
-        CLI_ROOT / "internal" / "credentials" / "credentials.go", "tightenDirMode(dir)",
-    ),
-    "decodes `usable` as an optional field, not a plain bool": (
-        CLI_ROOT / "internal" / "backend" / "client.go", "Usable *bool",
-    ),
-    "shows the resolved endpoint before asking for the key": (
-        CLI_ROOT / "internal" / "cli" / "login.go", "promptEndpoint",
-    ),
-    "verifies the key against the backend during sign-in": (
-        CLI_ROOT / "internal" / "app" / "signin.go", "backend.CheckSignIn",
-    ),
-    "removes the credential on logout": (
-        CLI_ROOT / "internal" / "cli" / "login.go", "credentials.Delete",
-    ),
-    "registers the new key as a redaction secret": (
-        CLI_ROOT / "internal" / "app" / "signin.go", "redact.RegisterSecret",
-    ),
-    "fails doctor on a credential file wider than 0600": (
-        CLI_ROOT / "internal" / "cli" / "doctorreport.go", "StatusFail",
-    ),
-}
-
-# Row number -> the symbol whose PRESENCE means that row can no longer be ⏳.
-# Chosen to appear only once the behaviour exists, not merely once the function
-# does: `promptEndpoint` predates the endpoint actually being displayed, so row 2
-# keys on the restatement itself.
-CLI_LIFECYCLE_ROWS: dict[int, tuple[Path, str]] = {
-    1: (CLI_ROOT / "internal" / "cli" / "login.go", "KeyPurposeNotice"),
-    2: (CLI_ROOT / "internal" / "cli" / "login.go", "Signing in to"),
-    3: (CLI_ROOT / "internal" / "app" / "signin.go", "backend.CheckSignIn"),
-    7: (CLI_ROOT / "internal" / "cli" / "login.go", "credentials.Delete"),
-    9: (CLI_ROOT / "internal" / "app" / "signin.go", "redact.RegisterSecret"),
-}
-
-
-@pytest.mark.parametrize("behaviour", sorted(CLI_LIFECYCLE_EVIDENCE))
-def test_key_handling_only_claims_cli_behaviour_the_vendored_source_has(
-    behaviour: str,
-) -> None:
-    _require_cli_submodule()
-    path, symbol = CLI_LIFECYCLE_EVIDENCE[behaviour]
-    assert symbol in path.read_text(encoding="utf-8"), (
-        f"docs/KEY_HANDLING.md §5 claims the CLI {behaviour}, but {symbol} is gone "
-        f"from {path.relative_to(REPO_ROOT)}. Either the CLI regressed or the pin "
-        f"moved; the doc says ✅ either way, which is the failure this test exists for."
-    )
-
-
-def _lifecycle_rows() -> dict[int, str]:
-    """The §5 lifecycle table, as `row number -> status cell`."""
-    section = _read(DOC_KEYS).split("### Required lifecycle", 1)[-1]
-    rows: dict[int, str] = {}
-    for line in section.splitlines():
-        cells = [c.strip() for c in line.split("|")]
-        if len(cells) >= 4 and cells[1].isdigit():
-            rows[int(cells[1])] = cells[3]
-    return rows
-
-
-@pytest.mark.parametrize("row", sorted(CLI_LIFECYCLE_ROWS))
-def test_a_lifecycle_row_whose_code_has_landed_is_not_still_marked_pending(
-    row: int,
-) -> None:
-    """The other direction, and the one that actually bit.
-
-    Checking only that a claimed ✅ has its symbol catches a REGRESSION. It does
-    nothing about the opposite drift: the pin moves, the behaviour arrives, and the
-    row still says ⏳ because nobody looked. That is how a status table turns into
-    an inventory of what used to be missing — the failure this section was rewritten
-    to fix in the first place.
-    """
-    _require_cli_submodule()
-    path, symbol = CLI_LIFECYCLE_ROWS[row]
-    if symbol not in path.read_text(encoding="utf-8"):
-        pytest.skip(f"row {row}'s implementation is genuinely absent from the pin")
-    status = _lifecycle_rows().get(row)
-    assert status is not None, f"docs/KEY_HANDLING.md §5 has no row {row}"
-    assert "⏳" not in status, (
-        f"docs/KEY_HANDLING.md §5 row {row} is still ⏳, but {symbol} is present in "
-        f"{path.relative_to(REPO_ROOT)} — the pin moved and the status did not"
-    )
-
-
-def test_the_cli_verifies_the_key_before_it_reaches_disk() -> None:
-    """The ordering claim, which symbol presence alone cannot establish.
-
-    "Verify, then persist" is the whole value of row 3: a typo must never reach
-    disk. Both calls being present in the file would satisfy the coarse check
-    above even if they were the wrong way round.
-    """
-    _require_cli_submodule()
-    source = (CLI_ROOT / "internal" / "app" / "signin.go").read_text(encoding="utf-8")
-    verify = source.find("backend.CheckSignIn(")
-    persist = source.find("credentials.Save(")
-    assert verify != -1 and persist != -1, "sign-in no longer verifies or no longer persists"
-    assert verify < persist, (
-        "credentials.Save now runs before backend.CheckSignIn — a rejected key "
-        "would reach disk, which docs/KEY_HANDLING.md §5 row 3 says cannot happen"
     )

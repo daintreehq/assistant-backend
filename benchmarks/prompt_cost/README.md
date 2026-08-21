@@ -93,7 +93,7 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-08-20, 39 skills / 77 tools (sizes are KiB). The catalog holds 39
+Measured 2026-08-21, 39 skills / 79 tools (sizes are KiB). The catalog holds 39
 but the selector prompt renders 38 — `daintree.docs.answer-usage-question` is
 server-pinned off the turn's `docs_query` and hidden from the selector, so it
 costs the selector nothing:
@@ -103,18 +103,21 @@ costs the selector nothing:
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
 | system+tools stable — topic-shift | **1.0000** (enforced floor) |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~113.9 KB, ~29.0k proxy tok |
-| tool schemas share of request | ~73.5 KB, **64.4%**, ~18.7k tok |
-| base prompt | ~23.3 KB, 20.4%, ~5.9k tok |
-| loaded skills (2 active) | ~11.8 KB, 10.3%, ~3.0k tok |
+| total request | ~120.7 KB, ~30.6k proxy tok |
+| tool schemas share of request | ~79.3 KB, **65.7%**, ~20.2k tok |
+| base prompt | ~24.1 KB, 20.0%, ~6.1k tok |
+| loaded skills (2 active) | ~11.8 KB, 9.7%, ~3.0k tok |
 | skill selection | **local two-stage selector — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
 | state token | 389–492 B (0–3 skills; 16 KiB cap) |
 
-The tool region fell ~10% (81.6 → 73.5 KiB, ~20.9k → ~18.8k proxy tokens) when
-the CLI dropped its `docs__*` family — the backend retrieves documentation itself
-now, so the client no longer needs a docs tool or a second MCP connection. It is
-still the largest single region of the request by a wide margin, and still the
-largest remaining lever.
+The tool region rose 73.5 → 79.3 KiB (~18.7k → ~20.2k proxy tokens) when the pin
+moved to `cb12688`, which added `subagent__run` and `terminal__moveToWorktree`
+and removed nothing. That reverses most of the ~10% fall recorded against the
+previous pin, when the CLI dropped its `docs__*` family because the backend
+retrieves documentation itself now. The region remains the largest single part of
+the request by a wide margin, and the largest remaining lever: skill-aware tool
+projection (`skills/tool_projection.py`, still in shadow mode) would cut it to a
+median ~34.9 KiB.
 
 The base-prompt row is the one that moved most against the previous snapshot,
 and it moved because the 2026-08-17 reading was already stale rather than because

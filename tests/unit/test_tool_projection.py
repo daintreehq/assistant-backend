@@ -351,6 +351,12 @@ _REVIEWED_UNDECLARED = {
     # every specific, and projection is shadow-only regardless. The reason is
     # metadata truth, not enforcement.)
     ("daintree.worktree.create-plain-worktree", "daintree.call"),
+    # PROHIBITION. `terminal.moveToWorktree` gained a typed wrapper, so its step 6
+    # names `daintree.call` only to forbid routing the move through it — the raw
+    # action now returns USE_TYPED_WRAPPER and does nothing, which would ask the
+    # user to approve a call that cannot run. Same reasoning as the entry above:
+    # the runbook needs this tool NOT to be used.
+    ("daintree.worktree.relocate-agents", "daintree.call"),
     # PROHIBITIONS. The durable-graph runbook says graph operations are CLI-local
     # and must not be routed through the raw MCP escape hatch. The resource
     # runbook says that raw MCP lifecycle calls cannot be grant-authorized.

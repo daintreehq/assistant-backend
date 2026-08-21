@@ -86,12 +86,11 @@ Onboarding must state all of this, plainly, before the tester hands over a key:
   **Zero data retention is not enforced** <!-- privacy-copy-ok -->  — see
   [`PROVIDER_POLICY.md` §4](PROVIDER_POLICY.md#4-privacy--what-is-and-is-not-promised).
   Never say "does not store". <!-- privacy-copy-ok -->
-- Where the CLI stores the key — by default
-  `~/.daintree/assistant-cli/credentials.json`, per-user so one login serves every
-  project, moved by an explicit `DAINTREE_ASSISTANT_STATE_DIR`. The file is `0600`;
-  the directory is `0700` **when the CLI creates it**, and a pre-existing root
-  keeps whatever mode it had (`doctor` reports the file's mode, not that one). And
-  how to remove or rotate it.
+- That the CLI stores **no key at all** — the sign-in flow and the credential
+  file it wrote were removed, so there is nothing on disk to protect, rotate or
+  delete. `DAINTREE_API_KEY` is the only way to set one, it is normally unset,
+  and an unset key sends no `Authorization` header. See
+  [`KEY_HANDLING.md` §5](KEY_HANDLING.md#5-client-side-storage-the-cli).
 - That Daintree logs **metadata but not prompt or tool content**, with one
   exception: when OpenRouter rejects a request, a bounded excerpt of *its* error
   body is logged and may appear in the error message, and a provider is free to

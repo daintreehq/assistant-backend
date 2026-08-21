@@ -154,70 +154,31 @@ not a key record. Then we genuinely do not know, and must not imply a verdict.
 
 ## 5. Client-side storage (the CLI)
 
-Owned by the CLI repository; recorded here because it is part of the same
-lifecycle.
+**There is none, and that is the current design.** The CLI dropped the API-key
+requirement outright: `internal/credentials/`, `internal/cli/login.go` and
+`internal/app/signin.go` are gone from the vendored source, along with the
+`login`/`logout` commands and the per-user credential file they maintained under
+the CLI's state root. Nothing is persisted, so there is nothing to chmod, nothing
+for `doctor` to inspect, and nothing to delete to sign out.
 
-- `~/.daintree/assistant-cli/credentials.json`, written atomically as mode `0600`.
-  The sign-in is **per-user, not per-project**: it lives at the CLI's state root
-  rather than in the per-project subdirectory, so one login serves every project.
-  (An explicit `DAINTREE_ASSISTANT_STATE_DIR` override moves it, which is how
-  tests and benchmarks avoid reading or clobbering the real sign-in.)
-- The parent directory is created `0700` — but `MkdirAll`'s mode applies only to
-  directories it **creates**, so a pre-existing state root (an older build, an
-  installer, a restored backup, a permissive umask) keeps whatever mode it already
-  had. The `0700` is a promise about new installs.
-- `Save` therefore repairs it, narrowly: `tightenDirMode` clears the group and
-  world bits before writing — but only on a directory the CLI owns (an
-  `assistant-cli` state root). A custom directory supplied through
-  `DAINTREE_ASSISTANT_STATE_DIR` is left as the user configured it, since chmod-ing
-  an arbitrary path the user chose is not ours to do. Either way, a directory that
-  is group- or world-WRITABLE refuses the save outright: that is a different
-  problem, and no chmod makes it safe.
-- Detection covers the file: `doctor` re-checks the credential file's own mode and
-  **fails** — not warns — on anything wider than `0600`, because the CLI writes it
-  `0600` by construction, so a wider mode means something else set it and the file
-  spends the user's money. Doctor's *directory* check runs against the resolved
-  state dir, which under the normal project-scoped configuration is the per-project
-  subdirectory rather than the parent root the sign-in lives in — so the repair
-  above, not that check, is what covers the credential's own directory.
-- **The stored key is NOT bound to the stored endpoint.** `DAINTREE_BACKEND_URL`
-  resolves ahead of the persisted URL while the persisted key still applies, so a
-  process-level override sends the server's provider credential to whatever
-  host it names. That is deliberate — the key is valid against a local backend as
-  well as the deployed one, and binding it would break the sign-in-once dev loop —
-  but it is a fail-OPEN default and must be described as one. What the pairing
-  does protect against is a *bound project's* `.env`: neither the key nor the URL
-  is read from untrusted project configuration.
-- For this internal beta, a `0600` file is acceptable **provided it is
-  disclosed**. Native OS keychain storage is a worthwhile later enhancement,
-  especially because this key carries spend authority.
+What remains is a single escape hatch. `cfg.APIKey` is read only from
+`DAINTREE_API_KEY` and is normally empty; an empty key sends **no**
+`Authorization` header at all (`internal/backend/client.go`, `setHeaders`). When
+it is set, `redact.RegisterSecret` registers it during app construction before
+anything can log — unconditionally, so the rare install that exports it is
+covered without a second code path.
 
-### Required lifecycle
+The server ignores the header regardless (§1, §2), so the env var changes what
+goes over the wire and nothing about what happens to the request. It is a
+transitional affordance, not a credential mechanism.
 
-What must be true before testers are invited. Implemented in the CLI repository.
-
-Statuses are `✅` done, `◐` partly, `⏳` not yet. They describe the **`cli/`
-submodule at its current pin**, not the CLI's `develop` tip: the pin does not
-float, so it trails, and a row that has landed upstream but not here stays ⏳ until
-the pin moves.
-
-`tests/unit/test_docs_drift.py` pins the rows whose evidence is a symbol in the
-vendored source. Two limits worth knowing: symbol presence cannot establish
-semantics (so the one ordering that matters — verify before persist — is checked
-positionally instead), and CI does not fetch the submodule, so those checks are a
-LOCAL gate that skips in CI rather than a green-build guarantee.
-
-| | Requirement | Status |
-|---|---|---|
-| 1 | (Historical — callers no longer supply a key.) On first launch, state plainly that the key is an **OpenRouter** key and that OpenRouter bills it. | ✅ `login.go` names the provider and prints `backend.KeyPurposeNotice` before the key prompt |
-| 2 | Normalise and display the target backend endpoint *before* asking for the key. | ✅ the RESOLVED endpoint is restated ("Signing in to …") ahead of `promptAPIKey` — a custom URL is normalised on the way through, so what was typed is not necessarily the host the key is about to reach |
-| 3 | **Verify the key before persisting it.** Login must not silently persist a rejected key. | ✅ `App.SignIn` runs `backend.CheckSignIn` against a THROWAWAY client, then persists, then swaps the live client |
-| 4 | Show the safe label and remaining limit when the provider reports them. | ◐ the startup login path does, on the no-warning branch; the in-session `App.SignIn` discards the verification object and shows only a generic warning |
-| 5 | Run a tiny streaming smoke after verification. | ⏳ verification is a tokenless key probe, so it proves the credential without proving a turn can stream |
-| 6 | Persist only after the checks pass — unless the tester explicitly chooses an offline/custom-endpoint setup. | ◐ a DEFINITE rejection is not persisted; an INCONCLUSIVE verification (provider unreachable, or a backend not serving the route on loopback) persists with a warning, deliberately — neither is evidence about the key, and refusing would leave no way to configure the CLI |
-| 7 | Provide a clear/logout path that removes the stored key. | ✅ `logout` deletes the file and names the path it removed. Note it cannot clear a key supplied through `DAINTREE_API_KEY`, which keeps applying |
-| 8 | Provide rotation instructions. | ⏳ §6 below is the content; nothing surfaces it in the CLI |
-| 9 | No debug, audit, crash or doctor output may contain the raw key. | ✅ `redact.RegisterSecret` is called on the new key before it is persisted. Note it is registered *after* the verification call that first uses it, so redaction covers storage and every later use, not the probe |
+The lifecycle table that used to live here described the interactive sign-in
+flow: prompt, verify before persist, show the endpoint, offer logout, redact the
+key. Every row of it is moot now that no key is collected. It was deleted rather
+than marked historical, because a status table nobody can act on is exactly the
+inventory-of-the-past this document was rewritten to stop being. Git history has
+it. When account authentication lands (`TODO.md`), the requirements get written
+fresh against whatever that flow actually is.
 
 ## 6. Rotation
 

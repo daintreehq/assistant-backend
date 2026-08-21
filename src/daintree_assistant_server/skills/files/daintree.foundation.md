@@ -13,6 +13,7 @@ requiredTools:
   - git.getProjectPulse
   - tool.search
   - daintree.call
+  - subagent.run
   - agentTask.spawnForEdits
   - terminal.awaitAll
   - terminal.await.async

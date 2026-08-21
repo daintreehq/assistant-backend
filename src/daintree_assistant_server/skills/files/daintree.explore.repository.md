@@ -11,6 +11,7 @@ requiredTools:
   - fs.list
   - fs.read
   - fs.search
+  - subagent.run
   - agentTask.spawnForEdits
   - terminal.awaitAll
   - terminal.await.async

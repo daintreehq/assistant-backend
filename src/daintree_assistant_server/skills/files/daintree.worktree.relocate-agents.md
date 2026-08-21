@@ -8,7 +8,7 @@ requiredTools:
   - context.snapshot
   - worktree.list
   - worktree.createWithRecipe
-  - daintree.call
+  - terminal.moveToWorktree
   - terminal.sendCommand
   - terminal.read
 ---
@@ -35,12 +35,11 @@ Procedure:
 
 5. End the turn on those creates and read the real values back. The `worktreeId` and `worktreePath` are minted by this reply, so nothing in the SAME reply can use them (foundation rule 9). Take `worktreePath` from the result verbatim; do not assemble a path by hand from the branch name.
 
-6. File each terminal under its worktree, one call per terminal:
+6. File the terminals under their worktree. `terminal.moveToWorktree` is a TYPED wrapper: call it directly, never through `daintree.call`, which returns `USE_TYPED_WRAPPER` and does nothing.
 
-       daintree.call({ "name": "terminal.moveToWorktree",
-                       "arguments": { "terminalId": "<id>", "worktreeId": "<id>" } })
+       terminal.moveToWorktree({ "terminalIds": ["<id>", "<id>"], "worktreeId": "<worktreePath>" })
 
-   One call per terminal, batched in a single reply since every id is already resolved. If one is refused, report the refusal verbatim and stop that terminal there: do NOT retry it under another name, do NOT reach for raw `git worktree`, and do NOT fall back to closing the agent and respawning it, which throws away the session you were asked to preserve. Step 7 still runs for every terminal either way.
+   Send the whole cohort in ONE call with `terminalIds`; use the single `terminalId` form only when moving one. **`worktreeId` takes the worktree PATH, not the id** — the exact `worktreePath` you read back in step 5. A branch name or a worktree id is never accepted. If the move is refused, report the refusal verbatim and stop there: do NOT retry it under another name, do NOT reach for raw `git worktree`, and do NOT fall back to closing the agent and respawning it, which throws away the session you were asked to preserve. Step 7 still runs for every terminal either way.
 
 7. Tell each agent where it now lives. One `terminal.sendCommand` per terminal, with exactly the sentence Daintree itself uses for this:
 
