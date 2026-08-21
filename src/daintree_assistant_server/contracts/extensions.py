@@ -268,6 +268,28 @@ class Selection(BaseModel):
 
     policy: Literal["new_instruction", "always"] = "new_instruction"
     force: bool = False
+    # Skills the CALLER requires this turn, whatever the classifier thinks.
+    #
+    # `force` means "re-run the selector this round", never "select this skill",
+    # so before this field there was no way to say the latter. The case it exists
+    # for is skill DEVELOPMENT: exercising a runbook you are rewriting against a
+    # real turn, instead of reverse-engineering a prompt that talks the selector
+    # into picking it.
+    #
+    # It rides ALONGSIDE selection rather than replacing it — the realistic test
+    # is the runbook plus whatever else the turn genuinely needs — and it is
+    # admitted FIRST, foundation-paired, against `max_active_skills`. See
+    # `resolve_active_skills`, which owns every one of those rules.
+    #
+    # Ids that are unknown, or not executable under this request's `profile`, are
+    # dropped and REPORTED in `warnings`; they are never a 422. Whether a pin fits
+    # depends on the live catalog, the foundation topology and the configured cap,
+    # none of which a request-shape validator can see.
+    #
+    # Gated by `skills.pinned_skill_ids` in /v1/daintree/capabilities: this model
+    # is extra="forbid", so sending the field to a deployment that predates it
+    # would 422 the whole turn.
+    pinned_skill_ids: list[str] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------

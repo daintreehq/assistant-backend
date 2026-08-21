@@ -221,6 +221,7 @@ def _orchestrator_request(
     profile: str | None,
     text: str = "find the issue about the terrain flicker",
     tools: list | None = None,
+    selection: dict | None = None,
 ):
     body: dict = {
         "protocol_version": 2,
@@ -230,6 +231,8 @@ def _orchestrator_request(
     }
     if tools is not None:
         body["input"]["tools"] = tools
+    if selection is not None:
+        body["selection"] = selection
     if profile is not None:
         body["profile"] = profile
     return RespondRequest.model_validate(body)
@@ -528,3 +531,101 @@ def test_a_cross_profile_token_forces_a_fresh_selection(orchestrator) -> None:
     assert orchestrator._should_run_selector(
         **same, state_profile="assistant", profile="subagent"
     )
+
+
+# ---------------------------------------------------------------------------
+# Caller pins meet the capability boundary (issue #54).
+#
+# `selection.pinned_skill_ids` overrides the CLASSIFIER. It must not override
+# `executable_with`: the two refusals look the same from outside (the skill did
+# not load) but mean opposite things, and only one of them is a bug. A pin is a
+# developer saying "I know better than the router"; a narrowed menu is the server
+# saying "you do not hold the tools these steps call", which no amount of knowing
+# better changes.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_subagent_pin_outside_its_menu_is_refused_and_warned(
+    settings, fake_provider
+) -> None:  # type: ignore[no-untyped-def]
+    """A real, known runbook the sub-agent simply cannot execute. Loading it would
+    spend the worker's context and then steer it into calls that can only fail —
+    worse than loading nothing — so it is refused, and said out loud."""
+    from pydantic import SecretStr
+
+    from daintree_assistant_server.main import build_container
+
+    container = build_container(settings, fake_provider)
+    try:
+        catalog = container.orchestrator.catalog
+        menu = catalog.executable_with([t["function"]["name"] for t in _READ_ONLY_TOOLS])
+        outside = next(
+            (s.id for s in catalog.skills if s.id not in menu),
+            None,
+        )
+        assert outside is not None, "precondition: the menu must exclude something"
+        outcome = await container.orchestrator.complete(
+            _orchestrator_request(
+                "subagent",
+                tools=_READ_ONLY_TOOLS,
+                selection={"pinned_skill_ids": [outside]},
+            ),
+            upstream_model="m",
+            api_key=SecretStr("k"),
+            request_id="req_pin_denied",
+        )
+        assert outcome.body is not None
+        active = [ref["id"] for ref in outcome.body["skills"]["active"]]
+        assert outside not in active, "a pin bypassed the capability boundary"
+        assert "pinned_skill_not_executable" in outcome.body["warnings"], (
+            "a refused pin that returns a normal-looking turn is the silent failure "
+            "this warning exists for"
+        )
+        assert "unknown_skill_id_ignored" not in outcome.body["warnings"], (
+            "a KNOWN skill must not be reported as a typo — the two mistakes need "
+            "different answers"
+        )
+    finally:
+        await container.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_subagent_pin_inside_its_menu_loads(settings, fake_provider) -> None:  # type: ignore[no-untyped-def]
+    """The other half. Narrowing must not make pinning useless for the profile —
+    a skill the worker CAN execute is loaded on demand, under the tighter
+    sub-agent cap of two."""
+    from pydantic import SecretStr
+
+    from daintree_assistant_server.main import build_container
+
+    container = build_container(settings, fake_provider)
+    try:
+        catalog = container.orchestrator.catalog
+        menu = catalog.executable_with([t["function"]["name"] for t in _READ_ONLY_TOOLS])
+        # Explicitly NOT `menu.skills[0]`: catalog order is incidental, and the first
+        # entry can be the selector-hidden docs runbook, which declares no required
+        # tools and so survives every narrowing. Pinning that would exercise the
+        # hidden-skill path rather than the capability boundary this test is about.
+        inside = next(
+            (s.id for s in menu.skills if s.id in menu.selectable_ids and not s.meta.foundation),
+            None,
+        )
+        assert inside is not None, "precondition: the menu must offer a selectable specific"
+        outcome = await container.orchestrator.complete(
+            _orchestrator_request(
+                "subagent",
+                tools=_READ_ONLY_TOOLS,
+                selection={"pinned_skill_ids": [inside]},
+            ),
+            upstream_model="m",
+            api_key=SecretStr("k"),
+            request_id="req_pin_ok",
+        )
+        assert outcome.body is not None
+        active = [ref["id"] for ref in outcome.body["skills"]["active"]]
+        assert inside in active, f"the pinned skill did not load; active={active}"
+        assert len(active) <= 2, "the sub-agent cap still binds a pinned turn"
+        assert "pinned_skill_not_executable" not in outcome.body["warnings"]
+    finally:
+        await container.aclose()

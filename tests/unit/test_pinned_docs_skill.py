@@ -490,3 +490,106 @@ def test_the_fast_path_survives_a_finished_docs_answer() -> None:
     assert can_skip_selection(body, prior_active_ids=[DOCS_SKILL_ID, WORKFLOW]) is False, (
         "a real workflow beside the pin still disqualifies the turn"
     )
+
+
+# ---------------------------------------------------------------------------
+# The two pin tiers together.
+#
+# `selection.pinned_skill_ids` (issue #54) is the caller's own pin, and it is the
+# MIRROR of this one: admitted first and foundation-paired, where the docs pin is
+# admitted last and bare. Both can be live on the same turn, so the tiers need a
+# regression that holds them apart — the risk is not that either rule is wrong but
+# that one quietly starts applying to the other's ids.
+# ---------------------------------------------------------------------------
+
+
+def test_a_caller_pin_outranks_the_docs_pin(catalog: Any) -> None:
+    """A saturated caller pin displaces the docs runbook, not the reverse. Two
+    slots go to the pinned specific and its foundation, the third to the
+    selection, and the docs pin takes the leftover slot there is none of."""
+    result = resolve_active_skills(
+        _authoritative([OPERATIONAL]),
+        [],
+        catalog,
+        3,
+        pinned_id=DOCS_SKILL_ID,
+        client_pinned_ids=[WORKFLOW],
+    )
+    assert result.active == [WORKFLOW, FOUNDATION, OPERATIONAL], (
+        "the exact set matters: asserting only the pin would pass an implementation "
+        f"that dropped the selection entirely; active={result.active}"
+    )
+    assert DOCS_SKILL_ID not in result.active
+    assert DOCS_SKILL_ID in result.dropped_over_cap
+
+
+def test_the_docs_pin_still_takes_the_leftover_slot_beside_a_caller_pin(catalog: Any) -> None:
+    """The other direction: room for both means both. A caller pin must not
+    suppress the docs pin, only outrank it when the budget is contested."""
+    result = resolve_active_skills(
+        _authoritative([]),
+        [],
+        catalog,
+        3,
+        pinned_id=DOCS_SKILL_ID,
+        client_pinned_ids=[WORKFLOW],
+    )
+    assert result.active[:2] == [WORKFLOW, FOUNDATION]
+    assert result.active[2] == DOCS_SKILL_ID, (
+        f"the docs pin lost the slot the caller pin left it; active={result.active}"
+    )
+
+
+def test_caller_pinning_the_docs_skill_admits_it_once(catalog: Any) -> None:
+    """The id both tiers can claim. A developer working ON the docs runbook pins it
+    by name on a turn that also produced a `docs_query`; it must be admitted once.
+    It is PAIRED here — the automatic pin skips pairing because nobody asked for
+    the foundation, which stops being true the moment somebody names the id."""
+    result = resolve_active_skills(
+        _authoritative([]),
+        [],
+        catalog,
+        3,
+        pinned_id=DOCS_SKILL_ID,
+        client_pinned_ids=[DOCS_SKILL_ID],
+    )
+    assert result.active.count(DOCS_SKILL_ID) == 1, f"admitted twice: {result.active}"
+    assert result.active == [DOCS_SKILL_ID, FOUNDATION]
+    assert DOCS_SKILL_ID not in result.dropped_over_cap
+
+
+def test_a_caller_pin_can_load_a_skill_the_selector_cannot_see(catalog: Any) -> None:
+    """The docs runbook is hidden from `selector_metadata` so the classifier cannot
+    also pick it. Pinning is the explicit act that bypasses selection, so hidden
+    must not mean unpinnable — otherwise the one skill a developer most needs a
+    direct handle on is the one they cannot get."""
+    assert DOCS_SKILL_ID not in {m["id"] for m in catalog.selector_metadata()}
+    result = resolve_active_skills(
+        _authoritative([]), [], catalog, 3, client_pinned_ids=[DOCS_SKILL_ID]
+    )
+    assert DOCS_SKILL_ID in result.active
+
+
+def test_a_caller_pin_the_cap_refused_is_not_retried_by_the_server_tier(catalog: Any) -> None:
+    """The overlap the two tiers can both claim, at the moment tier one says no.
+
+    A caller pin is PAIRED, so at a cap of one its unit (runbook + foundation)
+    cannot fit and tier one refuses it. Tier three must then leave it alone — and
+    the slot is free, which is exactly what makes the bug reachable: retrying it
+    there would admit UNPAIRED the very unit tier one had just refused for being
+    unaffordable whole, and would report the same id in `dropped_over_cap` twice.
+    """
+    result = resolve_active_skills(
+        _authoritative([OPERATIONAL]),
+        [],
+        catalog,
+        1,
+        pinned_id=DOCS_SKILL_ID,
+        client_pinned_ids=[DOCS_SKILL_ID],
+    )
+    assert DOCS_SKILL_ID not in result.active, (
+        "tier three re-admitted, bare, the unit tier one refused as unaffordable"
+    )
+    assert result.dropped_over_cap.count(DOCS_SKILL_ID) == 1, (
+        f"the same refusal was reported twice: {result.dropped_over_cap}"
+    )

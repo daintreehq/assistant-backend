@@ -16,12 +16,16 @@ The three rules worth knowing before editing:
   turn late. Front-loading is deterministic here, not left to the classifier.
 * **Reuse never re-pairs.** A prior set already carries its foundation, so a
   continuation round can never surprise the user with a new load.
-* **A PINNED skill takes the LEFTOVER slot, on both paths, unpaired.** It carries a
-  need the server has already established rather than one the classifier inferred —
-  the documentation runbook when the turn produced a ``docs_query``. It is admitted
-  AFTER the selection, into whatever capacity the selection leaves, and a saturated
-  set displaces it; see the long comment at the admission site for why going last
-  beats reserving it a slot.
+* **A SERVER-PINNED skill takes the LEFTOVER slot, on both paths, unpaired.** It
+  carries a need the server has already established rather than one the classifier
+  inferred — the documentation runbook when the turn produced a ``docs_query``. It is
+  admitted AFTER the selection, into whatever capacity the selection leaves, and a
+  saturated set displaces it; see the long comment at the admission site for why
+  going last beats reserving it a slot.
+* **A CALLER-PINNED skill takes the FIRST slots, paired, on both paths.** The caller
+  named it (``selection.pinned_skill_ids``), so unlike the server pin it is not an
+  inference that can be outranked — the selection budgets against what the pins
+  leave. The two pins invert deliberately; ``resolve_active_skills`` says why.
 
 ``merge_active_skills`` stays ADDITIVE and is for the explicit ``/skills/resolve``
 ``load`` path only — never for ordinary selection.
@@ -190,6 +194,8 @@ def resolve_active_skills(
     catalog: Catalog,
     max_active: int,
     pinned_id: str | None = None,
+    *,
+    client_pinned_ids: Sequence[str] = (),
 ) -> ActiveSkillSet:
     """Per-turn active set from a selection decision (section 7.9).
 
@@ -211,6 +217,18 @@ def resolve_active_skills(
     ``pinned_id`` is a skill the SERVER has decided the turn needs, admitted unpaired
     into whatever slot the selection leaves — see the comment below the admission for
     why it goes last rather than first.
+
+    ``client_pinned_ids`` are skills the CALLER requires, and they are the OPPOSITE
+    tier: admitted FIRST, foundation-paired exactly like an authoritative pick, with
+    the selection budgeted against what they leave. The two pins invert for a reason.
+    The server pin is the server's own inference off a `docs_query` — a good guess the
+    turn can survive losing, so it takes the leftover slot. A caller pin is not a
+    guess at all: "always loaded" is the entire feature, and a pin that quietly loses
+    to the classifier is a pin whose only failure mode is looking like it worked.
+
+    The three tiers therefore rank: caller pins, then the selection, then the server
+    pin. Unknown ids are skipped silently HERE — the orchestrator holds the catalog
+    the caller was actually offered, and warns before calling this.
     """
     # Authority, not merely "did a call happen". A successful selector run is
     # authoritative; so is the no-task fast path, which reaches the same answer
@@ -218,15 +236,54 @@ def resolve_active_skills(
     # fast path's empty result into a REUSE of the prior set — the opposite of
     # the clear it advertised.
     authoritative = (decision.ran or decision.authoritative) and not decision.degraded
+    # Caller pins, in request order, first occurrence wins. Deduped HERE rather than
+    # relied on downstream because the strip below is set-based: a duplicate that
+    # survived to `pins` would be admitted once but stripped from the selection
+    # twice, which is harmless, while a duplicate that reached `dropped` would be
+    # reported twice, which is not.
+    #
+    # Set-backed, not `if sid not in pins` over a list: this list is client-supplied
+    # and uncapped, so a linear membership test inside the loop is quadratic work on
+    # an attacker-chosen n, synchronous, on the request path.
+    pins = list(dict.fromkeys(client_pinned_ids))
+    pinned = set(pins)
+    # Strip BOTH pin tiers out of the ordinary candidates before either branch, so a
+    # skill the caller pinned (or the server did) cannot also be admitted at its own,
+    # lower priority. Without this a caller pin the selector ALSO returned would be
+    # admitted twice at the wrong rank, and — worse — a pin the cap refused at tier
+    # one could sneak back in at tier two, which is the exact opposite of a pin.
     candidates = [s for s in (decision.skill_ids if authoritative else prior_active_ids)
-                  if s != pinned_id]
+                  if s not in pinned and s != pinned_id]
 
     if authoritative:
-        # authoritative — replaces the prior set, admitted as foundation-paired units
-        active, dropped = _admit_with_domain_foundations(candidates, catalog, max_active)
+        # One pass, pins first. `_admit_with_domain_foundations` already walks in
+        # order and tracks what it has admitted, so concatenation IS the priority
+        # rule: pins take their foundation-paired units out of the budget, the
+        # selection fills what remains, and a foundation a pin already pulled in
+        # costs a later pick nothing. With no pins this is byte-for-byte the call
+        # that was here before.
+        active, dropped = _admit_with_domain_foundations(
+            pins + candidates, catalog, max_active
+        )
     else:
-        # reuse (no run) / fail-open (degraded) — verbatim, never re-paired
-        active, dropped = filter_dedup_cap(candidates, catalog, max_active)
+        # reuse (no run) / fail-open (degraded) — verbatim, never re-paired.
+        #
+        # The pins still pair, because a caller pin is an explicit act on THIS
+        # round rather than an inheritance from an earlier one. The remainder does
+        # not: running unit admission over a PRIOR set would invert rank retention,
+        # since a prior set carries its foundations as ordinary elements — at a
+        # budget of one, `[a.one, a.base]` would drop the specific and keep the bare
+        # foundation. Verbatim truncation is also this module's third rule, and
+        # truncating a prior set is already live behaviour (a sub-agent round
+        # re-budgets an inherited set against a cap of two).
+        pin_active, dropped = _admit_with_domain_foundations(pins, catalog, max_active)
+        rest, rest_dropped = filter_dedup_cap(
+            [s for s in candidates if s not in pin_active],
+            catalog,
+            max_active - len(pin_active),
+        )
+        active = pin_active + rest
+        dropped = dropped + rest_dropped
 
     # The PIN — a skill whose need the SERVER already knows about, loaded without
     # asking the classifier to notice. Same argument as foundation pairing, one step
@@ -259,7 +316,25 @@ def resolve_active_skills(
     # and cost two slots — and the foundation is live-state judgement a documentation
     # answer does not use. A standalone usage question should load one runbook, not
     # two.
-    if pinned_id is not None and pinned_id in catalog:
+    #
+    # Two guards the caller tier adds here, and they cover different halves of the
+    # same overlap: a caller may pin the very skill the server was about to.
+    #
+    # `pinned_id not in pinned` — tier one ALREADY ruled on this id, and its ruling
+    # stands either way. If it admitted it, re-admitting duplicates it; if it refused
+    # it (the unit did not fit), tier three would either report the same id in
+    # `dropped_over_cap` twice or, with one slot free, re-admit UNPAIRED the very
+    # unit tier one refused for being unaffordable whole. Both contradict rules
+    # stated above this function.
+    #
+    # `pinned_id not in active` — the id can also arrive as somebody else's domain
+    # foundation, pulled in by unit admission rather than named by anyone.
+    if (
+        pinned_id is not None
+        and pinned_id in catalog
+        and pinned_id not in pinned
+        and pinned_id not in active
+    ):
         if len(active) < max_active:
             active = active + [pinned_id]
         else:

@@ -999,6 +999,30 @@ class ChatOrchestrator:
             # Daintree's own usage documentation.
             docs_query = None
 
+        # Caller pins (section 7.9). Partitioned against TWO catalogs, because
+        # "unknown" and "not yours" are different mistakes and a developer chasing a
+        # pin that did not load needs to know which one they made: `resolved_catalog`
+        # is every skill that exists, `skills_catalog` is the menu this profile may
+        # execute. A sub-agent pinning a real orchestration runbook it holds no tools
+        # for is the second case, and it is refused rather than admitted — a pin
+        # overrides the CLASSIFIER's judgement, not the capability boundary, and a
+        # procedure whose every step calls a tool the caller lacks is worse than no
+        # procedure. Requesting the same id twice is not an error; first mention wins.
+        # `dict.fromkeys`, not `if sid not in requested_pins`: the list is
+        # client-supplied and uncapped, so a linear membership test inside the loop
+        # is quadratic work on an n the caller chooses — synchronous, on the request
+        # path, where no timeout can interrupt it. Linear here means the request
+        # body's own byte ceiling is the only bound the field needs.
+        requested_pins = list(dict.fromkeys(request.selection.pinned_skill_ids))
+        eligible_pins = [sid for sid in requested_pins if sid in skills_catalog]
+        if any(sid not in resolved_catalog for sid in requested_pins):
+            # Same code the explicit `/skills/resolve` load path emits — one typo'd
+            # id, one meaning. Ids are deliberately NOT interpolated into the string:
+            # every warning in this protocol is a stable code the CLI matches on.
+            warnings.append("unknown_skill_id_ignored")
+        if any(sid in resolved_catalog and sid not in skills_catalog for sid in requested_pins):
+            warnings.append("pinned_skill_not_executable")
+
         resolution = resolve_active_skills(
             decision,
             prior_active_ids,
@@ -1021,9 +1045,18 @@ class ChatOrchestrator:
             # and answer unverified rather than fabricate — and that is exactly
             # the turn where a fabricated menu path is most likely.
             pinned_id=DOCS_SKILL_ID if docs_query else None,
+            client_pinned_ids=eligible_pins,
         )
         active_ids = resolution.active
         newly_loaded_ids = resolution.newly_loaded
+        # `dropped_over_cap` is log-only for everything else, deliberately: nobody
+        # ASKED for the skills the cap refused, so there is nothing to answer for.
+        # A caller pin is the exception — it is a request, and a refused request
+        # that returns a normal-looking turn is precisely the silent failure this
+        # feature would otherwise be debugged into. Pins are admitted first, so
+        # reaching here at all means the pins alone did not fit the cap.
+        if any(sid in eligible_pins for sid in resolution.dropped_over_cap):
+            warnings.append("pinned_skill_over_cap")
 
         skills = skills_catalog.get_many(active_ids)
         executions: list[SkillLoadExecution | DocsSearchExecution] = [
@@ -1134,6 +1167,11 @@ class ChatOrchestrator:
             # is the measurement we need (is the cap costing us skills, and which?)
             # at zero wire cost, without teaching the CLI a new warning code.
             dropped_over_cap=resolution.dropped_over_cap,
+            # Which skills the CALLER demanded, after the unknown/not-executable
+            # partition. Logged separately from `active_skills` because it is the
+            # only way to tell a turn the classifier routed from one a developer
+            # steered by hand — and routing metrics should not count the latter.
+            client_pinned=eligible_pins,
             warnings=warnings,
             selector_ms=selector_ms,
             # Which upstream endpoint served the classification, and whether the

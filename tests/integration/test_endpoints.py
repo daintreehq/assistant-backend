@@ -101,6 +101,11 @@ def test_capabilities(client, auth, app) -> None:
     # tests/unit/test_task_runner.py.
     assert set(body["tasks"]) == EXPECTED_TASK_IDS
     assert body["skills"]["manual_resolve"] is True
+    # Same gate as `display_context` above, for `selection.pinned_skill_ids`.
+    # `Selection` is extra="forbid", so a CLI that sends pins to a backend
+    # advertising false here 422s the whole turn before the model runs — which is
+    # why this is a literal the CLI can branch on rather than something inferred.
+    assert body["skills"]["pinned_skill_ids"] is True
     # The id/title listing a client validates a skill name against before spending a
     # turn on it. Asserted as one exact equality rather than a count: that pins
     # cardinality, the full-catalog scope (pinned skills included), the exact key set
