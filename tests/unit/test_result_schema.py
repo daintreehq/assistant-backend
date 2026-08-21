@@ -11,7 +11,7 @@ from daintree_assistant_server.services.result_schema import conforms, validate_
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+    return Settings(CEREBRAS_API_KEY="csk", STATE_SIGNING_KEY_CURRENT="s")
 
 
 def test_validate_accepts_safe_subset(settings: Settings) -> None:
@@ -135,7 +135,7 @@ def test_conforms_enforces_array_bounds_and_unique() -> None:
 
 
 def test_validate_depth_bound() -> None:
-    s = Settings(OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s", MAX_RESULT_SCHEMA_DEPTH=2)
+    s = Settings(CEREBRAS_API_KEY="csk", STATE_SIGNING_KEY_CURRENT="s", MAX_RESULT_SCHEMA_DEPTH=2)
     node: dict = {"type": "object"}
     cur = node
     for _ in range(5):

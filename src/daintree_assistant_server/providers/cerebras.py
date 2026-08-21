@@ -1,36 +1,52 @@
-"""The OpenRouter provider adapter (OpenAI-compatible wire format).
+"""The Cerebras provider adapter (OpenAI-compatible wire format).
 
-Translates the normalized :class:`ProviderChatRequest` to OpenRouter's
+Translates the normalized :class:`ProviderChatRequest` to Cerebras Inference's
 ``/chat/completions`` API and maps upstream failures to Daintree errors. A
 single process-wide ``httpx.AsyncClient`` is injected; a client is never built
 per request.
 
-OpenRouter is a router, not a model host: it fronts ~24 independent endpoints
-serving the same DeepSeek V4 Flash weights, and the ``provider`` block on every
-request is what decides which one answers (see ``_PROVIDER_ROUTING``). Three
-OpenRouter-specific details separate this from a direct-to-DeepSeek adapter:
+**Cerebras is a model HOST, not a router**, and that single fact is what
+separates this adapter from the OpenRouter one it replaced (git history has it).
+There is exactly one endpoint serving each model, so there is no endpoint to
+select, no privacy filter to apply, no fallback pool, and no sticky-affinity
+record to steer — prefix caching is automatic, org-scoped, and matched on the
+literal prompt prefix in 128-token blocks. Every mechanism the old adapter grew
+to steer a pool of ~24 interchangeable endpoints is therefore *gone* rather than
+neutered: the ``provider`` routing block, the caller-facing routing preference,
+the cohort-scoped affinity key, and the ``upstream_no_compliant_provider``
+taxonomy branch. What survives is the part that was never about routing — the
+credential redaction, the SSE framing, and the error taxonomy.
 
-* **Reasoning control** is OpenRouter's unified ``reasoning`` object
-  (``{"enabled": false}`` / ``{"effort": "high"}``), NOT DeepSeek's native
-  ``thinking`` object — OpenRouter translates it to whatever the winning endpoint
-  speaks. It is sent explicitly on every call because a reasoning model's default
-  is ON, and the explicit disable is what keeps the non-thinking selector
-  non-thinking. ``send_reasoning=False`` drops it for a model that has no
-  reasoning mode at all.
-* **Chain-of-thought is called ``reasoning``** on the OpenRouter wire, while the
-  Daintree contract (and the CLI) speak ``reasoning_content``. The rename is
-  confined to this adapter — outbound in ``_rewrite_messages``, inbound in
+Four wire details are Cerebras-specific and each one is load-bearing:
+
+* **``max_completion_tokens``, never ``max_tokens``.** Both are accepted alone,
+  but sending BOTH is a 400. One spelling, chosen here, so the two can never
+  meet.
+* **No ``reasoning`` object.** OpenRouter's unified ``{"enabled": false}`` /
+  ``{"effort": ...}`` block is rejected outright (``400 wrong_api_format``).
+  Cerebras takes a bare ``reasoning_effort`` string instead, and it has no "off"
+  value — a model that reasons cannot be told not to. The serving model
+  (``gemma-4-31b``) is not a reasoning model at all, so non-thinking is its
+  natural state and the field is simply omitted; only the skill-learning calls on
+  ``gpt-oss-120b`` ever set it. See ``_build_body``.
+* **Chain-of-thought is called ``reasoning``** on the wire, while the Daintree
+  contract (and the CLI) speak ``reasoning_content``. The rename is confined to
+  this adapter — outbound in ``_rewrite_messages``, inbound in
   ``_normalize_choices`` — so nothing above the provider boundary knows.
-* **No ``prompt_cache_key``**: no endpoint for this model advertises it, and with
-  ``require_parameters`` on, sending an unadvertised parameter can empty the
-  eligible-endpoint pool. Prefix caching is implicit at whichever endpoint serves
-  the request.
+* **Error bodies are FLAT.** Cerebras returns ``{"message", "type", "param",
+  "code"}`` at the top level, not OpenAI's ``{"error": {...}}`` envelope.
+  ``_upstream_error_detail`` reads both shapes; reading only the nested one
+  would silently discard every diagnostic this provider produces.
+
+And one thing it does NOT report: **cost**. Cerebras returns token counts but no
+billed amount, so ``ProviderUsage.cost`` is ``None`` on every call from here.
+That is the honest value — "not reported" — and the turn accounting already
+treats it as such rather than as zero.
 """
 
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import itertools
 import json
 import os
@@ -47,7 +63,6 @@ from ..errors import (
     provider_invalid_api_key,
     provider_key_forbidden,
     upstream_error,
-    upstream_no_compliant_provider,
     upstream_protocol_error,
     upstream_rate_limited,
     upstream_request_rejected,
@@ -62,7 +77,6 @@ from .base import (
     ProviderToolCallResult,
     ProviderUsage,
 )
-from .policy import DEFAULT_POLICY, RoutingPreference
 from .sse import (
     ChunkShapeError,
     SseProtocolError,
@@ -72,9 +86,12 @@ from .sse import (
     validate_message_shape,
 )
 
-logger = get_logger("daintree.openrouter")
+logger = get_logger("daintree.cerebras")
+
+DEFAULT_BASE_URL = "https://api.cerebras.ai/v1"
 
 _CHAT_PATH = "/chat/completions"
+_MODELS_PATH = "/models"
 
 # Cap on how much of an upstream error body we log / surface — enough to carry the
 # provider's reason ("temperature must be between 0.0 and 2.0", a schema complaint)
@@ -99,144 +116,16 @@ _ESCAPE_DECODE_PASSES = 3
 # An allowlist rather than a blocklist of the bad characters: blocklisting misses
 # DEL (0x7f, which h11 happily accepts) and everything above 0x7f, which instead
 # explodes inside httpx's header encoder (it encodes str values as ASCII). Real
-# OpenRouter keys are `sk-or-v1-` plus hex, so nothing legitimate is near this
+# Cerebras keys are `csk-` plus alphanumerics, so nothing legitimate is near this
 # boundary. Keeping the credential ASCII is also what makes the escape-decoding
 # leak check in `_still_reveals` sound.
 _HEADER_SAFE_MIN = 0x21
 _HEADER_SAFE_MAX = 0x7E
 
-# Cap on the logged serving-endpoint name ("CoreWeave", "Baidu", …).
-_ENDPOINT_NAME_CAP = 64
-
-# Length of the routing-cohort suffix on an affinity key (see `_cohort_scoped`).
-# It separates cohorts, it does not authenticate one: a collision costs two
-# cohorts a shared sticky record, which is the pre-existing behaviour, not a
-# correctness failure. Short enough to keep the key legible upstream.
-_COHORT_DIGEST_CHARS = 8
-
-# Attribution headers. OpenRouter uses them for its public model/app rankings;
-# they carry no auth weight and are safe to send on every call.
-_REFERER = "https://daintree.dev"
-_APP_TITLE = "Daintree Assistant"
-
 # Read budget for the key-verification probe. Hardcoded, not a setting: it is a
 # single tokenless introspection GET behind a sign-in spinner, so it has nothing in
 # common with the main model's budget and there is no deployment that wants it long.
 _VERIFY_TIMEOUT_SECONDS = 10.0
-
-# THE endpoint-selection policy, sent on EVERY request. One policy, deliberately:
-# the adapter does not inspect a request to decide how to route it. The policy
-# OBJECT lives in providers/policy.py (RoutingPolicy / PrivacyMode); this
-# module-level dict is its rendered wire form, kept here because the surrounding
-# adapter and its tests read it directly.
-#
-# The shipped defaults are hardcoded like the model ids and the thinking posture
-# (config.py): there is one optimum and the server ships it. A caller may narrow
-# or re-rank it through a validated RoutingPreference, but can never disable the
-# no-training floor. Three product decisions are encoded:
-#
-# FASTEST, ON BOTH AXES. A request's wall-clock is time-to-first-token plus
-# tokens/throughput, and OpenRouter ranks on either but not on the sum. So rank on
-# one and put a floor under the other: ``sort: "throughput"`` takes the fastest
-# generator (explicitly at the cost of price, and it disables OpenRouter's default
-# price-weighted load balancing), while ``preferred_max_latency`` stops that being
-# an endpoint which streams fast and takes seconds to say the first word. Ranking
-# on throughput ALONE is what elected the measured p99 12.6s and 13.9s endpoints.
-#
-# This pair replaced a set of per-call-shape policies, and the generality is the
-# point: a rule that needs to know whether a request is a classifier, a chat turn
-# or a greeting is a rule that will misjudge the next call shape someone adds.
-# Bounding the axis you did not sort on needs no such knowledge and is safe
-# everywhere, because the bound deprioritises rather than filters (see
-# LATENCY_BOUND) and therefore can never empty the pool. Selection stays automatic
-# and per-request, so a newly-faster endpoint is picked up with no code change.
-#
-# PRIVACY FLOOR. ``data_collection: "deny"`` restricts routing to endpoints that
-# do not COLLECT prompt data or train on it — the pool is filtered FIRST, then
-# sorted, so throughput never buys its speed with user prompts.
-#
-# BE PRECISE ABOUT WHAT THIS PROMISES, because it is a user trust decision and
-# Daintree carries source code, terminal output and project instructions.
-# ``data_collection: "deny"`` is a NO-TRAINING / no-collection guarantee. It is
-# NOT a no-retention one: an endpoint may still hold a request transiently for
-# abuse monitoring. Zero data retention is OpenRouter's SEPARATE ``"zdr": True``
-# flag (PrivacyMode.ZDR), which narrows the pool much further and is not sent by
-# default. Every user-facing statement must say "does not collect or train on",
-# never "does not store" (docs/PROVIDER_POLICY.md is the authority, and
-# tests/unit/test_docs_drift.py fails CI if the copy and this policy disagree).
-#
-# ``require_parameters`` drops endpoints that would silently ignore something we
-# sent. It matters most for the json_object calls (selector, utility tasks):
-# several otherwise-fast endpoints for this model do not implement
-# ``response_format``, and without this they would answer with unconstrained prose
-# that fails our parse. Per-request, so a plain chat turn still reaches them.
-#
-# AND IT IS THE LARGEST REMAINING SPEED COST, which is worth writing down where
-# the flag lives rather than in a document nobody opens. For this model the
-# endpoints it drops from a json_object call include the FASTEST one — CoreWeave,
-# measured p50 361ms TTFT at 101 tok/s, and the endpoint a plain chat turn
-# actually lands on. Pinning it for those calls is not available either:
-# CoreWeave plus ``response_format`` is a hard ``404 No endpoints found``. So every
-# JSON call in this system is routed within a smaller, slower pool, and no amount
-# of sorting or bounding inside that pool recovers what was removed before the
-# sort ran. Getting it back means not sending ``response_format`` at all and
-# parsing tolerantly instead — a real change with a real risk, not a tuning knob.
-# (Measured 2026-07; see docs/PROVIDER_POLICY.md section 8 on dated observations.)
-#
-# ``allow_fallbacks`` keeps the next-fastest compliant endpoint available when the
-# winner is down. With filters this strict, turning it off would make any single
-# outage a hard 404/503 ("No allowed providers are available").
-_PROVIDER_ROUTING: dict[str, Any] = DEFAULT_POLICY.to_wire()
-
-# The same policy with its ranking axis flipped, for a call that declares
-# ``latency_critical``. Everything else — pool, filters, privacy floor, bound — is
-# identical; only ``sort`` differs, and only because this call's shape is known at
-# the call site rather than guessed from a request.
-#
-# Today that is the skill selector and nothing else: ~10.3k prompt tokens for ~90
-# of answer (438 trials, `benchmarks/skill_selection`), sitting on the turn's
-# first-byte path, and the turn's whole
-# time-to-first-token IS this call's latency.
-#
-# Generation is not negligible even here — ~90 tokens at ~100 tok/s is ~0.9s of a
-# 2.044s p50, call it 45% — so this is a lean, not a landslide. What tips it is
-# that the other ~55% is the half that MOVES: prefill over 10.3k tokens plus
-# queueing, which scales with the catalog and which an affinity key can drive
-# toward zero. The same run measured p99 9.878s against that p50, and a spread
-# like that is a slow first byte, not a slow generator.
-_PROVIDER_ROUTING_FIRST_BYTE: dict[str, Any] = DEFAULT_POLICY.ranked_on_first_byte().to_wire()
-
-
-def _cohort_scoped(
-    cache_session_id: str, provider_block: dict[str, Any], routing: RoutingPreference | None
-) -> str:
-    """Scope an affinity key to the pool of endpoints the call can actually reach.
-
-    A sticky key names an endpoint, but only endpoints that pass this request's
-    FILTERS are reachable. Two calls that share a key while routing under
-    different filters therefore fight over one record: the stricter call cannot
-    use the endpoint the looser one pinned, so it re-elects, and the looser call
-    then inherits a pin it never asked for. Under a **shared server credential**
-    that is no longer one caller's problem — sticky records are scoped to the API
-    key, so one caller's ``zdr`` or ``only`` would be re-pointing every other
-    caller's selector traffic. Folding the emitted pool into the key gives each
-    routing cohort its own record instead.
-
-    The suffix is derived from the ``provider`` block THIS request sends, not from
-    a re-derivation of the policy, so it cannot drift from what was actually
-    routed. Sorted keys: the block's key ORDER is deliberately fixed for prompt-
-    cache reasons, but two blocks with the same constraints in any order are the
-    same cohort, and the digest should say so.
-
-    The default policy — overwhelmingly the common path — gets **no suffix at
-    all**, so the shared selector and task keys stay short, readable in an upstream
-    dashboard, and stable across a deploy that never touches routing.
-    """
-    if routing is None:
-        return cache_session_id
-    canonical = json.dumps(provider_block, sort_keys=True, separators=(",", ":"))
-    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:_COHORT_DIGEST_CHARS]
-    return f"{cache_session_id}-{digest}"
 
 
 def _extract_upstream_error(
@@ -244,25 +133,25 @@ def _extract_upstream_error(
 ) -> str | None:
     """Pull a short human-readable reason out of an upstream error body.
 
-    OpenRouter returns ``{"error": {"message": "...", ...}}`` on a 4xx/5xx. That
-    message is the single most useful diagnostic for a malformed request, so we
-    surface it rather than discard it. Best-effort: any parse failure falls back to
-    the raw (capped) text, and an empty body yields ``None``.
+    Cerebras returns ``{"message": "...", "type": ..., "param": ..., "code": ...}``
+    on a 4xx/5xx. That message is the single most useful diagnostic for a malformed
+    request, so we surface it rather than discard it. Best-effort: any parse failure
+    falls back to the raw (capped) text, and an empty body yields ``None``.
 
     ``secret`` is the credential this call used, scrubbed from the text if the
-    upstream echoed it back. That reflection is the one way a caller's key could
+    upstream echoed it back. That reflection is the one way the server's key could
     escape: this return value goes BOTH to the structured log and — for a non-auth
     4xx — into the client-facing error envelope via :meth:`_map_http_error`.
 
     Order matters twice, and both orderings are deliberate:
 
     * Scrub AFTER extraction, not on the raw body. JSON can encode an ordinary
-      key as ``\\u0073\\u006b…``, which no literal match on the undecoded bytes
-      would find but ``json.loads`` faithfully turns back into the plaintext.
-      ``_upstream_error_detail`` therefore hands back decoded text on every
-      branch. (It also keeps the parse honest: replacing inside the raw document
-      could make it invalid JSON and silently demote a structured error to raw
-      text.)
+      key as ``\\u0063\\u0073\\u006b…``, which no literal match on the undecoded
+      bytes would find but ``json.loads`` faithfully turns back into the
+      plaintext. ``_upstream_error_detail`` therefore hands back decoded text on
+      every branch. (It also keeps the parse honest: replacing inside the raw
+      document could make it invalid JSON and silently demote a structured error
+      to raw text.)
     * Scrub BEFORE capping. Capping first can slice a key in half and leave a
       usable prefix behind.
 
@@ -299,20 +188,39 @@ def _upstream_error_detail(raw: str) -> str:
     literal characters an exact match can find. Only a body that is not JSON at
     all is returned verbatim — there, escapes denote nothing and nothing decodes
     them.
+
+    BOTH error shapes are read, flat first. Cerebras puts the reason at the top
+    level; an intermediary (a proxy, a mock, a future gateway) may still wrap it
+    in OpenAI's ``{"error": {...}}`` envelope. Checking only one shape would
+    throw away the entire diagnostic from the other, which is precisely the
+    failure this function exists to prevent.
     """
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
         return raw
-    err = data.get("error") if isinstance(data, dict) else None
-    if isinstance(err, dict):
-        msg = err.get("message") or err.get("code") or err.get("type")
-        if msg:
-            return str(msg)
-    elif isinstance(err, str) and err:
-        return err
+    if isinstance(data, dict):
+        flat = _reason_from(data)
+        if flat:
+            return flat
+        err = data.get("error")
+        if isinstance(err, dict):
+            nested = _reason_from(err)
+            if nested:
+                return nested
+        elif isinstance(err, str) and err:
+            return err
     # No single reason to quote: hand back the whole document, decoded.
     return json.dumps(data, ensure_ascii=False)
+
+
+def _reason_from(payload: dict[str, Any]) -> str | None:
+    """The most specific human-readable reason in an error object, if any."""
+    for key in ("message", "code", "type"):
+        value = payload.get(key)
+        if value:
+            return str(value)
+    return None
 
 
 def _still_reveals(text: str, plain: str) -> bool:
@@ -320,7 +228,7 @@ def _still_reveals(text: str, plain: str) -> bool:
 
     The backstop for a doubly encoded echo, where one decode pass leaves the key
     hidden from an exact match but a second restores it. Bounded passes, and the
-    credential is guaranteed ASCII by :meth:`OpenRouterProvider._resolve_key`, so
+    credential is guaranteed ASCII by :meth:`CerebrasProvider._resolve_key`, so
     the latin-1-based ``unicode_escape`` view is sound for this comparison.
     """
     if plain in text:
@@ -339,24 +247,12 @@ def _still_reveals(text: str, plain: str) -> bool:
     return False
 
 
-def _endpoint_name(payload: dict[str, Any]) -> str | None:
-    """The serving endpoint OpenRouter names on a response/chunk (``provider``).
-
-    Best-effort and metadata-only: a non-string value is discarded rather than
-    coerced, since this is only ever logged. Capped because it is upstream-supplied
-    text landing in our logs.
-    """
-    name = payload.get("provider")
-    return name[:_ENDPOINT_NAME_CAP] if isinstance(name, str) and name else None
-
-
 def _rewrite_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Rename outbound ``reasoning_content`` to OpenRouter's ``reasoning``.
+    """Rename outbound ``reasoning_content`` to the wire's ``reasoning``.
 
     The assembler replays an assistant tool-call turn's chain-of-thought so the
-    model can continue the reasoning that produced those calls. OpenRouter's
-    normalized name for it is ``reasoning`` (it re-encodes it into whatever the
-    winning endpoint speaks); an unrecognized ``reasoning_content`` would simply be
+    model can continue the reasoning that produced those calls. The wire name for
+    it is ``reasoning``; an unrecognized ``reasoning_content`` would simply be
     dropped, silently losing the context rather than erroring. Copy-on-write: only
     the messages that actually carry the field are rebuilt, so the byte-stable
     prefix the prompt cache depends on is untouched everywhere else.
@@ -378,7 +274,7 @@ def _normalize_choices(choices: Any, key: str) -> None:
 
     ``key`` is ``"message"`` (non-streaming) or ``"delta"`` (streaming). Everything
     above the provider boundary — the orchestrator, the SSE contract, the CLI —
-    speaks ``reasoning_content``, so the OpenRouter spelling stops here. A
+    speaks ``reasoning_content``, so the upstream spelling stops here. A
     non-string value is dropped rather than renamed: the shape validators
     guarantee ``reasoning_content`` is a string when present, and this runs
     outside their reach.
@@ -392,63 +288,18 @@ def _normalize_choices(choices: Any, key: str) -> None:
         if not isinstance(part, dict) or "reasoning" not in part:
             continue
         value = part.pop("reasoning")
-        # reasoning_details (the structured/encrypted variant) is deliberately not
-        # consumed: the plaintext field is the documented equivalent for replay,
-        # and it is the one the Daintree contract already carries.
         if isinstance(value, str) and part.get("reasoning_content") is None:
             part["reasoning_content"] = value
-
-
-# Markers OpenRouter uses when routing preferences matched no endpoint. It
-# answers this with a 404 *or* a 503 depending on which filter emptied the pool
-# ("No endpoints found matching your data policy", "No allowed providers are
-# available for the selected model", "There is no available model provider that
-# meets your routing requirements"), so on the 503 branch the message is the only
-# thing separating a policy dead-end from a real outage.
-#
-# Matched conservatively and biased toward the outage reading: mistaking an
-# outage for a policy problem sends the operator to inspect a routing policy that
-# is fine, and — worse — marks a transient failure permanent, killing a retry
-# that would have succeeded.
-# Each entry is a set of fragments that must ALL appear. Requiring a combination
-# rather than any single phrase is deliberate: "no endpoints found" on its own
-# also occurs in messages like "No endpoints found because the service is
-# temporarily unavailable", and classifying that as a policy dead-end would mark
-# a transient failure permanent and kill a retry that would have succeeded.
-_UNROUTABLE_MARKER_SETS = (
-    ("no endpoints found", "data policy"),
-    ("no endpoints found", "routing"),
-    ("no allowed providers",),
-    ("no available model provider",),
-    ("meets your routing requirements",),
-)
-
-
-def _looks_unroutable(detail: str | None) -> bool:
-    """Whether an upstream message says the routing policy matched no endpoint.
-
-    Biased toward reading an ambiguous message as an OUTAGE, not a policy
-    dead-end. Getting it wrong in that direction costs one wasted retry; getting
-    it wrong the other way marks a transient failure permanent and sends an
-    operator to inspect a routing policy that is fine.
-    """
-    if not detail:
-        return False
-    blob = detail.lower()
-    return any(
-        all(fragment in blob for fragment in fragments)
-        for fragments in _UNROUTABLE_MARKER_SETS
-    )
 
 
 def _looks_rate_limited(err: dict[str, Any]) -> bool:
     """Whether an in-band stream error is a rate limit.
 
     Deliberately does NOT match "quota". A quota message is far more often an
-    exhausted *balance* — a permanent, caller-fixable condition — than a rate
+    exhausted *balance* — a permanent, operator-fixable condition — than a rate
     limit, and calling it a rate limit makes it retryable, so the turn replays a
     doomed request and reports the wrong fix. Insufficient credit is matched
-    explicitly in ``_stream_error_status`` instead.
+    explicitly in ``map_stream_error`` instead.
     """
     blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
     return any(
@@ -460,10 +311,10 @@ def _looks_rate_limited(err: dict[str, Any]) -> bool:
 def _stream_error_status(err: dict[str, Any]) -> int | None:
     """The HTTP-ish status an in-band stream error is reporting, if it says.
 
-    OpenRouter puts a numeric ``code`` on most in-band errors. When it is there,
-    it is a far better signal than prose — so the streaming path can reuse the
-    exact same taxonomy as the HTTP path rather than inventing a second, weaker
-    one.
+    When a numeric ``code`` is there it is a far better signal than prose — so the
+    streaming path can reuse the exact same taxonomy as the HTTP path rather than
+    inventing a second, weaker one. Cerebras usually sends a symbolic code
+    (``"wrong_api_key"``), which simply falls through to the prose branch.
     """
     code = err.get("code")
     if isinstance(code, bool):
@@ -489,14 +340,25 @@ _INSUFFICIENT_CREDIT_MARKERS = (
     "add more credits",
 )
 
+# Symbolic codes/phrases Cerebras uses for a rejected credential, where no numeric
+# status rides the in-band error. Narrow on purpose: mistaking anything else for
+# an auth failure marks a transient condition permanent and kills a retry that
+# would have succeeded.
+_INVALID_KEY_MARKERS = (
+    "wrong_api_key",
+    "wrong api key",
+    "invalid_api_key",
+    "invalid api key",
+)
+
 
 def map_stream_error(err: dict[str, Any]) -> DaintreeError:
     """Map an in-band SSE error onto the SAME taxonomy as an HTTP failure.
 
     Without this, the streaming path had its own two-outcome world — rate limited
     or generic ``upstream_error`` — which recreated the exact bug the taxonomy
-    exists to fix: an invalid key, a spent balance and a routing dead-end all
-    arrived as one retryable-looking code, and the CLI replayed each of them.
+    exists to fix: an invalid key and a spent balance both arrived as one
+    retryable-looking code, and the CLI replayed each of them.
 
     Most turns are streamed, so this is the path that matters most.
     """
@@ -511,37 +373,41 @@ def map_stream_error(err: dict[str, Any]) -> DaintreeError:
     blob = " ".join(str(err.get(k, "")) for k in ("code", "type", "message")).lower()
     if any(marker in blob for marker in _INSUFFICIENT_CREDIT_MARKERS):
         return provider_insufficient_credits()
+    if any(marker in blob for marker in _INVALID_KEY_MARKERS):
+        return provider_invalid_api_key()
     if _looks_rate_limited(err):
         return upstream_rate_limited()
-    if _looks_unroutable(blob):
-        return upstream_no_compliant_provider()
     return upstream_error("The upstream model stream reported an error.")
 
 
-def _map_status(
-    status: int, *, retry_after: str | None, detail: str | None
-) -> DaintreeError:
+def _map_status(status: int, *, retry_after: str | None, detail: str | None) -> DaintreeError:
     """Status -> Daintree error. Shared by the HTTP and in-band stream paths.
 
     The organizing question is **whose problem is this, and what do they do about
     it?** These outcomes used to collapse into one 502 ``upstream_error``, which
-    told a tester with an exhausted balance that their credentials were rejected
-    — so they replaced a perfectly good key. The CLI branches on ``error.code``,
-    so only distinct codes can produce distinct advice.
+    told an operator with an exhausted balance that their credentials were
+    rejected. The CLI branches on ``error.code``, so only distinct codes can
+    produce distinct advice.
 
-    Retryability is set per branch and is load-bearing: an account failure or an
-    empty routing pool is deterministic, and replaying it burns the CLI's retry
-    budget to arrive at the same answer more slowly.
+    Retryability is set per branch and is load-bearing: an account failure is
+    deterministic, and replaying it burns the CLI's retry budget to arrive at the
+    same answer more slowly.
+
+    Note what is NOT here any more: the 404-means-routing-dead-end branch. Against
+    a single-host provider a 404 on a fixed, correct chat-completion path can only
+    mean the MODEL id is wrong — a server-side bug in what we sent, not a pool the
+    filters emptied — so it falls through to ``upstream_request_rejected`` with the
+    upstream's own "Model does not exist" attached.
     """
     if status == 429:
         return upstream_rate_limited(retry_after=retry_after)
     if status in (408, 504):
         return upstream_timeout()
 
-    # ---- The caller's provider account -------------------------------
-    # Their own key rode this request, so these are their settings to fix, and
-    # each fix is different. Upstream prose is deliberately NOT echoed: the log
-    # already carries it, and account/quota detail is not ours to relay.
+    # ---- The provider account ----------------------------------------
+    # Each of these is a different fix, and upstream prose is deliberately NOT
+    # echoed: the log already carries it, and account/quota detail is not ours to
+    # relay.
     if status == 401:
         return provider_invalid_api_key()
     if status == 402:
@@ -549,34 +415,24 @@ def _map_status(
     if status == 403:
         return provider_key_forbidden()
 
-    # ---- Routing ------------------------------------------------------
-    # OpenRouter answers "no endpoint matched your preferences" with EITHER a 404
-    # or a 503 depending on which filter emptied the pool, so status alone cannot
-    # separate routing from a real outage. A 404 on a chat completion is
-    # unambiguous (the path is fixed and correct, so it is never a bad URL); a
-    # 503 has to be disambiguated by its message.
-    if status == 404:
-        return upstream_no_compliant_provider()
-    if status == 503 and _looks_unroutable(detail):
-        return upstream_no_compliant_provider()
-
     if status >= 500:
         # Genuine upstream fault or capacity shortfall. Transient, so retry while
         # no model output is exposed.
         return upstream_unavailable()
 
-    # Any other 4xx means the upstream rejected OUR request as malformed:
-    # permanent, and almost always a server-side bug in what we sent. Carry the
-    # upstream's own reason through so the failure is diagnosable instead of an
-    # opaque "status 400" — the CLI and logs then name the offending field.
+    # Any other 4xx (400, 404, 422, …) means the upstream rejected OUR request as
+    # malformed: permanent, and almost always a server-side bug in what we sent.
+    # Carry the upstream's own reason through so the failure is diagnosable
+    # instead of an opaque "status 400" — the CLI and logs then name the
+    # offending field.
     suffix = f" {detail}" if detail else ""
     return upstream_request_rejected(
         f"The upstream provider rejected this server's request (HTTP {status}).{suffix}"
     )
 
 
-class OpenRouterStream(ProviderStream):
-    """An open OpenRouter SSE stream yielding OpenAI-shaped chunk dicts."""
+class CerebrasStream(ProviderStream):
+    """An open Cerebras SSE stream yielding OpenAI-shaped chunk dicts."""
 
     def __init__(self, stream_ctx: Any, response: httpx.Response, model: str) -> None:
         self._ctx = stream_ctx
@@ -589,6 +445,9 @@ class OpenRouterStream(ProviderStream):
         self._done = False
         self._saw_done = False
         self.usage: ProviderUsage | None = None
+        # Never set: Cerebras hosts one endpoint per model, so there is no serving
+        # endpoint to name. The field stays on the base class for the protocol's
+        # sake and simply reads "not reported" here.
         self.endpoint: str | None = None
 
     async def _read_one(self) -> dict[str, Any] | None:
@@ -642,17 +501,13 @@ class OpenRouterStream(ProviderStream):
             raise map_stream_error(chunk["error"])
         if chunk.get("usage"):
             self.usage = ProviderUsage.from_wire(chunk["usage"])
-        # Every chunk repeats it; keep the first non-empty one so the value is
-        # already available when the caller logs the stream-open timing.
-        if self.endpoint is None:
-            self.endpoint = _endpoint_name(chunk)
         _normalize_choices(chunk.get("choices"), "delta")
         return chunk
 
     async def prefetch_first_event(self) -> dict[str, Any] | None:
         return await self._read_one()
 
-    def __aiter__(self) -> OpenRouterStream:
+    def __aiter__(self) -> CerebrasStream:
         return self
 
     async def __anext__(self) -> dict[str, Any]:
@@ -669,30 +524,28 @@ class OpenRouterStream(ProviderStream):
             await self._ctx.__aexit__(None, None, None)
 
 
-class OpenRouterProvider:
-    """A :class:`ChatProvider` backed by the OpenRouter hosted API."""
+class CerebrasProvider:
+    """A :class:`ChatProvider` backed by the Cerebras Inference API."""
 
     def __init__(
         self,
         client: httpx.AsyncClient,
         *,
         api_key: SecretStr | None = None,
-        base_url: str = "https://openrouter.ai/api/v1",
+        base_url: str = DEFAULT_BASE_URL,
         default_timeout: float = 60.0,
-        send_reasoning: bool = True,
         dump_dir: str | None = None,
     ) -> None:
         self._client = client
-        # The FALLBACK credential only: a request carrying its own ``api_key``
-        # overrides it. The SERVER passes None here (it holds no upstream key —
-        # every call carries the caller's own); standalone tooling (benchmarks,
-        # live tests) may pass a default. Held as a SecretStr and unwrapped solely
-        # where a header or a redaction pattern is built, never stored as
+        # The SERVER's own upstream credential, and on the serving path the only
+        # one there is: Daintree funds every turn from this key rather than from a
+        # caller's. A request may still carry its own ``api_key`` (benchmarks and
+        # live tests do), and it overrides this. Held as a SecretStr and unwrapped
+        # solely where a header or a redaction pattern is built, never stored as
         # plaintext on the instance.
         self._default_api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._default_timeout = default_timeout
-        self._send_reasoning = send_reasoning
         # Dev-only diagnostic (Settings.dump_upstream_dir, gated out of production
         # by readiness): when set, every upstream request body is written there as
         # numbered pretty-printed JSON. This is THE tool for prompt-cache forensics
@@ -721,13 +574,12 @@ class OpenRouterProvider:
         return f"{self._base_url}{_CHAT_PATH}"
 
     def _resolve_key(self, request_api_key: SecretStr | None) -> SecretStr:
-        """The credential for one call: the request's own, else the default.
+        """The credential for one call: the request's own, else the server's.
 
         Deliberately an ``is not None`` test rather than truthiness. A credential
         supplied explicitly by a caller is never silently replaced by the server's
         own — even when it is empty or malformed, which is rejected below rather
-        than papered over. Falling back would spend THIS server's OpenRouter
-        account on a request whose owner failed to authenticate.
+        than papered over.
 
         Single source of truth for the fallback, because two paths need the same
         answer: the ``Authorization`` header and the redaction of an echoed key out
@@ -736,7 +588,7 @@ class OpenRouterProvider:
         A credential that cannot become a header value is rejected HERE rather than
         handed to httpx. h11 refuses an empty, whitespace-padded, or control-char
         value with ``LocalProtocolError`` — and that exception embeds the offending
-        header value verbatim ("Illegal header value b'Bearer sk-…'"), which
+        header value verbatim ("Illegal header value b'Bearer csk-…'"), which
         httpcore logs at DEBUG before this adapter ever sees it. So the permissive
         path leaks the key into logs, exactly what this must not do. Failing fast
         also turns a confusing retryable transport error into an honest permanent
@@ -744,10 +596,10 @@ class OpenRouterProvider:
         """
         key = request_api_key if request_api_key is not None else self._default_api_key
         if key is None:
-            # No per-call credential and no configured default. On the serving
-            # path this is a propagation bug (auth guarantees every request
-            # carries a key): fail loudly here rather than ever spending a
-            # shared account.
+            # No per-call credential and no configured default. Readiness gates on
+            # CEREBRAS_API_KEY being present, so reaching here means the provider
+            # was constructed without one — fail loudly rather than send an
+            # unauthenticated request and read the 401 back as the caller's fault.
             raise upstream_error("No upstream credential was supplied for this call.")
         plain = key.get_secret_value()
         if not plain or not all(_HEADER_SAFE_MIN <= ord(c) <= _HEADER_SAFE_MAX for c in plain):
@@ -755,32 +607,27 @@ class OpenRouterProvider:
         return key
 
     async def verify_key(self, api_key: SecretStr | None = None) -> dict[str, Any]:
-        """Ask the provider whether a caller's key is actually usable.
+        """Ask the provider whether a credential is actually usable.
 
-        This is the ONLY honest answer to "is my key valid?". Our own auth is
-        structural (see auth.py) — a well-formed string that no provider has ever
-        issued passes it — so without this probe the first real turn is where a bad
-        key surfaces, long after the user thought they had signed in.
+        ``GET /models`` is the right probe: it is the cheapest authenticated call
+        the API offers, costs no tokens, and answers for the credential rather than
+        for a generation. Returns the model listing on success, which is more than
+        a bare verdict — it also proves the model this server is pinned to is one
+        the account can reach.
 
-        ``GET /key`` is the right probe: it is the provider's own key-introspection
-        endpoint, costs no tokens, and answers for the credential rather than for a
-        model. Returns the provider's key record on success.
-
-        Raises ``invalid_api_key`` when the provider rejects the credential (a 401/403
-        — a definite "this key is not usable"), and ``upstream_error`` when the probe
-        could not be completed at all. The distinction matters: the first is a verdict
-        the caller must act on, the second means we simply do not know.
+        Raises ``invalid_api_key`` when the provider rejects the credential (a
+        401/403 — a definite "this key is not usable"), and ``upstream_error`` when
+        the probe could not be completed at all. The distinction matters: the first
+        is a verdict to act on, the second means we simply do not know.
         """
         key = self._resolve_key(api_key)
-        url = f"{self._base_url}/key"
+        url = f"{self._base_url}{_MODELS_PATH}"
         try:
             response = await self._client.get(
                 url,
                 headers={
                     "Authorization": f"Bearer {key.get_secret_value()}",
                     "Accept": "application/json",
-                    "HTTP-Referer": _REFERER,
-                    "X-Title": _APP_TITLE,
                 },
                 timeout=self._verify_timeout(),
             )
@@ -804,25 +651,29 @@ class OpenRouterProvider:
             payload = response.json()
         except ValueError as exc:
             raise upstream_protocol_error(
-                "The provider returned an unreadable key record."
+                "The provider returned an unreadable model listing."
             ) from exc
-        if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
-            # A 200 whose body is not a key record answers nothing. Degrading it to an
-            # empty record would surface as `valid: true` — the exact false positive
-            # this endpoint exists to prevent — so it is an error, not a default.
-            raise upstream_protocol_error("The provider returned no key record.")
-        data: dict[str, Any] = payload["data"]
-        return data
+        if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+            # A 200 whose body is not a model listing answers nothing. Degrading it
+            # to an empty record would surface as `valid: true` — the exact false
+            # positive this endpoint exists to prevent — so it is an error, not a
+            # default.
+            raise upstream_protocol_error("The provider returned no model listing.")
+        models = [
+            entry["id"]
+            for entry in payload["data"]
+            if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+        ]
+        return {"models": models}
 
     def _verify_timeout(self) -> httpx.Timeout:
         """A short read budget for the sign-in probe, structured like ``_timeout``.
 
-        The probe must NOT inherit ``_default_timeout`` (the 14-minute main-model
-        budget): a user is watching a sign-in spinner, and a stalled provider would
-        otherwise pin a request — and a Cloud Run concurrency slot — for the whole of
-        it, on an endpoint any header-safe token can reach. A bare float would also
-        collapse the client's connect/write/pool components, which ``_timeout``
-        documents at length; only READ is narrowed here.
+        The probe must NOT inherit ``_default_timeout`` (the main-model budget): a
+        user is watching a spinner, and a stalled provider would otherwise pin a
+        request — and a Cloud Run concurrency slot — for the whole of it. A bare
+        float would also collapse the client's connect/write/pool components, which
+        ``_timeout`` documents at length; only READ is narrowed here.
         """
         base = self._client.timeout
         return httpx.Timeout(
@@ -830,21 +681,14 @@ class OpenRouterProvider:
         )
 
     def _map_verify_error(self, response: httpx.Response) -> DaintreeError:
-        """Non-200 on the probe, mapped like the chat path — minus its 404 prose.
-
-        ``_map_http_error`` is not reused wholesale because its 404 branch names
-        `_PROVIDER_ROUTING`, which is chat-completion-specific and would send a reader
-        hunting through endpoint-selection policy over a plain introspection call.
-        """
+        """Non-200 on the probe, mapped like the chat path."""
         status = response.status_code
         if status == 429:
             return upstream_rate_limited(retry_after=response.headers.get("retry-after"))
         if status in (408, 504):
             return upstream_timeout("Verifying the key with the provider timed out.")
         if status >= 500:
-            return upstream_unavailable(
-                f"The provider could not verify the key (HTTP {status})."
-            )
+            return upstream_unavailable(f"The provider could not verify the key (HTTP {status}).")
         return upstream_error(f"The provider could not verify the key (HTTP {status}).")
 
     def _headers(self, *, stream: bool, api_key: SecretStr) -> dict[str, str]:
@@ -856,8 +700,6 @@ class OpenRouterProvider:
             "Authorization": f"Bearer {api_key.get_secret_value()}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream" if stream else "application/json",
-            "HTTP-Referer": _REFERER,
-            "X-Title": _APP_TITLE,
         }
 
     def _build_body(self, request: ProviderChatRequest, *, stream: bool) -> dict[str, Any]:
@@ -872,71 +714,33 @@ class OpenRouterProvider:
         if request.temperature is not None:
             body["temperature"] = request.temperature
         if request.max_tokens is not None:
-            body["max_tokens"] = request.max_tokens
+            # ONE spelling. Cerebras accepts either name alone but 400s when both
+            # arrive, so the normalized field resolves to exactly this one here and
+            # `max_tokens` never appears on the wire.
+            body["max_completion_tokens"] = request.max_tokens
         if request.response_format is not None:
             body["response_format"] = request.response_format
         if request.stop:
             body["stop"] = request.stop
-        if self._send_reasoning:
-            if request.thinking_disabled:
-                # An explicit disable is mandatory: a reasoning model reasons by
-                # default when the field is absent, and the non-thinking selector's
-                # whole latency argument depends on it actually being off.
-                body["reasoning"] = {"enabled": False}
-            else:
-                # Reasoning mode: the model emits a chain-of-thought (returned as
-                # `reasoning`, renamed to reasoning_content on the way back out)
-                # before the answer. `effort` tunes the depth; with no tier we send
-                # a bare enable and let the endpoint's default apply. `effort` and
-                # `max_tokens` are mutually exclusive here — only `effort` is used.
-                if request.reasoning_effort:
-                    body["reasoning"] = {"effort": request.reasoning_effort}
-                else:
-                    body["reasoning"] = {"enabled": True}
-        # Structured calls route under the tail-bounded policy: `response_format`
-        # is exactly the signal that this call sits in the slower JSON-capable pool
-        # and cares about time-to-first-token, not tokens/second.
-        if request.routing is None:
-            # The overwhelmingly common path. Reuse the prebuilt module-level dict
-            # rather than re-rendering: this block is serialized into every request
-            # body, and the prompt cache keys on a byte-identical prefix.
-            body["provider"] = (
-                _PROVIDER_ROUTING_FIRST_BYTE if request.latency_critical else _PROVIDER_ROUTING
-            )
-        else:
-            # Server axis FIRST, caller preference on top: `ranked_on_first_byte`
-            # replaces the sort key, so applying it last would silently overrule a
-            # caller who asked for `price`, and that trade is legitimately theirs.
-            # The bound and the privacy floor survive either ordering.
-            policy = DEFAULT_POLICY
-            if request.latency_critical:
-                policy = policy.ranked_on_first_byte()
-            body["provider"] = policy.merged_with(request.routing).to_wire()
-        # Cache affinity. OpenRouter keeps a sticky record of which endpoint served
-        # a cached request and routes the next request with the same key back to
-        # it, so a conversation's growing prefix stays on the node that holds it.
-        # Left absent, the key defaults to a hash of the first system message and
-        # the first non-system message — for this assembler that is the invariant
-        # base prompt plus whichever optional row happens to come first (skill
-        # bodies, else the integrations block, else startup), so it changes on
-        # every selector topic shift and differs per machine on a skill-less turn.
-        # Naming the key ourselves replaces that accident with something meant.
+        # Reasoning is a bare string here, and it has no "off". There is nothing to
+        # send for a non-thinking call: `gemma-4-31b` does not reason at all
+        # (measured `reasoning_tokens: 0`), so omission IS the non-thinking posture
+        # rather than a hope that the default is off. The explicit-disable argument
+        # the OpenRouter adapter made does not carry over — the wire has no field
+        # that could express it, and sending OpenRouter's `reasoning` object is a
+        # hard 400.
+        if not request.thinking_disabled and request.reasoning_effort:
+            body["reasoning_effort"] = request.reasoning_effort
+        # Prefix-cache affinity. Cerebras caches automatically on the literal
+        # prompt prefix, org-scoped, with no endpoint to steer — so unlike a
+        # router this is a HINT the upstream is free to ignore, not the mechanism
+        # the cache depends on. It is still sent: it is the OpenAI-standard
+        # spelling for exactly this, it is accepted, and it costs one short field.
         #
-        # WHAT THE KEY NAMES varies by call and is chosen by the caller of this
-        # adapter, not here: a session for a conversation, the catalog revision for
-        # the selector, the task id for a utility task (section 3a).
-        #
-        # A SIBLING of `provider`, deliberately not part of it: the block above is
-        # the endpoint-selection POLICY (filters, sort, fallbacks) and is reused as
-        # a prebuilt module-level dict precisely because it must not vary per
-        # request. Affinity varies per cohort, so it rides its own top-level field
-        # and leaves that dict untouched. It is likewise not `provider.order`, which
-        # OpenRouter documents as DISABLING sticky routing — see
-        # docs/PROVIDER_POLICY.md section 3.
+        # NOT `session_id` — OpenRouter's spelling for the same idea, and a hard
+        # 400 (`property 'session_id' is unsupported`) here.
         if request.cache_session_id:
-            body["session_id"] = _cohort_scoped(
-                request.cache_session_id, body["provider"], request.routing
-            )
+            body["prompt_cache_key"] = request.cache_session_id
         if stream:
             body["stream"] = True
             if request.include_usage:
@@ -966,9 +770,7 @@ class OpenRouterProvider:
         A thin wrapper so the streaming in-band path and the HTTP path can never
         drift into two different answers for the same condition.
         """
-        return _map_status(
-            status, retry_after=headers.get("retry-after"), detail=detail
-        )
+        return _map_status(status, retry_after=headers.get("retry-after"), detail=detail)
 
     def _build_result(self, data: dict[str, Any]) -> ProviderChatResult:
         # `or []` only for a genuinely absent key — a present-but-wrong `choices`
@@ -994,7 +796,8 @@ class OpenRouterProvider:
             choices=choices,
             usage=ProviderUsage.from_wire(data.get("usage")),
             finish_reason=finish,
-            endpoint=_endpoint_name(data),
+            # No serving endpoint to report: one host per model.
+            endpoint=None,
             raw=data,
         )
 
@@ -1052,30 +855,22 @@ class OpenRouterProvider:
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             stream=False,
-            # DeepSeek rejects a forced tool_choice under thinking ("Thinking mode
-            # does not support this tool_choice"). OpenRouter may route around the
-            # endpoint that enforces it, but the constraint is the model's, not the
-            # router's, so pin the call non-thinking regardless of what the caller
-            # requested rather than gamble the turn on which endpoint answers.
+            # A forced tool_choice and a chain-of-thought are an awkward pair on
+            # every model this server has run against, and the caller wants one
+            # object back rather than reasoning about it. Pin it non-thinking
+            # regardless of what the caller requested.
             thinking_disabled=True,
             reasoning_effort=None,
             timeout=request.timeout,
             # Must be forwarded explicitly: this sub-request is rebuilt field by
-            # field, so an omission here would silently spend the SERVER's default
-            # credential on every forced-tool-call path instead of the caller's.
+            # field, so an omission here would silently fall back to the server's
+            # default credential on every forced-tool-call path instead of using
+            # the one the caller pinned.
             api_key=request.api_key,
-            # Same reasoning: dropping the caller's routing preference here would
-            # silently downgrade a ZDR request to the default privacy filter on
-            # the one path that rebuilds its request from scratch.
-            routing=request.routing,
             # And again: this sub-request carries the parent's whole prompt, so
-            # dropping the affinity key would send the turn's largest call to
-            # whatever endpoint the default hash elects — off the node holding the
-            # prefix, which is the one thing the key exists to prevent.
+            # dropping the affinity key would lose the parent's cache hint on the
+            # turn's largest call.
             cache_session_id=request.cache_session_id,
-            # Same class of omission: this sub-request is the parent's call, so it
-            # inherits the parent's cost shape and must be ranked on the same axis.
-            latency_critical=request.latency_critical,
         )
         result = await self.complete(sub)
         calls = result.tool_calls
@@ -1132,7 +927,7 @@ class OpenRouterProvider:
                 detail=detail,
             )
             raise self._map_http_error(response.status_code, response.headers, detail)
-        return OpenRouterStream(ctx, response, request.model)
+        return CerebrasStream(ctx, response, request.model)
 
     async def aclose(self) -> None:
         await self._client.aclose()

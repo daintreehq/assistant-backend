@@ -151,7 +151,12 @@ steps:
         # be set together", so mounting the secret alone would fail the candidate's
         # /readyz and abort the release.
         ENV_FLAGS="ENVIRONMENT=production,LOG_LEVEL=INFO,STATE_SIGNING_KID=${_CURRENT_KID}"
-        SECRET_FLAGS="STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest"
+        # cerebras-api-key is REQUIRED, not optional like the previous signing key:
+        # the server holds the upstream credential now and `missing_secrets()` gates
+        # /readyz on it, so a deploy without it would build a candidate that can never
+        # pass its own smoke check. Mounting it unconditionally means a missing secret
+        # fails the deploy loudly here rather than as a red /readyz two steps later.
+        SECRET_FLAGS="STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest,CEREBRAS_API_KEY=cerebras-api-key:latest"
 
         # `describe` distinguishes ABSENT from FORBIDDEN. Treating every failure as
         # "no previous key" would turn a missing IAM grant into a silently

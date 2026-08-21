@@ -90,11 +90,19 @@ def test_verify_propagates_an_unreachable_provider_as_502(client, auth, fake_pro
     assert r.json()["error"]["code"] == "upstream_error"
 
 
-def test_verify_requires_authentication(client) -> None:
+def test_verify_without_a_bearer_probes_the_server_credential(client, fake_provider) -> None:
+    """The endpoint outlived the question it was written for.
+
+    It used to answer "is the key you pasted valid?". Callers hold no key now, so
+    with no bearer it probes the SERVER's — which answers the question that
+    actually matters today: can this backend serve me at all?
+    """
+    fake_provider.verify_key_result = {"models": ["gemma-4-31b"]}
+
     r = client.post("/v1/daintree/auth/verify")
 
-    assert r.status_code == 401
-    assert r.json()["error"]["code"] == "invalid_api_key"
+    assert r.status_code == 200
+    assert r.json()["valid"] is True
 
 
 def test_verify_never_echoes_the_key(client, auth, fake_provider) -> None:

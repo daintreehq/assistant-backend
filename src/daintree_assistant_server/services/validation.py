@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 
-from ..config import OPENROUTER_MODEL, Settings
+from ..config import CEREBRAS_MODEL, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.openai import (
     ChatMessage,
@@ -324,4 +324,4 @@ def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
     _validate_content(req.input.messages, settings)
     _validate_startup(req, settings)
     _validate_generation(req)
-    return OPENROUTER_MODEL
+    return CEREBRAS_MODEL

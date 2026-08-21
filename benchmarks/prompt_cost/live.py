@@ -27,7 +27,7 @@ import time
 import uuid
 from typing import Any
 
-from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
+from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 
 from .._harness.env import caller_api_key, make_upstream_provider
@@ -47,8 +47,8 @@ async def _prompt_request(
     prompt (what we measure) is untouched.
 
     ``skills`` selects the active set, which is what the affinity A/B varies: the
-    skill block is the first non-system message, so it is what OpenRouter's default
-    sticky key hashes. Passing it through the assembler rather than editing the
+    skill block is the first non-system message, so shifting it is what breaks the
+    reusable prefix. Passing it through the assembler rather than editing the
     assembled array afterwards keeps the row identification the assembler's job —
     surgery on "the first non-system message" would silently target the
     integrations or startup row if the set were ever empty.
@@ -66,7 +66,7 @@ async def _prompt_request(
     if json_mode:
         gen = req.generation.model_copy(update={"response_format": "json_object"})
         req = req.model_copy(update={"generation": gen})
-    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=OPENROUTER_MODEL)
+    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=CEREBRAS_MODEL)
     pr.max_tokens = 8  # bound completion cost; prompt tokens are the measurement
     pr.stream = stream
     pr.include_usage = stream
@@ -131,7 +131,7 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
             )
             t0 = time.perf_counter()
             outcome = await container.orchestrator.complete(
-                req, upstream_model=OPENROUTER_MODEL, api_key=caller_api_key(settings)
+                req, upstream_model=CEREBRAS_MODEL, api_key=caller_api_key(settings)
             )
             assert outcome.stream is not None
             async for _chunk in outcome.stream:
@@ -162,14 +162,21 @@ async def _affinity_sequence(
     """One session's worth of turns, run with or without an affinity key.
 
     The sequence deliberately SHIFTS the active skill set between turns. That is
-    the whole experiment: the skill block is the first non-system message, so it is
-    what OpenRouter's default sticky key hashes — a shift changes that key and
-    releases the endpoint, while the invariant head above it (base prompt, response
-    contract, tool schemas) is still perfectly reusable. An arm that sent the same
-    request twice would measure nothing, because both keying strategies agree there.
+    the whole experiment: the skill block is the first non-system message, so a
+    shift invalidates everything below it while the invariant head above it (base
+    prompt, response contract, tool schemas) is still perfectly reusable. An arm
+    that sent the same request twice would measure nothing.
 
-    ``cache_session_id=None`` is the NO-KEY baseline — the behaviour before this
-    change, not the behaviour at HEAD, which now always attaches a key.
+    **What this A/B can still tell you has narrowed**, and it is worth saying so
+    rather than reading the old number off a new provider. Against a ROUTER the
+    key decided which of many endpoints answered, so the arms could differ by a
+    whole cold prefill. Cerebras hosts one endpoint and caches prefixes
+    automatically, org-scoped, with no sticky record to steer — so
+    ``prompt_cache_key`` is a hint it may ignore and the honest expectation is
+    that the two arms agree. A DIFFERENCE here is now the finding; parity is the
+    null result, not a regression.
+
+    ``cache_session_id=None`` is the NO-KEY baseline.
 
     ``offset`` picks this arm's slice of the catalog, and it is the ONLY lever that
     moves the default sticky key: that key hashes the first system message and the
@@ -231,8 +238,8 @@ def _summarize_affinity(calls: list[dict[str, Any]]) -> dict[str, Any]:
 async def _affinity_ab(settings: Settings) -> dict[str, Any]:
     """The issue #42 A/B: does naming the sticky key keep a session on one endpoint?
 
-    Both arms are one sequential session at concurrency one, well inside
-    OpenRouter's 10-minute sticky-session idle window.
+    Both arms are one sequential session at concurrency one, well inside the
+    upstream's prefix-cache TTL (Cerebras guarantees 5 minutes, often longer).
 
     The two arms take DISJOINT, run-randomized slices of the catalog. That is what
     makes the comparison WITHIN a run fair rather than ordered: the arms share no
@@ -243,12 +250,12 @@ async def _affinity_ab(settings: Settings) -> dict[str, Any]:
     second arm's favour.
 
     ACROSS runs it is weaker, and the limit is worth stating rather than papering
-    over. The no-key arm's sticky key is OpenRouter's default: a hash of the base
-    prompt and the skill block. Both are fixed content, so the only freshness
-    available is the offset, and the catalog affords a couple of dozen positions —
-    two runs can draw overlapping slices, and ordinary served traffic may have used
-    those same blocks anyway. A rerun is therefore not guaranteed cold. Space runs
-    beyond the 10-minute sticky idle window if independence matters.
+    over. Cerebras matches prefixes ORG-WIDE, so any traffic from this account —
+    another bench, a dev server, a real turn — can have warmed the same base
+    prompt and skill blocks already. The only freshness available is the offset,
+    and the catalog affords a couple of dozen positions, so two runs can draw
+    overlapping slices. A rerun is therefore not guaranteed cold. Space runs
+    beyond the cache TTL if independence matters.
 
     What remains shared in every case is the invariant head above the skill block
     (base prompt, response contract, tool schemas). That is not a confound to
@@ -329,7 +336,7 @@ async def run_live(
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "live",
-            "model": OPENROUTER_MODEL,
+            "model": CEREBRAS_MODEL,
             "trials": trials,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },

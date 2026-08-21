@@ -12,7 +12,6 @@ from __future__ import annotations
 import contextlib
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -40,11 +39,10 @@ from .observability import (
 )
 from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
-from .providers.openrouter import OpenRouterProvider
+from .providers.cerebras import CerebrasProvider
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
 from .services.prompt_assembler import PromptAssembler
-from .services.skill_learning import SkillLearner
 from .services.task_runner import TaskRunner
 from .skills.catalog import Catalog, CatalogManager, default_skills_dir, load_catalog
 from .skills.local.paths_local import selector_artifact_dir
@@ -159,7 +157,7 @@ def _safe_request_id(inbound: str | None, authorization: str | None) -> str:
     * **Shape.** Bounded length and a conservative charset, so an id cannot smuggle
       newlines, control characters or a kilobyte of padding into a log line.
     * **Credential overlap.** A bearer token is header-safe ASCII, which means a
-      caller's own OpenRouter key is a *structurally valid* request id. Somebody
+      caller's own API key is a *structurally valid* request id. Somebody
       scripting against this API can paste one into the wrong variable, and we
       would faithfully log and echo their spend-authorizing credential. Checked
       both directions, since a prefix is as damaging as the whole value.
@@ -210,7 +208,6 @@ class Container:
     assembler: PromptAssembler
     orchestrator: ChatOrchestrator
     task_runner: TaskRunner
-    skill_learner: SkillLearner | None = None
     # Its own httpx client, kept here so lifespan can close it. Deliberately not
     # the provider's: the docs server is a different host with a different
     # latency profile, and a documentation search must never queue behind a
@@ -222,19 +219,18 @@ class Container:
 
     @property
     def catalog(self) -> Catalog:
-        """The current catalog (live: the skill-learning harness may reload it)."""
+        """The current catalog, read live — CatalogManager supports reload."""
         return self.catalog_manager.catalog
 
     async def aclose(self) -> None:
         """Drain in-flight background work, then close the providers.
 
         Best-effort teardown usable by any owner (the app lifespan, or a direct
-        ``build_container`` caller). There is one provider to close: skill learning
-        rides the same OpenRouter client, differing only in the model it names.
+        ``build_container`` caller).
         """
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort drain
-            # Let any in-flight fire-and-forget learning finish (its write+reload is
-            # cancellation-shielded) before the provider it uses is torn down.
+            # Detached tasks own live upstream calls; drain them (bounded) before
+            # the provider they are calling through is torn down.
             await self.orchestrator.drain_background_tasks()
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
             await self.provider.aclose()
@@ -284,20 +280,17 @@ def _build_provider(settings: Settings) -> ChatProvider:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    return OpenRouterProvider(
+    return CerebrasProvider(
         client,
-        # NO default credential — the server holds no upstream key. Every provider
-        # call must carry the caller's own key (their bearer token, threaded as
-        # ProviderChatRequest.api_key); a call that arrives without one fails
-        # loudly in _resolve_key instead of quietly billing a shared account.
-        # Standalone tooling (benchmarks, live tests) may still construct a
-        # provider WITH a default; the serving path deliberately does not.
-        api_key=None,
-        base_url=settings.openrouter_base_url,
+        # THE server credential. Daintree funds every turn from this key: callers
+        # supply none of their own any more (see auth.py), so a provider built
+        # without one cannot answer at all — which is why `missing_secrets` gates
+        # readiness on it rather than letting the first turn discover it. A
+        # request may still carry its own key and override this; nothing on the
+        # serving path does today.
+        api_key=settings.cerebras_api_key,
+        base_url=settings.cerebras_base_url,
         default_timeout=settings.main_timeout_seconds,
-        # send_reasoning stays at its True default: a reasoning model thinks when
-        # the field is absent, and the explicit per-call directive is what keeps
-        # the non-thinking selector actually non-thinking.
         dump_dir=settings.dump_upstream_dir,
     )
 
@@ -331,19 +324,13 @@ def build_container(
     prompt_loader = PromptLoader()
     prompt_loader.validate()
 
-    # The catalog loads the packaged skills, plus an optional local overlay when the
-    # skill-learning harness is configured to write to a separate directory (in the
-    # default edit-in-place mode there is no overlay). A CatalogManager holds it so a
-    # learning write can reload it in place.
+    # The packaged skills are the whole catalog. The overlay slot that
+    # `load_catalog`/`CatalogManager` still accept was for the skill-learning
+    # harness, which wrote generated skills to a separate directory; nothing
+    # populates it now, and the catalog is authored by hand.
     primary_dir = default_skills_dir()
-    learn_dir = Path(settings.skill_learning_dir) if settings.skill_learning_dir else None
-    overlay_dir = (
-        learn_dir
-        if (learn_dir is not None and learn_dir.resolve() != primary_dir.resolve())
-        else None
-    )
-    catalog = load_catalog(primary_dir, overlay_dir)
-    catalog_manager = CatalogManager(catalog, primary_dir=primary_dir, overlay_dir=overlay_dir)
+    catalog = load_catalog(primary_dir)
+    catalog_manager = CatalogManager(catalog, primary_dir=primary_dir)
 
     state_codec = _build_state_codec(settings)
     # The selector is built BEFORE the provider: loading it can raise, and
@@ -369,18 +356,6 @@ def build_container(
     chat_provider = provider if provider is not None else _build_provider(settings)
     assembler = PromptAssembler(prompt_loader, settings)
 
-    skill_learner: SkillLearner | None = None
-    if settings.skill_learning_enabled:
-        # Build/improve run on a stronger model (SKILL_BUILDER_MODEL) than the gate,
-        # but on the SAME provider — OpenRouter fronts both, so the split is a model
-        # id, not a second client or a second credential.
-        skill_learner = SkillLearner(
-            settings=settings,
-            provider=chat_provider,
-            prompt_loader=prompt_loader,
-            catalog_manager=catalog_manager,
-        )
-
     docs_http_client, docs_client = _build_docs_client()
     orchestrator = ChatOrchestrator(
         settings=settings,
@@ -389,7 +364,6 @@ def build_container(
         state_codec=state_codec,
         assembler=assembler,
         provider=chat_provider,
-        learner=skill_learner,
         docs_client=docs_client,
     )
     task_runner = TaskRunner(
@@ -409,7 +383,6 @@ def build_container(
         assembler=assembler,
         orchestrator=orchestrator,
         task_runner=task_runner,
-        skill_learner=skill_learner,
         docs_http_client=docs_http_client,
         inference_pool=inference_pool,
     )
@@ -437,7 +410,6 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
             catalog_revision=container.catalog.revision,
             skills=len(container.catalog),
             tasks=container.task_runner.task_ids(),
-            skill_learning_mode=settings.skill_learning_mode,
         )
     except Exception as exc:  # noqa: BLE001 - readiness must not crash liveness
         app.state.container = None

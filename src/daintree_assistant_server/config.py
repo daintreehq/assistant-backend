@@ -16,22 +16,25 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Hardcoded model identities — a product decision, not deployment config. The
-# main completion, the skill selector, the utility tasks, and the skill-learning
-# gate all run on the small model (OPENROUTER_MODEL) — DeepSeek V4 Flash, reached
-# through OpenRouter rather than DeepSeek directly, so the fastest compliant
-# endpoint serving those weights answers each call (see providers/openrouter.py).
-# The date-pinned slug is deliberate: the floating alias would silently re-point
-# at a differently-tuned revision, and every prompt and benchmark here is
-# calibrated against this one. The skill-learning builder and improver run on a
-# deliberately STRONGER model — GPT-5.6 Sol — for the harder "write a whole
-# skill" generation task; routing everything through OpenRouter is what makes
-# that a one-line model swap on the same provider and the same key, instead of a
-# second SDK and a second credential. PUBLIC_MODEL_ID is the alias returned to
-# clients. Only the provider API key (and base URL) comes from the environment.
-OPENROUTER_MODEL = "deepseek/deepseek-v4-flash-0731"
-SKILL_BUILDER_MODEL = "openai/gpt-5.6-sol"
-SKILL_IMPROVER_MODEL = "openai/gpt-5.6-sol"
+# THE model identity — singular, and a product decision rather than deployment
+# config. The main completion and every utility task run on CEREBRAS_MODEL:
+# Gemma 4 31B on Cerebras Inference, a model HOST rather than a router, so one
+# endpoint serves these weights and there is nothing to select between (see
+# providers/cerebras.py). Skill selection makes no upstream call at all — it is
+# the local ONNX classifier in skills/local/.
+#
+# There is exactly ONE model now. The second one existed for skill learning,
+# which has been removed: a background pass that spent a large thinking budget
+# rewriting the catalog from model output, for a catalog a human curates anyway.
+#
+# Gemma 4 31B is a PREVIEW model and Cerebras has said it will be replaced. When
+# that happens this constant is the whole code change: the prompts, budgets and
+# benchmarks are calibrated against it, so the swap is a deliberate re-baseline
+# (benchmarks/baseline.json), not a floating alias that re-points underneath us.
+#
+# PUBLIC_MODEL_ID is the alias returned to clients. Only the provider API key and
+# base URL come from the environment.
+CEREBRAS_MODEL = "gemma-4-31b"
 PUBLIC_MODEL_ID = "daintree-assistant"
 
 # The runbook loaded whenever a turn produces a `docs_query` — i.e. whenever the
@@ -54,40 +57,24 @@ DOCS_SKILL_ID = "daintree.docs.answer-usage-question"
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
 # There is one optimum and the server ships it.
 #
-# THE INTERACTIVE SURFACE IS NON-THINKING. The main completion, every utility
-# task, and the skill selector all run with reasoning explicitly disabled. This
-# workload does not need it: the main model's job is to route a short request
-# onto a skill runbook and emit tool calls, and the utility tasks are bounded
-# extractions and classifications against text the client already gathered. A
-# measured greeting turn (2026-08-08, turn_2c1bbc09) spent 366 reasoning tokens
-# and ~3.5s of a 11.5s wall-clock thinking about "Hello!".
+# NOTHING IN THIS SERVER THINKS, and on Cerebras that is now a property of the
+# model rather than a flag held down. Gemma 4 31B does not reason at all
+# (measured `reasoning_tokens: 0` on every probe), and the wire has no field that
+# could ask it to — Cerebras takes a bare `reasoning_effort` string with no "off"
+# value, and rejects OpenRouter's `reasoning` object outright. So a main or
+# utility call simply sends nothing, and cannot regress into spending 366
+# reasoning tokens and ~3.5s of an 11.5s wall-clock deciding how to answer
+# "Hello!" (measured 2026-08-08, turn_2c1bbc09, on the previous stack).
 #
-# There is NO middle setting to retreat to. DeepSeek V4 Flash collapses the
-# effort tiers: measured over 5 samples each on a fixed prompt, "low" and "high"
-# produced statistically identical chain-of-thought (mean 662 vs 656 reasoning
-# tokens, fully overlapping ranges). "low" buys nothing, so the only real step
-# below "high" is off — which is what this posture takes.
-#
-# Two constraints outlive the posture and stay enforced independently, so that
-# flipping the flag back on cannot reintroduce a known failure:
-#   * A main call whose client pinned a forced tool_choice must stay non-thinking
-#     regardless — DeepSeek 400s on thinking + forced tool_choice.
-#   * The selector is separately hardcoded off (skills/selector.py): it gates the
-#     turn's first byte, and thinking there benchmarked strictly worse (median
-#     ~4-5s with a 13-20s timeout-retry tail vs a consistent 1.2-2.6s) for no
-#     selection-quality gain once its prompt asked for reason-first JSON.
-#
-# SKILL LEARNING STILL THINKS. It is local-dev-only and runs fire-and-forget
-# AFTER the response is sent, so its latency never reaches a user, and "read a
-# whole transcript and write a skill" is the one genuinely hard task here. The
-# gate runs thinking-high on the small model; the builder/improver on GPT-5.6 Sol
-# likewise pin "high" — its xhigh top tier is excluded on purpose, high already
-# covers the task.
+# Skill learning used to be the one exception — it ran fire-and-forget after the
+# response, so its latency never reached a user. It has been removed, so there is
+# no thinking surface left at all.
 INTERACTIVE_THINKING_ENABLED = False
-# The effort sent whenever this server DOES think on the small model. With the
-# posture above that is the skill-learning gate only.
-OPENROUTER_REASONING_EFFORT = "high"
-SKILL_LEARNING_REASONING_EFFORT = "high"
+# The tier the interactive surface would send if that posture were ever flipped
+# back on. Kept beside the flag rather than inlined at the one call site that
+# reads it (services/task_runner.py) so the pair stays legible as a single
+# decision — and so flipping the flag does not also require choosing a tier.
+INTERACTIVE_REASONING_EFFORT = "high"
 
 # The development default salt; rejected in production by weak_secrets().
 DEFAULT_STATE_SALT = "daintree-state-salt"
@@ -120,21 +107,18 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", alias="HOST")
     port: int = Field(default=8080, alias="PORT")
 
-    # ---- Upstream provider (OpenRouter, OpenAI-compatible) ---------------
-    # Models are hardcoded (see the constants above) and so is the endpoint-
-    # selection policy (throughput-sorted, no-data-collection — see
-    # ``_PROVIDER_ROUTING`` in providers/openrouter.py); only the key and base URL
+    # ---- Upstream provider (Cerebras, OpenAI-compatible) -----------------
+    # Models are hardcoded (see the constants above). Only the key and base URL
     # come from the environment.
-    openrouter_base_url: str = Field(
-        default="https://openrouter.ai/api/v1", alias="OPENROUTER_BASE_URL"
+    cerebras_base_url: str = Field(
+        default="https://api.cerebras.ai/v1", alias="CEREBRAS_BASE_URL"
     )
-    # Benchmark / live-test tooling ONLY. The serving path holds no upstream
-    # credential at all: every request's provider calls use the caller's own key
-    # (their bearer token — see auth.py), and main.py builds the server provider
-    # with api_key=None so a propagation bug fails loudly instead of quietly
-    # billing a shared account. Standalone tooling (benchmarks/, tests/live)
-    # still constructs providers directly from this value.
-    openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
+    # THE server's upstream credential, and the only one there is. Daintree funds
+    # every turn from this key: callers no longer supply their own (see auth.py),
+    # so this is required for the server to answer anything and is gated by
+    # ``missing_secrets``. Local dev reads it from .env; Cloud Run injects it from
+    # Secret Manager.
+    cerebras_api_key: SecretStr = Field(default=SecretStr(""), alias="CEREBRAS_API_KEY")
 
     # ---- Thinking headroom -----------------------------------------------
     # The thinking POSTURE itself is hardcoded (see INTERACTIVE_THINKING_ENABLED at
@@ -142,7 +126,7 @@ class Settings(BaseSettings):
     # skill-learning gate and builder/improver still think. reasoning_content
     # round-trips through the wire contract so a tool-call turn can replay the
     # chain-of-thought that produced its calls (the provider adapter renames it to
-    # OpenRouter's `reasoning` on the way out), which the assembler preserves —
+    # the wire's `reasoning` on the way out), which the assembler preserves —
     # that path stays live because the posture is a flag, not a deletion. Thinking
     # mode ignores temperature/top_p.
     #
@@ -299,7 +283,7 @@ class Settings(BaseSettings):
     # forced tool call.
 
     # ---- Retries --------------------------------------------------------
-    # ONE HOP ONLY: backend -> OpenRouter. Applies to every upstream call (main
+    # ONE HOP ONLY: backend -> Cerebras. Applies to every upstream call (main
     # completion, stream open, selector, utility tasks): retries transient
     # failures only while no model output or replay-unsafe side effect has been
     # exposed. Streaming metadata may already be public during an open/prefetch
@@ -379,79 +363,7 @@ class Settings(BaseSettings):
     # entirely invisible to the CLI: no new wire fields, no feedback tool, and the
     # main assistant model is never told it exists — a created skill simply appears
     # as a normal dynamic skill load. It MUST be off in production: an enabled mode
-    # fails readiness there (see local_only_problems). Modes:
-    #   off     — disabled (default)
-    #   propose — run the gate (small model) + the gpt-5.6-sol builder/improver and write
-    #             the proposed skill markdown + an audit JSON under the audit dir's
-    #             proposals/, but never touch the real skill files or the catalog
-    #   apply   — also write/rewrite the skill file and reload the catalog in place
-    skill_learning_mode: Literal["off", "propose", "apply"] = Field(
-        default="off", alias="SKILL_LEARNING_MODE"
-    )
-    # Where created/improved skills are written. Empty → the packaged skills dir
-    # (edit-in-place: improvements show up in `git diff`, ready to commit). Set to a
-    # separate directory to keep the source tree untouched — the catalog then loads
-    # packaged skills PLUS this overlay, and overlay skills win on an id collision.
-    skill_learning_dir: str = Field(default="", alias="SKILL_LEARNING_DIR")
-    # Per-change audit JSON records (old/new hash, gate verdict, diff) land here.
-    skill_learning_audit_dir: str = Field(
-        default=".daintree/skill-learning", alias="SKILL_LEARNING_AUDIT_DIR"
-    )
-    # The builder/improver reasoning tier (GPT-5.6 Sol) and the gate's thinking-high
-    # posture (small model, json_object verdict) are hardcoded — see
-    # SKILL_LEARNING_REASONING_EFFORT / OPENROUTER_REASONING_EFFORT at the top of
-    # this module. Learning is the one surface that still thinks: it runs
-    # fire-and-forget after the response, so its latency never reaches a user.
-    # Gate verdicts below this confidence never write.
-    skill_learning_min_confidence: float = Field(
-        default=0.75, ge=0.0, le=1.0, alias="SKILL_LEARNING_MIN_CONFIDENCE"
-    )
-    # Whether the learner may MINT a new foundation skill or PROMOTE a specific one to
-    # foundation. Off by default: a foundation is near-always paired into selection, so
-    # tiering one wrong is costly — promotion is a human curation decision. The learner
-    # can always IMPROVE (and grow) an EXISTING foundation regardless of this flag; this
-    # only gates turning `foundation` ON where it was off. See skill_learning.py._validate.
-    skill_learning_allow_foundation_create: bool = Field(
-        default=False, alias="SKILL_LEARNING_ALLOW_FOUNDATION_CREATE"
-    )
-    # Learning is only considered once the conversation has at least this many
-    # messages — there must be prior work to learn from before the gate runs.
-    skill_learning_min_messages: int = Field(
-        default=3, ge=1, alias="SKILL_LEARNING_MIN_MESSAGES"
-    )
-    # Transcript token budget the gate/builder see. Learning runs full detection over
-    # the whole (newest-biased) message history — cost is not a concern in this local
-    # harness — so this is much larger than the selector's context budget.
-    skill_learning_context_tokens: int = Field(
-        default=200000, alias="SKILL_LEARNING_CONTEXT_TOKENS"
-    )
-    # Per-call timeout for the learning model calls. The build/improve call thinks
-    # at high effort and must emit a COMPLETE skill body — minutes, not seconds —
-    # and it runs off the response path, so a generous timeout costs nothing.
-    skill_learning_timeout_seconds: float = Field(
-        default=300.0, alias="SKILL_LEARNING_TIMEOUT_SECONDS"
-    )
-    skill_gate_max_output_tokens: int = Field(
-        default=700, alias="SKILL_GATE_MAX_OUTPUT_TOKENS"
-    )
-    # Must cover the improver's REQUIRED output — the complete replacement body
-    # (the largest packaged skill is ~24 KB ≈ 6k tokens before JSON escaping) plus
-    # the diagnosis fields plus the builder's reasoning tokens. It bounds reasoning
-    # AND visible output together (OpenRouter maps it to `max_completion_tokens` for
-    # endpoints that need that spelling), so high-effort reasoning eats into this
-    # budget. Too small and the JSON
-    # truncates: the parse fails, the repair retry truncates identically, and the
-    # improve path can never land.
-    skill_build_max_output_tokens: int = Field(
-        default=24000, alias="SKILL_BUILD_MAX_OUTPUT_TOKENS"
-    )
-
     # ---- Derived helpers ------------------------------------------------
-
-    @property
-    def skill_learning_enabled(self) -> bool:
-        """True when skill learning runs at all (``propose`` or ``apply``)."""
-        return self.skill_learning_mode != "off"
 
     @property
     def is_hardened(self) -> bool:
@@ -468,30 +380,31 @@ class Settings(BaseSettings):
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty.
 
-        Only server-owned material is required. Neither upstream nor inbound API
-        keys appear here: every request supplies its own caller key, which is
-        both the auth credential and the upstream credential, so there is
-        nothing key-related for the server to validate at startup.
+        Both entries are server-owned, and that is the whole shape of the current
+        credential model: Daintree holds the upstream key and callers hold none
+        (see auth.py). ``CEREBRAS_API_KEY`` is therefore required for the server
+        to answer anything at all, and its absence must fail READINESS rather than
+        surface a turn later as an upstream 401 that reads like the caller's
+        fault. There is still no INBOUND key to configure — the door is open by
+        design until account auth lands.
         """
         missing: list[str] = []
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
+        if not self.cerebras_api_key.get_secret_value():
+            missing.append("CEREBRAS_API_KEY")
         return missing
 
     def local_only_problems(self) -> list[str]:
-        """Local-development-only features that must never run in production, plus
-        their required config.
+        """Local-development-only features that must never run in production.
 
-        These join ``missing_secrets()`` / ``weak_secrets()`` in readiness gating,
-        so a production (or Cloud Run) deploy that leaves skill learning enabled
-        fails ``/readyz`` rather than mutating the catalog from model output at
-        runtime. Empty in development: the builder/improver run on the SAME
-        OpenRouter key as everything else, so enabling learning needs no extra
-        credential of its own.
+        These join ``missing_secrets()`` / ``weak_secrets()`` in readiness gating.
+        Only one entry remains: prompt dumping, which writes full prompts to disk.
+        (Skill learning used to be the other, and was the reason this method
+        exists — a production deploy that left it on would have mutated the skill
+        catalog from model output at runtime. It has been removed entirely.)
         """
         problems: list[str] = []
-        if self.is_hardened and self.skill_learning_enabled:
-            problems.append("SKILL_LEARNING_MODE must be 'off' in production")
         if self.is_hardened and self.dump_upstream_dir:
             problems.append(
                 "DAINTREE_DUMP_UPSTREAM_DIR must be unset in production "
@@ -510,21 +423,20 @@ class Settings(BaseSettings):
         if not self.is_hardened:
             return []
         problems: list[str] = []
-        # The upstream base URL now receives CALLER credential material on every
-        # request (each turn's bearer key rides the Authorization header to this
-        # origin). A hardened deployment with a typo'd, plain-http, or foreign
-        # host would silently disclose every caller key while staying green, so
-        # production pins the real OpenRouter origin. Development stays free to
+        # The upstream base URL receives THE SERVER's credential on every request.
+        # A hardened deployment with a typo'd, plain-http, or foreign host would
+        # disclose the key that funds every Daintree turn while staying green, so
+        # production pins the real Cerebras origin. Development stays free to
         # point at proxies/mocks.
         try:
-            parsed = urlsplit(self.openrouter_base_url)
+            parsed = urlsplit(self.cerebras_base_url)
             origin_ok = (
                 parsed.scheme == "https"
-                and parsed.hostname == "openrouter.ai"
+                and parsed.hostname == "api.cerebras.ai"
                 # Default port only: a non-443 port is a different origin, and a
                 # malformed one should fail readiness, not the first request.
                 and parsed.port in (None, 443)
-                # No userinfo — `https://x@openrouter.ai` still reaches OpenRouter,
+                # No userinfo — `https://x@api.cerebras.ai` still reaches Cerebras,
                 # but credentials do not belong in this URL in any form.
                 and parsed.username is None
             )
@@ -532,8 +444,8 @@ class Settings(BaseSettings):
             origin_ok = False
         if not origin_ok:
             problems.append(
-                "OPENROUTER_BASE_URL must be the https://openrouter.ai origin in production "
-                "(caller API keys are sent to it)"
+                "CEREBRAS_BASE_URL must be the https://api.cerebras.ai origin in production "
+                "(the server API key is sent to it)"
             )
         if len(self.state_signing_key_current.get_secret_value()) < 32:
             problems.append("STATE_SIGNING_KEY_CURRENT is too short (<32 chars)")

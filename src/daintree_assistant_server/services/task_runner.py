@@ -17,9 +17,9 @@ from typing import Any
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from ..config import (
+    CEREBRAS_MODEL,
+    INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
-    OPENROUTER_MODEL,
-    OPENROUTER_REASONING_EFFORT,
     Settings,
 )
 from ..contracts.tasks import (
@@ -56,7 +56,6 @@ from ..errors import (
 from ..observability import get_logger, new_task_run_id
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
-from ..providers.policy import routing_preference
 from ..providers.retry import retry_upstream
 from ..skills.catalog import CatalogManager
 from ..text_utils import cap_bytes
@@ -868,7 +867,7 @@ class TaskRunner:
 
         system = self.prompts.task_system_prompt(profile.id)
         user = profile.build_user(input_obj, request)
-        model = OPENROUTER_MODEL
+        model = CEREBRAS_MODEL
         timeout = profile.timeout_seconds or self.settings.utility_timeout_seconds
 
         messages = [
@@ -887,10 +886,7 @@ class TaskRunner:
         # truncation — but handing that same slack to a NON-thinking task just raises
         # its visible-output ceiling above the cap its profile deliberately set.
         thinking_enabled = INTERACTIVE_THINKING_ENABLED
-        reasoning_effort = OPENROUTER_REASONING_EFFORT if thinking_enabled else None
-        # Normalize the caller's routing choice once, so the first attempt and any
-        # repair attempt route identically.
-        routing = routing_preference(request.routing)
+        reasoning_effort = INTERACTIVE_REASONING_EFFORT if thinking_enabled else None
         max_tokens = profile.max_output_tokens + (
             self.settings.thinking_headroom_tokens if thinking_enabled else 0
         )
@@ -905,20 +901,12 @@ class TaskRunner:
             timeout=timeout,
             # The caller's own credential (threaded from the route handler).
             api_key=api_key,
-            # And their routing preference. A task ships terminal tails,
-            # transcripts and memories upstream just as a turn does, so a privacy
-            # choice honoured only on /respond would be honoured exactly where the
-            # user can see it and dropped everywhere else.
-            routing=routing,
             # Cache affinity, keyed by TASK rather than by caller. A task's system
             # prompt is server-owned and identical for everyone who runs it, so the
             # calls that share a prefix are the ones that share a task id — not the
-            # ones that share a session. Left absent, OpenRouter would hash the
-            # first system and first non-system message, and the latter is the
-            # caller's terminal tail or transcript: a different key every call, so
-            # affinity would never engage. Per task and not one key for all tasks,
-            # so `terminal_summarize` and `checkpoint` cannot evict each other from
-            # an endpoint holding a prefix the other does not have.
+            # ones that share a session. Per task and not one key for all tasks, so
+            # `terminal_summarize` and `checkpoint` are never described to the
+            # upstream as one growing conversation.
             cache_session_id=_affinity_key(profile.id),
         )
 
@@ -946,12 +934,9 @@ class TaskRunner:
                 # Same caller credential as the first attempt — an omission here
                 # would fail the repair call outright (no provider default).
                 api_key=api_key,
-                # ...and the same routing, so a repair cannot land on an endpoint
-                # the original call was routed away from.
-                routing=routing,
                 # ...and the same affinity key: the repair replays the whole first
-                # attempt plus one instruction, so the endpoint that just prefilled
-                # it is the one that can answer cheapest.
+                # attempt plus one instruction, so it is the same prefix and should
+                # say so.
                 cache_session_id=_affinity_key(profile.id),
             )
             repair = await self._complete_with_retry(repair_request, budget=budget)

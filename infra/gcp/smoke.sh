@@ -2,20 +2,17 @@
 #
 # Basic end-to-end check of a deployed Daintree Assistant Server.
 #
-#   ./infra/gcp/smoke.sh                     # public endpoints + the auth gate
-#   OPENROUTER_API_KEY=sk-or-... ./infra/gcp/smoke.sh
-#                                            # ... plus the authenticated metadata routes
-#   OPENROUTER_API_KEY=sk-or-... ./infra/gcp/smoke.sh --full
-#                                            # ... plus two real model turns
+#   ./infra/gcp/smoke.sh                     # public endpoints + metadata routes
+#   ./infra/gcp/smoke.sh --full              # ... plus two real model turns
 #
 #   ./infra/gcp/smoke.sh --url https://assistant.daintree.org
 #                                            # test a specific host instead of the
 #                                            # Cloud Run URL discovered from gcloud
 #
-# Note what the bearer token is: this server has NO API key of its own. The
-# Authorization header carries the CALLER's OpenRouter key, which both admits the
-# request and pays for its upstream calls. That is why --full is opt-in — it
-# spends real money on whichever key you export, and nothing else here does.
+# NO BEARER TOKEN IS NEEDED. The server holds its own upstream credential
+# (CEREBRAS_API_KEY) and funds every turn from it, so the metadata routes answer
+# an anonymous request. That is also why --full is opt-in and everything else
+# here is not: --full spends DAINTREE's money, not the caller's.
 #
 # Exits non-zero on the first failed check so it is usable as a gate.
 
@@ -110,15 +107,22 @@ else
 fi
 
 # --------------------------------------------------------------------------
-head_ "Authentication gate"
+head_ "Authentication posture"
 
+# The door is open, deliberately and temporarily: the server holds the upstream
+# credential, so a request without a bearer has one to spend. Asserted rather
+# than assumed — this is the check that must start failing when account
+# authentication lands.
 code="$(req "$URL/v1/daintree/capabilities")"; load_body
-if [ "$code" = "401" ]; then
-  pass "an unauthenticated request is rejected with 401"
+if [ "$code" = "200" ]; then
+  pass "a request with no bearer token is served (server holds the credential)"
 else
-  fail "expected 401 without a bearer token, got $code" "$BODY"
+  fail "expected 200 without a bearer token, got $code" "$BODY"
 fi
 
+# A header that is PRESENT but unusable is still refused. Absence is a choice;
+# a broken header is a mistake, and ignoring it would show a caller a successful
+# sign-in while every turn ran on the server's account.
 code="$(req -H 'Authorization: Bearer' "$URL/v1/daintree/capabilities")"; load_body
 if [ "$code" = "401" ]; then
   pass "a malformed bearer header is rejected with 401"
@@ -127,14 +131,13 @@ else
 fi
 
 # --------------------------------------------------------------------------
-KEY="${OPENROUTER_API_KEY:-}"
-if [ -z "$KEY" ]; then
-  head_ "Authenticated routes"
-  echo "  SKIP  set OPENROUTER_API_KEY to exercise these"
-else
-  AUTH=(-H "Authorization: Bearer $KEY")
+if true; then
+  # No Authorization header: the server funds the turn. Kept as an array so the
+  # call sites below are unchanged, and so a future account credential slots in
+  # here rather than being threaded through each one.
+  AUTH=()
 
-  head_ "Authenticated routes (metadata only — no upstream model call, no cost)"
+  head_ "Metadata routes (no upstream model call, no cost)"
 
   code="$(req "${AUTH[@]}" "$URL/v1/daintree/capabilities")"; load_body
   if [ "$code" = "200" ]; then
@@ -257,9 +260,9 @@ d=json.load(sys.stdin)
 print(','.join(s.get('id','') for s in (d.get('skills') or {}).get('active', [])) or 'none')" 2>/dev/null)"
       pass "POST /v1/daintree/respond -> \"$reply\" (active skills: $active)"
     else
-      # 502 upstream_error is the shape an invalid or unfunded caller key takes:
-      # the server has no key to fall back on, so OpenRouter's rejection surfaces
-      # here rather than as a 401 from this service.
+      # A 502 here points at the SERVER's credential, not the caller's: an
+      # invalid or unfunded CEREBRAS_API_KEY surfaces as the upstream's rejection
+      # relayed through this service, since there is nothing else to fall back on.
       fail "POST /v1/daintree/respond returned $code" "$BODY"
     fi
 

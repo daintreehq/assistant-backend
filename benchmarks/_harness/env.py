@@ -1,7 +1,7 @@
 """Settings + live-provider bootstrap, shared by every suite that talks to a model.
 
 Reads the repo-root ``.env`` (the same file production uses) unless an explicit
-path is given, so a live run uses the real ``OPENROUTER_API_KEY``. Deterministic
+path is given, so a live run uses the real ``CEREBRAS_API_KEY``. Deterministic
 suites call ``build_settings`` too (they need caps, model ids, and the state
 keys) but never construct a provider.
 """
@@ -16,7 +16,7 @@ from pydantic import SecretStr
 
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.providers.base import ProviderChatRequest
-from daintree_assistant_server.providers.openrouter import OpenRouterProvider
+from daintree_assistant_server.providers.cerebras import CerebrasProvider
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -57,21 +57,23 @@ def build_settings(
 
 
 # Service entry points (orchestrator.complete, task_runner.run, selector.select)
-# now require a per-call caller key — the serving path holds no default. Fake-
-# provider suites pass this fixed sentinel (never sent anywhere); live suites
-# pass the real key via ``caller_api_key``.
+# take an optional per-call caller key. The serving path passes None and lets the
+# provider spend the server's own; fake-provider suites pass this fixed sentinel
+# (never sent anywhere) and live suites pass the real key via ``caller_api_key``,
+# so a bench always names the credential it means to spend rather than inheriting
+# one.
 BENCH_CALLER_KEY = SecretStr("benchmark-caller-key-not-a-secret")
 
 
 def caller_api_key(settings: Settings) -> SecretStr:
     """The per-call credential for service-level benchmark calls.
 
-    The real ``OPENROUTER_API_KEY`` when the environment has one (live suites),
+    The real ``CEREBRAS_API_KEY`` when the environment has one (live suites),
     else the bench sentinel (deterministic suites, whose fake providers never
     build a header from it).
     """
-    if settings.openrouter_api_key.get_secret_value():
-        return settings.openrouter_api_key
+    if settings.cerebras_api_key.get_secret_value():
+        return settings.cerebras_api_key
     return BENCH_CALLER_KEY
 
 
@@ -82,32 +84,32 @@ def require_api_key(settings: Settings) -> SecretStr:
     the provider unwraps it only to build a header or to scrub an echoed key out of
     upstream error text.
     """
-    if not settings.openrouter_api_key.get_secret_value():
+    if not settings.cerebras_api_key.get_secret_value():
         raise EnvError(
-            "OPENROUTER_API_KEY is not set — export it or point --env-file at a .env "
-            "that has it (live suites make real, paid calls)."
+            "CEREBRAS_API_KEY is not set — export it or point --env-file at a .env "
+            "that has it (live suites make real calls)."
         )
-    return settings.openrouter_api_key
+    return settings.cerebras_api_key
 
 
 def build_provider_body(
     request: ProviderChatRequest, settings: Settings, *, stream: bool = False
 ) -> dict[str, Any]:
-    """The EXACT upstream body ``OpenRouterProvider`` would POST — built through the
+    """The EXACT upstream body ``CerebrasProvider`` would POST — built through the
     real provider (no network, no key needed) so the deterministic cache metric is
     measured over production's wire bytes, not a hand-rebuilt dict."""
-    provider = OpenRouterProvider(
+    provider = CerebrasProvider(
         None,  # type: ignore[arg-type]  # _build_body never touches the client
         api_key=SecretStr(""),  # no network: _build_body never builds a header
-        base_url=settings.openrouter_base_url,
+        base_url=settings.cerebras_base_url,
     )
     return provider._build_body(request, stream=stream)
 
 
 def make_upstream_provider(
     settings: Settings, *, timeout: float | None = None
-) -> OpenRouterProvider:
-    """A real OpenRouter provider over a fresh httpx client — identical wiring to
+) -> CerebrasProvider:
+    """A real Cerebras provider over a fresh httpx client — identical wiring to
     the production ``Container``/existing benches (never a bespoke client)."""
     key = require_api_key(settings)
     t = timeout or settings.utility_timeout_seconds
@@ -115,9 +117,9 @@ def make_upstream_provider(
         timeout=httpx.Timeout(t, connect=settings.upstream_connect_timeout_seconds),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    return OpenRouterProvider(
+    return CerebrasProvider(
         client,
         api_key=key,
-        base_url=settings.openrouter_base_url,
+        base_url=settings.cerebras_base_url,
         default_timeout=t,
     )

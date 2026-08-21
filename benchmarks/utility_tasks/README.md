@@ -24,7 +24,7 @@ reference scorer and are out of scope here):
 ## Quick start
 
 ```bash
-# from the repo root, venv active, OPENROUTER_API_KEY in .env (or exported)
+# from the repo root, venv active, CEREBRAS_API_KEY in .env (or exported)
 python -m benchmarks.utility_tasks.bench list             # validate cases, no API calls
 python -m benchmarks.utility_tasks.bench run              # baseline (packaged prompts)
 python -m benchmarks.utility_tasks.bench run --variant my-idea

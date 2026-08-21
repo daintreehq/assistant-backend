@@ -5,12 +5,8 @@
     "skills": 39
   },
   "identity": {
-    "default_endpoint_sort": "throughput",
-    "denied_endpoints": [
-      "digitalocean"
-    ],
-    "model": "deepseek/deepseek-v4-flash-0731",
-    "privacy_mode": "no_training",
+    "model": "gemma-4-31b",
+    "provider": "cerebras",
     "public_model": "daintree-assistant"
   },
   "prompt": {

@@ -36,8 +36,7 @@ FLOORS: dict[str, int] = {
     "src/daintree_assistant_server/main.py": 95,
     "src/daintree_assistant_server/api/daintree_auth.py": 93,
     "src/daintree_assistant_server/providers/base.py": 92,
-    "src/daintree_assistant_server/providers/openrouter.py": 89,
-    "src/daintree_assistant_server/providers/policy.py": 93,
+    "src/daintree_assistant_server/providers/cerebras.py": 92,
     # Added 2026-08-20 (measured 94.70%). The orchestrator earned a floor when the
     # streaming fold became a COST-CONTAINMENT surface as well as a correctness
     # one: the runaway guard is the only thing standing between a degenerating

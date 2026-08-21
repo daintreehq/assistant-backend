@@ -1,9 +1,11 @@
 """The narrow provider protocol and its normalized request/result types.
 
-Business logic depends only on these types, never on OpenRouter wire shapes. A
+Business logic depends only on these types, never on a vendor's wire shapes. A
 later provider (another hosted API, or a self-hosted PyTorch model) implements
 the same protocol without touching request validation, skill selection, state,
-prompt construction, or the public endpoints.
+prompt construction, or the public endpoints. Swapping OpenRouter for Cerebras
+touched only ``providers/`` and the config that names the models, which is the
+property this file exists to keep.
 """
 
 from __future__ import annotations
@@ -15,8 +17,6 @@ from typing import Any, Protocol, runtime_checkable
 
 from pydantic import SecretStr
 
-from .policy import RoutingPreference
-
 
 @dataclass(frozen=True)
 class ProviderUsage:
@@ -26,15 +26,16 @@ class ProviderUsage:
     completion_tokens: int | None = None
     total_tokens: int | None = None
     cached_tokens: int | None = None
-    # What this call actually charged the CALLER's account, in provider credits
-    # (USD for OpenRouter). It is not a per-token estimate we compute: the router
-    # reports what it billed, so it already accounts for the endpoint that served
-    # the request and for any cache discount. `None` means "not reported".
+    # What this call actually charged, in provider credits (USD). It is not a
+    # per-token estimate we compute: it is what the provider says it billed, so it
+    # already accounts for any cache discount. `None` means "not reported".
     #
-    # OpenRouter returns this unconditionally — the `usage: {include: true}`
-    # opt-in is deprecated and has no effect — in the same object as the token
-    # counts, including the final chunk of a stream. So there is no second call
-    # and no added latency; verified against the live API 2026-08-14.
+    # **Cerebras reports no cost at all**, so on the serving path this is `None`
+    # on every call today. The field stays because "not reported" is exactly what
+    # `None` already means, and because the whole accounting chain below —
+    # `cost_complete`, the floor-vs-total rules, the client-facing `cost` block —
+    # was built to survive an unknown rather than invent a zero. A provider that
+    # does report one needs no change above this line.
     cost: float | None = None
     # Whether ``cost`` accounts for EVERY billed call folded into this record.
     #
@@ -97,10 +98,10 @@ class ProviderChatRequest:
     include_usage: bool = False
     thinking_disabled: bool = True
     # Reasoning effort, only meaningful when thinking is enabled
-    # (``thinking_disabled=False``). OpenRouter accepts the usual tiers
-    # ("minimal"/"low"/"medium"/"high"/"xhigh"/"max") and translates them for the
-    # endpoint that answers; DeepSeek collapses low/medium to high and xhigh to
-    # max. ``None`` lets the endpoint default apply.
+    # (``thinking_disabled=False``) AND the model reasons at all. Cerebras takes
+    # "low"/"medium"/"high"; ``None`` lets the model's default apply. The serving
+    # model does not reason, so this is set only on the skill-learning calls that
+    # run on gpt-oss-120b.
     reasoning_effort: str | None = None
     timeout: float | None = None
     # The upstream credential for THIS call — on the serving path, always the
@@ -115,22 +116,18 @@ class ProviderChatRequest:
     # plain dataclass that coerces nothing and untyped callers (benchmarks)
     # could put a bare string here without mypy objecting.
     api_key: SecretStr | None = field(default=None, repr=False)
-    # The caller's validated endpoint-routing preference for THIS call, or
-    # ``None`` for the server default. Like ``api_key`` it rides the request
-    # rather than the provider instance, because one shared provider serves every
-    # caller — a per-process policy could not represent "this turn's choice".
-    # Already normalized to the typed form by the request boundary; the adapter
-    # never sees raw client input here.
-    routing: RoutingPreference | None = None
-    # An OPAQUE cache-affinity key for this call, or ``None`` to let the router
-    # pick its own. A router that fronts many hosts for the same weights keeps
-    # prefix caches node-locally, so it needs to know which calls belong to one
-    # growing conversation in order to send them back to the host already holding
-    # that prefix. This is that key — routing metadata, never prompt content.
+    # An OPAQUE cache-affinity key for this call, or ``None`` to say nothing.
+    #
+    # A ROUTER that fronts many hosts for the same weights needs this to send a
+    # growing conversation back to the node already holding its prefix. Cerebras
+    # is a single host with automatic org-scoped prefix caching, so here the key
+    # is a hint the upstream may ignore rather than the mechanism the cache runs
+    # on — it is still sent, under the OpenAI-standard `prompt_cache_key`
+    # spelling, because it costs one short field and states the intent.
     #
     # WHAT IT NAMES depends on which calls share a prefix, and that is not always a
-    # session. A conversation is keyed per session, the skill selector per catalog
-    # revision, a utility task per task id (docs/PROVIDER_POLICY.md section 3a).
+    # session. A conversation is keyed per session, a utility task per task id
+    # (docs/PROVIDER_POLICY.md section 3a).
     #
     # It is NEVER the client's session id, whatever it names. Where the value does
     # derive from one, it is a salted pseudonym (see
@@ -138,21 +135,8 @@ class ProviderChatRequest:
     # and a raw client identifier has no business doing so. The name says ``cache_``
     # precisely so a future caller does not read ``session_id`` and forward the real
     # one. ``repr=False`` keeps it out of logs alongside ``api_key`` — a
-    # session-derived key is a stable correlator even hashed. (The selector and task
-    # keys carry no caller-derived data at all, but they ride the same field and
-    # inherit the same discipline rather than earning an exception.)
+    # session-derived key is a stable correlator even hashed.
     cache_session_id: str | None = field(default=None, repr=False)
-    # Flips the endpoint RANKING axis from tokens/second to time-to-first-token
-    # (`RoutingPolicy.ranked_on_first_byte`). Set it on a call whose answer is a
-    # handful of tokens and whose latency a user is waiting on, so that the sort
-    # ranks on the half of its wall-clock that actually varies.
-    #
-    # A CALL-SITE property, never a guess about a request. It says what this call
-    # permanently is, which the code constructing it knows for certain; a rule
-    # that tried to infer it from message content would be a rule waiting to be
-    # wrong. It changes ranking only — never the pool, the prompt, the model, the
-    # parameters, or the privacy floor.
-    latency_critical: bool = False
 
 
 @dataclass
@@ -166,11 +150,11 @@ class ProviderChatResult:
     usage: ProviderUsage
     finish_reason: str | None = None
     # Which upstream endpoint actually served this call, when the provider reports
-    # one (a router like OpenRouter fronts many hosts for the same weights, and
-    # they differ by more than 10x in latency). Observability ONLY: nothing branches
-    # on it, and ``None`` simply means "not reported" — a single-host provider never
-    # sets it. It exists because a slow turn is otherwise undiagnosable: the log
-    # says the call took 10s but not which of ~24 endpoints was responsible.
+    # one. Observability ONLY: nothing branches on it, and ``None`` simply means
+    # "not reported" — a single-host provider never sets it, which is every call
+    # against Cerebras today. Kept for a future router, where a slow turn is
+    # otherwise undiagnosable: the log says the call took 10s but not which of
+    # many interchangeable endpoints was responsible.
     endpoint: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -256,8 +240,9 @@ class ChatProvider(Protocol):
     async def verify_key(self, api_key: SecretStr | None = None) -> dict[str, Any]:
         """Ask the provider whether a credential is usable, spending no tokens.
 
-        Part of the protocol because sign-in needs an answer our structural auth
-        cannot give — see api/daintree_auth.py. Implementations raise
+        Part of the protocol because readiness and the doctor endpoint need an
+        answer that a configured-but-wrong key would otherwise hide until the
+        first real turn — see api/daintree_auth.py. Implementations raise
         ``invalid_api_key`` for a definite rejection and ``upstream_error`` when the
         probe could not be completed, so "unusable" and "unknown" stay distinct.
         """

@@ -47,7 +47,6 @@ def test_no_prompt_file_is_read_on_the_request_path(monkeypatch) -> None:  # typ
 
     loader.base_prompt()
     loader.task_system_prompt("checkpoint")
-    loader.skill_learning_prompt("gate")
 
     assert reads == [], f"prompt files were read on the request path: {reads}"
 

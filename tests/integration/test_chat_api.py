@@ -381,8 +381,28 @@ def test_error_envelopes(client, auth, messages, tools, code) -> None:
     assert r.json()["error"]["code"] == code
 
 
-def test_missing_auth_401(client) -> None:
+def test_missing_auth_is_served_anonymously(client) -> None:
+    """The door is open, and this is where that is visible on the wire.
+
+    The server holds the upstream credential, so a request with no Authorization
+    header has one to spend. This assertion is the one that must break loudly
+    when account authentication lands — it is the stage, not an oversight.
+    """
     r = client.post(URL, json=respond_body([{"role": "user", "content": "x"}]))
+    assert r.status_code == 200
+
+
+def test_a_malformed_bearer_is_still_401(client) -> None:
+    """Absence is a choice; a broken header is a mistake worth naming.
+
+    Silently ignoring it would show a caller a successful sign-in while every
+    turn ran on the server's account instead of theirs.
+    """
+    r = client.post(
+        URL,
+        headers={"Authorization": "Bearer bad key"},
+        json=respond_body([{"role": "user", "content": "x"}]),
+    )
     assert r.status_code == 401
     assert r.json()["error"]["code"] == "invalid_api_key"
 
@@ -851,28 +871,6 @@ def test_nonstream_usage_summing_tolerates_unreported_fields(
     assert usage["completion_tokens"] == 5
     assert usage["cached_tokens"] == 40
     assert usage["total_tokens"] == 0      # neither side reported it
-
-
-def test_nonstream_discarded_draft_never_reaches_skill_learning(
-    client, auth, fake_provider, app, monkeypatch
-) -> None:
-    """Learning must see the accepted answer, not the round that did nothing."""
-    seen: list[str] = []
-    monkeypatch.setattr(
-        app.state.container.orchestrator,
-        "_maybe_learn_after_turn",
-        lambda **kwargs: seen.append(kwargs["assistant_text"]),
-    )
-    fake_provider.selection_result = selection_result([])
-    fake_provider.complete_result = [
-        make_result(content=DEAD_ROUND, finish_reason="stop"),
-        make_result(content="Read five votes; here is the tally.", finish_reason="stop"),
-    ]
-    client.post(URL, headers=auth, json=respond_body(
-        [{"role": "user", "content": "read the votes"}], session_id="bi15", turn_id="t1",
-        tools=[EXTRACT_TOOL],
-    ))
-    assert seen == ["Read five votes; here is the tally."]
 
 
 def test_stream_reasoning_disarms_the_gate(client, auth, fake_provider) -> None:

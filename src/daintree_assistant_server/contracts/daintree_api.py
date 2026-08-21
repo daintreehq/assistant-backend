@@ -21,7 +21,6 @@ from .errors import ErrorDetail
 from .extensions import (
     ClientInfo,
     Prelude,
-    Routing,
     RuntimeContext,
     Selection,
     SelectorMeta,
@@ -110,9 +109,6 @@ class RespondRequest(BaseModel):
     turn: TurnContext | None = None
     selection: Selection = Field(default_factory=Selection)
     generation: Generation = Field(default_factory=Generation)
-    # Optional endpoint-routing preference. Omitted by almost every request,
-    # which keeps the server default (see providers/policy.py DEFAULT_POLICY).
-    routing: Routing | None = None
     client: ClientInfo | None = None
 
 

@@ -1,4 +1,4 @@
-"""OpenRouter provider adapter tests using a mock HTTP transport."""
+"""Cerebras provider adapter tests using a mock HTTP transport."""
 
 from __future__ import annotations
 
@@ -13,44 +13,39 @@ from pydantic import SecretStr
 
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
-from daintree_assistant_server.providers.openrouter import (
+from daintree_assistant_server.providers.cerebras import (
     _ERROR_DETAIL_CAP,
     _REDACTED,
-    OpenRouterProvider,
+    CerebrasProvider,
     _extract_upstream_error,
-)
-from daintree_assistant_server.providers.policy import (
-    EndpointSort,
-    PrivacyMode,
-    RoutingPreference,
 )
 from daintree_assistant_server.providers.retry import retry_upstream
 
-_BASE = "https://openrouter.ai/api/v1"
-_MODEL = "deepseek/deepseek-v4-flash-0731"
+_BASE = "https://api.cerebras.ai/v1"
+_MODEL = "gemma-4-31b"
 # The provider's constructor default (fallback) key, and a distinct per-call key.
 # They must differ so a dropped per-call credential is detectable rather than
 # accidentally matching the fallback. Both are long, distinctive sentinels so a
 # test can assert the literal value is ABSENT without matching incidental prose.
-_DEFAULT_KEY = "sk-or-v1-default-credential"
-_CALL_KEY = "sk-or-v1-per-call-credential"
+_DEFAULT_KEY = "csk-default-credential"
+_CALL_KEY = "csk-per-call-credential"
 
 SSE_OK = (
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek/deepseek-v4-flash-0731",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"gemma-4-31b",'
     '"choices":[{"index":0,"delta":{"role":"assistant","content":"Hel"}}]}\n\n'
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek/deepseek-v4-flash-0731",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"gemma-4-31b",'
     '"choices":[{"index":0,"delta":{"content":"lo"}}]}\n\n'
-    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"deepseek/deepseek-v4-flash-0731",'
+    'data: {"id":"x","object":"chat.completion.chunk","created":1,"model":"gemma-4-31b",'
     '"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],'
     '"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n'
     "data: [DONE]\n\n"
 )
 
 
-def _provider(handler, **kwargs) -> OpenRouterProvider:
+def _provider(handler, **kwargs) -> CerebrasProvider:
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     kwargs.setdefault("api_key", SecretStr(_DEFAULT_KEY))
-    return OpenRouterProvider(client, base_url=_BASE, **kwargs)
+    return CerebrasProvider(client, base_url=_BASE, **kwargs)
 
 
 def _capture(captured: dict):
@@ -91,7 +86,7 @@ async def test_complete_success() -> None:
             json={
                 "id": "abc",
                 "created": 10,
-                "model": "deepseek/deepseek-v4-flash-0731",
+                "model": "gemma-4-31b",
                 "choices": [
                     {"index": 0, "message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}
                 ],
@@ -108,370 +103,109 @@ async def test_complete_success() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reasoning_disabled_sent_by_default() -> None:
-    # thinking_disabled=True (the default) sends an EXPLICIT disable directive — a
-    # reasoning model reasons when the field is absent, so this is what keeps
-    # non-thinking calls (the latency-critical selector above all) actually
-    # non-thinking, and what keeps any client-forced tool_choice from 400ing.
+async def test_reasoning_effort_is_a_bare_string() -> None:
+    # Cerebras takes a flat `reasoning_effort`, NOT OpenRouter's `reasoning`
+    # object — which it rejects with a 400. Only the skill-learning calls on
+    # gpt-oss-120b ever set this; the serving model has no reasoning mode.
     captured: dict = {}
     provider = _provider(_capture(captured))
-    await provider.complete(_req())
-    assert captured["body"]["reasoning"] == {"enabled": False}
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_reasoning_not_sent_when_flag_off() -> None:
-    # send_reasoning=False means the model has no reasoning mode at all: send
-    # neither the directive nor the effort.
-    captured: dict = {}
-    provider = _provider(_capture(captured), send_reasoning=False)
-    await provider.complete(_req())
+    await provider.complete(_req(thinking_disabled=False, reasoning_effort="high"))
+    assert captured["body"]["reasoning_effort"] == "high"
     assert "reasoning" not in captured["body"]
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_reasoning_enabled_sends_effort() -> None:
-    # OpenRouter's unified object carries the tier; `effort` and `max_tokens` are
-    # mutually exclusive there, so a tiered request must not also emit a bare
-    # enable or a flat reasoning_effort field.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req(thinking_disabled=False, reasoning_effort="max"))
-    assert captured["body"]["reasoning"] == {"effort": "max"}
-    assert "reasoning_effort" not in captured["body"]
-    await provider.aclose()
+async def test_a_non_thinking_call_sends_nothing_at_all() -> None:
+    """Omission IS the non-thinking posture, and it has to be.
 
-
-@pytest.mark.asyncio
-async def test_reasoning_enabled_omits_effort_when_unset() -> None:
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req(thinking_disabled=False))
-    assert captured["body"]["reasoning"] == {"enabled": True}
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_disabled_reasoning_never_sends_effort() -> None:
-    # reasoning_effort is meaningless without thinking; it must not leak into a
-    # non-thinking request even if a caller set it.
+    There is no "off" value on this wire — `reasoning_effort` takes
+    low/medium/high and nothing else — so a non-thinking call cannot state its
+    posture, only decline to state one. The explicit-disable the previous adapter
+    sent has no expressible equivalent, and sending the old object is a 400.
+    """
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.complete(_req(thinking_disabled=True, reasoning_effort="high"))
-    assert captured["body"]["reasoning"] == {"enabled": False}
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_reasoning_params_omitted_when_flag_off() -> None:
-    # send_reasoning=False: even a thinking-enabled request sends neither field.
-    captured: dict = {}
-    provider = _provider(_capture(captured), send_reasoning=False)
-    await provider.complete(_req(thinking_disabled=False, reasoning_effort="max"))
-    assert "reasoning" not in captured["body"]
     assert "reasoning_effort" not in captured["body"]
+    assert "reasoning" not in captured["body"]
     await provider.aclose()
 
 
-# ---- endpoint-selection policy --------------------------------------------
-
-
 @pytest.mark.asyncio
-async def test_provider_routing_policy_sent_on_every_request() -> None:
-    # OpenRouter picks WHICH endpoint answers, so this block is not decoration: it
-    # is the throughput-first / no-data-collection product decision. A request that
-    # silently omitted it would route on price to any endpoint, including ones that
-    # train on prompts.
+async def test_thinking_enabled_with_no_tier_sends_no_field_either() -> None:
+    # There is no bare "enable" to send: with no tier, the model's own default
+    # applies and the field is simply absent.
     captured: dict = {}
     provider = _provider(_capture(captured))
-    await provider.complete(_req())
-    assert captured["body"]["provider"] == {
-        "sort": "throughput",
-        "data_collection": "deny",
-        "require_parameters": True,
-        "allow_fallbacks": True,
-        "ignore": ["digitalocean"],
-        "preferred_max_latency": {"p50": 1.0, "p90": 2.0, "p99": 5.0},
-    }
+    await provider.complete(_req(thinking_disabled=False, reasoning_effort=None))
+    assert "reasoning_effort" not in captured["body"]
+    assert "reasoning" not in captured["body"]
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("label", "kwargs"),
-    [
-        ("plain chat", {}),
-        ("json mode", {"response_format": {"type": "json_object"}}),
-        ("first-byte ranked", {"latency_critical": True}),
-        ("caller preference", {"routing": RoutingPreference(sort=EndpointSort.PRICE)}),
-        ("streaming", {"stream": True}),
-    ],
-)
-async def test_every_call_shape_is_bounded_on_first_byte(label: str, kwargs: dict) -> None:
-    """The invariant that replaced two tests encoding the old design.
+async def test_max_tokens_is_sent_under_exactly_one_name() -> None:
+    """The trap that breaks every request if it is ever got wrong.
 
-    The bound used to be added by a derivation applied to `response_format` calls,
-    which left the plain chat call — the ONLY upstream call a short question makes
-    — elected purely on tokens/second, with nothing bounding how long an endpoint
-    took to say the first word. That was the "it takes a while to start" symptom.
-
-    Parametrised over shapes rather than asserted once, because the failure mode is
-    specifically that ONE path forgets. A shape added later without a bound fails
-    here rather than being discovered by a user waiting on a greeting.
+    Cerebras accepts `max_tokens` OR `max_completion_tokens` alone, but 400s when
+    both arrive. The normalized field here is called `max_tokens`, so passing it
+    straight through *works* — right up until something also sets the other name,
+    at which point every single call fails.
     """
     captured: dict = {}
     provider = _provider(_capture(captured))
-    if kwargs.pop("stream", False):
-        stream = await provider.open_stream(_req(stream=True, **kwargs))
-        await stream.aclose()
-    else:
-        await provider.complete(_req(**kwargs))
-    bound = captured["body"]["provider"].get("preferred_max_latency")
-    assert bound == {"p50": 1.0, "p90": 2.0, "p99": 5.0}, f"{label} routes unbounded"
+    await provider.complete(_req(max_tokens=512))
+    assert captured["body"]["max_completion_tokens"] == 512
+    assert "max_tokens" not in captured["body"]
     await provider.aclose()
 
 
 @pytest.mark.asyncio
-async def test_the_selector_call_is_ranked_on_first_byte_not_throughput() -> None:
-    # The selector: ~10.3k prompt tokens for ~90 of answer, on the turn's
-    # first-byte path. Ranking that pool by tokens/second optimises the sliver of
-    # the call that is generation. `sort: "latency"` ranks on time-to-first-token,
-    # which is the rest of it (docs/PROVIDER_POLICY.md section 3b).
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(
-        _req(response_format={"type": "json_object"}, latency_critical=True)
-    )
-    routing = captured["body"]["provider"]
-    assert routing["sort"] == "latency"
-    assert routing["preferred_max_latency"] == {"p50": 1.0, "p90": 2.0, "p99": 5.0}
-    # Same filtered pool as every other call — this re-ranks, it does not narrow.
-    assert routing["data_collection"] == "deny"
-    assert routing["require_parameters"] is True
-    assert routing["allow_fallbacks"] is True
-    await provider.aclose()
+@pytest.mark.parametrize("field", ["provider", "session_id", "reasoning", "usage"])
+async def test_no_openrouter_only_field_is_ever_sent(field: str) -> None:
+    """Each of these was on every request under the previous adapter.
 
-
-@pytest.mark.asyncio
-async def test_a_caller_routing_preference_outranks_the_first_byte_axis() -> None:
-    # The ordering documented in section 3b, asserted on the wire. The classifier
-    # policy REPLACES the sort key, so applying it after the caller's preference
-    # would silently overrule a caller who asked for price — a trade that is
-    # legitimately theirs. The floor is not theirs, and does not move.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(
-        _req(
-            response_format={"type": "json_object"},
-            latency_critical=True,
-            routing=RoutingPreference(sort=EndpointSort.PRICE),
-        )
-    )
-    routing = captured["body"]["provider"]
-    assert routing["sort"] == "price"
-    assert routing["preferred_max_latency"] == {"p50": 1.0, "p90": 2.0, "p99": 5.0}
-    assert routing["data_collection"] == "deny"
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_latency_critical_without_json_mode_still_flips_the_axis() -> None:
-    # `latency_critical` is a statement about the call's COST SHAPE, not about its
-    # output format, and the branch treats it as authoritative over `structured`.
-    # Pinned because nothing today exercises the combination: the one classifier we
-    # ship also sets response_format, so a refactor that quietly made the flag
-    # conditional on it would break nothing visible.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req(latency_critical=True))
-    routing = captured["body"]["provider"]
-    assert "response_format" not in captured["body"]
-    assert routing["sort"] == "latency"
-    assert routing["preferred_max_latency"] == {"p50": 1.0, "p90": 2.0, "p99": 5.0}
-    assert routing["data_collection"] == "deny"
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_a_default_routed_call_keeps_its_affinity_key_unsuffixed() -> None:
-    # The common path, and the reason the cohort suffix is conditional: the shared
-    # selector and task keys are meant to be short, legible upstream, and identical
-    # across every caller on the default policy. A suffix that appeared
-    # unconditionally would still be correct, but it would put a routing digest in
-    # a key that has no routing variation to disambiguate.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req(cache_session_id="daintree-selector-abc123"))
-    assert captured["body"]["session_id"] == "daintree-selector-abc123"
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_a_caller_routing_preference_puts_the_call_in_its_own_affinity_cohort() -> None:
-    """THE point of the suffix, and it is about a SHARED credential.
-
-    A sticky key names an endpoint; only endpoints passing this request's filters
-    are reachable. Two calls sharing a key under different filters fight over one
-    record — and once one server-held key funds every caller, that stops being one
-    caller's problem and becomes one caller's `zdr` re-pointing everyone else's
-    selector traffic.
+    Each is now a hard `400 wrong_api_format`. They are checked here rather than
+    discovered in production because the failure is total — not one degraded
+    feature but every call — and nothing in a mocked test would otherwise notice
+    a stray field.
     """
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    base = "daintree-selector-abc123"
-
-    await provider.complete(_req(cache_session_id=base))
-    default_key = captured["body"]["session_id"]
-
-    await provider.complete(
-        _req(cache_session_id=base, routing=RoutingPreference(privacy=PrivacyMode.ZDR))
-    )
-    zdr_key = captured["body"]["session_id"]
-
-    await provider.complete(
-        _req(cache_session_id=base, routing=RoutingPreference(only=("deepinfra",)))
-    )
-    only_key = captured["body"]["session_id"]
-
-    assert len({default_key, zdr_key, only_key}) == 3, (
-        "two routing cohorts share one sticky record; the stricter one will "
-        "re-elect and the looser one will inherit a pin it never asked for"
-    )
-    # Still recognisably the same key underneath — the suffix scopes it, it does
-    # not replace it, so an upstream dashboard still groups the cohorts together.
-    for key in (zdr_key, only_key):
-        assert key.startswith(f"{base}-")
-    assert len(only_key) <= 256
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_the_cohort_suffix_tracks_the_pool_and_not_the_preference_object() -> None:
-    # Derived from the `provider` block actually emitted, so it cannot drift from
-    # what was really routed. Two preferences that render the SAME pool are the
-    # same cohort and must share a record — splitting them would halve the warmth
-    # for no benefit.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-
-    await provider.complete(
-        _req(cache_session_id="k", routing=RoutingPreference(sort=EndpointSort.THROUGHPUT))
-    )
-    explicit_default = captured["body"]["session_id"]
-    explicit_block = captured["body"]["provider"]
-
-    await provider.complete(
-        _req(
-            cache_session_id="k",
-            routing=RoutingPreference(sort=EndpointSort.THROUGHPUT, privacy=PrivacyMode.NO_TRAINING),
-        )
-    )
-    assert captured["body"]["provider"] == explicit_block
-    assert captured["body"]["session_id"] == explicit_default
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_structured_tool_call_preserves_the_latency_classification() -> None:
-    # Same trap as the api_key and affinity cases: this sub-request is rebuilt
-    # field by field. Dropping the flag would silently re-rank the call by
-    # tokens/second while every comment above it claims otherwise.
-    captured: dict = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["body"] = _json.loads(request.content)
-        return httpx.Response(
-            200,
-            json={
-                "id": "x",
-                "created": 0,
-                "model": "m",
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": "{}"}}],
-                "usage": {},
-            },
-        )
-
-    provider = _provider(handler)
-    await provider.structured_tool_call(
-        _req(latency_critical=True),
-        function_name="pick",
-        function_schema={"type": "object", "properties": {}},
-    )
-    assert captured["body"]["provider"]["sort"] == "latency"
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_cache_session_key_rides_as_a_top_level_field() -> None:
-    # OpenRouter's sticky routing keys on a top-level `session_id`, NOT on
-    # anything inside the provider block. Placement is the whole test: a key
-    # nested under `provider` would be an unrecognized preference rather than an
-    # affinity hint, and would fail silently — the request still succeeds, it just
-    # routes as if we had never asked.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req(cache_session_id="daintree-main-abc123"))
-    assert captured["body"]["session_id"] == "daintree-main-abc123"
-    assert "session_id" not in captured["body"]["provider"]
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_cache_session_key_leaves_the_routing_policy_untouched() -> None:
-    # Affinity must be additive. In particular it must NOT arrive as
-    # `provider.order`, which OpenRouter documents as DISABLING sticky routing and
-    # as taking precedence over `sort` — the exact hand-rolled pin this mechanism
-    # replaces (see docs/PROVIDER_POLICY.md section 3).
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req(cache_session_id="daintree-main-abc123"))
-    assert captured["body"]["provider"] == {
-        "sort": "throughput",
-        "data_collection": "deny",
-        "require_parameters": True,
-        "allow_fallbacks": True,
-        "ignore": ["digitalocean"],
-        "preferred_max_latency": {"p50": 1.0, "p90": 2.0, "p99": 5.0},
-    }
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_no_cache_session_key_sends_no_field() -> None:
-    # Absent, not null. A caller with no session leaves the router on its own
-    # default keying rather than joining a shared cohort.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req())
-    assert "session_id" not in captured["body"]
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_cache_session_key_survives_a_caller_routing_preference() -> None:
-    # The caller-preference branch rebuilds the provider block per request instead
-    # of reusing the prebuilt dict. Affinity must survive that — it is a SIBLING of
-    # the block, not part of it — and the caller's own allow/deny list must still be
-    # what filters the pool the sticky endpoint is chosen from.
-    #
-    # Survives, not "is byte-identical": the key is now scoped to the routing cohort
-    # (see the cohort tests above), because a caller filtered to a different pool
-    # cannot share a sticky record with one that is not. What must not change is the
-    # session the key names.
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.complete(
         _req(
             cache_session_id="daintree-main-abc123",
-            routing=RoutingPreference(only=("deepinfra",)),
+            thinking_disabled=False,
+            reasoning_effort="high",
+            response_format={"type": "json_object"},
         )
     )
-    assert captured["body"]["session_id"].startswith("daintree-main-abc123")
-    assert captured["body"]["provider"]["only"] == ["deepinfra"]
-    assert "order" not in captured["body"]["provider"]
-    assert "session_id" not in captured["body"]["provider"]
+    assert field not in captured["body"]
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_cache_session_key_rides_the_openai_standard_field() -> None:
+    # `prompt_cache_key` is the OpenAI-standard spelling and the one Cerebras
+    # accepts. The spelling is the whole risk: `session_id` — OpenRouter's name
+    # for the same idea — is a hard 400, and this field is attached to every main
+    # turn and every utility task, so getting it wrong breaks everything.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req(cache_session_id="daintree-main-abc123"))
+    assert captured["body"]["prompt_cache_key"] == "daintree-main-abc123"
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_no_cache_session_key_sends_no_field() -> None:
+    # Absent, not null. A caller with no session says nothing about prefixes
+    # rather than claiming an empty one.
+    captured: dict = {}
+    provider = _provider(_capture(captured))
+    await provider.complete(_req())
+    assert "prompt_cache_key" not in captured["body"]
     await provider.aclose()
 
 
@@ -487,7 +221,7 @@ async def test_cache_session_key_is_sent_on_the_streaming_path() -> None:
 
     provider = _provider(handler)
     stream = await provider.open_stream(_req(stream=True, cache_session_id="daintree-main-xyz"))
-    assert captured["body"]["session_id"] == "daintree-main-xyz"
+    assert captured["body"]["prompt_cache_key"] == "daintree-main-xyz"
     await stream.aclose()
     await provider.aclose()
 
@@ -532,7 +266,7 @@ async def test_structured_tool_call_forwards_the_cache_session_key() -> None:
         function_name="pick",
         function_schema={"type": "object", "properties": {"a": {"type": "integer"}}},
     )
-    assert captured["body"]["session_id"] == "daintree-main-abc123"
+    assert captured["body"]["prompt_cache_key"] == "daintree-main-abc123"
     await provider.aclose()
 
 
@@ -545,85 +279,8 @@ def test_provider_chat_request_repr_omits_the_cache_session_key() -> None:
 
 
 @pytest.mark.asyncio
-async def test_serving_endpoint_is_captured_for_logging() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "id": "x",
-                "created": 0,
-                "model": "m",
-                "choices": [],
-                "usage": {},
-                "provider": "CoreWeave",
-            },
-        )
-
-    provider = _provider(handler)
-    result = await provider.complete(_req())
-    assert result.endpoint == "CoreWeave"
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_missing_serving_endpoint_is_none_not_an_error() -> None:
-    provider = _provider(_capture({}))
-    result = await provider.complete(_req())
-    assert result.endpoint is None
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_provider_routing_policy_sent_on_streams_too() -> None:
-    captured: dict = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["body"] = _json.loads(request.content)
-        return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=SSE_OK)
-
-    provider = _provider(handler)
-    stream = await provider.open_stream(_req(stream=True))
-    assert captured["body"]["provider"]["sort"] == "throughput"
-    assert captured["body"]["provider"]["data_collection"] == "deny"
-    await stream.aclose()
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_attribution_headers_sent() -> None:
-    seen: dict = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        seen["referer"] = request.headers.get("http-referer")
-        seen["title"] = request.headers.get("x-title")
-        return httpx.Response(
-            200, json={"id": "x", "created": 0, "model": "m", "choices": [], "usage": {}}
-        )
-
-    provider = _provider(handler)
-    await provider.complete(_req())
-    assert seen["referer"] and seen["title"]
-    await provider.aclose()
-
-
-@pytest.mark.asyncio
-async def test_no_prompt_cache_key_is_sent() -> None:
-    # No endpoint for this model advertises prompt_cache_key, and with
-    # require_parameters on, sending an unadvertised parameter can empty the
-    # eligible pool — i.e. a hard routing failure, not a lost optimisation.
-    captured: dict = {}
-    provider = _provider(_capture(captured))
-    await provider.complete(_req())
-    assert "prompt_cache_key" not in captured["body"]
-    await provider.aclose()
-
-
-# ---- reasoning field rename (OpenRouter `reasoning` <-> wire reasoning_content)
-
-
-@pytest.mark.asyncio
 async def test_outbound_reasoning_content_is_renamed() -> None:
-    # The Daintree contract and the CLI speak reasoning_content; OpenRouter speaks
+    # The Daintree contract and the CLI speak reasoning_content; Cerebras speaks
     # `reasoning`. An unrecognised field would be dropped silently, losing the
     # replayed chain-of-thought rather than erroring, so assert the rename.
     captured: dict = {}
@@ -726,24 +383,6 @@ async def test_non_string_inbound_reasoning_is_dropped_not_renamed() -> None:
 
 
 # ---- 404 routing failure ---------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_404_reads_as_a_routing_failure_not_a_bad_request() -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(404, json={"error": {"message": "No allowed providers"}})
-
-    provider = _provider(handler)
-    with pytest.raises(DaintreeError) as exc:
-        await provider.complete(_req())
-    # 503, not 502: nothing is wrong with the request — no endpoint satisfied the
-    # policy we sent. Not retryable, because the policy is deterministic and an
-    # immediate replay re-derives the same empty pool.
-    assert exc.value.status_code == 503
-    assert exc.value.code == "upstream_no_compliant_provider"
-    assert exc.value.retryable is False
-    assert "routing policy" in exc.value.message
-    await provider.aclose()
 
 
 @pytest.mark.asyncio
@@ -1097,7 +736,7 @@ async def test_api_key_none_uses_default() -> None:
 @pytest.mark.asyncio
 async def test_empty_per_request_api_key_does_not_fall_back_to_the_default() -> None:
     # An explicitly supplied empty credential is a CALLER error. It must NOT fall
-    # back — that would spend this server's OpenRouter account on a request whose
+    # back — that would spend this server's Cerebras account on a request whose
     # owner failed to authenticate — and it must fail before any request goes out.
     seen: dict = {}
     provider = _provider(_auth_capture(seen))
@@ -1115,11 +754,11 @@ async def test_empty_per_request_api_key_does_not_fall_back_to_the_default() -> 
     [
         "",
         " ",
-        "sk-or-v1-trailing ",
-        "sk-or-v1-x\n",
+        "csk-trailing ",
+        "csk-x\n",
         "sk or v1",
-        "sk-or-v1-del\x7f",  # h11 ACCEPTS DEL, so a blocklist of controls misses it
-        "sk-or-v1-nonlatin\U0001f600",  # would raise inside httpx's latin-1 encoder
+        "csk-del\x7f",  # h11 ACCEPTS DEL, so a blocklist of controls misses it
+        "csk-nonlatin\U0001f600",  # would raise inside httpx's latin-1 encoder
     ],
 )
 async def test_header_unsafe_credentials_are_rejected_without_echoing_the_value(
@@ -1143,8 +782,8 @@ async def test_header_unsafe_credentials_are_rejected_without_echoing_the_value(
 @pytest.mark.asyncio
 async def test_a_realistic_credential_is_not_falsely_rejected() -> None:
     # The guard's real risk is over-rejection: a false positive breaks live traffic.
-    # A full-length `sk-or-v1-` + 64 hex key must sail straight through.
-    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    # A full-length `csk-` + 64 hex key must sail straight through.
+    key = "csk-" + "0123456789abcdef" * 4
     seen: dict = {}
     provider = _provider(_auth_capture(seen))
     await provider.complete(_req(api_key=SecretStr(key)))
@@ -1337,13 +976,13 @@ async def test_concurrent_calls_do_not_cross_credentials() -> None:
         )
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    provider = OpenRouterProvider(client, api_key=SecretStr(_DEFAULT_KEY), base_url=_BASE)
+    provider = CerebrasProvider(client, api_key=SecretStr(_DEFAULT_KEY), base_url=_BASE)
     await asyncio.gather(
-        provider.complete(_req(model="model-a", api_key=SecretStr("sk-or-v1-caller-a"))),
-        provider.complete(_req(model="model-b", api_key=SecretStr("sk-or-v1-caller-b"))),
+        provider.complete(_req(model="model-a", api_key=SecretStr("csk-caller-a"))),
+        provider.complete(_req(model="model-b", api_key=SecretStr("csk-caller-b"))),
     )
-    assert seen["model-a"] == "Bearer sk-or-v1-caller-a"
-    assert seen["model-b"] == "Bearer sk-or-v1-caller-b"
+    assert seen["model-a"] == "Bearer csk-caller-a"
+    assert seen["model-b"] == "Bearer csk-caller-b"
     await provider.aclose()
 
 
@@ -1394,7 +1033,7 @@ async def test_provider_invalid_key_is_distinct_from_our_own_door_401() -> None:
     """Both are 401 and both mean "fix your key" — but not the same fix.
 
     Ours means the header was missing or malformed at Daintree's door; this one
-    means the key travelled fine and OpenRouter refused it. A client that cannot
+    means the key travelled fine and Cerebras refused it. A client that cannot
     tell them apart cannot write correct copy for either.
     """
     from daintree_assistant_server.errors import invalid_api_key, provider_invalid_api_key
@@ -1417,7 +1056,7 @@ async def test_no_default_and_no_per_call_key_fails_cleanly() -> None:
         return httpx.Response(200, json={})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    provider = OpenRouterProvider(client, base_url=_BASE)  # api_key omitted → None
+    provider = CerebrasProvider(client, base_url=_BASE)  # api_key omitted → None
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req())
     assert exc.value.code == "upstream_error"
@@ -1436,7 +1075,7 @@ async def test_keyless_provider_still_honors_a_per_call_key() -> None:
         )
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    provider = OpenRouterProvider(client, base_url=_BASE)  # no default credential
+    provider = CerebrasProvider(client, base_url=_BASE)  # no default credential
     await provider.complete(_req(api_key=SecretStr(_CALL_KEY)))
     assert captured["auth"] == f"Bearer {_CALL_KEY}"
     await provider.aclose()
@@ -1505,7 +1144,7 @@ def _escape_first(text: str) -> str:
 def test_escaped_credential_is_not_recoverable_from_any_fallback_branch(
     label: str, body: str
 ) -> None:
-    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    key = "csk-" + "0123456789abcdef" * 4
     raw = body.format(esc=_escape_first(key))
     assert key not in raw  # precondition: no literal match for a scrub to find
     detail = _extract_upstream_error(raw.encode(), secret=SecretStr(key))
@@ -1519,7 +1158,7 @@ def test_double_encoded_credential_drops_the_diagnostic_entirely() -> None:
     # Two encoding layers defeat any single-pass scrub. Rather than emit something
     # a reader could decode, the detail is withheld — losing a rare message beats
     # leaking a key.
-    key = "sk-or-v1-" + "0123456789abcdef" * 4
+    key = "csk-" + "0123456789abcdef" * 4
     inner = _json.dumps({"k": _escape_first(key)})
     raw = _json.dumps({"error": {"message": inner}})
     detail = _extract_upstream_error(raw.encode(), secret=SecretStr(key))
@@ -1554,7 +1193,7 @@ async def test_per_request_timeout_overrides_read_only() -> None:
         transport=httpx.MockTransport(handler),
         timeout=httpx.Timeout(connect=10.0, read=840.0, write=30.0, pool=10.0),
     )
-    provider = OpenRouterProvider(
+    provider = CerebrasProvider(
         client, api_key=SecretStr(_DEFAULT_KEY), base_url=_BASE, default_timeout=840.0
     )
     await provider.complete(_req(timeout=25.0))
@@ -1564,7 +1203,7 @@ async def test_per_request_timeout_overrides_read_only() -> None:
 
 @pytest.mark.asyncio
 async def test_stream_transport_interruption_is_retryable() -> None:
-    from daintree_assistant_server.providers.openrouter import OpenRouterStream
+    from daintree_assistant_server.providers.cerebras import CerebrasStream
 
     class _Ctx:
         async def __aexit__(self, *_a: object) -> bool:
@@ -1575,7 +1214,7 @@ async def test_stream_transport_interruption_is_retryable() -> None:
             raise httpx.ReadError("connection dropped")
             yield b""  # pragma: no cover - makes this an async generator
 
-    stream = OpenRouterStream(_Ctx(), _Resp(), _MODEL)
+    stream = CerebrasStream(_Ctx(), _Resp(), _MODEL)
     with pytest.raises(DaintreeError) as exc:
         await stream.prefetch_first_event()
     assert exc.value.code == "upstream_unavailable"
@@ -1591,7 +1230,7 @@ async def test_structured_tool_call() -> None:
         body = _json.loads(request.content)
         assert body["tool_choice"]["function"]["name"] == "select_skills"
         # A forced tool call must go non-thinking.
-        assert body["reasoning"] == {"enabled": False}
+        assert "reasoning_effort" not in body
         return httpx.Response(
             200,
             json={
@@ -1624,49 +1263,23 @@ async def test_structured_tool_call() -> None:
 
 @pytest.mark.asyncio
 async def test_structured_tool_call_forces_non_thinking() -> None:
-    # Even if the caller enabled thinking, a forced tool call MUST go non-thinking
-    # — otherwise DeepSeek 400s the forced tool_choice ("Thinking mode does not
-    # support this tool_choice"), and which OpenRouter endpoint enforces that is
-    # not ours to bet on.
+    # Even if the caller enabled thinking, a forced tool call goes non-thinking.
+    # A forced tool_choice and a chain-of-thought are an awkward pair on every
+    # model this server has run against, and the caller here wants one object
+    # back rather than reasoning about it.
     captured: dict = {}
     provider = _provider(_capture(captured))
     await provider.structured_tool_call(
-        _req(thinking_disabled=False, reasoning_effort="max"),
+        _req(thinking_disabled=False, reasoning_effort="high"),
         function_name="select_skills",
         function_schema={"type": "object"},
     )
-    assert captured["body"]["reasoning"] == {"enabled": False}
     assert "reasoning_effort" not in captured["body"]
+    assert "reasoning" not in captured["body"]
     await provider.aclose()
 
 
 # --- key verification (sign-in probe) ---------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_verify_key_returns_the_providers_key_record() -> None:
-    """The probe reads GET /key — the provider's own introspection, costing no tokens."""
-    captured: dict[str, Any] = {}
-
-    async def handler(request: httpx.Request) -> httpx.Response:
-        captured["method"] = request.method
-        captured["url"] = str(request.url)
-        captured["auth"] = request.headers.get("Authorization")
-        captured["body"] = request.content
-        return httpx.Response(200, json={"data": {"label": "sk-key", "limit_remaining": 3.5}})
-
-    transport = httpx.MockTransport(handler)
-    async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
-        record = await provider.verify_key(SecretStr("sk-or-v1-caller"))
-
-    assert record == {"label": "sk-key", "limit_remaining": 3.5}
-    # The METHOD is the point, not just the path: a POST to /key would be a
-    # different (and not tokenless) operation, so pin it.
-    assert captured["method"] == "GET"
-    assert captured["url"] == "https://openrouter.test/api/v1/key"
-    assert captured["body"] == b""
-    assert captured["auth"] == "Bearer sk-or-v1-caller"
 
 
 @pytest.mark.asyncio
@@ -1678,9 +1291,9 @@ async def test_verify_key_maps_a_provider_401_to_invalid_api_key() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        provider = CerebrasProvider(client, base_url="https://cerebras.test/v1")
         with pytest.raises(DaintreeError) as exc:
-            await provider.verify_key(SecretStr("sk-or-v1-bad"))
+            await provider.verify_key(SecretStr("csk-bad"))
 
     assert exc.value.code == "invalid_api_key"
 
@@ -1694,9 +1307,9 @@ async def test_verify_key_maps_other_failures_to_upstream_error() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        provider = CerebrasProvider(client, base_url="https://cerebras.test/v1")
         with pytest.raises(DaintreeError) as exc:
-            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+            await provider.verify_key(SecretStr("csk-caller"))
 
     assert exc.value.code == "upstream_unavailable"
 
@@ -1709,14 +1322,14 @@ async def test_verify_key_never_leaks_the_key_in_an_error() -> None:
     pass this test, so the failure body quotes the credential verbatim — which is what
     a real provider error does when it complains about the key it was given.
     """
-    secret = "sk-or-v1-supersecret"  # noqa: S105 - test credential, not a real key
+    secret = "csk-supersecret"  # noqa: S105 - test credential, not a real key
 
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500, text=f"upstream blew up on {secret}")
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        provider = CerebrasProvider(client, base_url="https://cerebras.test/v1")
         with pytest.raises(DaintreeError) as exc:
             await provider.verify_key(SecretStr(secret))
 
@@ -1727,26 +1340,39 @@ async def test_verify_key_never_leaks_the_key_in_an_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_verify_key_rejects_a_redirect_instead_of_reading_it_as_valid() -> None:
-    """A 3xx is not an answer.
+async def test_verify_key_returns_the_reachable_models() -> None:
+    """The probe answers more than "is this key valid?".
 
-    The client does not follow redirects, so a redirect arrives here as-is. A status
-    check of ``>= 400`` would wave this through and — because the body is shaped like
-    a key record — report a bad key as VALID. Exactly 200 or we do not know.
+    Cerebras has no key-introspection endpoint, so the probe is a model listing —
+    and that is a better answer than a bare verdict: it also proves the account
+    can reach the model this server is pinned to, which a 200 alone would hide.
     """
 
     async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/models")
+        assert request.headers["Authorization"] == f"Bearer {_CALL_KEY}"
         return httpx.Response(
-            302, json={"data": {"label": "not really"}}, headers={"Location": "/elsewhere"}
+            200,
+            json={
+                "object": "list",
+                "data": [
+                    {"id": "gemma-4-31b", "object": "model"},
+                    {"id": "gpt-oss-120b", "object": "model"},
+                    {"not": "a model entry"},
+                    "garbage",
+                ],
+            },
         )
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
-        with pytest.raises(DaintreeError) as exc:
-            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+        provider = CerebrasProvider(client, base_url=_BASE)
+        record = await provider.verify_key(SecretStr(_CALL_KEY))
 
-    assert exc.value.code == "upstream_error"
+    # Malformed entries are dropped rather than coerced: this list is reported to
+    # a caller and read back by the doctor, so a non-string id has no business in
+    # it.
+    assert record == {"models": ["gemma-4-31b", "gpt-oss-120b"]}
 
 
 @pytest.mark.parametrize(
@@ -1755,21 +1381,20 @@ async def test_verify_key_rejects_a_redirect_instead_of_reading_it_as_valid() ->
         {},
         {"data": None},
         {"data": "nope"},
-        {"data": ["nope"]},
+        {"data": {"id": "x"}},
         {"error": {"message": "temporarily unavailable"}},
-        [{"data": {}}],
+        [{"data": []}],
         None,
     ],
-    ids=["empty", "null-data", "string-data", "list-data", "error-envelope", "list", "null"],
+    ids=["empty", "null-data", "string-data", "dict-data", "error-envelope", "list", "null"],
 )
 @pytest.mark.asyncio
-async def test_verify_key_rejects_a_200_that_is_not_a_key_record(payload: Any) -> None:
-    """A 200 whose body is not a key record answers nothing — and must not read as valid.
+async def test_verify_key_rejects_a_200_that_is_not_a_model_listing(payload: object) -> None:
+    """A 200 whose body is not a listing answers nothing.
 
-    Degrading these to an empty record is the dangerous failure: the endpoint reports
-    any returned dict as ``valid: true``, so a 200-with-an-error-envelope would tell a
-    user their bad key was accepted. That is the precise false positive this whole
-    endpoint exists to prevent.
+    Degrading it to an empty record would surface as `valid: true` — the exact
+    false positive this probe exists to prevent — so it is an error, not a
+    default.
     """
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -1777,11 +1402,29 @@ async def test_verify_key_rejects_a_200_that_is_not_a_key_record(payload: Any) -
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        provider = CerebrasProvider(client, base_url=_BASE)
         with pytest.raises(DaintreeError) as exc:
-            await provider.verify_key(SecretStr("sk-or-v1-caller"))
-
+            await provider.verify_key(SecretStr(_CALL_KEY))
     assert exc.value.code == "upstream_protocol_error"
+
+
+@pytest.mark.asyncio
+async def test_verify_key_rejects_a_redirect_instead_of_reading_it_as_valid() -> None:
+    """EXACTLY 200, deliberately — not `< 400`.
+
+    The client does not follow redirects, so a 3xx arrives here as-is, and a
+    body-shaped 302 would otherwise read as a successful verification.
+    """
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, json={"object": "list", "data": []})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = CerebrasProvider(client, base_url=_BASE)
+        with pytest.raises(DaintreeError) as exc:
+            await provider.verify_key(SecretStr(_CALL_KEY))
+    assert exc.value.code != "invalid_api_key"
 
 
 @pytest.mark.asyncio
@@ -1793,9 +1436,9 @@ async def test_verify_key_keeps_a_rate_limit_as_a_rate_limit() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        provider = CerebrasProvider(client, base_url="https://cerebras.test/v1")
         with pytest.raises(DaintreeError) as exc:
-            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+            await provider.verify_key(SecretStr("csk-caller"))
 
     assert exc.value.code == "upstream_rate_limited"
     assert exc.value.headers == {"Retry-After": "30"}
@@ -1808,9 +1451,9 @@ async def test_verify_key_maps_a_transport_timeout_to_upstream_timeout() -> None
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        provider = CerebrasProvider(client, base_url="https://cerebras.test/v1")
         with pytest.raises(DaintreeError) as exc:
-            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+            await provider.verify_key(SecretStr("csk-caller"))
 
     assert exc.value.code == "upstream_timeout"
 
@@ -1822,9 +1465,9 @@ async def test_verify_key_maps_a_transport_error_to_upstream_error() -> None:
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
-        provider = OpenRouterProvider(client, base_url="https://openrouter.test/api/v1")
+        provider = CerebrasProvider(client, base_url="https://cerebras.test/v1")
         with pytest.raises(DaintreeError) as exc:
-            await provider.verify_key(SecretStr("sk-or-v1-caller"))
+            await provider.verify_key(SecretStr("csk-caller"))
 
     assert exc.value.code == "upstream_unavailable"
 
@@ -1840,15 +1483,15 @@ async def test_verify_key_does_not_inherit_the_main_model_timeout() -> None:
 
     async def handler(request: httpx.Request) -> httpx.Response:
         captured["timeout"] = request.extensions.get("timeout")
-        return httpx.Response(200, json={"data": {"label": "k"}})
+        return httpx.Response(200, json={"object": "list", "data": [{"id": "gemma-4-31b"}]})
 
     transport = httpx.MockTransport(handler)
     base = httpx.Timeout(connect=5.0, read=840.0, write=15.0, pool=5.0)
     async with httpx.AsyncClient(transport=transport, timeout=base) as client:
-        provider = OpenRouterProvider(
-            client, base_url="https://openrouter.test/api/v1", default_timeout=840.0
+        provider = CerebrasProvider(
+            client, base_url="https://cerebras.test/v1", default_timeout=840.0
         )
-        await provider.verify_key(SecretStr("sk-or-v1-caller"))
+        await provider.verify_key(SecretStr("csk-caller"))
 
     assert captured["timeout"]["read"] == 10.0
     assert captured["timeout"]["connect"] == 5.0

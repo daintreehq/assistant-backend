@@ -23,7 +23,7 @@ from typing import Any
 
 from pydantic import SecretStr
 
-from ..config import OPENROUTER_MODEL, Settings
+from ..config import CEREBRAS_MODEL, Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
 from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader, RenderCache
@@ -33,7 +33,6 @@ from ..providers.base import (
     ProviderChatResult,
     ProviderUsage,
 )
-from ..providers.policy import RoutingPreference
 from ..providers.retry import retry_upstream
 from ..text_utils import (
     estimate_tokens,
@@ -594,10 +593,9 @@ class Selector:
         conversation: list[ChatMessage],
         active_ids: list[str],
         *,
-        api_key: SecretStr,
+        api_key: SecretStr | None,
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
-        routing: RoutingPreference | None = None,
         catalog: Catalog | None = None,
     ) -> SelectionDecision:
         # An explicit catalog narrows the MENU for a caller that cannot run the
@@ -641,7 +639,7 @@ class Selector:
         # The snapshot, not `self.catalog`, from here down: it rendered the prompt,
         # it names the affinity key, and it is what the answer gets validated
         # against. See `_run`.
-        return await self._run(messages, api_key, routing, catalog=catalog)
+        return await self._run(messages, api_key, catalog=catalog)
 
     def _render_system(self, catalog: Catalog, active_ids: list[str]) -> str:
         """The selector system prompt, memoised.
@@ -681,8 +679,7 @@ class Selector:
     def _build_request(
         self,
         messages: list[dict[str, Any]],
-        api_key: SecretStr,
-        routing: RoutingPreference | None,
+        api_key: SecretStr | None,
         cache_session_id: str | None = None,
     ) -> ProviderChatRequest:
         # HARDCODED non-thinking (see INTERACTIVE_THINKING_ENABLED in config.py):
@@ -692,7 +689,7 @@ class Selector:
         # first-byte latency specifically and holds regardless of the main posture.
         # json_object output, never a forced tool_choice.
         return ProviderChatRequest(
-            model=OPENROUTER_MODEL,
+            model=CEREBRAS_MODEL,
             messages=messages,
             temperature=0.0,
             max_tokens=self.settings.selector_max_output_tokens,
@@ -700,31 +697,19 @@ class Selector:
             thinking_disabled=True,
             reasoning_effort=None,
             timeout=self.settings.selector_timeout_seconds,
-            # The caller's own credential; the provider has no default to fall
-            # back to, so omitting this would fail the call, not bill anyone.
+            # The caller's own credential when they have one; otherwise the
+            # provider spends the server's.
             api_key=api_key,
-            # The caller's routing preference must reach THIS call too. The
-            # selector sends a BOUNDED SUBSET of the conversation upstream (see
-            # split_selector_evidence) — smaller than the main call's, but the
-            # caller's own words either way. A turn that asked for ZDR and got it
-            # only on the main call would still route that subset to a non-ZDR
-            # endpoint here: the privacy choice honoured everywhere except where it
-            # was invisible.
-            routing=routing,
-            # Pin the fleet's selector traffic to one endpoint so the ~10.3k-token
-            # catalog prefix stays resident there (see _CACHE_AFFINITY_PREFIX).
+            # Name the ~10.3k-token catalog prefix so the upstream can recognise
+            # the fleet's selector traffic as one repeated prefix (see
+            # _CACHE_AFFINITY_PREFIX).
             cache_session_id=cache_session_id,
-            # Rank endpoints by time-to-first-token, not tokens/second: this call
-            # is ~10.3k tokens of prompt for ~90 of answer, and with a winning
-            # speculation the turn's whole TTFT is this call's latency.
-            latency_critical=True,
         )
 
     async def _run(
         self,
         messages: list[dict[str, Any]],
-        api_key: SecretStr,
-        routing: RoutingPreference | None = None,
+        api_key: SecretStr | None,
         *,
         catalog: Catalog,
     ) -> SelectionDecision:
@@ -740,7 +725,7 @@ class Selector:
         explain.
         """
         cache_session_id = _affinity_key(catalog.revision)
-        request = self._build_request(messages, api_key, routing, cache_session_id)
+        request = self._build_request(messages, api_key, cache_session_id)
 
         try:
             result = await self._call_once(request)
@@ -756,7 +741,6 @@ class Selector:
             repair_request = self._build_request(
                 [*messages, {"role": "user", "content": _REPAIR_INSTRUCTION}],
                 api_key,
-                routing,
                 # The repair carries the same catalog prefix as the attempt it is
                 # repairing, so it wants the same endpoint — the one that just
                 # prefilled it moments ago.

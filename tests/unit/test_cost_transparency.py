@@ -1,13 +1,14 @@
 """Cost reporting — the tester pays this bill.
 
-Every upstream call is funded by the caller's own OpenRouter key, so what a turn
+Cost is the provider's own reported figure, never a token-price estimate
+computed here — so what a turn
 costs is their money, not a hosting expense we absorb. That makes the figure a
 product surface rather than an internal metric, and makes two failure modes
 unacceptable: reporting a cost we did not observe, and reporting zero for one we
 could not observe.
 
 The wire fact these tests rest on was verified against the live API on
-2026-08-14: OpenRouter returns `cost` in the usage object unconditionally — the
+2026-08-14, against OpenRouter: `cost` arrived in the usage object unconditionally — the
 `usage: {include: true}` opt-in is deprecated and has no effect — on both the
 non-streaming body and the final chunk of a stream.
 """

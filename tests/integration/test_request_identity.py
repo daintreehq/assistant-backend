@@ -297,7 +297,7 @@ def test_a_streaming_error_before_meta_still_carries_the_request_id(
 @pytest.mark.parametrize(
     "kind,expected",
     [
-        ("unauthenticated", 401),
+        ("malformed_bearer", 401),
         ("unsupported_protocol", 426),
         ("unknown_task", 404),
         ("body_too_large", 413),
@@ -309,8 +309,14 @@ def test_every_failure_status_still_carries_a_request_id(client, auth, kind, exp
     code (an auth dependency, a route dependency, a validator, and the outermost
     body-cap middleware, which answers ABOVE the middleware that mints the id)."""
     task = {"task": "terminal_judge", "input": {"question": "q", "tail": "t"}}
-    if kind == "unauthenticated":
-        r = client.post("/v1/daintree/tasks", json=task)
+    if kind == "malformed_bearer":
+        # Absence is served now (the server holds the credential), so the 401 that
+        # still exists — and still has to carry an id — is the malformed-header one.
+        r = client.post(
+            "/v1/daintree/tasks",
+            headers={"Authorization": "Bearer bad key"},
+            json=task,
+        )
     elif kind == "unsupported_protocol":
         r = client.post(
             "/v1/daintree/tasks",

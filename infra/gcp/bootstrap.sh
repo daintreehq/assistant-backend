@@ -19,10 +19,9 @@
 # will NOT rotate an existing secret: rotating the state signing key would
 # invalidate every outstanding state token, so that is a deliberate manual act.
 #
-# What the server needs at runtime is only state-signing material. There is no
-# server-side model API key — every request's bearer token is the caller's own
-# OpenRouter key, which both authenticates the request and funds its upstream
-# calls (see README.md and docs/DAINTREE_API.md).
+# What the server needs at runtime is state-signing material PLUS the upstream
+# credential (CEREBRAS_API_KEY), which it holds itself and funds every turn from.
+# Callers supply no key of their own (see README.md and docs/KEY_HANDLING.md).
 
 set -euo pipefail
 
@@ -103,6 +102,11 @@ fi
 say "Secrets"
 # STATE_SIGNING_KEY_CURRENT must be >=32 chars and STATE_SALT must not be the
 # packaged default, or production readiness fails (Settings.weak_secrets).
+#
+# cerebras-api-key is DIFFERENT IN KIND from the two below: it cannot be
+# generated, only supplied. So this script creates the secret shell and stops —
+# a random value here would deploy a service that fails /readyz on a credential
+# nobody realised was fake.
 ensure_secret() {
   local name="$1" generator="$2"
   if ! gcloud secrets describe "$name" --project="$PROJECT" >/dev/null 2>&1; then
@@ -122,6 +126,19 @@ gen_salt() { openssl rand -hex 16; }
 ensure_secret state-signing-key-current gen_key
 ensure_secret state-salt gen_salt
 
+if ! gcloud secrets describe cerebras-api-key --project="$PROJECT" >/dev/null 2>&1; then
+  gcloud secrets create cerebras-api-key --replication-policy=automatic \
+    --project="$PROJECT" >/dev/null
+  ok "created secret cerebras-api-key"
+fi
+if has_version cerebras-api-key; then
+  ok "cerebras-api-key already has a version (left alone — rotation is manual)"
+else
+  ok "!! cerebras-api-key has NO version. The deploy will fail until you add one:"
+  echo "    printf '%s' 'csk-...' | gcloud secrets versions add cerebras-api-key \\"
+  echo "      --data-file=- --project=$PROJECT"
+fi
+
 # ---------------------------------------------------------------------------
 say "Runtime service account (what the container runs as)"
 if gcloud iam service-accounts describe "$RUNTIME_SA_EMAIL" --project="$PROJECT" >/dev/null 2>&1; then
@@ -133,13 +150,13 @@ else
 fi
 # Scoped per-secret rather than project-wide: this identity can read exactly the
 # secrets it mounts and nothing else in the project.
-for s in state-signing-key-current state-salt; do
+for s in state-signing-key-current state-salt cerebras-api-key; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
     --role=roles/secretmanager.secretAccessor \
     --project="$PROJECT" --quiet >/dev/null
 done
-ok "granted secretAccessor on state-signing-key-current, state-salt"
+ok "granted secretAccessor on state-signing-key-current, state-salt, cerebras-api-key"
 
 # The Developer Connect connection's GitHub OAuth token. The fetch-lfs build
 # step reads it to pull LFS content (the model artifact) from the PRIVATE repo
@@ -278,10 +295,13 @@ fi
 
 # ---------------------------------------------------------------------------
 say "Public access to the service"
-# The app's own bearer auth is the gate, not Google IAM: every request carries
-# the caller's OpenRouter key, and the unauthenticated surface is limited to
-# /healthz, /readyz, and /version. Granting allUsers roles/run.invoker is what
-# makes the service reachable at all. This step needs the service to exist, so
+# Granting allUsers roles/run.invoker is what makes the service reachable at all.
+#
+# BE CLEAR ABOUT WHAT GUARDS IT RIGHT NOW: nothing does. The app's bearer auth
+# used to be the gate — every request carried the caller's own key — but the
+# server now holds the credential and serves anonymous requests, so a public
+# Cloud Run service is an open, Daintree-funded endpoint. That is the accepted
+# state for this stage; account authentication is what closes it. This step needs the service to exist, so
 # on a first run it is expected to be skipped.
 if gcloud run services describe "$SERVICE" --region="$REGION" --project="$PROJECT" >/dev/null 2>&1; then
   gcloud run services add-iam-policy-binding "$SERVICE" \

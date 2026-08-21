@@ -1,13 +1,12 @@
 # Provider policy
 
-**Authoritative** for: which model answers, which endpoint serves it, what privacy
-the request is routed under, how failures are retried, and what error the caller
-gets back. Every other document (README, `CLAUDE.md`, `.env.example`, CLI copy)
+**Authoritative** for: which model answers, what the upstream promises about
+request data, how failures are retried, and what error the caller gets back. Every other document (README, `CLAUDE.md`, `.env.example`, CLI copy)
 summarises this one and links here.
 
 `tests/unit/test_docs_drift.py` fails CI when *selected* facts below stop matching
 the code — privacy wording, thinking posture, model ids, credential ownership,
-retry layers, the routing policy, the environment set. It is a targeted gate over
+retry layers, the wire shape, the environment set. It is a targeted gate over
 this repository's own prose, not a proof that every sentence here is accurate, and
 it does not see the vendored CLI at all.
 
@@ -18,37 +17,49 @@ present tense.
 
 ## 1. Provider and models
 
-The **only** upstream is OpenRouter. It is a router, not a model host: it fronts
-many independent endpoints serving the same weights (roughly two dozen for this
-model when last checked, 2026-07 — a provider-side number that moves, not
-something this repository can assert), and the `provider` block on every request
-decides which one answers.
+The **only** upstream is **Cerebras Inference** (`https://api.cerebras.ai/v1`,
+OpenAI-compatible wire format). It is a model **host**, not a router: one endpoint
+serves each model, and there is nothing to select between.
 
-⏳ A paid tier would change that calculus — we would hold the credential and pay
-per token, which makes a single known host cheaper than a router. The deferred
-plan to serve the main model directly from Novita is in [`TODO.md`](../TODO.md).
-Nothing below describes anything but OpenRouter today.
-
-> **Skill selection is not an upstream call anymore.** It runs as a LOCAL
-> in-process two-stage selector (`skills/local/`, no credential, no endpoint).
-> Selector-specific policy below — the latency-critical sort, the shared
-> selector affinity key, selector cost lines — describes the prompt-based
-> selector that now exists only as the scripted test seam, and is kept for the
-> record.
+That single fact is why this document is much shorter than it used to be. Under
+OpenRouter, ~24 interchangeable endpoints served the same weights and a `provider`
+block on every request decided which one answered — which meant a privacy filter,
+a ranking axis, a latency floor, a fallback policy, an output-quality denylist, a
+sticky-affinity key and a caller-facing `routing` preference to expose all of it.
+None of that has a subject any more, so all of it is **deleted rather than
+neutered** (git history has the previous revision). What remains is the part that
+was never about routing: which model answers, what the upstream promises about
+data, how failures are retried, and what error the caller gets back.
 
 | Call | Model | Source of truth |
 |---|---|---|
-| Main completion | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
+| Main completion | `gemma-4-31b` | `config.CEREBRAS_MODEL` |
+| Utility tasks | `gemma-4-31b` | `config.CEREBRAS_MODEL` |
 | Skill selection | — local two-stage ONNX selector, no upstream call | `skills/local/setwise.py` |
-| Utility tasks | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
-| Skill-learning gate | `deepseek/deepseek-v4-flash-0731` | `config.OPENROUTER_MODEL` |
-| Skill builder / improver | `openai/gpt-5.6-sol` | `config.SKILL_BUILDER_MODEL`, `config.SKILL_IMPROVER_MODEL` |
 
-Model ids are **hardcoded** — a product decision, not deployment config. There is
-no environment override, and there must not be one: every prompt and benchmark in
-this repository is calibrated against these exact revisions. The date-pinned
-DeepSeek slug is deliberate; the floating alias would silently re-point at a
-differently-tuned revision.
+**One model, singular.** The second one existed for skill learning — a background
+pass that read a completed workflow and wrote or rewrote a skill file from model
+output. That feature has been removed: it spent a large thinking budget per turn
+on a catalog a human curates anyway.
+
+The id is **hardcoded** — a product decision, not deployment config. There is no
+environment override, and there must not be one: every prompt and benchmark in
+this repository is calibrated against this exact model.
+
+**`gemma-4-31b` is a preview model and Cerebras has said it will be replaced.**
+When that happens the constant is the whole code change, but not the whole job:
+see §9. Two properties of this specific model are load-bearing beyond quality —
+it does not reason (§2) and it is what the prompt budgets are sized against.
+
+> **Skill selection is not an upstream call.** It runs as a LOCAL in-process
+> two-stage selector (`skills/local/`, no credential, no endpoint, ~10ms). The
+> prompt-based selector survives only as the scripted test seam; where selector
+> latency or selector cost is discussed below, that is what is meant.
+
+**The credential is the server's.** `CEREBRAS_API_KEY` funds every turn, and
+callers supply none of their own — see [`KEY_HANDLING.md`](KEY_HANDLING.md). This
+inverted with the move to Cerebras and it is the fact most likely to be
+misremembered from older copy.
 
 `/v1/daintree/respond` and `/v1/daintree/capabilities` report
 `config.PUBLIC_MODEL_ID` (`daintree-assistant`), never a real model id.
@@ -58,340 +69,135 @@ client never sees a real model id" without qualifying it.
 
 ## 2. Thinking posture
 
-**The whole interactive surface is non-thinking.** The main completion, every
-utility task and the skill selector send `reasoning: {"enabled": false}`
-explicitly on every call, because a reasoning model reasons by default when the
-field is absent.
+**Nothing in this server thinks — and that is now a property of the model, not a
+flag held down.**
 
-| Surface | Thinking | Flag |
+Under the previous stack it took an explicit `reasoning: {"enabled": false}` on
+every call, because a reasoning model reasons by default when the field is
+absent. Cerebras has no such switch: it accepts a bare `reasoning_effort` string
+with `low`/`medium`/`high` and **no off value**, and rejects OpenRouter's
+`reasoning` object outright with a 400. So the posture is not sent — it is
+inherited from `gemma-4-31b`, which does not reason at all (measured
+`reasoning_tokens: 0`).
+
+| Surface | Thinking | How |
 |---|---|---|
-| Main completion | off | `INTERACTIVE_THINKING_ENABLED = False` |
-| Utility tasks | off | `INTERACTIVE_THINKING_ENABLED = False` |
-| Skill selector | off | independent hardcode in `skills/selector.py` |
-| Skill-learning gate | **high** | `OPENROUTER_REASONING_EFFORT = "high"` |
-| Skill builder / improver | **high** | `SKILL_LEARNING_REASONING_EFFORT = "high"` |
+| Main completion | off | model has no reasoning mode; `INTERACTIVE_THINKING_ENABLED = False` |
+| Utility tasks | off | same |
+| Skill selector | n/a | local classifier, no model call |
 
-Skill learning is the one surface that still thinks. It is local-development-only
-and runs fire-and-forget *after* the response is sent, so its latency never
-reaches a user.
+Skill learning used to be the one exception — it ran fire-and-forget after the
+response, so its latency never reached a user, and "read a whole transcript and
+write a skill" was genuinely worth reasoning about. It has been removed, so no
+call in this system sets `reasoning_effort` at all.
 
-There is no middle tier to retreat to: DeepSeek V4 Flash collapses `low` and
-`medium` into `high` (measured, 5 samples each: 662 vs 656 reasoning tokens, fully
-overlapping ranges), so the only real step below `high` is off.
+`INTERACTIVE_THINKING_ENABLED` stays in the code as the decision record and the
+switch a future reasoning-capable serving model would need;
+`INTERACTIVE_REASONING_EFFORT` sits beside it so flipping the flag does not also
+require choosing a tier. `tests/live/test_live_cerebras.py` asserts the serving
+model reports zero reasoning tokens, so a replacement model that *does* reason
+announces itself there rather than in an unexplained latency regression.
 
-The selector keeps a **second, independent** hardcode rather than reading the
-shared flag. Re-enabling interactive thinking must not silently drag the selector
-— which gates the turn's first byte — along with it.
+## 3. Wire shape — what a request carries, and what it must never carry
 
-## 3. Endpoint-selection policy
+**Cerebras is not a router: one endpoint serves each model.** So there is no
+endpoint-selection policy and no caller-facing `routing` block — a request
+carries the model, the messages, and the parameters the call actually needs, and
+nothing about where it should go. Four details are Cerebras-specific and each one is a hard failure if got
+wrong — they are pinned by `tests/unit/test_docs_drift.py` against the adapter's
+source and by `tests/live/test_live_cerebras.py` against the real API.
 
-Sent as the top-level `provider` block on every request. The **defaults** live
-beside the model ids (`providers/policy.py`, `DEFAULT_POLICY`); there are
-deliberately no environment toggles.
+| Rule | Consequence of breaking it |
+|---|---|
+| `max_completion_tokens`, never `max_tokens` | Both spellings together is a 400. Either alone is fine, so this is a live trap: the normalized field is called `max_tokens` and passing it straight through *works* until something else also sets the other name. |
+| No `reasoning` object | `400 wrong_api_format`. Use the bare `reasoning_effort` string (§2). |
+| No `provider` block | `400 wrong_api_format`. |
+| No `session_id` | `400 wrong_api_format`. The affinity key is `prompt_cache_key` (§3a). |
 
-A caller may narrow or re-rank them per request through the validated `routing`
-block ([`DAINTREE_API.md`](DAINTREE_API.md#endpoint-routing-optional)) — they own
-the key and pay the bill, so privacy strictness and the speed/price trade are
-legitimately theirs. What they cannot do is weaken the floor: `data_collection:
-"deny"` is emitted unconditionally and is derived from no caller-controlled
-field. The shipped default block is:
+Error bodies are **flat** — `{"message", "type", "param", "code"}` — not wrapped
+in OpenAI's `{"error": {...}}` envelope. The adapter reads both shapes, flat
+first; reading only the nested one would silently discard every diagnostic this
+provider produces, which is the sort of failure that surfaces as "HTTP 400" and
+nothing else.
 
-```json
-{
-  "sort": "throughput",
-  "data_collection": "deny",
-  "require_parameters": true,
-  "allow_fallbacks": true,
-  "ignore": ["digitalocean"],
-  "preferred_max_latency": { "p50": 1.0, "p90": 2.0, "p99": 5.0 }
-}
-```
+### 3a. Cache affinity — `prompt_cache_key`
 
-**One policy, every call.** There is no per-call-shape routing and there must not
-be: a rule that has to decide whether a request is "a classifier" or "a chat turn"
-or "a greeting" is a rule that will misjudge the next call shape someone adds. The
-only thing that varies is the ranking axis, at one call site, for a reason known
-statically (§3b).
+Cerebras caches prompt prefixes **automatically**: matched in 128-token blocks,
+scoped to the organization, held in memory with a guaranteed 5-minute TTL (longer
+under light load). Nothing has to be configured, and there is no endpoint to
+steer traffic toward — the mechanism the previous adapter's sticky-key machinery
+existed to drive is simply built in here.
 
-**Why both a sort and a bound.** A request's wall-clock is
-`time-to-first-token + tokens / throughput`, and OpenRouter can rank on either of
-those but not on their sum. Ranking on one alone is how a bad endpoint gets
-elected — sorting purely by tokens/second cheerfully picks a host that streams
-fast and takes four seconds to say the first word. So: rank on one axis, put a
-floor under the other.
-
-- **`sort: "throughput"`** — rank eligible endpoints by measured tokens/second and
-  take the fastest, explicitly at the cost of price. Right for an interactive
-  assistant, where a real answer's wall-clock is mostly generation and this model
-  is cheap enough that a 40% price delta is noise next to a 2x speed one.
-- **`preferred_max_latency`** — the other half, and the reason a short request no
-  longer sits there before it starts. It **deprioritises, never excludes**, so
-  unlike a filter it can never empty the pool or turn into a 404, which is exactly
-  why it is safe to send on every call regardless of shape. p90/p99 are the
-  live-measured pair (TTFT median 1222ms → 635ms, worst 1811ms → 920ms over 10
-  calls) and are known not to empty the pool. **p50 is the load-bearing addition**:
-  without it the bound only describes an endpoint's bad days, and a host whose
-  *typical* first byte is slow still wins the election. The tails this exists to
-  demote were real — p99 12.6s at one endpoint, 13.9s at another, against medians
-  that looked fine.
-- **`data_collection: "deny"`** — the privacy floor. See §4.
-- **`require_parameters: true`** — drop endpoints that would silently ignore
-  something we sent. It matters most for `json_object` calls (selector, utility
-  tasks): several otherwise-fast endpoints for this model do not implement
-  `response_format`, and without this they would answer with unconstrained prose
-  that fails our parse. **It is also the largest remaining speed cost in this
-  system**: the endpoints it drops from a JSON call include the *fastest* one
-  (CoreWeave, p50 361ms TTFT at 101 tok/s), and no amount of sorting or bounding
-  inside the smaller pool recovers what was removed before the sort ran. Getting
-  it back means not sending `response_format` and parsing tolerantly instead — a
-  real change with real risk, not a knob.
-- **`allow_fallbacks: true`** — keep the next-fastest compliant endpoint available
-  when the winner is down. With filters this strict, turning it off makes any
-  single outage a hard 404.
-- **`ignore`** — the **output-quality floor**, and the only filter here that is
-  about what an endpoint *says* rather than how fast, private or capable it is.
-  Sorting on throughput ranks how fast an endpoint streams and cannot tell that
-  what it streams has stopped making sense; worse, the cheapest way for a host to
-  win a throughput sort is to cut exactly the corners that cause it. Entries are
-  named hosts with **measured evidence**, not a quantization threshold: fp4
-  endpoints in this pool served 35 clean turns in the window that produced the
-  one entry below, and a `quantizations` filter would drop those *and* DeepSeek's
-  own first-party endpoint (it declares `unknown`) to catch a single bad actor.
-
-  | Endpoint | Excluded because |
-  |---|---|
-  | `digitalocean` | Entered the pool 2026-08-20; served 5 turns. Two ran away to the 8000-token ceiling (`finish_reason=length`, ~33.5k chars) with output degenerating into memorised pretraining text; a third miscounted its own completed tool calls. The other nine endpoints: zero runaways in 189 turns over the same fortnight. An identical prompt with an identical active-skill set answered correctly on Novita three minutes after collapsing here. |
-
-  Unlike every other caller-adjustable field, a client's `routing.ignore` is
-  **unioned onto** this list rather than replacing it — otherwise any caller
-  sending an ignore list at all would silently re-enable a host the server
-  excluded, which would make routing *looser*, the one thing the `routing` block
-  promises is impossible. A caller who names a denied endpoint in `only` gets a
-  clean `upstream_no_compliant_provider`, never a quiet downgrade onto it.
-
-### 3a. Cache affinity — `session_id`, and why not `provider.order`
-
-Prefix caches are **node-local**. The invariant head of a main request — base
-prompt, response contract, tool schemas — is ~29.5k tokens, and a turn whose
-rounds land on different endpoints re-encodes all of it on every bounce, however
-well the prompt is laid out. Keeping one conversation on one endpoint is
-therefore worth more than any byte-level layout change left to make.
-
-OpenRouter already implements this. After a request that used prompt caching it
-remembers which endpoint served it and routes the next request with the same
-**sticky key** back there; the key expires after 10 minutes of inactivity, and an
-error from the sticky endpoint leaves the record unchanged so the next request
-re-routes. Both of those are failure modes we would otherwise have to build.
-
-**What we send.** Main conversation calls carry a top-level `session_id` — a
-sibling of the `provider` block, not part of it — naming the sticky key
-explicitly:
+Main conversation calls and utility tasks still name a key:
 
 ```json
-{"session_id": "daintree-main-<sha256(session id + salt)>"}
+{"prompt_cache_key": "daintree-main-<sha256(session id + salt)>"}
 ```
+
+**It is a hint, not the mechanism.** The upstream is free to ignore it, and the
+honest expectation is that caching works identically without it. It is sent
+because it is the OpenAI-standard spelling for exactly this intent, it costs one
+short field, and it states which calls belong to one growing prefix — which is
+information a future provider may use and which no one can recover later.
 
 It is a salted digest, never the client's own session id: the field crosses to a
 third party, and a client session id is opaque local text we make no promises
 about. The salt is shared by every instance, so the key is stable across a
-stateless fleet without any instance storing it. A JSON-mode main call gets a
-`daintree-main-json-` namespace instead, because validation rejects
-`response_format` alongside tools, so it carries none of the tool schemas — and
-`require_parameters` then filters it to the smaller pool of endpoints that
-implement `response_format`. Different prefix, different pool: sharing one key
-across the two shapes would let each evict the other's sticky endpoint for a
-prefix that endpoint does not hold.
+stateless fleet without any instance storing it.
 
-**Why name the key rather than let it default.** Left absent, OpenRouter derives
-the key by hashing the first system message and the first non-system message.
-For this assembler the first system message is the invariant base prompt, and the
-first non-system message is whichever optional row happens to exist first — the
-active skill bodies, else the integrations block, else startup context. So the
-default key changes on **every selector topic shift**, exactly when most of the
-prefix is still reusable, and falls through to a per-machine MCP endpoint URL on a
-turn with no active skill. That is not a policy anyone chose; it is a side effect
-of the message layout. Naming the key replaces it with the session.
-
-**The selector and the utility tasks are keyed the other way — SHARED, not per
-session.** Neither has a growing per-session prefix, so a per-session key would
-splinter them across endpoints for no gain. What they do have is a large prefix
-that is identical for *every* caller, and the right key for that is one key.
-
-| Call | Key | What the key holds warm |
+| Call | Key | What it names |
 |---|---|---|
 | Main conversation | `daintree-main-<sha256(session id + salt)>` | that session's growing prefix |
 | Main, JSON mode | `daintree-main-json-<sha256(session id + salt)>` | ditto, minus the tool schemas |
-| Skill selector | `daintree-selector-<catalog revision digest>` | the ~10.3k-token catalog menu, fleet-wide |
 | Utility task | `daintree-task-<task id>` | that task's server-owned system prompt |
 
-**How widely "shared" actually shares is set by the credential, not by us.** A
-sticky record is scoped to the API key, and today every request is funded by the
-*caller's own*, so `daintree-selector-<revision>` gathers **one caller's**
-sessions onto one endpoint. It becomes literally fleet-wide the day a server-held
-key arrives — which is when it pays most, and also when the concentration caveat
-at the end of this section starts to matter. The key is written for that day; it
-is already the right key for today.
+Task keys are per task rather than one key for all of them: `terminal_summarize`
+and `checkpoint` have different prompts, and one shared key would describe two
+unrelated prefixes to the upstream as a single conversation.
 
-The selector is the case worth stating plainly, because it is the largest
-invariant prefix in the system and it was the one call getting no affinity at
-all. `Catalog.selector_metadata` and `Selector._render_system` exist to make the
-catalog block byte-identical for every caller at a given revision — but a prefix
-cache is node-local, so identical bytes scattered across two dozen endpoints hit
-nothing. One shared key concentrates the fleet's selector traffic onto one
-endpoint and keeps the catalog resident there. The **catalog revision** is in the
-key because it is exactly what invalidates that prefix: skill learning can swap
-the catalog in place, and when it does the fleet should re-elect rather than stay
-pinned to a node warm for a catalog that no longer exists.
-
-Sending *no* key was worse than either option, and not by a little. The default
-derivation (below) hashes the first non-system message — for the selector, the
-user's own words; for a task, the caller's terminal tail or transcript. That hash
-differs on **every call**, so affinity never engaged, every call re-elected an
-endpoint, and every call re-paid the prefill. The measured signature is in
-`benchmarks/skill_selection`: 7.711s on a case's first trial, 1.606s on its
-second.
-
-Task keys are per task rather than one key for all of them, on the same logic
-that splits `daintree-main-json-` off `daintree-main-`: `terminal_summarize` and
-`checkpoint` have different prompts, and sharing a key would let each evict the
-other from an endpoint holding a prefix it does not have.
-
-**Skill learning still sends no key.** It runs *after* the response, so pulling it
-onto the node serving that user's foreground turns would buy nothing, and its
-builder/improver calls use a different model entirely.
-
-**A caller who overrides routing gets their own cohort.** A sticky key names an
-endpoint, but only endpoints that pass a request's *filters* are reachable — so
-two calls sharing a key under different filters fight over one record: the
-stricter one cannot use what the looser one pinned, re-elects, and the looser one
-then inherits a pin it never asked for. Harmless while each caller's own key
-scopes the record; corrosive the moment one server credential is shared, because
-then one caller's `zdr` or `only` is re-pointing everybody's selector traffic. So
-any request carrying a `routing` block has a short digest of the `provider` block
-it actually sent appended to its key:
-
-```
-daintree-selector-<catalog revision digest>-<routing cohort digest>
-```
-
-Derived from the emitted block rather than a re-derivation of the policy, so it
-cannot drift from what was really routed. Requests on the default policy — nearly
-all of them — get **no suffix**, which keeps the shared keys short and stable
-across any deploy that does not touch routing.
-
-**Why not `provider.order`.** It is the obvious hand-rolled alternative — carry
-the last serving endpoint and ask for it first — and it is the wrong one on three
-counts. OpenRouter documents that sticky routing **is not used** when a manual
-`provider.order` is present, so the pin would replace the native mechanism rather
-than reinforce it; `order` takes precedence over `sort`, so a session would stay
-pinned to an endpoint that had since gone slow, with none of the 10-minute expiry
-or error-driven re-route above; and the endpoint name we can actually observe is
-the display name OpenRouter reports on a response (`CoreWeave`, `Baidu`), not the
-lowercase request-side slug `order` takes. `session_id` needs none of that: it is
-derived from data already in hand, and the router owns the pin.
-
-**What is *not* claimed.** An endpoint is many GPU workers, so affinity improves
-the odds that a prefix is resident — it does not guarantee it, and whether the
-provider routes prefix-aware *within* an endpoint is invisible to us. Sticky
-routing also only activates where cache-read pricing beats regular prompt
-pricing. And a caller on a non-default routing policy (`zdr`, or their own
-`only`/`ignore`) is filtered to a different pool and therefore sits in its own
-cache cohort regardless — a documented cost of honouring the preference, not
-something to engineer away. `session_id` is additive: it never narrows the pool,
-and the caller's own `only`/`ignore` still decides what that pool is.
-
-**The shared keys concentrate load, deliberately, and that is the thing to watch
-as traffic grows.** A sticky record is scoped to the API key, so today — with
-every request funded by the *caller's* own key — a shared selector key
-concentrates one user's selector calls, which is all it can do. On a server-held
-key it would concentrate the whole fleet's onto one endpoint, which is the point
-(that is what keeps the catalog resident) but is also the failure mode to
-monitor. It is not a hard pin: `allow_fallbacks` stays on, an error at the sticky
-endpoint leaves the record unchanged so the next call re-routes, and the record
-expires after 10 minutes idle. If one endpoint ever becomes the bottleneck, the
-fix is to shard the key (`daintree-selector-<revision>-<n>`) and trade some
-warmth for spread — not to drop it and go back to re-electing per call.
-
-The subtler half is **degradation, not saturation**: errors re-route, and idle
-expiry re-elects, but an endpoint that stays up and merely gets slow keeps its
-record — and busy shared traffic may never go idle long enough to expire. So
-`sort: "latency"` ranks the *election*, not the steady state. If that shows up in
-practice, the answer is a deliberate rotation term in the key, not removing the
-key; the selector's `endpoint` and `selector_cache_ratio` are already logged per
-turn, which is where the evidence would come from.
-
-### 3b. Ranking on first byte — the one thing that varies per call
-
-One call site flips the ranking axis. Everything else — pool, filters, privacy
-floor, bound — is byte-identical to §3:
-
-```json
-{
-  "sort": "latency",
-  "data_collection": "deny",
-  "require_parameters": true,
-  "allow_fallbacks": true,
-  "ignore": ["digitalocean"],
-  "preferred_max_latency": { "p50": 1.0, "p90": 2.0, "p99": 5.0 }
-}
-```
-
-It is selected by `latency_critical` on `ProviderChatRequest`, and today exactly
-one call sets it: the **skill selector**.
-
-**Why this is not request classification.** The distinction matters, because
-classifying user input into "short" and "long" would be a rule waiting to be
-wrong. Nothing here inspects a request. The selector is a *fixed, server-owned
-call* whose shape is known permanently and cannot vary with what a user types:
-measured over 438 trials (`benchmarks/skill_selection`), **~10.3k prompt tokens in,
-~90 completion tokens out**, p50 2.044s — the numbers that justified replacing it
-with the local two-stage selector, which is what serves today.
-
-**It is a lean, not a landslide, and the honest version is worth keeping.**
-Generation is not negligible even here — ~90 tokens at ~100 tok/s is ~0.9s of that
-2.044s, call it 45%. What tips it is that the other ~55% is the half that *moves*:
-prefill over 10.3k tokens plus queueing, which scales with the catalog and which
-an affinity key (§3a) can drive toward zero. The same run measured **p99 9.878s**
-against that p50, and a spread like that is a slow first byte, not a slow
-generator.
-
-Order of application matters when a caller sends their own `routing` block: the
-axis is applied **first** and the caller's preference merged on **top**, so a
-caller who names `sort: "price"` gets `sort: "price"` on the wire rather than
-having it silently overruled. Neither ordering can touch `data_collection: "deny"`
-(§4).
-
-Be precise about what that buys them, because "the caller still gets price" is
-half a sentence. The **bound stays** — it is a server-side floor, like the privacy
-floor, not part of the speed/price trade — so what they get is cheapest *among
-endpoints that answer promptly*, not cheapest outright. If a caller ever needs
-unconditional price, that is a new preference to add deliberately, not something
-to reach by dropping the bound.
-
-Measuring a change here: compare the selector call's **complete** latency, not its
-time-to-first-token. TTFT is what the sort ranks on, not what the turn waits for —
-the turn needs the whole JSON object — so an endpoint that starts fast and then
-dribbles wins a TTFT benchmark while losing the user's turn. Give each arm a
-distinct affinity namespace too, or the sticky record from arm A will serve arm B
-and the comparison measures nothing.
+**What prompt layout still buys.** Everything in
+[`prompt_assembler`](../src/daintree_assistant_server/services/prompt_assembler.py)
+about ordering rows widest-shared-first is *unchanged in value* by the provider
+move — arguably more valuable, since org-wide automatic prefix matching rewards a
+byte-stable head and nothing else. What is gone is only the part about keeping a
+conversation pinned to one node.
 
 ## 4. Privacy — what is and is not promised
 
-> **`data_collection: "deny"` is a no-training guarantee.**
-> **It is not a no-retention guarantee.**
+> **Daintree's promise is a no-training guarantee.**
+> **It is deliberately not a no-retention guarantee.**
 
-This distinction is the whole of the privacy contract, and getting the wording
-wrong is worse than a conservative promise, because it becomes part of a tester's
-trust decision about source code, terminal output, issue text and project
-instructions.
+**The basis of this changed and the wording deliberately did not.** Under
+OpenRouter, the no-training floor was something this server *enforced* per
+request, by sending `data_collection: "deny"` and filtering the eligible endpoint
+pool. Cerebras is a single host: there is no pool, no filter, and no per-request
+data-handling parameter to send. What Daintree can say now rests entirely on
+Cerebras's own published policy.
+
+**Cerebras publishes a stronger position than the copy below claims** — no
+training on inference inputs or outputs, and zero retention of them by default across all tiers <!-- privacy-copy-ok -->,
+with prompt caching held in ephemeral memory. Authoritative sources, which a
+reader should check rather than take from here:
+
+- Trust centre — <https://trust.cerebras.ai>
+- Privacy policy — <https://cerebras.ai/privacy-policy>
+- Inference terms — <https://cerebras.ai/inference-terms>
+
+The copy is **not** upgraded to match, and that is a decision rather than an
+oversight. Understating a privacy guarantee cannot mislead a user; overstating
+one is the failure this section exists to prevent, and it becomes part of a
+tester's trust decision about source code, terminal output, issue text and
+project instructions. Raising the claim to "does not retain" is a deliberate act
+that needs a human to verify Cerebras's terms against Daintree's actual account
+tier, then relax the scan below — not a default that drifts in.
 
 | Phrase | Allowed? |
 |---|---|
 | "does not collect or train on request data" | ✅ accurate |
-| "no endpoint trains on your prompts" | ✅ accurate |
+| "the provider does not train on your prompts" | ✅ accurate |
 | "does not store your prompts" | ❌ overstated <!-- privacy-copy-ok --> |
 | "zero retention" / "not retained" | ❌ overstated <!-- privacy-copy-ok --> |
-| "ZDR" / "zero data retention" | ❌ not enforced <!-- privacy-copy-ok --> |
+| "ZDR" / "zero data retention" | ❌ overstated <!-- privacy-copy-ok --> |
 
 `tests/unit/test_docs_drift.py` scans this repository's prose files (README,
 `CLAUDE.md`, `.env.example` and `docs/*.md` — not the vendored CLI) for the banned
@@ -402,28 +208,13 @@ marker `privacy-copy-ok`. That is deliberately an explicit marker rather than a
 containing the word "not", which exempted "does **not** store your prompts", the
 one phrasing it was written to catch.
 
-OpenRouter models the two separately. `data_collection: "deny"` filters to
-endpoints whose policy is not to collect prompt data or train on it; an endpoint
-in that pool may still hold a request transiently, e.g. for abuse monitoring.
-The stricter mode is OpenRouter's separate `zdr` flag, which this server does not
-send. <!-- privacy-copy-ok -->
-
-**Current default: `NO_TRAINING`.** The stricter mode is available per request
-as `routing.privacy: "zdr"`, and is `PrivacyMode.ZDR` in code. <!-- privacy-copy-ok -->
-It stays off *by
-default* because it narrows the endpoint pool substantially and has not been
-live-tested against every request shape this server emits (streaming with tools,
-non-streaming, `json_object`, forced tool choice, tool-free) — defaulting to it
-would risk `upstream_no_compliant_provider` on ordinary turns.
-
-A caller who opts in gets it on **every** upstream call the turn makes: the main
-completion, the skill selector, utility tasks, `/skills/resolve`'s `find`, and
-(in local development) skill learning. A privacy choice honoured only on the
-visible call would be worse than none, because it would look like it worked.
+There is no per-request privacy preference and no caller-facing knob, because the
+upstream exposes none. `tests/unit/test_docs_drift.py` asserts the adapter sends
+nothing in this space, so an edit that invented one would fail rather than quietly
+make this section wrong.
 
 If the posture ever changes, every one of these must change with it, in the same
-commit: this file, `README.md`, `CLAUDE.md`, `.env.example`,
-`providers/openrouter.py`, the `/v1/daintree/capabilities` response, and the CLI's
+commit: this file, `README.md`, `CLAUDE.md`, `.env.example`, and the CLI's
 onboarding copy.
 
 ## 5. Retries — two hops, two layers, both legitimate
@@ -433,16 +224,16 @@ not a stacking bug, and neither may be "fixed" by assuming the other does not
 exist.
 
 ```
-  CLI  ──(hop 1: CLI → backend)──►  backend  ──(hop 2: backend → OpenRouter)──►  endpoint
+  CLI  ──(hop 1: CLI → backend)──►  backend  ──(hop 2: backend → Cerebras)──►  model
         cli/internal/backend/retry.go          providers/retry.py
         ≤10 attempts / 2-minute window         MAX_UPSTREAM_RETRIES = 1
 ```
 
-### Hop 2 — backend → OpenRouter (`MAX_UPSTREAM_RETRIES`, default 1)
+### Hop 2 — backend → Cerebras (`MAX_UPSTREAM_RETRIES`, default 1)
 
-Applies to every **model** call: main completion, stream open, selector, utility
-tasks, and the skill-learning gate/builder/improver. It does **not** apply to the
-key-verification probe (`verify_key` calls OpenRouter directly, with no retry
+Applies to every **model** call: main completion, stream open, and utility
+tasks. It does **not** apply to the
+key-verification probe (`verify_key` calls the upstream directly, with no retry
 wrapper — a sign-in probe should answer or fail, not stall behind a backoff).
 
 Retries **transient** failures only — 5xx, timeouts, rate limits, transport
@@ -481,7 +272,7 @@ The CLI never replays:
 error arrives as an HTTP response. The same `upstream_error` delivered as a
 terminal **SSE** event *is* retried, provided no visible content has committed.
 Because `meta` is emitted before the canonical upstream stream is opened, a
-deterministic OpenRouter rejection — a revoked key, an unroutable parameter mix —
+deterministic upstream rejection — a revoked key, a malformed parameter mix —
 can reach the CLI as an SSE `upstream_error` and be replayed to no purpose. This
 is the strongest argument for the error-taxonomy work in §6: with distinct codes,
 the SSE path could exclude the deterministic ones too.
@@ -564,11 +355,6 @@ complete one. Stream teardown on that path is itself bounded (5 s), because an
 `aclose()` hanging on the same dead upstream would otherwise swallow the terminal
 error and let the request outlive the deadline that just fired.
 
-**Not covered:** detached post-turn skill learning. It runs after the response is
-sent, so it cannot delay a turn, but it has its own timeout rather than a share
-of this budget — and it is local-development-only, failing readiness in staging
-and production.
-
 Utility tasks get the same treatment with a budget derived from their profile
 timeout, because a task that also repairs its JSON makes two upstream calls.
 
@@ -616,25 +402,30 @@ actually exercised. The existing selector benchmark captures neither cached
 tokens nor endpoint attribution and runs at concurrency six, so it cannot answer
 this as written.
 
-## 5c. Cost reporting — the caller's bill, not our metric
+## 5c. Cost reporting — built for a number the current provider does not send
 
-Every upstream call is funded by the caller's own OpenRouter key. What a request
-costs is therefore their money, which makes it a product surface rather than an
-internal metric, and makes two failure modes unacceptable: reporting a cost we
-did not observe, and reporting zero for one we could not observe.
+> **Cerebras reports no cost.** Every field described in this section is
+> therefore absent today. This is not a regression to route around: the rules
+> below were written so that "we do not know what this cost" is a first-class
+> answer, and a client that implemented them correctly already behaves correctly.
 
-**Where it comes from.** OpenRouter returns a `cost` field inside the usage
-object on every completion. The historical `usage: {"include": true}` opt-in is
-**deprecated and has no effect** — full usage is now always included. It arrives
-in the non-streaming body and in the *final chunk* of a stream, computed
-in-flight, so there is no second call and no added latency. Verified against the
-live API on 2026-08-14; `tests/unit/test_cost_transparency.py` parses a captured
-response verbatim.
+Two failure modes are unacceptable and stay unacceptable: reporting a cost we did
+not observe, and reporting **zero** for one we could not observe. The second is
+the one that bites — a zero reads as "this turn was free", which is a claim about
+someone's money with nothing behind it.
 
-It is the router's own reported figure, never a token-price estimate we compute.
-That matters because OpenRouter fronts ~24 endpoints for the same weights at
-different prices and applies cache discounts we cannot see; anything we
-calculated ourselves would be a guess presented as a bill.
+**Where it would come from.** `ProviderUsage.cost` is whatever the provider says
+it billed, never a token-price estimate computed here. Anything we calculated
+ourselves would be a guess presented as a bill, and would be wrong in the
+direction that looks authoritative. Cerebras returns token counts and a
+`cached_tokens` figure but no billed amount, so `cost` parses to `None` on every
+call. Asking for one is not merely useless here — a `usage` key on the request is
+a hard 400 (§3).
+
+The plumbing is kept rather than deleted, and the reason is the same one that
+justifies the honesty rules: `None` already means exactly "not reported", so
+there is nothing to strip out, and a provider that does report cost needs no
+change above the adapter.
 
 **What is reported.**
 
@@ -698,14 +489,8 @@ not a rounding error — a busy orchestration session runs dozens of
 `terminal_summarize` / `terminal_extract` calls, and each silently-low figure
 would compound into the session total.
 
-**What is not counted at all:** skill learning. It runs fire-and-forget *after*
-the response, on a stronger model (`openai/gpt-5.6-sol`), and can cost more than
-the turn that triggered it. It is off by default and fails readiness in
-production, so no beta tester is exposed — but a local developer who enables it
-must read their spend from the OpenRouter dashboard, not from these fields.
-
-The authority on a bill is always the OpenRouter dashboard; these figures are for
-proportion and trend.
+The authority on a bill is always the provider's own dashboard; these figures,
+when a provider supplies them, are for proportion and trend.
 
 ---
 
@@ -713,7 +498,7 @@ proportion and trend.
 
 The caller must be able to tell *whose* problem a failure is: their key, their
 account balance, their key's permissions, Daintree's request, or the provider
-being down. `providers/openrouter.py` maps upstream status codes onto the stable
+being down. `providers/cerebras.py` maps upstream status codes onto the stable
 codes in [`DAINTREE_API.md`](DAINTREE_API.md#errors); the CLI branches on
 `error.code`, never on prose.
 
@@ -724,8 +509,7 @@ codes in [`DAINTREE_API.md`](DAINTREE_API.md#errors); the CLI branches on
 | 401 | 401 | `provider_invalid_api_key` | no |
 | 402 | 402 | `provider_insufficient_credits` | no |
 | 403 | 403 | `provider_key_forbidden` | no |
-| 404 | 503 | `upstream_no_compliant_provider` | no |
-| 503 *with a no-route message* | 503 | `upstream_no_compliant_provider` | no |
+| 404 | 502 | `upstream_request_rejected` | no |
 | 429 | 429 | `upstream_rate_limited` (bounded `Retry-After`) | yes |
 | 408, 504 | 504 | `upstream_timeout` | yes |
 | other ≥ 500 | 503 | `upstream_unavailable` | yes |
@@ -734,18 +518,26 @@ codes in [`DAINTREE_API.md`](DAINTREE_API.md#errors); the CLI branches on
 
 Two subtleties worth knowing before editing this:
 
-- **Retryability is load-bearing, not decoration.** An account failure or an empty
-  routing pool is deterministic; replaying it reaches the same answer more slowly,
-  and on the streaming path it burns the CLI's retry budget *after* `meta` has
-  already committed a 200.
-- **A no-route answer can arrive as 404 or 503**, depending on which filter
-  emptied the pool, so the 503 branch is disambiguated by the message
-  (`_looks_unroutable`). That match is biased toward reading an ambiguous 503 as
-  an outage: mistaking an outage for a policy dead-end would mark a transient
-  failure permanent and kill a retry that would have worked.
-
-`upstream_no_compliant_provider` **fails closed**. The alternative — quietly
-relaxing the privacy filter until something routes — would make §4 a lie.
+- **Retryability is load-bearing, not decoration.** An account failure or a
+  malformed request is deterministic; replaying it reaches the same answer more
+  slowly, and on the streaming path it burns the CLI's retry budget *after* `meta`
+  has already committed a 200.
+- **404 is our bug, not a routing dead-end.** Against a single-host provider the
+  chat path is fixed and correct, so a 404 can only mean the *model id* is wrong.
+  It therefore shares `upstream_request_rejected` with 400 — one condition, one
+  answer ("fix what the server sent"), with the upstream's own reason carried
+  through. The previous stack needed a whole marker-matching layer to separate a
+  routing dead-end from an outage; that ambiguity no longer exists, and neither
+  does the code, nor the `upstream_no_compliant_provider` code it produced.
+- **Every 5xx is simply an outage** and stays retryable. Prose that used to be
+  read as a permanent policy failure ("No endpoints found matching your data
+  policy") must not be, and `tests/unit/test_error_taxonomy.py` pins that —
+  misclassifying an outage as permanent kills a retry that would have worked.
+- **An in-band stream error may carry a symbolic code, not a numeric one.**
+  Cerebras sends `"wrong_api_key"` rather than `401`, so the streaming path
+  matches those markers explicitly; without that a rejected credential would fall
+  through to a generic retryable error and the CLI would replay a request that
+  can never succeed.
 
 ### Diagnostics and content
 
@@ -766,41 +558,64 @@ upstream bodies are never echoed".
 ## 7. Readiness is *configuration* readiness, not provider readiness
 
 `/readyz` validates the server's own secrets, the prompt files, the skill catalog
-and provider-object construction. It **cannot** prove OpenRouter is reachable or
-that a caller's key works, because the service intentionally holds no key of its
-own.
+and provider-object construction. `CEREBRAS_API_KEY` being **present** is part of
+that (`missing_secrets`) — without it nothing can be answered at all, and
+discovering that on the first turn surfaces as an upstream 401 that reads like the
+caller's fault. But presence is not validity: `/readyz` **cannot** prove Cerebras
+is reachable or that the key works, and it deliberately does not try. A readiness
+probe that made a network call to a third party would fail this service for their
+outage.
 
 Base-URL validation is narrower still: the origin is only checked in **hardened**
-environments (`staging`, `production`), where caller keys are forwarded to it. A
-development deployment constructs the provider from whatever string it is given.
+environments (`staging`, `production`), where the server credential is forwarded
+to it. A development deployment constructs the provider from whatever string it is
+given.
 
-Live provider readiness belongs to the authenticated `/v1/daintree/auth/verify`
-probe and to release smoke — never to `/readyz`.
+Live provider readiness belongs to the `/v1/daintree/auth/verify` probe (a
+tokenless model listing) and to release smoke — never to `/readyz`.
 
 ## 8. What this document can and cannot prove
 
 The code proves exactly one class of fact: **which parameters we send**. That is
 what the drift tests pin.
 
-Everything else here is either an OpenRouter behaviour or a measurement, and is
+Everything else here is either a Cerebras behaviour or a measurement, and is
 recorded as a **dated observation** rather than a timeless truth. Specifically:
 
-- the size of the eligible endpoint pool;
-- that `preferred_max_latency` deprioritises rather than excludes;
-- the precise semantics OpenRouter attaches to `data_collection: "deny"`;
-- that no endpoint for this model advertises `prompt_cache_key`;
-- that this model collapses `low`/`medium` into `high`;
-- every TTFT, p90/p99, price and reasoning-token figure quoted above.
+- what Cerebras retains and for how long (§4) — their published policy, not
+  something this repository can assert or enforce;
+- that `prompt_cache_key` is accepted but not required;
+- that `gemma-4-31b` does not reason;
+- the prefix-cache block size and TTL;
+- every latency and token figure quoted above.
 
-The measurements come from this repository's benchmark suites, but those suites
-write their results to a gitignored directory, so the numbers in this document
-cannot currently be traced back to a committed run. Treat a quoted figure as
-"what we saw on the date given", re-measure before relying on it, and prefer
-citing OpenRouter's documentation (with the date read) for provider semantics.
+The live suite (`tests/live/test_live_cerebras.py`) does pin the *wire* half
+against the real API — which parameters are accepted, which are rejected, and
+that the serving model reports zero reasoning tokens — so the facts most likely
+to break silently are checked rather than remembered. The rest comes from this
+repository's benchmark suites, which write their results to a gitignored
+directory, so those numbers cannot be traced back to a committed run. Treat a
+quoted figure as "what we saw on the date given", re-measure before relying on
+it, and prefer citing Cerebras's own documentation (with the date read) for
+provider semantics.
 
 ## 9. Changing the pinned model
 
 A model change requires, before merge: the full deterministic suite, the full live
 suite, a skill-selection comparison, an injection comparison, a latency
-comparison, a tool-call correctness comparison, and an explicit release note. Do
-not switch to a floating alias during internal testing.
+comparison, a tool-call correctness comparison, a refreshed
+`benchmarks/baseline.json`, and an explicit release note. Do not switch to a
+floating alias during internal testing.
+
+**`gemma-4-31b` is a preview model with a stated replacement coming**, so this is
+scheduled work rather than a hypothetical. Two things beyond quality have to be
+re-decided when it moves:
+
+- **Thinking posture.** Nothing thinks because this model cannot reason, not
+  because a flag is set — and Cerebras offers no way to switch reasoning off. A
+  reasoning-capable replacement is therefore a *deliberate* posture decision, not
+  a drop-in (§2). The live suite asserts zero reasoning tokens so this cannot be
+  missed.
+- **Prompt budgets.** The per-file budget tests and `benchmarks/baseline.json`
+  are sized against this model's context window and this model's behaviour under
+  the current prompts.

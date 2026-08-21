@@ -1,16 +1,20 @@
-"""Key verification — the endpoint that answers "is this key actually usable?".
+"""Credential verification — "can this backend actually run a turn for me?".
 
-Our own authentication is deliberately structural (see ``auth.py``): the server holds
-no upstream credential and cannot judge a caller's key, so a well-formed string that no
-provider ever issued authenticates fine. That is correct for the serving path — it keeps
-the door cheap and the failure modes distinct — but it leaves a real gap at SIGN-IN,
-where the user is explicitly asking whether the credential they just pasted works. Left
-unanswered, the first real turn is where they find out, minutes later and in the middle
-of something else.
+Originally this answered "is the key you just pasted valid?", because the caller
+supplied the credential that funded their turns and our own auth was structural
+(see ``auth.py``) — a well-formed string no provider ever issued passed the door
+and only failed minutes later, mid-task.
 
-This endpoint closes that gap by asking the provider directly. It costs no tokens (the
-provider's own key-introspection call, not a model call) and returns a verdict the CLI
-can act on immediately.
+The credential moved to the server, so the question moved with it. What this
+endpoint verifies now is **whichever key this request would actually spend**: the
+caller's if they sent one, the server's ``CEREBRAS_API_KEY`` otherwise — which is
+every request today. Same probe, same verdict shape, and still the only honest
+answer available before a real turn: it costs no tokens (a model listing, not a
+generation).
+
+It is deliberately kept rather than deleted while the door is open. Account
+authentication is being built next, and this is where a caller learns their
+credential works — a question that returns, not one that went away.
 """
 
 from __future__ import annotations
@@ -32,7 +36,7 @@ async def verify(
     principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
 ) -> dict[str, object]:
-    """Verify the caller's own bearer token against the upstream provider.
+    """Verify the credential this request would spend, against the upstream provider.
 
     Always 200 when we managed to GET an answer: "this key is invalid" is a successful
     result for this question, not a request failure, and modelling it as an HTTP error
@@ -68,9 +72,22 @@ async def verify(
     # Echo only non-sensitive, decision-useful fields. `label` helps a user confirm they
     # pasted the key they meant to; the limit fields let the CLI warn about an exhausted
     # key, which reads as a broken sign-in otherwise. Never echo the key itself.
+    #
+    # Cerebras returns none of them — its probe answers with a model listing — so
+    # in practice only `models` is populated today. The label/budget branches stay
+    # because they cost nothing to keep and are exactly what an account-mapped
+    # credential will want to report; `_usability` below is already written to
+    # treat their absence as "not known to be exhausted" rather than a failure.
     out: dict[str, object] = {"valid": True}
+    caller_key = principal.api_key
     if isinstance(record, dict):
-        label = _safe_label(record.get("label"), principal.api_key.get_secret_value())
+        models = record.get("models")
+        if isinstance(models, list):
+            out["models"] = [m for m in models if isinstance(m, str)]
+        label = _safe_label(
+            record.get("label"),
+            caller_key.get_secret_value() if caller_key is not None else "",
+        )
         if label:
             out["label"] = label
         for field in ("limit", "usage", "limit_remaining"):

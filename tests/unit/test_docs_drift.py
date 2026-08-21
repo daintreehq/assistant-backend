@@ -2,9 +2,9 @@
 
 A tester's trust decision is built out of prose, not source. The specific failure
 these tests exist to prevent is a *stale* statement surviving a code change and
-becoming the thing a reader believes: a privacy promise the routing policy does
-not make, a thinking posture that was turned off two commits ago, a claim that
-the CLI cannot retry when it demonstrably does.
+becoming the thing a reader believes: a privacy promise the upstream does not
+make, a thinking posture that was turned off two commits ago, a claim that the
+CLI cannot retry when it demonstrably does, a credential model that inverted.
 
 So every fact below is asserted against the code that implements it, not against
 a hardcoded expectation. Change the code and the doc must move with it, in the
@@ -18,7 +18,6 @@ spell-checker for the whole corpus.
 from __future__ import annotations
 
 import inspect
-import json
 import re
 from pathlib import Path
 from typing import get_args
@@ -29,22 +28,14 @@ from daintree_assistant_server import PROTOCOL_MAX, PROTOCOL_MIN
 from daintree_assistant_server import main as main_module
 from daintree_assistant_server.auth import authenticate
 from daintree_assistant_server.config import (
+    CEREBRAS_MODEL,
+    INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
-    OPENROUTER_MODEL,
-    OPENROUTER_REASONING_EFFORT,
     PUBLIC_MODEL_ID,
-    SKILL_BUILDER_MODEL,
-    SKILL_IMPROVER_MODEL,
-    SKILL_LEARNING_REASONING_EFFORT,
     Settings,
 )
 from daintree_assistant_server.errors import DaintreeError
-from daintree_assistant_server.providers.openrouter import (
-    _PROVIDER_ROUTING,
-    _PROVIDER_ROUTING_FIRST_BYTE,
-    OpenRouterProvider,
-)
-from daintree_assistant_server.providers.policy import DEFAULT_POLICY, PrivacyMode
+from daintree_assistant_server.providers.cerebras import CerebrasProvider
 from daintree_assistant_server.services.task_runner import TaskRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -87,13 +78,25 @@ def test_authoritative_docs_exist(doc: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Privacy: `data_collection: "deny"` is a no-training floor, NOT no-retention.
+# Privacy: say "does not collect or train on", never "does not store".
+#
+# THE MECHANISM CHANGED AND THE COPY DELIBERATELY DID NOT. Under OpenRouter the
+# no-training floor was something this server ENFORCED per request, by sending
+# `data_collection: "deny"` and filtering the eligible endpoint pool. Cerebras is
+# a single host: there is no pool, no filter, and nothing to send. What Daintree
+# can say now rests entirely on Cerebras's own published policy, cited in
+# docs/PROVIDER_POLICY.md section 4.
+#
+# Cerebras publishes a STRONGER position than the old copy claims — no training,
+# and zero retention of inference inputs and outputs by default. The copy is
+# still not upgraded to match, and that is a decision rather than an oversight:
+# understating a privacy guarantee cannot mislead a user, and overstating one is
+# the failure this whole section exists to prevent. Raising the claim to "does
+# not retain" is a deliberate act that needs a human to verify Cerebras's terms
+# and then relax the scan below — not a default that drifts in.
 # ---------------------------------------------------------------------------
 
-# Phrases that assert something stronger than the routing policy actually sends.
-# `data_collection: "deny"` filters to endpoints that do not COLLECT or train on
-# prompt data; an endpoint in that pool may still hold a request transiently. Zero
-# data retention is OpenRouter's separate `zdr` flag, which we do not send.
+# Phrases that assert something stronger than the copy is willing to promise.
 #
 # Scoped to PROMPT/REQUEST data on purpose. "The server never persists a key" is a
 # true and important statement about credentials, and must not trip this scan.
@@ -133,15 +136,21 @@ _OVERSTATED_PRIVACY = (
 _OPT_OUT = "privacy-copy-ok"
 
 
-def test_routing_policy_does_not_claim_zero_retention() -> None:
-    """The code half: if `zdr` is ever sent, this test must be revisited."""
-    assert "zdr" not in _PROVIDER_ROUTING, (
-        "The routing policy now sends `zdr`. That is a stronger promise than the "
-        "current copy makes: update docs/PROVIDER_POLICY.md section 4, the README, "
-        "CLAUDE.md, .env.example and the CLI onboarding copy, then relax the "
-        "overstated-phrase scan below."
-    )
-    assert _PROVIDER_ROUTING["data_collection"] == "deny"
+def test_nothing_sends_a_per_request_privacy_preference() -> None:
+    """The code half, inverted.
+
+    There is no longer a privacy knob on the wire: Cerebras exposes no
+    per-request data-handling parameter, and the adapter must not invent one. If
+    a future edit starts sending something in this space, the copy above stops
+    describing the arrangement and this is where that shows up.
+    """
+    source = inspect.getsource(CerebrasProvider._build_body)
+    for token in ("data_collection", "zdr", "privacy"):
+        assert token not in source, (
+            f"_build_body now sends {token!r}. The privacy posture is documented "
+            "in docs/PROVIDER_POLICY.md section 4 as resting on Cerebras's own "
+            "policy, with nothing sent per request; update it in this commit."
+        )
 
 
 @pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
@@ -156,11 +165,12 @@ def test_no_document_overstates_the_privacy_guarantee(path: Path) -> None:
                 continue
             pytest.fail(
                 f"{path.name}:{number} claims {match.group(0)!r}.\n"
-                '`data_collection: "deny"` guarantees no collection or training. It '
-                "does NOT guarantee no retention — that is OpenRouter's separate "
-                "`zdr` flag, which this server does not send.\n"
-                "Say 'does not collect or train on'. If this line is deliberately "
-                f"discussing the banned phrasing, append '{_OPT_OUT}' to it.\n"
+                "Daintree's user-facing promise is 'does not collect or train on'. "
+                "It deliberately stops short of a retention claim — see the note at "
+                "the top of this section: understating is safe, overstating is the "
+                "failure this scan exists to prevent.\n"
+                f"If this line is deliberately discussing the banned phrasing, "
+                f"append '{_OPT_OUT}' to it.\n"
                 "See docs/PROVIDER_POLICY.md section 4."
             )
 
@@ -195,45 +205,27 @@ def test_the_privacy_scan_catches_its_own_motivating_phrase() -> None:
         assert not offenders, f"{sentence!r} is accurate copy but trips {offenders}"
 
 
-def test_the_shipped_privacy_mode_matches_the_documented_posture() -> None:
-    """The enum and the prose are two halves of one promise."""
-    assert DEFAULT_POLICY.privacy is PrivacyMode.NO_TRAINING, (
-        "the shipped privacy mode changed. docs/PROVIDER_POLICY.md section 4 says "
-        "'Current posture: NO_TRAINING' and every user-facing string is written to "
-        "match; update them in this commit."
-    )
-    assert "NO_TRAINING" in _read(DOC_PROVIDER)
+def test_provider_policy_names_the_upstream_whose_policy_this_now_is() -> None:
+    """The promise has a source, and the doc must name it.
 
-
-@pytest.mark.parametrize("mode", list(PrivacyMode))
-def test_every_privacy_mode_has_accurate_copy(mode: PrivacyMode) -> None:
-    """The description ships with the enum precisely so a client cannot invent its
-    own wording.
-
-    Note this is NOT the corpus-wide banned-phrase scan: a retention claim is
-    accurate for ZDR (it is exactly what that mode buys) and inaccurate for
-    NO_TRAINING. The blunt scan cannot tell those apart, so the assertion is
-    per-mode.
+    This is the substantive difference from the old arrangement, and the one a
+    reader most needs. The guarantee is no longer something this server enforces
+    per request — it is Cerebras's published policy, and a reader who wants to
+    check it needs to know whose policy to read.
     """
-    text = mode.description
-    assert "collect or train" in text, (
-        f"PrivacyMode.{mode.name}.description omits the no-training guarantee, "
-        "which every mode provides"
+    text = _read(DOC_PROVIDER)
+    assert "cerebras" in text.lower()
+    assert "trust.cerebras.ai" in text or "cerebras.ai/privacy" in text, (
+        "docs/PROVIDER_POLICY.md section 4 must link Cerebras's own authoritative "
+        "data-handling page. The privacy claim now rests on it, so a reader has to "
+        "be able to reach it."
     )
-    if mode is PrivacyMode.NO_TRAINING:
-        assert "not enforced" in text, (
-            "the default mode's copy must say explicitly that zero data retention "
-            "is NOT enforced — silence reads as a promise"
-        )
-    else:
-        assert "zero data retention" in text.lower()
 
 
 def test_provider_policy_states_the_privacy_posture_explicitly() -> None:
     text = _read(DOC_PROVIDER)
     assert "no-training guarantee" in text
     assert "not a no-retention" in text.lower() or "not a no-retention guarantee" in text.lower()
-    assert "zdr" in text.lower(), "the doc must name the flag it is NOT sending"
 
 
 # ---------------------------------------------------------------------------
@@ -241,14 +233,14 @@ def test_provider_policy_states_the_privacy_posture_explicitly() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_interactive_surface_is_documented_as_non_thinking() -> None:
+def test_the_non_thinking_posture_is_documented() -> None:
     assert INTERACTIVE_THINKING_ENABLED is False, (
         "Interactive thinking was re-enabled. docs/PROVIDER_POLICY.md section 2, "
-        ".env.example and CLAUDE.md all state the interactive surface is "
-        "non-thinking; update them in this commit."
+        ".env.example and CLAUDE.md all state that nothing in this server thinks; "
+        "update them in this commit."
     )
-    text = _read(DOC_PROVIDER)
-    assert "interactive surface is non-thinking" in text.lower()
+    text = _read(DOC_PROVIDER).lower()
+    assert "nothing in this server thinks" in text
 
 
 @pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
@@ -281,9 +273,17 @@ def test_no_document_claims_the_interactive_surface_thinks(path: Path) -> None:
         )
 
 
-def test_skill_learning_is_documented_as_the_only_thinking_surface() -> None:
+def test_nothing_is_documented_as_thinking() -> None:
+    """There is no thinking surface left at all, and the doc has to say so.
+
+    Skill learning was the one exception — it ran after the response, so its
+    latency never reached a user — and it has been removed. A doc that still
+    carves out an exception sends a reader looking for a thinking budget that
+    nothing spends.
+    """
     text = _read(DOC_PROVIDER).lower()
-    assert "skill learning is the one surface that still thinks" in text
+    assert "nothing in this server thinks" in text
+    assert "skill learning is the one surface that still thinks" not in text
 
 
 # The stale posture survived in *source comments* too — `config.py` justified the
@@ -330,7 +330,7 @@ def test_task_runner_actually_sends_reasoning_disabled() -> None:
 
 def test_provider_policy_names_the_pinned_models() -> None:
     text = _read(DOC_PROVIDER)
-    for model in (OPENROUTER_MODEL, SKILL_BUILDER_MODEL, SKILL_IMPROVER_MODEL, PUBLIC_MODEL_ID):
+    for model in (CEREBRAS_MODEL, PUBLIC_MODEL_ID):
         assert model in text, (
             f"docs/PROVIDER_POLICY.md does not name {model!r}. The model table is "
             "the documented source of truth for what actually answers a call."
@@ -338,100 +338,145 @@ def test_provider_policy_names_the_pinned_models() -> None:
 
 
 def test_readme_names_the_pinned_main_model() -> None:
-    assert OPENROUTER_MODEL in _read(README)
+    assert CEREBRAS_MODEL in _read(README)
 
 
 # ---------------------------------------------------------------------------
-# Caller-key ownership: the server holds no upstream credential.
+# Credential ownership: the SERVER holds the upstream key.
+#
+# This inverted with the move to Cerebras, and it inverted in the direction that
+# costs money if the docs are wrong. The old arrangement — every caller's bearer
+# token IS the upstream credential — is now false, and a document that still says
+# it tells a tester their key funds their turns when Daintree's does.
 # ---------------------------------------------------------------------------
 
-_SERVER_OWNS_CREDENTIALS = re.compile(
-    r"server owns[^.\n]{0,120}\bupstream credentials\b", re.IGNORECASE
-)
-
-
-@pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
-def test_no_document_claims_the_server_owns_upstream_credentials(path: Path) -> None:
-    text = _read(path)
-    match = _SERVER_OWNS_CREDENTIALS.search(text)
-    assert match is None, (
-        f"{path.name} says {match.group(0)!r}. The serving path is built with "
-        "api_key=None (main._build_provider); every request's bearer token IS the "
-        "upstream credential. See docs/KEY_HANDLING.md."
-    )
-
-
-def test_serving_provider_is_built_without_a_default_credential() -> None:
-    """The invariant the copy above depends on, pinned at its source.
-
-    Source inspection rather than a behavioural test because the failure mode is
-    textual: someone passes ``settings.openrouter_api_key`` into the serving
-    provider and the server starts quietly billing a shared account instead of
-    failing loudly in ``_resolve_key``. ``inspect.getsource`` on the real function
-    object survives reordering and renaming of everything around it.
-    """
-    builder = inspect.getsource(main_module._build_provider)
-    assert "api_key=None" in builder
-    assert "openrouter_api_key" not in builder, (
-        "main._build_provider now reads settings.openrouter_api_key. That turns a "
-        "loud propagation failure into silently billing a shared account. See "
-        "docs/KEY_HANDLING.md section 1."
-    )
-
-
-def test_the_serving_provider_really_holds_no_credential() -> None:
-    """The behaviour behind the doc claim, not just the source text.
-
-    A provider with no default credential must reject a call that arrives without
-    one rather than substituting something of its own.
-    """
-    settings = Settings(
-        STATE_SIGNING_KEY_CURRENT="x" * 32,
-        OPENROUTER_API_KEY="sk-or-v1-should-never-be-used",
-    )
-    provider = main_module._build_provider(settings)
-    assert isinstance(provider, OpenRouterProvider)
-    assert provider._default_api_key is None
-    with pytest.raises(DaintreeError) as excinfo:
-        provider._resolve_key(None)
-    assert excinfo.value.status_code >= 500
-
-
-# A doc line describing a way to reach the service WITHOUT a caller key. Auth does
-# not vary by environment (auth.authenticate is unconditional), so any such line is
-# stale. Matched as a phrase rather than the bare word "unauthenticated", because
-# the accurate copy uses that word too ("there is no unauthenticated mode").
-_UNAUTH_MODE = re.compile(
-    r"(?:unauthenticated|without a (?:caller )?key|no bearer)[^.\n]{0,60}"
-    r"\b(?:mode|access|path|allowed|permitted|works|supported|development)\b",
+_CALLER_FUNDS_THE_TURN = re.compile(
+    r"(?:caller|user|your)(?:'s)?\s+(?:own\s+)?(?:bearer\s+token|key|credential)"
+    r"[^.\n]{0,80}\b(?:funds?|pays?\s+for|bills?)\b",
     re.IGNORECASE,
 )
-_UNAUTH_DENIAL = re.compile(r"\b(?:no|never|not|rejected|removed|gone)\b", re.IGNORECASE)
 
 
 @pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
-def test_no_document_describes_an_unauthenticated_mode(path: Path) -> None:
+def test_no_document_claims_the_caller_funds_the_turn(path: Path) -> None:
     for number, line in enumerate(_read(path).splitlines(), start=1):
-        match = _UNAUTH_MODE.search(line)
+        match = _CALLER_FUNDS_THE_TURN.search(line)
         if match is None:
             continue
-        # The accurate statement is a denial ("there is no unauthenticated mode",
-        # "the development shortcut was removed"). Require one on the same line.
-        assert _UNAUTH_DENIAL.search(line), (
-            f"{path.name}:{number} appears to describe reaching the service without "
-            f"a caller key: {match.group(0)!r}. Every environment requires one "
-            "(auth.authenticate), and without a caller key there is no upstream "
-            "credential to run the turn with."
+        # The accurate copy discusses the OLD arrangement in the past tense, or
+        # denies it outright.
+        if re.search(r"\b(?:no longer|used to|previously|before|not|never|was)\b", line, re.I):
+            continue
+        pytest.fail(
+            f"{path.name}:{number} says {match.group(0)!r}. The server holds the "
+            "upstream credential (CEREBRAS_API_KEY) and funds every turn from it; "
+            "callers supply no key. See docs/KEY_HANDLING.md."
         )
 
 
-@pytest.mark.parametrize("header", [None, "", "Bearer", "Basic abc", "Bearer "])
-def test_authentication_rejects_a_missing_key_unconditionally(header: str | None) -> None:
+def test_serving_provider_is_built_with_the_server_credential() -> None:
+    """The invariant the copy above depends on, pinned at its source.
+
+    Source inspection rather than a behavioural test because the failure mode is
+    textual: someone reinstates ``api_key=None`` and every turn fails in
+    ``_resolve_key`` with a message about a propagation bug that no longer
+    describes anything. ``inspect.getsource`` on the real function object survives
+    reordering and renaming of everything around it.
+    """
+    builder = inspect.getsource(main_module._build_provider)
+    assert "settings.cerebras_api_key" in builder, (
+        "main._build_provider no longer passes the server credential. Readiness "
+        "gates on CEREBRAS_API_KEY precisely so this cannot be missing at runtime; "
+        "a provider built without it cannot answer anything."
+    )
+
+
+def test_the_serving_provider_really_holds_the_credential() -> None:
+    """The behaviour behind the doc claim, not just the source text.
+
+    A request that arrives with no caller key must still be servable — that is the
+    entire current credential model, and the thing an anonymous CLI depends on.
+    """
+    settings = Settings(
+        STATE_SIGNING_KEY_CURRENT="x" * 32,
+        CEREBRAS_API_KEY="csk-server-owned",
+    )
+    provider = main_module._build_provider(settings)
+    assert isinstance(provider, CerebrasProvider)
+    # No per-call key: the server's own is what gets resolved.
+    assert provider._resolve_key(None).get_secret_value() == "csk-server-owned"
+
+
+def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
+    """The seam account authentication will land in.
+
+    A per-request credential must keep winning over the server's, even though
+    nothing on the serving path sets one today. Keeping this live is what makes
+    account-mapped credentials a value change rather than a plumbing change.
+    """
+    from pydantic import SecretStr as _SecretStr
+
+    settings = Settings(
+        STATE_SIGNING_KEY_CURRENT="x" * 32,
+        CEREBRAS_API_KEY="csk-server-owned",
+    )
+    provider = main_module._build_provider(settings)
+    resolved = provider._resolve_key(_SecretStr("csk-caller-supplied"))
+    assert resolved.get_secret_value() == "csk-caller-supplied"
+
+
+# THE DOOR IS OPEN, and the docs must say so plainly.
+#
+# This is the inverse of the gate that used to live here. Authentication still
+# does not vary by environment — ``authenticate`` takes no environment argument —
+# but the unconditional outcome flipped from "reject" to "accept": the server
+# holds the upstream credential, so a request without a bearer token has one to
+# spend. A document that still tells a tester their request will be rejected
+# without a key sends them hunting for a credential that does not exist.
+_KEY_IS_REQUIRED = re.compile(
+    r"(?:request|call|every request)[^.\n]{0,60}"
+    r"\b(?:without|lacking|missing)\b[^.\n]{0,30}"
+    r"\bkey\b[^.\n]{0,40}\b(?:rejected|refused|401|denied)\b",
+    re.IGNORECASE,
+)
+
+
+@pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
+def test_no_document_claims_a_caller_key_is_required(path: Path) -> None:
+    for number, line in enumerate(_read(path).splitlines(), start=1):
+        match = _KEY_IS_REQUIRED.search(line)
+        if match is None:
+            continue
+        # Accurate copy discusses the old rule in the past tense, or is talking
+        # about the MALFORMED-token case, which genuinely is still rejected.
+        if re.search(r"\b(?:used to|previously|no longer|malformed|garbage|was)\b", line, re.I):
+            continue
+        pytest.fail(
+            f"{path.name}:{number} says {match.group(0)!r}. A request with no "
+            "Authorization header is served (auth.authenticate returns an "
+            "anonymous principal); the server funds it. See auth.py."
+        )
+
+
+def test_a_request_with_no_authorization_header_is_accepted() -> None:
     """The code fact behind the copy above.
 
-    ``authenticate`` takes no environment argument at all, which is the real
-    guarantee — but a behavioural test says so in a way a future refactor cannot
-    quietly undo.
+    Absence is a valid choice now. This is the single assertion that would break
+    the moment account authentication lands — which is exactly what it is for.
+    """
+    for header in (None, "", "   "):
+        principal = authenticate(header)
+        assert principal.api_key is None
+        assert principal.id == "anonymous"
+
+
+@pytest.mark.parametrize("header", ["Bearer", "Basic abc", "Bearer ", "Bearer with space"])
+def test_a_malformed_authorization_header_is_still_rejected(header: str) -> None:
+    """The asymmetry that makes the open door safe to ship.
+
+    Absence means "I have no key". A header that is present but unusable means "I
+    meant to authenticate and got it wrong" — and silently ignoring it would show
+    that caller a successful sign-in while every turn ran on the server's account.
     """
     with pytest.raises(DaintreeError) as excinfo:
         authenticate(header)
@@ -488,7 +533,7 @@ def test_provider_policy_documents_both_retry_hops() -> None:
 def test_provider_policy_excludes_key_verification_from_the_retry_scope() -> None:
     """`verify_key` deliberately bypasses `retry_upstream`; the doc used to say
     the retry policy covered "every upstream call", which swept it in."""
-    verify = inspect.getsource(OpenRouterProvider.verify_key)
+    verify = inspect.getsource(CerebrasProvider.verify_key)
     assert "retry_upstream" not in verify, (
         "verify_key now retries. docs/PROVIDER_POLICY.md section 5 states it does "
         "not; update the doc."
@@ -497,30 +542,14 @@ def test_provider_policy_excludes_key_verification_from_the_retry_scope() -> Non
 
 
 # ---------------------------------------------------------------------------
-# Structured-call routing.
+# Wire shape: the parameters a single-host provider must and must not send.
+#
+# What used to live here was an elaborate bidirectional gate over the endpoint-
+# selection policy — the doc's JSON block parsed and compared key-for-key against
+# `_PROVIDER_ROUTING`. None of it has a subject any more. What replaces it is
+# smaller and sharper: three OpenRouter parameters that are now hard 400s, and
+# the one spelling that must be right on every single request.
 # ---------------------------------------------------------------------------
-
-
-def _documented_routing_policy() -> dict[str, object]:
-    """The ```json block in docs/PROVIDER_POLICY.md section 3, parsed.
-
-    Comparing parsed dicts rather than grepping substrings is what makes this gate
-    bidirectional: a changed *value* fails, and so does a key that was deleted
-    from the code but left behind in the prose. A substring scan catches neither.
-    """
-    # Scoped to section 3's own prose, ABOVE its subsections. Section 3a documents
-    # a second block that also carries `data_collection`, and an unscoped scan
-    # would happily compare the wrong one the day someone reorders the file.
-    return _documented_policy_block(
-        doc_section("## 3. Endpoint-selection policy", ends_at="\n### "),
-        where="section 3",
-    )
-
-
-def _documented_first_byte_policy() -> dict[str, object]:
-    """The ```json block in docs/PROVIDER_POLICY.md section 3b, parsed."""
-    return _documented_policy_block(doc_section("### 3b.", ends_at="\n## "), where="section 3b")
-
 
 def doc_section(heading: str, *, ends_at: str, text: str | None = None) -> str:
     """The slice of PROVIDER_POLICY.md under `heading`, or fail loudly.
@@ -543,144 +572,85 @@ def doc_section(heading: str, *, ends_at: str, text: str | None = None) -> str:
     return body.split(heading)[1].split(ends_at)[0]
 
 
-def _documented_policy_block(section: str, *, where: str) -> dict[str, object]:
-    candidates = []
-    for block in re.findall(r"```json\n(.*?)```", section, re.DOTALL):
-        try:
-            parsed = json.loads(block)
-        except json.JSONDecodeError:  # pragma: no cover - a prose example
-            continue
-        if isinstance(parsed, dict) and "data_collection" in parsed:
-            candidates.append(parsed)
-    # Exactly one, not the first: a section that grew a second policy block is
-    # ambiguous about which one is the contract, and picking the first would let
-    # the other drift from the code unnoticed.
-    assert len(candidates) == 1, (
-        f"docs/PROVIDER_POLICY.md {where} contains {len(candidates)} parseable "
-        "routing-policy ```json blocks, expected exactly 1. That block is the "
-        "documented contract; keep it machine-readable and unambiguous."
-    )
-    return candidates[0]
+# Sent on every request by the previous adapter; rejected outright by Cerebras
+# ("property is unsupported"). Reintroducing any of them breaks every call, so
+# they are checked at the source rather than discovered in production.
+_REJECTED_UPSTREAM_FIELDS = ("provider", "session_id", '"reasoning"')
 
 
-def test_documented_routing_policy_matches_the_code_exactly() -> None:
-    assert _documented_routing_policy() == _PROVIDER_ROUTING, (
-        "the provider block in docs/PROVIDER_POLICY.md section 3 has drifted from "
-        "_PROVIDER_ROUTING in providers/openrouter.py. That block is what a reader "
-        "believes the server sends."
+@pytest.mark.parametrize("field", _REJECTED_UPSTREAM_FIELDS)
+def test_the_adapter_sends_no_openrouter_only_parameter(field: str) -> None:
+    source = inspect.getsource(CerebrasProvider._build_body)
+    assert f'body[{field}]' not in source and f"body['{field}']" not in source, (
+        f"_build_body emits {field}, which Cerebras rejects with a 400. See "
+        "docs/PROVIDER_POLICY.md section 3."
     )
 
 
-def test_documented_first_byte_policy_matches_the_code_exactly() -> None:
-    assert _documented_first_byte_policy() == _PROVIDER_ROUTING_FIRST_BYTE, (
-        "the provider block in docs/PROVIDER_POLICY.md section 3b has drifted from "
-        "_PROVIDER_ROUTING_FIRST_BYTE in providers/openrouter.py."
-    )
+def test_the_adapter_sends_max_completion_tokens_and_never_max_tokens() -> None:
+    """One spelling, and the reason it has to be exactly one.
 
-
-def test_the_first_byte_policy_changes_the_ranking_axis_and_nothing_else() -> None:
-    """One policy with one axis flipped — not a second policy.
-
-    The design claim in section 3b is that ranking, and only ranking, varies
-    between calls. Worth a gate because this block is the one a future latency
-    push reaches for first, and the tempting move is to widen the pool to find a
-    faster endpoint — which is how `data_collection` quietly goes.
+    Cerebras accepts either name ALONE but 400s when both arrive. The normalized
+    request field is called ``max_tokens``, so the temptation to pass it straight
+    through is real and permanent — and the failure is total, on every request
+    that sets a budget, which is all of them.
     """
-    differing = {
-        key
-        for key in set(_PROVIDER_ROUTING) | set(_PROVIDER_ROUTING_FIRST_BYTE)
-        if _PROVIDER_ROUTING.get(key) != _PROVIDER_ROUTING_FIRST_BYTE.get(key)
-    }
-    assert differing == {"sort"}, (
-        f"the first-byte policy now differs from the default policy in {sorted(differing)}. "
-        "It exists to re-rank one pool on time-to-first-token, not to route a "
-        "different pool; document the new keys in docs/PROVIDER_POLICY.md section 3b."
+    source = inspect.getsource(CerebrasProvider._build_body)
+    assert 'body["max_completion_tokens"]' in source, (
+        "_build_body no longer sends max_completion_tokens"
     )
-    assert _PROVIDER_ROUTING_FIRST_BYTE["sort"] == "latency"
-    assert _PROVIDER_ROUTING["sort"] == "throughput"
+    assert 'body["max_tokens"]' not in source, (
+        "_build_body sends max_tokens as well. Cerebras 400s when both spellings "
+        "are present."
+    )
 
 
-def test_every_call_carries_the_first_byte_bound() -> None:
-    """The bound is on the DEFAULT policy, and that is the point.
+def test_cache_affinity_rides_the_openai_standard_field() -> None:
+    """Section 3a's claim, asserted where it can actually break.
 
-    It used to arrive via a derivation applied to structured calls, which left the
-    main chat call — the only upstream call a short question makes — elected purely
-    on tokens/second with nothing bounding how long it took to START. Both blocks
-    must carry it, and the doc must say so.
+    The spelling is the whole risk: `session_id` (OpenRouter's name for the same
+    idea) is a hard 400 here, and this field is attached to every main turn and
+    every utility task. Get it wrong and nothing works — which no mocked test
+    would notice, because the rejection lives at Cerebras.
     """
-    for name, block in (
-        ("_PROVIDER_ROUTING", _PROVIDER_ROUTING),
-        ("_PROVIDER_ROUTING_FIRST_BYTE", _PROVIDER_ROUTING_FIRST_BYTE),
-    ):
-        bound = block.get("preferred_max_latency")
-        assert bound, f"{name} no longer bounds time-to-first-token"
-        assert "p50" in bound, (
-            f"{name} bounds only the tail. An endpoint whose TYPICAL first byte is "
-            "slow has an unremarkable tail and would still win the election."
-        )
-    text = _read(DOC_PROVIDER)
-    for key, value in _PROVIDER_ROUTING["preferred_max_latency"].items():
-        pattern = rf'"{key}"\D{{0,4}}{re.escape(str(value).rstrip("0").rstrip("."))}'
-        assert re.search(pattern, text), (
-            f"docs/PROVIDER_POLICY.md does not document preferred_max_latency {key}={value}"
-        )
-
-
-def test_cache_affinity_rides_a_top_level_field_not_the_provider_block() -> None:
-    """Section 3a promises affinity is additive and is NOT `provider.order`.
-
-    Both halves are asserted against the code because both are the kind of claim a
-    reader acts on. `order` is the specific danger: OpenRouter documents it as
-    DISABLING the sticky routing this relies on, and as overriding `sort` — so a
-    future edit that "helpfully" pinned the endpoint in the provider block would
-    silently invert the documented behaviour while the prose still described it.
-    """
-    for name, block in (
-        ("_PROVIDER_ROUTING", _PROVIDER_ROUTING),
-        ("_PROVIDER_ROUTING_FIRST_BYTE", _PROVIDER_ROUTING_FIRST_BYTE),
-    ):
-        assert "order" not in block, (
-            f"{name} now sends `provider.order`. OpenRouter does not apply sticky "
-            "routing when a manual order is present, so this disables the cache "
-            "affinity docs/PROVIDER_POLICY.md section 3a describes."
-        )
-        assert "session_id" not in block, (
-            f"{name} carries `session_id` inside the provider block. It is a "
-            "TOP-LEVEL sibling of that block; nested it is an unrecognized "
-            "preference and affinity silently stops working."
-        )
-    source = inspect.getsource(OpenRouterProvider._build_body)
-    assert 'body["session_id"]' in source, (
-        "_build_body no longer emits a top-level session_id. "
+    source = inspect.getsource(CerebrasProvider._build_body)
+    assert 'body["prompt_cache_key"]' in source, (
+        "_build_body no longer emits prompt_cache_key. "
         "docs/PROVIDER_POLICY.md section 3a says main calls carry one."
     )
-    # Scoped to section 3a and to the CLAIM, not to the words. A bare substring
-    # scan for "session_id"/"provider.order" would pass a document that said the
-    # exact opposite ("do not send session_id; use provider.order") — both tokens
-    # are present either way, and the prose is what a reader acts on.
-    #
-    # `\n### ` and not `\n## `: 3b now follows 3a, and a slice that ran to the next
-    # top-level heading would swallow it — letting 3b's prose satisfy assertions
-    # about 3a and pass a document where 3a had been gutted.
-    section = doc_section("### 3a.", ends_at="\n### ")
-    assert "session_id" in section, (
+    section = doc_section("### 3a.", ends_at="\n## ")
+    assert "prompt_cache_key" in section, (
         "docs/PROVIDER_POLICY.md section 3a no longer documents the affinity key."
     )
-    assert "Why not `provider.order`" in section, (
-        "docs/PROVIDER_POLICY.md section 3a no longer explains why `provider.order` "
-        "is rejected. That paragraph is the one thing stopping a future reader from "
-        "'fixing' affinity by adding the very field that disables it."
+
+
+def test_provider_policy_describes_a_single_host_upstream() -> None:
+    """The structural fact the whole document now turns on.
+
+    A reader who believes there is still a pool of interchangeable endpoints will
+    go looking for routing controls that do not exist, and will misread every
+    availability failure as a policy dead-end.
+    """
+    section = doc_section("## 3. ", ends_at="\n### ")
+    assert re.search(r"single[- ]host|one endpoint|not a router", section, re.I), (
+        "docs/PROVIDER_POLICY.md section 3 must state that Cerebras hosts one "
+        "endpoint per model. Every removed control follows from that."
     )
 
 
-def test_reasoning_effort_tiers_are_documented() -> None:
-    """The doc's thinking table names an effort tier per surface; pin the strings."""
-    text = _read(DOC_PROVIDER)
-    for effort in {OPENROUTER_REASONING_EFFORT, SKILL_LEARNING_REASONING_EFFORT}:
-        assert f"`{effort}`" in text or f"**{effort}**" in text, (
-            f"docs/PROVIDER_POLICY.md section 2 does not name the {effort!r} effort "
-            "tier that config.py actually sends"
-        )
+def test_no_reasoning_effort_is_sent_by_anything() -> None:
+    """The tier constant survives the removal; nothing sends it.
+
+    ``INTERACTIVE_REASONING_EFFORT`` is the value the interactive surface WOULD
+    use if ``INTERACTIVE_THINKING_ENABLED`` were flipped back on, kept beside the
+    flag so that decision does not also require choosing a tier. With the flag
+    off and skill learning gone, no call in the system sets ``reasoning_effort``
+    at all — which is what the doc's thinking table now says.
+    """
+    assert INTERACTIVE_THINKING_ENABLED is False
+    assert INTERACTIVE_REASONING_EFFORT  # still defined, still unsent
+    text = _read(DOC_PROVIDER).lower()
+    assert "no reasoning mode" in text or "does not reason" in text
 
 
 # ---------------------------------------------------------------------------
@@ -700,7 +670,6 @@ _ERROR_CODES = (
     "provider_key_forbidden",
     "upstream_rate_limited",
     "upstream_timeout",
-    "upstream_no_compliant_provider",
     "upstream_unavailable",
     "upstream_request_rejected",
     "upstream_protocol_error",
@@ -842,35 +811,60 @@ def test_no_admission_control_exists_in_the_service() -> None:
 
 
 @pytest.mark.parametrize("environment", ["production", "staging"])
-def test_skill_learning_fails_readiness_in_every_hardened_environment(
+def test_prompt_dumping_fails_readiness_in_every_hardened_environment(
     environment: str,
 ) -> None:
-    """Both hardened environments, and the specific problem — not merely 'some
-    problem was reported', which a weak-secret complaint would also satisfy."""
+    """The last local-only feature, and the reason that gate still exists.
+
+    Skill learning used to be the other entry — and the more dangerous one, since
+    it mutated the skill catalog from model output at runtime. It has been
+    removed entirely, leaving prompt dumping: it writes FULL prompts to disk,
+    which is a development forensics tool and a disclosure risk anywhere else.
+
+    Both hardened environments, and the specific problem — not merely 'some
+    problem was reported', which a weak-secret complaint would also satisfy.
+    """
     hardened = Settings(
         STATE_SIGNING_KEY_CURRENT="x" * 32,
         STATE_SALT="not-the-default",
         ENVIRONMENT=environment,
-        SKILL_LEARNING_MODE="apply",
+        DAINTREE_DUMP_UPSTREAM_DIR="/tmp/dump",
     )
     assert hardened.is_hardened
     problems = hardened.local_only_problems()
-    assert any("SKILL_LEARNING_MODE" in p for p in problems), (
-        f"skill learning no longer fails readiness in {environment}, but "
-        f"docs/INTERNAL_BETA.md item 9 and section 7 both say it does: {problems}"
-    )
+    assert any("DAINTREE_DUMP_UPSTREAM_DIR" in p for p in problems), problems
 
 
 @pytest.mark.parametrize("environment", ["development", "test"])
-def test_skill_learning_is_permitted_in_local_environments(environment: str) -> None:
+def test_prompt_dumping_is_permitted_in_local_environments(environment: str) -> None:
     """The other half of the section 7 table."""
     local = Settings(
         STATE_SIGNING_KEY_CURRENT="x" * 32,
         ENVIRONMENT=environment,
-        SKILL_LEARNING_MODE="apply",
+        DAINTREE_DUMP_UPSTREAM_DIR="/tmp/dump",
     )
     assert not local.is_hardened
-    assert not any("SKILL_LEARNING_MODE" in p for p in local.local_only_problems())
+    assert local.local_only_problems() == []
+
+
+def test_no_document_still_describes_skill_learning() -> None:
+    """It is gone, and a document that still offers it is worse than silent.
+
+    A reader following `.env.example` or the README would set
+    `SKILL_LEARNING_MODE`, see nothing happen (extra env vars are ignored), and
+    have no way to tell whether the feature was broken or absent.
+    """
+    offenders: list[str] = []
+    for path in PROSE_FILES:
+        for number, line in enumerate(_read(path).splitlines(), start=1):
+            if "SKILL_LEARNING" in line or "skill-learning" in line.lower():
+                # A line explaining the REMOVAL is the accurate copy.
+                if re.search(r"\b(?:removed|no longer|used to|gone|deleted)\b", line, re.I):
+                    continue
+                offenders.append(f"{path.name}:{number}")
+    assert not offenders, (
+        f"{offenders} still describe skill learning, which has been removed."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -916,20 +910,25 @@ def test_the_absent_means_unknown_rule_is_real() -> None:
     assert "cost" not in body
 
 
-def test_the_doc_does_not_claim_a_cost_opt_in_is_needed() -> None:
-    """OpenRouter's `usage: {include: true}` is deprecated and inert.
+def test_the_adapter_asks_for_no_cost_opt_in() -> None:
+    """There is no cost figure to opt into, and asking for one is a 400.
 
-    The request builder must not send it, and the doc must not tell a reader to.
-    A stale instruction here costs nothing to follow and teaches the wrong model
-    of where the number comes from.
+    OpenRouter had a (deprecated, inert) `usage: {include: true}` opt-in, and the
+    temptation to reach for it survives the provider swap because `cost` is still
+    on `ProviderUsage`. Here it is worse than useless: Cerebras rejects a `usage`
+    key outright, so a request that asked for cost would fail entirely rather
+    than come back without it.
     """
     import inspect as _inspect
 
-    from daintree_assistant_server.providers import openrouter as _or
+    from daintree_assistant_server.providers import cerebras as _cb
 
-    source = _inspect.getsource(_or)
-    assert '"include"' not in source, "the deprecated usage opt-in crept back in"
-    assert "deprecated and has no effect" in DOC_PROVIDER.read_text(encoding="utf-8")
+    source = _inspect.getsource(_cb.CerebrasProvider._build_body)
+    assert '"usage"' not in source, (
+        "_build_body sends a `usage` key. Cerebras rejects it with a 400 — and "
+        "reports no cost either way. See docs/PROVIDER_POLICY.md section 5c."
+    )
+    assert "reports no cost" in DOC_PROVIDER.read_text(encoding="utf-8").lower()
 
 
 def test_the_documented_total_is_a_sum_of_both_calls() -> None:

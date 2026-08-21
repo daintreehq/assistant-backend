@@ -299,13 +299,19 @@ def test_workflow_resume_digest_task_endpoint(client, auth, fake_provider) -> No
     assert body["output"]["ranked"][0]["headline"] == "Ready to verify"
 
 
-def test_authed_routes_reject_missing_and_malformed_bearer(client) -> None:
-    """The caller-key auth matrix: every authed route 401s with a distinct
-    invalid_api_key code (so the CLI can tell 'fix your header' from an upstream
-    502 upstream_error), while probes stay open."""
+def test_a_malformed_bearer_is_rejected_on_every_route(client) -> None:
+    """The auth matrix, with the door open.
+
+    ABSENCE is served (the server holds the credential — see the next test).
+    A header that is PRESENT but unusable is still a distinct invalid_api_key
+    401 on every route, so the CLI can tell 'fix your header' from an upstream
+    502 upstream_error. The asymmetry is the point: a caller who sent a broken
+    header meant to authenticate, and silently ignoring it would show them a
+    successful sign-in while every turn ran on the server's account.
+    """
     from conftest import respond_body
 
-    for headers in ({}, {"Authorization": "Token x"}, {"Authorization": "Bearer bad key"}):
+    for headers in ({"Authorization": "Token x"}, {"Authorization": "Bearer bad key"}):
         r = client.get("/v1/daintree/capabilities", headers=headers)
         assert r.status_code == 401
         assert r.json()["error"]["code"] == "invalid_api_key"
@@ -329,11 +335,9 @@ def test_authed_routes_reject_missing_and_malformed_bearer(client) -> None:
             json={"action": "clear", "session_id": "s"},
         )
         assert r.status_code == 401
-        # The sign-in probe is authed like everything else. It answers a question
-        # ABOUT a key, which makes it the one route where "no key" could plausibly
-        # have been allowed through to be judged upstream — it is not. A malformed
-        # bearer is our own structural 401, decided at the door, and must never
-        # reach the provider as a verification request.
+        # The credential probe is no exception. A malformed bearer is our own
+        # structural 401, decided at the door, and must never reach the provider
+        # as a verification request.
         assert client.post("/v1/daintree/auth/verify", headers=headers).status_code == 401
     # Probes and version never require a key (Cloud Run probes them).
     assert client.get("/healthz").status_code == 200
@@ -341,10 +345,35 @@ def test_authed_routes_reject_missing_and_malformed_bearer(client) -> None:
     assert client.get("/version").status_code == 200
 
 
-def test_caller_key_reaches_selector_and_main_calls(client, fake_provider) -> None:
-    """The bearer token IS the upstream credential: BOTH the selector call and the
-    main call of a turn must carry exactly the caller's key — never a server-side
-    default (the provider has none)."""
+def test_every_route_is_served_without_an_authorization_header(client) -> None:
+    """The current credential model, on the wire, across the whole surface.
+
+    Callers send no key; the server funds the turn from its own. Every one of
+    these assertions is expected to flip when account authentication lands —
+    which is exactly why they are enumerated rather than spot-checked.
+    """
+    from conftest import respond_body
+
+    assert client.get("/v1/daintree/capabilities").status_code == 200
+    assert client.get("/v1/daintree/skills").status_code == 200
+    assert client.post(
+        "/v1/daintree/skills/resolve", json={"action": "clear", "session_id": "s"}
+    ).status_code == 200
+    assert client.post(
+        "/v1/daintree/respond",
+        json=respond_body([{"role": "user", "content": "rename my terminals"}]),
+    ).status_code == 200
+
+
+def test_a_caller_supplied_key_reaches_selector_and_main_calls(client, fake_provider) -> None:
+    """The seam account authentication will land in, kept alive and tested.
+
+    Nothing sends a bearer today, so this path is currently exercised only here —
+    which is the reason to keep testing it. When per-account credentials arrive
+    they become a VALUE flowing through this plumbing, not new plumbing: a key on
+    the request must still reach BOTH the selector call and the main call, and
+    still override the server's own.
+    """
     from conftest import respond_body
 
     fake_provider.selection_result = selection_result([SKILL_PREP])
@@ -432,58 +461,61 @@ def test_oversized_body_413(client, auth) -> None:
     assert r.status_code == 413
 
 
-def test_dev_boots_ready_without_any_api_key_but_still_requires_auth() -> None:
-    """No key env vars at all: the server boots ready (nothing to validate), but
-    every authed route still demands a caller key — the dev unauthenticated
-    shortcut is gone (without a caller key there is no upstream credential)."""
+def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
+    """CEREBRAS_API_KEY gates READINESS, and that placement is the whole point.
+
+    Without it nothing can be answered at all. Discovering that on the first turn
+    surfaces as an upstream 401 that reads like the caller's fault — an operator
+    would go looking at the caller's credentials for a problem that is entirely
+    in the deployment. Liveness stays green either way, so the container is not
+    killed for a missing secret it cannot fix by restarting.
+    """
     from fastapi.testclient import TestClient
 
     from daintree_assistant_server.config import Settings
     from daintree_assistant_server.main import create_app
 
     settings = Settings(
-        ENVIRONMENT="development", OPENROUTER_API_KEY="",
+        ENVIRONMENT="development", CEREBRAS_API_KEY="",
         STATE_SIGNING_KEY_CURRENT="sk", STATE_SALT="x",
     )
     app = create_app(settings=settings)  # real lifespan (no injected provider)
     with TestClient(app) as client:
-        assert app.state.ready is True
-        # No Authorization header → 401 even in development.
-        r = client.get("/v1/daintree/capabilities")
-        assert r.status_code == 401
-        assert r.json()["error"]["code"] == "invalid_api_key"
-        # A caller-supplied key (any well-formed bearer) is accepted.
-        ok = client.get(
-            "/v1/daintree/capabilities",
-            headers={"Authorization": "Bearer sk-or-v1-caller"},
-        )
-        assert ok.status_code == 200
+        assert app.state.ready is False
+        assert client.get("/readyz").status_code == 503
+        assert client.get("/healthz").status_code == 200
 
 
-def test_prod_boots_ready_without_upstream_key_env() -> None:
-    """Production readiness no longer requires any API-key env var: the caller
-    funds each request, so only server-owned state material is validated."""
+def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
+    """Production readiness needs no INBOUND key: there is nothing to configure
+    on the door. Only the server's own material — the signing key, the salt, and
+    the upstream credential — is validated."""
     from fastapi.testclient import TestClient
 
     from daintree_assistant_server.config import Settings
     from daintree_assistant_server.main import create_app
 
     settings = Settings(
-        ENVIRONMENT="production", OPENROUTER_API_KEY="",
+        ENVIRONMENT="production", CEREBRAS_API_KEY="csk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48, STATE_SALT="a-real-salt-value",
     )
     app = create_app(settings=settings)
     with TestClient(app) as client:
         assert app.state.ready is True
         assert client.get("/readyz").status_code == 200
-        # Probes stay unauthenticated; authed routes still reject a missing key.
         assert client.get("/healthz").status_code == 200
-        assert client.get("/v1/daintree/capabilities").status_code == 401
+        # And the open door holds in production too — it is not a dev shortcut.
+        assert client.get("/v1/daintree/capabilities").status_code == 200
 
 
-def test_prod_not_ready_when_skill_learning_enabled(fake_provider) -> None:
-    """Skill learning is local-dev-only: enabling it in production fails readiness,
-    even with an injected provider (the guard runs before the secret checks)."""
+def test_prod_not_ready_when_prompt_dumping_is_enabled(fake_provider) -> None:
+    """Prompt dumping is local-dev-only: enabling it in production fails readiness,
+    even with an injected provider (the guard runs before the secret checks).
+
+    It writes FULL prompts to disk — a forensics tool locally, a disclosure risk
+    anywhere else. This is the last entry in `local_only_problems`; skill
+    learning, which used to be the other, has been removed entirely.
+    """
     from fastapi.testclient import TestClient
 
     from daintree_assistant_server.config import Settings
@@ -491,14 +523,15 @@ def test_prod_not_ready_when_skill_learning_enabled(fake_provider) -> None:
 
     settings = Settings(
         ENVIRONMENT="production",
+        CEREBRAS_API_KEY="csk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",
-        SKILL_LEARNING_MODE="apply",
+        DAINTREE_DUMP_UPSTREAM_DIR="/tmp/daintree-dump",
     )
     app = create_app(settings=settings, provider=fake_provider)
     with TestClient(app) as client:
         assert app.state.ready is False
-        assert "SKILL_LEARNING_MODE" in (app.state.ready_error or "")
+        assert "DAINTREE_DUMP_UPSTREAM_DIR" in (app.state.ready_error or "")
         assert client.get("/readyz").status_code == 503
 
 

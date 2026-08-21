@@ -11,75 +11,84 @@ from daintree_assistant_server.errors import DaintreeError
 
 
 def _settings(**overrides: object) -> Settings:
-    base = {"STATE_SIGNING_KEY_CURRENT": "sk"}
+    base = {"STATE_SIGNING_KEY_CURRENT": "sk", "CEREBRAS_API_KEY": "csk-test"}
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
 
 
-def test_missing_secrets_reports_signing_key_only() -> None:
-    # No API key is required at startup: every request supplies the caller's own,
-    # which is both the auth credential and the upstream credential.
-    s = Settings(OPENROUTER_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
-    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT"]
+def test_missing_secrets_reports_both_server_owned_secrets() -> None:
+    # Both are the SERVER's own material, which is the whole shape of the current
+    # credential model: Daintree holds the upstream key and callers hold none.
+    # CEREBRAS_API_KEY must fail READINESS — without it nothing can be answered,
+    # and discovering that on the first turn surfaces as an upstream 401 that
+    # reads like the caller's fault.
+    s = Settings(CEREBRAS_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
+    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT", "CEREBRAS_API_KEY"]
+
+
+def test_missing_upstream_key_alone_still_fails_readiness() -> None:
+    s = Settings(CEREBRAS_API_KEY="", STATE_SIGNING_KEY_CURRENT="sk")
+    assert s.missing_secrets() == ["CEREBRAS_API_KEY"]
 
 
 def test_missing_secrets_empty_when_present() -> None:
     assert _settings().missing_secrets() == []
 
 
-def test_ready_without_any_api_key_env_vars() -> None:
-    # A deployment with zero key material beyond the signing key is complete —
-    # in development AND in production shape. OPENROUTER_API_KEY is pinned empty
-    # so a developer's exported key can't quietly satisfy the premise.
+def test_no_inbound_api_key_is_ever_required() -> None:
+    # There is still no INBOUND key to configure — the door is open by design
+    # until account auth lands. A deployment carrying only the two server-owned
+    # secrets is complete, in development AND in production shape.
     for env in ("development", "production"):
         s = _settings(
             ENVIRONMENT=env,
-            OPENROUTER_API_KEY="",
             STATE_SIGNING_KEY_CURRENT="y" * 48,
             STATE_SALT="a-real-random-salt-value",
         )
-        assert not s.openrouter_api_key.get_secret_value()
         assert s.missing_secrets() == []
+        assert not any("DAINTREE_API_KEY" in p for p in s.weak_secrets())
 
 
-def test_server_provider_is_built_without_a_default_credential() -> None:
-    # THE production wiring guarantee: even with a key in the environment, the
-    # serving provider must be keyless — every call carries the caller's key, and
-    # a propagation bug fails loudly instead of billing this shared account.
+def test_server_provider_is_built_with_the_configured_credential() -> None:
+    # THE production wiring guarantee, now inverted: the serving provider carries
+    # the server's own key, because callers no longer bring one. A provider built
+    # keyless would fail every request in `_resolve_key`.
     from daintree_assistant_server.main import _build_provider
 
-    s = _settings(OPENROUTER_API_KEY="must-not-be-used")
+    s = _settings(CEREBRAS_API_KEY="csk-server-owned")
     provider = _build_provider(s)
-    assert provider._default_api_key is None  # noqa: SLF001
+    assert provider._resolve_key(None).get_secret_value() == "csk-server-owned"  # noqa: SLF001
 
 
-def test_production_requires_the_real_openrouter_origin() -> None:
-    # Caller keys ride every request to this origin; a hardened deployment must
-    # not be able to point them anywhere else (or downgrade to plain http).
+def test_production_requires_the_real_cerebras_origin() -> None:
+    # THE SERVER's key rides every request to this origin, so a hardened
+    # deployment must not be able to point it anywhere else (or downgrade to
+    # plain http). The stake went UP with the credential move: a misdirected
+    # request now leaks the one key that funds all of Daintree, not one caller's.
     base = {
         "ENVIRONMENT": "production",
         "STATE_SIGNING_KEY_CURRENT": "y" * 48,
         "STATE_SALT": "a-real-random-salt-value",
     }
     for bad in (
-        "http://openrouter.ai/api/v1",
-        "https://openrouter.ai.evil.example/api/v1",
-        "https://openrouter.ai@evil.example/api/v1",
-        "https://user@openrouter.ai/api/v1",  # userinfo never belongs here
-        "https://openrouter.ai:444/api/v1",  # non-default port = different origin
-        "https://openrouter.ai:bogus/api/v1",  # malformed port fails readiness, not requests
+        "http://api.cerebras.ai/v1",
+        "https://api.cerebras.ai.evil.example/v1",
+        "https://api.cerebras.ai@evil.example/v1",
+        "https://user@api.cerebras.ai/v1",  # userinfo never belongs here
+        "https://api.cerebras.ai:444/v1",  # non-default port = different origin
+        "https://api.cerebras.ai:bogus/v1",  # malformed port fails readiness, not requests
     ):
-        s = _settings(OPENROUTER_BASE_URL=bad, **base)
-        assert any("OPENROUTER_BASE_URL" in p for p in s.weak_secrets()), bad
+        s = _settings(CEREBRAS_BASE_URL=bad, **base)
+        assert any("CEREBRAS_BASE_URL" in p for p in s.weak_secrets()), bad
     for ok_url in (
-        "https://openrouter.ai/api/v1",
-        "https://OPENROUTER.AI/api/v1",  # hostname compares case-insensitively
-        "https://openrouter.ai:443/api/v1",  # explicit default port
+        "https://api.cerebras.ai/v1",
+        "https://API.CEREBRAS.AI/v1",  # hostname compares case-insensitively
+        "https://api.cerebras.ai:443/v1",  # explicit default port
     ):
-        ok = _settings(OPENROUTER_BASE_URL=ok_url, **base)
+        ok = _settings(CEREBRAS_BASE_URL=ok_url, **base)
         assert ok.weak_secrets() == [], ok_url
     # Development stays free to point at proxies/mocks.
-    dev = _settings(OPENROUTER_BASE_URL="http://127.0.0.1:9999/v1")
+    dev = _settings(CEREBRAS_BASE_URL="http://127.0.0.1:9999/v1")
     assert dev.weak_secrets() == []
 
 
@@ -93,8 +102,9 @@ def test_weak_secrets_flagged_in_production() -> None:
     problems = s.weak_secrets()
     assert any("STATE_SALT" in p for p in problems)
     assert any("STATE_SIGNING_KEY_CURRENT" in p for p in problems)
-    # The shared inbound API key is gone; nothing key-related is gated here.
-    assert not any("API_KEY" in p for p in problems)
+    # The shared INBOUND API key is gone; the only key-shaped gate left is the
+    # upstream ORIGIN (checked above), never an inbound credential.
+    assert not any("DAINTREE_API_KEY" in p for p in problems)
 
 
 def test_strong_production_secrets_pass() -> None:
@@ -117,33 +127,43 @@ def test_production_previous_key_must_pair_with_kid() -> None:
 
 
 def test_secret_not_in_repr() -> None:
-    s = _settings(OPENROUTER_API_KEY="dk")
-    assert "dk" not in repr(s)
+    s = _settings(CEREBRAS_API_KEY="csk-should-not-appear")
+    assert "csk-should-not-appear" not in repr(s)
 
 
 def test_authenticate_returns_the_caller_key() -> None:
-    principal = authenticate("Bearer sk-or-v1-abc123")
+    # Nothing sends one today, but a token that IS present is still carried and
+    # still overrides the server's credential — the seam account auth lands in.
+    principal = authenticate("Bearer csk-abc123")
     assert principal.has_scope("chat")
-    assert principal.api_key.get_secret_value() == "sk-or-v1-abc123"
+    assert principal.api_key is not None
+    assert principal.api_key.get_secret_value() == "csk-abc123"
 
 
 def test_authenticate_accepts_any_wellformed_token() -> None:
     # Structural admission only: the server no longer knows a shared secret, so
     # any header-safe token is accepted here and judged by the upstream instead.
     principal = authenticate("Bearer some-future-subscription-key")
+    assert principal.api_key is not None
     assert principal.api_key.get_secret_value() == "some-future-subscription-key"
 
 
 def test_authenticate_key_not_in_repr() -> None:
-    principal = authenticate("Bearer sk-or-v1-secret-material")
-    assert "sk-or-v1-secret-material" not in repr(principal)
+    principal = authenticate("Bearer csk-secret-material")
+    assert "csk-secret-material" not in repr(principal)
 
 
 @pytest.mark.parametrize(
     "header",
-    [None, "", "secret", "Token secret", "Bearer", "Bearer  ", "Bearer bad key", "Bearer k\x7f"],
+    ["secret", "Token secret", "Bearer", "Bearer  ", "Bearer bad key", "Bearer k\x7f"],
 )
-def test_authenticate_rejects_missing_or_malformed(header: str | None) -> None:
+def test_authenticate_rejects_a_malformed_header(header: str) -> None:
+    """Present but unusable is still a 401 — deliberately, and unlike absence.
+
+    A caller who sends a broken header MEANT to authenticate. Ignoring it would
+    show them a successful sign-in while every turn quietly ran on the server's
+    account, which is the one failure mode the open door could otherwise create.
+    """
     with pytest.raises(DaintreeError) as exc:
         authenticate(header)
     assert exc.value.status_code == 401
@@ -153,7 +173,8 @@ def test_authenticate_rejects_missing_or_malformed(header: str | None) -> None:
 def test_authenticate_rejects_an_absurdly_long_token() -> None:
     from daintree_assistant_server.auth import MAX_TOKEN_LENGTH
 
-    assert authenticate(f"Bearer {'k' * MAX_TOKEN_LENGTH}").api_key  # at the cap: fine
+    at_cap = authenticate(f"Bearer {'k' * MAX_TOKEN_LENGTH}").api_key
+    assert at_cap is not None  # at the cap: fine
     with pytest.raises(DaintreeError) as exc:
         authenticate(f"Bearer {'k' * (MAX_TOKEN_LENGTH + 1)}")
     assert exc.value.code == "invalid_api_key"
@@ -161,61 +182,29 @@ def test_authenticate_rejects_an_absurdly_long_token() -> None:
 
 def test_authenticate_rejects_non_ascii_token() -> None:
     with pytest.raises(DaintreeError) as exc:
-        authenticate("Bearer sk-or-v1-café")
+        authenticate("Bearer csk-café")
     assert exc.value.code == "invalid_api_key"
 
 
 def test_authenticate_case_insensitive_scheme() -> None:
     # "bearer" scheme keyword is case-insensitive; the token itself is kept verbatim.
-    assert authenticate("bearer MiXeD-case").api_key.get_secret_value() == "MiXeD-case"
+    key = authenticate("bearer MiXeD-case").api_key
+    assert key is not None
+    assert key.get_secret_value() == "MiXeD-case"
 
 
-def test_authenticate_never_allows_unauthenticated() -> None:
-    # The old dev shortcut is gone: no environment serves without a caller key
-    # (without one there would be no upstream credential to run the turn with).
-    with pytest.raises(DaintreeError) as exc:
-        authenticate(None)
-    assert exc.value.code == "invalid_api_key"
+@pytest.mark.parametrize("header", [None, "", "   "])
+def test_an_absent_header_is_served_anonymously(header: str | None) -> None:
+    """The current credential model, at its one seam.
 
-
-# ---- skill learning (local-development-only guard) ----------------------
-
-
-def test_skill_learning_off_by_default() -> None:
-    s = _settings()
-    assert s.skill_learning_mode == "off"
-    assert s.skill_learning_enabled is False
-    assert s.local_only_problems() == []
-
-
-@pytest.mark.parametrize("mode", ["propose", "apply"])
-def test_skill_learning_enabled_ok_in_development(mode: str) -> None:
-    # Learning is a local-dev feature, so an enabled mode is fine outside production
-    # and needs no credential beyond the one OpenRouter key.
-    s = _settings(SKILL_LEARNING_MODE=mode)
-    assert s.skill_learning_enabled is True
-    assert s.local_only_problems() == []
-
-
-@pytest.mark.parametrize("mode", ["propose", "apply"])
-def test_skill_learning_enabled_needs_no_extra_credential(mode: str) -> None:
-    # The builder/improver reach their stronger model over the SAME OpenRouter key
-    # as every other call, so enabling learning must not demand a second credential
-    # (it used to require its own OPENAI_API_KEY). Readiness stays clean in dev.
-    s = _settings(SKILL_LEARNING_MODE=mode)
-    assert s.local_only_problems() == []
-
-
-@pytest.mark.parametrize("mode", ["propose", "apply"])
-def test_skill_learning_fails_readiness_in_production(mode: str) -> None:
-    s = _settings(ENVIRONMENT="production", SKILL_LEARNING_MODE=mode)
-    assert any("SKILL_LEARNING_MODE" in p for p in s.local_only_problems())
-
-
-def test_skill_learning_off_ok_in_production() -> None:
-    s = _settings(ENVIRONMENT="production")
-    assert s.skill_learning_enabled is False
-    assert s.local_only_problems() == []
+    The server holds the upstream key, so a request with no bearer token has one
+    to spend and is served. This assertion is the thing that must break loudly
+    when account authentication lands — it is not an oversight, it is the stage.
+    """
+    principal = authenticate(header)
+    assert principal.id == "anonymous"
+    assert principal.api_key is None
+    assert principal.has_scope("chat")
 
 
 # ---- upstream request dumping (local-development-only guard) --------------
