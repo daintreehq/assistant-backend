@@ -67,6 +67,7 @@ scratch__get
 scratch__set
 skill__run__get
 skill__step__advance
+subagent__run
 terminal__arm
 terminal__awaitAll
 terminal__await__async
@@ -76,6 +77,7 @@ terminal__disarmAll
 terminal__extract
 terminal__extract__json
 terminal__focus
+terminal__moveToWorktree
 terminal__read
 terminal__rename
 terminal__run__async

@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:a35b32e7b8af07a004a556d02e3958688dec97b7e30769ed9c3cae399b4663e2",
+    "revision": "sha256:0d79f3ac7d58acb38997c3b746b6af1f25dcab5497c5ab0ed1af05cc4a51c9a9",
     "skills": 39
   },
   "identity": {
@@ -18,13 +18,13 @@
     "candidates": 32,
     "ordering": "equivariant",
     "routing_revision_at_train": "routing:94a3c1a6da09478b843b9b1b57d48095",
-    "routing_revision_matches_catalog": true,
+    "routing_revision_matches_catalog": false,
     "selector_onnx_bytes": 142587320,
     "trained_skills": 38
   },
   "tools": {
-    "count": 77,
-    "names_sha256": "ffa03fb26a2d818c8026ef7f65255ad4bcde157ab5055edc92517d1d3a1b4517",
-    "tool_inventory_bytes": 93145
+    "count": 79,
+    "names_sha256": "b7f9a91036470ed6b759ade83ae17bce39dc0d45b15b13df72f7b9eec0cb7f58",
+    "tool_inventory_bytes": 99686
   }
 }

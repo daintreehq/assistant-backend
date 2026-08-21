@@ -43,7 +43,7 @@
       "type": "string"
      },
      "title": {
-      "description": "Short title for the task and any watcher.",
+      "description": "Short title for the task and any watcher \u2014 the task alone, e.g. \"auth refactor\". The agent name is added to the tab for you, so never write an agent name into this title yourself.",
       "type": "string"
      },
      "watch": {
@@ -453,7 +453,7 @@
   "type": "function",
   "function": {
    "name": "terminal__extract",
-   "description": "Read a bounded tail of one or more Daintree terminals and extract content as plain TEXT with the small model \u2014 the default way to read what an agent said. Over MULTIPLE terminalIds it MERGES every tail into ONE answer. For a distinct answer per agent, or several named fields, use terminal.extract.json with an array schema keyed by terminalId. PARALLEL: no-wait extract/.json calls batched in ONE reply run CONCURRENTLY \u2014 emit several independent extractions as one batch, not one per turn; the wait is roughly the slowest single call. A wait-bearing call is a barrier and runs serially. Omit `instruction` to use it as a finished/condition gate (booleans only, no extraction model call). A wait that observes the agent FINISH auto-retires that terminal's spawn-attached watcher (watchersRetired) \u2014 the completion is in your hands, so no notification follows. Read-only; needs Daintree MCP.",
+   "description": "Over MULTIPLE terminalIds, MERGES bounded tails via the small model into ONE plain-TEXT answer \u2014 never one per terminal. For a distinct answer per agent, or several named fields, use terminal.extract.json with an array schema keyed by terminalId. On a SINGLE terminalId it is the default way to read what an agent said. PARALLEL: no-wait extract/.json calls batched in ONE reply run CONCURRENTLY \u2014 emit several independent extractions as one batch, not one per turn; the wait is roughly the slowest single call. A wait-bearing call is a barrier and runs serially. Omit `instruction` to use it as a finished/condition gate (booleans only, no extraction model call). A wait that observes the agent FINISH auto-retires that terminal's spawn-attached watcher (watchersRetired) \u2014 the completion is in your hands, so no notification follows. Read-only; needs Daintree MCP.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -497,7 +497,8 @@
       },
       "maxItems": 16,
       "minItems": 1,
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
      },
      "wait": {
       "additionalProperties": false,
@@ -541,7 +542,7 @@
         "type": "object"
        },
        "regex": {
-        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
+        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile). Matches the COMBINED tail across multiple terminalIds, so it can straddle a terminal boundary.",
         "minLength": 1,
         "type": "string"
        },
@@ -628,7 +629,8 @@
       },
       "maxItems": 16,
       "minItems": 1,
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
      },
      "wait": {
       "additionalProperties": false,
@@ -672,7 +674,7 @@
         "type": "object"
        },
        "regex": {
-        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile).",
+        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile). Matches the COMBINED tail across multiple terminalIds, so it can straddle a terminal boundary.",
         "minLength": 1,
         "type": "string"
        },
@@ -776,12 +778,12 @@
   "type": "function",
   "function": {
    "name": "fs__read",
-   "description": "Read a UTF-8 text file from the project (read-only). PARALLEL: fs.read/fs.list calls batched in ONE reply run concurrently \u2014 to read several files, emit one fs.read each in one batch, not one per turn.",
+   "description": "Read a UTF-8 text file from the project (read-only). Reads up to 200000 bytes by default \u2014 omit maxBytes and read the whole file. PARALLEL: fs.read/fs.list calls batched in ONE reply run concurrently \u2014 to read several files, emit one fs.read each in one batch, not one per turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
      "maxBytes": {
-      "description": "Max bytes to read.",
+      "description": "OMIT THIS. The default reads up to 200000 bytes \u2014 the whole of almost any source file. Use it only to sample the head of a known-huge file, never as caution: a truncated read cannot be continued, so seeing the rest means re-reading from the start.",
       "type": "number"
      },
      "path": {
@@ -954,6 +956,10 @@
    "parameters": {
     "additionalProperties": false,
     "properties": {
+     "name": {
+      "description": "Short label for this run (2-4 words, e.g. 'auth flow context'), shown in the user's copy-tree history and the completion notification. A sibling of worktreeId and options, never inside options.",
+      "type": "string"
+     },
      "options": {
       "additionalProperties": true,
       "description": "Opaque copyTree options forwarded to Daintree verbatim (do not invent keys).",
@@ -1022,6 +1028,41 @@
  {
   "type": "function",
   "function": {
+   "name": "terminal__moveToWorktree",
+   "description": "Move existing Daintree terminal(s) into ONE already-open worktree. Pass {\"terminalId\":\"terminal-<uuid>\",\"worktreeId\":\"<worktreePath>\"}, or terminalIds:[\"terminal-<uuid>\", ...] to relocate a whole cohort in one call. worktreeId is the exact PATH from worktree.list \u2014 a branch name is NEVER accepted. The move does NOT restart the process: a live agent keeps running in the directory it launched from, so you MUST follow up with terminal.sendCommand \"Please continue in the directory <worktreePath>\" \u2014 that sentence, not this move, relocates the work.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "terminalId": {
+      "description": "A single Daintree terminal id to move, e.g. \"terminal-5284bfef-3d11-424c-90cb-136f24046295\".",
+      "minLength": 1,
+      "type": "string"
+     },
+     "terminalIds": {
+      "description": "Several terminal ids to move into the SAME worktree in one confirmed call (e.g. relocating a spawned cohort) \u2014 prefer this over calling terminal.moveToWorktree once per id.",
+      "items": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+     },
+     "worktreeId": {
+      "description": "Destination worktree, as the exact id/PATH from worktree.list (e.g. \"/Users/you/Projects/app-worktrees/feature-x\"). A branch name is NOT accepted here.",
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "worktreeId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
    "name": "terminal__arm",
    "description": "Add a terminal to Daintree's fleet arming set so the human's next broadcast keystrokes are ALSO routed to it. Mutating (reroutes the human's input), so it always confirms. Typed wrapper around the Daintree terminal.arm MCP tool. Reports the resulting armed set so arming is never silent.",
    "parameters": {
@@ -1079,6 +1120,10 @@
    "parameters": {
     "additionalProperties": false,
     "properties": {
+     "name": {
+      "description": "Short label for this run (2-4 words), shown in the user's copy-tree history and the completion notification. A sibling of terminalId and worktreeId, never inside options.",
+      "type": "string"
+     },
      "options": {
       "additionalProperties": true,
       "description": "Opaque copyTree options forwarded to Daintree verbatim (do not invent keys).",
@@ -1108,6 +1153,10 @@
    "parameters": {
     "additionalProperties": false,
     "properties": {
+     "name": {
+      "description": "Short label for this run (2-4 words, e.g. 'auth flow context'), shown in the user's copy-tree history and the completion notification. A sibling of worktreeId and options, never inside options.",
+      "type": "string"
+     },
      "options": {
       "additionalProperties": true,
       "description": "Opaque copyTree options forwarded to Daintree verbatim (do not invent keys).",
@@ -1247,6 +1296,40 @@
  {
   "type": "function",
   "function": {
+   "name": "subagent__run",
+   "description": "Delegate ONE research question to a read-only sub-agent working in its own separate conversation; only its short report comes back. Use it when FINDING an answer costs far more context than the answer \u2014 one issue among thousands, a symbol across an unfamiliar tree, exploring a tree before a copyTree scope. Nothing it reads enters this conversation. It has read-only tools only (no edits, spawns, terminal input, forge writes) and cannot ask questions, so the brief must stand alone. Fan out independent questions as several calls in one batch. Its transcriptId pages the full run via artifact.read.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "context": {
+      "description": "Optional. Background it cannot discover itself: a constraint the user stated, a decision made earlier, an id you already hold. Never paste file contents or tool output \u2014 it can fetch those itself, and pasting re-spends the context this call exists to save.",
+      "type": "string"
+     },
+     "deliverable": {
+      "description": "Optional but strongly recommended: the shape of the answer you need, e.g. \"the issue number, title, and URL\". This is what separates a report you can act on from one you have to re-read.",
+      "type": "string"
+     },
+     "maxRounds": {
+      "description": "Optional round budget (default 10). A round is one sub-agent message plus its tool calls. Raise it only for a genuinely wide search; a well-aimed brief finishes in three to six.",
+      "maximum": 24,
+      "minimum": 1,
+      "type": "number"
+     },
+     "task": {
+      "description": "The ONE question the sub-agent must answer, as a standalone brief \u2014 it sees none of this conversation. Name the thing concretely: \"Find the GitHub issue describing terrain mesh flicker at chunk borders\". Not a topic (\"terrain bugs\"), not a plan, not a multi-part errand.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "task"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
    "name": "grant__create",
    "description": "Pre-authorize unattended confirm-required tool use, bounded by TTL, use-count and a tool/risk allowlist. actorType watcher/timer authorizes that one watcher/timer (actorId = its wch_/tmr_ id); actorType \"wake\" with actorId \"wake\" authorizes the supervisor daemon's autonomous wake turns while the user is away (create it when the user asks for unattended work that must MUTATE \u2014 e.g. sending terminal commands overnight).",
    "parameters": {
@@ -1326,7 +1409,7 @@
   "type": "function",
   "function": {
    "name": "grant__revoke",
-   "description": "Revoke an automation grant by its grt_\u2026 id, immediately withdrawing that actor's pre-authorization to run confirm-required tools unattended \u2014 the next watcher/timer/wake call that needed it becomes a blocked pending-approval inbox item instead. Interactive main actor only (else GRANT_ACTOR_FORBIDDEN); an unknown id fails GRANT_NOT_FOUND. Use it when the user calls off unattended work.",
+   "description": "Revoke an automation grant by its grt_\u2026 id, immediately withdrawing that actor's pre-authorization to run confirm-required tools unattended \u2014 the next watcher/timer/wake call that needed it becomes a blocked pending-approval inbox item instead. Interactive main actor only (else GRANT_ACTOR_FORBIDDEN). Use it when the user calls off unattended work. Idempotent: only an unknown id fails GRANT_NOT_FOUND \u2014 an already-revoked, expired, or used-up grant returns alreadyRevoked:true, not an error, so a redundant revoke after timer.cancel is a no-op.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2034,7 +2117,7 @@
   "type": "function",
   "function": {
    "name": "timer__schedule",
-   "description": "Schedule a durable timer that fires once (fireAt ISO-8601 or delayMs) or repeats (repeat.everyMs plus maxRuns/until). payload.type \"enqueue\" posts message to the attention inbox; \"call_safe_tool\" runs toolCall.toolName \u2014 a MUTATING tool there needs a grant.create for that tmr_\u2026 actor or the call lands as a blocked approval. Timers keep firing after the assistant closes; missed occurrences catch up. Returns the timer id.",
+   "description": "Schedule a durable timer that fires once (fireAt ISO-8601 or delayMs) or repeats (repeat.everyMs plus maxRuns/until). payload.type \"call_safe_tool\" runs toolCall.toolName \u2014 ANY registered tool, not a safe subset (tier/confirm gates still apply): use agentTask.spawnForEdits to spawn AT fire time, then grant.create (actorType \"timer\", actorId = the returned timerId) for a grantable confirm-required target. \"enqueue\" only posts message and runs nothing. A timer's own event never wakes you. Timers persist after the assistant closes; missed occurrences catch up. Returns timerId.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2052,16 +2135,20 @@
       "additionalProperties": false,
       "properties": {
        "message": {
+        "description": "Reminder text for \"enqueue\" (defaults to the timer title). Ignored by \"call_safe_tool\".",
         "type": "string"
        },
        "toolCall": {
         "additionalProperties": false,
+        "description": "Required by \"call_safe_tool\", ignored by \"enqueue\".",
         "properties": {
          "args": {
           "additionalProperties": true,
+          "description": "Arguments passed to toolName; omitted becomes {}.",
           "type": "object"
          },
          "toolName": {
+          "description": "Exact registered tool name \u2014 any tool in your inventory, not a restricted subset. Use \"agentTask.spawnForEdits\" to spawn a terminal at fire time.",
           "minLength": 1,
           "type": "string"
          }
@@ -2072,6 +2159,7 @@
         "type": "object"
        },
        "type": {
+        "description": "\"enqueue\" posts an inbox item and runs nothing; \"call_safe_tool\" dispatches toolCall.toolName. A timer's own event never wakes you. Success files info (below the deck's attention filter), an ordinary failure error, a confirmation-required denial blocked.",
         "enum": [
          "enqueue",
          "call_safe_tool"
@@ -2151,7 +2239,7 @@
   "type": "function",
   "function": {
    "name": "timer__cancel",
-   "description": "Cancel a scheduled timer by its tmr_\u2026 id (from timer.list): it never fires again and any automation grant held by that timer actor is revoked. Use it when the reminder or scheduled tool call is no longer wanted. An unknown id fails TIMER_NOT_FOUND (unrecoverable). Local bookkeeping only \u2014 it never touches terminals or project state.",
+   "description": "Cancel a scheduled timer by its tmr_\u2026 id (from timer.list): it never fires again and any automation grant held by that timer actor is revoked. Use it when the reminder or scheduled tool call is no longer wanted. An unknown id fails TIMER_NOT_FOUND (unrecoverable). Local bookkeeping only \u2014 it never touches terminals or project state. The result reports revokedGrants (live grants that cascade withdrew, 0 if none) \u2014 they need no follow-up grant.revoke unless grantRevokeFailed is true.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2427,7 +2515,7 @@
   "type": "function",
   "function": {
    "name": "watcher__cancel",
-   "description": "Stop an ACTIVE watcher by its wch_\u2026 id: it stops checking, its automation grants are revoked, and any workflow ledger row it supervises closes as cancelled. Use it when the watched work is done or the user no longer wants it supervised. An already-ended watcher (condition_met/timeout/error/cancelled) returns WATCHER_NOT_FOUND \u2014 do not re-cancel. This NEVER touches the terminal: nothing is closed or killed.",
+   "description": "Stop an ACTIVE watcher by its wch_\u2026 id: it stops checking, its automation grants are revoked, and any workflow ledger row it supervises closes as cancelled. Use it when the watched work is done or the user no longer wants it supervised. An already-ended watcher (condition_met/timeout/error/cancelled) returns WATCHER_NOT_FOUND \u2014 do not re-cancel. This NEVER touches the terminal: nothing is closed or killed. The result reports revokedGrants (live grants that cascade withdrew, 0 if none) \u2014 they need no follow-up grant.revoke unless grantRevokeFailed is true.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
