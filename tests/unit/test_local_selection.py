@@ -243,6 +243,14 @@ class _StubClassifier:
         #: What the stub should report as force-included, for the telemetry test.
         self.reserved: tuple[str, ...] = ()
 
+    def query_fits(self, text: str) -> bool:  # noqa: ARG002 - the stub never shrinks
+        """The real classifier measures against its tokenizer; the stub has none.
+
+        Always True, so ``fit_query`` takes its first schedule entry and these
+        tests keep asserting the exact string the renderer produces by default.
+        """
+        return True
+
     def select(self, query: str, active_ids=(), *, catalog=None, max_active: int = 3,
                docs_query: str | None = None, docs_threshold: float = 0.4):
         if self._fail:

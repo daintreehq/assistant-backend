@@ -261,6 +261,18 @@ class SetwiseClassifier:
         # would silently apply whichever cap was configured last.
         self._retriever_doc_tok = _tokenizer(directory / "retriever", self._doc_max)
         self._ranker_doc_tok = _tokenizer(directory / "ranking", self._doc_max)
+        # Counting only, so truncation and padding are explicitly OFF.
+        #
+        # Explicitly, because ``Tokenizer.from_file`` carries whatever the JSON
+        # declares — the shipped file already sets a 256-token truncation, so a
+        # freshly loaded instance silently caps at exactly the number this is
+        # trying to measure against. It reported "fits" for every string in the
+        # world, which is a counter that always agrees.
+        self._counter_tok = Tokenizer.from_file(
+            str(directory / "retriever" / "tokenizer.json")
+        )
+        self._counter_tok.no_truncation()
+        self._counter_tok.no_padding()
 
         # An artifact is several files that must agree — a head.onnx from one
         # export beside a meta.json from another loads fine and then reads the
@@ -329,6 +341,21 @@ class SetwiseClassifier:
     def candidates(self) -> int:
         """How many skills reach the head. Shortlist width, not a catalog size."""
         return self._k
+
+    def query_fits(self, text: str) -> bool:
+        """Would the encoder receive ALL of ``text``, or cut it at the cap?
+
+        Exposed because the render contract lives in ``documents.py``, which has
+        no tokenizer — the tokenizer is part of the artifact. ``fit_query`` calls
+        this to shrink a query deliberately rather than letting truncation take
+        the tail, which is where the turn context and, with dense enough history,
+        the newest instruction live.
+
+        Measured on the UNTRUNCATED tokenizer: the serving instances have a cap
+        configured, so their ``len(ids)`` can never exceed it and could not
+        distinguish "exactly fits" from "was cut".
+        """
+        return len(self._counter_tok.encode(text).ids) <= self._query_max
 
     @property
     def table(self) -> SkillTable | None:

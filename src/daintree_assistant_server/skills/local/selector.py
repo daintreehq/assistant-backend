@@ -38,7 +38,7 @@ from ...config import Settings
 from ...contracts.openai import ChatMessage
 from ..catalog import Catalog, CatalogManager
 from ..selector import SelectionDecision
-from .documents import last_user_text, query_document
+from .documents import ACTIVE_PREFIX, fit_query, last_user_text
 from .runtime import InferencePool
 from .setwise import SetwiseClassifier
 
@@ -143,7 +143,6 @@ class LocalSelector:
                 reason="no new user instruction; continuing the active workflow",
             )
 
-        query = query_document(conversation, turn_context=turn_context)
         max_active = self._settings.max_active_skills
         # Only SELECTABLE actives reach the model. The prior set can carry a
         # server-pinned skill (the docs runbook) that is hidden from selection
@@ -164,6 +163,18 @@ class LocalSelector:
         # so the decision and the search cannot be about different questions,
         # but the model's input is not shortened to suit a search endpoint.
         docs_text = last_user_text(eligible)
+        # Rendered against the encoder's token cap rather than blind to it. The
+        # classifier truncates from the RIGHT and this string ends with the turn
+        # context, so a long user message or a token-dense history used to delete
+        # the evidence that matters most — silently, since a truncated query still
+        # scores. A query that already fits comes back byte-identical; see
+        # ``documents.fit_query``.
+        query = fit_query(
+            conversation,
+            turn_context=turn_context,
+            fits=self._classifier.query_fits,
+            prefix=ACTIVE_PREFIX.format(", ".join(visible_active)) if visible_active else "",
+        )
         result = await self._pool.run(
             lambda: self._classifier.select(
                 query,

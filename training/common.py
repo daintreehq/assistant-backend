@@ -11,9 +11,14 @@ silently degrades accuracy without producing an error anywhere.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
-from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX, query_document
+from daintree_assistant_server.skills.local.documents import (
+    ACTIVE_PREFIX,
+    fit_query,
+    query_document,
+)
 
 
 class _Msg:
@@ -32,8 +37,8 @@ class _Msg:
         self.content = content
 
 
-def render_training_query(query: str, history: list[str] | None = None) -> str:
-    """Build the query string exactly as the server will at request time."""
+def training_messages(query: str, history: list[str] | None = None) -> list[_Msg]:
+    """One corpus row's history + query as the typed messages the renderer takes."""
     messages: list[_Msg] = []
     for line in history or []:
         role, _, text = line.partition(":")
@@ -42,22 +47,37 @@ def render_training_query(query: str, history: list[str] | None = None) -> str:
             _Msg(role if role in ("user", "assistant", "tool") else "user", text.strip() or line)
         )
     messages.append(_Msg("user", query))
-    return query_document(messages)
+    return messages
 
 
-def build_query(row: dict[str, object]) -> str:
+def render_training_query(query: str, history: list[str] | None = None) -> str:
+    """Build the query string exactly as the server will at request time."""
+    return query_document(training_messages(query, history))
+
+
+def build_query(row: dict[str, object], *, fits: Callable[[str], bool] | None = None) -> str:
     """Render one corpus row into the exact string a ranker will embed.
 
     Both stages and every evaluator go through this, so the ``[loaded: …]``
     state prefix can never be applied by one and forgotten by another. It was
     previously a private helper in the classifier trainer, which meant the
     retriever and the set-wise head each had to re-derive it correctly.
+
+    ``fits`` is the encoder's token-cap test. Supply it and this takes the same
+    overflow-shrink path the server does (``documents.fit_query``); omit it and
+    a row is rendered at the default budgets. Both are correct for today's
+    corpus — its longest row is 155 tokens against a cap of 256, so no row
+    reaches the shrink path — and the parameter exists so that stays true by
+    construction rather than by nobody having generated a long row yet. Serving
+    shrinks; if training did not, the two would diverge on exactly the rows
+    where the difference matters.
     """
-    query = render_training_query(str(row["query"]), row.get("history"))  # type: ignore[arg-type]
+    messages = training_messages(str(row["query"]), row.get("history"))  # type: ignore[arg-type]
     active = row.get("active_ids") or []
-    if active:
-        return ACTIVE_PREFIX.format(", ".join(active)) + query  # type: ignore[arg-type]
-    return query
+    prefix = ACTIVE_PREFIX.format(", ".join(active)) if active else ""  # type: ignore[arg-type]
+    if fits is None:
+        return prefix + query_document(messages)
+    return prefix + fit_query(messages, fits=fits, prefix=prefix)
 
 
 def corpus_rows(path: Path) -> list[dict]:

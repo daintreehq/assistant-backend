@@ -149,3 +149,48 @@ What has to be decided rather than built is the ontology: which domains earn one
 and how the prompt-byte budget behaves when a two-domain task pulls in two
 foundations plus two specifics against `max_active_skills` of 3. That budget
 question is the real work here, not the routing.
+
+---
+
+## Role and channel markers in the selector's evidence
+
+**Trigger: the next selector retrain — it changes the query string, so it cannot
+land without one.**
+
+`query_document` joins prior turns with spaces, so the encoder cannot tell a tool
+error from an assistant plan from a user instruction. They carry very different
+authority and currently read alike. Explicit role markers are the audit's V1
+evidence change and the cheapest half of its V2 proposal.
+
+The related token-cap defects are FIXED rather than deferred — see
+`documents.fit_query`. The renderer now shrinks deliberately (history first, then
+head-and-tail on the newest message, never the turn context) instead of letting
+the tokenizer cut the tail. That needed no retrain because the default render is
+returned byte-identical whenever it fits, and nothing the model has been judged
+on comes close: the 9,774-row training corpus peaks at 155 tokens and the 177
+benchmark queries at 130, against a cap of 256. Role markers are different — they
+change every string, including the ones that fit.
+
+## Give the docs head training rows that carry an active set
+
+**Trigger: the next corpus generation pass.**
+
+`tests/unit/test_training_corpus_guards.py` now cross-tabs the structural
+features against the labels. The history axis is repaired — a docs positive is
+about as likely with history as without. The ACTIVE axis is not: a documentation
+positive is ~16x rarer on a row with an active skill (0.4%, 7 of 1,956) than
+without (6.3%, 492 of 7,818).
+
+That is the same shape as the shortcut that caused the original docs outage, on
+the other axis, and it is why `setwise.py` still runs a whole second pass over
+the bare user question to re-read the docs logit — ~8ms, on every turn whose bare
+question differs from its contextual query, which is most turns with any history
+and not only docs ones. With seven active-bearing positives the head is severely
+underexposed to that combination rather than never having seen it, so the
+workaround is load-bearing rather than a historical note.
+
+The fix is generation, not thresholds: docs questions asked mid-workflow, with
+one and two skills loaded, across the same phrasings the bare rows already cover.
+The guard is a ratchet, not a tolerance: the ceiling is 20x against a measured
+17.6x, so losing even one of the seven positives fails it. The next augmentation
+cannot improve something else at this one's expense.

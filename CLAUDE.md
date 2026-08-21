@@ -143,7 +143,21 @@ All prompt text is **server-owned** and lives in `src/daintree_assistant_server/
 **Two things that are easy to get wrong:**
 
 - **Assembly order is load-bearing — and role choice IS position.** The serving model's chat template (a property of the model, not of whichever API fronts it — this survived the OpenRouter→Cerebras move unchanged) serializes [ALL system messages, in array order] → [tools] → [non-system conversation], so a volatile system message ANYWHERE in the array lands before the ~21.5k-token tool schemas and busts their cache (measured 2026-07-08: 36% hit on byte-identical turns → 99% after the fix). The system role is therefore reserved for what is static for **every caller**, and the rows below it are ordered by **how widely each can be shared, widest first**, so a change to one never re-encodes anything above it. `PromptAssembler.build_main_request` emits: the two static **system** blocks (base → response contract), then — after the schemas — a **user-role** loaded-skills block (shared by task), a **user-role** integrations block and the stable **user-role** startup block (per session, instance and project), the append-only visible `input.messages`, and ONE trailing **user-role** "[Injected context …]" block carrying per-request runtime + turn state. While the skill, integration and startup rows hold steady, only the final tail re-encodes each round — the client republishes `mcp_servers` every round, so a server reconnecting mid-session moves the integrations row too. Integrations and skills used to be system-role, which put a per-machine MCP endpoint URL and every selector topic shift ahead of all 21.5k tokens of schemas; moving them below (issue #39) makes a skill load cost its own bytes instead of the tool region, and `benchmarks/prompt_cost` now gates `skill_topic_shift` at `system_tools_stable == 1.0` to hold that. Skill bodies stay **ahead of the conversation** rather than in the tail — a large runbook in the tail is re-paid uncached every round of every turn. Startup is required even when empty, stays outside the visible transcript, and is never sent to selector/learning calls. Don't reorder casually, and never add a volatile system message. All client-provided local context is treated as untrusted: sanitized and byte-capped (`text_utils.py`, the `cap_*` settings in `config.py`); exact agent ids are JSON-quoted and rows are admitted whole.
-- **Prompt bytes are behavior.** On a meaningful prompt change, regenerate golden snapshots (below) — that diff is the reviewable record. Do **not** bump version strings: `MAIN_PROMPT_VERSION` is a fixed family label (`"main"`), not a per-edit version (see "Versioning" below).
+- **The selector's query has a 256-token cap, and the renderer now respects it.**
+`query_document` builds `[prior] [newest] [turn_context]`; the encoder truncates
+at 256 tokens from the RIGHT, so the tail — the turn context, and with dense
+enough history the newest instruction itself — was being deleted with no error
+anywhere, because a truncated query still scores. `documents.fit_query` shrinks
+deliberately instead: prior history first, then head-and-tail on the newest
+message, never the turn context. A query that already fits is returned
+byte-identical, which is why this needed no retrain — the training corpus peaks
+at 155 tokens and the benchmark at 130, so neither ever reaches the shrink path.
+Serving and `training/common.py::build_query` share the function.
+`tests/unit/test_selector_query_truncation.py` pins it, and no character
+heuristic can replace it: 320 characters of one unbroken word is 3 tokens, the
+same 320 of path-like output is 320.
+
+**Prompt bytes are behavior.** On a meaningful prompt change, regenerate golden snapshots (below) — that diff is the reviewable record. Do **not** bump version strings: `MAIN_PROMPT_VERSION` is a fixed family label (`"main"`), not a per-edit version (see "Versioning" below).
 
 ## Versioning (pre-release)
 

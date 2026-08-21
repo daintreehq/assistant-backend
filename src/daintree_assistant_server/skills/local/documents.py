@@ -15,7 +15,7 @@ server can never import it, so it cannot be the authority.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 # Where a whenToUse line stops describing what the skill IS and starts listing
@@ -132,17 +132,44 @@ def _content_text(content: Any) -> str:
 QUERY_HISTORY_CHARS = 320
 
 
+#: Marks where the middle of an over-long newest message was removed.
+_ELLIPSIS = " … "
+
+
+def _head_and_tail(text: str, budget: int) -> str:
+    """``text`` shortened to ``budget`` characters, keeping both ends.
+
+    Head AND tail, not a prefix, because the two halves of a long message carry
+    different things and either can be the decisive one. A pasted stack trace
+    followed by "so why is it failing?" has its ask at the END; a request
+    followed by supporting detail has it at the start. Cutting from one side
+    reliably loses one of those cases, and cutting from the middle loses the
+    part that is usually context for both.
+    """
+    if budget <= 0 or len(text) <= budget:
+        return text
+    keep = max(budget - len(_ELLIPSIS), 1)
+    head = keep - keep // 2
+    return text[:head] + _ELLIPSIS + text[len(text) - (keep - head):]
+
+
 def query_document(
     messages: Sequence[Any],
     *,
     turn_context: str | None = None,
     history_chars: int = QUERY_HISTORY_CHARS,
+    newest_chars: int | None = None,
 ) -> str:
     """Render a conversation as the query string the rankers embed.
 
     The newest eligible message is always present, mirroring the prompt
     selector's unconditional admission of it: a query built from history alone
     describes a task the ranker was never shown.
+
+    ``newest_chars`` bounds that newest message, head and tail. It is ``None``
+    on every ordinary call and is only set by :func:`fit_query`, on a query that
+    would otherwise be cut by the encoder's token cap — see there for why the
+    default path stays byte-identical.
     """
     eligible = [
         m for m in messages if getattr(m, "role", None) in ("user", "assistant", "tool")
@@ -151,6 +178,8 @@ def query_document(
         return (turn_context or "").strip()
 
     newest = _content_text(getattr(eligible[-1], "content", "")).strip()
+    if newest_chars is not None:
+        newest = _head_and_tail(newest, newest_chars)
 
     prior: list[str] = []
     if history_chars > 0 and len(eligible) > 1:
@@ -170,6 +199,90 @@ def query_document(
     if turn_context:
         parts.append(turn_context.strip())
     return " ".join(p for p in parts if p).strip()
+
+
+#: Successive (history_chars, newest_chars) budgets tried when a rendered query
+#: will not fit the encoder's cap. The FIRST entry is today's default, so a query
+#: that already fits is rendered exactly as before and never reaches the rest.
+#:
+#: The order encodes what is worth losing, cheapest first:
+#:
+#: 1. **Prior history.** Bounded evidence about what the conversation WAS. Useful,
+#:    and the thing the turn can most afford to lose.
+#: 2. **The newest message's middle.** Head and tail are kept (see
+#:    :func:`_head_and_tail`); the middle of a long paste is the least decisive
+#:    part of it.
+#: 3. **Nothing else.** The turn context is never dropped, because it carries the
+#:    current goal and the top workflow digest, and because it is what the
+#:    tokenizer would have thrown away first — that being the whole reason this
+#:    schedule exists.
+_FIT_SCHEDULE: tuple[tuple[int, int | None], ...] = (
+    (QUERY_HISTORY_CHARS, None),
+    (160, None),
+    (0, None),
+    (0, 1200),
+    (0, 600),
+    (0, 280),
+)
+
+
+def fit_query(
+    messages: Sequence[Any],
+    *,
+    turn_context: str | None = None,
+    fits: Callable[[str], bool],
+    prefix: str = "",
+) -> str:
+    """The query string, shrunk until the encoder will take all of it.
+
+    ## Why this exists
+
+    The renderer cannot see the token cap and the cap cannot see the renderer.
+    ``SetwiseClassifier`` truncates at 256 tokens FROM THE RIGHT, and this string
+    ends with the turn context — so a long enough user message, or a token-dense
+    enough history, silently deletes the end of the evidence. Measured: 320
+    characters of path-like tool output is 320 tokens (the same 320 characters of
+    one unbroken word is 3), and three such messages push the newest INSTRUCTION
+    out entirely.
+
+    Losing the tail is not a smaller version of the same thing. It is losing the
+    turn context first, then the instruction — precisely the two most important
+    channels — while every accuracy number carries on looking normal, because a
+    truncated query still scores.
+
+    ## Why this does not need a retrain
+
+    The first schedule entry is the current default, so **a query that fits is
+    returned byte-identical**. Measured over everything the model has ever been
+    judged on: the 9,774-row training corpus peaks at 155 tokens and the 177
+    benchmark queries at 130, against a cap of 256. Neither ever reaches the
+    shrink path, so the training distribution is untouched and this is not a
+    change the weights have to be re-fit to.
+
+    What it does change is the over-cap case, and there it moves TOWARD the
+    training distribution rather than away: the trainer renders
+    ``[…] [turn_context]``, and a hard right-truncation produces a string ending
+    mid-sentence with no context at all, which is a shape the head has never
+    seen.
+
+    ``fits`` is supplied by the caller because the tokenizer belongs to the
+    artifact, not to this module; ``prefix`` is the ``[loaded: …]`` block, which
+    is prepended downstream and so has to be counted here.
+    """
+    text = ""
+    for history_chars, newest_chars in _FIT_SCHEDULE:
+        text = query_document(
+            messages,
+            turn_context=turn_context,
+            history_chars=history_chars,
+            newest_chars=newest_chars,
+        )
+        if fits(prefix + text):
+            return text
+    # Every budget exhausted — a turn context alone can exceed the cap. Return
+    # the smallest render and let the encoder truncate: there is nothing further
+    # to give up, and a hard cut is still better than refusing to rank.
+    return text
 
 
 def last_user_text(messages: Sequence[Any]) -> str | None:
