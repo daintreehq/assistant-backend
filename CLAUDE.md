@@ -322,6 +322,23 @@ must NOT ignore it: ignoring it would let a locally-selected run load an
 orchestration runbook the sub-agent cannot follow, and the two implementations
 would disagree about what a profile may see.
 
+Two boundaries are enforced server-side rather than left to the client. The signed
+state token records the profile that resolved its active set (`StatePayload.profile`),
+and a cross-profile token forces a fresh selection — the profiles choose from
+different menus, so a sub-agent's set can hold a specific whose domain foundation was
+filtered out of its menu, and continuation reuse deliberately does not re-pair
+foundations. And **skill learning never runs on a sub-agent turn**: its transcript is a
+fragment of somebody else's workflow that happens to wear the shape the gate's create
+signal looks for (every run ends in a final answer with no pending tool calls), and a
+fan-out would fire one thinking pass per worker.
+
+One performance property the narrowed menu depends on: `SetwiseClassifier` holds a
+single table slot, so syncing a narrowed catalog used to evict the rest of the
+catalog's vectors and make the NEXT orchestrator turn re-embed them on the first-byte
+path — measured at 5.3s for 37 skills, once per alternation, against a ~10ms selection
+budget. A digest-keyed embedding memo (`_vec_memo`) is what makes profile alternation
+free; `test_a_narrowed_catalog_does_not_evict_the_full_catalog_s_vectors` holds it.
+
 `profile` is `omitempty` on the CLI's wire and defaults to `"assistant"` here, so
 an ordinary turn stays byte-identical and the prompt cache does not split.
 
