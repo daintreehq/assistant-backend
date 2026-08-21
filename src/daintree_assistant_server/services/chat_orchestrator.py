@@ -502,7 +502,11 @@ class ChatOrchestrator:
         request: RespondRequest,
         *,
         upstream_model: str,
-        api_key: SecretStr | None,
+        # NOT supplied on the serving path: the provider spends the SERVER's key.
+        # Benchmarks and live tests pass one to name the credential they mean to
+        # spend, and account authentication will pass one per caller — so the
+        # parameter stays, defaulted, rather than being deleted and rebuilt.
+        api_key: SecretStr | None = None,
         request_id: str | None = None,
     ) -> RespondOutcome:
         request_id = request_id or new_request_id()
@@ -1427,7 +1431,7 @@ class ChatOrchestrator:
         action: str,
         session_id: str | None,
         state_token: str | None,
-        api_key: SecretStr | None,
+        api_key: SecretStr | None = None,
         turn_id: str | None = None,
         instruction_revision: int = 0,
         query: str | None = None,

@@ -781,7 +781,7 @@ class TaskRunner:
             remaining_seconds=(budget.remaining_total if budget is not None else None),
         )
 
-    async def run(self, request: TaskRequest, *, api_key: SecretStr) -> TaskResult:
+    async def run(self, request: TaskRequest, *, api_key: SecretStr | None = None) -> TaskResult:
         """Run one named utility task under a finite total budget.
 
         The per-call `httpx` timeout on a profile is an inactivity bound; a task
@@ -839,7 +839,7 @@ class TaskRunner:
         )
 
     async def _run_inner(
-        self, request: TaskRequest, *, api_key: SecretStr, budget: RequestBudget
+        self, request: TaskRequest, *, api_key: SecretStr | None, budget: RequestBudget
     ) -> TaskResult:
         profile = self.profiles.get(request.task)
         if profile is None:

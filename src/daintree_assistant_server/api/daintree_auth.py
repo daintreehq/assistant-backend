@@ -53,9 +53,10 @@ async def verify(
     """
     container = request.app.state.container
     provider = container.provider
+    settings = request.app.state.settings
 
     try:
-        record = await provider.verify_key(principal.api_key)
+        record = await provider.verify_key()
     except DaintreeError as exc:
         if exc.code in ("invalid_api_key", "provider_invalid_api_key"):
             # A definite rejection from the provider. Report it as a 200 verdict, not
@@ -79,15 +80,11 @@ async def verify(
     # credential will want to report; `_usability` below is already written to
     # treat their absence as "not known to be exhausted" rather than a failure.
     out: dict[str, object] = {"valid": True}
-    caller_key = principal.api_key
     if isinstance(record, dict):
         models = record.get("models")
         if isinstance(models, list):
             out["models"] = [m for m in models if isinstance(m, str)]
-        label = _safe_label(
-            record.get("label"),
-            caller_key.get_secret_value() if caller_key is not None else "",
-        )
+        label = _safe_label(record.get("label"), settings.cerebras_api_key.get_secret_value())
         if label:
             out["label"] = label
         for field in ("limit", "usage", "limit_remaining"):

@@ -149,10 +149,11 @@ a typo like `prod` cannot fail open past the hardening gates):
 | `production` | **fails readiness** | on | the tester endpoint |
 
 Authentication does **not** vary by environment, and currently that means the
-door is open in all four: the server holds the upstream credential, so a request
-with no bearer token has one to spend and is served. A token that IS present is
-still validated for shape and rejected if malformed. Account authentication is
-being built next. The operational endpoints — `/`, `/health`, `/healthz`,
+door is open in all four: the server holds the upstream credential, so every
+request has one to spend. The `Authorization` header is **ignored entirely** —
+not parsed, not validated, not rejected — so a client still sending an old
+OpenRouter key is served rather than having that key forwarded upstream and
+rejected as theirs. Account authentication is being built next. The operational endpoints — `/`, `/health`, `/healthz`,
 `/readyz`, `/version` — have always been unauthenticated, because a probe that
 needs a credential is not a health check.
 

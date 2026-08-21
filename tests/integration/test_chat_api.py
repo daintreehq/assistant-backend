@@ -392,19 +392,24 @@ def test_missing_auth_is_served_anonymously(client) -> None:
     assert r.status_code == 200
 
 
-def test_a_malformed_bearer_is_still_401(client) -> None:
-    """Absence is a choice; a broken header is a mistake worth naming.
+def test_a_stale_openrouter_bearer_is_ignored_not_forwarded(client, fake_provider) -> None:
+    """The migration case, end to end.
 
-    Silently ignoring it would show a caller a successful sign-in while every
-    turn ran on the server's account instead of theirs.
+    A CLI that has not been updated still sends the OpenRouter key it used to
+    authenticate with. If the door read it, that key would be threaded to the
+    provider and forwarded to Cerebras — which rejects a credential it never
+    issued — and the caller would see `provider_invalid_api_key`: their key
+    blamed for a header they were right to still be sending.
     """
     r = client.post(
         URL,
-        headers={"Authorization": "Bearer bad key"},
+        headers={"Authorization": "Bearer sk-or-v1-a-stale-openrouter-key"},
         json=respond_body([{"role": "user", "content": "x"}]),
     )
-    assert r.status_code == 401
-    assert r.json()["error"]["code"] == "invalid_api_key"
+    assert r.status_code == 200
+    # And nothing carried the stale value upstream.
+    for req in [*fake_provider.selection_requests, *fake_provider.requests]:
+        assert req.api_key is None
 
 
 def test_unsupported_protocol_426(client, auth) -> None:

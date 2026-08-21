@@ -1,56 +1,57 @@
-"""Bearer authentication — currently open, deliberately and temporarily.
+"""Request identity — currently open, deliberately and temporarily.
 
-**The door is open.** The server now holds its own upstream credential
-(``CEREBRAS_API_KEY``) and funds every turn from it, so a request no longer needs
-to carry a key in order to have one to spend. With nothing to authenticate
-against — no shared server secret, no account store yet — requiring a bearer
-token would reject callers on a check that could not tell a real credential from
-any other well-formed string. So this module accepts a request with no
-``Authorization`` header at all.
+**The `Authorization` header is ignored entirely.** Not parsed, not validated,
+not rejected. Every request becomes the same anonymous principal, and the turn is
+funded by the server's own upstream credential (``CEREBRAS_API_KEY``).
 
-That is a **stage, not a destination**. Account authentication and sign-in are
-being built next, and this is the seam they land in: ``authenticate`` is the one
-place a request becomes a :class:`Principal`, and every route already depends on
-it through ``require_auth``. When accounts arrive, the anonymous branch below
-becomes a rejection and the rest of the server does not move.
+That is stronger than "a key is optional", and the difference is the whole point
+of this module. A CLI mid-migration may still be sending the OpenRouter key it
+used to authenticate with. If this door read that header, the key would be
+carried on the `Principal`, threaded to every provider call, and forwarded to
+Cerebras — which would reject a credential it never issued, and the caller would
+see ``provider_invalid_api_key``: an error blaming their key for a header they
+were right to still be sending. Refusing to look at it is what makes an old
+client work rather than fail confusingly.
 
-Two things are kept alive in the meantime rather than deleted, because they are
-what the next step needs:
+The same reasoning retires the structural check that used to live here. Rejecting
+a malformed bearer only made sense while a bearer *meant* something — it warned a
+caller that the credential they meant to use was not going to be used. Now no
+credential is ever used, so a 401 on a stray header would reject a request the
+server can serve perfectly well, for a value it does not read.
 
-* :class:`Principal` still carries an ``api_key``, now ``None`` on every real
-  request. It is the field an account-mapped credential will occupy, and the
-  provider already prefers a request-supplied key over the server's default
-  (``CerebrasProvider._resolve_key``), so per-caller credentials need no new
-  plumbing — only a value here.
-* A bearer token that IS present is still structurally validated and rejected
-  when malformed. A caller who sends garbage should hear about it at the door
-  rather than have it silently ignored.
+**This is a stage, not a destination.** Account authentication and sign-in are
+next, and this is the seam they land in: ``authenticate`` is the one place a
+request becomes a :class:`Principal`, and every route already depends on it
+through ``require_auth``. When accounts arrive, this function starts reading the
+header again — validating it against an account store rather than against its own
+shape — and the rest of the server does not move. See ``TODO.md``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from fastapi import Request
-from pydantic import SecretStr
-
-from .errors import invalid_api_key
 
 
 @dataclass(frozen=True)
 class Principal:
     """An authenticated caller.
 
-    ``api_key`` is the caller's own upstream credential when they have one, and
-    ``None`` otherwise — which, until account auth lands, is every request. When
-    it is set it is threaded explicitly to every provider call the request makes
-    and overrides the server's own key. It is credential material: repr is
-    suppressed and downstream code must never log or echo it.
+    Carries no credential. The upstream key is the server's own, held on
+    ``Settings`` and resolved inside the provider
+    (``CerebrasProvider._resolve_key``) — it never travels on a per-request
+    object, because there is no per-request credential to travel.
+
+    ``ProviderChatRequest.api_key`` still exists and still overrides the
+    server's default, but nothing on the serving path sets it: benchmarks and
+    live tests construct providers directly and name the credential they mean to
+    spend. That is the field an account-mapped credential will occupy, and the
+    reason it is kept live and tested rather than deleted.
     """
 
     id: str
     scopes: frozenset[str]
-    api_key: SecretStr | None = field(default=None, repr=False)
 
     def has_scope(self, scope: str) -> bool:
         return scope in self.scopes
@@ -58,66 +59,18 @@ class Principal:
 
 CALLER_SCOPES = frozenset({"chat", "tasks", "skills:read", "skills:write"})
 
-# Generous ceiling on the bearer token. Real keys are well under 200 bytes; the
-# cap only stops an absurd header from being scanned and copied into a SecretStr.
-MAX_TOKEN_LENGTH = 4096
-
-
-def _extract_bearer(authorization: str | None) -> str | None:
-    if not authorization:
-        return None
-    # Bound the RAW header before any scanning/stripping, so a whitespace-padded
-    # monster can't hide a short token behind an expensive normalization pass.
-    if len(authorization) > MAX_TOKEN_LENGTH + len("Bearer "):
-        return None
-    parts = authorization.split(" ", 1)
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-    token = parts[1].strip()
-    return token or None
-
-
-def _structurally_valid(token: str) -> bool:
-    """Printable non-space ASCII only (0x21–0x7E).
-
-    The same shape ``CerebrasProvider._resolve_key`` enforces before building an
-    Authorization header, applied at our door so garbage 401s here instead of
-    surfacing as an upstream 502. Deliberately NO prefix check: the key's issuer
-    is not our business, only that it can ride an HTTP header safely — plus a
-    generous length cap (``MAX_TOKEN_LENGTH``) so absurd input is refused rather
-    than forwarded.
-    """
-    if len(token) > MAX_TOKEN_LENGTH:
-        return False
-    return all(0x21 <= ord(ch) <= 0x7E for ch in token)
-
 
 def authenticate(authorization: str | None) -> Principal:
-    """Turn the bearer header into a principal.
+    """Return the anonymous principal, whatever the caller sent.
 
-    Three outcomes, and the middle one is the current normal case:
-
-    * **A well-formed token** — carried on the principal and used as this
-      request's upstream credential, ahead of the server's own.
-    * **No header at all** — an anonymous principal with full caller scopes. The
-      server's key funds the turn. This is what the CLI sends today.
-    * **A header that is present but unusable** (not ``Bearer <token>``, or a
-      token with characters no HTTP header may carry) — 401. Silently ignoring it
-      would strand a caller who *meant* to authenticate: they would see their key
-      apparently accepted while every turn ran on the server's account instead.
-
-    Note the asymmetry between the last two. Absence is a valid choice; a
-    malformed presence is a mistake, and saying so is the whole value of still
-    checking.
+    ``authorization`` is accepted and ignored. The parameter stays in the
+    signature because it is what account authentication will read, and because a
+    function called ``authenticate`` that took no input would be a confusing
+    place to put that back.
     """
-    if authorization is None or not authorization.strip():
-        return Principal(id="anonymous", scopes=CALLER_SCOPES, api_key=None)
-    token = _extract_bearer(authorization)
-    if not token or not _structurally_valid(token):
-        raise invalid_api_key()
-    return Principal(id="caller", scopes=CALLER_SCOPES, api_key=SecretStr(token))
+    return Principal(id="anonymous", scopes=CALLER_SCOPES)
 
 
 def require_auth(request: Request) -> Principal:
-    """FastAPI dependency: authenticate the request's bearer header."""
+    """FastAPI dependency: the caller's principal for this request."""
     return authenticate(request.headers.get("authorization"))

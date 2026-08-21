@@ -70,11 +70,6 @@ async def resolve_skills(
         action=body.action,
         session_id=body.session_id,
         state_token=body.state,
-        # A 'find' runs the selector, which is LOCAL — no upstream call and no
-        # credential needed. Threaded anyway so the seam stays uniform with
-        # /respond, and so a future selector that does call upstream needs no new
-        # plumbing here.
-        api_key=principal.api_key,
         turn_id=body.turn_id,
         instruction_revision=body.instruction_revision,
         query=body.query,

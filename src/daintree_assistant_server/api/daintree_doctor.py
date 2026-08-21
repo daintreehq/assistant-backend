@@ -111,7 +111,6 @@ async def _provider_section(
         # it. Stated here because it is the fact a tester most often needs
         # confirmed, and it inverted when the backend moved to Cerebras.
         "server_holds_credential": True,
-        "caller_supplied_key": principal.api_key is not None,
         "key_valid": None,
         "key_usable": None,
         "reason": None,
@@ -123,7 +122,7 @@ async def _provider_section(
 
     started = time.perf_counter()
     try:
-        record = await container.provider.verify_key(principal.api_key)
+        record = await container.provider.verify_key()
     except DaintreeError as exc:
         section["verify_ms"] = round((time.perf_counter() - started) * 1000)
         if exc.code in ("invalid_api_key", "provider_invalid_api_key"):

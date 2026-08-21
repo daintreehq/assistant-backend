@@ -27,18 +27,23 @@ def test_verify_accepts_a_good_key(client, auth, fake_provider) -> None:
     assert body["is_free_tier"] is False
 
 
-def test_verify_forwards_the_callers_own_key(client, auth, fake_provider) -> None:
-    """The probe must use the CALLER's credential, never a server-held one.
+def test_verify_probes_the_server_credential_whatever_the_caller_sent(
+    client, auth, fake_provider
+) -> None:
+    """The probe asks about the key this request would actually spend.
 
-    The server holds no upstream key at all; verifying with anything other than the
-    caller's would answer a question nobody asked.
+    That is always the SERVER's now, and the caller's header is not consulted —
+    so a client still holding a stale OpenRouter key gets a truthful answer about
+    the backend instead of a verdict on a credential nobody is going to use.
     """
-    client.post("/v1/daintree/auth/verify", headers=auth)
+    fake_provider.verify_key_result = {"models": ["gemma-4-31b"]}
 
+    r = client.post("/v1/daintree/auth/verify", headers=auth)
+
+    assert r.status_code == 200
     assert len(fake_provider.verify_key_calls) == 1
-    forwarded = fake_provider.verify_key_calls[0]
-    assert forwarded is not None
-    assert forwarded.get_secret_value() == auth["Authorization"].removeprefix("Bearer ")
+    # Called with no argument: the provider falls back to its configured key.
+    assert fake_provider.verify_key_calls[0] is None
 
 
 def test_verify_reports_a_rejected_key_as_a_200_verdict(client, auth, fake_provider) -> None:
@@ -105,28 +110,33 @@ def test_verify_without_a_bearer_probes_the_server_credential(client, fake_provi
     assert r.json()["valid"] is True
 
 
-def test_verify_never_echoes_the_key(client, auth, fake_provider) -> None:
+def test_verify_never_echoes_the_server_key(client, app, fake_provider) -> None:
     """The response is shown to a user and may be logged; it must not carry the key.
 
-    The label is set to the BEARER ITSELF, which is the realistic leak: some providers
-    default a key's label to the key (or a prefix of it). A benign placeholder label
-    would let a completely unsafe passthrough pass this test.
+    The label is set to the CREDENTIAL ITSELF, which is the realistic leak: some
+    providers default a key's label to the key (or a prefix of it). A benign
+    placeholder label would let a completely unsafe passthrough pass this test.
+
+    The stake went UP when the credential moved: this is the one key that funds
+    all of Daintree, not one tester's account.
     """
-    token = auth["Authorization"].removeprefix("Bearer ")
-    fake_provider.verify_key_result = {"label": token}
+    key = app.state.settings.cerebras_api_key.get_secret_value()
+    fake_provider.verify_key_result = {"label": key}
 
-    r = client.post("/v1/daintree/auth/verify", headers=auth)
+    r = client.post("/v1/daintree/auth/verify")
 
-    assert token not in r.text
+    assert key not in r.text
     assert "label" not in r.json()
 
 
-def test_verify_drops_a_label_that_is_a_prefix_of_the_key(client, auth, fake_provider) -> None:
+def test_verify_drops_a_label_that_is_a_prefix_of_the_server_key(
+    client, app, fake_provider
+) -> None:
     """A truncated key is still key material and must not be echoed."""
-    token = auth["Authorization"].removeprefix("Bearer ")
-    fake_provider.verify_key_result = {"label": token[: len(token) // 2]}
+    key = app.state.settings.cerebras_api_key.get_secret_value()
+    fake_provider.verify_key_result = {"label": key[: len(key) // 2]}
 
-    r = client.post("/v1/daintree/auth/verify", headers=auth)
+    r = client.post("/v1/daintree/auth/verify")
 
     assert "label" not in r.json()
 

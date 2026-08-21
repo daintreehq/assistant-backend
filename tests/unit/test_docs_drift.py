@@ -430,9 +430,9 @@ def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
 # This is the inverse of the gate that used to live here. Authentication still
 # does not vary by environment — ``authenticate`` takes no environment argument —
 # but the unconditional outcome flipped from "reject" to "accept": the server
-# holds the upstream credential, so a request without a bearer token has one to
-# spend. A document that still tells a tester their request will be rejected
-# without a key sends them hunting for a credential that does not exist.
+# holds the upstream credential, so there is no per-request credential for a
+# bearer to supply. A document that still tells a tester their request will be
+# rejected without a key sends them hunting for a credential that does not exist.
 _KEY_IS_REQUIRED = re.compile(
     r"(?:request|call|every request)[^.\n]{0,60}"
     r"\b(?:without|lacking|missing)\b[^.\n]{0,30}"
@@ -447,41 +447,52 @@ def test_no_document_claims_a_caller_key_is_required(path: Path) -> None:
         match = _KEY_IS_REQUIRED.search(line)
         if match is None:
             continue
-        # Accurate copy discusses the old rule in the past tense, or is talking
-        # about the MALFORMED-token case, which genuinely is still rejected.
-        if re.search(r"\b(?:used to|previously|no longer|malformed|garbage|was)\b", line, re.I):
+        # Accurate copy discusses the old rule in the past tense.
+        if re.search(r"\b(?:used to|previously|no longer|was|were)\b", line, re.I):
             continue
         pytest.fail(
-            f"{path.name}:{number} says {match.group(0)!r}. A request with no "
-            "Authorization header is served (auth.authenticate returns an "
-            "anonymous principal); the server funds it. See auth.py."
+            f"{path.name}:{number} says {match.group(0)!r}. Every request is "
+            "served: auth.authenticate ignores the Authorization header entirely "
+            "and the server funds the turn. See auth.py."
         )
 
 
-def test_a_request_with_no_authorization_header_is_accepted() -> None:
-    """The code fact behind the copy above.
+def test_the_authorization_header_is_ignored_not_merely_optional() -> None:
+    """The distinction that protects a CLI mid-migration.
 
-    Absence is a valid choice now. This is the single assertion that would break
-    the moment account authentication lands — which is exactly what it is for.
+    "Optional" would mean reading a bearer when one is sent — and a client still
+    holding its old OpenRouter key would have that key threaded to the provider
+    and forwarded to Cerebras, which rejects a credential it never issued. The
+    caller would see ``provider_invalid_api_key``: their key blamed for a header
+    they were right to still be sending.
+
+    Asserted at the door AND at the source, because the source is where the
+    temptation to "just parse it while we're here" would land.
     """
-    for header in (None, "", "   "):
+    for header in (None, "Bearer sk-or-v1-stale", "Bearer bad key", "Basic x"):
         principal = authenticate(header)
-        assert principal.api_key is None
         assert principal.id == "anonymous"
+        assert not hasattr(principal, "api_key")
 
 
-@pytest.mark.parametrize("header", ["Bearer", "Basic abc", "Bearer ", "Bearer with space"])
-def test_a_malformed_authorization_header_is_still_rejected(header: str) -> None:
-    """The asymmetry that makes the open door safe to ship.
+def test_no_route_hands_a_caller_supplied_key_to_the_provider() -> None:
+    """The other half: even if the door changed, the routes must not thread one.
 
-    Absence means "I have no key". A header that is present but unusable means "I
-    meant to authenticate and got it wrong" — and silently ignoring it would show
-    that caller a successful sign-in while every turn ran on the server's account.
+    Textual, because that is how the regression would arrive — someone
+    reinstating ``api_key=principal.api_key`` on one handler while the other four
+    stay correct, which no single behavioural test would catch.
     """
-    with pytest.raises(DaintreeError) as excinfo:
-        authenticate(header)
-    assert excinfo.value.status_code == 401
-    assert excinfo.value.code == "invalid_api_key"
+    api_dir = SRC_ROOT / "api"
+    offenders = [
+        f"{path.relative_to(REPO_ROOT)}"
+        for path in sorted(api_dir.glob("*.py"))
+        if "principal.api_key" in path.read_text(encoding="utf-8")
+    ]
+    assert not offenders, (
+        f"{offenders} thread a caller-supplied credential to the provider. The "
+        "server funds every turn from its own key; a caller's would be forwarded "
+        "to Cerebras and rejected as theirs. See auth.py and docs/KEY_HANDLING.md."
+    )
 
 
 # ---------------------------------------------------------------------------

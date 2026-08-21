@@ -1,7 +1,8 @@
 """Branches of the Cerebras adapter and the auth door that the main suites miss.
 
 Every test here covers a path that only runs when something has already gone
-wrong — a truncated stream, an unreadable body, a header nobody should send. The
+wrong — a truncated stream, an unreadable body, a shape no healthy upstream
+sends. The
 per-module coverage floors in ``tools/coverage_floors.py`` exist for exactly this
 class of code: a global percentage stays green while the error paths rot, and an
 untested error path is how a 502 becomes a 500.
@@ -15,11 +16,6 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from daintree_assistant_server.auth import (
-    MAX_TOKEN_LENGTH,
-    _extract_bearer,
-    _structurally_valid,
-)
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
 from daintree_assistant_server.providers.cerebras import (
@@ -314,30 +310,3 @@ async def test_a_stream_closed_twice_closes_once() -> None:
     await stream.aclose()
     await stream.aclose()
     await provider.aclose()
-
-
-# ---------------------------------------------------------------------------
-# The auth door's own edges.
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize("header", [None, "", "Bearer x"])
-def test_extract_bearer_handles_absence_and_presence(header: str | None) -> None:
-    result = _extract_bearer(header)
-    assert result == ("x" if header == "Bearer x" else None)
-
-
-def test_an_oversized_raw_header_is_refused_before_any_scanning() -> None:
-    """Bounded on the RAW header, not on the extracted token.
-
-    A whitespace-padded monster would otherwise hide a short token behind an
-    expensive normalization pass — the cheap denial-of-service this bound exists
-    to close.
-    """
-    padded = "Bearer " + " " * (MAX_TOKEN_LENGTH * 2) + "k"
-    assert _extract_bearer(padded) is None
-
-
-def test_a_token_at_the_cap_is_valid_and_one_past_it_is_not() -> None:
-    assert _structurally_valid("k" * MAX_TOKEN_LENGTH) is True
-    assert _structurally_valid("k" * (MAX_TOKEN_LENGTH + 1)) is False

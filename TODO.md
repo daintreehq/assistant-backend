@@ -22,24 +22,27 @@ Cloud Run service that is an open, Daintree-funded endpoint with no rate limitin
 
 **The seam already exists**, deliberately, and nothing about it is a shim:
 
-- `auth.authenticate` is the one place a request becomes a `Principal`. The
-  anonymous branch becomes a rejection; the rest of the server does not move.
-- `Principal.api_key` is `None` on every real request today but is still carried,
-  and `CerebrasProvider._resolve_key` still prefers a request-supplied credential
-  over the server's own. So a per-account credential is a **value** flowing
-  through existing plumbing, not new plumbing.
-  `tests/integration/test_endpoints.py::test_a_caller_supplied_key_reaches_selector_and_main_calls`
-  keeps that path live and tested precisely so it does not rot before it is used.
-- A malformed bearer is *already* a 401 on every route. Absence is what is
-  permitted, not garbage.
+- `auth.authenticate` is the one place a request becomes a `Principal`. It
+  currently ignores the `Authorization` header entirely — see `docs/KEY_HANDLING.md`
+  for why *ignore* rather than *optional*: a CLI mid-migration is still sending
+  its old OpenRouter key, and reading it would forward that key to Cerebras and
+  blame the caller for the rejection. When accounts land, this function starts
+  reading the header again and the rest of the server does not move.
+- `ProviderChatRequest.api_key` still overrides the server's default in
+  `CerebrasProvider._resolve_key`. So a per-account credential is a **value**
+  flowing through existing plumbing, not new plumbing. Benchmarks and live tests
+  are its only callers today, which is what keeps it from rotting before it is
+  used.
 
 What has to be decided rather than merely built: whether an authenticated caller
 still spends Daintree's key (an account is an entitlement) or brings their own
 (an account is a credential mapping). The code supports either; the tests that
-enumerate the open door — `test_every_route_is_served_without_an_authorization_header`,
-`test_an_absent_header_is_served_anonymously`, and the smoke script's
-"Authentication posture" block — are the ones that must start failing when this
-lands, and they are written to be found.
+enumerate the open door are the ones that must start failing when this
+lands, and they are written to be found:
+`test_every_authorization_header_is_ignored`,
+`test_no_route_hands_a_caller_supplied_key_to_the_provider`,
+`test_every_route_ignores_an_authorization_header_entirely`, and the smoke
+script's "Authentication posture" block.
 
 ---
 

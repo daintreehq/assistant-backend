@@ -124,10 +124,11 @@ export CEREBRAS_API_KEY=...               # the upstream credential; funds every
 ```
 
 Those two are the whole list, and both are the **server's own**. There is no
-inbound API key to configure: callers send no bearer token today, so the door is
-open — deliberately and temporarily, until account authentication lands. A token
-that *is* sent is still validated for shape and used as that request's upstream
-credential.
+inbound API key to configure, and the `Authorization` header is **ignored
+entirely** — not parsed, not validated, not rejected. That is deliberate and
+temporary, until account authentication lands, and it is stronger than "a key is
+optional": a CLI still sending the OpenRouter key it used to authenticate with
+would otherwise have that key forwarded to Cerebras and rejected as *theirs*.
 
 Missing required secrets do not crash the process — they fail **readiness**
 (`/readyz` returns 503) so liveness stays green. `CEREBRAS_API_KEY` is gated

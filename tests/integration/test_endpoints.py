@@ -299,46 +299,41 @@ def test_workflow_resume_digest_task_endpoint(client, auth, fake_provider) -> No
     assert body["output"]["ranked"][0]["headline"] == "Ready to verify"
 
 
-def test_a_malformed_bearer_is_rejected_on_every_route(client) -> None:
-    """The auth matrix, with the door open.
+def test_every_route_ignores_an_authorization_header_entirely(client, fake_provider) -> None:
+    """Not "a key is optional" — the header is never read.
 
-    ABSENCE is served (the server holds the credential — see the next test).
-    A header that is PRESENT but unusable is still a distinct invalid_api_key
-    401 on every route, so the CLI can tell 'fix your header' from an upstream
-    502 upstream_error. The asymmetry is the point: a caller who sent a broken
-    header meant to authenticate, and silently ignoring it would show them a
-    successful sign-in while every turn ran on the server's account.
+    Each of these shapes used to be a 401: a malformed bearer at our own door, or
+    (worse) a well-formed stale OpenRouter key forwarded to Cerebras and rejected
+    as the caller's. Both are served now, because there is no per-request
+    credential for a bearer to supply and nothing for its shape to be wrong
+    about.
     """
     from conftest import respond_body
 
-    for headers in ({"Authorization": "Token x"}, {"Authorization": "Bearer bad key"}):
-        r = client.get("/v1/daintree/capabilities", headers=headers)
-        assert r.status_code == 401
-        assert r.json()["error"]["code"] == "invalid_api_key"
-        assert r.headers.get("www-authenticate") == "Bearer"
+    fake_provider.complete_result = make_result(
+        content=json.dumps({"reason": "ok", "confidence": 0.9, "matched": True})
+    )
+    for headers in (
+        {"Authorization": "Bearer sk-or-v1-a-stale-openrouter-key"},
+        {"Authorization": "Token x"},
+        {"Authorization": "Bearer bad key"},
+        {"Authorization": "Bearer"},
+    ):
+        assert client.get("/v1/daintree/capabilities", headers=headers).status_code == 200
         r = client.post(
             "/v1/daintree/respond",
             headers=headers,
             json=respond_body([{"role": "user", "content": "rename my terminals"}]),
         )
-        assert r.status_code == 401
+        assert r.status_code == 200, headers
         r = client.post(
             "/v1/daintree/tasks",
             headers=headers,
             json={"task": "terminal_judge", "input": {"question": "q"}},
         )
-        assert r.status_code == 401
-        assert client.get("/v1/daintree/skills", headers=headers).status_code == 401
-        r = client.post(
-            "/v1/daintree/skills/resolve",
-            headers=headers,
-            json={"action": "clear", "session_id": "s"},
-        )
-        assert r.status_code == 401
-        # The credential probe is no exception. A malformed bearer is our own
-        # structural 401, decided at the door, and must never reach the provider
-        # as a verification request.
-        assert client.post("/v1/daintree/auth/verify", headers=headers).status_code == 401
+        assert r.status_code == 200, headers
+        assert client.get("/v1/daintree/skills", headers=headers).status_code == 200
+        assert client.post("/v1/daintree/auth/verify", headers=headers).status_code == 200
     # Probes and version never require a key (Cloud Run probes them).
     assert client.get("/healthz").status_code == 200
     assert client.get("/readyz").status_code == 200
@@ -365,14 +360,12 @@ def test_every_route_is_served_without_an_authorization_header(client) -> None:
     ).status_code == 200
 
 
-def test_a_caller_supplied_key_reaches_selector_and_main_calls(client, fake_provider) -> None:
-    """The seam account authentication will land in, kept alive and tested.
+def test_no_caller_credential_reaches_any_provider_call(client, fake_provider) -> None:
+    """The serving path names no credential at all; the provider spends its own.
 
-    Nothing sends a bearer today, so this path is currently exercised only here —
-    which is the reason to keep testing it. When per-account credentials arrive
-    they become a VALUE flowing through this plumbing, not new plumbing: a key on
-    the request must still reach BOTH the selector call and the main call, and
-    still override the server's own.
+    Asserted across BOTH calls of a turn because that is how the old bug would
+    come back — one handler reinstating `api_key=principal.api_key` while the
+    others stay correct.
     """
     from conftest import respond_body
 
@@ -387,11 +380,10 @@ def test_a_caller_supplied_key_reaches_selector_and_main_calls(client, fake_prov
     assert len(fake_provider.selection_requests) == 1, "selector call not recorded"
     assert fake_provider.requests, "main call not recorded"
     for req in [*fake_provider.selection_requests, *fake_provider.requests]:
-        assert req.api_key is not None
-        assert req.api_key.get_secret_value() == "sk-or-v1-caller-abc"
+        assert req.api_key is None
 
 
-def test_caller_key_reaches_task_calls(client, fake_provider) -> None:
+def test_no_caller_credential_reaches_a_task_call(client, fake_provider) -> None:
     fake_provider.complete_result = make_result(
         content=json.dumps({"reason": "ok", "confidence": 0.9, "matched": True})
     )
@@ -402,57 +394,7 @@ def test_caller_key_reaches_task_calls(client, fake_provider) -> None:
     )
     assert r.status_code == 200
     assert fake_provider.requests
-    for req in fake_provider.requests:
-        assert req.api_key is not None
-        assert req.api_key.get_secret_value() == "sk-or-v1-task-key"
-
-
-def test_task_upstream_rejection_maps_to_502_not_401(client, fake_provider) -> None:
-    """A structurally valid key the UPSTREAM rejects is a 502 upstream_error —
-    distinguishable from our 401 invalid_api_key, so the CLI can tell 'fix your
-    header' from 'fix your account'."""
-    from daintree_assistant_server.errors import upstream_error
-
-    fake_provider.complete_error = upstream_error("The upstream provider rejected the supplied credentials.")
-    r = client.post(
-        "/v1/daintree/tasks",
-        headers={"Authorization": "Bearer sk-or-v1-plausible-but-rejected"},
-        json={"task": "terminal_judge", "input": {"question": "q"}},
-    )
-    assert r.status_code == 502
-    assert r.json()["error"]["code"] == "upstream_error"
-
-
-def test_streaming_turn_carries_the_caller_key(client, fake_provider) -> None:
-    from conftest import parse_sse, respond_body
-
-    fake_provider.selection_result = selection_result([])
-    body = respond_body([{"role": "user", "content": "rename my terminals"}], generation={"stream": True})
-    with client.stream(
-        "POST",
-        "/v1/daintree/respond",
-        headers={"Authorization": "Bearer sk-or-v1-stream-key"},
-        json=body,
-    ) as s:
-        assert s.status_code == 200
-        events = parse_sse(s.read().decode())
-    assert events[-1][0] == "done"
-    assert len(fake_provider.selection_requests) == 1
-    assert fake_provider.stream_requests
-    for req in [*fake_provider.selection_requests, *fake_provider.stream_requests]:
-        assert req.api_key is not None
-        assert req.api_key.get_secret_value() == "sk-or-v1-stream-key"
-
-
-def test_tasks_unknown_404(client, auth) -> None:
-    r = client.post("/v1/daintree/tasks", headers=auth, json={"task": "nope", "input": {}})
-    assert r.status_code == 404
-    assert r.json()["error"]["code"] == "unknown_task"
-
-
-def test_tasks_invalid_input_400(client, auth) -> None:
-    r = client.post("/v1/daintree/tasks", headers=auth, json={"task": "terminal_judge", "input": {}})
-    assert r.status_code == 400
+    assert all(req.api_key is None for req in fake_provider.requests)
 
 
 def test_oversized_body_413(client, auth) -> None:

@@ -7,7 +7,6 @@ from pydantic import ValidationError
 
 from daintree_assistant_server.auth import authenticate
 from daintree_assistant_server.config import Settings
-from daintree_assistant_server.errors import DaintreeError
 
 
 def _settings(**overrides: object) -> Settings:
@@ -131,80 +130,51 @@ def test_secret_not_in_repr() -> None:
     assert "csk-should-not-appear" not in repr(s)
 
 
-def test_authenticate_returns_the_caller_key() -> None:
-    # Nothing sends one today, but a token that IS present is still carried and
-    # still overrides the server's credential — the seam account auth lands in.
-    principal = authenticate("Bearer csk-abc123")
-    assert principal.has_scope("chat")
-    assert principal.api_key is not None
-    assert principal.api_key.get_secret_value() == "csk-abc123"
-
-
-def test_authenticate_accepts_any_wellformed_token() -> None:
-    # Structural admission only: the server no longer knows a shared secret, so
-    # any header-safe token is accepted here and judged by the upstream instead.
-    principal = authenticate("Bearer some-future-subscription-key")
-    assert principal.api_key is not None
-    assert principal.api_key.get_secret_value() == "some-future-subscription-key"
-
-
-def test_authenticate_key_not_in_repr() -> None:
-    principal = authenticate("Bearer csk-secret-material")
-    assert "csk-secret-material" not in repr(principal)
-
-
 @pytest.mark.parametrize(
     "header",
-    ["secret", "Token secret", "Bearer", "Bearer  ", "Bearer bad key", "Bearer k\x7f"],
+    [
+        None,
+        "",
+        "   ",
+        # A CLI mid-migration, still sending the OpenRouter key it used to
+        # authenticate with. This is the case the ignore rule exists for: read it,
+        # and it would be forwarded to Cerebras and rejected as the CALLER's bad
+        # key — an error blaming them for a header they were right to still send.
+        "Bearer sk-or-v1-a-stale-openrouter-key",
+        # Shapes that used to be our own 401. A malformed bearer only meant
+        # something while a bearer meant something; rejecting one now would
+        # refuse a request the server can serve, over a value it does not read.
+        "Bearer",
+        "Bearer  ",
+        "Bearer bad key",
+        "Bearer k\x7f",
+        "Basic abc",
+        "Token secret",
+        "not-a-scheme-at-all",
+    ],
 )
-def test_authenticate_rejects_a_malformed_header(header: str) -> None:
-    """Present but unusable is still a 401 — deliberately, and unlike absence.
+def test_every_authorization_header_is_ignored(header: str | None) -> None:
+    """The header is not parsed, not validated, and never rejected.
 
-    A caller who sends a broken header MEANT to authenticate. Ignoring it would
-    show them a successful sign-in while every turn quietly ran on the server's
-    account, which is the one failure mode the open door could otherwise create.
-    """
-    with pytest.raises(DaintreeError) as exc:
-        authenticate(header)
-    assert exc.value.status_code == 401
-    assert exc.value.code == "invalid_api_key"
-
-
-def test_authenticate_rejects_an_absurdly_long_token() -> None:
-    from daintree_assistant_server.auth import MAX_TOKEN_LENGTH
-
-    at_cap = authenticate(f"Bearer {'k' * MAX_TOKEN_LENGTH}").api_key
-    assert at_cap is not None  # at the cap: fine
-    with pytest.raises(DaintreeError) as exc:
-        authenticate(f"Bearer {'k' * (MAX_TOKEN_LENGTH + 1)}")
-    assert exc.value.code == "invalid_api_key"
-
-
-def test_authenticate_rejects_non_ascii_token() -> None:
-    with pytest.raises(DaintreeError) as exc:
-        authenticate("Bearer csk-café")
-    assert exc.value.code == "invalid_api_key"
-
-
-def test_authenticate_case_insensitive_scheme() -> None:
-    # "bearer" scheme keyword is case-insensitive; the token itself is kept verbatim.
-    key = authenticate("bearer MiXeD-case").api_key
-    assert key is not None
-    assert key.get_secret_value() == "MiXeD-case"
-
-
-@pytest.mark.parametrize("header", [None, "", "   "])
-def test_an_absent_header_is_served_anonymously(header: str | None) -> None:
-    """The current credential model, at its one seam.
-
-    The server holds the upstream key, so a request with no bearer token has one
-    to spend and is served. This assertion is the thing that must break loudly
-    when account authentication lands — it is not an oversight, it is the stage.
+    This is stronger than "a key is optional", and the difference is the whole
+    point: the server holds the upstream credential, so there is no per-request
+    credential for a bearer to supply and nothing for its shape to be wrong
+    about.
     """
     principal = authenticate(header)
     assert principal.id == "anonymous"
-    assert principal.api_key is None
     assert principal.has_scope("chat")
+
+
+def test_the_principal_carries_no_credential_at_all() -> None:
+    """Not `None` — absent.
+
+    A `SecretStr | None` field that is structurally always None is a trap: the
+    next reader threads it through, sees no type error, and believes a caller key
+    is reaching the provider. The field comes back with account authentication,
+    deliberately.
+    """
+    assert not hasattr(authenticate("Bearer anything"), "api_key")
 
 
 # ---- upstream request dumping (local-development-only guard) --------------

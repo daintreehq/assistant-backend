@@ -22,19 +22,38 @@ code enforces:
   its presence — without it nothing can be answered at all, and discovering that
   on the first turn surfaces as an upstream 401 that reads like the caller's
   fault. Unit tests pin both halves.
-- **There is no inbound API key to configure, and the door is open.** A request
-  with no `Authorization` header is served (`auth.authenticate` returns an
-  anonymous principal). That is a *stage*, not a destination: account
-  authentication and sign-in are being built next, and `auth.py` is the seam they
-  land in.
-- **A caller-supplied bearer still wins.** A well-formed token is carried on the
-  `Principal` and used as that request's upstream credential ahead of the
-  server's (`CerebrasProvider._resolve_key`). Nothing sends one today; the path
-  is kept live and tested precisely so per-account credentials become a *value*
-  flowing through existing plumbing rather than new plumbing.
-- **A malformed bearer is still a 401.** Absence is a valid choice; a header that
-  is present but unusable is a mistake, and silently ignoring it would show that
-  caller a successful sign-in while every turn ran on the server's account.
+- **The `Authorization` header is ignored entirely.** Not parsed, not validated,
+  not rejected. `auth.authenticate` returns the same anonymous principal whatever
+  arrives, and `Principal` carries no credential field at all.
+
+  That is stronger than "a key is optional", and the difference is why it is
+  written this way. A CLI mid-migration may still be sending the OpenRouter key
+  it used to authenticate with. A door that *read* that header would carry the
+  key on the principal, thread it to every provider call, and forward it to
+  Cerebras — which rejects a credential it never issued. The caller would see
+  `provider_invalid_api_key`: an error blaming their key for a header they were
+  right to still be sending. Refusing to look at it is what makes an old client
+  work rather than fail confusingly.
+
+  The same reasoning retires the structural check that used to live here.
+  Rejecting a malformed bearer only made sense while a bearer *meant* something
+  — it warned a caller that the credential they meant to use was not going to be.
+  Now no credential is ever used, so a 401 on a stray header would refuse a
+  request the server can serve, over a value it does not read.
+
+  `tests/unit/test_docs_drift.py` asserts both halves: the door ignores every
+  header shape, and no route under `api/` threads `principal.api_key` to a
+  provider call.
+- **A per-request credential is still possible, and still tested.**
+  `ProviderChatRequest.api_key` overrides the server's default in
+  `CerebrasProvider._resolve_key`. Nothing on the serving path sets it —
+  benchmarks and live tests are its only callers — and it is kept live precisely
+  so per-account credentials become a *value* flowing through existing plumbing
+  rather than new plumbing.
+- **This is a stage, not a destination.** Account authentication and sign-in are
+  being built next, and `auth.py` is the seam they land in: `authenticate` starts
+  reading the header again, validating it against an account store rather than
+  against its own shape, and the rest of the server does not move.
 
 ## 2. Server-side handling
 

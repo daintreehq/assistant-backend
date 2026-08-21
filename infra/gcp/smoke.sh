@@ -120,14 +120,14 @@ else
   fail "expected 200 without a bearer token, got $code" "$BODY"
 fi
 
-# A header that is PRESENT but unusable is still refused. Absence is a choice;
-# a broken header is a mistake, and ignoring it would show a caller a successful
-# sign-in while every turn ran on the server's account.
-code="$(req -H 'Authorization: Bearer' "$URL/v1/daintree/capabilities")"; load_body
-if [ "$code" = "401" ]; then
-  pass "a malformed bearer header is rejected with 401"
+# A header that IS present is ignored too, not merely tolerated. A CLI still
+# sending its old OpenRouter key must be served, not have that key forwarded to
+# Cerebras and rejected as the caller's own.
+code="$(req -H 'Authorization: Bearer sk-or-v1-a-stale-openrouter-key' "$URL/v1/daintree/capabilities")"; load_body
+if [ "$code" = "200" ]; then
+  pass "a stale OpenRouter bearer is ignored, not forwarded"
 else
-  fail "expected 401 for a malformed header, got $code" "$BODY"
+  fail "expected 200 for a stale bearer, got $code" "$BODY"
 fi
 
 # --------------------------------------------------------------------------

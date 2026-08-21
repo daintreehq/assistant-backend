@@ -38,17 +38,18 @@ def test_doctor_reports_a_healthy_server(client, auth, fake_provider) -> None:
     assert body["request_id"]
 
 
-def test_doctor_verifies_with_the_callers_own_key(client, auth, fake_provider) -> None:
-    """Same rule as sign-in: the probe must ask about the CALLER's credential.
+def test_doctor_verifies_the_server_credential(client, auth, fake_provider) -> None:
+    """Same rule as sign-in: the probe must ask about the credential in play.
 
-    The server holds none, so verifying with anything else would answer a
-    question nobody asked and report a verdict about the wrong account.
+    That is the SERVER's, and the caller's header is not consulted — so a
+    diagnosis is about the account that will actually run the turn rather than
+    about a stale key the client happens to still be sending.
     """
     client.post(URL, headers=auth)
 
     assert len(fake_provider.verify_key_calls) == 1
-    forwarded = fake_provider.verify_key_calls[0]
-    assert forwarded.get_secret_value() == auth["Authorization"].removeprefix("Bearer ")
+    # No argument: the provider falls back to its configured credential.
+    assert fake_provider.verify_key_calls[0] is None
 
 
 def test_a_rejected_key_is_a_verdict_not_an_error(client, auth, fake_provider) -> None:
@@ -144,7 +145,7 @@ def test_doctor_is_reachable_without_a_bearer(client) -> None:
     with no credential goes first to find out what is wrong."""
     r = client.post(URL)
     assert r.status_code == 200
-    assert r.json()["provider"]["caller_supplied_key"] is False
+    assert r.json()["provider"]["server_holds_credential"] is True
 
 
 @pytest.mark.parametrize(

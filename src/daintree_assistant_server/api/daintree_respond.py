@@ -51,8 +51,9 @@ async def respond(
     outcome = await container.orchestrator.complete(
         body,
         upstream_model=upstream_model,
-        # The caller's own key funds every upstream call this turn makes.
-        api_key=principal.api_key,
+        # No per-call credential: the provider spends the SERVER's key. The
+        # parameter is still there for benchmarks and live tests, which name the
+        # credential they mean to spend; the serving path never does.
         # The middleware-resolved id, so logs, X-Request-Id, and SSE meta all agree.
         request_id=request_id(request),
     )
