@@ -21,6 +21,15 @@ async def capabilities(
 ) -> dict[str, object]:
     container = request.app.state.container
     settings = request.app.state.settings
+    # One snapshot, deliberately. `Container.catalog` reads live through
+    # `CatalogManager`, which supports atomic replacement, and the revision
+    # below is what keys the list beside it — so reading the property twice
+    # would be reading a pair that is only meaningful if it comes from one
+    # generation. NOT a live race today: nothing in production calls
+    # `reload()`, and this handler never awaits, so the async reload's
+    # rebind cannot interleave with it. A defensive invariant held cheaply,
+    # so that whenever runtime reload does arrive it is already correct.
+    catalog = container.catalog
     return {
         "server_version": __version__,
         "protocol": {"min": PROTOCOL_MIN, "max": PROTOCOL_MAX},
@@ -86,8 +95,35 @@ async def capabilities(
             },
         },
         "skills": {
-            "catalog_revision": container.catalog.revision,
+            "catalog_revision": catalog.revision,
             "manual_resolve": True,
+            # Every skill the catalog holds, as the minimal {id, title} reference.
+            # A client naming a skill — a CLI flag, a manual `resolve` load — can
+            # now check the id BEFORE it spends a turn, and offer near misses. The
+            # server is not silent about a bad id (`load` warns
+            # `unknown_skill_id_ignored`), but that arrives after the turn ran, in
+            # a response field, with no idea what the user meant; preflight is a
+            # different thing from a post-hoc warning.
+            #
+            # Cache it against `catalog_revision` above — same snapshot. That is
+            # CONSERVATIVE rather than exact: the revision hashes every skill's
+            # metadata AND body, so a body-only edit moves it while this list stays
+            # byte-identical. Re-fetching more often than strictly needed is the
+            # right side to err on for a ~3.5KB array, and a second revision
+            # covering only ids and titles would be a version to maintain.
+            #
+            # Minimal on purpose. `/v1/daintree/skills` already serves the full
+            # metadata (summary, when_to_use, risk, required_tools) with an ETag;
+            # repeating ~53KB of it here would make every capabilities call pay for
+            # what validation does not read. Ordering is deterministic for free —
+            # `Catalog.skills` is sorted by id at construction.
+            #
+            # The CANONICAL catalog, not a menu: capabilities carries neither a
+            # profile nor a tool inventory, so it cannot honestly narrow to what a
+            # sub-agent could execute. Server-pinned skills are included because
+            # manual `load` accepts them (`filter_known`, not `selectable_ids`) —
+            # a listing that hid them would lie about what the client may name.
+            "catalog": [skill.ref() for skill in catalog.skills],
         },
         # Daintree usage questions are answered HERE now: the server classifies
         # them on the selector call it already makes, searches the public docs

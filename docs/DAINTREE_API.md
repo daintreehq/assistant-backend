@@ -518,6 +518,18 @@ Skill selection is removed from the main thread:
 `skill.find` / `skill.load` (and their wire-safe `skill__find` / `skill__load` forms) are
 reserved and rejected if a client offers them as tools or replays them in history.
 
+`/v1/daintree/capabilities` carries `skills.catalog`: every catalog skill as a minimal
+`{id, title}` object, sorted by id, so a client naming a skill can validate the id and
+suggest near misses before spending a turn. It is the **canonical full catalog** —
+capabilities has neither a `profile` nor a tool inventory, so it is not narrowed to a
+profile's executable menu, and server-pinned skills are included because manual `load`
+accepts them. Cache it against the `catalog_revision` alongside it: both come from one
+catalog snapshot. That keying is **conservative, not exact** — the revision hashes every
+skill's metadata *and body*, so it moves on a body-only edit that leaves the id/title list
+byte-identical; a client will occasionally re-fetch a list that did not change. For the
+full metadata (summary, when-to-use, risk, required tools) use `/v1/daintree/skills`,
+which serves it with an ETag; `skills.catalog` deliberately does not repeat it.
+
 ---
 
 ## Profiles
@@ -769,7 +781,7 @@ changing the already-committed HTTP status. When an exhausted rate limit carried
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `POST` | `/v1/daintree/respond` | yes | Generation (native, + first-class skills) |
-| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision |
+| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision + skill `{id, title}` listing |
 | `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: does OpenRouter recognise the bearer? (no body; no inference). `valid` plus optional budget metadata; recognised is not the same as fundable |
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual `find` / `load` / `clear`; returns the same `skills` block + `state` |
