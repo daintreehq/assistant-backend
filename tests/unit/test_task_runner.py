@@ -10,8 +10,10 @@ import pytest
 from fakes import FakeProvider, make_result
 from pydantic import SecretStr
 
+from daintree_assistant_server.config import CEREBRAS_MODEL
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError, upstream_error, upstream_timeout
+from daintree_assistant_server.providers.base import ProviderUsage
 from daintree_assistant_server.services.task_runner import (
     TaskRunner,
     _affinity_key,
@@ -24,6 +26,7 @@ TEST_API_KEY = SecretStr("test-caller-key")
 # profile runs inside the tight default (settings.utility_timeout_seconds).
 HEAVY_TASKS = {
     "checkpoint",
+    "context_compact",
     "memory_distill",
     "workflow_plan",
     "workflow_reconcile",
@@ -525,6 +528,12 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
 EXPECTED_TASK_IDS = frozenset(
     {
         "checkpoint",
+        # Producer-only for now: the server offers it and the CLI does not call it
+        # yet (delivering a compacted block over the wire is separate work). An id
+        # the CLI does not know is additive and safe in that direction — the
+        # failure this contract guards against is the reverse, an id the CLI calls
+        # that the server dropped or renamed.
+        "context_compact",
         "memory_distill",
         "watcher_classify",
         "terminal_judge",
@@ -672,3 +681,185 @@ def test_readiness_rejects_a_blanked_display_context_template(tmp_path) -> None:
     display.write_text("# Display context\n\nUsable content width: x cells.\n", encoding="utf-8")
     with pytest.raises(PromptError, match="Pipe-table cap"):
         PromptLoader(staged).validate()
+
+
+# ---- provider selection ----------------------------------------------------
+#
+# One task runs somewhere other than the serving model. Everything below exists
+# because that fact is invisible in a passing suite: a compaction call that
+# quietly fell back to Cerebras would return perfectly good JSON, cost ~12x more
+# per input token, and report a model it never used.
+
+
+@pytest.fixture
+def openrouter_provider() -> FakeProvider:
+    return FakeProvider()
+
+
+@pytest.fixture
+def dual_runner(
+    settings,
+    fake_provider: FakeProvider,
+    openrouter_provider: FakeProvider,
+    prompt_loader,
+    catalog_manager,
+) -> TaskRunner:
+    return TaskRunner(
+        settings=settings,
+        provider=fake_provider,
+        prompt_loader=prompt_loader,
+        catalog_manager=catalog_manager,
+        openrouter_provider=openrouter_provider,
+    )
+
+
+_COMPACT_OUTPUT = {
+    "original_ask": "get the auth refactor merged",
+    "agents": [
+        {
+            "agent_id": "agt_7f2a",
+            "worktree_path": "/Users/x/wt/auth",
+            "brief": "refactor the token path",
+            "status": "running",
+        }
+    ],
+    "terminals": ["terminal-5284bfef-3d11-424c-90cb-136f24046295 — pytest, green"],
+    "decisions": ["use HMAC, not RSA"],
+    "blockers": ["waiting on CI"],
+    "next_actions": ["review the diff"],
+    "preserved_ids": ["wfr_991 — the release workflow"],
+}
+
+
+@pytest.mark.asyncio
+async def test_compaction_routes_to_openrouter_not_the_serving_provider(
+    dual_runner: TaskRunner,
+    fake_provider: FakeProvider,
+    openrouter_provider: FakeProvider,
+) -> None:
+    openrouter_provider.complete_result = make_result(content=json.dumps(_COMPACT_OUTPUT))
+    out = await _run(dual_runner, "context_compact", {"transcript": "a long conversation"})
+
+    assert out["original_ask"] == "get the auth refactor merged"
+    # The serving provider was never touched.
+    assert fake_provider.requests == []
+    assert len(openrouter_provider.requests) == 1
+    assert openrouter_provider.requests[0].model == "deepseek/deepseek-v4-flash"
+
+
+@pytest.mark.asyncio
+async def test_every_other_task_still_runs_on_the_serving_provider(
+    dual_runner: TaskRunner,
+    fake_provider: FakeProvider,
+    openrouter_provider: FakeProvider,
+) -> None:
+    """The blast radius of adding a second provider is exactly one task."""
+    fake_provider.complete_result = make_result(content="Tests are green.")
+    await _run(dual_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
+    assert len(fake_provider.requests) == 1
+    assert openrouter_provider.requests == []
+
+
+@pytest.mark.asyncio
+async def test_the_json_repair_retry_stays_on_the_same_provider_and_model(
+    dual_runner: TaskRunner,
+    fake_provider: FakeProvider,
+    openrouter_provider: FakeProvider,
+) -> None:
+    """The failure mode the whole `_provider_for` design exists to prevent.
+
+    A repair that resolved the provider a second time — or worse, used
+    ``self.provider`` because that is what the old code said — would replay the
+    prompt against a model that never produced the malformed output, and bill a
+    different account for it. Both calls must land on the same adapter.
+    """
+    # A queue: the first response fails to parse, the second is the repair.
+    openrouter_provider.complete_result = [
+        make_result(content="not json at all"),
+        make_result(content=json.dumps(_COMPACT_OUTPUT)),
+    ]
+
+    out = await _run(dual_runner, "context_compact", {"transcript": "conversation"})
+    assert out["original_ask"] == "get the auth refactor merged"
+
+    assert fake_provider.requests == []
+    assert len(openrouter_provider.requests) == 2
+    assert {r.model for r in openrouter_provider.requests} == {"deepseek/deepseek-v4-flash"}
+
+
+@pytest.mark.asyncio
+async def test_an_unconfigured_openrouter_key_fails_only_that_task(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """A missing optional credential is a 503 on ONE task, not a dead server.
+
+    The default ``task_runner`` fixture is built with no OpenRouter provider —
+    which is exactly what a deployment that never set OPENROUTER_API_KEY looks
+    like. It must still answer every other task normally.
+    """
+    with pytest.raises(DaintreeError) as exc:
+        await _run(task_runner, "context_compact", {"transcript": "conversation"})
+    assert exc.value.status_code == 503
+    assert exc.value.code == "provider_not_configured"
+    # Named, because the fix is to set that provider's key.
+    assert "OpenRouter" in exc.value.message
+    # Not retryable: no amount of waiting configures a credential.
+    assert exc.value.retryable is False
+    # And nothing was spent trying.
+    assert fake_provider.requests == []
+
+    # The rest of the registry is unaffected.
+    fake_provider.complete_result = make_result(content="Tests are green.")
+    out = await _run(task_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
+    assert out == {"text": "Tests are green."}
+
+
+@pytest.mark.asyncio
+async def test_the_reported_model_is_the_one_actually_used(
+    dual_runner: TaskRunner, openrouter_provider: FakeProvider
+) -> None:
+    """``TaskResult.model`` reaches the client verbatim, so it must not lie."""
+    openrouter_provider.complete_result = make_result(content=json.dumps(_COMPACT_OUTPUT))
+    result = await dual_runner.run(
+        TaskRequest(task="context_compact", input={"transcript": "x"}), api_key=TEST_API_KEY
+    )
+    assert result.model == "deepseek/deepseek-v4-flash"
+
+
+@pytest.mark.asyncio
+async def test_a_reported_cost_survives_to_the_client(
+    dual_runner: TaskRunner, openrouter_provider: FakeProvider
+) -> None:
+    """Cerebras reports no cost, so no task had ever carried a real one.
+
+    The withholding rule (``cost`` omitted when a repaired task billed twice and
+    only one call reported) is provider-agnostic and already tested; this pins
+    the other half — that a single clean call on a cost-REPORTING provider
+    actually surfaces the number rather than dropping it.
+    """
+    openrouter_provider.complete_result = make_result(
+        content=json.dumps(_COMPACT_OUTPUT),
+        usage=ProviderUsage(
+            prompt_tokens=1000, completion_tokens=200, total_tokens=1200, cost=0.00009
+        ),
+    )
+    result = await dual_runner.run(
+        TaskRequest(task="context_compact", input={"transcript": "x"}), api_key=TEST_API_KEY
+    )
+    assert result.usage.cost == 0.00009
+
+
+def test_only_the_compaction_profile_leaves_the_serving_provider() -> None:
+    """A guard on scope, not on behaviour.
+
+    Provider selection is one field on a dataclass, which makes it cheap to add a
+    second, then a third — and that is the road back to the endpoint-selection
+    policy this repo deliberately deleted. Moving another task off Cerebras
+    should require deleting this assertion, deliberately.
+    """
+    profiles = build_profiles()
+    off_default = {p.id for p in profiles.values() if p.provider_id != "cerebras"}
+    assert off_default == {"context_compact"}
+    for profile in profiles.values():
+        if profile.id != "context_compact":
+            assert profile.model == CEREBRAS_MODEL, profile.id

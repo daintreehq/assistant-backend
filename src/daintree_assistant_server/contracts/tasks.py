@@ -86,6 +86,28 @@ class MemoryDistillInput(BaseModel):
     transcript: str = Field(max_length=400_000)
 
 
+class ContextCompactInput(BaseModel):
+    """One span of conversation to reconcile into current state.
+
+    A TRANSCRIPT STRING, like ``checkpoint`` and ``memory_distill``, and not a
+    list of typed messages. The distinction is deliberate: the protected content
+    this task exists to preserve — worktree paths, terminal ids, an agent's
+    delegation brief — lives in the *prose and tool output* of a conversation,
+    not in fields a schema could name. Any segment model would have to be lossy
+    about exactly the material that must survive verbatim, so the transcript is
+    handed over whole and the structure is produced on the way OUT.
+
+    The same 400 KB ceiling as its two siblings. It is not a compaction policy:
+    which span to compact, and the guarantee that a span already compacted is
+    never fed back in, both belong to the CLI, which owns durable conversation
+    state (see the task prompt).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    transcript: str = Field(max_length=400_000)
+
+
 class TerminalState(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -186,6 +208,78 @@ class CheckpointOutput(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
     approvals_grants: list[str] = Field(default_factory=list)
     preserved_ids: list[str] = Field(default_factory=list)
+
+
+class CompactedAgentOut(BaseModel):
+    """One delegated agent, as current state rather than as narration.
+
+    The three fields together are the thing a compaction most easily destroys and
+    can least afford to: WHICH agent, WHERE it is working, and WHAT it was told
+    to do. An orchestrator that can no longer name the agent it is supervising,
+    or that has kept the name but lost the worktree, is worse off than one that
+    never compacted at all — it will re-delegate work that is already running.
+
+    ``brief`` is the agent's delegation brief in the words it was given, not a
+    summary of it: a paraphrased brief drifts a little on every cycle until the
+    agent is being supervised against instructions nobody issued.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    agent_id: str = Field(min_length=1, max_length=128)
+    worktree_path: str | None = Field(default=None, max_length=4096)
+    brief: str = Field(default="", max_length=4000)
+    status: str = Field(default="", max_length=300)
+
+
+class ContextCompactOutput(BaseModel):
+    """Conversation history reconciled into current state.
+
+    NOT a prose summary, and the field list is the mechanism: every entry names
+    something that is true NOW. Daintree supervises a mutable world — agent
+    statuses, terminal output, watcher events, queue state — where a snapshot is
+    superseded by the next one, so the sequence of observations that produced the
+    current state is the disposable part and the state itself is what has to
+    survive. A narrative summary inverts that, preserving the story and losing
+    the identifiers.
+
+    Deliberately shares ``decisions`` / ``blockers`` / ``preserved_ids`` with
+    ``CheckpointOutput`` rather than inventing a parallel vocabulary for the same
+    ideas — the two tasks are neighbours and should stay legible as such. What is
+    NOT shared is why they exist: ``checkpoint`` writes a recovery record at a
+    session boundary and the CLI stores it, while this replaces a SPAN of history
+    mid-session and is re-run as the session grows, which is what makes its
+    per-token cost worth a second provider.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    # The user's own words, carried verbatim. First field because it is the one
+    # whose loss is least recoverable: everything else in a conversation can be
+    # re-derived from the world, but what the user actually asked for cannot.
+    original_ask: str = Field(default="", max_length=4000)
+    agents: list[CompactedAgentOut] = Field(default_factory=list, max_length=50)
+    terminals: list[str] = Field(default_factory=list)
+    decisions: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+    # The catch-all for load-bearing ids the fields above have no slot for
+    # (wch_*, wfr_*, grt_*, tmr_*, branch names). Bounded generously: a dropped
+    # identifier is unrecoverable, and this is the last net under the others.
+    preserved_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("terminals", "decisions", "blockers", "next_actions")
+    @classmethod
+    def _bound_lists(cls, v: list[str]) -> list[str]:
+        return _truncate_items(v, max_items=40, max_chars=600)
+
+    @field_validator("preserved_ids")
+    @classmethod
+    def _bound_ids(cls, v: list[str]) -> list[str]:
+        # Longer per-item cap than a prose list and no aggressive item bound: each
+        # entry is an identifier plus a few words of what it is, and truncating an
+        # identifier is the one failure mode this whole task exists to prevent.
+        return _truncate_items(v, max_items=100, max_chars=300)
 
 
 class WatcherClassifyOutput(BaseModel):
