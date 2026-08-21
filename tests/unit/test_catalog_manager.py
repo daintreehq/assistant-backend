@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
+import time
 from pathlib import Path
 
 import pytest
 
+from daintree_assistant_server.skills import catalog as catalog_module
 from daintree_assistant_server.skills.catalog import CatalogManager, load_catalog
 from daintree_assistant_server.skills.loader import SkillLoadError
 
@@ -80,7 +84,7 @@ def test_reload_picks_up_new_file(tmp_path: Path) -> None:
     assert "test.delta" not in manager.catalog
 
     _write(primary, "test.delta", "Delta.")
-    new = manager.reload_sync()
+    _, new = manager.reload_sync()
     assert "test.delta" in new
     assert manager.catalog is new
     assert new.revision != before
@@ -92,7 +96,7 @@ async def test_reload_async(tmp_path: Path) -> None:
     _write(primary, "test.alpha", "Alpha.")
     manager = CatalogManager(load_catalog(primary), primary_dir=primary)
     _write(primary, "test.epsilon", "Epsilon.")
-    new = await manager.reload()
+    _, new = await manager.reload()
     assert "test.epsilon" in new
     assert manager.catalog is new
 
@@ -115,7 +119,7 @@ def test_reload_uses_the_overlay_dir(tmp_path: Path) -> None:
 
     _write(overlay, "test.alpha", "Overridden after startup.")
     _write(overlay, "test.gamma", "Gamma from overlay.")
-    new = manager.reload_sync()
+    _, new = manager.reload_sync()
 
     alpha = new.get("test.alpha")
     assert alpha is not None
@@ -133,7 +137,7 @@ async def test_reload_async_uses_the_overlay_dir(tmp_path: Path) -> None:
         load_catalog(primary, overlay), primary_dir=primary, overlay_dir=overlay
     )
     _write(overlay, "test.gamma", "Gamma from overlay.")
-    new = await manager.reload()
+    _, new = await manager.reload()
     assert "test.gamma" in new
 
 
@@ -194,14 +198,58 @@ def test_an_overlay_path_that_is_a_file_is_rejected(tmp_path: Path) -> None:
         load_catalog(primary, not_a_directory)
 
 
-def test_reload_serializes_on_the_manager_s_lock(tmp_path: Path) -> None:
-    """The lock is the manager's, not the endpoint's — one per catalog.
+def test_reload_reports_the_revision_it_replaced(tmp_path: Path) -> None:
+    """The pair is the contract: what was bound before, and what is bound now.
 
-    Two containers in one process (which the test suite routinely builds) must
-    not contend, and any future caller gets the same serialization for free.
+    Reading the old revision separately, before calling, is what made this racy
+    in the first place — so the manager reports it from inside the same critical
+    section that performed the swap.
     """
     primary = tmp_path / "primary"
     _write(primary, "test.alpha", "Alpha.")
-    first = CatalogManager(load_catalog(primary), primary_dir=primary)
-    second = CatalogManager(load_catalog(primary), primary_dir=primary)
-    assert first.reload_lock is not second.reload_lock
+    manager = CatalogManager(load_catalog(primary), primary_dir=primary)
+    before = manager.catalog.revision
+
+    _write(primary, "test.delta", "Delta.")
+    previous, new = manager.reload_sync()
+
+    assert previous == before
+    assert new.revision != previous
+    assert manager.catalog is new
+
+
+@pytest.mark.asyncio
+async def test_concurrent_reloads_cannot_overlap(tmp_path: Path, monkeypatch) -> None:
+    """Two reloads must not be in flight at once.
+
+    Without the lock both coroutines dispatch their blocking load to the thread
+    pool before either finishes, so the slower one rebinds LAST and the newer
+    catalog is lost — an author's edit reverting itself. The assertion is on the
+    overlap itself rather than on which revision won, because "which won" is
+    exactly the thing that is nondeterministic when the bug is present.
+    """
+    primary = tmp_path / "primary"
+    _write(primary, "test.alpha", "Alpha.")
+    manager = CatalogManager(load_catalog(primary), primary_dir=primary)
+
+    real = catalog_module.load_catalog
+    counter = threading.Lock()
+    in_flight = 0
+    peak = 0
+
+    def counting(*args: object, **kwargs: object) -> object:
+        nonlocal in_flight, peak
+        with counter:
+            in_flight += 1
+            peak = max(peak, in_flight)
+        try:
+            time.sleep(0.05)
+            return real(*args, **kwargs)  # type: ignore[arg-type]
+        finally:
+            with counter:
+                in_flight -= 1
+
+    monkeypatch.setattr(catalog_module, "load_catalog", counting)
+    await asyncio.gather(manager.reload(), manager.reload())
+
+    assert peak == 1

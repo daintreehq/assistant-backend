@@ -304,14 +304,7 @@ class CatalogManager:
         self._catalog = catalog
         self._primary_dir = primary_dir
         self._overlay_dir = overlay_dir
-        # One reload at a time. Each load completes before it rebinds, so no
-        # interleaving can expose a half-built catalog — but two concurrent
-        # reloads can still FINISH out of order and leave the older one bound,
-        # which reads to an author as an edit that silently reverted. Held by
-        # the caller across its whole read-revision-then-reload critical
-        # section, so the revision a reload reports replacing is the one it
-        # actually replaced. `reload` does not take it: it is not reentrant.
-        self.reload_lock = asyncio.Lock()
+        self._reload_lock = asyncio.Lock()
 
     @property
     def catalog(self) -> Catalog:
@@ -325,13 +318,30 @@ class CatalogManager:
     def overlay_dir(self) -> Path | None:
         return self._overlay_dir
 
-    def reload_sync(self) -> Catalog:
+    def reload_sync(self) -> tuple[str, Catalog]:
+        previous = self._catalog.revision
         self._catalog = load_catalog(self._primary_dir, self._overlay_dir)
-        return self._catalog
+        return previous, self._catalog
 
-    async def reload(self) -> Catalog:
-        """Reload off the event loop (skill files are read with blocking IO)."""
-        new = await asyncio.to_thread(load_catalog, self._primary_dir, self._overlay_dir)
-        self._catalog = new
-        return new
+    async def reload(self) -> tuple[str, Catalog]:
+        """Reload off the event loop; returns (revision replaced, new catalog).
+
+        Serialized on the manager's own lock, and reporting what it replaced
+        rather than leaving the caller to read that before calling. Both exist
+        for the same reason: two concurrent reloads each complete their load
+        before rebinding, so neither can expose a half-built catalog, but they
+        can still FINISH out of order and leave the OLDER one bound — while the
+        loser cheerfully reports the revision it thought it was replacing. To an
+        author that is an edit which silently reverted. Holding the lock across
+        the read AND the swap is what makes the reported pair true.
+
+        The lock is deliberately inside this method rather than something a
+        caller is trusted to take: a serialization rule that has to be
+        remembered at every call site is one that eventually is not.
+        """
+        async with self._reload_lock:
+            previous = self._catalog.revision
+            new = await asyncio.to_thread(load_catalog, self._primary_dir, self._overlay_dir)
+            self._catalog = new
+            return previous, new
 
