@@ -459,7 +459,7 @@ def test_an_active_skill_puts_its_declared_tools_on_the_wire(
         CORE_TOOL,  # core
         _named("terminal__rename"),  # the skill's own reason for existing
         _named("terminal__extract__json"),  # also declared by the skill
-        _named("daintree__call"),  # via the paired domain foundation
+        _named("git__getProjectPulse"),  # ONLY via the paired domain foundation
         _named("skill__step__advance"),  # the scaffold, because a skill is active
         WITHHELD_TOOL,  # declared elsewhere, needed by nothing here
     ]
@@ -470,7 +470,11 @@ def test_an_active_skill_puts_its_declared_tools_on_the_wire(
     assert {"terminal__rename", "terminal__extract__json"} <= sent, (
         "the selected skill's own tools were withheld"
     )
-    assert "daintree__call" in sent, "the paired domain foundation's tools were withheld"
+    # `git__getProjectPulse` is declared by the foundation and by nothing in the
+    # core, so this is the only assertion here that can fail if pairing breaks.
+    # An earlier version asserted `daintree__call`, which is core — it would have
+    # passed with foundation pairing removed entirely.
+    assert "git__getProjectPulse" in sent, "the paired domain foundation's tools were withheld"
     assert "skill__step__advance" in sent, "the scaffold was withheld with a skill active"
     assert "context__snapshot" in sent
     # And the point of the exercise: something was actually dropped.

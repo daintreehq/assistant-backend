@@ -61,6 +61,7 @@ def _decide(**overrides: object) -> object:
         "selector_degraded": False,
         "projection": HEALTHY,
         "messages": [],
+        "offered_total": 3,
         "forced_tool": None,
     }
     kwargs.update(overrides)
@@ -208,10 +209,33 @@ def test_an_uncomputed_projection_fails_open() -> None:
 
 
 def test_no_offered_tools_is_not_a_failure() -> None:
-    decision = _decide(projection=_projection(set(), set()))
+    decision = _decide(projection=_projection(set(), set()), offered_total=0)
     assert decision.enforce is False
     assert decision.reason == REASON_NO_OFFERED_TOOLS
     assert decision.fail_open is False
+
+
+def test_an_empty_projection_of_a_real_inventory_is_a_failure_not_a_quiet_pass() -> None:
+    """The benign-looking shape of the worst bug.
+
+    Every other check here can be answered out of the projection's own `offered`
+    set — so a projector that wrongly returned nothing would be describing a turn
+    where nothing was offered, and "nothing to withhold" is the one outcome that
+    reads as fine. `offered_total` comes from the REQUEST, which is what makes the
+    projection's self-report checkable at all.
+    """
+    decision = _decide(projection=_projection(set(), set()), offered_total=12)
+    assert decision.enforce is False
+    assert decision.reason == REASON_INVALID_PROJECTION
+    assert decision.fail_open is True
+
+
+def test_a_projection_counting_a_different_inventory_fails_open() -> None:
+    """It judged some other request; its proposal cannot describe this one."""
+    decision = _decide(offered_total=99)
+    assert decision.enforce is False
+    assert decision.reason == REASON_INVALID_PROJECTION
+    assert decision.fail_open is True
 
 
 def test_an_empty_proposal_against_a_real_inventory_fails_open() -> None:
@@ -222,7 +246,10 @@ def test_an_empty_proposal_against_a_real_inventory_fails_open() -> None:
     means the projection is wrong about this request — and a request offering the
     model no tools is not a cheaper turn, it is a turn that cannot act.
     """
-    decision = _decide(projection=ToolProjection(proposed=frozenset(), offered=frozenset({"a"})))
+    decision = _decide(
+        projection=ToolProjection(proposed=frozenset(), offered=frozenset({"a"})),
+        offered_total=1,
+    )
     assert decision.enforce is False
     assert decision.reason == REASON_EMPTY_PROJECTION
     assert decision.fail_open is True
@@ -241,7 +268,7 @@ def test_an_empty_proposal_against_a_real_inventory_fails_open() -> None:
     ids=["proposes-unoffered", "reasons-mismatch"],
 )
 def test_an_internally_inconsistent_projection_fails_open(broken: ToolProjection) -> None:
-    decision = _decide(projection=broken)
+    decision = _decide(projection=broken, offered_total=1)
     assert decision.enforce is False
     assert decision.reason == REASON_INVALID_PROJECTION
     assert decision.fail_open is True
@@ -290,7 +317,9 @@ def test_an_unanswered_call_whose_tool_the_proposal_lost_fails_open() -> None:
         )
     ]
     decision = _decide(
-        projection=_projection({"fs__read"}, {"fs__read", "git__x"}), messages=messages
+        projection=_projection({"fs__read"}, {"fs__read", "git__x"}),
+        messages=messages,
+        offered_total=2,
     )
     assert decision.enforce is False
     assert decision.reason == REASON_UNRESOLVED_TOOL_MISSING
@@ -317,7 +346,9 @@ def test_an_answered_call_does_not_pin_its_tool() -> None:
         ChatMessage(role="tool", tool_call_id="c1", content="done"),
     ]
     decision = _decide(
-        projection=_projection({"fs__read"}, {"fs__read", "git__x"}), messages=messages
+        projection=_projection({"fs__read"}, {"fs__read", "git__x"}),
+        messages=messages,
+        offered_total=2,
     )
     assert decision.enforce is True
 
@@ -329,7 +360,7 @@ def test_a_proposal_that_removes_nothing_still_enforces() -> None:
     a fail-open and inflate the one rate a rollback triggers on.
     """
     same = _projection({"fs__read"}, {"fs__read"})
-    assert _decide(projection=same).enforce is True
+    assert _decide(projection=same, offered_total=1).enforce is True
 
 
 # ---------------------------------------------------------------------------

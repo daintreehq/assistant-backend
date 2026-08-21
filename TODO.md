@@ -293,5 +293,6 @@ left as config nobody sets; the three-mode switch stays, because the kill switch
 is the permanent part. And the **79.3 KiB → 34.9 KiB** figure in the issue needs
 replacing with what production actually reports (`tools_full_bytes` vs
 `tools_projected_bytes`, p50 over healthy assistant turns) — the deterministic
-benchmark measures 79.3 KiB → 45.8 KiB, ~42%, on one fixture with a skill loaded,
-which is a narrower scenario than the median and should not be mistaken for it.
+projection measures 79.3 KiB → 20.8 KiB skill-less (74%) and → 46.8 KiB with a
+skill and its foundation (41%). The median depends entirely on the mix of those
+two shapes in real traffic, which is the thing only production can report.

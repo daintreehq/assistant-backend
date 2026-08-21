@@ -457,6 +457,7 @@ class ChatOrchestrator:
         called: list[str],
         *,
         request_id: str,
+        profile: str = "assistant",
         enforcement: EnforcementDecision | None = None,
         projection_computed: bool = True,
         offered_total: int | None = None,
@@ -505,6 +506,10 @@ class ChatOrchestrator:
             logger.info(
                 "tool_projection_result",
                 request_id=request_id,
+                # Stamped here rather than joined from `respond`: `request_id` is
+                # caller-supplied, so it is neither guaranteed unique nor a safe
+                # join key, and this is the record `outside_proposed` lives on.
+                profile=profile,
                 called=len(names),
                 outside_proposed=outside,
                 outside_proposed_count=len(outside),
@@ -742,6 +747,7 @@ class ChatOrchestrator:
             prepared.projection,
             [c.get("function", {}).get("name", "") for c in result.tool_calls],
             request_id=request_id,
+            profile=request.profile,
             enforcement=prepared.enforcement,
             projection_computed=prepared.projection_computed,
             offered_total=len(prepared.provider_request.tools or ()),
@@ -1262,6 +1268,9 @@ class ChatOrchestrator:
                 selector_degraded=decision.degraded,
                 projection=computed,
                 messages=request.input.messages,
+                # From the REQUEST, not from the projection — the one input here
+                # the projection cannot have got wrong about itself.
+                offered_total=len(provider_request.tools or ()),
                 forced_tool=forced_tool,
             )
         except Exception:  # noqa: BLE001 — the gate itself must never break a turn
@@ -1346,8 +1355,14 @@ class ChatOrchestrator:
             # `tools_proposed` vs `tools_offered` is the size of the prize;
             # `tools_sent_*` is what was actually paid for, and the two differ on
             # every turn that measured a projection without sending it.
-            tools_offered=len(projection.offered),
-            tools_proposed=len(projection.proposed),
+            # From the REQUEST. Reading the placeholder projection reported 0 in
+            # disabled mode and after any failure — "this turn offered no tools"
+            # when it offered every one of them, on exactly the turns someone is
+            # querying to find out what went wrong.
+            tools_offered=len(full_tools or ()),
+            # None, never 0: no projection was computed, which is a different
+            # statement from one that proposed nothing.
+            tools_proposed=len(computed.proposed) if computed is not None else None,
             tools_sent=len(provider_request.tools or ()),
             tool_projection_mode=mode,
             # Sub-agents will never enforce, and in shadow mode they are decided as
@@ -2554,6 +2569,7 @@ class ChatOrchestrator:
                 projection,
                 tool_call_buffer.called_names,
                 request_id=meta.request_id,
+                profile=request.profile,
                 enforcement=enforcement,
                 projection_computed=projection_computed,
                 offered_total=len(provider_request.tools or ()),

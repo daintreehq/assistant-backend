@@ -732,15 +732,10 @@ def test_the_mandated_core_is_pinned_by_name() -> None:
                 # Speak to work already running.
                 "terminal.sendCommand",
                 "terminal.close",
-                # Read work already running. Instructed in PROSE, so the hygiene
-                # scanner cannot see them — `_PROSE_INSTRUCTED` there records why,
-                # and the CLI's own `coreToolNames` lists all four independently.
+                # Instructed in PROSE, so the hygiene scanner cannot see them —
+                # `_PROSE_INSTRUCTED` there carries the quote for each.
                 "terminal.read",
-                "terminal.extract",
-                "terminal.awaitAll",
                 "queue.digest",
-                "memory.recall",
-                "memory.list",
                 # See standing supervision.
                 "watcher.list",
                 "timer.list",

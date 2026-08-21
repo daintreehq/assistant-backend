@@ -300,10 +300,10 @@ Tool schemas are the largest region of a request (~65% of the deterministic
 fixture), and most of them are irrelevant to what a turn is doing.
 `skills/tool_projection.py` narrows them to the active skills' declared
 `requiredTools`, plus their domain foundations', plus a core, plus anything a
-pinned `tool_choice` or an unresolved tool call needs. Measured at 45.8 KiB
-against 79.3 KiB full on the benchmark fixture — and that 79.3 KiB is exactly the
-full-inventory figure issue #64 quotes, so the fixture is representative of the
-inventory even though its ~42% is short of the ~56% median the issue projected.
+pinned `tool_choice` or an unresolved tool call needs. Against the pinned 79.3 KiB inventory: 20.8 KiB on a skill-less turn (74% saved),
+46.8 KiB with a workflow skill and its foundation loaded (41%). Issue #64's ~56%
+median sits between the two — the saving is a function of how much a turn loaded,
+so a single number was always going to be a blend.
 
 **`TOOL_PROJECTION_MODE` is `disabled` | `shadow` | `enforced`, and it defaults to
 `shadow`** — every deployment measures, none enforces until somebody says so.

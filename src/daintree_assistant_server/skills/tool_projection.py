@@ -3,8 +3,10 @@
 Tool schemas are ~61% of a representative request, and most of them are
 irrelevant to what the turn is doing: a rename-terminals turn does not need the
 forge, git or recipe families. Filtering them to the active skills' declared
-needs is the single largest prompt saving available (a measured ~79.3 KiB
-inventory against a ~34.9 KiB median projection).
+needs is the single largest prompt saving available. Measured against the pinned
+CLI inventory (79.3 KiB): 20.8 KiB on a skill-less turn (74% saved) and 46.8 KiB
+with a workflow skill and its domain foundation loaded (41% saved). Issue #64's
+~56% median sits between the two, which is what a mix of both shapes looks like.
 
 **Three modes, one switch.** ``TOOL_PROJECTION_MODE`` is ``disabled`` (compute
 nothing, send everything), ``shadow`` (compute and log, send everything) or
@@ -131,24 +133,20 @@ ALWAYS_AVAILABLE: frozenset[str] = frozenset(
         # finished terminal strands the cohort it started.
         "terminal.sendCommand",
         "terminal.close",
-        # Read work already running. These are instructed in PROSE, not by name —
-        # "confirm a finish with a bounded tail read per terminal", "read output
-        # only when you need the content", "surface queue items" — so the hygiene
-        # scanner cannot see them and they have to be reasoned about by hand
-        # (`_PROSE_INSTRUCTED` in that test records the reasoning). The CLI agrees
-        # independently: all four are in its own `coreToolNames`, the set it
-        # asserts at boot precisely because the base prompt advertises them.
+        # Instructed in PROSE, so the hygiene scanner cannot see them and each has
+        # to be argued for by hand (`_PROSE_INSTRUCTED` in that test carries the
+        # quote). The bar is a SPECIFIC instruction naming the capability, not a
+        # passing mention: "confirm a finish with a bounded tail read per
+        # terminal" is one, and "read output only when you need the content" is
+        # not — under the looser reading, terminal.summarize and every watcher and
+        # async tool qualify too, and the derivation stops meaning anything.
+        #
+        # The CLI's `coreToolNames` is a tempting second source and was tried as
+        # one; it is the CLI's list, written against its own view, and four of the
+        # six tools it added here turned out to be justified by nothing in this
+        # prompt. It is a cross-check, never the authority.
         "terminal.read",
-        "terminal.extract",
-        "terminal.awaitAll",
         "queue.digest",
-        # Recall. Read-only and in the CLI's core for the same reason; `memory.save`
-        # sits below only because the base prompt names it (in a PROHIBITION on
-        # saving secrets, which presumes rather than instructs the capability) and
-        # the scanner cannot tell the two apart. One schema is not worth a scanner
-        # that has to parse intent.
-        "memory.recall",
-        "memory.list",
         # See what is already watching. Listing is read-only and the base prompt
         # names all three as the way to check standing supervision.
         "watcher.list",
@@ -389,6 +387,7 @@ def decide_enforcement(
     selector_degraded: bool,
     projection: ToolProjection | None,
     messages: list[ChatMessage],
+    offered_total: int,
     forced_tool: str | None = None,
 ) -> EnforcementDecision:
     """Decide whether this turn may send the projected inventory.
@@ -401,6 +400,14 @@ def decide_enforcement(
     DIFFERENT fact from an empty projection, and conflating them is how a bug
     that returns nothing becomes a request that offers nothing — so the caller
     passes ``None`` on failure rather than a default-constructed instance.
+
+    ``offered_total`` is how many tools the REQUEST carries, read from the request
+    rather than from the projection. Every other question here could be answered
+    out of the projection's own ``offered`` set, and that is exactly the problem:
+    a projector that wrongly returned an empty result would then be describing a
+    turn where nothing was offered, and "nothing to withhold" is the one shape
+    that reads as benign. One number from outside the projection is what makes
+    that self-report checkable.
 
     Order matters below: the cheap categorical answers (mode, profile, cohort)
     come first so a disabled deployment never pays for the checks, and the
@@ -438,10 +445,16 @@ def decide_enforcement(
         return verdict(False, REASON_SELECTOR_DEGRADED)
     if projection is None:
         return verdict(False, REASON_PROJECTION_ERROR)
-    # Nothing was offered, so there is nothing to withhold. Not a failure — a
-    # request with no tools is already as small as it gets.
     if not projection.offered:
+        # Nothing was offered, so there is nothing to withhold. Benign ONLY when
+        # the request agrees; a projection that saw no tools in a request full of
+        # them is describing some other turn, and letting that pass as "nothing to
+        # do here" would hide the failure behind its most reassuring outcome.
+        if offered_total:
+            return verdict(False, REASON_INVALID_PROJECTION)
         return verdict(False, REASON_NO_OFFERED_TOOLS)
+    if len(projection.offered) != offered_total:
+        return verdict(False, REASON_INVALID_PROJECTION)
     # Tools WERE offered and the projection kept none of them. The core alone
     # guarantees a non-empty proposal whenever the inventory contains any of it,
     # so this means either an inventory sharing no name with the catalog or a

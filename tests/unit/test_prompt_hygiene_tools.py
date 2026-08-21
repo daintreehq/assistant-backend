@@ -150,21 +150,28 @@ def test_every_tool_the_base_prompt_instructs_survives_projection() -> None:
 # `coreToolNames` (internal/agent/session.go), the set it asserts at boot BECAUSE
 # the base prompt advertises them as always available. Two sources, one list.
 _PROSE_INSTRUCTED: dict[str, str] = {
-    # "Confirm a finish with a bounded tail read per terminal" (20-tool-discipline),
-    # and "read output only when you need the content" on an async wake.
-    "terminal.read": "20-tool-discipline: bounded tail read per terminal",
-    "terminal.extract": "20-tool-discipline: reading output that is too large to inline",
-    "terminal.awaitAll": "20-tool-discipline: waiting on a spawned cohort in-turn",
-    # "Keep the main conversation clean: ... surface queue items". `queue.resolve`
-    # is named, but resolving presupposes reading, and reading is prose-only.
-    "queue.digest": "20-tool-discipline: surface queue items",
-    # The recall half of memory. `memory.save` is named — inside a PROHIBITION on
-    # saving secrets, which presumes the capability rather than instructing it —
-    # and the scanner cannot tell an instruction from a ban, so it stays in the
-    # core on the safe side of one schema.
-    "memory.recall": "00-persona/20-tool-discipline: recalling prior context",
-    "memory.list": "00-persona/20-tool-discipline: recalling prior context",
+    # 20-tool-discipline: "Confirm a finish with a bounded tail read per terminal,
+    # or a watcher's confirmed completion". A specific act, named as the way to
+    # establish a specific fact — and there is no backticked name to match.
+    "terminal.read": "20-tool-discipline: 'a bounded tail read per terminal'",
+    # 20-tool-discipline: "Keep the main conversation clean: ... surface queue
+    # items", alongside the backticked `queue.resolve`. Resolving presupposes
+    # reading, and 30-skills lists what the injected context carries — the queue
+    # is not on it, so reading it is a call.
+    "queue.digest": "20-tool-discipline: 'surface queue items'",
 }
+
+# Four more were here and came out. `terminal.extract` rested on "read output only
+# when you need the content"; `terminal.awaitAll` on nothing in this prompt at
+# all; `memory.recall`/`memory.list` on the assumption that memory is searched,
+# when 30-skills says "pinned and recalled memories" ARRIVE in the injected
+# context and to "read the answer straight out of whatever is present".
+#
+# They were added from the CLI's `coreToolNames`, which is a fine cross-check and
+# a bad authority — it is written against the CLI's own view. Under the reading
+# that admitted `terminal.extract`, `terminal.summarize` and every watcher and
+# async tool qualify too, and "derived from the prompt" stops constraining
+# anything. The bar is a specific instruction naming the capability.
 
 
 def test_the_prose_instructed_tools_are_in_the_core() -> None:
