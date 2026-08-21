@@ -21,6 +21,11 @@ async def capabilities(
 ) -> dict[str, object]:
     container = request.app.state.container
     settings = request.app.state.settings
+    # Bound ONCE, not read twice. `Container.catalog` reads live through
+    # `CatalogManager`, which supports atomic replacement — so two property
+    # reads could pair one generation's revision with another's entries, and
+    # the whole point of the pair is that the revision keys the list.
+    catalog = container.catalog
     return {
         "server_version": __version__,
         "protocol": {"min": PROTOCOL_MIN, "max": PROTOCOL_MAX},
@@ -86,8 +91,27 @@ async def capabilities(
             },
         },
         "skills": {
-            "catalog_revision": container.catalog.revision,
+            "catalog_revision": catalog.revision,
             "manual_resolve": True,
+            # Every skill the catalog holds, as the minimal {id, title} reference.
+            # A client naming a skill — a CLI flag, a manual `resolve` load — can
+            # now check the id before it spends a turn, and suggest near misses on
+            # a typo instead of running a turn that looks fine and silently loaded
+            # nothing. Keyed by `catalog_revision` above: same snapshot, so a
+            # cached list is valid exactly as long as the revision it arrived with.
+            #
+            # Minimal on purpose. `/v1/daintree/skills` already serves the full
+            # metadata (summary, when_to_use, risk, required_tools) with an ETag;
+            # repeating ~53KB of it here would make every capabilities call pay for
+            # what validation does not read. Ordering is deterministic for free —
+            # `Catalog.skills` is sorted by id at construction.
+            #
+            # The CANONICAL catalog, not a menu: capabilities carries neither a
+            # profile nor a tool inventory, so it cannot honestly narrow to what a
+            # sub-agent could execute. Server-pinned skills are included because
+            # manual `load` accepts them (`filter_known`, not `selectable_ids`) —
+            # a listing that hid them would lie about what the client may name.
+            "catalog": [skill.ref() for skill in catalog.skills],
         },
         # Daintree usage questions are answered HERE now: the server classifies
         # them on the selector call it already makes, searches the public docs

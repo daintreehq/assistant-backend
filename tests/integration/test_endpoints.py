@@ -76,8 +76,9 @@ def test_version(client) -> None:
     assert r.json()["protocol"] == {"min": 2, "max": 2}
 
 
-def test_capabilities(client, auth) -> None:
+def test_capabilities(client, auth, app) -> None:
     r = client.get("/v1/daintree/capabilities", headers=auth)
+    assert r.status_code == 200
     body = r.json()
     assert body["respond"]["system_messages_accepted"] is False
     # The CLI's ONLY signal that `runtime.display` is safe to send. `runtime` is
@@ -100,6 +101,15 @@ def test_capabilities(client, auth) -> None:
     # tests/unit/test_task_runner.py.
     assert set(body["tasks"]) == EXPECTED_TASK_IDS
     assert body["skills"]["manual_resolve"] is True
+    # The id/title listing a client validates a skill name against before spending a
+    # turn on it. Asserted as one exact equality rather than a count: that pins
+    # cardinality, the full-catalog scope (pinned skills included), the exact key set
+    # (no body, no metadata leaking in), the titles and the id ordering at once, and
+    # stays correct as the catalog grows. `catalog_revision` must come from the same
+    # snapshot — it is what the list is keyed on.
+    catalog = app.state.container.catalog
+    assert body["skills"]["catalog_revision"] == catalog.revision
+    assert body["skills"]["catalog"] == [{"id": s.id, "title": s.title} for s in catalog.skills]
     wf = body["workflow_intelligence"]
     assert wf["turn_context_field"] == "workflow_state"
     assert wf["tasks"] == ["workflow_plan", "workflow_reconcile", "workflow_resume_digest"]
