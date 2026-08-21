@@ -1,10 +1,12 @@
 """The immutable skill catalog.
 
-Built once at startup from the packaged skill files. Computes a deterministic
-catalog revision used for prompt-cache identity and skill-state validation. A
-``Catalog`` instance is immutable; where the catalog can change at runtime (the
-local skill-learning harness), a :class:`CatalogManager` holds the current
-instance and swaps in a freshly-loaded one — never mutating in place.
+Built at startup from the packaged skill files, plus a local overlay directory
+when one is configured. Computes a deterministic catalog revision used for
+prompt-cache identity and skill-state validation. A ``Catalog`` instance is
+immutable; the catalog changes at runtime only by REPLACEMENT — a
+:class:`CatalogManager` holds the current instance and swaps in a freshly-loaded
+one, never mutating in place. Today the one thing that asks for a swap is the
+local skill-overlay reload endpoint.
 """
 
 from __future__ import annotations
@@ -257,15 +259,22 @@ def load_catalog(
 ) -> Catalog:
     """Load and validate the catalog from disk.
 
-    ``primary_dir`` is the packaged skills directory. ``overlay_dir`` (used only by
-    the local skill-learning harness when it writes to a separate directory) is a
-    second directory whose skills are merged on top: an overlay skill with the same
-    id REPLACES the packaged one, and a new id is added. When ``overlay_dir`` is the
-    packaged directory itself, or absent/missing, only the primary set is loaded.
+    ``primary_dir`` is the packaged skills directory. ``overlay_dir`` (local
+    development only, from ``DAINTREE_SKILLS_OVERLAY_DIR``) is a scratch directory
+    whose skills are merged on top: an overlay skill with the same id REPLACES the
+    packaged one, and a new id is added. When ``overlay_dir`` is the packaged
+    directory itself, or absent/missing, only the primary set is loaded — a
+    developer who has not created the directory yet gets the packaged catalog
+    rather than a startup failure.
     """
     primary = load_skills_dir(primary_dir or default_skills_dir())
-    if overlay_dir is None or not overlay_dir.is_dir():
+    if overlay_dir is None or not overlay_dir.exists():
         return Catalog(primary)
+    # An overlay path that exists but is not a directory is a typo, and the one
+    # thing worse than failing on it is succeeding: the developer edits skills
+    # into a path nothing reads, reloads, and is told nothing changed.
+    if not overlay_dir.is_dir():
+        raise SkillLoadError(f"skill overlay path is not a directory: {overlay_dir}")
     if primary_dir is not None and overlay_dir.resolve() == primary_dir.resolve():
         return Catalog(primary)
     merged: dict[str, Skill] = {s.id: s for s in primary}
@@ -280,8 +289,9 @@ class CatalogManager:
     The catalog itself stays immutable; a reload builds a brand-new instance and
     rebinds the reference (an atomic assignment in CPython), so concurrent readers
     always observe a fully-valid catalog — either the old one or the new one, never
-    a half-built mix. Writers (the skill-learning harness) are expected to
-    serialize their own write+reload critical section.
+    a half-built mix. That ordering is also what makes a reload fail SAFE: the
+    whole new catalog is loaded and validated before the assignment, so a malformed
+    overlay skill leaves the previous catalog serving untouched.
     """
 
     def __init__(
@@ -294,6 +304,7 @@ class CatalogManager:
         self._catalog = catalog
         self._primary_dir = primary_dir
         self._overlay_dir = overlay_dir
+        self._reload_lock = asyncio.Lock()
 
     @property
     def catalog(self) -> Catalog:
@@ -307,13 +318,30 @@ class CatalogManager:
     def overlay_dir(self) -> Path | None:
         return self._overlay_dir
 
-    def reload_sync(self) -> Catalog:
+    def reload_sync(self) -> tuple[str, Catalog]:
+        previous = self._catalog.revision
         self._catalog = load_catalog(self._primary_dir, self._overlay_dir)
-        return self._catalog
+        return previous, self._catalog
 
-    async def reload(self) -> Catalog:
-        """Reload off the event loop (skill files are read with blocking IO)."""
-        new = await asyncio.to_thread(load_catalog, self._primary_dir, self._overlay_dir)
-        self._catalog = new
-        return new
+    async def reload(self) -> tuple[str, Catalog]:
+        """Reload off the event loop; returns (revision replaced, new catalog).
+
+        Serialized on the manager's own lock, and reporting what it replaced
+        rather than leaving the caller to read that before calling. Both exist
+        for the same reason: two concurrent reloads each complete their load
+        before rebinding, so neither can expose a half-built catalog, but they
+        can still FINISH out of order and leave the OLDER one bound — while the
+        loser cheerfully reports the revision it thought it was replacing. To an
+        author that is an edit which silently reverted. Holding the lock across
+        the read AND the swap is what makes the reported pair true.
+
+        The lock is deliberately inside this method rather than something a
+        caller is trusted to take: a serialization rule that has to be
+        remembered at every call site is one that eventually is not.
+        """
+        async with self._reload_lock:
+            previous = self._catalog.revision
+            new = await asyncio.to_thread(load_catalog, self._primary_dir, self._overlay_dir)
+            self._catalog = new
+            return previous, new
 

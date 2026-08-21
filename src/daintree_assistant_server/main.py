@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -324,13 +325,15 @@ def build_container(
     prompt_loader = PromptLoader()
     prompt_loader.validate()
 
-    # The packaged skills are the whole catalog. The overlay slot that
-    # `load_catalog`/`CatalogManager` still accept was for the skill-learning
-    # harness, which wrote generated skills to a separate directory; nothing
-    # populates it now, and the catalog is authored by hand.
+    # The packaged skills are the catalog. `DAINTREE_SKILLS_OVERLAY_DIR` (local
+    # development only, refused in production by `local_only_problems`) merges a
+    # scratch directory on top, so a skill can be authored against a running
+    # server and picked up by POST /v1/daintree/skills/reload without a restart.
+    # The path is fixed here for the process; only its contents are re-read.
     primary_dir = default_skills_dir()
-    catalog = load_catalog(primary_dir)
-    catalog_manager = CatalogManager(catalog, primary_dir=primary_dir)
+    overlay_dir = Path(settings.skills_overlay_dir) if settings.skills_overlay_dir else None
+    catalog = load_catalog(primary_dir, overlay_dir)
+    catalog_manager = CatalogManager(catalog, primary_dir=primary_dir, overlay_dir=overlay_dir)
 
     state_codec = _build_state_codec(settings)
     # The selector is built BEFORE the provider: loading it can raise, and
@@ -485,6 +488,14 @@ def create_app(
     # patient cannot diagnose the outage a tester is calling about.
     app.include_router(daintree_doctor.router)
     app.include_router(daintree_skills.router)
+    # The overlay reload trigger is mounted ONLY for local skill authoring. It
+    # mutates process state and `require_auth` gates nothing yet, so rather than
+    # ship a route production has to be trusted not to call, production simply
+    # does not have it — with no overlay configured, or in a hardened
+    # environment, the URL 404s. (A hardened deploy that sets the variable at
+    # all also fails readiness; this is the second lock on the same door.)
+    if settings.skills_overlay_dir and not settings.is_hardened:
+        app.include_router(daintree_skills.reload_router)
     app.include_router(daintree_tasks.router)
 
     return app

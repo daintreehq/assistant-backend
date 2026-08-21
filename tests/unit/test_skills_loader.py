@@ -120,3 +120,33 @@ def test_load_skill_file_uses_filename_as_id(tmp_path) -> None:
     path.write_text(VALID, encoding="utf-8")
     skill = load_skill_file(path)
     assert skill.id == "test.example"
+
+
+def test_a_yaml_scalar_that_pyyaml_cannot_construct_is_a_skill_error() -> None:
+    """PyYAML does not route every failure through ``yaml.YAMLError``.
+
+    An unquoted impossible date is constructed, not parsed, so it surfaces as a
+    bare ``ValueError``. Left uncaught it escapes this module entirely and an
+    ordinary typo reads as a server fault rather than "your frontmatter is
+    wrong" — which is the whole promise of loading strictly.
+    """
+    text = VALID.replace("title: Example", "title: 2025-02-29")
+    with pytest.raises(SkillLoadError, match="invalid YAML frontmatter"):
+        parse_skill(text)
+
+
+def test_a_recursion_error_from_the_parser_is_a_skill_error(monkeypatch) -> None:
+    """The other way PyYAML escapes its own error type.
+
+    Deeply nested frontmatter exhausts the parser's recursion before it can
+    raise anything of its own, and a RecursionError reaching the reload endpoint
+    is a 500 for what is still just a bad file. Forced rather than nested by
+    hand: the depth that actually trips CPython is a moving target, and a test
+    that only fails on some builds is not a test.
+    """
+    def boom(_text: str) -> object:
+        raise RecursionError("maximum recursion depth exceeded")
+
+    monkeypatch.setattr("daintree_assistant_server.skills.loader.yaml.safe_load", boom)
+    with pytest.raises(SkillLoadError, match="invalid YAML frontmatter"):
+        parse_skill(VALID)

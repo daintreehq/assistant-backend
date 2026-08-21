@@ -56,7 +56,12 @@ def parse_skill(text: str, *, expected_id: str | None = None) -> Skill:
 
     try:
         data = yaml.safe_load(yaml_text)
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, ValueError, RecursionError) as exc:
+        # NOT just YAMLError: PyYAML raises straight out of its constructors for
+        # some inputs — `title: 2025-02-29` is a bare ValueError, deep nesting a
+        # RecursionError. Either one escaping means an ordinary authoring typo
+        # reads as a server fault instead of "your frontmatter is wrong", which
+        # is exactly the promise this module's strictness is supposed to make.
         raise SkillLoadError(f"invalid YAML frontmatter: {exc}") from exc
     if not isinstance(data, dict):
         raise SkillLoadError("frontmatter must be a YAML mapping")

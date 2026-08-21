@@ -9,10 +9,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..auth import Principal, require_auth
-from ..errors import invalid_request
+from ..errors import DaintreeError, invalid_request
+from ..observability import get_logger
+from ..skills.loader import SkillLoadError
 from .deps import check_protocol_header, check_protocol_value, request_id, require_ready
 
 router = APIRouter()
+logger = get_logger("daintree.skills")
 
 
 @router.get("/v1/daintree/skills")
@@ -79,3 +82,63 @@ async def resolve_skills(
         request_id=request_id(request),
     )
     return JSONResponse(content=result)
+
+
+# Kept on its own router because mounting is the security boundary: `create_app`
+# includes this one only when a skill-overlay directory is configured and the
+# environment is not hardened, so production never exposes it. A runtime guard
+# inside a route production still serves would be a weaker version of the same
+# idea — and `require_auth` cannot carry it, since it gates nothing yet.
+reload_router = APIRouter()
+
+
+@reload_router.post("/v1/daintree/skills/reload")
+async def reload_skills(
+    request: Request,
+    _principal: Principal = Depends(require_auth),
+    _ready: None = Depends(require_ready),
+) -> JSONResponse:
+    """Rebuild the catalog from disk so an overlay edit takes effect live.
+
+    Fail-safe by construction: ``CatalogManager.reload`` loads and validates the
+    whole new catalog before it rebinds, so a skill saved half-written leaves the
+    previous catalog serving and the server ready. The author fixes the file and
+    calls again — a malformed skill costs a 409, not a restart.
+
+    Nothing else has to be told. Every consumer reads the catalog through the
+    manager, and the local selector re-embeds only what changed on its next
+    selection, keyed off the revision.
+    """
+    manager = request.app.state.container.catalog_manager
+    try:
+        previous, catalog = await manager.reload()
+    except (SkillLoadError, OSError) as exc:
+        # The catalog that is still bound, which the load never got far enough
+        # to replace — so this names what the caller is still being served.
+        logger.warning(
+            "skill_reload_failed", error=str(exc), catalog_revision=manager.catalog.revision
+        )
+        raise DaintreeError(
+            status_code=409,
+            message=f"Skill catalog reload failed; the previous catalog is still active: {exc}",
+            type="api_error",
+            code="skill_catalog_reload_failed",
+        ) from exc
+
+    changed = catalog.revision != previous
+    logger.info(
+        "skill_catalog_reloaded",
+        previous_catalog_revision=previous,
+        catalog_revision=catalog.revision,
+        changed=changed,
+        skills=len(catalog),
+    )
+    return JSONResponse(
+        content={
+            "object": "skill_catalog_reload",
+            "previous_catalog_revision": previous,
+            "catalog_revision": catalog.revision,
+            "changed": changed,
+            "skills": len(catalog),
+        }
+    )
