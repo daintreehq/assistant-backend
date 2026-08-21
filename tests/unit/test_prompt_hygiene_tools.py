@@ -16,6 +16,16 @@ When this fails, the fix is usually to add the tool to `ALWAYS_AVAILABLE`. The
 other fix is to stop instructing it in the always-present prompt and let a skill
 own it instead — but that is a prompt decision, not a projection one, and it has
 to be made deliberately rather than discovered as a withheld call in production.
+
+**The scanner does only half the job, and the half it cannot do is written down
+rather than left implicit.** It reads names; the prompt also instructs
+capabilities in prose ("confirm a finish with a bounded tail read per terminal"
+names no tool at all), and it names `memory.save` inside a PROHIBITION, which
+reads identically to an instruction. So `_PROSE_INSTRUCTED` below records the
+prose cases by hand with their justification, and a third test bounds the core
+from the other side — nothing may sit in it that none of the three sources
+explains. Between them the set is pinned in both directions without pretending a
+regex understood the prompt.
 """
 
 from __future__ import annotations
@@ -23,6 +33,8 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+
+import pytest
 
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.skills.catalog import load_catalog
@@ -56,13 +68,67 @@ def _tools_named_in(text: str) -> set[str]:
     return {wire_name(match) for match in _BACKTICKED.findall(text) if wire_name(match) in registry}
 
 
-def test_the_base_prompt_names_tools_the_scanner_can_see() -> None:
-    """Guard the guard: a scanner that matched nothing would pass everything."""
+# Every registry tool the base prompt currently names, reviewed by hand. Pinned as
+# a SET rather than a count: a floor lets today's references disappear one by one
+# without a word, and this list's whole job is to notice when the prompt and the
+# core stop agreeing about what a turn can do.
+_NAMED_IN_BASE_PROMPT: frozenset[str] = frozenset(
+    {
+        "agentTask__spawnForEdits",
+        "artifact__read",
+        "context__snapshot",
+        "daintree__call",
+        "fs__list",
+        "fs__read",
+        "fs__search",
+        "memory__save",
+        "queue__resolve",
+        "subagent__run",
+        "terminal__close",
+        "terminal__sendCommand",
+        "timer__list",
+        "user__askMultipleChoice",
+        "watcher__list",
+        "worktree__list",
+    }
+)
+
+
+def test_the_scanner_still_sees_what_the_prompt_says() -> None:
+    """Guard the guard, in both directions.
+
+    A scanner that quietly stopped matching would make every assertion in this
+    file pass over an empty set, and the feature it guards silently withholds
+    tools — so "found nothing" must never read as "found no problem". Pinning the
+    exact set also catches the opposite drift: a NEW tool named in the permanent
+    prompt shows up here as a diff to review rather than as a core entry someone
+    added without anyone asking why.
+    """
     named = _tools_named_in(PromptLoader().base_prompt())
-    assert len(named) >= 10, (
-        "the base prompt names fewer real tools than expected — the scanner has "
-        f"probably stopped matching (found {sorted(named)})"
+    assert named == _NAMED_IN_BASE_PROMPT, (
+        "the tools the base prompt names have changed.\n"
+        f"  newly named: {sorted(named - _NAMED_IN_BASE_PROMPT)}\n"
+        f"  no longer named: {sorted(_NAMED_IN_BASE_PROMPT - named)}\n"
+        "Review whether ALWAYS_AVAILABLE should follow, then update this set."
     )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "call `fs.read` to read it",
+        "- `terminal.sendCommand` is always there",
+        "use `fs.read`, then `fs.list`",
+    ],
+)
+def test_the_scanner_matches_the_shapes_the_prompt_actually_uses(text: str) -> None:
+    """The regex, tested directly rather than only through the prompt.
+
+    Every assertion above depends on this matching; none of them would fail
+    informatively if it stopped. A shape the prompt uses today and the scanner
+    misses is a false all-clear, and this is where that gets caught.
+    """
+    assert _tools_named_in(text), f"scanner missed a tool in: {text!r}"
 
 
 def test_every_tool_the_base_prompt_instructs_survives_projection() -> None:
@@ -72,6 +138,73 @@ def test_every_tool_the_base_prompt_instructs_survives_projection() -> None:
         "the always-present base prompt instructs these tools, but the projection "
         f"would withhold them on a turn no skill covers: {missing}. Add them to "
         "ALWAYS_AVAILABLE, or stop naming them in the permanent prompt."
+    )
+
+
+# Tools the base prompt instructs in PROSE, with no registry name to match. The
+# scanner is blind to every one of these, so they are recorded here by hand — the
+# alternative is a check that silently covers less of the prompt than it appears
+# to, which is worse than no check because it stops the next reader looking.
+#
+# The CLI reaches the same conclusion independently: all of these are in its own
+# `coreToolNames` (internal/agent/session.go), the set it asserts at boot BECAUSE
+# the base prompt advertises them as always available. Two sources, one list.
+_PROSE_INSTRUCTED: dict[str, str] = {
+    # "Confirm a finish with a bounded tail read per terminal" (20-tool-discipline),
+    # and "read output only when you need the content" on an async wake.
+    "terminal.read": "20-tool-discipline: bounded tail read per terminal",
+    "terminal.extract": "20-tool-discipline: reading output that is too large to inline",
+    "terminal.awaitAll": "20-tool-discipline: waiting on a spawned cohort in-turn",
+    # "Keep the main conversation clean: ... surface queue items". `queue.resolve`
+    # is named, but resolving presupposes reading, and reading is prose-only.
+    "queue.digest": "20-tool-discipline: surface queue items",
+    # The recall half of memory. `memory.save` is named — inside a PROHIBITION on
+    # saving secrets, which presumes the capability rather than instructing it —
+    # and the scanner cannot tell an instruction from a ban, so it stays in the
+    # core on the safe side of one schema.
+    "memory.recall": "00-persona/20-tool-discipline: recalling prior context",
+    "memory.list": "00-persona/20-tool-discipline: recalling prior context",
+}
+
+
+def test_the_prose_instructed_tools_are_in_the_core() -> None:
+    """The half of the derivation no regex can do.
+
+    Deleting an entry from `ALWAYS_AVAILABLE` that the prompt only describes would
+    otherwise be invisible: the scanner finds no name, so the test above stays
+    green while an enforced skill-less turn loses the ability to confirm that a
+    terminal finished.
+    """
+    core = {wire_name(name) for name in ALWAYS_AVAILABLE}
+    registry = _registry_names()
+    for dotted, why in _PROSE_INSTRUCTED.items():
+        assert wire_name(dotted) in registry, f"{dotted} is not a real CLI tool"
+        assert wire_name(dotted) in core, f"{dotted} dropped from the core — {why}"
+
+
+def test_the_core_holds_nothing_the_prompt_does_not_reach() -> None:
+    """Every core entry is a permanent per-request cost, so each needs a reason.
+
+    Equality against the scanner is deliberately NOT the assertion — the core is
+    legitimately wider than what a regex over the base prompt can see, in exactly
+    two ways, and both are enumerated here so a future addition cannot hide among
+    them. Anything outside all three sources is dead weight: bytes on every request
+    with no instruction behind them.
+    """
+    named = _tools_named_in(PromptLoader().base_prompt())
+    prose = {wire_name(n) for n in _PROSE_INSTRUCTED}
+    # The discovery escape hatch. These predate enforcement and are not instructed
+    # anywhere in `base/` — they exist so a turn can find and reach a capability it
+    # was not projected, which is the one thing withholding must never make
+    # unrecoverable.
+    escape_hatch = {
+        wire_name(n)
+        for n in ("tool.search", "daintree.listTools", "daintree.call", "daintree.status")
+    }
+    unexplained = sorted({wire_name(n) for n in ALWAYS_AVAILABLE} - named - prose - escape_hatch)
+    assert not unexplained, (
+        "these core tools are not named in the base prompt, not recorded in "
+        f"_PROSE_INSTRUCTED, and not part of the escape hatch: {unexplained}"
     )
 
 

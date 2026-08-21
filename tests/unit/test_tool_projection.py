@@ -1,14 +1,20 @@
-"""Skill-aware tool projection — shadow mode.
+"""Skill-aware tool projection — what a turn WOULD send.
 
 Tool schemas are ~61% of a request, and filtering them to the active skills'
-declared needs is the largest prompt saving available. It is not enabled, and
-these tests are mostly about *why not*.
+declared needs is the largest prompt saving available. These tests cover the
+projector: which tools survive, and why each one did.
 
-The projection is computed every turn and applied to nothing. What decides
-whether it can be applied is `outside_proposed` in the shadow log: how often the
-model calls a tool the projection would have withheld. Until that is durably
-empty in real usage, filtering would break turns in a way that reads as model
-failure rather than configuration.
+Whether the result is ever APPLIED is a separate question with its own suite
+(`test_tool_projection_enforcement.py` for the gate,
+`tests/integration/test_tool_projection_enforced.py` for the wiring). Nothing
+here depends on the mode — the projection is computed identically in `shadow` and
+`enforced`, and that is deliberate: the evidence that authorizes enforcement has
+to come from the same computation enforcement will use.
+
+What decides whether a stage may be promoted is `outside_proposed` in the result
+log: how often the model calls a tool the projection would have withheld. Read it
+from SHADOW traffic — an enforced turn cannot call a tool it was never offered,
+so enforced evidence grades itself clean by construction.
 
 `test_declared_tools_cover_what_skill_bodies_actually_use` is the offline half of
 that measurement. Read what it proves narrowly: it finds backticked registry
@@ -351,8 +357,7 @@ _REVIEWED_UNDECLARED = {
     # about the runbook's dependencies — `requiredTools` says what a skill NEEDS,
     # and this one needs the tool not to be used. (It would not actually withhold
     # anything: the foundation declares `daintree.call` and is projected alongside
-    # every specific, and projection is shadow-only regardless. The reason is
-    # metadata truth, not enforcement.)
+    # every specific. The reason is metadata truth, not enforcement.)
     ("daintree.worktree.create-plain-worktree", "daintree.call"),
     # PROHIBITION. `terminal.moveToWorktree` gained a typed wrapper, so its step 6
     # names `daintree.call` only to forbid routing the move through it — the raw
@@ -456,7 +461,7 @@ def test_the_core_set_is_bounded_and_real(catalog) -> None:  # type: ignore[no-u
     from test_skill_catalog_hygiene import _known_tool_names, _wire_name
 
     known = _known_tool_names()
-    assert len(ALWAYS_AVAILABLE) <= 24, "the always-on core is growing; each entry is permanent"
+    assert len(ALWAYS_AVAILABLE) <= 30, "the always-on core is growing; each entry is permanent"
     unknown = sorted(n for n in ALWAYS_AVAILABLE if _wire_name(n) not in known)
     assert not unknown, f"core tools missing from the CLI registry: {unknown}"
 
@@ -727,6 +732,15 @@ def test_the_mandated_core_is_pinned_by_name() -> None:
                 # Speak to work already running.
                 "terminal.sendCommand",
                 "terminal.close",
+                # Read work already running. Instructed in PROSE, so the hygiene
+                # scanner cannot see them — `_PROSE_INSTRUCTED` there records why,
+                # and the CLI's own `coreToolNames` lists all four independently.
+                "terminal.read",
+                "terminal.extract",
+                "terminal.awaitAll",
+                "queue.digest",
+                "memory.recall",
+                "memory.list",
                 # See standing supervision.
                 "watcher.list",
                 "timer.list",
@@ -745,6 +759,12 @@ def test_the_scaffold_is_admitted_only_with_a_skill_active(catalog) -> None:  # 
     No skill declares either — they belong to `loaded_skills.md.j2` — so nothing
     that reads `requiredTools` could admit them, and a skill-less turn never sees
     the paragraph that names them.
+
+    The WITHHOLDING half is the load-bearing assertion, and it is the one that
+    nearly did not work: the unclassified pass-through admits anything the catalog
+    has no opinion about, and it has no opinion about these two either. So they
+    are classified explicitly, and without that this test would have asserted an
+    activation rule that changed nothing on the wire.
     """
     offered = _tools(*SKILL_SCAFFOLD_TOOLS, "terminal.rename")
     skill = catalog.get("daintree.terminals.rename")
@@ -754,18 +774,12 @@ def test_the_scaffold_is_admitted_only_with_a_skill_active(catalog) -> None:  # 
         offered=offered, active_skills=[skill], catalog=catalog, messages=_user()
     )
     assert {wire_name(n) for n in SKILL_SCAFFOLD_TOOLS} <= with_skill.proposed
-    assert all(
-        with_skill.reasons[wire_name(n)] == "skill_scaffold" for n in SKILL_SCAFFOLD_TOOLS
-    )
+    assert all(with_skill.reasons[wire_name(n)] == "skill_scaffold" for n in SKILL_SCAFFOLD_TOOLS)
 
-    without = project_tools(
-        offered=offered, active_skills=[], catalog=catalog, messages=_user()
-    )
-    # Still proposed — but as UNCLASSIFIED, because no skill declares them. The
-    # reason is the assertion: it says the scaffold rule did not fire, which is
-    # what a skill-less turn should look like.
-    assert all(
-        without.reasons[wire_name(n)] == "unclassified" for n in SKILL_SCAFFOLD_TOOLS
+    without = project_tools(offered=offered, active_skills=[], catalog=catalog, messages=_user())
+    assert {wire_name(n) for n in SKILL_SCAFFOLD_TOOLS} <= without.withheld, (
+        "a skill-less turn renders no scaffold paragraph, so it must not pay for "
+        "the schemas either — and `unclassified` must not smuggle them back in"
     )
 
 

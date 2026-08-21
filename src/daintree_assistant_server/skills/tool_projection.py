@@ -131,6 +131,24 @@ ALWAYS_AVAILABLE: frozenset[str] = frozenset(
         # finished terminal strands the cohort it started.
         "terminal.sendCommand",
         "terminal.close",
+        # Read work already running. These are instructed in PROSE, not by name —
+        # "confirm a finish with a bounded tail read per terminal", "read output
+        # only when you need the content", "surface queue items" — so the hygiene
+        # scanner cannot see them and they have to be reasoned about by hand
+        # (`_PROSE_INSTRUCTED` in that test records the reasoning). The CLI agrees
+        # independently: all four are in its own `coreToolNames`, the set it
+        # asserts at boot precisely because the base prompt advertises them.
+        "terminal.read",
+        "terminal.extract",
+        "terminal.awaitAll",
+        "queue.digest",
+        # Recall. Read-only and in the CLI's core for the same reason; `memory.save`
+        # sits below only because the base prompt names it (in a PROHIBITION on
+        # saving secrets, which presumes rather than instructs the capability) and
+        # the scanner cannot tell the two apart. One schema is not worth a scanner
+        # that has to parse intent.
+        "memory.recall",
+        "memory.list",
         # See what is already watching. Listing is read-only and the base prompt
         # names all three as the way to check standing supervision.
         "watcher.list",
@@ -251,9 +269,14 @@ def project_tools(
     # otherwise be withheld by silence and stay withheld until someone noticed.
     # Filtering has to be safe by default when the metadata is incomplete, which
     # is exactly the state it is always in.
-    declared = catalog.declared_tools
+    # The scaffold counts as CLASSIFIED even when it did not fire: the catalog has
+    # a definite opinion about those two (they belong to the loaded-skills block),
+    # so a skill-less turn must WITHHOLD them rather than re-admit them here as
+    # things nobody has heard of — which would make the activation rule above
+    # decorative.
+    classified = catalog.declared_tools | {wire_name(n) for n in SKILL_SCAFFOLD_TOOLS}
     for name in offered_names:
-        if name not in declared and name not in reasons:
+        if name not in classified and name not in reasons:
             reasons[name] = "unclassified"
 
     return ToolProjection(proposed=frozenset(reasons), offered=offered_names, reasons=reasons)

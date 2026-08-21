@@ -337,6 +337,14 @@ class _PreparedTurn:
     enforcement: EnforcementDecision = field(
         default_factory=lambda: EnforcementDecision(enforce=False, reason=REASON_DISABLED)
     )
+    # Whether `projection` is a real answer or the empty placeholder standing in
+    # for one that could not be built. Grading MUST know the difference: an empty
+    # projection withholds nothing, so a round graded against it reports
+    # `outside_proposed=[]` — a clean bill of health produced by the failure
+    # itself. That is the exact false all-clear `measured` exists to prevent, and
+    # it is worse than no evidence because this number's only job is to authorize
+    # withholding tools.
+    projection_computed: bool = False
     # Wall-clock marks for the phases preparation owns. Continues to be filled in
     # by the response paths, which is why it is mutable and travels with the turn.
     timings: _Timings = field(default_factory=_Timings)
@@ -450,6 +458,8 @@ class ChatOrchestrator:
         *,
         request_id: str,
         enforcement: EnforcementDecision | None = None,
+        projection_computed: bool = True,
+        offered_total: int | None = None,
         names_complete: bool = True,
     ) -> None:
         """Log whether the projection would have broken — or did break — this turn.
@@ -486,14 +496,23 @@ class ChatOrchestrator:
             if not names and names_complete:
                 return
             outside = projection.outside(names)
+            # A projection that could not be BUILT withholds nothing, so grading
+            # against it manufactures a clean zero out of the failure. Fold that
+            # into `measured` alongside an unreadable call buffer: both mean "this
+            # round establishes nothing", and both must be excluded from the
+            # evidence that authorizes enforcement.
+            measured = names_complete and projection_computed
             logger.info(
                 "tool_projection_result",
                 request_id=request_id,
                 called=len(names),
                 outside_proposed=outside,
                 outside_proposed_count=len(outside),
-                proposed=len(projection.proposed),
-                offered=len(projection.offered),
+                proposed=len(projection.proposed) if projection_computed else None,
+                # The count the request actually carried, which a failed projection
+                # does not know — reporting its empty `offered` as 0 would say the
+                # turn offered no tools when it offered every one of them.
+                offered=(offered_total if offered_total is not None else len(projection.offered)),
                 # Whether these calls were made against the projected inventory or
                 # the full one. Without it the two populations are one column of
                 # numbers that cannot be told apart.
@@ -502,7 +521,7 @@ class ChatOrchestrator:
                 # Explicit on every record, so a query for "rounds with nothing
                 # outside the projection" cannot silently include rounds where
                 # that was never established.
-                measured=names_complete,
+                measured=measured,
             )
         except Exception:  # noqa: BLE001 — measurement must never break a turn
             logger.warning("tool_projection_result_failed", request_id=request_id)
@@ -724,6 +743,8 @@ class ChatOrchestrator:
             [c.get("function", {}).get("name", "") for c in result.tool_calls],
             request_id=request_id,
             enforcement=prepared.enforcement,
+            projection_computed=prepared.projection_computed,
+            offered_total=len(prepared.provider_request.tools or ()),
         )
         lint_warnings = self._lint_final_output(
             result, request=request, request_id=request_id, had_tool_calls=had_tool_calls
@@ -1329,6 +1350,12 @@ class ChatOrchestrator:
             tools_proposed=len(projection.proposed),
             tools_sent=len(provider_request.tools or ()),
             tool_projection_mode=mode,
+            # Sub-agents will never enforce, and in shadow mode they are decided as
+            # `shadow` before the profile is ever consulted — so without this their
+            # records are indistinguishable from assistant ones, and the first
+            # rollout stage would be promoted on evidence from a profile it does
+            # not cover.
+            profile=request.profile,
             tool_projection_enforced=enforcement.enforce,
             tool_projection_fail_open=enforcement.fail_open,
             tool_projection_reason=enforcement.reason,
@@ -1341,6 +1368,7 @@ class ChatOrchestrator:
         return _PreparedTurn(
             projection=projection,
             enforcement=enforcement,
+            projection_computed=computed is not None,
             timings=timings,
             provider_request=provider_request,
             meta=meta,
@@ -1937,6 +1965,7 @@ class ChatOrchestrator:
             budget=budget,
             projection=prepared.projection,
             enforcement=prepared.enforcement,
+            projection_computed=prepared.projection_computed,
             timings=prepared.timings,
         )
         try:
@@ -1984,6 +2013,7 @@ class ChatOrchestrator:
         budget: RequestBudget | None = None,
         projection: ToolProjection,
         enforcement: EnforcementDecision,
+        projection_computed: bool,
         timings: _Timings,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
@@ -2525,6 +2555,8 @@ class ChatOrchestrator:
                 tool_call_buffer.called_names,
                 request_id=meta.request_id,
                 enforcement=enforcement,
+                projection_computed=projection_computed,
+                offered_total=len(provider_request.tools or ()),
                 names_complete=tool_call_buffer.names_complete,
             )
 

@@ -313,9 +313,12 @@ def test_a_percentage_outside_zero_to_one_hundred_is_rejected(percent: int) -> N
 def test_the_rollout_controls_do_not_gate_readiness() -> None:
     """They are operational switches, not secrets or dev-only escape hatches.
 
-    Neither value can make a deployment unsafe — the worst either does is send
-    more tools than necessary — so neither belongs in the readiness gates, which
-    exist for things that make the server unable or unfit to answer.
+    Neither belongs in the readiness gates, which exist for things that make the
+    server unable or unfit to ANSWER — a missing upstream key, a malformed skill.
+    A misconfigured rollout changes how many tools a turn is offered, which the
+    fail-open paths already bound; it cannot stop the turn being served, and a
+    server refused readiness over it would be down for a reason it could have
+    simply logged.
     """
     settings = _settings(TOOL_PROJECTION_MODE="enforced", TOOL_PROJECTION_ROLLOUT_PERCENT=100)
     assert settings.missing_secrets() == []

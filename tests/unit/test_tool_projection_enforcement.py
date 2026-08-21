@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import pytest
 
+from daintree_assistant_server.contracts.daintree_api import RespondToolChoice
 from daintree_assistant_server.contracts.openai import ChatMessage, FunctionCall, ToolCall
+from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
 from daintree_assistant_server.skills.tool_projection import (
     REASON_COHORT_EXCLUDED,
     REASON_DISABLED,
@@ -119,6 +121,24 @@ def test_zero_percent_enforces_nothing_and_is_not_a_failure() -> None:
 def test_the_bucket_is_stable_for_a_session() -> None:
     assert session_bucket("sess-1") == session_bucket("sess-1")
     assert 0 <= session_bucket("sess-1") < 100
+
+
+@pytest.mark.parametrize(
+    ("session_id", "bucket"),
+    [("sess-1", 98), ("sess-a", 32), ("sess-b", 40), ("", 22)],
+)
+def test_the_bucket_is_pinned_to_literal_values(session_id: str, bucket: int) -> None:
+    """Stability across PROCESSES, which every other test here would miss.
+
+    A regression to Python's built-in `hash()` — randomized per process by PEP
+    456 — passes the repeated-call, distribution and monotonicity tests above
+    while silently reshuffling every session into a different arm on each
+    deployment. A rollout measured that way is measuring a different population
+    every restart, which is the one property the percentage exists to provide.
+    These literals come from the specified SHA-256 construction; regenerate them
+    ONLY alongside a deliberate change to it.
+    """
+    assert session_bucket(session_id) == bucket
 
 
 def test_enrollment_is_monotonic_in_the_percentage() -> None:
@@ -243,10 +263,18 @@ def test_a_pinned_tool_the_proposal_kept_enforces() -> None:
     assert _decide(forced_tool="fs.read").enforce is True
 
 
-def test_tool_choice_required_needs_no_particular_tool() -> None:
-    """`"required"` forces A call without naming one, so `_forced_tool_name`
-    yields None and any non-empty proposal satisfies it."""
-    assert _decide(forced_tool=None).enforce is True
+def test_tool_choice_required_names_no_tool_to_keep() -> None:
+    """`"required"` forces A call without naming one.
+
+    The gate sees whatever `_forced_tool_name` extracted, so this pins the
+    EXTRACTION as well as the decision — asserting `_decide(forced_tool=None)`
+    alone would have been a second copy of the healthy case, green whether or not
+    `"required"` was handled correctly anywhere upstream of it.
+    """
+    assert ChatOrchestrator._forced_tool_name("required") is None
+    assert ChatOrchestrator._forced_tool_name("auto") is None
+    assert ChatOrchestrator._forced_tool_name(RespondToolChoice(name="fs.read")) == "fs.read"
+    assert _decide(forced_tool=ChatOrchestrator._forced_tool_name("required")).enforce is True
 
 
 def test_an_unanswered_call_whose_tool_the_proposal_lost_fails_open() -> None:
@@ -339,10 +367,40 @@ def test_the_filter_refuses_a_tool_it_cannot_name() -> None:
 
 
 def test_the_size_metric_measures_the_compact_array() -> None:
-    assert tools_bytes(None) == len(b"[]")
-    assert tools_bytes([]) == len(b"[]")
-    one = tools_bytes([_tool("fs__read")])
-    two = tools_bytes([_tool("fs__read"), _tool("fs__list")])
-    assert 0 < one < two
-    # Compact separators: no whitespace padding the measurement.
-    assert b", " not in str(tools_bytes).encode()
+    """Exact bytes, computed independently of the function under test.
+
+    An earlier version of this asserted `b", " not in str(tools_bytes)` — the
+    repr of the FUNCTION OBJECT, which contains no JSON at all and would stay
+    green if the serializer switched to pretty-printed output. The measurement is
+    the number a rollout is judged on, so it is pinned against a separately
+    written encoding rather than against itself.
+    """
+    import json as _json
+
+    assert tools_bytes(None) == 2  # "[]"
+    assert tools_bytes([]) == 2
+    tools = [_tool("fs__read"), _tool("fs__list")]
+    expected = len(_json.dumps(tools, separators=(",", ":")).encode("utf-8"))
+    assert tools_bytes(tools) == expected
+    # And padded output would be LONGER, which is the regression being excluded.
+    assert tools_bytes(tools) < len(_json.dumps(tools).encode("utf-8"))
+
+
+def test_the_size_metric_counts_utf8_bytes_not_characters() -> None:
+    """The wire carries bytes.
+
+    Every fixture in this file is ASCII, where the two are identical — so a
+    length taken over characters would measure correctly here and understate
+    every real description containing an em dash, which the base prompt and the
+    CLI's own tool descriptions are full of.
+    """
+    ascii_tool = {
+        "type": "function",
+        "function": {"name": "a__b", "description": "aaa", "parameters": {}},
+    }
+    wide_tool = {
+        "type": "function",
+        "function": {"name": "a__b", "description": "—— ", "parameters": {}},
+    }
+    # Same character count, three bytes per em dash.
+    assert tools_bytes([wide_tool]) == tools_bytes([ascii_tool]) + 4
