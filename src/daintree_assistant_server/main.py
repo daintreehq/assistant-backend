@@ -41,6 +41,7 @@ from .observability import (
 from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
 from .providers.cerebras import CerebrasProvider
+from .providers.openrouter import OpenRouterProvider
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
 from .services.prompt_assembler import PromptAssembler
@@ -209,6 +210,11 @@ class Container:
     assembler: PromptAssembler
     orchestrator: ChatOrchestrator
     task_runner: TaskRunner
+    # The second adapter, or None when OPENROUTER_API_KEY is unset. `None` is a
+    # NORMAL configuration, not a degraded one — the credential is optional and
+    # ungated, so a deployment without it is complete and only the one utility
+    # task that routes there is unavailable (it 503s saying so).
+    openrouter_provider: ChatProvider | None = None
     # Its own httpx client, kept here so lifespan can close it. Deliberately not
     # the provider's: the docs server is a different host with a different
     # latency profile, and a documentation search must never queue behind a
@@ -235,6 +241,9 @@ class Container:
             await self.orchestrator.drain_background_tasks()
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
             await self.provider.aclose()
+        if self.openrouter_provider is not None:
+            with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
+                await self.openrouter_provider.aclose()
         if self.docs_http_client is not None:
             with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
                 await self.docs_http_client.aclose()
@@ -292,6 +301,48 @@ def _build_provider(settings: Settings) -> ChatProvider:
         api_key=settings.cerebras_api_key,
         base_url=settings.cerebras_base_url,
         default_timeout=settings.main_timeout_seconds,
+        dump_dir=settings.dump_upstream_dir,
+    )
+
+
+def _build_openrouter_provider(settings: Settings) -> ChatProvider | None:
+    """The second adapter, or ``None`` when its credential is not configured.
+
+    NOT CONSTRUCTING is the whole design. A keyless provider would start fine and
+    then fail on its first call with an upstream 401 — an error that reads like a
+    bad key rather than an absent one, and that arrives at the worst possible
+    moment to diagnose it. Returning ``None`` instead makes "not configured" a
+    state the task runner can see and report as itself
+    (``provider_not_configured``, naming the provider).
+
+    It gets its OWN client rather than sharing the Cerebras one — for isolation,
+    which is the same argument the docs client already makes here: a compaction
+    call must never queue behind a live turn holding a pooled connection, and a
+    misbehaving second vendor must not be able to exhaust the pool the serving
+    path depends on. (Sharing would be technically possible — neither client is
+    given a ``base_url`` and the adapters build absolute URLs — so this is a
+    deliberate choice, not a constraint.) The pool is small because compaction is
+    an occasional background task rather than the serving path, against the ~100
+    connections that one sizes for; it is not a concurrency limit, and nothing
+    gates how many compactions may run at once.
+    """
+    if not settings.openrouter_api_key.get_secret_value():
+        return None
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            connect=settings.upstream_connect_timeout_seconds,
+            # The heavy-task budget, not the main model's: nothing streams here,
+            # so there is no long inter-chunk gap to accommodate.
+            read=settings.utility_timeout_seconds,
+            write=_UPSTREAM_WRITE_TIMEOUT_SECONDS,
+            pool=_UPSTREAM_POOL_TIMEOUT_SECONDS,
+        ),
+        limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
+    )
+    return OpenRouterProvider(
+        client,
+        api_key=settings.openrouter_api_key,
+        default_timeout=settings.utility_timeout_seconds,
         dump_dir=settings.dump_upstream_dir,
     )
 
@@ -357,6 +408,11 @@ def build_container(
         inference_pool = InferencePool()
         selector = LocalSelector(classifier, inference_pool, catalog_manager, settings)
     chat_provider = provider if provider is not None else _build_provider(settings)
+    # Never substituted by the `provider` override: that argument exists so tests
+    # and deterministic benchmarks can replace the SERVING provider, and silently
+    # pointing the compaction task at the same fake would hide the fact that it
+    # runs somewhere else entirely.
+    openrouter_provider = _build_openrouter_provider(settings)
     assembler = PromptAssembler(prompt_loader, settings)
 
     docs_http_client, docs_client = _build_docs_client()
@@ -374,6 +430,7 @@ def build_container(
         provider=chat_provider,
         prompt_loader=prompt_loader,
         catalog_manager=catalog_manager,
+        openrouter_provider=openrouter_provider,
     )
 
     return Container(
@@ -381,6 +438,7 @@ def build_container(
         prompt_loader=prompt_loader,
         catalog_manager=catalog_manager,
         provider=chat_provider,
+        openrouter_provider=openrouter_provider,
         state_codec=state_codec,
         selector=selector,
         assembler=assembler,

@@ -12,7 +12,7 @@ import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, SecretStr, ValidationError
 
@@ -25,6 +25,8 @@ from ..config import (
 from ..contracts.tasks import (
     CheckpointInput,
     CheckpointOutput,
+    ContextCompactInput,
+    ContextCompactOutput,
     ExtractionVerdictInput,
     ExtractionVerdictOutput,
     JudgeOutput,
@@ -50,6 +52,7 @@ from ..contracts.tasks import (
 from ..errors import (
     DaintreeError,
     invalid_request,
+    provider_not_configured,
     turn_deadline_exceeded,
     unknown_task,
 )
@@ -184,6 +187,14 @@ def _u_checkpoint(inp: CheckpointInput, _req: TaskRequest) -> str:
         "Conversation to compact:\n"
         + _fenced(inp.transcript) + "\n\n"
         + "Produce the checkpoint JSON now."
+    )
+
+
+def _u_context_compact(inp: ContextCompactInput, _req: TaskRequest) -> str:
+    return (
+        "Conversation span to reconcile:\n"
+        + _fenced(inp.transcript) + "\n\n"
+        + "Produce the current-state JSON now."
     )
 
 
@@ -441,6 +452,13 @@ def _p_checkpoint(raw: str, _req: TaskRequest) -> dict[str, Any]:
     return CheckpointOutput.model_validate(data).model_dump()
 
 
+def _p_context_compact(raw: str, _req: TaskRequest) -> dict[str, Any]:
+    data = _loads_lenient(raw)
+    if not isinstance(data, dict):
+        raise TaskParseError("context_compact output is not a JSON object")
+    return ContextCompactOutput.model_validate(data).model_dump()
+
+
 def _p_memory_distill(raw: str, _req: TaskRequest) -> dict[str, Any]:
     data = _loads_lenient(raw)
     facts: list[dict[str, str]] = []
@@ -580,6 +598,23 @@ def _affinity_key(task_id: str) -> str:
 # --------------------------------------------------------------------------
 
 
+# Which adapter answers a task. A CLOSED two-value type, not a registry key: this
+# exists so ONE task can reach a cheaper model, and the type is what stops it
+# growing into the endpoint-selection policy that was deliberately deleted in the
+# move to Cerebras. Adding a third value should feel like a decision.
+ProviderId = Literal["cerebras", "openrouter"]
+
+# The compaction model, hardcoded beside the task that uses it exactly as
+# CEREBRAS_MODEL is hardcoded in config.py — no env toggle, one optimum.
+#
+# The whole reason a second provider exists: at ~$0.08 per million input tokens
+# it is an order of magnitude below the serving model's ~$0.99, and compaction is
+# the one task whose cost is dominated by RE-READING history it has already been
+# paid to read. Running it on the serving model would spend more than the
+# resend it exists to avoid.
+OPENROUTER_COMPACTION_MODEL = "deepseek/deepseek-v4-flash"
+
+
 @dataclass(frozen=True)
 class TaskProfile:
     id: str
@@ -591,6 +626,15 @@ class TaskProfile:
     max_output_tokens: int = 500
     timeout_seconds: float | None = None
     sensitive_fields: frozenset[str] = field(default_factory=frozenset)
+    # Which adapter and model answer this task. DECLARATIVE — a name, never a
+    # provider instance — because `build_profiles()` is called with no arguments
+    # (the golden suite parametrizes over it) and must stay constructible without
+    # building an HTTP client. `TaskRunner` resolves the name to an instance.
+    #
+    # Defaulting both together keeps every existing profile byte-identical in
+    # behaviour: Cerebras, on the one hardcoded serving model.
+    provider_id: ProviderId = "cerebras"
+    model: str = CEREBRAS_MODEL
     # Appended to the generic repair instruction so the retry re-anchors on this
     # task's exact output shape (the selector does the same for select_skills).
     # Only used on the rare second attempt — no happy-path cost.
@@ -623,6 +667,35 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 "described above: goal, user_directives, active_terminals, active_watchers, "
                 "workflow_run_ids, decisions, failed_approaches, pending_tool_state, "
                 "next_actions, open_questions, approvals_grants, preserved_ids.",
+            ),
+            # The one profile that does not run on the serving model. Neighbour to
+            # `checkpoint` and deliberately not merged with it: `checkpoint`
+            # writes a recovery record at a session boundary and the CLI stores
+            # it, while this replaces a SPAN of history mid-session and re-runs as
+            # the session grows. Merging them would also repoint a live, shipped
+            # CLI task at an optional credential, so a deployment without an
+            # OpenRouter key would lose a feature that works today.
+            TaskProfile(
+                "context_compact", ContextCompactInput, "json", _u_context_compact,
+                _p_context_compact,
+                # Same heavy budget as the other whole-transcript tasks: it reads
+                # a full span of history, not a tail.
+                #
+                # The OUTPUT cap is larger than any sibling's because this task is
+                # the only one that emits a nested array whose length tracks how
+                # busy the session was. A real orchestration session with a
+                # dozen live agents serializes to ~2.4k tokens of state, so the
+                # obvious 1200-2000 would truncate mid-JSON exactly on the
+                # sessions worth compacting — and a truncated identifier is
+                # unrecoverable. Output is ~$0.17/M here, so the headroom costs
+                # well under a hundredth of a cent per call.
+                max_output_tokens=4000, timeout_seconds=heavy_timeout,
+                sensitive_fields=frozenset({"transcript"}),
+                provider_id="openrouter", model=OPENROUTER_COMPACTION_MODEL,
+                repair_hint="Return a single JSON object with exactly these keys: "
+                "original_ask, agents, terminals, decisions, blockers, next_actions, "
+                "preserved_ids. Each entry of agents is an object with agent_id, "
+                "worktree_path, brief and status. Preserve every identifier verbatim.",
             ),
             TaskProfile(
                 "memory_distill", MemoryDistillInput, "json", _u_memory_distill,
@@ -759,20 +832,52 @@ class TaskRunner:
         # Read-only skill-outline source for workflow_plan; optional so the
         # runner stays constructible without a catalog (outlines just drop out).
         catalog_manager: CatalogManager | None = None,
+        # The second adapter, for the one profile that does not run on the
+        # serving model. Optional and defaulted so every existing construction
+        # site is unchanged, and `None` is a NORMAL state, not a degraded one: it
+        # is what a deployment without OPENROUTER_API_KEY looks like, and every
+        # other task is unaffected by it.
+        openrouter_provider: ChatProvider | None = None,
     ) -> None:
         self.settings = settings
         self.provider = provider
+        self.openrouter_provider = openrouter_provider
         self.prompts = prompt_loader
         self.profiles = profiles if profiles is not None else build_profiles(catalog_manager)
 
     def task_ids(self) -> list[str]:
         return sorted(self.profiles)
 
+    def _provider_for(self, profile: TaskProfile) -> ChatProvider:
+        """The adapter that answers this profile.
+
+        Resolved ONCE per task run and then threaded through both the first
+        attempt and any JSON-repair retry. Re-resolving per call would be the
+        same answer today, but passing the instance makes it structurally
+        impossible for a repair to land on a different provider — or a different
+        model — than the attempt it is repairing.
+
+        An unconfigured optional provider fails HERE, with a 503 that names it,
+        rather than at readiness. That split is the point: this task's absence
+        costs a deployment nothing it is currently using, so taking the whole
+        server down for it would be the wrong trade, while returning an empty
+        compaction would be a lie about work that never happened.
+        """
+        if profile.provider_id == "cerebras":
+            return self.provider
+        if self.openrouter_provider is None:
+            raise provider_not_configured("OpenRouter")
+        return self.openrouter_provider
+
     async def _complete_with_retry(
-        self, request: ProviderChatRequest, *, budget: RequestBudget | None = None
+        self,
+        request: ProviderChatRequest,
+        provider: ChatProvider,
+        *,
+        budget: RequestBudget | None = None,
     ) -> Any:
         return await retry_upstream(
-            lambda: self.provider.complete(request),
+            lambda: provider.complete(request),
             retries=self.settings.max_upstream_retries,
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
             # A first attempt plus a JSON-repair retry must share one budget, not
@@ -867,7 +972,12 @@ class TaskRunner:
 
         system = self.prompts.task_system_prompt(profile.id)
         user = profile.build_user(input_obj, request)
-        model = CEREBRAS_MODEL
+        # Both from the PROFILE, resolved once and reused by the repair retry
+        # below. `model` reaches the client verbatim as `TaskResult.model`, so a
+        # task that runs on the second provider says so honestly rather than
+        # reporting the serving model it never touched.
+        model = profile.model
+        provider = self._provider_for(profile)
         timeout = profile.timeout_seconds or self.settings.utility_timeout_seconds
 
         messages = [
@@ -899,8 +1009,19 @@ class TaskRunner:
             thinking_disabled=not thinking_enabled,
             reasoning_effort=reasoning_effort,
             timeout=timeout,
-            # The caller's own credential (threaded from the route handler).
-            api_key=api_key,
+            # The caller's own credential (threaded from the route handler), and
+            # ONLY for the default provider. A credential is issued by one vendor
+            # and is meaningless — or worse, leaked — at another, so a task
+            # routed elsewhere falls back to that provider's own configured key
+            # by passing None.
+            #
+            # Latent on the serving path, where the route passes no key at all
+            # (auth.py ignores the Authorization header). Not latent for
+            # benchmarks: `benchmarks/_harness/env.py::caller_api_key` returns
+            # CEREBRAS_API_KEY and the utility-task benchmarks thread it into
+            # `TaskRunner.run`, so an unscoped forward would put the Cerebras key
+            # in an Authorization header bound for OpenRouter.
+            api_key=api_key if profile.provider_id == "cerebras" else None,
             # Cache affinity, keyed by TASK rather than by caller. A task's system
             # prompt is server-owned and identical for everyone who runs it, so the
             # calls that share a prefix are the ones that share a task id — not the
@@ -910,7 +1031,7 @@ class TaskRunner:
             cache_session_id=_affinity_key(profile.id),
         )
 
-        result = await self._complete_with_retry(provider_request, budget=budget)
+        result = await self._complete_with_retry(provider_request, provider, budget=budget)
         usage = result.usage
         finish = result.finish_reason or "stop"
         endpoint = result.endpoint
@@ -931,15 +1052,22 @@ class TaskRunner:
                 thinking_disabled=not thinking_enabled,
                 reasoning_effort=reasoning_effort,
                 timeout=timeout,
-                # Same caller credential as the first attempt — an omission here
-                # would fail the repair call outright (no provider default).
-                api_key=api_key,
+                # Same credential as the first attempt, scoped the same way. The
+                # repair rebuilds this request field by field, so an omission
+                # here would silently swap the caller's key for the provider's
+                # configured default midway through a task, and a blind forward
+                # would misdirect it to another vendor.
+                api_key=api_key if profile.provider_id == "cerebras" else None,
                 # ...and the same affinity key: the repair replays the whole first
                 # attempt plus one instruction, so it is the same prefix and should
                 # say so.
                 cache_session_id=_affinity_key(profile.id),
             )
-            repair = await self._complete_with_retry(repair_request, budget=budget)
+            # The SAME provider and model as the attempt being repaired. A repair
+            # that fell back to the default provider would replay the prompt
+            # against a model that never produced the malformed output, and bill
+            # a second account for it.
+            repair = await self._complete_with_retry(repair_request, provider, budget=budget)
             usage = _sum_usage(usage, repair.usage)
             finish = repair.finish_reason or "stop"
             endpoint = repair.endpoint or endpoint

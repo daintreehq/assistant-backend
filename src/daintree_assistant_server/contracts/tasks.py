@@ -86,6 +86,28 @@ class MemoryDistillInput(BaseModel):
     transcript: str = Field(max_length=400_000)
 
 
+class ContextCompactInput(BaseModel):
+    """One span of conversation to reconcile into current state.
+
+    A TRANSCRIPT STRING, like ``checkpoint`` and ``memory_distill``, and not a
+    list of typed messages. The distinction is deliberate: the protected content
+    this task exists to preserve — worktree paths, terminal ids, an agent's
+    delegation brief — lives in the *prose and tool output* of a conversation,
+    not in fields a schema could name. Any segment model would have to be lossy
+    about exactly the material that must survive verbatim, so the transcript is
+    handed over whole and the structure is produced on the way OUT.
+
+    The same 400 KB ceiling as its two siblings. It is not a compaction policy:
+    which span to compact, and the guarantee that a span already compacted is
+    never fed back in, both belong to the CLI, which owns durable conversation
+    state (see the task prompt).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    transcript: str = Field(max_length=400_000)
+
+
 class TerminalState(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -186,6 +208,129 @@ class CheckpointOutput(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
     approvals_grants: list[str] = Field(default_factory=list)
     preserved_ids: list[str] = Field(default_factory=list)
+
+
+class CompactedAgentOut(BaseModel):
+    """One delegated agent, as current state rather than as narration.
+
+    The three fields together are the thing a compaction most easily destroys and
+    can least afford to: WHICH agent, WHERE it is working, and WHAT it was told
+    to do. An orchestrator that can no longer name the agent it is supervising,
+    or that has kept the name but lost the worktree, is worse off than one that
+    never compacted at all — it will re-delegate work that is already running.
+
+    ``brief`` is the agent's delegation brief in the words it was given, not a
+    summary of it: a paraphrased brief drifts a little on every cycle until the
+    agent is being supervised against instructions nobody issued.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    # These caps bound a pathological output; the profile's token budget is what
+    # binds a realistic one, and it binds first. They were brought DOWN from far
+    # larger values because a cap wildly above the budget is not free — it reads
+    # as permission, and an output that tries to use it is cut off at the token
+    # ceiling mid-JSON, which fails the parse and costs a repair. Filling every
+    # cap here would still exceed the budget; the point is that nothing realistic
+    # comes close to either.
+    # IDENTIFIERS REJECT, PROSE TRUNCATES — the split that matters in this model.
+    #
+    # A `max_length` on a pydantic str REJECTS, which is right for the two fields
+    # that name things: a clipped agent id or worktree path is not a degraded
+    # answer, it is a wrong one that points at nothing, and failing the parse buys
+    # a repair retry. For prose it is the wrong trade — a brief 100 characters
+    # over its cap would sink the whole compaction, and losing the tail of a
+    # sentence is survivable in a way that losing an id is not.
+    agent_id: str = Field(min_length=1, max_length=128)
+    # Real worktree paths are well under 200 characters. PATH_MAX would be 4096,
+    # but nothing legitimate is near it and the cap exists to bound a runaway.
+    worktree_path: str | None = Field(default=None, max_length=1024)
+    # A delegation brief is a paragraph, not a document — it is what an agent was
+    # TOLD to do, kept close to the words it was given. Truncated rather than
+    # rejected: see above.
+    brief: str = ""
+    status: str = ""
+
+    @field_validator("brief")
+    @classmethod
+    def _bound_brief(cls, v: str) -> str:
+        return v[:1500]
+
+    @field_validator("status")
+    @classmethod
+    def _bound_status(cls, v: str) -> str:
+        return v[:300]
+
+
+class ContextCompactOutput(BaseModel):
+    """Conversation history reconciled into current state.
+
+    NOT a prose summary, and the field list is the mechanism: every entry names
+    something that is true NOW. Daintree supervises a mutable world — agent
+    statuses, terminal output, watcher events, queue state — where a snapshot is
+    superseded by the next one, so the sequence of observations that produced the
+    current state is the disposable part and the state itself is what has to
+    survive. A narrative summary inverts that, preserving the story and losing
+    the identifiers.
+
+    Deliberately shares ``decisions`` / ``blockers`` / ``preserved_ids`` with
+    ``CheckpointOutput`` rather than inventing a parallel vocabulary for the same
+    ideas — the two tasks are neighbours and should stay legible as such. What is
+    NOT shared is why they exist: ``checkpoint`` writes a recovery record at a
+    session boundary and the CLI stores it, while this replaces a SPAN of history
+    mid-session and is re-run as the session grows, which is what makes its
+    per-token cost worth a second provider.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    # The user's own words, carried verbatim. First field because it is the one
+    # whose loss is least recoverable: everything else in a conversation can be
+    # re-derived from the world, but what the user actually asked for cannot.
+    #
+    # REQUIRED, and the only field here that is — the deliberate asymmetry with
+    # its siblings and with CheckpointOutput, whose fields all default. Those
+    # defaults are right for the lists: a session with no agents genuinely has
+    # `agents: []`, and forcing a value would only invite an invented one. But
+    # every real conversation has an ask, so its ABSENCE is not an empty result,
+    # it is a malformed one. Without this, `{"agents": [...]}` validates into a
+    # hollow compaction — no ask, no decisions, nothing — the parse SUCCEEDS, and
+    # the repair retry that exists for exactly this never fires. Requiring the
+    # one always-present field is what keeps that path reachable.
+    original_ask: str = Field(min_length=1, max_length=2000)
+    agents: list[CompactedAgentOut] = Field(default_factory=list, max_length=25)
+    terminals: list[str] = Field(default_factory=list)
+    decisions: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+    # The catch-all for load-bearing ids the fields above have no slot for
+    # (wch_*, wfr_*, grt_*, tmr_*, branch names). Bounded generously: a dropped
+    # identifier is unrecoverable, and this is the last net under the others.
+    preserved_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("terminals", "decisions", "blockers", "next_actions")
+    @classmethod
+    def _bound_lists(cls, v: list[str]) -> list[str]:
+        return _truncate_items(v, max_items=40, max_chars=600)
+
+    @field_validator("preserved_ids")
+    @classmethod
+    def _bound_ids(cls, v: list[str]) -> list[str]:
+        # These bounds are a guard against a runaway output, NOT a safe place to
+        # lose data: `_truncate_items` slices and drops silently, which is the
+        # house posture for model-produced lists (tolerate, never reject).
+        #
+        # What makes that survivable HERE is the entry format the prompt pins:
+        # every entry leads with its identifier and follows with prose, so a
+        # per-item slice trims the description and leaves the id intact.
+        #
+        # The ITEM bound is the one that could genuinely lose a whole identifier.
+        # It is set high rather than safe — 200 short entries fit inside the 4k
+        # output budget, so this is reachable in principle, unlike the character
+        # bound. It stays a silent truncation because that is the house posture
+        # for model-produced lists, and because a compaction that returns 200 ids
+        # and drops the 201st is still worth having.
+        return _truncate_items(v, max_items=200, max_chars=300)
 
 
 class WatcherClassifyOutput(BaseModel):

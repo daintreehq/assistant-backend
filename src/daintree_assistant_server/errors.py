@@ -256,6 +256,40 @@ def upstream_unavailable(
 # --------------------------------------------------------------------------
 
 
+def provider_not_configured(provider: str) -> DaintreeError:
+    """A named task asked for a provider this deployment did not configure.
+
+    Distinct from :func:`upstream_unavailable`, which shares the 503 but means an
+    outage — transient, and retryable. This one is a deployment fact: the
+    credential for a SECOND, optional provider was never set, so the provider was
+    never constructed (see ``main._build_openrouter_provider``).
+
+    ``retryable=False`` governs OUR retry loop (``providers/retry.py``), which is
+    the only consumer of the flag — it is deliberately not serialized, so
+    ``ErrorDetail`` carries message/type/param/code and nothing else. What
+    reaches a client is the distinct ``code``, which is the whole reason to mint
+    one rather than reuse ``upstream_unavailable``: a client that retried this
+    503 the way it should retry that one would replay a deterministic failure
+    until its budget ran out.
+
+    It is deliberately NOT a readiness failure. The optional provider funds one
+    utility task; a deployment without it answers every turn and every other task
+    normally, so the honest place to report the gap is the call that actually
+    needed it — not /readyz, which would take the whole server down over a
+    feature it is not using.
+
+    The provider is NAMED because the fix is to set that provider's key, and an
+    operator reading "not configured" with no subject has to go looking.
+    """
+    return DaintreeError(
+        status_code=503,
+        message=f"The {provider} provider is not configured on this server.",
+        type=TYPE_API,
+        code="provider_not_configured",
+        retryable=False,
+    )
+
+
 def upstream_request_rejected(
     message: str = "The upstream model provider rejected this server's request.",
 ) -> DaintreeError:

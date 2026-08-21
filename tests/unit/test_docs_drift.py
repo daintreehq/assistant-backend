@@ -679,6 +679,11 @@ _ERROR_CODES = (
     "provider_invalid_api_key",
     "provider_insufficient_credits",
     "provider_key_forbidden",
+    # Listed explicitly because the introspection test below cannot reach it:
+    # it calls each factory with no arguments, and this one names the provider
+    # it is reporting on, so it is skipped there and would otherwise land
+    # undocumented through a gate that exists to prevent exactly that.
+    "provider_not_configured",
     "upstream_rate_limited",
     "upstream_timeout",
     "upstream_unavailable",

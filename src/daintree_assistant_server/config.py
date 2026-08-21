@@ -120,6 +120,27 @@ class Settings(BaseSettings):
     # Secret Manager.
     cerebras_api_key: SecretStr = Field(default=SecretStr(""), alias="CEREBRAS_API_KEY")
 
+    # ---- Second provider (OpenRouter) — OPTIONAL, and deliberately not gating.
+    # Funds the ONE utility task that does not run on Cerebras: context
+    # compaction, which routes to a model an order of magnitude cheaper per input
+    # token than the serving model precisely because it re-reads conversation
+    # history (see OPENROUTER_COMPACTION_MODEL in services/task_runner.py).
+    #
+    # It is absent from ``missing_secrets`` ON PURPOSE, and that is the whole
+    # difference between the two credentials. Without CEREBRAS_API_KEY nothing
+    # can be answered at all, so its absence must fail readiness. Without this
+    # one everything still works except a single task that nothing on the serving
+    # path calls yet — so a deployment that never sets it is a correct
+    # deployment, not a broken one. Gating readiness on it would take the whole
+    # server down over a feature it is not using.
+    #
+    # There is no OPENROUTER_BASE_URL to match ``cerebras_base_url``: that one
+    # exists so tests and local proxies can redirect the credential-bearing
+    # serving path, and ``weak_secrets`` pins it back to the real origin in
+    # production. This provider is constructed against its module default and
+    # nothing has asked to move it.
+    openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
+
     # ---- Thinking headroom -----------------------------------------------
     # The thinking POSTURE itself is hardcoded (see INTERACTIVE_THINKING_ENABLED at
     # the top of this module): main/utility/selector are non-thinking, only the

@@ -37,6 +37,14 @@ FLOORS: dict[str, int] = {
     "src/daintree_assistant_server/api/daintree_auth.py": 93,
     "src/daintree_assistant_server/providers/base.py": 92,
     "src/daintree_assistant_server/providers/cerebras.py": 92,
+    # Added 2026-08-21 (measured 88.0%). A second provider adapter earns a floor
+    # for the same reason the first one has one: it holds a credential, scrubs it
+    # out of echoed upstream error bodies, and owns an error taxonomy the CLI
+    # branches on. It sits below its sibling's 92% because the mid-stream
+    # transport-failure handlers are awkward to drive through a mock transport,
+    # not because less of it matters — recorded honestly at its real number
+    # rather than rounded up, so the gap stays visible.
+    "src/daintree_assistant_server/providers/openrouter.py": 88,
     # Added 2026-08-20 (measured 94.70%). The orchestrator earned a floor when the
     # streaming fold became a COST-CONTAINMENT surface as well as a correctness
     # one: the runaway guard is the only thing standing between a degenerating
