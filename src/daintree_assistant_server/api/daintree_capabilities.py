@@ -7,12 +7,6 @@ from fastapi import APIRouter, Depends, Request
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
 from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
-from ..providers.policy import (
-    DEFAULT_POLICY,
-    MAX_ENDPOINT_LIST,
-    EndpointSort,
-    PrivacyMode,
-)
 from ..services.docs_events import DOCS_SEARCH_WIRE_NAME
 from .deps import require_ready
 
@@ -61,15 +55,18 @@ async def capabilities(
             "display_context": True,
             "max_active_skills": settings.max_active_skills,
             "metadata_transport": "body+stream_meta_event",
-            # Every upstream call is funded by the caller's own key, so what a
-            # request cost is their money and is reported back to them.
+            # What a request cost, when the upstream says. `total` sums every
+            # upstream call the request made that we could observe — the main
+            # completion, a re-rolled round the user never saw, a utility call.
+            # It is the provider's own reported figure, never a token-price
+            # estimate computed here.
             #
-            # `total` sums every upstream call the request made that we could
-            # observe — the skill selector and its repair, a losing speculative
-            # generation, the main completion, a re-rolled round the user never
-            # saw. It is the provider's own reported figure, not a token-price
-            # estimate: OpenRouter knows which endpoint served the call and what
-            # cache discount applied.
+            # **Cerebras reports no cost**, so today this block is always absent.
+            # That is not a regression to paper over: the two rules below were
+            # written for exactly this case and a client that implemented them
+            # already behaves correctly. Advertising the capability with
+            # `absent_when_unknown` keeps the contract honest and needs no change
+            # if a provider that does report cost returns.
             #
             # Two rules a client must implement, not infer:
             #   * the block is ABSENT rather than zero when nothing was reported,
@@ -86,23 +83,6 @@ async def capabilities(
                 # not be measured, so `total` is a floor. A session accumulator
                 # must render such a total as a lower bound rather than a sum.
                 "total_may_be_incomplete": True,
-            },
-        },
-        # The active endpoint-routing posture, and what a caller may change about
-        # it. Surfaced because privacy is part of the tester's trust decision and
-        # must be visible BEFORE the first turn — not discovered from a doc. The
-        # description string is served from PrivacyMode itself so a client cannot
-        # invent its own wording (and cannot say "does not store").
-        "routing": {
-            "privacy_mode": DEFAULT_POLICY.privacy.value,
-            "privacy_description": DEFAULT_POLICY.privacy.description,
-            "sort": DEFAULT_POLICY.sort.value,
-            "client_selectable": {
-                "field": "routing",
-                "privacy": [mode.value for mode in PrivacyMode],
-                "sort": [axis.value for axis in EndpointSort],
-                "endpoint_lists": ["only", "ignore"],
-                "max_endpoints": MAX_ENDPOINT_LIST,
             },
         },
         "skills": {

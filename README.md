@@ -3,10 +3,12 @@
 A Daintree-operated model-orchestration service. It moves the orchestration
 boundary off the local CLI: the server owns the permanent system prompt, the
 skill catalog and bodies, automatic skill selection, prompt assembly, and the
-small-model utility prompts. The CLI keeps local state, local tool execution,
-and **the upstream credential** — the server holds none: every request's bearer
-token *is* the caller's own OpenRouter key, and it funds that turn's upstream
-calls.
+small-model utility prompts. The CLI keeps local state and local tool execution.
+
+**The server holds the upstream credential** (`CEREBRAS_API_KEY`) and funds every
+turn from it, so a request needs no API key of its own. That is a stage, not a
+destination: account authentication and sign-in are next, and `auth.py` is the
+seam they land in.
 
 It exposes a **Daintree-native** API (`POST /v1/daintree/respond`) — purpose-built,
 not OpenAI-compatible. The session/skill envelope is first-class, skills are surfaced
@@ -14,7 +16,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`delta`
 `error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** OpenRouter (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek/deepseek-v4-flash-0731` for the main/utility calls and the skill-learning gate (skill selection is LOCAL — an in-process two-stage ONNX selector, no upstream call), routed to the fastest endpoint that does not collect or train on request data ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, *not* zero data retention <!-- privacy-copy-ok -->); the local skill-learning builder/improver name a stronger model (`openai/gpt-5.6-sol`) on the same provider and the same key
+- **Upstream:** Cerebras Inference (OpenAI-format API spoken *internally*, behind a provider abstraction) — `gemma-4-31b` for the main completion and every utility task; skill selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Cerebras is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference. Requests are not collected for training ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, deliberately *not* a zero-retention claim <!-- privacy-copy-ok -->)
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Authoritative documents
@@ -24,7 +26,7 @@ This README is a summary. Where it disagrees with one of these, the document win
 | Document | Authority for |
 |---|---|
 | [`docs/INTERNAL_BETA.md`](docs/INTERNAL_BETA.md) | What the beta is: included/excluded scope, required tester disclosure, environments, invariants |
-| [`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) | Model ids, endpoint routing, privacy posture, thinking posture, both retry layers, failure mapping |
+| [`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) | Model ids, upstream wire shape, privacy posture, thinking posture, both retry layers, failure mapping |
 | [`docs/KEY_HANDLING.md`](docs/KEY_HANDLING.md) | What a key is, how it moves, where it must never appear, verification, rotation |
 | [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md) | The wire contract |
 
@@ -39,9 +41,8 @@ proof that the whole corpus is accurate.
 - Client `system`/`developer` messages are rejected (server owns all system text).
 - Every respond request carries required structured `startup` context. Its curated project,
   agent-roster, and project-instruction data reaches only the main model in a stable framed
-  block. Neither the selector nor the skill learner ever sees `startup`: the selector's
-  evidence is sanitized `input.messages` plus bounded turn/workflow hints and tool names;
-  the learner's is `input.messages` plus the just-generated final answer and tool names.
+  block. The selector never sees `startup`: its evidence is sanitized
+  `input.messages` plus bounded turn/workflow hints and tool names.
 - `skill.find` / `skill.load` are never offered to the main model; selection runs
   server-side as a local two-stage forward pass before the main completion.
 - Only the active skill bodies (max 3) are injected — never the full catalog.
@@ -79,11 +80,11 @@ proof that the whole corpus is accurate.
 src/daintree_assistant_server/
   api/            # FastAPI routers (chat, models, capabilities, skills, tasks, health)
   contracts/      # Pydantic wire models (OpenAI subset, extension, tasks, errors)
-  providers/      # ChatProvider protocol + OpenRouter adapter + SSE parser
-  prompts/        # Server-owned prompt text (.md / .md.j2) + loader (incl. skill_learning/)
+  providers/      # ChatProvider protocol + Cerebras adapter + SSE parser
+  prompts/        # Server-owned prompt text (.md / .md.j2) + loader
   skills/         # Skill models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed skill-state token codec
-  services/       # validation, prompt_assembler, chat_orchestrator, task_runner, skill_learning
+  services/       # validation, prompt_assembler, chat_orchestrator, task_runner, docs_mcp
   config.py auth.py errors.py observability.py main.py
 tests/            # unit / integration / contract / golden
 infra/terraform/  # Cloud Run + load balancer skeleton
@@ -103,10 +104,10 @@ mypy src/
 # Regenerate prompt golden snapshots after an intentional change
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
-# Live provider-contract tests (skipped by default; make real OpenRouter calls).
-# Pins the things mocks can't see — e.g. that the
-# endpoint-routing policy matches an endpoint for every parameter mix we send.
-RUN_LIVE_OPENROUTER=1 OPENROUTER_API_KEY=sk-or-v1-... pytest tests/live -q
+# Live provider-contract tests (skipped by default; make real Cerebras calls).
+# Pins the things mocks can't see — which parameters Cerebras accepts and which
+# it rejects with a 400, and that the serving model reports no reasoning tokens.
+RUN_LIVE_CEREBRAS=1 CEREBRAS_API_KEY=csk-... pytest tests/live -q
 ```
 
 CI (`.github/workflows/ci.yml`) runs ruff + `mypy --strict` + pytest on every
@@ -119,99 +120,37 @@ Set this (see `.env.example` for the full list):
 
 ```bash
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
+export CEREBRAS_API_KEY=...               # the upstream credential; funds every turn
 ```
 
-The server holds **no API keys**. Every request carries the caller's own key as its
-bearer token (for early testers, their OpenRouter key), and that same key funds the
-turn's upstream calls — there is no unauthenticated mode in any environment.
-`OPENROUTER_API_KEY` remains only as a benchmark/live-test convenience; the serving
-path never reads it. Missing required secrets do not crash the process — they fail
-**readiness** (`/readyz` returns 503) so liveness stays green.
+Those two are the whole list, and both are the **server's own**. There is no
+inbound API key to configure: callers send no bearer token today, so the door is
+open — deliberately and temporarily, until account authentication lands. A token
+that *is* sent is still validated for shape and used as that request's upstream
+credential.
+
+Missing required secrets do not crash the process — they fail **readiness**
+(`/readyz` returns 503) so liveness stays green. `CEREBRAS_API_KEY` is gated
+there precisely so its absence surfaces as "this deployment is not ready" rather
+than as a first-turn upstream 401 that reads like the caller's fault.
 
 ### Run locally
 
 ```bash
 # Copy the env scaffold; it binds HOST/PORT from .env (default 127.0.0.1:8473).
-# Requests authenticate with YOUR OpenRouter key as the bearer token.
-cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT (+ PORT if you like)
-python -m daintree_assistant_server
+cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT and CEREBRAS_API_KEY
+./dev                  # exports .env, then runs the server
 ```
+
+`./dev` is the convenience wrapper: it exports `.env` into the environment (so a
+`curl` typed in the same terminal agrees with the server), warns about missing
+required secrets, and turns on human-readable logs. Plain
+`python -m daintree_assistant_server` still works — `Settings` reads `.env`
+either way.
 
 Point your CLI at `http://127.0.0.1:8473` (or whatever `PORT` you set). For
 auto-reload during development: `uvicorn daintree_assistant_server.main:app
 --reload --port 8473`.
-
-## Skill learning (local development only)
-
-The server can **learn skills from your own sessions**: after a workflow, a
-backend-internal pipeline can write a brand-new skill or improve an existing one,
-so the catalog gets better as you use it. It is **off by default** and **cannot run in a hardened environment** (an
-enabled mode fails `/readyz` when `ENVIRONMENT` is `production` *or* `staging`).
-
-It is invisible to the CLI. The main assistant model is never told it exists.
-Learning runs **off the response path, in the background, after** the turn's answer
-is already sent, so the triggering turn is not slowed at all; the new/improved skill
-simply shows up as an ordinary dynamic skill load on a **later** relevant turn. Keep
-pointing your CLI at the same server — nothing about the wire protocol changes.
-
-**How it works (fire-and-forget, after a turn completes with a final answer):**
-
-1. A cheap **gate** (`deepseek/deepseek-v4-flash-0731`) reads the just-completed workflow and
-   decides: nothing to learn / improve an existing skill / create a new one. Strong
-   triggers are you signalling a problem ("what happened here?", "this shouldn't
-   have happened") or the assistant visibly struggling; a cleanly completed,
-   repeatable workflow can also justify a *new* skill.
-2. If warranted, **`openai/gpt-5.6-sol`** (high reasoning) first diagnoses the workflow — what
-   the assistant (and the current skill, if improving) did that worked and where it failed —
-   then writes the new skill or the improved one. The diagnosis is kept in the audit
-   record so you can review *why* each change landed.
-3. The backend validates it through the real skill loader (frontmatter, tool-name
-   rules, size caps) plus a learning-layer gate (house-style checks + a secret
-   scan), writes the `.md` file, and reloads the catalog. The created/improved
-   skill is **never** folded into the turn it learned from (that answer is already
-   sent) — it becomes live for the **next** relevant turn's selection.
-
-**Enable it locally.** The builder/improver reach their stronger model over the same
-OpenRouter key as everything else, so this mode needs no extra credential. The
-fastest way is to prefix the run command — no `.env` edit needed (a real env var
-wins over `.env` anyway):
-
-```bash
-SKILL_LEARNING_MODE=apply python -m daintree_assistant_server
-```
-
-That is the everything-on-defaults mode: the gate (`deepseek/deepseek-v4-flash-0731`)
-runs after each completed turn, the GPT-5.6 Sol builder writes/improves a skill when warranted,
-changes land in the real `skills/files/` (so they show up in `git diff`), and the
-catalog reloads live. Point your CLI at the server as usual and just work. For a
-safe dry run that never touches the skill files, swap `apply` for `propose`.
-
-Or set it in `.env` to make it the default for every run:
-
-```bash
-SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (writes files)
-# SKILL_LEARNING_DIR=            # empty = edit the real skills/files/ (git-diff-able); or
-                                 # point at e.g. .daintree/skills to keep source untouched
-```
-
-- **`apply`** rewrites/creates real skill files under `src/.../skills/files/` (the
-  default), so improvements show up in `git diff` — review them and commit the good
-  ones. Bad ones are just `git checkout`-ed away.
-- **`propose`** runs the whole pipeline but writes only the proposed skill markdown
-  + an audit JSON under `.daintree/skill-learning/proposals/` (gitignored) — a safe
-  dry run that never touches real skill files or the catalog.
-- Every applied change also drops an audit record (old/new hash, gate verdict,
-  a unified diff, and the model's what-worked / what-failed diagnosis) under
-  `.daintree/skill-learning/`. Watch the server logs for
-  `skill_learning_applied` events. Learned skill changes do **not** touch the
-  golden snapshots (those render against a pinned fixture catalog) — the test
-  suite stays green; just review the `git diff` and commit what's good.
-- Learning fires **after** a turn that ends in a final answer — not after tool-call
-  continuation rounds (those aren't a finished workflow) — and runs in the
-  background, so it never delays the response. Because it triggers on completion
-  rather than on your *next* message, even the **last** workflow of a session is
-  learned from; no throwaway follow-up is needed. What it writes lands for a later
-  turn, never the one it learned from.
 
 ## Endpoints
 
@@ -219,7 +158,7 @@ SKILL_LEARNING_MODE=apply        # off (default) | propose (dry-run) | apply (wr
 |---|---|---|---|
 | `POST` | `/v1/daintree/respond` | yes | Native generation (+ first-class `skills` block; stream or JSON) |
 | `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision |
-| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: does OpenRouter recognise the bearer? (no body; no inference). Returns `valid` plus optional budget metadata — recognised is not the same as fundable |
+| `POST` | `/v1/daintree/auth/verify` | open | Credential probe: is the key this request would spend usable? (no body; no inference — a model listing). With no bearer that is the *server's* key, which answers "can this backend serve me?" |
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual find / load / clear |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks |
@@ -302,13 +241,13 @@ the switch and exits non-zero if they disagree, because a traffic split that
 applied while leaving the service unhealthy is the worst outcome: the operator
 believes they have recovered and stops looking.
 
-The only secrets the deployment mounts are state-signing material
-(`STATE_SIGNING_KEY_CURRENT`, `STATE_SALT`) — there is **no server-side model
-API key**. Each request's bearer token is the caller's own OpenRouter key, which
-both authenticates the request and funds its upstream calls. In production
-(`ENVIRONMENT=production`) the service fails readiness if a secret is weak or
-default (the packaged `STATE_SALT`, a signing key under 32 characters), or if
-`OPENROUTER_BASE_URL` is not the real `https://openrouter.ai` origin.
+The deployment mounts state-signing material (`STATE_SIGNING_KEY_CURRENT`,
+`STATE_SALT`) and the upstream credential (`CEREBRAS_API_KEY`), which funds every
+turn. In production (`ENVIRONMENT=production`) the service fails readiness if a
+secret is weak or default (the packaged `STATE_SALT`, a signing key under 32
+characters), or if `CEREBRAS_BASE_URL` is not the real `https://api.cerebras.ai`
+origin — the server key rides every request to that origin, so a typo'd or
+plain-http host would leak the one credential all of Daintree runs on.
 
 `infra/terraform/` remains a Terraform description of the same topology plus the
 deferred external-load-balancer edge; `infra/gcp/bootstrap.sh` is what actually

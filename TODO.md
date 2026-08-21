@@ -10,88 +10,55 @@ claim about today's behaviour against the source before acting on it.
 
 ---
 
-## Serve the main model directly from Novita, not through OpenRouter
+## Account authentication and sign-in
 
-**Trigger: the day Daintree has its own paid tier.** Not before.
+**Trigger: now. This is the next piece of work, not a someday.**
 
-Today every request's bearer token IS the caller's own OpenRouter key — it
-authenticates the request and funds that turn's upstream calls, and the server
-holds no upstream credential at all (`docs/KEY_HANDLING.md`). OpenRouter earns its
-place in exactly that arrangement: the caller already has an account there, we
-never touch their money, and the router's endpoint selection is a hedge across
-~24 hosts serving the same weights, filtered to endpoints that do not collect or
-train on request data (`_PROVIDER_ROUTING`, `docs/PROVIDER_POLICY.md` §3).
+The door is currently open. The server holds the upstream credential
+(`CEREBRAS_API_KEY`) and funds every turn from it, and `auth.py` serves a request
+with no `Authorization` header as an anonymous principal. Combined with a public
+Cloud Run service that is an open, Daintree-funded endpoint with no rate limiting
+— which is the accepted state for this stage and the reason this entry is first.
 
-On a paid tier the arrangement inverts. **We** hold the credential and **we** pay
-per token, so a router's margin stops being someone else's cost and starts being
-ours, and "which of two dozen endpoints answered" stops being a hedge and starts
-being an unpriced variable. At that point a single known host with a published
-price is the better trade.
+**The seam already exists**, deliberately, and nothing about it is a shim:
 
-**The target** — <https://novita.ai/models/model-detail/deepseek-deepseek-v4-flash-0731>
-(checked 2026-08-15; all of this is provider-side and moves):
+- `auth.authenticate` is the one place a request becomes a `Principal`. The
+  anonymous branch becomes a rejection; the rest of the server does not move.
+- `Principal.api_key` is `None` on every real request today but is still carried,
+  and `CerebrasProvider._resolve_key` still prefers a request-supplied credential
+  over the server's own. So a per-account credential is a **value** flowing
+  through existing plumbing, not new plumbing.
+  `tests/integration/test_endpoints.py::test_a_caller_supplied_key_reaches_selector_and_main_calls`
+  keeps that path live and tested precisely so it does not rot before it is used.
+- A malformed bearer is *already* a 401 on every route. Absence is what is
+  permitted, not garbage.
 
-- Same model, same slug: `deepseek/deepseek-v4-flash-0731`. No prompt
-  recalibration, no benchmark re-baselining — the weights we are already
-  calibrated against.
-- OpenAI-compatible endpoint at `https://api.novita.ai/openai`, which is the wire
-  shape `providers/openrouter.py` already speaks.
-- $0.14 / M input, $0.028 / M cache read, $0.28 / M output, 1M context.
+What has to be decided rather than merely built: whether an authenticated caller
+still spends Daintree's key (an account is an entitlement) or brings their own
+(an account is a credential mapping). The code supports either; the tests that
+enumerate the open door — `test_every_route_is_served_without_an_authorization_header`,
+`test_an_absent_header_is_served_anonymously`, and the smoke script's
+"Authentication posture" block — are the ones that must start failing when this
+lands, and they are written to be found.
 
-### What the work actually is
+---
 
-The provider swap itself is the small half. `providers/base.py` already defines a
-narrow `ChatProvider` protocol that business logic depends on instead of
-OpenRouter wire shapes, so a `providers/novita.py` implementing it touches nothing
-in validation, selection, state, prompt assembly, or the endpoints. **Do not add
-any abstraction for this ahead of time** — that protocol is the whole abstraction
-needed, and it exists.
+## Watch `gemma-4-31b`'s replacement
 
-The large half is everything OpenRouter is currently doing for us that a single
-host will not:
+**Trigger: when Cerebras retires the preview model.** Announced, not scheduled.
 
-1. **Cost reporting.** OpenRouter returns `usage.cost` — what it actually billed,
-   already accounting for the endpoint that served the call and any cache
-   discount. Novita is one host with published per-token prices, so cost becomes
-   something we *compute* from a price table we now have to keep current. The
-   `absent means unknown, never free` rule and the `cost_complete` flag
-   (`providers/base.py`, `docs/DAINTREE_API.md` §5c) have to survive that
-   change intact — a stale price table producing a confidently wrong number is
-   worse than the `None` it replaces.
-2. **The privacy posture.** `data_collection: "deny"` is a *filter over a pool*;
-   against one vendor it is a contract term instead, and the whole of
-   `providers/policy.py` (`PrivacyMode`, `RoutingPreference`, the per-request
-   `routing` block a caller may narrow) needs a real answer for what it means with
-   nothing left to route between. Read Novita's actual terms before writing a
-   single user-facing string, then update `docs/PROVIDER_POLICY.md` §3–§4 and
-   everything downstream of it.
-3. **Failover.** OpenRouter fails over between endpoints; one host means an
-   outage is an outage. Decide deliberately whether OpenRouter stays as a
-   fallback path — this is the one place a two-provider design might be earned
-   rather than legacy.
-4. **The credential inversion, which is the real project.** `main._build_provider`
-   passes `api_key=None` on purpose so a propagation bug fails loudly instead of
-   quietly billing a shared account. A paid tier bills a shared account *by
-   design*, so that guard, `_resolve_key`, `/v1/daintree/auth/verify` (which
-   probes the caller's key against the provider) and
-   `test_serving_provider_is_built_without_a_default_credential` all invert
-   meaning at once. And with a server-held key comes everything
-   `docs/INTERNAL_BETA.md` §4 says we deliberately do not have: admission control,
-   rate limiting, per-account quotas. That reasoning — "the backend funds no spend
-   of its own" — expires on exactly this day.
-5. **`openai/gpt-5.6-sol` does not move.** The skill builder/improver is
-   local-development-only and has no Novita equivalent, so it stays on OpenRouter.
-   "One provider" means one provider *on the serving path*.
+`config.CEREBRAS_MODEL` is the whole code change, but not the whole job — see
+`docs/PROVIDER_POLICY.md` §9. Two things beyond output quality have to be
+re-decided:
 
-### Surfaces that name OpenRouter and will need updating
-
-`config.py` (`OPENROUTER_BASE_URL`, and the hardened-environment check that it is
-the `openrouter.ai` origin), `docs/PROVIDER_POLICY.md` (authoritative — §1 says
-"the **only** upstream is OpenRouter"), `docs/KEY_HANDLING.md`,
-`docs/INTERNAL_BETA.md`, `docs/DAINTREE_API.md`, `README.md`, `CLAUDE.md`,
-`.env.example`, `tests/unit/test_docs_drift.py`, `tests/live/`,
-`tools/baseline.py` + `benchmarks/baseline.json`, and the CLI's sign-in copy.
-
-Per the pre-release rule in `CLAUDE.md`: this is a **replacement**, not an
-addition. No parallel versioned surface, no compatibility shim, no migration path
-— except where a fallback provider (3 above) is chosen as a deliberate design.
+1. **Thinking posture.** Nothing in this server thinks, and that is a property of
+   *this model* rather than a flag: `gemma-4-31b` does not reason, and Cerebras
+   offers no way to switch reasoning off (a bare `reasoning_effort` string with no
+   "off" value). A reasoning-capable replacement is therefore a deliberate posture
+   decision with a real latency cost, not a drop-in.
+   `tests/live/test_live_cerebras.py::test_live_serving_model_reports_no_reasoning_tokens`
+   asserts zero reasoning tokens so this cannot be missed silently.
+2. **Prompt budgets and the baseline.** The per-file budget tests and
+   `benchmarks/baseline.json` are sized against this model's context window and
+   its behaviour under the current prompts. Refresh the baseline deliberately
+   (`python -m tools.baseline capture`) and explain the move.

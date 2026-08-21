@@ -51,7 +51,6 @@ from ..errors import (
 from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
-from ..providers.policy import RoutingPreference, routing_preference
 from ..providers.retry import retry_upstream
 from ..skills.active_set import (
     merge_active_skills,
@@ -76,7 +75,6 @@ from .docs_mcp import (
 )
 from .output_policy import lint_output, repair_tables, resolve_content_width
 from .prompt_assembler import PromptAssembler
-from .skill_learning import SkillLearner
 from .tool_call_repair import (
     ParameterIndex,
     StreamToolCallBuffer,
@@ -219,7 +217,7 @@ _DOCS_BUDGET_RESERVE_SECONDS = 3.0
 # it says what it is and which surface produced it: a bare digest would collide
 # in meaning with any other use of the same field, and an unlabelled key is
 # undebuggable from the far side. `main-` because only the main conversation
-# calls carry one — the selector, utility tasks and skill learning deliberately
+# calls carry one — the selector and utility tasks deliberately
 # do not (they have no growing per-session prefix to keep warm, and keying them
 # per session would only fragment a pool they share fleet-wide).
 _CACHE_SESSION_PREFIX = "daintree-main-"
@@ -289,10 +287,12 @@ class _PreparedTurn:
     provider_request: ProviderChatRequest
     meta: _RespondMeta
     active_ids: list[str]
-    # The caller's upstream credential (already attached to provider_request);
-    # carried separately so the post-stream learning dispatch can capture it by
-    # value without re-narrowing the request's optional field.
-    api_key: SecretStr
+    # The caller's own upstream credential when they supplied one, ``None``
+    # otherwise — which is every request until account auth lands, and means the
+    # provider spends the server's key (see auth.py). Already attached to
+    # provider_request; carried separately so a caller that rebuilds a request
+    # (the bare-intent re-roll) does not have to reach into it.
+    api_key: SecretStr | None
     # The SHADOW tool projection for this turn. Carried so both response paths
     # can grade what the model actually called against what a filter would have
     # withheld — the one number that says whether filtering is safe to enable.
@@ -345,7 +345,6 @@ class ChatOrchestrator:
         state_codec: StateCodec,
         assembler: PromptAssembler,
         provider: ChatProvider,
-        learner: SkillLearner | None = None,
         # The public documentation MCP. Optional so a turn is constructible
         # without one — a container built for a test or a benchmark simply never
         # looks anything up, which is the same outcome as a docs server that is
@@ -358,16 +357,16 @@ class ChatOrchestrator:
         self.state_codec = state_codec
         self.assembler = assembler
         self.provider = provider
-        self.learner = learner
         self.docs_client = docs_client
-        # In-flight fire-and-forget skill-learning tasks. asyncio holds only a weak
-        # reference to a bare task, so we keep a strong one here (discarded on done)
-        # to stop a learning pass being garbage-collected mid-flight.
+        # In-flight detached tasks — today, the streaming path's preparation task.
+        # asyncio holds only a weak reference to a bare task, so we keep a strong
+        # one here (discarded on done) to stop one being garbage-collected
+        # mid-flight, and drain them on shutdown before the provider closes.
         self._background_tasks: set[asyncio.Task[Any]] = set()
 
     @property
     def catalog(self) -> Catalog:
-        # Read live: the skill-learning harness may reload it in place mid-request.
+        # Read live: CatalogManager supports reload, so never cache the object.
         return self.catalog_manager.catalog
 
     # ---- cadence --------------------------------------------------------
@@ -503,7 +502,7 @@ class ChatOrchestrator:
         request: RespondRequest,
         *,
         upstream_model: str,
-        api_key: SecretStr,
+        api_key: SecretStr | None,
         request_id: str | None = None,
     ) -> RespondOutcome:
         request_id = request_id or new_request_id()
@@ -585,7 +584,7 @@ class ChatOrchestrator:
         *,
         upstream_model: str,
         request_id: str,
-        api_key: SecretStr,
+        api_key: SecretStr | None,
         budget: RequestBudget,
         headers: dict[str, str],
     ) -> RespondOutcome:
@@ -616,7 +615,7 @@ class ChatOrchestrator:
         *,
         upstream_model: str,
         request_id: str,
-        api_key: SecretStr,
+        api_key: SecretStr | None,
         budget: RequestBudget,
         headers: dict[str, str],
     ) -> RespondOutcome:
@@ -630,9 +629,9 @@ class ChatOrchestrator:
         result = await self._complete_with_retry(prepared.provider_request, budget=budget)
         # Snapshot BEFORE the re-roll: it returns the repaired result in `result`'s
         # place, and only the usage is carried across (`sum_usage` inside). The
-        # first attempt's host would otherwise be unrecoverable — on exactly the
-        # turns worth measuring, since a re-roll is where a routing switch can
-        # blend two caches into one ratio.
+        # first attempt's host would otherwise be unrecoverable. Against a
+        # single-host provider this is always None; the snapshot stays because
+        # the accounting below reads it either way.
         first_endpoint = result.endpoint
         # A round that only announced a tool call it never emitted would end the turn
         # having performed nothing. Re-roll it once here, before anything is built or
@@ -687,16 +686,6 @@ class ChatOrchestrator:
             cost=turn_cost,
             timings=prepared.timings.to_wire(budget),
         )
-        self._maybe_learn_after_turn(
-            request=request,
-            active_ids=prepared.active_ids,
-            assistant_text=result.text,
-            had_tool_calls=had_tool_calls,
-            finish_reason=result.finish_reason,
-            tools_callable=self._tools_callable(prepared.provider_request),
-            request_id=request_id,
-            api_key=api_key,
-        )
         return RespondOutcome(headers=headers, streaming=False, body=body)
 
     async def _prepare(
@@ -705,7 +694,7 @@ class ChatOrchestrator:
         *,
         upstream_model: str,
         request_id: str,
-        api_key: SecretStr,
+        api_key: SecretStr | None,
         budget: RequestBudget | None = None,
     ) -> _PreparedTurn:
         """Validate, decode state, select skills and assemble — under a deadline.
@@ -783,7 +772,7 @@ class ChatOrchestrator:
         *,
         upstream_model: str,
         request_id: str,
-        api_key: SecretStr,
+        api_key: SecretStr | None,
         # Only the docs lookup reads it: everything else in preparation is bounded
         # by the enclosing `asyncio.timeout`, but an outbound call to a third
         # server needs a slice of its own or a slow docs host silently spends the
@@ -931,12 +920,6 @@ class ChatOrchestrator:
                 # list is used for the menu filter above, not here.
                 available_tools=self._available_tool_names(request),
                 catalog=selection_catalog,
-                # The selector sends a bounded slice of the conversation
-                # upstream too, so the caller's routing choice has to reach it
-                # — otherwise a ZDR turn would honour the request on the
-                # visible call and quietly route the user's own words under the
-                # default policy here.
-                routing=routing_preference(request.routing),
             )
             selector_ms = round((time.perf_counter() - t_sel) * 1000)
             timings.selection_ms = selector_ms
@@ -954,7 +937,7 @@ class ChatOrchestrator:
         # A successful selector run is authoritative (topic-shift replacement); a
         # no-run continuation round or a degraded selector reuses the prior set.
         # Pin one post-selection catalog snapshot for active resolution, prompt,
-        # state, and metadata. If learning reloaded the catalog during selection,
+        # state, and metadata. If the catalog were reloaded during selection,
         # the prompt renders against the same skills the state token records.
         resolved_catalog = self.catalog
         # Resolution and body lookup follow the same NARROWING the decision was made
@@ -962,7 +945,7 @@ class ChatOrchestrator:
         # menu.
         #
         # Derived from `resolved_catalog` (the post-selection snapshot), NOT from
-        # `selection_catalog` (the pre-selection one). Skill learning can swap the
+        # `selection_catalog` (the pre-selection one). CatalogManager can swap the
         # live catalog while the selector is awaiting, and the assistant path already
         # resolves bodies from the post-await snapshot so that bodies, response
         # metadata and the state token all describe ONE generation. Deriving the
@@ -1415,138 +1398,25 @@ class ChatOrchestrator:
             logger.warning("main_output_lint_error", request_id=request_id, error=str(exc))
             return []
 
-    # ---- skill learning (local dev only, off the response path) ---------
-
-    def _maybe_learn_after_turn(
-        self,
-        *,
-        request: RespondRequest,
-        active_ids: list[str],
-        assistant_text: str,
-        had_tool_calls: bool,
-        finish_reason: str | None,
-        tools_callable: bool,
-        request_id: str,
-        api_key: SecretStr,
-    ) -> None:
-        """Fire skill learning on the just-completed workflow, off the response path.
-
-        Runs ONLY when the turn ended with a final answer (no tool calls) — a
-        tool-continuation round is a half-finished workflow, so we wait for the
-        round that actually closes it. This is exactly what lets the LAST workflow
-        of a session be learned: there is no next instruction to trigger on, but a
-        final answer is the natural completion boundary. The learner reloads the
-        catalog in place, so a created/improved skill is live for the next turn.
-
-        A *bare intent* round is the second thing that is not a completion boundary,
-        and the reason this takes the same structural signals ``is_bare_tool_intent``
-        does: a round that only ANNOUNCED an action wears the exact shape of a final
-        answer (no tool calls, ``stop``, non-empty text), so ``had_tool_calls`` cannot
-        see it. The response path already re-rolls such a round once; this catches the
-        ones the re-roll did not fix, which arrive here having accomplished nothing.
-
-        Fire-and-forget: a slow (thinking-model) learning pass must never delay or
-        block the response the user already has, and the learner fails open
-        internally. Invisible to the CLI — no wire fields, no feedback tool.
-        """
-        if self.learner is None or not self.learner.enabled:
-            return
-        if request.profile == "subagent":
-            # A sub-agent transcript is not a workflow. It is a FRAGMENT of one —
-            # somebody else's, seen through a read-only tool set, ending in a
-            # report to a machine rather than a completed task. Learning from it
-            # would mine the search for the answer instead of the work the answer
-            # was for, and the gate's strongest create signal (a cleanly completed
-            # repeatable workflow) is exactly what a sub-agent's shape counterfeits:
-            # every run ends in a final answer with no pending tool calls.
-            #
-            # It is also a fan-out multiplier — three concurrent sub-agents would
-            # fire three GPT-5.6-Sol thinking passes against the caller's key for
-            # one user turn, none of them about a workflow the user ran.
-            return
-        if had_tool_calls or not assistant_text.strip():
-            return
-        try:
-            bare_intent = is_bare_tool_intent(
-                assistant_text,
-                finish_reason=finish_reason,
-                saw_tool_calls=had_tool_calls,
-                tools_callable=tools_callable,
-            )
-        except Exception:
-            # Same never-propagate posture as ``_is_bare_intent``, opposite fail
-            # direction: on the response path a detector bug must not cost a reply
-            # the user is already owed, but here the cheap side is NOT learning. A
-            # skipped pass costs nothing (learning is opportunistic, and the same
-            # workflow can be learned on a later run), while learning from a dead
-            # round can write a real skill file out of a non-answer.
-            logger.warning(
-                "skill_learning_bare_intent_check_failed", request_id=request_id, exc_info=True
-            )
-            bare_intent = True
-        if bare_intent:
-            # Content-free by design: the skip rate is worth watching, but assistant
-            # text never belongs in a log line.
-            logger.info("skill_learning_skipped_bare_intent", request_id=request_id)
-            return
-        trailing = [ChatMessage(role="assistant", content=assistant_text)]
-        # The caller's credential is captured BY VALUE into the task's arguments:
-        # by the time the fire-and-forget pass runs, the HTTP request (and its
-        # Principal) is gone, so nothing ambient (contextvars included) would
-        # still hold it.
-        task = asyncio.create_task(
-            self._run_learner_background(request, list(active_ids), trailing, api_key)
-        )
-        self._background_tasks.add(task)
-        task.add_done_callback(self._background_tasks.discard)
-
-    async def _run_learner_background(
-        self,
-        request: RespondRequest,
-        active_ids: list[str],
-        trailing: list[ChatMessage],
-        api_key: SecretStr,
-    ) -> None:
-        """Guarded wrapper so a background learning pass can never surface an
-        exception to the (already-detached) task — ``learner.run`` is fail-open,
-        this is belt-and-suspenders for anything around it."""
-        assert self.learner is not None  # guarded by the caller
-        try:
-            await self.learner.run(
-                request=request,
-                active_ids=active_ids,
-                trailing_messages=trailing,
-                api_key=api_key,
-            )
-        except Exception as exc:  # noqa: BLE001 - detached task must swallow everything
-            logger.warning("skill_learning_background_failed", error=str(exc))
-
     async def drain_background_tasks(self, timeout: float = 30.0) -> None:
-        """Give in-flight learning tasks a BOUNDED grace period on shutdown, then
+        """Give in-flight detached tasks a BOUNDED grace period on shutdown, then
         cancel — used before the provider they depend on is closed.
 
-        A learning pass is a slow (thinking-model) call that can legitimately run
-        for minutes, so an unbounded await here would hang server shutdown after a
-        Ctrl-C (the common case: stopping the local server right when the last
-        turn's pass just fired). We wait up to ``timeout`` for passes to finish, then
-        cancel the stragglers. Cancelling only interrupts the model call; a pass
-        already inside its write+reload is cancellation-shielded (see
-        ``SkillLearner._apply``), so the catalog is never left half-written. Losing
-        an unfinished pass is acceptable — learning is fire-and-forget and
-        best-effort, and the same workflow can be re-learned on a later run.
+        The bound is what matters. A preparation task owns a live upstream call,
+        so an unbounded await here would hang server shutdown after a Ctrl-C for
+        as long as the model felt like taking. We wait up to ``timeout``, then
+        cancel the stragglers and gather them so nothing surfaces as an orphaned
+        "exception was never retrieved" warning.
         """
         tasks = list(self._background_tasks)
         if not tasks:
             return
-        logger.info("skill_learning_drain_wait", pending=len(tasks), timeout=timeout)
+        logger.info("background_drain_wait", pending=len(tasks), timeout=timeout)
         _, pending = await asyncio.wait(tasks, timeout=timeout)
         if pending:
-            logger.warning("skill_learning_drain_timeout", abandoned=len(pending))
+            logger.warning("background_drain_timeout", abandoned=len(pending))
             for task in pending:
                 task.cancel()
-            # A cancelled pass unwinds fast unless it is in the shielded commit,
-            # which finishes on its own first (a file write + reload, not a model
-            # call), so this final gather stays bounded.
             await asyncio.gather(*pending, return_exceptions=True)
 
     # ---- manual resolve (section 12.2) ---------------------------------
@@ -1557,13 +1427,12 @@ class ChatOrchestrator:
         action: str,
         session_id: str | None,
         state_token: str | None,
-        api_key: SecretStr,
+        api_key: SecretStr | None,
         turn_id: str | None = None,
         instruction_revision: int = 0,
         query: str | None = None,
         skill_ids: list[str] | None = None,
         request_id: str | None = None,
-        routing: RoutingPreference | None = None,
     ) -> dict[str, Any]:
         request_id = request_id or new_request_id()
         verification = self.state_codec.verify(state_token, session_id=session_id)
@@ -1594,7 +1463,7 @@ class ChatOrchestrator:
             run_selector = True
             conversation = [ChatMessage(role="user", content=query or "")]
             decision = await self.selector.select(
-                conversation, prior_active_ids, api_key=api_key, routing=routing
+                conversation, prior_active_ids, api_key=api_key
             )
             warnings.extend(decision.warnings)
             # A find re-selects: the selector result is authoritative, same as a turn.
@@ -1882,8 +1751,6 @@ class ChatOrchestrator:
             prepared.provider_request,
             meta=prepared.meta,
             request=request,
-            active_ids=prepared.active_ids,
-            api_key=prepared.api_key,
             budget=budget,
             projection=prepared.projection,
             timings=prepared.timings,
@@ -1930,8 +1797,6 @@ class ChatOrchestrator:
         *,
         meta: _RespondMeta,
         request: RespondRequest,
-        active_ids: list[str],
-        api_key: SecretStr,
         budget: RequestBudget | None = None,
         projection: ToolProjection,
         timings: _Timings,
@@ -1959,9 +1824,9 @@ class ChatOrchestrator:
             timings.first_output_ms = round(budget.elapsed() * 1000)
 
 
-        # Accumulate the reply so post-completion learning can see the workflow it
-        # just finished. content_parts is joined into the final answer; a tool_calls
-        # delta marks this as a continuation round (not a completion boundary).
+        # Accumulate the VISIBLE reply. It is what the bare-intent detector reads
+        # (a round that only announces an action is re-rolled rather than sent) and
+        # what the runaway guard measures against.
         content_parts: list[str] = []
         # Running length of the VISIBLE reply, kept beside content_parts so the
         # runaway guard costs an int add per chunk instead of a join per chunk.
@@ -2373,16 +2238,6 @@ class ChatOrchestrator:
                 tool_call_buffer.called_names,
                 request_id=meta.request_id,
                 names_complete=tool_call_buffer.names_complete,
-            )
-            self._maybe_learn_after_turn(
-                request=request,
-                active_ids=active_ids,
-                assistant_text="".join(content_parts),
-                had_tool_calls=saw_tool_calls or finish_reason == "tool_calls",
-                finish_reason=finish_reason,
-                tools_callable=tools_callable,
-                request_id=meta.request_id,
-                api_key=api_key,
             )
 
     @staticmethod

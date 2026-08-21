@@ -36,7 +36,6 @@ from pydantic import SecretStr
 
 from ...config import Settings
 from ...contracts.openai import ChatMessage
-from ...providers.policy import RoutingPreference
 from ..catalog import Catalog, CatalogManager
 from ..selector import SelectionDecision
 from .documents import last_user_text, query_document
@@ -64,7 +63,6 @@ class SkillSelector(Protocol):
         api_key: SecretStr | None = None,
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
-        routing: RoutingPreference | None = None,
         catalog: Catalog | None = None,
     ) -> SelectionDecision: ...
 
@@ -96,12 +94,11 @@ class LocalSelector:
         api_key: SecretStr | None = None,
         turn_context: str | None = None,
         available_tools: list[str] | None = None,
-        routing: RoutingPreference | None = None,
         catalog: Catalog | None = None,
     ) -> SelectionDecision:
         """Classify this turn. Never raises; degrades to the prior active set.
 
-        ``api_key``, ``available_tools`` and ``routing`` are accepted and ignored
+        ``api_key`` and ``available_tools`` are accepted and ignored
         — they exist so this is signature-compatible with the upstream selector.
         Nothing leaves the process here, which is the entire point: no credential
         is spent, no endpoint is chosen, and the caller's conversation does not

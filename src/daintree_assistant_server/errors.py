@@ -234,30 +234,8 @@ def provider_key_forbidden(
 
 
 # --------------------------------------------------------------------------
-# Provider routing and availability.
+# Upstream availability.
 # --------------------------------------------------------------------------
-
-
-def upstream_no_compliant_provider(
-    message: str = (
-        "No upstream endpoint matched the active routing policy for this request."
-    ),
-) -> DaintreeError:
-    """No endpoint satisfied the privacy/parameter policy we sent.
-
-    503 rather than 502 because nothing is wrong with the request: it is a
-    capacity/eligibility condition that may clear on its own. Crucially it is
-    **not** retryable within the turn — the policy is deterministic, so an
-    immediate replay re-derives the same empty pool. Failing closed here is the
-    point: the alternative is silently relaxing the privacy floor to find a
-    route, which would make the promise in docs/PROVIDER_POLICY.md a lie.
-    """
-    return DaintreeError(
-        status_code=503,
-        message=message,
-        type=TYPE_API,
-        code="upstream_no_compliant_provider",
-    )
 
 
 def upstream_unavailable(

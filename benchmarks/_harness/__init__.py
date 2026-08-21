@@ -5,7 +5,7 @@ runner, selector, provider, validators) and treats only the prompt directory /
 a fixture corpus as an injectable seam — a measured number is exactly what
 production produces. This package holds the pieces they all reuse:
 
-- ``env``      — settings + live OpenRouter provider bootstrap (reads ``.env``).
+- ``env``      — settings + live Cerebras provider bootstrap (reads ``.env``).
 - ``counting`` — a transparent provider decorator that counts model calls and
   captures the FIRST response, so a repaired-then-parsed result is no longer
   byte-indistinguishable from a clean first-try one (the production classes sum

@@ -31,7 +31,7 @@ def test_doctor_reports_a_healthy_server(client, auth, fake_provider) -> None:
     assert body["ready"] is True
     assert body["provider"]["key_valid"] is True
     assert body["provider"]["key_usable"] is True
-    assert body["provider"]["server_holds_credential"] is False
+    assert body["provider"]["server_holds_credential"] is True
     assert body["catalog"]["revision"]
     assert body["catalog"]["skills"] > 0
     assert body["warnings"] == []
@@ -139,8 +139,12 @@ def test_the_startup_reason_is_withheld_in_a_hardened_environment(app, auth, mon
     assert "changeme" not in json.dumps(body)
 
 
-def test_doctor_requires_authentication(client) -> None:
-    assert client.post(URL).status_code == 401
+def test_doctor_is_reachable_without_a_bearer(client) -> None:
+    """Same open door as every other route — and the doctor is where a tester
+    with no credential goes first to find out what is wrong."""
+    r = client.post(URL)
+    assert r.status_code == 200
+    assert r.json()["provider"]["caller_supplied_key"] is False
 
 
 @pytest.mark.parametrize(
@@ -174,11 +178,18 @@ def test_the_bundle_reports_the_public_model_alias(client, auth) -> None:
     assert body["provider"]["model"] == "daintree-assistant"
 
 
-def test_the_bundle_states_the_privacy_posture(client, auth) -> None:
-    """The fact a tester most needs confirmed before pasting a real key."""
+def test_the_bundle_states_who_holds_the_credential(client, auth) -> None:
+    """The fact a tester most needs confirmed, and the one that inverted.
+
+    There is no privacy_mode to report any more — Cerebras is a single host with
+    no per-request data-handling knob, so the posture is its published policy
+    rather than something this server selects (docs/PROVIDER_POLICY.md section 4).
+    What the bundle reports instead is who is paying.
+    """
     body = client.post(URL, headers=auth).json()
-    assert body["provider"]["privacy_mode"]
-    assert body["provider"]["server_holds_credential"] is False
+    assert body["provider"]["name"] == "cerebras"
+    assert body["provider"]["server_holds_credential"] is True
+    assert "privacy_mode" not in body["provider"]
 
 
 def test_doctor_survives_a_server_with_no_container_at_all(app, auth) -> None:

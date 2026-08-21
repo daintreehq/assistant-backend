@@ -1,15 +1,30 @@
-"""Bearer authentication.
+"""Bearer authentication — currently open, deliberately and temporarily.
 
-Every request carries the caller's own API key as the bearer token; that key is
-also the upstream credential for the turn's provider calls (for early testers it
-is literally their OpenRouter key — later a subscription key the backend maps to
-a credential server-side, with no wire change). Authentication is therefore
-credential *extraction* plus structural validation, identical in every
-environment: there is no shared server secret to compare against and no
-unauthenticated development mode. A missing or malformed key 401s here
-(``invalid_api_key``); a well-formed key that the upstream then rejects surfaces
-as a 502 ``upstream_error`` — two distinct codes so the CLI can tell "fix your
-header" from "fix your account".
+**The door is open.** The server now holds its own upstream credential
+(``CEREBRAS_API_KEY``) and funds every turn from it, so a request no longer needs
+to carry a key in order to have one to spend. With nothing to authenticate
+against — no shared server secret, no account store yet — requiring a bearer
+token would reject callers on a check that could not tell a real credential from
+any other well-formed string. So this module accepts a request with no
+``Authorization`` header at all.
+
+That is a **stage, not a destination**. Account authentication and sign-in are
+being built next, and this is the seam they land in: ``authenticate`` is the one
+place a request becomes a :class:`Principal`, and every route already depends on
+it through ``require_auth``. When accounts arrive, the anonymous branch below
+becomes a rejection and the rest of the server does not move.
+
+Two things are kept alive in the meantime rather than deleted, because they are
+what the next step needs:
+
+* :class:`Principal` still carries an ``api_key``, now ``None`` on every real
+  request. It is the field an account-mapped credential will occupy, and the
+  provider already prefers a request-supplied key over the server's default
+  (``CerebrasProvider._resolve_key``), so per-caller credentials need no new
+  plumbing — only a value here.
+* A bearer token that IS present is still structurally validated and rejected
+  when malformed. A caller who sends garbage should hear about it at the door
+  rather than have it silently ignored.
 """
 
 from __future__ import annotations
@@ -26,14 +41,16 @@ from .errors import invalid_api_key
 class Principal:
     """An authenticated caller.
 
-    ``api_key`` is the caller's own upstream credential, threaded explicitly to
-    every provider call the request makes. It is credential material: repr is
+    ``api_key`` is the caller's own upstream credential when they have one, and
+    ``None`` otherwise — which, until account auth lands, is every request. When
+    it is set it is threaded explicitly to every provider call the request makes
+    and overrides the server's own key. It is credential material: repr is
     suppressed and downstream code must never log or echo it.
     """
 
     id: str
     scopes: frozenset[str]
-    api_key: SecretStr = field(repr=False)
+    api_key: SecretStr | None = field(default=None, repr=False)
 
     def has_scope(self, scope: str) -> bool:
         return scope in self.scopes
@@ -41,9 +58,8 @@ class Principal:
 
 CALLER_SCOPES = frozenset({"chat", "tasks", "skills:read", "skills:write"})
 
-# Generous ceiling on the bearer token. Real keys are well under 200 bytes
-# (OpenRouter today, subscription keys later); the cap only stops an absurd
-# header from being scanned, copied into a SecretStr, and forwarded upstream.
+# Generous ceiling on the bearer token. Real keys are well under 200 bytes; the
+# cap only stops an absurd header from being scanned and copied into a SecretStr.
 MAX_TOKEN_LENGTH = 4096
 
 
@@ -64,12 +80,12 @@ def _extract_bearer(authorization: str | None) -> str | None:
 def _structurally_valid(token: str) -> bool:
     """Printable non-space ASCII only (0x21–0x7E).
 
-    The same shape ``OpenRouterProvider._resolve_key`` enforces before building
-    an Authorization header, applied at our door so garbage 401s here instead of
+    The same shape ``CerebrasProvider._resolve_key`` enforces before building an
+    Authorization header, applied at our door so garbage 401s here instead of
     surfacing as an upstream 502. Deliberately NO prefix check: the key's issuer
-    is not our business (today an OpenRouter key, later a subscription key),
-    only that it can ride an HTTP header safely — plus a generous length cap
-    (``MAX_TOKEN_LENGTH``) so absurd input is refused rather than forwarded.
+    is not our business, only that it can ride an HTTP header safely — plus a
+    generous length cap (``MAX_TOKEN_LENGTH``) so absurd input is refused rather
+    than forwarded.
     """
     if len(token) > MAX_TOKEN_LENGTH:
         return False
@@ -77,12 +93,25 @@ def _structurally_valid(token: str) -> bool:
 
 
 def authenticate(authorization: str | None) -> Principal:
-    """Validate the bearer header and return the principal, or raise 401.
+    """Turn the bearer header into a principal.
 
-    No environment ever allows unauthenticated access: without a caller key
-    there is no upstream credential to run the turn with, so the old
-    development shortcut is gone rather than gated.
+    Three outcomes, and the middle one is the current normal case:
+
+    * **A well-formed token** — carried on the principal and used as this
+      request's upstream credential, ahead of the server's own.
+    * **No header at all** — an anonymous principal with full caller scopes. The
+      server's key funds the turn. This is what the CLI sends today.
+    * **A header that is present but unusable** (not ``Bearer <token>``, or a
+      token with characters no HTTP header may carry) — 401. Silently ignoring it
+      would strand a caller who *meant* to authenticate: they would see their key
+      apparently accepted while every turn ran on the server's account instead.
+
+    Note the asymmetry between the last two. Absence is a valid choice; a
+    malformed presence is a mistake, and saying so is the whole value of still
+    checking.
     """
+    if authorization is None or not authorization.strip():
+        return Principal(id="anonymous", scopes=CALLER_SCOPES, api_key=None)
     token = _extract_bearer(authorization)
     if not token or not _structurally_valid(token):
         raise invalid_api_key()

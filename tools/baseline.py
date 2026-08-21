@@ -59,11 +59,10 @@ BANDS: dict[str, float] = {
 def capture() -> dict[str, Any]:
     sys.path.insert(0, str(REPO_ROOT / "src"))
     from daintree_assistant_server.config import (
-        OPENROUTER_MODEL,
+        CEREBRAS_MODEL,
         PUBLIC_MODEL_ID,
     )
     from daintree_assistant_server.prompts.loader import PromptLoader
-    from daintree_assistant_server.providers.policy import DEFAULT_POLICY
     from daintree_assistant_server.skills.catalog import load_catalog
     from daintree_assistant_server.skills.local.documents import routing_revision
     from daintree_assistant_server.skills.local.paths_local import selector_artifact_dir
@@ -83,17 +82,14 @@ def capture() -> dict[str, Any]:
 
     return {
         "identity": {
-            "model": OPENROUTER_MODEL,
+            "model": CEREBRAS_MODEL,
             "public_model": PUBLIC_MODEL_ID,
-            "privacy_mode": DEFAULT_POLICY.privacy.value,
-            "default_endpoint_sort": DEFAULT_POLICY.sort.value,
-            # The output-quality floor. A release fact for the same reason the
-            # privacy mode is: it decides which endpoints may answer at all, and
-            # every entry SHRINKS the pool that `allow_fallbacks` draws on. The
-            # per-file policy tests assert what is on the list; this makes a
-            # change to it show up in a release diff, which is the only place a
-            # silently-growing denylist would otherwise be visible.
-            "denied_endpoints": list(DEFAULT_POLICY.ignore),
+            # The upstream this server talks to. A release fact, and the one
+            # that moved when the intelligence layer did: Cerebras hosts one
+            # endpoint per model, so the endpoint-selection posture the old
+            # baseline recorded (privacy mode, sort axis, denylist) has no
+            # subject any more and is gone rather than reported as a constant.
+            "provider": "cerebras",
         },
         "selector": {
             # Selection is LOCAL and two-stage: these describe the shipped

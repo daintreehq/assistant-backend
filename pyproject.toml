@@ -62,7 +62,6 @@ daintree_assistant_server = [
     "prompts/main/*.j2",
     "prompts/selector/*.j2",
     "prompts/tasks/*.md",
-    "prompts/skill_learning/*.md",
     "skills/files/*.md",
     # The local two-stage skill selector — the SHIPPED selector. Both encoders
     # ship int8 only: fp32 is gitignored and exists locally so the export can

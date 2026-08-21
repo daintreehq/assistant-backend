@@ -5,27 +5,36 @@ and everywhere it must never appear.
 
 ---
 
-## 1. There is one key, and the tester owns it
+## 1. There is one key, and the SERVER owns it
 
-For the internal beta a Daintree credential **is an OpenRouter key**. It plays two
-roles at once and there is no second credential anywhere in the system:
+**This inverted with the move to Cerebras**, and it inverted in the direction
+that costs money if a reader remembers the old rule. It used to be that a
+Daintree credential *was* the caller's own OpenRouter key, playing two roles at
+once: authenticating the request, and funding that turn's model calls. The caller
+paid.
 
-1. it authenticates the request to the Daintree backend (HTTP bearer);
-2. it is the upstream credential that funds that turn's model calls.
+Now there is exactly one credential, `CEREBRAS_API_KEY`, it belongs to the
+server, and **Daintree pays**. Consequences that follow directly, and that the
+code enforces:
 
-Consequences that follow directly, and that the code enforces:
-
-- **The serving backend holds no model credential.** `main._build_provider` passes
-  `api_key=None` deliberately, so a key-propagation bug fails loudly in
-  `_resolve_key` instead of quietly billing a shared account. A unit test pins
-  this.
-- **`OPENROUTER_API_KEY` is benchmark and live-test tooling only.** The serving
-  path never reads it. It is not a fallback and must never become one.
-- **There is no unauthenticated mode in any environment.** Without a caller key
-  there is no upstream credential to run the turn with, so the old development
-  shortcut was removed rather than gated.
-- **The tester pays.** Every token — main completion, selector, utility tasks —
-  is billed to the key's own OpenRouter account.
+- **The serving backend holds the model credential.** `main._build_provider`
+  passes `settings.cerebras_api_key`, and `missing_secrets()` gates `/readyz` on
+  its presence — without it nothing can be answered at all, and discovering that
+  on the first turn surfaces as an upstream 401 that reads like the caller's
+  fault. Unit tests pin both halves.
+- **There is no inbound API key to configure, and the door is open.** A request
+  with no `Authorization` header is served (`auth.authenticate` returns an
+  anonymous principal). That is a *stage*, not a destination: account
+  authentication and sign-in are being built next, and `auth.py` is the seam they
+  land in.
+- **A caller-supplied bearer still wins.** A well-formed token is carried on the
+  `Principal` and used as that request's upstream credential ahead of the
+  server's (`CerebrasProvider._resolve_key`). Nothing sends one today; the path
+  is kept live and tested precisely so per-account credentials become a *value*
+  flowing through existing plumbing rather than new plumbing.
+- **A malformed bearer is still a 401.** Absence is a valid choice; a header that
+  is present but unusable is a mistake, and silently ignoring it would show that
+  caller a successful sign-in while every turn ran on the server's account.
 
 ## 2. Server-side handling
 
@@ -35,21 +44,24 @@ Consequences that follow directly, and that the code enforces:
 | Structural validation | printable non-space ASCII (0x21–0x7E) only, ≤ 4096 bytes. **No prefix check** — the issuer is not our business, only that the value can ride an HTTP header safely | `auth._structurally_valid` |
 | In-process form | `pydantic.SecretStr` on a frozen `Principal`, `repr=False` | `auth.Principal` |
 | Propagation | threaded explicitly as `ProviderChatRequest.api_key` to every provider call | `providers/base.py` |
-| Header construction | a fresh per-call header dict; the shared `httpx` client's own headers are never mutated, so concurrent calls carrying different keys cannot bleed into one another | `openrouter._headers` |
-| Malformed value | rejected in `_resolve_key` **before** httpx sees it — h11's `LocalProtocolError` embeds the offending header value verbatim and httpcore logs it at DEBUG, so the permissive path would leak the key into logs | `openrouter._resolve_key` |
-| Upstream error bodies | the credential is scrubbed out; if it is still recoverable after scrubbing (a doubly-encoded echo) the whole diagnostic is dropped | `openrouter._extract_upstream_error`, `_still_reveals` |
+| Header construction | a fresh per-call header dict; the shared `httpx` client's own headers are never mutated, so concurrent calls carrying different keys cannot bleed into one another | `cerebras._headers` |
+| Malformed value | rejected in `_resolve_key` **before** httpx sees it — h11's `LocalProtocolError` embeds the offending header value verbatim and httpcore logs it at DEBUG, so the permissive path would leak the key into logs | `cerebras._resolve_key` |
+| Upstream error bodies | the credential is scrubbed out; if it is still recoverable after scrubbing (a doubly-encoded echo) the whole diagnostic is dropped | `cerebras._extract_upstream_error`, `_still_reveals` |
 
 **The server never persists a key.** Not to disk, not to a cache, not to a
 metrics label, not to a request id. It lives in memory for the lifetime of the
 request that carried it, and is then dropped with the `Principal`.
 
-One bounded exception, in local development only: when **skill learning** is
-enabled, the post-turn learner runs fire-and-forget *after* the response has been
-sent, so the request is already gone. The orchestrator therefore captures the
-`SecretStr` by value into the detached task, and it survives until that task
-finishes. Learning is off by default and fails `/readyz` in staging and
-production, so this never applies to a deployed service — but it is a real
-in-memory extension of the key's lifetime on a developer's machine.
+The server's own key is different in kind: it is held for the process lifetime
+by design, as a `SecretStr` on the immutable `Settings`. Everything below about
+where a key must never appear applies to it identically — it is *more* sensitive
+than a caller's was, since one leak exposes every turn Daintree runs rather than
+one tester's account.
+
+(There used to be a bounded exception here: skill learning ran fire-and-forget
+after the response, so the orchestrator captured the caller's `SecretStr` by
+value into a detached task and it outlived the request. That feature has been
+removed.)
 
 ## 3. Where a key must never appear
 
@@ -74,7 +86,7 @@ Daintree's own auth is **structural** — a well-formed string that no provider 
 issued passes it — so without this probe a bad key first surfaces at the first
 real turn, long after the user thought they had signed in.
 
-The probe is `GET /key` against OpenRouter: the provider's own key-introspection
+The probe is `GET /models` against Cerebras: the cheapest authenticated call
 endpoint, which answers for the credential rather than for a model and runs no
 inference. It has a short, hardcoded 10s read budget, deliberately *not*
 inheriting the main model's budget — a user is watching a sign-in spinner. It is
@@ -151,7 +163,7 @@ lifecycle.
   above, not that check, is what covers the credential's own directory.
 - **The stored key is NOT bound to the stored endpoint.** `DAINTREE_BACKEND_URL`
   resolves ahead of the persisted URL while the persisted key still applies, so a
-  process-level override sends the caller's own provider credential to whatever
+  process-level override sends the server's provider credential to whatever
   host it names. That is deliberate — the key is valid against a local backend as
   well as the deployed one, and binding it would break the sign-in-once dev loop —
   but it is a fail-OPEN default and must be described as one. What the pairing
@@ -178,7 +190,7 @@ LOCAL gate that skips in CI rather than a green-build guarantee.
 
 | | Requirement | Status |
 |---|---|---|
-| 1 | On first launch, state plainly that the key is an **OpenRouter** key and that OpenRouter bills it. | ✅ `login.go` names the provider and prints `backend.KeyPurposeNotice` before the key prompt |
+| 1 | (Historical — callers no longer supply a key.) On first launch, state plainly that the key is an **OpenRouter** key and that OpenRouter bills it. | ✅ `login.go` names the provider and prints `backend.KeyPurposeNotice` before the key prompt |
 | 2 | Normalise and display the target backend endpoint *before* asking for the key. | ✅ the RESOLVED endpoint is restated ("Signing in to …") ahead of `promptAPIKey` — a custom URL is normalised on the way through, so what was typed is not necessarily the host the key is about to reach |
 | 3 | **Verify the key before persisting it.** Login must not silently persist a rejected key. | ✅ `App.SignIn` runs `backend.CheckSignIn` against a THROWAWAY client, then persists, then swaps the live client |
 | 4 | Show the safe label and remaining limit when the provider reports them. | ◐ the startup login path does, on the no-warning branch; the in-session `App.SignIn` discards the verification object and shows only a generic warning |
@@ -190,7 +202,7 @@ LOCAL gate that skips in CI rather than a green-build guarantee.
 
 ## 6. Rotation
 
-**The caller's OpenRouter key.** Rotate at OpenRouter, clear the stored
+**Historical — the caller's OpenRouter key.** Rotate at OpenRouter, clear the stored
 credential, sign in again. Nothing server-side needs to change: the backend keeps
 no copy and no cache.
 

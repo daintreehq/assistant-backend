@@ -23,11 +23,11 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
+from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.prompts.loader import PromptLoader
-from daintree_assistant_server.providers.openrouter import OpenRouterProvider
+from daintree_assistant_server.providers.cerebras import CerebrasProvider
 from daintree_assistant_server.services.task_runner import TaskRunner
 
 from .cases import TaskCase, load_cases
@@ -94,9 +94,9 @@ def _build_settings(config: BenchConfig) -> Settings:
         default = ROOT / ".env"
         env_file = str(default) if default.is_file() else None
     settings = Settings(_env_file=env_file, **config.settings_overrides)
-    if not settings.openrouter_api_key.get_secret_value():
+    if not settings.cerebras_api_key.get_secret_value():
         raise BenchError(
-            "OPENROUTER_API_KEY is not set — export it or point --env-file at a .env that has it"
+            "CEREBRAS_API_KEY is not set — export it or point --env-file at a .env that has it"
         )
     return settings
 
@@ -165,10 +165,10 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    provider = OpenRouterProvider(
+    provider = CerebrasProvider(
         client,
-        api_key=settings.openrouter_api_key,
-        base_url=settings.openrouter_base_url,
+        api_key=settings.cerebras_api_key,
+        base_url=settings.cerebras_base_url,
         default_timeout=settings.utility_timeout_seconds,
         send_prompt_cache_key=settings.deepseek_send_prompt_cache_key,
     )
@@ -177,7 +177,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     started_at = datetime.now(UTC)
     semaphore = asyncio.Semaphore(config.concurrency)
     jobs = [
-        _run_trial(runner, case, trial, semaphore, settings.openrouter_api_key)
+        _run_trial(runner, case, trial, semaphore, settings.cerebras_api_key)
         for trial in range(config.trials)
         for case in cases
     ]
@@ -195,7 +195,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
         "meta": {
             "benchmark": "utility_tasks",
             "variant": config.variant,
-            "model": OPENROUTER_MODEL,
+            "model": CEREBRAS_MODEL,
             "trials": config.trials,
             "concurrency": config.concurrency,
             "filter": config.id_filter,

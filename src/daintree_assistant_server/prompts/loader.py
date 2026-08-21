@@ -61,12 +61,6 @@ _ALL_TEMPLATES = (
     TEMPLATE_SELECTOR_SYSTEM,
 )
 
-# Backend-only skill-learning system prompts (raw .md, under prompts/skill_learning/).
-# Always shipped, so a missing one fails readiness even when learning is off. Like every
-# prompt here (task prompts included), they carry no version suffix — pre-release, the
-# file on disk is simply "the current prompt."
-SKILL_LEARNING_PROMPTS = ("gate", "build", "improve")
-
 
 # Character budget per cache. Chosen against the WIDEST plausible storage: a
 # Python string containing any non-BMP character costs 4 bytes per character, so
@@ -187,7 +181,6 @@ class PromptLoader:
         self._base_prompt = self._load_base()
         self._subagent_prompt = self._load_parts("main/subagent")
         self._task_prompts = self._load_dir("tasks")
-        self._learning_prompts = self._load_dir("skill_learning")
 
     def _resolve(self, relative: str) -> Path:
         """The overlay's copy of ``relative`` if it has one, else the package's."""
@@ -252,12 +245,6 @@ class PromptLoader:
         except KeyError:
             raise PromptError(f"missing task prompt: {task_id}") from None
 
-    def skill_learning_prompt(self, name: str) -> str:
-        try:
-            return self._learning_prompts[name]
-        except KeyError:
-            raise PromptError(f"missing skill-learning prompt: {name}") from None
-
     # ---- content hashes -------------------------------------------------
 
     def content_hashes(self) -> dict[str, str]:
@@ -282,8 +269,6 @@ class PromptLoader:
         }
         for task_id, body in self._task_prompts.items():
             hashes[f"task:{task_id}"] = digest(body)
-        for name, body in self._learning_prompts.items():
-            hashes[f"learning:{name}"] = digest(body)
         # Templates too. Without them, two builds whose selector or loaded-skills
         # INSTRUCTIONS differ report identical hashes — and those templates carry
         # as much behaviour as the raw bodies do.
@@ -347,8 +332,6 @@ class PromptLoader:
             except TemplateError as exc:
                 raise PromptError(f"template {name} failed to load: {exc}") from exc
         self._validate_display_context()
-        for prompt in SKILL_LEARNING_PROMPTS:
-            self.skill_learning_prompt(prompt)
         # Every REGISTERED task must have its prompt on disk. Without this a task
         # whose prompt file is missing or misnamed passes readiness and the whole
         # test suite, then 500s the first time a client calls it — PromptError has

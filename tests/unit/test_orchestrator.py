@@ -1007,37 +1007,6 @@ def _priced_selection(cost: float = 0.0004) -> ProviderChatResult:
 
 
 @pytest.mark.asyncio
-async def test_stream_discarded_draft_never_reaches_skill_learning(
-    orchestrator: ChatOrchestrator,
-    fake_provider: FakeProvider,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Learning must see the workflow that actually happened, not the dead draft.
-
-    Feeding it the discarded announcement would teach a skill from a round that
-    performed nothing — the exact behavior this repair exists to erase.
-    """
-    seen: list[str] = []
-    monkeypatch.setattr(
-        orchestrator,
-        "_maybe_learn_after_turn",
-        lambda **kwargs: seen.append(kwargs["assistant_text"]),
-    )
-    fake_provider.stream_chunks = lambda request: (  # type: ignore[assignment]
-        make_text_chunks("Read five votes; here is the tally.")
-        if _nudged(request)
-        else make_text_chunks(_DEAD_ROUND)
-    )
-    outcome = await orchestrator.complete(
-        _intent_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
-    )
-    assert outcome.stream is not None
-    await _drain(outcome.stream)
-    assert seen == ["Read five votes; here is the tally. "]
-    assert _DEAD_ROUND not in "".join(seen)
-
-
-@pytest.mark.asyncio
 async def test_stream_reroll_that_half_reported_cost_is_not_labelled_complete(
     orchestrator: ChatOrchestrator,
     fake_provider: FakeProvider,
@@ -1902,7 +1871,7 @@ async def test_json_mode_main_request_reaches_the_wire_with_its_key(
     # json_object call to `selection_requests` only when a selection result IS set
     # (tests/fakes.py), which would swallow the JSON main call too. With it unset
     # both land in `requests`, and the model id separates them — the selector
-    # always calls OPENROUTER_MODEL, while the main call uses the upstream model
+    # always calls CEREBRAS_MODEL, while the main call uses the upstream model
     # passed to `complete`. The selector then fails to parse "done" and degrades
     # open, which is its documented posture and does not stop the main call.
     fake_provider.complete_result = make_result(content="done")

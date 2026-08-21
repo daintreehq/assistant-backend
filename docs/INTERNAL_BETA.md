@@ -31,14 +31,14 @@ is not a description of today's build, so every line carries a status:
 | 2 | **The tester supplies an OpenRouter key**, and it is theirs. | ✅ |
 | 3 | **That key is the HTTP bearer** and funds every upstream call the turn makes. | ✅ |
 | 4 | **The serving backend holds no shared model credential** — not as a fallback, not as a default, not for "just the selector". | ✅ `main._build_provider(api_key=None)` |
-| 5 | **The primary model stays date-pinned.** | ✅ `config.OPENROUTER_MODEL` |
+| 5 | **The primary model stays pinned**, and is not a floating alias. | ✅ `config.CEREBRAS_MODEL` |
 | 6 | **The backend owns** prompts, the skill catalog and bodies, automatic skill selection, prompt assembly, and the utility-task prompts. | ✅ |
 | 7 | **The CLI owns** the visible conversation, local state, permissions and tool execution. | ✅ |
 | 8 | **The backend is stateless across instances**, apart from process-local caches; skill state travels in a signed, opaque token. | ✅ `state/codec.py` |
-| 9 | **Skill learning is off in staging and production** — an enabled mode fails `/readyz`. | ✅ `Settings.local_only_problems` |
+| 9 | **Prompt dumping is off in staging and production** — it writes full prompts to disk, and an enabled dir fails `/readyz`. (Skill learning was the other entry here; it has been removed entirely.) | ✅ `Settings.local_only_problems` |
 | 10 | **Tester prompt and tool content is never logged.** | ✅ with one exception — see §5 |
-| 11 | **The tester can verify their key before the first model call.** | ✅ `/auth/verify` reports `usable` and a stable `reason` separately from `valid`, and `App.SignIn` calls it against a throwaway client BEFORE persisting, so a key the provider REJECTS never reaches disk. An inconclusive probe (provider unreachable) persists with a warning — deliberately: that is not evidence about the key |
-| 12 | **Failures identify their owner**: Daintree, OpenRouter, account credits, key permissions, rate limiting, provider routing, or malformed input. | ✅ distinct codes — see [`DAINTREE_API.md`](DAINTREE_API.md#errors) |
+| 11 | **A caller can confirm the backend can actually serve before the first model call.** | ✅ `/auth/verify` probes the credential this request would spend — the caller's if they sent one, the SERVER's otherwise, which is every request today — with a tokenless model listing, and reports `usable` and a stable `reason` separately from `valid`. An inconclusive probe (provider unreachable) is reported as unknown, never as invalid |
+| 12 | **Failures identify their owner**: Daintree, the upstream provider, account credits, key permissions, rate limiting, or malformed input. | ✅ distinct codes — see [`DAINTREE_API.md`](DAINTREE_API.md#errors) |
 | 13 | **A release can be rolled back** to the immediately previous Cloud Run revision. | ◐ `infra/gcp/rollback.sh` exists (`--dry-run`, `--list`, `--to <revision>`), refuses every case where guessing would be worse than stopping, and fails closed unless it can confirm the target is serving. Its selection logic is tested offline against a fake `gcloud`; **moving real traffic has never been rehearsed**, so this is not ✅ until a drill has been run |
 
 ## 3. What is explicitly *not* in the beta
@@ -47,12 +47,10 @@ Not blockers. Do not delay the beta for any of them:
 
 - Daintree-owned login accounts
 - Daintree-issued API keys or subscription keys
-- shared or brokered OpenRouter credentials
 - billing metering, invoices, spend ledgers
 - tenant databases, team administration, admin console
 - model switching or provider switching in the client
 - user-created server-side skills
-- production skill learning
 - long-term server-side conversation storage
 - a public third-party developer API
 
@@ -122,13 +120,11 @@ These are load-bearing. Breaking one is a release blocker, not a regression.
   expired, unknown-key or wrong-session token is **ignored** and selection simply
   re-runs — it is not an error. (An *oversized* token is different: it is rejected
   as invalid input, by contract validation or the codec's 16 KiB bound.)
-- Required structured `startup` context reaches the **main model only** — neither
-  the selector nor the learner ever sees it. What they *do* see:
-  - **selector**: sanitized `input.messages`, plus bounded turn/workflow hints and
-    the available tool names;
-  - **learner**: `input.messages`, the just-generated final answer (it learns from
-    the workflow it actually completed), and the available tool names.
-- The serving provider is built with **no default credential**.
+- Required structured `startup` context reaches the **main model only** — the
+  selector never sees it. What it *does* see: sanitized `input.messages`, plus
+  bounded turn/workflow hints and the available tool names.
+- The serving provider is built **with the server's own credential**
+  (`CEREBRAS_API_KEY`), and `/readyz` gates on its presence.
 - Prompt order is cache-critical. The base prompt and the response contract are the
   **only** system messages; everything else the server injects sits below the tool
   schemas as a framed **user-role** row, ordered by how widely it can be shared,
@@ -145,29 +141,32 @@ These are load-bearing. Breaking one is a release blocker, not a regression.
 Four, and only these four (`config.Settings.environment` is a closed `Literal`, so
 a typo like `prod` cannot fail open past the hardening gates):
 
-| Environment | Skill learning | Weak-secret gate | Purpose |
+| Environment | Prompt dumping | Weak-secret gate | Purpose |
 |---|---|---|---|
-| `development` | allowed | off | local work; optional request dumping |
+| `development` | allowed | off | local work |
 | `test` | allowed | off | offline fakes, deterministic tests |
-| `staging` | **fails readiness** | on | real OpenRouter smoke, no external testers |
+| `staging` | **fails readiness** | on | real upstream smoke, no external testers |
 | `production` | **fails readiness** | on | the tester endpoint |
 
-Authentication does **not** vary by environment: every protected
-`/v1/daintree/*` route requires a caller key in all four. The operational
-endpoints — `/`, `/health`, `/healthz`, `/readyz`, `/version` — are deliberately
-unauthenticated everywhere, because a probe that needs a credential is not a
-health check.
+Authentication does **not** vary by environment, and currently that means the
+door is open in all four: the server holds the upstream credential, so a request
+with no bearer token has one to spend and is served. A token that IS present is
+still validated for shape and rejected if malformed. Account authentication is
+being built next. The operational endpoints — `/`, `/health`, `/healthz`,
+`/readyz`, `/version` — have always been unauthenticated, because a probe that
+needs a credential is not a health check.
 
 ## 8. Known limitations to publish with the beta
 
 State these to testers up front rather than letting them discover them:
 
 - Zero data retention is not enforced (§5). <!-- privacy-copy-ok -->
-- The request prompt is large — tool schemas dominate it — so a turn costs more of
-  the tester's OpenRouter balance than the visible conversation suggests.
-- There is no rate limiting; a runaway client burns the tester's own balance.
-- Skill learning never runs against the deployed service, so the catalog does not
-  improve from beta usage.
+- The request prompt is large — tool schemas dominate it — so a turn costs more
+  than the visible conversation suggests. That is now **Daintree's** spend, not
+  the tester's: the server holds the upstream credential.
+- There is no rate limiting and no inbound authentication, so a runaway client
+  burns Daintree's own balance. This is the most important consequence of the
+  credential move and the reason account auth is next.
 - Images: remote image URLs are disabled by default and in the current deployment
   (`ALLOW_REMOTE_IMAGE_URLS=false`, reported in `/v1/daintree/capabilities`).
   Nothing prevents a hardened environment from setting it, so read capabilities

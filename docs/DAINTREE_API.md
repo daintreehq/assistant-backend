@@ -295,10 +295,8 @@ Notes:
   identity, agent-registry metadata, and project instructions bounded to 16 KiB of UTF-8.
   It is deliberately
   outside `input.messages`: only the main model receives its framed user-role data block.
-  Neither the selector nor the skill learner ever sees it — the selector's evidence is the
-  sanitized `input.messages` transcript plus bounded turn/workflow hints and the available
-  tool names; the learner's is `input.messages` plus the just-generated final answer and
-  the available tool names.
+  The selector never sees it — its evidence is the sanitized `input.messages`
+  transcript plus bounded turn/workflow hints and the available tool names.
 - Agent ids are launch identifiers. They are preserved exactly and JSON-quoted in the
   prompt; aggregate limits omit whole agent rows rather than truncating an id. No launch
   commands, environment variables, presets, authentication paths, raw settings, or secrets
@@ -676,19 +674,19 @@ benchmarked at equal selection quality and a fraction of the latency. (Because a
 `tool_choice` is incompatible with thinking on DeepSeek, the selector was also moved off its
 forced `select_skills` call onto `response_format` json_object.)
 
-**Skill learning still thinks**: its gate runs thinking-high on the small model and its
-builder/improver run `high` on GPT-5.6 Sol. It is local-dev-only and runs fire-and-forget
-*after* the response is sent, so its latency never reaches a user, and writing a whole skill
-from a transcript is the one genuinely hard task here.
+**Nothing thinks any more, and on Cerebras that is the model's doing rather than a flag's.**
+`gemma-4-31b` has no reasoning mode, and the wire has no field that could switch one off —
+Cerebras takes a bare `reasoning_effort` string with no "off" value. Skill learning used to be
+the one surface that did think; it has been removed.
 
 `/respond` advertises the posture as `respond.thinking_enabled` on `/v1/daintree/capabilities`
 (currently `false`), which is what a client should gate any thinking UI on. Because
 `max_tokens` is shared by reasoning + visible output, a small-output **thinking** call adds
 `THINKING_HEADROOM_TOKENS` to its tight cap so the chain-of-thought can't starve the answer
-into a length truncation — under the current posture the skill-learning gate is the only such
-call, and a non-thinking utility task deliberately does *not* get that slack (it would raise
-the visible-output ceiling above the cap its profile set). The main `/respond` call instead
-runs on its own flat budget (`MAIN_DEFAULT_MAX_TOKENS` == `MAIN_MAX_TOKENS_CEILING`).
+into a length truncation. Under the current posture there is no such call: a non-thinking
+utility task deliberately does *not* get that slack, since it would raise the visible-output
+ceiling above the cap its profile set. The main `/respond` call instead runs on its own flat
+budget (`MAIN_DEFAULT_MAX_TOKENS` == `MAIN_MAX_TOKENS_CEILING`).
 
 Thinking is independently forced off for any request that pins a `tool_choice` (thinking + a
 forced tool choice is rejected by the model; which endpoint enforces it is not worth betting a

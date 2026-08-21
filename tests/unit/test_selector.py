@@ -260,15 +260,10 @@ async def test_selector_uses_json_mode_and_is_hardcoded_non_thinking(
     assert req.thinking_disabled is True
     assert req.reasoning_effort is None
     assert req.max_tokens == settings.selector_max_output_tokens
-    # Ranked on time-to-first-token, not tokens/second: ~10.3k prompt tokens buy
-    # ~90 of answer, so throughput ranking optimises a quantity that barely exists
-    # (docs/PROVIDER_POLICY.md section 3b).
-    assert req.latency_critical is True
-    # And a SHARED cache-affinity key naming the catalog revision. Not per session
-    # — the catalog block is byte-identical for every caller, so one key keeps it
-    # resident on one endpoint, where a per-session key would splinter it and no
-    # key at all lets OpenRouter hash the user's own words into a value that
-    # differs on every call (section 3a).
+    # And a SHARED cache-affinity key naming the catalog revision. Not per
+    # session — the catalog block is byte-identical for every caller, so one key
+    # describes the whole fleet's selector traffic as the one repeated prefix it
+    # actually is, where a per-session key would splinter it (section 3a).
     digest = catalog.revision.rpartition(":")[2]
     assert req.cache_session_id == f"daintree-selector-{digest[:16]}"
 
@@ -320,7 +315,6 @@ async def test_the_repair_attempt_reuses_the_first_attempt_s_affinity_key(
     first, repair = fake_provider.requests
     assert repair.cache_session_id == first.cache_session_id
     assert repair.cache_session_id is not None
-    assert repair.latency_critical is True
 
 
 @pytest.mark.asyncio
@@ -387,7 +381,8 @@ async def test_the_affinity_key_is_shared_by_callers_and_tracks_the_catalog(
 
     assert first.cache_session_id == _affinity_key(catalog.revision)
     assert _affinity_key("sha256:" + "a" * 64) != _affinity_key("sha256:" + "b" * 64)
-    # Opaque and bounded: it crosses to a third party and OpenRouter caps the field.
+    # Opaque and bounded: it crosses to a third party, and a key longer than
+    # this is illegible in an upstream dashboard.
     assert len(_affinity_key(catalog.revision)) <= 256
 
 

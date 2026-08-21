@@ -34,7 +34,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
-from ..config import INTERACTIVE_THINKING_ENABLED, OPENROUTER_REASONING_EFFORT, Settings
+from ..config import INTERACTIVE_REASONING_EFFORT, INTERACTIVE_THINKING_ENABLED, Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.extensions import (
     AgentSnapshot,
@@ -63,7 +63,6 @@ from ..prompts.loader import (
     RenderCache,
 )
 from ..providers.base import ProviderChatRequest
-from ..providers.policy import routing_preference
 from ..skills.models import Skill
 from ..text_utils import (
     cap_bytes,
@@ -884,7 +883,6 @@ class PromptAssembler:
             thinking_disabled=True,
             reasoning_effort=None,
             timeout=self.settings.main_timeout_seconds,
-            routing=routing_preference(request.routing),
         )
 
     def build_main_request(
@@ -1059,9 +1057,6 @@ class PromptAssembler:
             # reasoning_content round-trips through the wire contract so tool-call
             # turns can replay it. Thinking ignores temperature/top_p.
             thinking_disabled=not thinking_enabled,
-            reasoning_effort=OPENROUTER_REASONING_EFFORT if thinking_enabled else None,
+            reasoning_effort=INTERACTIVE_REASONING_EFFORT if thinking_enabled else None,
             timeout=self.settings.main_timeout_seconds,
-            # The caller's endpoint-routing preference, normalized once here so
-            # every downstream provider call for this turn routes identically.
-            routing=routing_preference(request.routing),
         )

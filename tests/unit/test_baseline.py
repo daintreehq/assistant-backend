@@ -60,27 +60,23 @@ def test_the_band_check_actually_fails_on_a_regression() -> None:
 
 
 def test_the_identity_block_records_the_pinned_posture() -> None:
-    """Model and privacy mode are release facts, not measurements.
+    """The model and the upstream are release facts, not measurements.
 
     They are in the baseline so a diff shows a posture change explicitly — the
-    kind of thing that must never move by accident.
+    kind of thing that must never move by accident. Asserted, not merely
+    captured: ``compare()`` only checks the BANDED numeric metrics, so an
+    identity string nobody asserts drifts in silence.
     """
-    from daintree_assistant_server.config import OPENROUTER_MODEL
-    from daintree_assistant_server.providers.policy import DEFAULT_POLICY
+    from daintree_assistant_server.config import CEREBRAS_MODEL
 
     identity = _baseline()["identity"]
-    assert identity["model"] == OPENROUTER_MODEL  # type: ignore[index]
-    assert identity["privacy_mode"] == DEFAULT_POLICY.privacy.value  # type: ignore[index]
-    # The sorts are asserted, not merely recorded. `compare()` only checks the
-    # BANDED numeric metrics, so an identity string it captures but nobody asserts
-    # drifts in silence — which is exactly what happened to `endpoint_sort` until
-    # a second sort existed to notice it.
-    assert identity["default_endpoint_sort"] == DEFAULT_POLICY.sort.value  # type: ignore[index]
-    # Asserted for the same reason, and it is the one identity field that is a
-    # LIST: a denylist that grows by accident costs availability, not just
-    # accuracy, because each entry removes a fallback.
-    assert identity["denied_endpoints"] == list(DEFAULT_POLICY.ignore)  # type: ignore[index]
-    # There is no first-byte endpoint sort anymore: the call that sat on the
+    assert identity["model"] == CEREBRAS_MODEL  # type: ignore[index]
+    # The upstream itself. There is no endpoint-selection posture to record any
+    # more — Cerebras hosts one endpoint per model, so privacy mode, sort axis
+    # and denylist have no subject. Naming the provider is what remains, and it
+    # is the field that would have to change for any of that to come back.
+    assert identity["provider"] == "cerebras"  # type: ignore[index]
+    # There is likewise no first-byte endpoint sort: the call that sat on the
     # first-byte path (the upstream skill selector) was replaced by the LOCAL
     # two-stage selector, whose release facts are asserted below instead.
 

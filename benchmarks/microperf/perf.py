@@ -37,7 +37,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
+from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.observability import configure_logging
 from daintree_assistant_server.providers.base import (
@@ -377,7 +377,7 @@ async def measure_concurrency(
     ) -> float:
         nonlocal warning_count, warning_count_at_cap
         outcome = await orchestrator.complete(
-            request, upstream_model=OPENROUTER_MODEL, api_key=BENCH_CALLER_KEY
+            request, upstream_model=CEREBRAS_MODEL, api_key=BENCH_CALLER_KEY
         )
         elapsed = time.perf_counter() - t_submit
         n_warn = len((outcome.body or {}).get("warnings") or [])
@@ -558,7 +558,7 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         "meta": {
             "benchmark": "microperf",
             "mode": "deterministic",
-            "model": OPENROUTER_MODEL,
+            "model": CEREBRAS_MODEL,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "platform": platform.platform(),
             "python_version": platform.python_version(),

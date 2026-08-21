@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
+from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.validation import validate_respond_request
@@ -12,12 +12,12 @@ from daintree_assistant_server.services.validation import validate_respond_reque
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+    return Settings(CEREBRAS_API_KEY="csk", STATE_SIGNING_KEY_CURRENT="s")
 
 
 def _settings(**overrides: object) -> Settings:
     base: dict[str, object] = {
-        "OPENROUTER_API_KEY": "d", "STATE_SIGNING_KEY_CURRENT": "s",
+        "CEREBRAS_API_KEY": "csk", "STATE_SIGNING_KEY_CURRENT": "s",
     }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
@@ -48,7 +48,7 @@ def _req(
 
 
 def test_valid_request_returns_upstream_model(settings: Settings) -> None:
-    assert validate_respond_request(_req(), settings) == OPENROUTER_MODEL
+    assert validate_respond_request(_req(), settings) == CEREBRAS_MODEL
 
 
 @pytest.mark.parametrize("instructions", ["12345678", "éééé"])

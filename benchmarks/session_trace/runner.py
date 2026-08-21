@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.config import OPENROUTER_MODEL
+from daintree_assistant_server.config import CEREBRAS_MODEL
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.skills.catalog import load_catalog
 
@@ -107,7 +107,7 @@ async def _run_trace(orchestrator: Any, spy: R.SpyLearner, provider: R.ReplayPro
         sel_before, main_before = provider.selector_calls, provider.main_calls
         req = _request(list(messages), state, session_id, turn["turn_id"])
         outcome = await orchestrator.complete(
-            req, upstream_model=OPENROUTER_MODEL, api_key=BENCH_CALLER_KEY
+            req, upstream_model=CEREBRAS_MODEL, api_key=BENCH_CALLER_KEY
         )
         body = outcome.body or {}
         sel_delta = provider.selector_calls - sel_before
@@ -234,7 +234,7 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
         "meta": {
             "benchmark": "session_trace",
             "mode": "deterministic",
-            "model": OPENROUTER_MODEL,
+            "model": CEREBRAS_MODEL,
             "catalog_revision": load_catalog().revision,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },

@@ -1,6 +1,6 @@
 """Skill-selection benchmark CLI.
 
-Run from the repo root (venv active, OPENROUTER_API_KEY in .env or the env):
+Run from the repo root (venv active, CEREBRAS_API_KEY in .env or the env):
 
     python -m benchmarks.skill_selection.bench run                    # baseline prompt
     python -m benchmarks.skill_selection.bench run --variant v2-foo   # a prompts/ variant
@@ -12,7 +12,7 @@ Run from the repo root (venv active, OPENROUTER_API_KEY in .env or the env):
 
 Only ``run`` makes API calls (REAL, paid DeepSeek: cases x trials per variant).
 ``list``, ``coverage``, ``report``, and ``compare`` are offline and free — they
-need no key, so they work with ``OPENROUTER_API_KEY=`` blanked.
+need no key, so they work with ``CEREBRAS_API_KEY=`` blanked.
 """
 
 from __future__ import annotations
@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--trials", type=int, default=3, help="trials per case (default 3)")
     run.add_argument("--concurrency", type=int, default=6, help="parallel calls (default 6)")
     run.add_argument("--filter", help="substring filter on case id/category")
-    run.add_argument("--env-file", help="path to a .env with OPENROUTER_API_KEY")
+    run.add_argument("--env-file", help="path to a .env with CEREBRAS_API_KEY")
     run.add_argument(
         "--model",
         help=(

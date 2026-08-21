@@ -1,23 +1,11 @@
 #!/usr/bin/env bash
 #
-# Run the Daintree Assistant Server locally, with skill learning ON by default so
-# a work session improves the skill catalog in place (changes land in `git diff`).
+# Run the Daintree Assistant Server locally.
 #
-#   ./dev            # apply mode — learns + writes/improves real skill files (default)
-#   ./dev propose    # dry-run — run the pipeline, write proposals only, touch nothing
-#   ./dev off        # plain server, no skill learning
+#   ./dev
 #
-# The mode can also come from the environment (SKILL_LEARNING_MODE); a positional
-# arg wins over it. Everything else (DEEPSEEK_API_KEY, PORT, …) is read from .env
-# as usual. In production the server refuses to boot with learning enabled — this
-# is a LOCAL convenience only.
-#
-# Why `apply` is the default and stays the default: apply writes into git-TRACKED
-# skill files, so `git diff` is the review surface and `git checkout --` is the undo
-# — a learned skill is reviewed exactly like any other edit. `propose` writes to a
-# gitignored audit dir instead, where good lessons are never seen and never land.
-# Editing a skill by hand while this is running is safe: an improve re-checks the
-# file on disk immediately before replacing it and abandons the write if it changed.
+# Everything comes from .env, which this script EXPORTS into the environment
+# before starting the server.
 set -euo pipefail
 
 # Resolve the repo root (this script's own directory) so ./dev works from anywhere.
@@ -33,26 +21,45 @@ else
   PY="python3"
 fi
 
-# Skill-learning mode: first positional arg, else an existing env var, else apply.
-export SKILL_LEARNING_MODE="${1:-${SKILL_LEARNING_MODE:-apply}}"
-case "$SKILL_LEARNING_MODE" in
-  off|propose|apply) ;;
-  *) echo "✗ Unknown mode '$SKILL_LEARNING_MODE' (use: off | propose | apply)" >&2; exit 2 ;;
-esac
+# Load .env into the ENVIRONMENT, not just into pydantic-settings.
+#
+# `Settings` reads .env by itself, so this is not what makes the server work — it
+# is what makes everything ELSE in this shell agree with the server: a `curl`
+# typed in the same terminal, a benchmark launched beside it, an inherited
+# subprocess. Without it the config the server holds and the config the operator
+# can see are two different things, which is exactly the confusion this script
+# exists to prevent.
+#
+# `set -a` exports every assignment; existing environment values are overwritten
+# by .env deliberately, so what the file says is what runs.
+if [[ -f "$ROOT/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091  # runtime file, not present at lint time
+  source "$ROOT/.env"
+  set +a
+fi
 
-# Friendly heads-up: without a signing key the server still boots, but /readyz
-# stays 503. (No API keys are needed: requests carry the caller's own key.)
-if [[ ! -f "$ROOT/.env" && -z "${STATE_SIGNING_KEY_CURRENT:-}" ]]; then
-  echo "⚠  No .env and no STATE_SIGNING_KEY_CURRENT — server will boot but /readyz will be 503." >&2
-  echo "   Run:  cp .env.example .env   then set STATE_SIGNING_KEY_CURRENT." >&2
+# Friendly heads-up: the server always boots, but /readyz stays 503 without the
+# two required secrets. CEREBRAS_API_KEY is one of them — the SERVER holds the
+# upstream credential and funds every turn from it, so a request no longer brings
+# its own key and there is nothing to fall back on if this is missing.
+missing=()
+[[ -z "${STATE_SIGNING_KEY_CURRENT:-}" ]] && missing+=("STATE_SIGNING_KEY_CURRENT")
+[[ -z "${CEREBRAS_API_KEY:-}" ]] && missing+=("CEREBRAS_API_KEY")
+if (( ${#missing[@]} )); then
+  echo "⚠  Missing: ${missing[*]} — server will boot but /readyz will be 503." >&2
+  [[ -f "$ROOT/.env" ]] || echo "   Run:  cp .env.example .env   then fill them in." >&2
 fi
 
 # Human-readable structured logs in dev so per-round timing lines (`respond`,
-# `respond_upstream_open` → selector_ms / upstream_first_event_ms / skill_speculation)
-# are legible in the terminal instead of raw JSON. Export-only; unset it or set
-# LOG_LEVEL=WARNING in .env to quiet things down.
+# `respond_upstream_open` → selector_ms / upstream_first_event_ms) are legible in
+# the terminal instead of raw JSON. Export-only; unset it or set LOG_LEVEL=WARNING
+# in .env to quiet things down.
 export DAINTREE_LOG_CONSOLE="${DAINTREE_LOG_CONSOLE:-1}"
 
-echo "▶ Daintree Assistant Server   SKILL_LEARNING_MODE=$SKILL_LEARNING_MODE"
+echo "▶ Daintree Assistant Server"
 echo "  python: $PY   logs: console (DAINTREE_LOG_CONSOLE=$DAINTREE_LOG_CONSOLE)"
+# Presence only — never the value.
+echo "  upstream: cerebras   key: $([[ -n "${CEREBRAS_API_KEY:-}" ]] && echo set || echo MISSING)"
+
 exec "$PY" -m daintree_assistant_server

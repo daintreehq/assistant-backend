@@ -17,19 +17,16 @@ import pytest
 from pydantic import SecretStr
 
 from daintree_assistant_server.errors import DaintreeError
-from daintree_assistant_server.providers.openrouter import (
-    OpenRouterProvider,
-    _looks_unroutable,
-)
+from daintree_assistant_server.providers.cerebras import CerebrasProvider
 
-_BASE = "https://openrouter.test/api/v1"
-_KEY = "sk-or-v1-taxonomy"
+_BASE = "https://cerebras.test/v1"
+_KEY = "csk-taxonomy"
 
 
-def _provider(handler) -> OpenRouterProvider:  # type: ignore[no-untyped-def]
+def _provider(handler) -> CerebrasProvider:  # type: ignore[no-untyped-def]
     transport = httpx.MockTransport(handler)
     client = httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(5.0))
-    return OpenRouterProvider(client, api_key=SecretStr(_KEY), base_url=_BASE)
+    return CerebrasProvider(client, api_key=SecretStr(_KEY), base_url=_BASE)
 
 
 def _request():  # type: ignore[no-untyped-def]
@@ -40,7 +37,12 @@ def _request():  # type: ignore[no-untyped-def]
 
 async def _fail_with(status: int, message: str = "boom") -> DaintreeError:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status, json={"error": {"message": message}})
+        # The FLAT shape Cerebras actually returns — no {"error": {...}} wrapper.
+        # The nested shape is covered separately (an intermediary could still
+        # produce it), but the default here is what production sees.
+        return httpx.Response(
+            status, json={"message": message, "type": "invalid_request_error"}
+        )
 
     provider = _provider(handler)
     try:
@@ -63,7 +65,10 @@ async def _fail_with(status: int, message: str = "boom") -> DaintreeError:
         (401, 401, "provider_invalid_api_key", False),
         (402, 402, "provider_insufficient_credits", False),
         (403, 403, "provider_key_forbidden", False),
-        (404, 503, "upstream_no_compliant_provider", False),
+        # 404 is NOT a routing dead-end any more. Cerebras hosts one endpoint
+        # per model on a fixed path, so a 404 can only mean the model id is
+        # wrong — our bug, reported like any other malformed request.
+        (404, 502, "upstream_request_rejected", False),
         (408, 504, "upstream_timeout", True),
         (429, 429, "upstream_rate_limited", True),
         (500, 503, "upstream_unavailable", True),
@@ -84,11 +89,18 @@ async def test_status_maps_to_a_distinct_actionable_code(
 @pytest.mark.asyncio
 async def test_every_mapped_code_is_distinct() -> None:
     """The whole point of the split. If two upstream conditions produce the same
-    code, the CLI cannot give different advice for them."""
+    code, the CLI cannot give different advice for them.
+
+    404 is deliberately absent from this list now: it shares
+    ``upstream_request_rejected`` with 400, and correctly so — both mean the
+    upstream refused what this server sent. Distinctness is only valuable where
+    the two conditions need DIFFERENT advice, and "fix the request we sent" is
+    one answer, not two.
+    """
     codes = set()
-    for status in (401, 402, 403, 404, 429, 500, 400):
+    for status in (401, 402, 403, 429, 500, 400):
         codes.add((await _fail_with(status)).code)
-    assert len(codes) == 7
+    assert len(codes) == 6
 
 
 # ---------------------------------------------------------------------------
@@ -99,9 +111,10 @@ async def test_every_mapped_code_is_distinct() -> None:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("status", [401, 402, 403, 404, 400])
 async def test_deterministic_failures_are_not_retryable(status: int) -> None:
-    """Replaying a revoked key, an empty balance, a guardrail denial or an empty
-    routing pool reaches the same answer, slower — and on the streaming path it
-    burns the CLI's retry budget after `meta` has already committed a 200."""
+    """Replaying a revoked key, an empty balance, a guardrail denial or a request
+    the upstream rejected reaches the same answer, slower — and on the streaming
+    path it burns the CLI's retry budget after `meta` has already committed a
+    200."""
     assert (await _fail_with(status)).retryable is False
 
 
@@ -113,61 +126,66 @@ async def test_transient_failures_stay_retryable(status: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 503: routing dead-end vs real outage.
+# 5xx is an outage, full stop.
 #
-# OpenRouter answers "nothing matched your preferences" with EITHER 404 or 503,
-# so on the 503 branch the message is the only thing separating a policy dead-end
-# from an outage.
+# There is no longer a second reading to disambiguate. Against a router, "nothing
+# matched your preferences" arrived as EITHER a 404 or a 503 and the message was
+# the only thing separating a policy dead-end from a real outage — an entire
+# marker-matching layer existed for that one ambiguity. A single-host provider
+# has no pool to empty, so every 5xx is simply the upstream being unwell, and the
+# ambiguity (with the code that resolved it) is gone rather than defanged.
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "detail",
+    "message",
     [
+        "Service temporarily unavailable",
+        # Prose that USED to be classified as a permanent routing dead-end. It
+        # must now stay a retryable outage: this is the regression that would
+        # silently kill a retry which would have succeeded.
         "No endpoints found matching your data policy.",
         "No allowed providers are available for the selected model",
-        "There is no available model provider that meets your routing requirements.",
-        "NO ENDPOINTS FOUND matching your data policy",
     ],
 )
-def test_no_route_messages_are_recognised(detail: str) -> None:
-    assert _looks_unroutable(detail) is True
-
-
-@pytest.mark.parametrize(
-    "detail",
-    [
-        None,
-        "",
-        "Service temporarily unavailable",
-        "upstream connect error or disconnect/reset before headers",
-        "The model is overloaded, please try again",
-    ],
-)
-def test_ordinary_outage_messages_are_not_mistaken_for_a_routing_dead_end(
-    detail: str | None,
-) -> None:
-    """Biased toward the outage reading on purpose.
-
-    Mistaking an outage for a policy problem sends an operator to inspect a
-    routing policy that is fine — and, worse, marks a transient failure permanent,
-    killing a retry that would have succeeded.
-    """
-    assert _looks_unroutable(detail) is False
-
-
-@pytest.mark.asyncio
-async def test_503_with_a_no_route_message_is_a_routing_failure() -> None:
-    err = await _fail_with(503, "No endpoints found matching your data policy.")
-    assert err.code == "upstream_no_compliant_provider"
-    assert err.retryable is False
-
-
-@pytest.mark.asyncio
-async def test_503_without_one_is_an_outage_and_stays_retryable() -> None:
-    err = await _fail_with(503, "Service temporarily unavailable")
+async def test_every_503_is_a_retryable_outage(message: str) -> None:
+    err = await _fail_with(503, message)
     assert err.code == "upstream_unavailable"
     assert err.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_a_nested_error_body_is_still_read() -> None:
+    """The other error shape.
+
+    Cerebras returns a flat body, but an intermediary (a proxy, a mock, a future
+    gateway) may still wrap it the OpenAI way. Reading only one shape would throw
+    the entire diagnostic away — silently, since the status still maps fine.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": "temperature too high"}})
+
+    provider = _provider(handler)
+    try:
+        with pytest.raises(DaintreeError) as exc:
+            await provider.complete(_request())
+    finally:
+        await provider.aclose()
+    assert "temperature too high" in exc.value.message
+
+
+@pytest.mark.asyncio
+async def test_a_flat_error_body_reason_reaches_the_client() -> None:
+    """The shape production actually sees, asserted on the message that escapes.
+
+    A 400 here is almost always a bug in what this server sent, and the
+    upstream's own words name the offending field. Losing them turns a
+    one-line fix into a bisect.
+    """
+    err = await _fail_with(400, "max_tokens: property is unsupported")
+    assert "max_tokens: property is unsupported" in err.message
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +260,7 @@ def test_our_door_401_and_the_provider_401_are_different_codes() -> None:
         ({"code": 401, "message": "no"}, "provider_invalid_api_key", False),
         ({"code": 402, "message": "no"}, "provider_insufficient_credits", False),
         ({"code": 403, "message": "no"}, "provider_key_forbidden", False),
-        ({"code": 404, "message": "no"}, "upstream_no_compliant_provider", False),
+        ({"code": 404, "message": "no"}, "upstream_request_rejected", False),
         ({"code": 429, "message": "slow down"}, "upstream_rate_limited", True),
         ({"code": 500, "message": "boom"}, "upstream_unavailable", True),
         ({"code": 400, "message": "bad body"}, "upstream_request_rejected", False),
@@ -253,20 +271,45 @@ def test_our_door_401_and_the_provider_401_are_different_codes() -> None:
 def test_inline_stream_errors_map_like_http_errors(
     err: dict, code: str, retryable: bool
 ) -> None:
-    from daintree_assistant_server.providers.openrouter import map_stream_error
+    from daintree_assistant_server.providers.cerebras import map_stream_error
 
     mapped = map_stream_error(err)
     assert mapped.code == code
     assert mapped.retryable is retryable
 
 
-def test_an_inline_503_no_route_is_a_routing_failure() -> None:
-    from daintree_assistant_server.providers.openrouter import map_stream_error
+def test_an_inline_503_stays_an_outage_whatever_it_says() -> None:
+    """The in-band path must reach the same verdict as the HTTP one.
+
+    It shares ``_map_status``, so this is really a guard against someone
+    reintroducing prose-matching on only one of the two paths — which is how the
+    streaming and non-streaming taxonomies drifted apart the first time.
+    """
+    from daintree_assistant_server.providers.cerebras import map_stream_error
 
     mapped = map_stream_error(
         {"code": 503, "message": "No endpoints found matching your data policy."}
     )
-    assert mapped.code == "upstream_no_compliant_provider"
+    assert mapped.code == "upstream_unavailable"
+    assert mapped.retryable is True
+
+
+def test_a_symbolic_auth_code_with_no_status_is_still_an_auth_failure() -> None:
+    """Cerebras sends symbolic codes, not numeric ones, on an in-band error.
+
+    ``_stream_error_status`` finds no HTTP status in ``"wrong_api_key"``, so
+    without the prose branch this would fall through to a generic retryable
+    ``upstream_error`` — and the CLI would replay a request that can never
+    succeed while telling the user nothing useful.
+    """
+    from daintree_assistant_server.providers.cerebras import map_stream_error
+
+    mapped = map_stream_error(
+        {"code": "wrong_api_key", "type": "invalid_request_error", "message": "Wrong API Key"}
+    )
+    assert mapped.code == "provider_invalid_api_key"
+    assert mapped.retryable is False
+
 
 
 def test_an_inline_quota_message_is_not_treated_as_a_rate_limit() -> None:
@@ -276,7 +319,7 @@ def test_an_inline_quota_message_is_not_treated_as_a_rate_limit() -> None:
     in-band became a retryable 429 — the turn replayed a doomed request and told
     the user to wait rather than to add credits.
     """
-    from daintree_assistant_server.providers.openrouter import map_stream_error
+    from daintree_assistant_server.providers.cerebras import map_stream_error
 
     mapped = map_stream_error({"message": "insufficient credits for this request"})
     assert mapped.code == "provider_insufficient_credits"
@@ -284,7 +327,7 @@ def test_an_inline_quota_message_is_not_treated_as_a_rate_limit() -> None:
 
 
 def test_an_inline_rate_limit_without_a_status_is_still_recognised() -> None:
-    from daintree_assistant_server.providers.openrouter import map_stream_error
+    from daintree_assistant_server.providers.cerebras import map_stream_error
 
     mapped = map_stream_error({"message": "Rate limit exceeded, too many requests"})
     assert mapped.code == "upstream_rate_limited"
@@ -292,7 +335,7 @@ def test_an_inline_rate_limit_without_a_status_is_still_recognised() -> None:
 
 
 def test_an_unrecognised_inline_error_stays_a_generic_upstream_error() -> None:
-    from daintree_assistant_server.providers.openrouter import map_stream_error
+    from daintree_assistant_server.providers.cerebras import map_stream_error
 
     assert map_stream_error({"message": "something odd"}).code == "upstream_error"
 
@@ -300,35 +343,40 @@ def test_an_unrecognised_inline_error_stays_a_generic_upstream_error() -> None:
 @pytest.mark.parametrize("code", [True, False, 99, 600, "4o2", "", None, {"x": 1}])
 def test_a_nonsense_inline_code_falls_back_to_prose(code: object) -> None:
     """A bool is an int in Python — `code: true` must not read as HTTP 1."""
-    from daintree_assistant_server.providers.openrouter import _stream_error_status
+    from daintree_assistant_server.providers.cerebras import _stream_error_status
 
     assert _stream_error_status({"code": code}) is None
 
 
 # ---------------------------------------------------------------------------
-# The no-route matcher requires a COMBINATION, not one loose phrase.
+# The credential never escapes, whatever the upstream echoes back.
 # ---------------------------------------------------------------------------
 
 
-def test_no_endpoints_found_alone_is_not_conclusive() -> None:
-    """An outage can borrow the same words.
+@pytest.mark.asyncio
+async def test_an_echoed_credential_is_scrubbed_from_the_diagnostic() -> None:
+    """The one way the server's key could leak.
 
-    Classifying this as a policy dead-end would mark a transient failure
-    permanent and kill a retry that would have succeeded.
+    A 400's upstream reason is carried through into the client-facing error
+    envelope, because it names the offending field and is the whole diagnostic.
+    That path is only safe because the credential is scrubbed out of it first.
     """
-    assert (
-        _looks_unroutable("No endpoints found because the service is temporarily down")
-        is False
-    )
+    err = await _fail_with(400, f"bad request from {_KEY}")
+    assert _KEY not in err.message
+    assert "[REDACTED]" in err.message
 
 
-def test_no_endpoints_found_with_a_policy_reason_is_conclusive() -> None:
-    assert _looks_unroutable("No endpoints found matching your data policy.") is True
+@pytest.mark.asyncio
+async def test_a_doubly_encoded_echo_drops_the_diagnostic_wholesale() -> None:
+    """A literal scrub cannot catch every encoding, so it is backed by a check.
 
+    Here one decode pass still hides the key from an exact match. Losing a rare
+    error message is the right trade against leaking a key, so the detail is
+    dropped rather than published.
+    """
+    from daintree_assistant_server.providers.cerebras import _CREDENTIAL_ECHOED
 
-def test_a_withheld_credential_diagnostic_reads_as_an_outage() -> None:
-    """When the credential-scrubbing path replaces the detail wholesale, we know
-    nothing about the cause — and the safe reading is the retryable one."""
-    from daintree_assistant_server.providers.openrouter import _CREDENTIAL_ECHOED
-
-    assert _looks_unroutable(_CREDENTIAL_ECHOED) is False
+    escaped = "".join(f"\\u{ord(c):04x}" for c in _KEY)
+    err = await _fail_with(400, f"rejected: {escaped}")
+    assert _KEY not in err.message
+    assert _CREDENTIAL_ECHOED in err.message

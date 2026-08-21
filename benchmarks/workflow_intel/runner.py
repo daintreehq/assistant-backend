@@ -29,7 +29,7 @@ from typing import Any
 
 from pydantic import SecretStr, ValidationError
 
-from daintree_assistant_server.config import OPENROUTER_MODEL
+from daintree_assistant_server.config import CEREBRAS_MODEL
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.task_runner import build_profiles
@@ -214,7 +214,7 @@ async def run_bench(
         "meta": {
             "benchmark": "workflow_intel",
             "mode": "live",
-            "model": OPENROUTER_MODEL,
+            "model": CEREBRAS_MODEL,
             "trials": trials,
             # What a COMPLETE run looks like, so the quality gate can tell one
             # from a --filter'd or interrupted run rather than grading whatever

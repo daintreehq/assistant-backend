@@ -21,7 +21,7 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import OPENROUTER_MODEL, Settings
+from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
 from daintree_assistant_server.prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
 from daintree_assistant_server.providers.base import (
     ChatProvider,
@@ -30,7 +30,7 @@ from daintree_assistant_server.providers.base import (
     ProviderStream,
     ProviderToolCallResult,
 )
-from daintree_assistant_server.providers.openrouter import OpenRouterProvider
+from daintree_assistant_server.providers.cerebras import CerebrasProvider
 from daintree_assistant_server.skills.catalog import (
     CatalogManager,
     default_skills_dir,
@@ -60,7 +60,7 @@ class BenchConfig:
     env_file: str | None = None
     settings_overrides: dict[str, Any] = field(default_factory=dict)
     #: Route this run at a DIFFERENT model than the pinned one. ``None`` uses
-    #: ``OPENROUTER_MODEL``, which is what a normal run must always do.
+    #: ``CEREBRAS_MODEL``, which is what a normal run must always do.
     #:
     #: The pinned id is hardcoded in `config.py` on purpose, and trying a
     #: candidate must not mean editing it: an experiment that starts by changing
@@ -74,17 +74,17 @@ class BenchConfig:
 class _ModelOverride:
     """A provider that rewrites the model id on the way out, and nothing else.
 
-    The selector hardcodes ``OPENROUTER_MODEL`` inside ``_build_request``, which
+    The selector hardcodes ``CEREBRAS_MODEL`` inside ``_build_request``, which
     is correct — the pinned model is a product decision, not a parameter. So to
     score a CANDIDATE model the substitution has to happen below the selector,
     and this is the narrowest place it can: one field, on the request, in the
     harness.
 
-    Deliberately a wrapper rather than a patch of `config.OPENROUTER_MODEL`. A
+    Deliberately a wrapper rather than a patch of `config.CEREBRAS_MODEL`. A
     module-level monkeypatch would also change the id the results document
     records and every other read in the process, so a run could report the model
     it *meant* to use rather than the one it sent. Here the two cannot disagree:
-    `run_bench` records `config.model or OPENROUTER_MODEL`, and this class is the
+    `run_bench` records `config.model or CEREBRAS_MODEL`, and this class is the
     only thing that puts a model id on the wire.
     """
 
@@ -150,9 +150,9 @@ def _build_settings(config: BenchConfig) -> Settings:
         default = ROOT / ".env"
         env_file = str(default) if default.is_file() else None
     settings = Settings(_env_file=env_file, **config.settings_overrides)
-    if not settings.openrouter_api_key.get_secret_value():
+    if not settings.cerebras_api_key.get_secret_value():
         raise BenchError(
-            "OPENROUTER_API_KEY is not set — export it or point --env-file at a .env that has it"
+            "CEREBRAS_API_KEY is not set — export it or point --env-file at a .env that has it"
         )
     return settings
 
@@ -214,14 +214,13 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    # No prompt_cache_key: the OpenRouter migration dropped that setting (no endpoint
-    # for this model advertises the parameter, and sending an unadvertised one can
-    # empty the eligible-endpoint pool under require_parameters). This suite predates
-    # that move and still passed the removed `deepseek_send_prompt_cache_key`.
-    provider: ChatProvider = OpenRouterProvider(
+    # Affinity is the provider's business now: Cerebras caches prefixes
+    # automatically and org-wide, and the adapter attaches `prompt_cache_key`
+    # itself when a caller names one. Nothing to configure here.
+    provider: ChatProvider = CerebrasProvider(
         client,
-        api_key=settings.openrouter_api_key,
-        base_url=settings.openrouter_base_url,
+        api_key=settings.cerebras_api_key,
+        base_url=settings.cerebras_base_url,
         default_timeout=settings.selector_timeout_seconds,
     )
     if config.model:
@@ -231,7 +230,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     started_at = datetime.now(UTC)
     semaphore = asyncio.Semaphore(config.concurrency)
     jobs = [
-        _run_trial(selector, case, trial, semaphore, settings.openrouter_api_key)
+        _run_trial(selector, case, trial, semaphore, settings.cerebras_api_key)
         for trial in range(config.trials)
         for case in cases
     ]
@@ -294,7 +293,7 @@ def build_results_doc(
             ) * config.trials,
             "categories_expected": sorted({c.category for c in whole_corpus}),
             "variant": config.variant,
-            "model": config.model or OPENROUTER_MODEL,
+            "model": config.model or CEREBRAS_MODEL,
             "trials": config.trials,
             "concurrency": config.concurrency,
             "filter": config.id_filter,

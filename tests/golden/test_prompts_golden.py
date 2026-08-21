@@ -53,7 +53,7 @@ def _fixture_catalog() -> Catalog:
 
 
 def _settings() -> Settings:
-    return Settings(OPENROUTER_API_KEY="d", STATE_SIGNING_KEY_CURRENT="s")
+    return Settings(CEREBRAS_API_KEY="csk", STATE_SIGNING_KEY_CURRENT="s")
 
 
 def _startup_payload() -> dict[str, object]:
@@ -452,11 +452,6 @@ def test_selector_prompt_renders_real_catalog(loader: PromptLoader) -> None:
 @pytest.mark.parametrize("task_id", sorted(build_profiles()))
 def test_task_prompts(loader: PromptLoader, task_id: str) -> None:
     assert_golden(f"task_{task_id}.md", loader.task_system_prompt(task_id))
-
-
-@pytest.mark.parametrize("name", ["gate", "build", "improve"])
-def test_skill_learning_prompts(loader: PromptLoader, name: str) -> None:
-    assert_golden(f"skill_learning_{name}.md", loader.skill_learning_prompt(name))
 
 
 def test_full_upstream_messages(assembler: PromptAssembler) -> None:

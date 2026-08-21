@@ -41,7 +41,6 @@ from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
 from ..errors import DaintreeError
 from ..observability import get_logger
 from ..prompts.loader import MAIN_PROMPT_VERSION
-from ..providers.policy import DEFAULT_POLICY
 from .daintree_auth import REASON_OK, REASON_REJECTED, _usability
 
 router = APIRouter()
@@ -91,24 +90,28 @@ async def doctor(
 async def _provider_section(
     container: Any, principal: Principal, warnings: list[str]
 ) -> dict[str, Any]:
-    """Provider identity, routing posture, and a live verdict on the caller's key.
+    """Provider identity and a live verdict on the credential this turn would use.
 
-    ``verify_key`` is the provider's own key-introspection call: no tokens, no
-    model. The distinction between "rejected" and "we could not ask" is preserved
-    — a network failure reports ``key_valid: null``, never ``false``, because
-    telling a tester their key is bad when we simply could not reach the provider
-    sends them to re-paste a credential that was fine.
+    ``verify_key`` is a tokenless model-listing call: no generation, no spend. The
+    distinction between "rejected" and "we could not ask" is preserved — a network
+    failure reports ``key_valid: null``, never ``false``, because telling a tester
+    the key is bad when we simply could not reach the provider sends them to
+    re-paste a credential that was fine.
+
+    The key under test is the one this request would actually spend: the caller's
+    if they sent one, the SERVER's otherwise — which is every request today. That
+    is the useful question either way ("can this backend answer for me?"), and it
+    is why the verdict is still worth reporting now that callers hold no key.
     """
     section: dict[str, Any] = {
-        "name": "openrouter",
+        "name": "cerebras",
         "model": PUBLIC_MODEL_ID,
         "thinking_enabled": INTERACTIVE_THINKING_ENABLED,
-        "privacy_mode": DEFAULT_POLICY.privacy.value,
-        "endpoint_sort": DEFAULT_POLICY.sort.value,
-        # The caller funds every upstream call with their own bearer token; the
-        # server holds no provider credential. Stated here because it is the
-        # fact a tester most often needs confirmed and least often believes.
-        "server_holds_credential": False,
+        # The server now holds the upstream credential and funds every turn from
+        # it. Stated here because it is the fact a tester most often needs
+        # confirmed, and it inverted when the backend moved to Cerebras.
+        "server_holds_credential": True,
+        "caller_supplied_key": principal.api_key is not None,
         "key_valid": None,
         "key_usable": None,
         "reason": None,
@@ -142,7 +145,10 @@ async def _provider_section(
     section["verify_ms"] = round((time.perf_counter() - started) * 1000)
     section["key_valid"] = True
     # Reuse the sign-in endpoint's budget arithmetic rather than restating it, so
-    # the two can never disagree about what "usable" means.
+    # the two can never disagree about what "usable" means. Cerebras reports no
+    # budget figures at all, so `_usability` sees an empty record and answers
+    # "not known to be exhausted" — which is the honest verdict, and exactly the
+    # asymmetry that helper documents.
     budget: dict[str, object] = {}
     if isinstance(record, dict):
         for field in ("limit", "usage", "limit_remaining"):

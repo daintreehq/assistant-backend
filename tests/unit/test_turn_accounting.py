@@ -1,7 +1,7 @@
 """Endpoint attribution for the number the prompt-cache work exists to move.
 
 `cache_ratio` is the metric the assembler's whole layout is built to protect,
-and until now it was logged without saying WHICH of OpenRouter's ~24 endpoints
+and until now it was logged without saying WHICH upstream endpoint
 produced it. Each keeps its own node-local prefix cache, so under
 throughput-sorted routing with fallbacks a re-rolled round can be answered by a
 host that has never seen this prefix — and a prompt layout regression and a

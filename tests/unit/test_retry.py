@@ -94,7 +94,7 @@ def test_default_retry_budget_is_one_retry_two_attempts() -> None:
     from daintree_assistant_server.config import Settings
 
     s = Settings(
-        OPENROUTER_API_KEY="dk", STATE_SIGNING_KEY_CURRENT="sk"
+        CEREBRAS_API_KEY="csk", STATE_SIGNING_KEY_CURRENT="sk"
     )
     assert s.max_upstream_retries == 1
 

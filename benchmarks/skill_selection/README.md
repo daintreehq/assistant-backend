@@ -11,7 +11,7 @@ are benchmarked before being promoted into `src`.
 ## Quick start
 
 ```bash
-# from the repo root, venv active, OPENROUTER_API_KEY in .env (or exported)
+# from the repo root, venv active, CEREBRAS_API_KEY in .env (or exported)
 python -m benchmarks.skill_selection.bench list          # validate cases, no API calls
 python -m benchmarks.skill_selection.bench coverage      # per-skill coverage matrix, no API calls
 python -m benchmarks.skill_selection.bench run           # baseline (production prompt)
@@ -20,7 +20,7 @@ python -m benchmarks.skill_selection.bench compare results/a.json results/b.json
 ```
 
 Only `run` costs money. `list`, `coverage`, `report`, and `compare` are offline
-and free — they work with `OPENROUTER_API_KEY=` blanked.
+and free — they work with `CEREBRAS_API_KEY=` blanked.
 
 A full default run is `cases x trials` (currently 150 x 3 = 450) real selector
 calls per variant — cheap on deepseek-v4-flash, but not free, and it is the bulk

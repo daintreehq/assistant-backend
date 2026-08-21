@@ -207,7 +207,7 @@ def test_every_task_affinity_key_is_safe_to_send_upstream() -> None:
     for task_id in build_profiles():
         key = _affinity_key(task_id)
         assert key.startswith("daintree-task-")
-        assert len(key) <= 256, "OpenRouter caps the affinity key"
+        assert len(key) <= 256, "the affinity key must stay legible upstream"
         assert re.fullmatch(r"[A-Za-z0-9._-]+", key), (
             f"task id {task_id!r} produces an affinity key with characters that are "
             "not safe to send verbatim as a router-level identifier"
@@ -299,7 +299,7 @@ async def test_a_withheld_task_cost_is_logged_rather_than_silently_dropped(
 ) -> None:
     """Dropping the figure is the right wire answer, but it must leave a trace.
 
-    Otherwise a developer reconciling their OpenRouter dashboard against these
+    Otherwise a developer reconciling the provider dashboard against these
     numbers has no way to tell a task that reported nothing from one whose
     partial figure we deliberately withheld.
     """
@@ -511,7 +511,7 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
     result = await task_runner.run(TaskRequest(task="terminal_summarize", input={"tail": "x"}), api_key=TEST_API_KEY)
     assert result.prompt_version == "terminal_summarize"
     assert result.usage.total_tokens >= 0
-    assert result.model == "deepseek/deepseek-v4-flash-0731"
+    assert result.model == "gemma-4-31b"
 
 
 # The task ids are a FROZEN WIRE CONTRACT shared with the Go CLI, which hardcodes
