@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 
 import pytest
-from fakes import make_result, selection_result
+from conftest import detach_docs_client, scripted_selector
+from fakes import FakeCompactor, make_result, selection_result
+from fastapi.testclient import TestClient
 from unit.test_task_runner import EXPECTED_TASK_IDS
+
+from daintree_assistant_server.main import create_app
 
 SKILL_PREP = "daintree.workflow.prep-branch-for-review"
 
@@ -69,6 +73,32 @@ def test_readyz(client, app) -> None:
     assert body["skills"] == len(app.state.container.catalog)
 
 
+def test_capabilities_reports_a_configured_compactor_as_enabled(
+    settings, fake_provider
+) -> None:
+    """`enabled` must track the container's ACTUAL compactor, not a constant.
+
+    The CLI gates on this during rollout, so a hardcoded false would keep the
+    feature dark the day a producer is finally wired in — the one failure that
+    would look like nothing being wrong.
+    """
+    application = create_app(
+        settings=settings,
+        provider=fake_provider,
+        selector=scripted_selector(fake_provider, settings),
+        compactor=FakeCompactor(),
+    )
+    # The container the LIFESPAN builds, not one substituted afterwards —
+    # substituting it would let this pass even if `create_app` dropped the
+    # injected compactor on the floor, which is the exact wiring under test.
+    with TestClient(application) as client:
+        container = application.state.container
+        detach_docs_client(container)
+        body = client.get("/v1/daintree/capabilities").json()
+    assert body["context_compaction"]["enabled"] is True
+    assert container.orchestrator.compactor is container.compactor
+
+
 def test_version(client) -> None:
     r = client.get("/version")
     assert r.status_code == 200
@@ -87,7 +117,19 @@ def test_capabilities(client, auth, app) -> None:
     # field cannot pass silently.
     assert body["respond"]["display_context"] is True
     assert body["respond"]["max_active_skills"] == 3
-    assert body["respond"]["stream_events"] == ["meta", "status", "delta", "done", "error"]
+    # The full parser vocabulary, asserted as an exact list. `compaction` is
+    # advertised even where no producer is configured (see `context_compaction`
+    # below): the event is optional on every turn anyway, so a client that handles
+    # it is correct against every deployment, and one that does not breaks the day
+    # a producer is switched on.
+    assert body["respond"]["stream_events"] == [
+        "meta",
+        "status",
+        "delta",
+        "compaction",
+        "done",
+        "error",
+    ]
     # Hardcoded posture, not config. Asserted as a literal rather than against the
     # constant on purpose: this field is a wire contract the CLI gates its thinking UI
     # on, so the test must fail — and force the CLI to be updated in lockstep — when
@@ -126,6 +168,29 @@ def test_capabilities(client, auth, app) -> None:
     assert wf["max_workflow_digests"] == 5
     assert wf["max_workflow_state_bytes"] == 16384
     assert set(wf["tasks"]) <= set(body["tasks"])
+    # Context compaction. `enabled` is the honest answer for THIS instance and is
+    # false with the null compactor every deployment currently holds — the
+    # declaration is still stripped, only the block is absent. Asserted as a whole
+    # block so a field the CLI branches on cannot quietly disappear.
+    assert body["context_compaction"] == {
+        "enabled": False,
+        "stream_event": "compaction",
+        "delivery": "before_done",
+        "at_most_once": True,
+        "streaming_only": True,
+        "best_effort": True,
+        "append_only": True,
+        "block_message_name": "daintree_compaction",
+        "span": {
+            "collection": "input.messages",
+            "index_base": 0,
+            "end_exclusive": True,
+            "excludes_current_reply": True,
+        },
+        "turn_id_match_required": True,
+        "max_block_content_bytes": 65536,
+    }
+    assert body["context_compaction"]["stream_event"] in body["respond"]["stream_events"]
 
 
 def test_skills_list_and_etag(client, auth, app) -> None:

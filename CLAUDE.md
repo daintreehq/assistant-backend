@@ -101,6 +101,35 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    state stay in the final volatile user-role tail.
 6. **Respond** — the skills/selection metadata is delivered first: as the response body's `skills` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential now — select → assemble → **one** upstream call; the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
 
+6b. **Turn-finality declaration and compaction** (`services/response_declaration.py`,
+   `services/compaction.py`) — the model opens its reply with one control line,
+   `[[DAINTREE:FINAL]]` or `[[DAINTREE:TOOLS]]` (`main/base/15-response-declaration.md`),
+   and the backend strips it before any byte reaches the client. The rule is in the
+   ASSISTANT base prompt only — a sub-agent is never asked for it — and carves out
+   a bare-JSON reply, which a control line would invalidate. Position is the whole
+   point: a marker at the end says nothing the stream terminating did not, while one at
+   the front buys the entire remaining generation for a compaction call to run beside it.
+   `DeclarationScanner` mirrors `bare_intent.py`'s monotonic-probe shape and sits AHEAD
+   of the commit gate rather than duplicating it, so `content_parts` — and with it the
+   runaway guard, the bare-intent predicate and the output lint — sees exactly what the
+   user sees. It is prefix-only by design: a marker quoted mid-reply is left alone.
+   On FINAL the orchestrator starts compaction as a `_background_tasks` task, but
+   DELIVERY is gated at the terminal event on what the reply actually did (a clean
+   `stop`, no tool calls) — the model contradicting itself is expected, and a discarded
+   block costs one call while a wrongly delivered one freezes history mid-task, which
+   append-only cannot undo. The block rides a `compaction` SSE event emitted immediately
+   BEFORE `done`, never after: `done` stays terminal because readers modelled on the
+   `data: [DONE]` convention break their loop on one. Nothing reaches the state token —
+   the span start is re-derived each turn from the reserved `daintree_compaction` message
+   name the client splices back in, so a frozen segment is never re-compacted without any
+   server-side state. **The PRODUCER does not exist yet** (issue #60): `Compactor` is a
+   Protocol and every deployment holds `NullCompactor`, so today the line is stripped and
+   nothing else happens. That is NOT free — the prompt bytes and the marker tokens are
+   paid on every turn — and what it buys meanwhile is the `response_declaration` log
+   line, which measures whether the model actually complies before #60 starts spending
+   on a second model. Compaction is streaming-only; the non-streaming path strips and
+   stops, having no generation left to overlap.
+
 **Invariants to preserve** (also in README): client `system`/`developer` messages are rejected; `skill.find`/`skill.load` are never offered to the main model; only active skill *bodies* are injected (never the full catalog); selector failure fails open; state is portable via the signed token; required structured `startup` context reaches the main model only — the selector's evidence is sanitized `input.messages` plus bounded turn/workflow hints and tool names, and it never sees `startup`.
 
 ## Skills — the main area of ongoing work
@@ -135,7 +164,7 @@ Skills are Markdown runbooks that become task-specific operating instructions fo
 
 All prompt text is **server-owned** and lives in `src/daintree_assistant_server/prompts/` (`.md` = raw bodies, `.md.j2` = Jinja templates), loaded via `prompts/loader.py`:
 
-- `main/base/NN-*.md` — the permanent assistant system prompt (persona + hard rules). It is a **directory of ordered partials**, not a single file: `PromptLoader.base_prompt()` globs `main/base/*.md`, sorts by filename, and joins them with blank lines, so the `NN-` prefix is load-bearing ordering (`00-persona`, `10-hard-rules`, `20-tool-discipline`, `30-skills`, `35-daintree-docs`, `40-communication`, `50-formatting`). Edit the partial that owns the rule; a new section is a new numbered file. **There is no `main/base.md`** — writing one creates a stray file the loader ignores. This directory is the highest-leverage prompt text in the repo.
+- `main/base/NN-*.md` — the permanent assistant system prompt (persona + hard rules). It is a **directory of ordered partials**, not a single file: `PromptLoader.base_prompt()` globs `main/base/*.md`, sorts by filename, and joins them with blank lines, so the `NN-` prefix is load-bearing ordering (`00-persona`, `10-hard-rules`, `15-response-declaration`, `20-tool-discipline`, `30-skills`, `35-daintree-docs`, `40-communication`, `50-formatting`). Edit the partial that owns the rule; a new section is a new numbered file. **There is no `main/base.md`** — writing one creates a stray file the loader ignores. This directory is the highest-leverage prompt text in the repo.
 - `main/{startup_context,runtime_context,integrations,loaded_skills,response_contract,turn_footer,docs_context}.md.j2` — the structured main-prompt layers. `response_contract.md.j2` is order-critical: the golden suite asserts it renders as the **final system message** — the second and last one, directly after the base prompt and so immediately ahead of the tool schemas. The skill, integration and startup layers are **user-role rows downstream of those schemas**, not system messages.
 - `selector/system.md.j2` — the skill-selector classifier prompt.
 - `tasks/<task>.md` — utility-task system prompts.

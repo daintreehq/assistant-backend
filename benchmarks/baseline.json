@@ -10,7 +10,7 @@
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 24655,
+    "base_prompt_bytes": 25301,
     "skill_body_bytes_total": 290532,
     "subagent_prompt_bytes": 5375
   },

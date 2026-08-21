@@ -35,7 +35,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from ..config import INTERACTIVE_REASONING_EFFORT, INTERACTIVE_THINKING_ENABLED, Settings
-from ..contracts.daintree_api import RespondRequest, RespondToolChoice
+from ..contracts.daintree_api import (
+    COMPACTION_BLOCK_NAME,
+    RespondRequest,
+    RespondToolChoice,
+)
 from ..contracts.extensions import (
     AgentSnapshot,
     RuntimeContext,
@@ -684,7 +688,12 @@ class PromptAssembler:
         else:
             wire["content"] = ""
 
-        if msg.name:
+        # A compacted block the client spliced back in wears a reserved name. That
+        # name is a marker BETWEEN the server and the client — it tells the next
+        # turn's span selector where frozen history ends — and it has no business
+        # upstream, where `name` reads as a speaker identity. Dropped here, so the
+        # block travels as ordinary user content and costs nothing extra.
+        if msg.name and msg.name != COMPACTION_BLOCK_NAME:
             wire["name"] = msg.name
         if msg.tool_calls:
             wire["tool_calls"] = [self._tool_call_to_wire(tc) for tc in msg.tool_calls]

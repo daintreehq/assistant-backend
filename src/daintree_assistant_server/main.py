@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import contextlib
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +43,7 @@ from .providers.base import ChatProvider
 from .providers.cerebras import CerebrasProvider
 from .providers.openrouter import OpenRouterProvider
 from .services.chat_orchestrator import ChatOrchestrator
+from .services.compaction import Compactor, NullCompactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
 from .services.prompt_assembler import PromptAssembler
 from .services.task_runner import TaskRunner
@@ -219,6 +220,11 @@ class Container:
     # the provider's: the docs server is a different host with a different
     # latency profile, and a documentation search must never queue behind a
     # long-lived streaming completion holding a pooled connection.
+    # The context compactor. `NullCompactor` unless a producer is injected —
+    # which is every deployment today, because issue #60 (the second provider and
+    # the reconciliation task) has not landed. Held here so `/capabilities` can
+    # report honestly whether the feature can actually do anything.
+    compactor: Compactor = field(default_factory=NullCompactor)
     docs_http_client: httpx.AsyncClient | None = None
     # The local selector's worker pool — owned here so lifespan teardown joins
     # its threads. None when a selector override was injected (tests/benchmarks).
@@ -365,6 +371,7 @@ def build_container(
     settings: Settings,
     provider: ChatProvider | None = None,
     selector: SkillSelector | None = None,
+    compactor: Compactor | None = None,
 ) -> Container:
     """Construct and validate all service components.
 
@@ -416,6 +423,10 @@ def build_container(
     assembler = PromptAssembler(prompt_loader, settings)
 
     docs_http_client, docs_client = _build_docs_client()
+    # No producer exists yet (issue #60), so this is the null one on every real
+    # deployment: declarations are still stripped, but nothing is started, nothing
+    # is awaited, and no `compaction` event is ever emitted.
+    chat_compactor: Compactor = compactor if compactor is not None else NullCompactor()
     orchestrator = ChatOrchestrator(
         settings=settings,
         catalog_manager=catalog_manager,
@@ -424,6 +435,7 @@ def build_container(
         assembler=assembler,
         provider=chat_provider,
         docs_client=docs_client,
+        compactor=chat_compactor,
     )
     task_runner = TaskRunner(
         settings=settings,
@@ -444,6 +456,7 @@ def build_container(
         assembler=assembler,
         orchestrator=orchestrator,
         task_runner=task_runner,
+        compactor=chat_compactor,
         docs_http_client=docs_http_client,
         inference_pool=inference_pool,
     )
@@ -454,6 +467,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     settings: Settings = app.state.settings
     injected: ChatProvider | None = getattr(app.state, "injected_provider", None)
     injected_selector: SkillSelector | None = getattr(app.state, "injected_selector", None)
+    injected_compactor: Compactor | None = getattr(app.state, "injected_compactor", None)
     try:
         # Local-development-only features (skill learning) must never be enabled in
         # production; checked always, even with an injected provider.
@@ -462,7 +476,9 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
             problems.extend(settings.missing_secrets() + settings.weak_secrets())
         if problems:
             raise RuntimeError(f"configuration problems: {', '.join(problems)}")
-        container = build_container(settings, injected, injected_selector)
+        container = build_container(
+            settings, injected, injected_selector, injected_compactor
+        )
         app.state.container = container
         app.state.ready = True
         logger.info(
@@ -490,6 +506,7 @@ def create_app(
     settings: Settings | None = None,
     provider: ChatProvider | None = None,
     selector: SkillSelector | None = None,
+    compactor: Compactor | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
@@ -505,6 +522,7 @@ def create_app(
     app.state.settings = settings
     app.state.injected_provider = provider
     app.state.injected_selector = selector
+    app.state.injected_compactor = compactor
     app.state.ready = False
     app.state.ready_error = None
 

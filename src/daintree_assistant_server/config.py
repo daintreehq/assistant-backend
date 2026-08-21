@@ -390,6 +390,22 @@ class Settings(BaseSettings):
     cap_docs_query: int = Field(default=256, alias="CAP_DOCS_QUERY")
     cap_docs_block_bytes: int = Field(default=16 * 1024, alias="CAP_DOCS_BLOCK_BYTES")
 
+    # ---- Context compaction ---------------------------------------------
+    # The largest compacted block worth delivering, in UTF-8 bytes. Generous
+    # rather than tight: the block is what a long conversation collapses INTO, so
+    # a mean cap would either lose the identifiers compaction exists to protect or
+    # reject the very turns it was built for. It is a runaway guard — an oversized
+    # block is discarded whole and the turn keeps its raw history, because
+    # truncating reconciled state cuts exactly the agent ids and worktree paths
+    # that make the block worth having.
+    # The upper bound is not decoration: `CompactionBlock.content` carries its own
+    # code-point limit, and a byte cap set above it would let a block clear this
+    # check and then be rejected by the wire model — a failure mode reachable only
+    # by configuration, which is the kind nobody finds until production.
+    cap_compaction_block_bytes: int = Field(
+        default=64 * 1024, ge=1, le=256 * 1024, alias="CAP_COMPACTION_BLOCK_BYTES"
+    )
+
     # ---- Skill learning (LOCAL DEVELOPMENT ONLY) ------------------------
     # A backend-internal harness that watches completed local workflows and, when
     # warranted, writes or improves skill files so the catalog "learns". It is

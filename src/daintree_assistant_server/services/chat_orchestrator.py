@@ -22,10 +22,13 @@ from pydantic import SecretStr
 from .. import PROTOCOL_VERSION
 from ..config import DOCS_SKILL_ID, PUBLIC_MODEL_ID, Settings
 from ..contracts.daintree_api import (
+    CompactionBlock,
+    CompactionSpan,
     RespondMessage,
     RespondRequest,
     RespondResponse,
     SkillsBlock,
+    StreamCompaction,
     StreamDelta,
     StreamDone,
     StreamError,
@@ -63,8 +66,14 @@ from ..skills.local.selector import SkillSelector
 from ..skills.selector import SelectionDecision
 from ..skills.tool_projection import ToolProjection, project_tools
 from ..state.codec import StateCodec
-from ..text_utils import sanitize_line
+from ..text_utils import sanitize_line, utf8_len
 from .bare_intent import could_still_be_bare_intent, is_bare_tool_intent
+from .compaction import (
+    CompactionRequest,
+    CompactionSource,
+    Compactor,
+    select_source,
+)
 from .deadlines import DeadlineExceeded, RequestBudget, TurnPhase
 from .docs_events import DocsSearchExecution
 from .docs_mcp import (
@@ -75,6 +84,7 @@ from .docs_mcp import (
 )
 from .output_policy import lint_output, repair_tables, resolve_content_width
 from .prompt_assembler import PromptAssembler
+from .response_declaration import Declaration, DeclarationScanner, strip_declaration
 from .tool_call_repair import (
     ParameterIndex,
     StreamToolCallBuffer,
@@ -211,6 +221,16 @@ _DOCS_MIN_TIMEOUT_SECONDS = 0.5
 # means a slow docs host turns a turn that would have answered unaided into a
 # preparation-deadline error — trading the feature's soft failure for a hard one.
 _DOCS_BUDGET_RESERVE_SECONDS = 3.0
+
+# How long the terminal event may wait on a compacted block that has not landed
+# yet. Compaction starts the moment the model declares the reply final, so it has
+# the whole remaining generation to run and is normally finished before the stream
+# is — this grace covers the tail case, not the common one. Deliberately short:
+# the block is an optimisation for the NEXT turn, and making the user wait on it
+# spends the thing it exists to save. Hardcoded like the rest of the latency
+# posture; no env toggle.
+_COMPACTION_GRACE_SECONDS = 1.0
+
 
 # Namespace for the upstream cache-affinity key (see `_cache_session_key`). The
 # key shares a flat keyspace with every other tenant of the upstream account, so
@@ -350,6 +370,11 @@ class ChatOrchestrator:
         # looks anything up, which is the same outcome as a docs server that is
         # down, and is already a path this code has to handle.
         docs_client: DocsMcpClient | None = None,
+        # The context compactor. Optional for the same reason `docs_client` is,
+        # and today ALWAYS the null one: the producer (issue #60) does not exist,
+        # so every turn takes the path it took before this feature landed — the
+        # declaration is stripped, nothing is started, and no event is emitted.
+        compactor: Compactor | None = None,
     ) -> None:
         self.settings = settings
         self.catalog_manager = catalog_manager
@@ -358,6 +383,7 @@ class ChatOrchestrator:
         self.assembler = assembler
         self.provider = provider
         self.docs_client = docs_client
+        self.compactor = compactor
         # In-flight detached tasks — today, the streaming path's preparation task.
         # asyncio holds only a weak reference to a bare task, so we keep a strong
         # one here (discarded on done) to stop one being garbage-collected
@@ -631,6 +657,10 @@ class ChatOrchestrator:
             budget=budget,
         )
         result = await self._complete_with_retry(prepared.provider_request, budget=budget)
+        # Strip the control line FIRST, before anything reads the text. The
+        # bare-intent detector, the output lint and the response body all consume
+        # `result.text`, and every one of them must see what the user will.
+        self._strip_declaration(result, request_id=request_id)
         # Snapshot BEFORE the re-roll: it returns the repaired result in `result`'s
         # place, and only the usage is carried across (`sum_usage` inside). The
         # first attempt's host would otherwise be unrecoverable. Against a
@@ -640,9 +670,17 @@ class ChatOrchestrator:
         # A round that only announced a tool call it never emitted would end the turn
         # having performed nothing. Re-roll it once here, before anything is built or
         # sent, so neither the client nor the transcript ever sees the dead draft.
+        drafted = result
         result = await self._repair_bare_intent(
             prepared.provider_request, result, request_id=request_id
         )
+        # ONLY when the repair actually produced a new result. Stripping is not
+        # idempotent — it removes the FIRST marker-shaped opening it finds — so
+        # running it twice over the same text would eat a second control line the
+        # model had written as visible content, and the two response modes would
+        # then disagree about what the user is owed.
+        if result is not drafted:
+            self._strip_declaration(result, request_id=request_id)
         # finish_reason is a second, independent signal: treat a continuation round as
         # such even if a malformed upstream drops the tool_calls payload.
         had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
@@ -1905,6 +1943,27 @@ class ChatOrchestrator:
         # attempt's content is already public and can never be discarded.
         tools_callable = self._tools_callable(provider_request)
         held: list[StreamDelta] | None = None
+        # THE DECLARATION GATE. The reply opens with a control line saying whether
+        # it is the turn's last (`response_declaration.py`), and that line must
+        # never reach the client. Rebuilt per attempt, just below, because each
+        # attempt writes its own opening.
+        #
+        # It sits AHEAD of the commit gate rather than duplicating it: the scanner
+        # holds only its own tiny prefix and hands rewritten deltas on, so
+        # `content_parts` — and with it the runaway guard, the bare-intent
+        # predicate and the output lint — sees exactly the text the user sees.
+        scanner = DeclarationScanner()
+        # The speculative compaction started when the reply declared itself final,
+        # running in parallel with the rest of the generation. Whether it is ever
+        # delivered is decided at the terminal event, against what the reply
+        # actually did.
+        compaction_task: asyncio.Task[StreamCompaction | None] | None = None
+        # Whether the FINAL branch has been taken at all. Separate from the task
+        # because the common answer is "there was nothing to start" — no producer
+        # configured, no span, a sub-agent — and `declaration` stays FINAL for the
+        # rest of the reply, so keying off the task alone would re-walk the
+        # conversation looking for a span on every remaining content chunk.
+        compaction_considered = False
         # The re-roll gets exactly one shot and is never itself gated: whatever it
         # produces is what the user gets, so there is nothing to delay it for.
         attempt = 0
@@ -2018,6 +2077,7 @@ class ChatOrchestrator:
 
                 if attempt == 0 and tools_callable:
                     held = []
+                scanner = DeclarationScanner()
 
                 async for chunk in self._chunk_iter(
                     opened_stream, first_event, budget=budget
@@ -2026,6 +2086,37 @@ class ChatOrchestrator:
                     delta = self._chunk_to_delta(chunk)
                     if delta is None:
                         continue
+                    if delta.content:
+                        visible = scanner.feed(delta.content)
+                        if visible != delta.content:
+                            delta = delta.model_copy(
+                                update={"content": visible or None}
+                            )
+                        # The instant the opening resolves to FINAL there is a
+                        # whole generation left to run alongside — which is the
+                        # entire reason the declaration goes first. Attempt 0
+                        # only: a re-roll has already shown this round's output
+                        # shape to be unreliable, and its predecessor's task was
+                        # cancelled at the fold.
+                        if (
+                            not compaction_considered
+                            and attempt == 0
+                            and scanner.declaration is Declaration.FINAL
+                        ):
+                            compaction_considered = True
+                            compaction_task = self._start_compaction(
+                                request, request_id=meta.request_id
+                            )
+                        # A fragment that was nothing but the control line has
+                        # nothing left to say. Yielding it would put an empty
+                        # delta on the wire and stamp a first-output time for
+                        # text the user never received.
+                        if (
+                            delta.content is None
+                            and not delta.reasoning_content
+                            and not delta.tool_calls
+                        ):
+                            continue
                     if delta.content:
                         content_parts.append(delta.content)
                         content_chars += len(delta.content)
@@ -2107,6 +2198,20 @@ class ChatOrchestrator:
                     _mark_first_output(delta)
                     yield self._sse("delta", delta)
 
+                # A reply that ended mid-marker ("[[DAINT") left real characters
+                # held. They are owed to the client — and to `content_parts`,
+                # which the bare-intent check immediately below is about to read.
+                tail = scanner.finish()
+                if tail:
+                    content_parts.append(tail)
+                    content_chars += len(tail)
+                    tail_delta = StreamDelta(content=tail)
+                    if held is not None:
+                        held.append(tail_delta)
+                    else:
+                        _mark_first_output(tail_delta)
+                        yield self._sse("delta", tail_delta)
+
                 # The reply has ended with its content still private. This is the one
                 # moment the dead round can be caught, and discarding it is free.
                 if held is not None and self._is_bare_intent(
@@ -2162,6 +2267,13 @@ class ChatOrchestrator:
                     content_chars = 0
                     tool_call_buffer = StreamToolCallBuffer(param_index)
                     held = None
+                    if compaction_task is not None:
+                        # Attempt 0's declaration described a draft being thrown
+                        # away. The re-roll deliberately starts no replacement:
+                        # a round whose output shape was already wrong once is
+                        # not the one to trust with freezing history.
+                        self._drop_compaction(compaction_task)
+                        compaction_task = None
                     continue
 
                 carried_usage = sum_usage(
@@ -2205,6 +2317,42 @@ class ChatOrchestrator:
                 _mark_first_output(StreamDelta(tool_calls=remaining))
                 yield self._sse("delta", StreamDelta(tool_calls=remaining))
             self._log_tool_call_repairs(tool_call_buffer.repairs, request_id=meta.request_id)
+            # Compaction rides AHEAD of the terminal event, never behind it. SSE
+            # itself has no notion of a terminal event, but a reader modelled on
+            # the `data: [DONE]` convention breaks its loop on one — so anything
+            # following `done` is silently dropped by exactly the kind of parser a
+            # client hand-writes. Keeping `done` last costs at most the grace
+            # inside `_collect_compaction`, and usually nothing at all: the call
+            # started when the model declared itself final and has had the whole
+            # remaining generation to finish in.
+            # Content-free telemetry on whether the model is actually keeping its
+            # side of the bargain. The declaration is a PROBABILISTIC contract —
+            # the prompt asks, the model may not comply — and until this is
+            # measured on real traffic nobody can say whether the mechanism is
+            # worth the prompt bytes it costs. Declared vs. what the round did is
+            # the whole signal; no reply text is logged.
+            declared = scanner.declaration
+            if declared is not None:
+                logger.info(
+                    "response_declaration",
+                    request_id=meta.request_id,
+                    declared=declared.value,
+                    had_tool_calls=saw_tool_calls,
+                    finish_reason=finish_reason,
+                    contradicted=(
+                        declared is Declaration.FINAL and saw_tool_calls
+                    )
+                    or (declared is Declaration.TOOLS and not saw_tool_calls),
+                )
+            if compaction_task is not None:
+                compaction = await self._collect_compaction(
+                    compaction_task,
+                    deliverable=(finish_reason == "stop" and not saw_tool_calls),
+                    request_id=meta.request_id,
+                    budget=budget,
+                )
+                if compaction is not None:
+                    yield self._sse("compaction", compaction.model_dump())
             yield self._sse(
                 "done",
                 StreamDone(
@@ -2247,6 +2395,11 @@ class ChatOrchestrator:
                 ),
             )
         finally:
+            # An errored or abandoned stream can never deliver a block, so the
+            # call it would have carried is pure waste. Idempotent: on the success
+            # path `_collect_compaction` has already settled the task.
+            if compaction_task is not None:
+                self._drop_compaction(compaction_task)
             if stream is not None:
                 await self._close_quietly(stream, request_id=meta.request_id)
 
@@ -2398,6 +2551,212 @@ class ChatOrchestrator:
         )
         body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         return f"event: {event}\ndata: {body}\n\n"
+
+    # ---- context compaction ---------------------------------------------
+
+    def _start_compaction(
+        self, request: RespondRequest, *, request_id: str
+    ) -> asyncio.Task[StreamCompaction | None] | None:
+        """Kick off compaction for a reply that has just declared itself final.
+
+        Speculative on purpose. The declaration is made BEFORE generation ends,
+        so it can still turn out to be wrong — the model declares final and then
+        emits a tool call anyway. Starting here is what buys the parallelism the
+        whole feature exists for; whether the result is ever DELIVERED is settled
+        later, against what the reply actually did (`_collect_compaction`). A
+        discarded block costs one cheap call. A delivered one that should not have
+        been freezes history in the middle of a task, and a frozen segment does
+        not unfreeze.
+
+        Returns ``None`` — cheaply, before anything is spent — whenever this turn
+        has nothing to compact or no way to compact it.
+        """
+        try:
+            return self._start_compaction_inner(request, request_id=request_id)
+        except Exception as exc:  # noqa: BLE001 - must never fail a turn
+            # `available` is a property a real producer may compute (a key, a
+            # provider health check), and every step below reads client-supplied
+            # messages. This runs INSIDE the delta loop, so an escaping exception
+            # would turn a reply the user is already reading into a terminal
+            # error — for an optimisation they never asked for.
+            logger.warning("compaction_start_failed", request_id=request_id, error=str(exc))
+            return None
+
+    def _start_compaction_inner(
+        self, request: RespondRequest, *, request_id: str
+    ) -> asyncio.Task[StreamCompaction | None] | None:
+        compactor = self.compactor
+        if compactor is None or not compactor.available:
+            return None
+        # A sub-agent runs a bounded, read-only, throwaway conversation in its own
+        # isolated context. There is no next turn for a block to pay off on, and
+        # its transcript is not the one growing without bound.
+        if request.profile != "assistant":
+            return None
+        # `RespondSession.turn_id` is required and non-empty at the request
+        # boundary, so there is nothing to guard here.
+        turn_id = request.session.turn_id
+        source = select_source(request.input.messages)
+        if source is None:
+            return None
+        task = asyncio.create_task(
+            self._run_compaction(
+                compactor, source, request_id=request_id, turn_id=turn_id
+            )
+        )
+        # Same detached-task discipline as the streaming path's preparation task:
+        # shutdown drains it (bounded) before the provider it may be calling
+        # through is torn down.
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
+
+    async def _run_compaction(
+        self,
+        compactor: Compactor,
+        source: CompactionSource,
+        *,
+        request_id: str,
+        turn_id: str,
+    ) -> StreamCompaction | None:
+        """One compaction call, and the wire event it produces — or nothing.
+
+        TOTAL, and deliberately so: the only thing that escapes is cancellation.
+        This runs on a detached task, so an exception here does not merely lose a
+        block — it sits unretrieved and surfaces later as a warning from nowhere,
+        attributed to no turn. Everything after the call is inside the boundary
+        too, because `CompactionResult` is a plain dataclass whose annotation is
+        not enforced at runtime: a producer returning `content=None` would
+        otherwise raise on `.strip()`.
+
+        Compaction is layered on a turn that is already answering correctly
+        without it, so no failure it can have is worth more than the turn.
+        """
+        try:
+            result = await compactor.compact(
+                CompactionRequest(
+                    request_id=request_id,
+                    turn_id=turn_id,
+                    messages=source.messages,
+                    max_output_bytes=self.settings.cap_compaction_block_bytes,
+                )
+            )
+            if result is None:
+                return None
+            content = result.content.strip()
+            if not content:
+                return None
+            # `utf8_len` measures with replacement semantics so a size check can
+            # never raise — which means a lone surrogate SURVIVES it, and would
+            # then blow up in `_sse`'s own encode, at a `yield` no handler covers.
+            content.encode("utf-8")
+            # Discarded WHOLE rather than truncated. What a block is made of is
+            # agent ids, worktree paths, terminal ids and open blockers; a cut
+            # removes exactly those and leaves prose that reads complete, which is
+            # worse than having no block at all.
+            size = utf8_len(content)
+            if size > self.settings.cap_compaction_block_bytes:
+                logger.warning(
+                    "compaction_oversized",
+                    request_id=request_id,
+                    bytes=size,
+                    limit=self.settings.cap_compaction_block_bytes,
+                )
+                return None
+            return StreamCompaction(
+                turn_id=turn_id,
+                replaces=CompactionSpan(
+                    start_index=source.start, end_index=source.end
+                ),
+                block=CompactionBlock(content=content),
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - best-effort, never fails a turn
+            logger.warning("compaction_failed", request_id=request_id, error=str(exc))
+            return None
+
+    async def _collect_compaction(
+        self,
+        task: asyncio.Task[StreamCompaction | None],
+        *,
+        deliverable: bool,
+        request_id: str,
+        budget: RequestBudget | None,
+    ) -> StreamCompaction | None:
+        """The delivery gate: what the reply DID, not what it said it would do.
+
+        ``deliverable`` is the ground truth — a clean stop with no tool calls. A
+        reply that declared itself final and then called a tool, or that ran out
+        of tokens, is a turn still in progress, and freezing its history would be
+        the one mistake this design cannot take back.
+        """
+        if not deliverable:
+            logger.info(
+                "compaction_discarded", request_id=request_id, reason="not_final"
+            )
+            self._drop_compaction(task)
+            return None
+        grace = _COMPACTION_GRACE_SECONDS
+        if budget is not None:
+            # Never past the turn's own wall clock: the grace is the last thing
+            # standing between the user and their terminal event.
+            grace = min(grace, max(0.0, budget.remaining_total()))
+        if not task.done() and grace > 0:
+            await asyncio.wait({task}, timeout=grace)
+        if not task.done():
+            self._drop_compaction(task)
+            logger.info("compaction_timed_out", request_id=request_id)
+            return None
+        if task.cancelled():
+            return None
+        exc = task.exception()
+        if exc is not None:  # pragma: no cover - _run_compaction is total
+            logger.warning("compaction_failed", request_id=request_id, error=str(exc))
+            return None
+        return task.result()
+
+    @staticmethod
+    def _drop_compaction(task: asyncio.Task[StreamCompaction | None]) -> None:
+        """Abandon a compaction task without leaving its outcome unclaimed.
+
+        Cancelling a task that has already FINISHED is a no-op, so a discard that
+        only cancels leaves a completed-with-exception task unretrieved — and the
+        loop reports it later as an "exception was never retrieved" warning from
+        nowhere, long after the turn it belonged to. `_run_compaction` is written
+        to be total, but this is the guarantee's other half: it holds whatever a
+        future producer does.
+        """
+        if task.done():
+            if not task.cancelled():
+                task.exception()
+            return
+        task.cancel()
+
+    @staticmethod
+    def _strip_declaration(result: Any, *, request_id: str) -> None:
+        """Remove the control line from a BUFFERED reply, in place.
+
+        The non-streaming path's half of the guarantee. It runs before anything
+        reads the text — the bare-intent detector, the output lint, the response
+        body — so every one of them sees exactly what the user will.
+
+        Non-streaming deliberately does not compact: the whole point of declaring
+        finality up front is to overlap the call with generation, and a single
+        awaited completion has no generation left to overlap with. It would be
+        pure added latency for a path the CLI does not use.
+        """
+        message = result.message
+        content = message.get("content")
+        if not isinstance(content, str) or not content:
+            return
+        declaration, visible = strip_declaration(content)
+        if declaration is Declaration.MISSING:
+            return
+        message["content"] = visible
+        logger.debug(
+            "response_declaration", request_id=request_id, declaration=declaration.value
+        )
 
     # ---- bare-tool-intent repair ----------------------------------------
 
