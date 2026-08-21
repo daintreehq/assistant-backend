@@ -97,6 +97,12 @@ async def capabilities(
         "skills": {
             "catalog_revision": catalog.revision,
             "manual_resolve": True,
+            # `selection.pinned_skill_ids` — skills the caller requires this turn,
+            # admitted ahead of the classifier's own picks. A GATE for the same
+            # reason as `display_context` above: `Selection` is extra="forbid", so
+            # sending the field to a deployment that predates it 422s the whole turn
+            # before the model runs. The CLI withholds it until it sees this.
+            "pinned_skill_ids": True,
             # Every skill the catalog holds, as the minimal {id, title} reference.
             # A client naming a skill — a CLI flag, a manual `resolve` load — can
             # now check the id BEFORE it spends a turn, and offer near misses. The

@@ -490,3 +490,79 @@ def test_the_fast_path_survives_a_finished_docs_answer() -> None:
     assert can_skip_selection(body, prior_active_ids=[DOCS_SKILL_ID, WORKFLOW]) is False, (
         "a real workflow beside the pin still disqualifies the turn"
     )
+
+
+# ---------------------------------------------------------------------------
+# The two pin tiers together.
+#
+# `selection.pinned_skill_ids` (issue #54) is the caller's own pin, and it is the
+# MIRROR of this one: admitted first and foundation-paired, where the docs pin is
+# admitted last and bare. Both can be live on the same turn, so the tiers need a
+# regression that holds them apart — the risk is not that either rule is wrong but
+# that one quietly starts applying to the other's ids.
+# ---------------------------------------------------------------------------
+
+
+def test_a_caller_pin_outranks_the_docs_pin(catalog: Any) -> None:
+    """A saturated caller pin displaces the docs runbook, not the reverse. Two
+    slots go to the pinned specific and its foundation, the third to the
+    selection, and the docs pin takes the leftover slot there is none of."""
+    result = resolve_active_skills(
+        _authoritative([OPERATIONAL]),
+        [],
+        catalog,
+        3,
+        pinned_id=DOCS_SKILL_ID,
+        client_pinned_ids=[WORKFLOW],
+    )
+    assert result.active[0] == WORKFLOW, f"the caller pin lost its priority; {result.active}"
+    assert FOUNDATION in result.active, "the caller pin was admitted unpaired"
+    assert DOCS_SKILL_ID not in result.active
+    assert DOCS_SKILL_ID in result.dropped_over_cap
+
+
+def test_the_docs_pin_still_takes_the_leftover_slot_beside_a_caller_pin(catalog: Any) -> None:
+    """The other direction: room for both means both. A caller pin must not
+    suppress the docs pin, only outrank it when the budget is contested."""
+    result = resolve_active_skills(
+        _authoritative([]),
+        [],
+        catalog,
+        3,
+        pinned_id=DOCS_SKILL_ID,
+        client_pinned_ids=[WORKFLOW],
+    )
+    assert result.active[:2] == [WORKFLOW, FOUNDATION]
+    assert result.active[2] == DOCS_SKILL_ID, (
+        f"the docs pin lost the slot the caller pin left it; active={result.active}"
+    )
+
+
+def test_caller_pinning_the_docs_skill_admits_it_once(catalog: Any) -> None:
+    """The id both tiers can claim. A developer working ON the docs runbook pins it
+    by name on a turn that also produced a `docs_query`; it must be admitted once.
+    It is PAIRED here — the automatic pin skips pairing because nobody asked for
+    the foundation, which stops being true the moment somebody names the id."""
+    result = resolve_active_skills(
+        _authoritative([]),
+        [],
+        catalog,
+        3,
+        pinned_id=DOCS_SKILL_ID,
+        client_pinned_ids=[DOCS_SKILL_ID],
+    )
+    assert result.active.count(DOCS_SKILL_ID) == 1, f"admitted twice: {result.active}"
+    assert result.active == [DOCS_SKILL_ID, FOUNDATION]
+    assert DOCS_SKILL_ID not in result.dropped_over_cap
+
+
+def test_a_caller_pin_can_load_a_skill_the_selector_cannot_see(catalog: Any) -> None:
+    """The docs runbook is hidden from `selector_metadata` so the classifier cannot
+    also pick it. Pinning is the explicit act that bypasses selection, so hidden
+    must not mean unpinnable — otherwise the one skill a developer most needs a
+    direct handle on is the one they cannot get."""
+    assert DOCS_SKILL_ID not in {m["id"] for m in catalog.selector_metadata()}
+    result = resolve_active_skills(
+        _authoritative([]), [], catalog, 3, client_pinned_ids=[DOCS_SKILL_ID]
+    )
+    assert DOCS_SKILL_ID in result.active

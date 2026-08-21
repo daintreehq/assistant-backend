@@ -276,7 +276,8 @@ The single generation endpoint. Returns a native JSON body, or — when
     ]
   },
 
-  "selection": { "policy": "new_instruction", "force": false },   // "new_instruction" | "always"
+  "selection": { "policy": "new_instruction", "force": false,     // "new_instruction" | "always"
+                 "pinned_skill_ids": [] },                        // gated: skills.pinned_skill_ids
 
   "generation": {                              // only supported params exist; unknown keys are rejected
     "temperature": 0.7, "max_tokens": 1024,
@@ -502,6 +503,33 @@ Skill selection is removed from the main thread:
    degraded selector reuses the prior set unchanged, so a classifier hiccup never evicts an
    in-progress runbook. The selector is instructed to re-list any active skill it means to
    keep. (The explicit `resolve` `load` action, by contrast, is additive over the prior set.)
+2b. **Caller pins.** `selection.pinned_skill_ids` names skills the caller requires this
+   turn whatever the classifier decides. (`force` means "re-run the selector", never
+   "select this skill".) It exists for skill **development** — exercising a runbook you are
+   rewriting against a real turn, instead of reverse-engineering a prompt that talks the
+   selector into picking it. The rules:
+   - **Alongside, not instead of.** Selection still runs on its usual cadence; pins do not
+     force it, suppress it, or alter `_should_run_selector`.
+   - **Admitted first, and paired.** Pins take their specific+domain-foundation units out of
+     the cap before the selection is budgeted, the mirror of the server's own documentation
+     pin (which takes the *leftover* slot, unpaired, because it is the server's inference
+     rather than the caller's instruction). A pin whose whole unit does not fit is skipped
+     entirely, never admitted foundation-less.
+   - **Counted against the cap**, not exempt from it — an exemption would make the
+     advertised `max_active_skills` false and let a pinned turn grow the prompt without
+     bound.
+   - **Applied every round**, so a pin sent on a tool-continuation round is honoured
+     without re-running the selector. Once admitted it rides the state token like any other
+     active skill; resend it to keep it through a fresh authoritative round.
+   - **Refusals are reported, never silent** — a mistyped id that produces a normal-looking
+     turn is exactly the failure this would be debugged into. `warnings` carries
+     `unknown_skill_id_ignored` (no such skill), `pinned_skill_not_executable` (a real skill
+     outside this `profile`'s narrowed menu — a pin overrides the classifier, not the
+     capability boundary), and `pinned_skill_over_cap` (the pins alone did not fit). None of
+     these is an error: whether a pin fits depends on the live catalog, the foundation
+     topology and the configured cap, none of which a request-shape validator can see.
+   Gated by `skills.pinned_skill_ids` in `/v1/daintree/capabilities` — `selection` is
+   `extra="forbid"`, so sending the field to a deployment that predates it 422s the turn.
 3. **One upstream call.** Selection is local (an in-process classifier, ~10ms), so both
    response paths are strictly sequential: select → assemble → one main completion. There
    is no speculative or private pre-selection stream.

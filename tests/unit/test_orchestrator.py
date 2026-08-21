@@ -396,6 +396,200 @@ def test_resolve_cross_domain_selection_never_returns_a_short_set(catalog) -> No
     assert result.active[0] == selection[0]  # the top-ranked pick is never sacrificed
 
 
+# ---- resolve_active_skills: CALLER pins (selection.pinned_skill_ids) ----------
+#
+# The inversion is the point. The server pin (the docs runbook) takes the LEFTOVER
+# slot because it is the server's own inference off a `docs_query` — a good guess
+# the turn survives losing. A caller pin is not a guess: the caller named the id,
+# so it is admitted FIRST and the selection budgets against what it leaves.
+# `tests/unit/test_pinned_docs_skill.py` holds the other tier and the cross-tier
+# regression; these run against the synthetic two-foundation catalog so the
+# admission contract is pinned under any topology.
+
+
+def test_a_client_pin_is_admitted_before_the_selection(paired_catalog) -> None:
+    """The headline promise, and the one assertion that separates the two tiers.
+
+    At a cap of three, the pin's cross-domain unit costs two, leaving one — too
+    few for either selector pick, both of which need their own foundation. Under
+    the server pin's leftover-slot rule the same turn would resolve the other way
+    round, and the pin would be the casualty."""
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[_ONE, _TWO], ran=True, degraded=False),
+        [],
+        paired_catalog,
+        3,
+        client_pinned_ids=[_OTHER_ONE],
+    )
+    assert result.active == [_OTHER_ONE, _OTHER_BASE], (
+        f"the pin lost its budget to the selection; active={result.active}"
+    )
+    assert result.dropped_over_cap == [_ONE, _TWO]
+
+
+def test_a_client_pin_is_paired_with_its_domain_foundation(paired_catalog) -> None:
+    """Paired, unlike the server pin. A runbook loaded without the foundation its
+    steps assume is a prompt shape production never produces — which defeats the
+    purpose of pinning it to test it."""
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+        [],
+        paired_catalog,
+        3,
+        client_pinned_ids=[_OTHER_ONE],
+    )
+    assert result.active == [_OTHER_ONE, _OTHER_BASE]
+
+
+def test_two_client_pins_sharing_a_foundation_cost_one_slot_each(paired_catalog) -> None:
+    """Unit admission already tracks what it admitted, so the second pin's
+    foundation is free. Three slots hold two pinned specifics, not one."""
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+        [],
+        paired_catalog,
+        3,
+        client_pinned_ids=[_ONE, _TWO],
+    )
+    assert result.active == [_ONE, _DOMAIN_BASE, _TWO]
+    assert result.dropped_over_cap == []
+
+
+def test_a_client_pin_unit_that_does_not_fit_is_skipped_whole(paired_catalog) -> None:
+    """Pins are atomic units like any other admission — never half a unit. The
+    second pin needs a second foundation and there is no room for the pair, so it
+    is refused ENTIRELY rather than admitted foundation-less."""
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+        [],
+        paired_catalog,
+        3,
+        client_pinned_ids=[_ONE, _OTHER_ONE],
+    )
+    assert result.active == [_ONE, _DOMAIN_BASE]
+    assert _OTHER_BASE not in result.active, "a refused pin still dragged its foundation in"
+    assert result.dropped_over_cap == [_OTHER_ONE], (
+        "a refused caller pin must be recorded — the orchestrator warns off this"
+    )
+
+
+def test_a_pin_the_selector_also_chose_is_admitted_once_at_pin_priority(
+    paired_catalog,
+) -> None:
+    """Both tiers want the same id. It must appear once, at the pin's rank — the
+    strip is what guarantees that, and without it the id would be admitted twice."""
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[_ONE, _TWO], ran=True, degraded=False),
+        [],
+        paired_catalog,
+        3,
+        client_pinned_ids=[_TWO],
+    )
+    assert result.active == [_TWO, _DOMAIN_BASE, _ONE]
+    assert len(set(result.active)) == len(result.active), "an id was admitted twice"
+
+
+def test_a_pin_the_cap_refused_cannot_re_enter_via_the_selection(paired_catalog) -> None:
+    """The subtle half of the strip. The pin is stripped from the selection BEFORE
+    tier one runs, so a pin the cap refuses stays refused — it cannot quietly come
+    back at the lower priority it was promoted out of."""
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[_ONE, _OTHER_ONE], ran=True, degraded=False),
+        [],
+        paired_catalog,
+        1,
+        client_pinned_ids=[_OTHER_ONE],
+    )
+    assert _OTHER_ONE not in result.active
+    assert _OTHER_ONE in result.dropped_over_cap
+    assert result.dropped_over_cap.count(_OTHER_ONE) == 1, "reported twice"
+
+
+def test_a_client_pin_applies_on_a_reuse_round_too(paired_catalog) -> None:
+    """A continuation round never re-runs the selector, so if pins only applied to
+    an authoritative round a pin sent mid-turn would silently do nothing. The
+    resolver runs on every round, and tier one runs with it."""
+    prior = [_ONE, _DOMAIN_BASE]
+    result = resolve_active_skills(
+        SelectionDecision.reuse(prior),
+        prior,
+        paired_catalog,
+        4,
+        client_pinned_ids=[_OTHER_ONE],
+    )
+    assert result.active[:2] == [_OTHER_ONE, _OTHER_BASE]
+    assert set(result.active) == {_OTHER_ONE, _OTHER_BASE, _ONE, _DOMAIN_BASE}
+    assert result.newly_loaded == [_OTHER_ONE, _OTHER_BASE]
+
+
+def test_a_reuse_remainder_is_truncated_verbatim_not_re_paired(paired_catalog) -> None:
+    """The deliberate cost of tier one, asserted rather than left to be discovered.
+
+    A new pin on a SATURATED continuation round takes budget the prior set was
+    using, and the remainder is truncated verbatim — so a prior specific can lose
+    the foundation it arrived with. Re-pairing the remainder instead is worse in
+    the same breath: a prior set carries its foundations as ordinary elements, so
+    unit admission over it inverts rank retention and would keep `_DOMAIN_BASE`
+    while dropping `_ONE` — a foundation with no runbook behind it, which is dead
+    weight where an orphaned specific is at least the runbook the round is about.
+    The module's third rule ("reuse never re-pairs") stands, and this is what it
+    costs."""
+    prior = [_ONE, _DOMAIN_BASE]
+    result = resolve_active_skills(
+        SelectionDecision.reuse(prior),
+        prior,
+        paired_catalog,
+        3,
+        client_pinned_ids=[_OTHER_ONE],
+    )
+    assert result.active == [_OTHER_ONE, _OTHER_BASE, _ONE]
+    assert result.dropped_over_cap == [_DOMAIN_BASE]
+
+
+def test_an_unknown_client_pin_never_costs_a_slot(paired_catalog) -> None:
+    """Skipped silently HERE — the orchestrator owns the warning, because it holds
+    the catalog the caller was actually offered. What must not happen is the
+    unknown id consuming budget a real skill could have used."""
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[_ONE], ran=True, degraded=False),
+        [],
+        paired_catalog,
+        3,
+        client_pinned_ids=["spec.dom.does-not-exist"],
+    )
+    assert result.active == [_ONE, _DOMAIN_BASE]
+
+
+def test_duplicate_client_pins_are_collapsed(paired_catalog) -> None:
+    """First mention wins, and a repeat is not an error. Asserted because the
+    strip is set-based while the drop list is not: a duplicate reaching
+    `dropped_over_cap` would be reported twice for one mistake."""
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+        [],
+        paired_catalog,
+        3,
+        client_pinned_ids=[_ONE, _ONE],
+    )
+    assert result.active == [_ONE, _DOMAIN_BASE]
+
+
+@pytest.mark.parametrize("authoritative", [True, False])
+def test_no_pins_leaves_resolution_exactly_as_it_was(paired_catalog, authoritative) -> None:
+    """The compatibility assertion that matters: an ordinary turn sends no pins,
+    and both branches must reach the answer they reached before this tier existed
+    — same ids, same order, same drops."""
+    prior = [_ONE, _DOMAIN_BASE]
+    decision = (
+        SelectionDecision(skill_ids=[_TWO, _OTHER_ONE], ran=True, degraded=False)
+        if authoritative
+        else SelectionDecision.reuse(prior)
+    )
+    with_kwarg = resolve_active_skills(decision, prior, paired_catalog, 3, client_pinned_ids=[])
+    without = resolve_active_skills(decision, prior, paired_catalog, 3)
+    assert with_kwarg == without
+
+
 def _delta_chunk(delta: dict) -> dict:
     return {"choices": [{"index": 0, "delta": delta, "finish_reason": None}]}
 

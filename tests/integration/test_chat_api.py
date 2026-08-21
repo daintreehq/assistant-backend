@@ -1048,3 +1048,138 @@ def test_request_id_is_unified_across_header_and_meta(client, auth, fake_provide
         assert s.headers["X-Request-Id"] == "req-supplied-1"
         text = "".join(s.iter_text())
     assert parse_sse(text)[0][1]["request_id"] == "req-supplied-1"
+
+
+# ---------------------------------------------------------------------------
+# selection.pinned_skill_ids — the caller's own pin (issue #54).
+#
+# End-to-end rather than resolver-level: the unit tests in
+# tests/unit/test_orchestrator.py own the admission algebra, so what these assert
+# is the wire — that the field is accepted at all, that a pinned body actually
+# reaches the model, and that every refusal is REPORTED on both response shapes.
+# A pin that silently does nothing is the one outcome this feature cannot have.
+# ---------------------------------------------------------------------------
+
+
+def _non_foundation_ids(app, count: int) -> list[str]:
+    catalog = app.state.container.catalog
+    return [s.id for s in catalog.skills if not s.meta.foundation][:count]
+
+
+def test_a_pinned_skill_loads_even_when_the_selector_wanted_something_else(
+    client, auth, fake_provider, app
+) -> None:
+    """The headline. The classifier picks the rename runbook; the caller pinned the
+    prep-branch one, and the pinned body is what the model is handed."""
+    fake_provider.selection_result = selection_result([SKILL_RENAME])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "rename my terminals"}],
+        session_id="pin1", turn_id="t1",
+        selection={"pinned_skill_ids": [SKILL_PREP]},
+    ))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    active = [s["id"] for s in body["skills"]["active"]]
+    assert active[0] == SKILL_PREP, f"the pin did not outrank the selection; {active}"
+    assert SKILL_PREP in _loaded_skills_message(fake_provider), (
+        "the pinned runbook's BODY never reached the model"
+    )
+    assert body["warnings"] == []
+
+
+def test_a_pinned_skill_survives_a_continuation_round_without_reselection(
+    client, auth, fake_provider, app
+) -> None:
+    """The selector does not run on a tool-continuation round, so if pins only
+    applied to an authoritative round a pin sent mid-turn would silently vanish.
+    The resolver runs every round, and the pin rides the state token after that."""
+    fake_provider.selection_result = selection_result([])
+    first = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}],
+        session_id="pin2", turn_id="t1",
+        selection={"pinned_skill_ids": [SKILL_PREP]},
+    ))
+    assert first.status_code == 200, first.text
+    state = first.json()["state"]
+    assert SKILL_PREP in [s["id"] for s in first.json()["skills"]["active"]]
+
+    second = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "hi"},
+         {"role": "user", "content": "and now?"}],
+        session_id="pin2", turn_id="t1", round=1, state=state,
+        selection={"pinned_skill_ids": [SKILL_PREP]},
+    ))
+    assert second.status_code == 200, second.text
+    active = [s["id"] for s in second.json()["skills"]["active"]]
+    assert SKILL_PREP in active, f"the pin was lost on continuation; {active}"
+    assert second.json()["skills"]["newly_loaded"] == [], (
+        "a skill already active must not be announced as a fresh load a second time"
+    )
+
+
+def test_an_unknown_pinned_id_warns_instead_of_silently_doing_nothing(
+    client, auth, fake_provider
+) -> None:
+    """The failure this feature would otherwise be debugged into: a typo'd id, a
+    turn that looks completely normal, and no signal that the pin missed."""
+    fake_provider.selection_result = selection_result([])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}],
+        session_id="pin3", turn_id="t1",
+        selection={"pinned_skill_ids": ["daintree.does.not-exist"]},
+    ))
+    assert r.status_code == 200, "an unknown pin degrades the turn, it never fails it"
+    body = r.json()
+    assert "unknown_skill_id_ignored" in body["warnings"]
+    assert body["skills"]["active"] == []
+
+
+def test_the_unknown_pin_warning_reaches_the_stream_meta_event(
+    client, auth, fake_provider
+) -> None:
+    """Streaming clients learn about it at the same moment — `meta` is emitted
+    before the model opens, so the warning arrives ahead of the reply it explains
+    rather than after the user has read it."""
+    fake_provider.selection_result = selection_result([])
+    fake_provider.stream_chunks = make_text_chunks("ok")
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}],
+        session_id="pin4", turn_id="t1",
+        selection={"pinned_skill_ids": ["daintree.does.not-exist"]},
+        generation={"stream": True},
+    ))
+    assert r.status_code == 200
+    events = {e: d for e, d in parse_sse(r.text) if e == "meta"}
+    assert "unknown_skill_id_ignored" in events["meta"]["warnings"]
+
+
+def test_pins_that_overflow_the_cap_are_reported(client, auth, fake_provider, app) -> None:
+    """Pins are admitted first, so reaching the cap means the pins alone did not
+    fit. Not a 422: whether they fit depends on the live catalog's foundation
+    topology and the configured cap, none of which a request validator can see —
+    so the turn proceeds with what fits and says what it refused."""
+    pins = _non_foundation_ids(app, 4)
+    assert len(pins) == 4, "precondition: the catalog must hold four specifics"
+    fake_provider.selection_result = selection_result([])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}],
+        session_id="pin5", turn_id="t1",
+        selection={"pinned_skill_ids": pins},
+    ))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "pinned_skill_over_cap" in body["warnings"]
+    assert len(body["skills"]["active"]) <= app.state.container.settings.max_active_skills
+
+
+def test_an_ordinary_turn_sends_no_pins_and_is_unchanged(client, auth, fake_provider, app) -> None:
+    """The field is opt-in and inert. An ordinary turn must resolve exactly as it
+    did before the tier existed — the prompt cache depends on it."""
+    fake_provider.selection_result = selection_result([SKILL_PREP])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "prep this branch for review"}],
+        session_id="pin6", turn_id="t1",
+    ))
+    assert r.status_code == 200
+    assert [s["id"] for s in r.json()["skills"]["active"]] == _paired(app, SKILL_PREP)
+    assert r.json()["warnings"] == []
