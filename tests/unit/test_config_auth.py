@@ -203,6 +203,53 @@ def test_dump_dir_empty_string_is_not_a_problem_in_production() -> None:
     assert s.local_only_problems() == []
 
 
+# ---- skill overlay directory (local-development-only guard) ---------------
+
+
+def test_skills_overlay_dir_unset_by_default() -> None:
+    s = _settings()
+    assert s.skills_overlay_dir is None
+    assert s.local_only_problems() == []
+
+
+def test_skills_overlay_dir_allowed_in_development() -> None:
+    s = _settings(DAINTREE_SKILLS_OVERLAY_DIR="/tmp/skills")
+    assert s.skills_overlay_dir == "/tmp/skills"
+    assert s.local_only_problems() == []
+
+
+def test_skills_overlay_dir_fails_readiness_in_production() -> None:
+    s = _settings(ENVIRONMENT="production", DAINTREE_SKILLS_OVERLAY_DIR="/tmp/skills")
+    assert any("DAINTREE_SKILLS_OVERLAY_DIR" in p for p in s.local_only_problems())
+
+
+def test_skills_overlay_dir_fails_readiness_in_staging() -> None:
+    # Staging is hardened too: it is the rehearsal for production, so a catalog
+    # it serves must be the one its image shipped.
+    s = _settings(ENVIRONMENT="staging", DAINTREE_SKILLS_OVERLAY_DIR="/tmp/skills")
+    assert any("DAINTREE_SKILLS_OVERLAY_DIR" in p for p in s.local_only_problems())
+
+
+def test_skills_overlay_dir_empty_string_is_not_a_problem_in_production() -> None:
+    # An empty value means "unset" — it must not trip the production gate.
+    s = _settings(ENVIRONMENT="production", DAINTREE_SKILLS_OVERLAY_DIR="")
+    assert s.local_only_problems() == []
+
+
+def test_both_local_only_features_are_reported_together() -> None:
+    # The gate returns a LIST, and a deploy with two development flags left on
+    # should learn about both from one readiness failure rather than one per fix.
+    s = _settings(
+        ENVIRONMENT="production",
+        DAINTREE_DUMP_UPSTREAM_DIR="/tmp/dumps",
+        DAINTREE_SKILLS_OVERLAY_DIR="/tmp/skills",
+    )
+    problems = s.local_only_problems()
+    assert len(problems) == 2
+    assert any("DAINTREE_DUMP_UPSTREAM_DIR" in p for p in problems)
+    assert any("DAINTREE_SKILLS_OVERLAY_DIR" in p for p in problems)
+
+
 def test_max_active_skills_rejects_a_cap_below_two() -> None:
     # Every skill resolves to a domain foundation and the orchestrator admits a
     # specific plus its foundation as one atomic unit, so a budget of 1 fits no unit

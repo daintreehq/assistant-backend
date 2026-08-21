@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from daintree_assistant_server.skills.catalog import CatalogManager, load_catalog
+from daintree_assistant_server.skills.loader import SkillLoadError
 
 
 def _skill(skill_id: str, summary: str) -> str:
@@ -94,3 +95,84 @@ async def test_reload_async(tmp_path: Path) -> None:
     new = await manager.reload()
     assert "test.epsilon" in new
     assert manager.catalog is new
+
+
+def test_reload_uses_the_overlay_dir(tmp_path: Path) -> None:
+    """The manager keeps the overlay path, so a reload re-reads BOTH directories.
+
+    A reload that only re-read the primary directory would be the one bug that
+    makes this whole feature useless: the overlay would work at startup and then
+    silently stop mattering the moment a developer edited a file.
+    """
+    primary = tmp_path / "primary"
+    overlay = tmp_path / "overlay"
+    _write(primary, "test.alpha", "Alpha.")
+    overlay.mkdir()
+    manager = CatalogManager(
+        load_catalog(primary, overlay), primary_dir=primary, overlay_dir=overlay
+    )
+    assert manager.overlay_dir == overlay
+
+    _write(overlay, "test.alpha", "Overridden after startup.")
+    _write(overlay, "test.gamma", "Gamma from overlay.")
+    new = manager.reload_sync()
+
+    alpha = new.get("test.alpha")
+    assert alpha is not None
+    assert alpha.summary == "Overridden after startup."
+    assert "test.gamma" in new
+
+
+@pytest.mark.asyncio
+async def test_reload_async_uses_the_overlay_dir(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    overlay = tmp_path / "overlay"
+    _write(primary, "test.alpha", "Alpha.")
+    overlay.mkdir()
+    manager = CatalogManager(
+        load_catalog(primary, overlay), primary_dir=primary, overlay_dir=overlay
+    )
+    _write(overlay, "test.gamma", "Gamma from overlay.")
+    new = await manager.reload()
+    assert "test.gamma" in new
+
+
+def test_a_failed_reload_keeps_the_previous_catalog(tmp_path: Path) -> None:
+    """Fail SAFE: a half-written skill must not take the running catalog down.
+
+    The load happens in full before the rebind, so the identity check is the
+    assertion that matters — not merely an equal revision, but the very same
+    object still serving.
+    """
+    primary = tmp_path / "primary"
+    overlay = tmp_path / "overlay"
+    _write(primary, "test.alpha", "Alpha.")
+    overlay.mkdir()
+    manager = CatalogManager(
+        load_catalog(primary, overlay), primary_dir=primary, overlay_dir=overlay
+    )
+    before = manager.catalog
+
+    (overlay / "test.broken.md").write_text("no frontmatter here", encoding="utf-8")
+    with pytest.raises(SkillLoadError):
+        manager.reload_sync()
+
+    assert manager.catalog is before
+
+
+@pytest.mark.asyncio
+async def test_a_failed_async_reload_keeps_the_previous_catalog(tmp_path: Path) -> None:
+    primary = tmp_path / "primary"
+    overlay = tmp_path / "overlay"
+    _write(primary, "test.alpha", "Alpha.")
+    overlay.mkdir()
+    manager = CatalogManager(
+        load_catalog(primary, overlay), primary_dir=primary, overlay_dir=overlay
+    )
+    before = manager.catalog
+
+    (overlay / "test.broken.md").write_text("no frontmatter here", encoding="utf-8")
+    with pytest.raises(SkillLoadError):
+        await manager.reload()
+
+    assert manager.catalog is before

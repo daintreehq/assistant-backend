@@ -314,6 +314,18 @@ class Settings(BaseSettings):
     # local_only_problems).
     dump_upstream_dir: str | None = Field(default=None, alias="DAINTREE_DUMP_UPSTREAM_DIR")
 
+    # ---- Skill overlay directory (LOCAL DEVELOPMENT ONLY) ----------------
+    # A second directory of skill files merged OVER the packaged catalog: a new
+    # id is added, a colliding id replaces the packaged skill. It exists so a
+    # skill can be authored in a scratch directory against a running server —
+    # POST /v1/daintree/skills/reload rebuilds the catalog without a restart.
+    # The path is read once, at startup; only its CONTENTS are re-read on
+    # reload. A set value in production fails readiness (see
+    # local_only_problems) and the reload route is not mounted there at all: a
+    # deploy must serve the catalog its image shipped, not whatever happens to
+    # be on the instance's disk.
+    skills_overlay_dir: str | None = Field(default=None, alias="DAINTREE_SKILLS_OVERLAY_DIR")
+
     # ---- Context field caps (bytes, unless noted) -----------------------
     # Session-stable agent registry rendered before the visible conversation.
     # Rows are admitted whole so an exact agent id is never truncated into a
@@ -399,16 +411,25 @@ class Settings(BaseSettings):
         """Local-development-only features that must never run in production.
 
         These join ``missing_secrets()`` / ``weak_secrets()`` in readiness gating.
-        Only one entry remains: prompt dumping, which writes full prompts to disk.
-        (Skill learning used to be the other, and was the reason this method
-        exists — a production deploy that left it on would have mutated the skill
-        catalog from model output at runtime. It has been removed entirely.)
+        Two entries: prompt dumping, which writes full prompts to disk, and the
+        skill overlay directory, which would let a production instance serve a
+        catalog its image never shipped. (Skill learning used to be here too,
+        and was the reason this method exists — a production deploy that left it
+        on would have mutated the skill catalog from model output at runtime. It
+        has been removed entirely. The overlay is a much smaller thing: it only
+        reads files a developer deliberately put there. Gated anyway, because
+        "which skills is production actually running?" must have one answer.)
         """
         problems: list[str] = []
         if self.is_hardened and self.dump_upstream_dir:
             problems.append(
                 "DAINTREE_DUMP_UPSTREAM_DIR must be unset in production "
                 "(prompt dumping is development-only)"
+            )
+        if self.is_hardened and self.skills_overlay_dir:
+            problems.append(
+                "DAINTREE_SKILLS_OVERLAY_DIR must be unset in production "
+                "(the skill overlay is development-only)"
             )
         return problems
 

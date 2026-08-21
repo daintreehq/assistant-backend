@@ -257,11 +257,13 @@ def load_catalog(
 ) -> Catalog:
     """Load and validate the catalog from disk.
 
-    ``primary_dir`` is the packaged skills directory. ``overlay_dir`` (used only by
-    the local skill-learning harness when it writes to a separate directory) is a
-    second directory whose skills are merged on top: an overlay skill with the same
-    id REPLACES the packaged one, and a new id is added. When ``overlay_dir`` is the
-    packaged directory itself, or absent/missing, only the primary set is loaded.
+    ``primary_dir`` is the packaged skills directory. ``overlay_dir`` (local
+    development only, from ``DAINTREE_SKILLS_OVERLAY_DIR``) is a scratch directory
+    whose skills are merged on top: an overlay skill with the same id REPLACES the
+    packaged one, and a new id is added. When ``overlay_dir`` is the packaged
+    directory itself, or absent/missing, only the primary set is loaded — a
+    developer who has not created the directory yet gets the packaged catalog
+    rather than a startup failure.
     """
     primary = load_skills_dir(primary_dir or default_skills_dir())
     if overlay_dir is None or not overlay_dir.is_dir():
@@ -280,8 +282,9 @@ class CatalogManager:
     The catalog itself stays immutable; a reload builds a brand-new instance and
     rebinds the reference (an atomic assignment in CPython), so concurrent readers
     always observe a fully-valid catalog — either the old one or the new one, never
-    a half-built mix. Writers (the skill-learning harness) are expected to
-    serialize their own write+reload critical section.
+    a half-built mix. That ordering is also what makes a reload fail SAFE: the
+    whole new catalog is loaded and validated before the assignment, so a malformed
+    overlay skill leaves the previous catalog serving untouched.
     """
 
     def __init__(
