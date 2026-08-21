@@ -82,9 +82,10 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
+import time
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -161,6 +162,26 @@ class Selection:
     #: number that says how close the catalog is to the scale where the old
     #: top-k-only ballot would have started evicting live workflows.
     reserved_ids: tuple[str, ...] = ()
+    #: The WHOLE ballot, (skill id, probability), descending. ``scores`` is the
+    #: top five of this, kept because several callers want a short log line.
+    #:
+    #: Carried in full because one end-to-end miss rate cannot say which stage
+    #: lost the skill, and the four causes have nothing to do with each other: it
+    #: was never a candidate (stage 1), the head ranked it below the cut
+    #: (stage 2), an admission floor rejected it, or the cardinality head asked
+    #: for fewer skills than the turn needed. Only the ballot distinguishes
+    #: "absent" from "scored 0.02", and those want opposite fixes.
+    #: ~32 tuples, so the cost is noise beside one forward pass.
+    ranked: tuple[tuple[str, float], ...] = ()
+    #: Wall-clock milliseconds per internal span. An aggregate ``selection_ms``
+    #: cannot tell a tokenizer regression from a catalog sync from queue
+    #: contention, and those are the three things that move.
+    timings: dict[str, float] = field(default_factory=dict)
+    #: skill id -> which admission rule rejected it (``REJECTED_*``), for every
+    #: ranked candidate that did not make the answer. Produced BY ``admit`` so a
+    #: diagnosis cannot drift from the rule it describes — see
+    #: ``admit_with_reasons``.
+    rejected: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -183,6 +204,11 @@ class SkillTable:
     digests: dict[str, str]
     #: Which encoder precision produced these vectors ("int8" / "fp32").
     precision: str
+
+
+def _since(started: float) -> float:
+    """Milliseconds since ``started``, rounded to something a log can carry."""
+    return round((time.perf_counter() - started) * 1000.0, 3)
 
 
 def document_digest(document: str) -> str:
@@ -444,7 +470,11 @@ class SetwiseClassifier:
     # ---------------------------------------------------------------- select
 
     def _encode_pass(
-        self, table: SkillTable, text: str, active: set[str]
+        self,
+        table: SkillTable,
+        text: str,
+        active: set[str],
+        spans: dict[str, float] | None = None,
     ) -> tuple[CandidateSet, dict[str, np.ndarray]]:
         """Build one complete, self-consistent set of head inputs for ``text``.
 
@@ -457,22 +487,34 @@ class SetwiseClassifier:
         by construction rather than by a comment asking the next reader to be
         careful.
 
+        ``spans`` accumulates per-stage milliseconds when a caller supplies one.
+        It is written to rather than returned so the docs pass can add its own
+        timings to the same record without the caller stitching two dicts.
+
         Which skills end up on the ballot is ``candidates.assemble_candidates``,
         not a top-k slice: an active skill dense retrieval missed is placed there
         anyway, because the head cannot keep a runbook it never sees and a
         successful selection is authoritative enough to evict one. Read that
         module for why, and for what it deliberately does not promise.
         """
+        spans = {} if spans is None else spans
         # normalize=True is redundant — the retriever graph L2-normalises
         # internally — and kept because it is idempotent and makes the cosine
         # contract local: `sims` below is a plain dot product only if BOTH sides
         # are unit vectors, and that should not depend on reading the exporter.
+        started = time.perf_counter()
         q_ret = _run_encoder(self._retriever, self._retriever_tok, [text], normalize=True)[0]
+        spans["retriever_ms"] = _since(started)
+
+        started = time.perf_counter()
         sims = table.retrieval @ q_ret
         chosen = assemble_candidates(sims, table.ids, active, self._k)
+        spans["search_ms"] = _since(started)
         n = len(chosen)
 
+        started = time.perf_counter()
         q_rank = _run_encoder(self._ranker, self._ranker_tok, [text], normalize=False)[0]
+        spans["ranker_ms"] = _since(started)
         # Exactly ``self._k`` slots, always. The head's graph is static (see
         # export_two_stage: MultiheadAttention bakes the sequence length into its
         # reshapes), so a catalog smaller than k is served by padding with zeros
@@ -503,9 +545,21 @@ class SetwiseClassifier:
         docs_query: str | None = None,
         docs_threshold: float = DOCS_THRESHOLD,
     ) -> Selection:
+        spans: dict[str, float] = {}
+        total_started = time.perf_counter()
+        started = time.perf_counter()
         table = self.sync(catalog) if catalog is not None else self.table
+        # Broken out because it is the one span that is not a forward pass and
+        # the one that moves for a reason nobody would guess from a total: a
+        # catalog edit re-embeds, and a profile alternation used to re-embed
+        # everything (see the memo note in ``sync``). 5.3s hiding inside an
+        # 11ms budget looked like "the selector got slow".
+        spans["sync_ms"] = _since(started)
         if table is None or not table.ids:
-            return Selection(skill_ids=[], docs_wanted=False, cardinality=0, scores={})
+            spans["total_ms"] = _since(total_started)
+            return Selection(
+                skill_ids=[], docs_wanted=False, cardinality=0, scores={}, timings=spans
+            )
 
         # The conversation's STATE rides in the query text as well as in the
         # per-candidate `active` feature. Both, deliberately: the prefix is what
@@ -521,9 +575,11 @@ class SetwiseClassifier:
         # contract local: `sims` below is a plain dot product only if BOTH sides
         # are unit vectors, and that should not depend on reading the exporter.
         active = set(active_ids)
-        chosen, feed = self._encode_pass(table, text, active)
+        chosen, feed = self._encode_pass(table, text, active, spans)
         n = len(chosen)
+        started = time.perf_counter()
         skill_logits, docs_logit, card_logits = self._head.run(None, feed)
+        spans["head_ms"] = _since(started)
         # Padded slots are already driven to -1e4 inside the graph, but they are
         # dropped here as well rather than trusted: a ranking is about to decide
         # what the turn loads, and a padding slot has no skill id to name.
@@ -533,7 +589,7 @@ class SetwiseClassifier:
         ranked = [
             (table.ids[int(chosen.indices[int(j)])], float(probs[int(j)])) for j in order
         ]
-        picked = admit(ranked, active, count, max_active)
+        picked, rejected = admit_with_reasons(ranked, active, count, max_active)
         # Which actives dense retrieval missed and this turn had to seat by hand.
         # Empty on almost every turn today (32 of 38 skills are on the ballot
         # anyway) and the number to watch as the catalog grows: it is the rate at
@@ -605,15 +661,25 @@ class SetwiseClassifier:
         # embedding of nothing. Same outcome as omitting it — keep the primary
         # logit — which is what a caller passing "" means.
         if docs_query and docs_query != text:
-            _, docs_feed = self._encode_pass(table, docs_query, set())
+            started = time.perf_counter()
+            # Its own span, and a whole second pass: this is the largest single
+            # cost the selector can pay on a turn, and folding it into the
+            # totals would make the docs workaround invisible in exactly the
+            # profile that would justify retiring it.
+            _, docs_feed = self._encode_pass(table, docs_query, set(), {})
             _, docs_logit, _ = self._head.run(None, docs_feed)
+            spans["docs_ms"] = _since(started)
         docs_p = float(1.0 / (1.0 + np.exp(-float(docs_logit[0]))))
+        spans["total_ms"] = _since(total_started)
         return Selection(
             skill_ids=picked,
             docs_wanted=docs_p >= docs_threshold,
             cardinality=count,
             scores=dict(ranked[:5]),
             reserved_ids=reserved_ids,
+            ranked=tuple(ranked),
+            timings=spans,
+            rejected=rejected,
         )
 
     #: Probability a skill must clear to displace or join an already-loaded set.
@@ -671,7 +737,48 @@ def admit(
     ``count`` is the cardinality head's answer; ``active`` is the prior set as
     the selector saw it (selectable ids only).
     """
+    return admit_with_reasons(ranked, active, count, max_active)[0]
+
+
+#: Why a ranked candidate did not make it into the answer. One per rule in
+#: :func:`admit_with_reasons`, and the vocabulary the benchmark's stage
+#: decomposition is built on.
+REJECTED_CARDINALITY = "cardinality"
+REJECTED_NEWCOMER_FLOOR = "newcomer_floor"
+REJECTED_BONUS_FLOOR = "bonus_floor"
+REJECTED_CAP = "cap"
+
+
+def admit_with_reasons(
+    ranked: list[tuple[str, float]],
+    active: set[str],
+    count: int,
+    max_active: int,
+) -> tuple[list[str], dict[str, str]]:
+    """:func:`admit`, plus the rule that rejected each candidate it did not take.
+
+    The reasons exist because "the turn did not load X" collapses four unrelated
+    causes that want four different fixes, and a benchmark cannot tell them apart
+    from the outside. It was tried from the outside first, and got two cases
+    wrong in ways that pointed at the wrong subsystem: with the cardinality head
+    answering zero, ``admit`` never evaluates a floor at all, but a reconstruction
+    that checks floors first blames calibration; and a candidate the bonus scan
+    stopped short of at the cap was blamed on the floor it never reached.
+
+    So the reasons come from the routine that actually admits. That is the same
+    reasoning as the shared candidate assembler and the shared document renderer:
+    the diagnosis has to be produced by the code being diagnosed, or it drifts
+    from it silently.
+
+    Behaviour is IDENTICAL to the old ``admit``. Both loops now run to the end of
+    the ranking rather than breaking early, which changes nothing about the
+    result — once ``want`` is met the first loop can no longer append, and the
+    ranking is descending so every candidate after the first sub-floor score is
+    also sub-floor — and lets a reason be recorded for every candidate rather
+    than only the ones examined before the break.
+    """
     picked: list[str] = []
+    rejected: dict[str, str] = {}
     want = min(max(count, 0), max_active)
     # Scan the WHOLE ranking until `want` candidates are accepted, not just the
     # first `count` rows. Bounding the scan to the count made a rejected
@@ -680,7 +787,8 @@ def admit(
     # back authoritatively empty, evicting a live workflow.
     for sid, prob in ranked:
         if len(picked) >= want:
-            break
+            rejected[sid] = REJECTED_CARDINALITY
+            continue
         # The earn-your-place rule: with a workflow already loaded, a skill that
         # is NOT part of it needs NEWCOMER_FLOOR_WHEN_ACTIVE, while a skill the
         # conversation is already running rides on the model's ranking alone. On
@@ -688,6 +796,7 @@ def admit(
         # early in a conversation the cheap mistake is to include, not withhold.
         newcomer = bool(active) and sid not in active
         if newcomer and prob < SetwiseClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE:
+            rejected[sid] = REJECTED_NEWCOMER_FLOOR
             continue
         picked.append(sid)
 
@@ -701,19 +810,25 @@ def admit(
     if picked:
         for sid, prob in ranked:
             if len(picked) >= max_active:
-                break
+                rejected[sid] = REJECTED_CAP
+                continue
             if sid in picked:
                 continue
             if prob < SetwiseClassifier.BONUS_FLOOR:
-                break
+                rejected[sid] = REJECTED_BONUS_FLOOR
+                continue
             if (
                 active
                 and sid not in active
                 and prob < SetwiseClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
             ):
+                rejected[sid] = REJECTED_NEWCOMER_FLOOR
                 continue
             picked.append(sid)
-    return picked
+
+    for sid in picked:
+        rejected.pop(sid, None)
+    return picked, rejected
 
 
 # ------------------------------------------------------------------ plumbing

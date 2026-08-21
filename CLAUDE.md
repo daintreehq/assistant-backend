@@ -221,10 +221,22 @@ files still parse, and the damage only surfaces as a skill declaring a tool the 
 dropped. CI checks the submodule out but does not BUILD it — regenerating needs a
 Go toolchain — so this offline equality check remains the available gate.
 
+**Routing quality IS gated here, and for free** — `benchmarks/skill_selection`
+`bench local` drives the SHIPPED ONNX artifact through the production decision
+procedure and runs in the deterministic dashboard on every push. It grades
+recall-pass (the local selector buys recall with precision on purpose, so the
+paid suite's exact-set contract is the wrong bar for it) and, more usefully,
+attributes every missing skill to the STAGE that lost it: `candidate_miss` /
+`rank_miss` / `floor_reject` / `cardinality_short` / `cap_full`. `candidate_miss`
+is gated at zero — no floor and no better head can recover a skill that never
+reached the ballot, and it is the first number to move as the catalog grows.
+`bench run` is the PAID comparator over the retired prompt selector; do not read
+it as the selector's accuracy.
+
 Not gated here, deliberately: anything needing a paid call. Live latency,
-selection accuracy and injection results belong in a nightly run against a
-low-spend key — a baseline that cannot be checked offline either gets skipped or
-makes every push cost money.
+injection results and the prompt-selector comparison belong in a nightly run
+against a low-spend key — a baseline that cannot be checked offline either gets
+skipped or makes every push cost money.
 
 ## Deploying (Cloud Run)
 

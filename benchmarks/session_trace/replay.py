@@ -1,4 +1,4 @@
-"""A scripted (replay) ChatProvider + a recording learner spy.
+"""A scripted (replay) ChatProvider.
 
 Lets ``session_trace`` drive the REAL ``ChatOrchestrator.complete`` deterministically
 — no network — while controlling exactly what the selector and the main model
@@ -97,22 +97,3 @@ class ReplayProvider:
         return None
 
 
-class SpyLearner:
-    """A stand-in ``SkillLearner`` that only records whether ``run`` was fired, so
-    the trace can assert the learning-trigger gate (final-answer vs continuation)
-    without any real (paid, OpenAI) learning pass."""
-
-    def __init__(self) -> None:
-        self.enabled = True
-        self.runs: list[dict[str, Any]] = []
-
-    async def run(
-        self,
-        *,
-        request: Any,  # noqa: ARG002
-        active_ids: list[str],
-        api_key: Any,  # noqa: ARG002
-        trailing_messages: Any,  # noqa: ARG002
-    ) -> None:
-        # Signature must match the real SkillLearner.run; only the fire is recorded.
-        self.runs.append({"active_ids": list(active_ids)})

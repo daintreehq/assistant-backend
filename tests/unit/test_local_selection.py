@@ -1234,3 +1234,82 @@ def test_a_narrowed_profile_cannot_seat_a_skill_outside_its_menu() -> None:
     chosen = assemble_candidates(sims, table.ids, set(outside), 32)
     assert not chosen.reserved.any()
     assert {table.ids[int(i)] for i in chosen.indices} <= set(narrow.selectable_ids)
+
+
+# --------------------------------------------------------------------------
+# pool queue-wait instrumentation
+# --------------------------------------------------------------------------
+
+
+def test_queue_wait_measures_time_spent_behind_a_busy_worker() -> None:
+    """The metric has to see executor contention, which is the only wait there is.
+
+    Written against the shape that broke the first version: the semaphore holds
+    `queue_depth` permits and the pool REFUSES rather than queues once they are
+    gone, so `acquire()` never blocks and a timer around it reads zero under
+    exactly the load it claims to measure. One worker, two jobs, the first
+    holding the thread — the second's wait is real and must be recorded.
+    """
+    import threading
+
+    async def go() -> None:
+        pool = InferencePool(workers=1, queue_depth=4, timeout_seconds=5.0)
+        release = threading.Event()
+
+        def blocker() -> str:
+            release.wait(timeout=2.0)
+            return "first"
+
+        first = asyncio.create_task(pool.run(blocker))
+        await asyncio.sleep(0.05)  # let the worker pick the blocker up
+        second = asyncio.create_task(pool.run(lambda: "second"))
+        await asyncio.sleep(0.05)
+        release.set()
+        assert await first == "first"
+        assert await second == "second"
+
+        stats = pool.stats()
+        assert stats.queue_waits == 2
+        # The second job waited behind the first; a timer on the semaphore would
+        # have reported ~0 here.
+        assert stats.queue_wait_ms_max >= 40.0
+        assert stats.queue_wait_ms_mean > 0.0
+        pool.close()
+
+    asyncio.run(go())
+
+
+def test_queue_wait_is_zero_when_nothing_is_contending() -> None:
+    """The control: without it, a metric that always reported a large number
+    would pass the test above."""
+
+    async def go() -> None:
+        pool = InferencePool(workers=1, queue_depth=4, timeout_seconds=5.0)
+        assert await pool.run(lambda: "x") == "x"
+        stats = pool.stats()
+        assert stats.queue_waits == 1
+        assert stats.queue_wait_ms_max < 40.0
+        pool.close()
+
+    asyncio.run(go())
+
+
+def test_a_rejected_job_never_counts_as_a_queue_wait() -> None:
+    """A pool-full rejection never reaches a worker, so it has no wait to record
+    — and counting it would dilute the mean with the jobs that waited least."""
+
+    async def go() -> None:
+        import threading
+
+        pool = InferencePool(workers=1, queue_depth=1, timeout_seconds=5.0)
+        release = threading.Event()
+        held = asyncio.create_task(pool.run(lambda: release.wait(timeout=2.0)))
+        await asyncio.sleep(0.05)
+        assert await pool.run(lambda: "refused") is None
+        release.set()
+        await held
+        assert pool.stats().rejected_full == 1
+        assert pool.stats().queue_waits == 1
+        pool.close()
+
+    asyncio.run(go())

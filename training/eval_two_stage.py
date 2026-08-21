@@ -20,10 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import statistics
 import sys
-import time
-from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,15 +28,12 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
 from benchmarks.skill_selection.cases import load_cases  # noqa: E402
-from benchmarks.skill_selection.scoring import score_trial, summarize  # noqa: E402
+from benchmarks.skill_selection.local_runner import STAGES, run_local  # noqa: E402
 from daintree_assistant_server.skills.catalog import (  # noqa: E402
     default_skills_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.local.documents import (  # noqa: E402
-    last_user_text,
-    query_document,
-)
+from daintree_assistant_server.skills.local.documents import query_document  # noqa: E402
 from daintree_assistant_server.skills.local.setwise import SetwiseClassifier  # noqa: E402
 
 #: Release floor for the product metric (every required skill present). The
@@ -53,52 +47,16 @@ ARTIFACT = (
 )
 
 
-def run(clf: SetwiseClassifier, catalog, cases):  # type: ignore[no-untyped-def]
-    """Score one artifact under the serving decision procedure."""
-    selectable = catalog.selectable_ids
-    results = []
-    picked_all: list[list[str]] = []
-    latencies: list[float] = []
-    for case in cases:
-        query = query_document(case.messages, turn_context=case.turn_context)
-        eligible = [m for m in case.messages if m.role in ("user", "assistant", "tool")]
-        started = time.perf_counter()
-        if case.active and eligible and eligible[-1].role != "user":
-            picked = list(case.active)
-            docs_q = None
-        else:
-            visible = [sid for sid in case.active if sid in selectable]
-            # Mirror the SERVER via the SHARED renderer: the docs decision is
-            # taken on the bare newest user message, not the context-laden
-            # ranking query. Scoring it any other way measures a behaviour that
-            # does not ship — and the docs flag is exactly where that mattered,
-            # since the head reads ~0 through an ACTIVE_PREFIX or a history tail.
-            # `last_user_text` rather than a local re-implementation so a typed
-            # or whitespace-heavy case cannot be scored on a string the server
-            # would never build.
-            sel = clf.select(query, visible, docs_query=last_user_text(case.messages))
-            picked = [sid for sid in sel.skill_ids if sid in selectable]
-            docs_q = "q" if sel.docs_wanted else None
-        latencies.append((time.perf_counter() - started) * 1000)
-        picked_all.append(picked)
-        results.append(
-            score_trial(
-                case, 0, picked, degraded=False, latency_s=0.0, confidence=None,
-                task_type=None, reason=None, prompt_tokens=0, completion_tokens=0,
-                docs_query=docs_q,
-            )
-        )
-    return summarize(cases, results), results, picked_all, latencies
-
-
-def recall_pass_flags(cases, picked_all) -> list[bool]:  # type: ignore[no-untyped-def]
-    flags = []
-    for case, picked in zip(cases, picked_all, strict=True):
-        got = set(picked)
-        miss = set(case.required) - got
-        extra = got - set(case.required) - set(case.optional)
-        flags.append(not miss and (bool(case.required) or not extra))
-    return flags
+# The scoring loop lives in ``benchmarks/skill_selection/local_runner.py`` and is
+# imported rather than reimplemented here. It was duplicated for a while, and the
+# duplicate is exactly the kind that rots: two loops applying "the serving
+# decision procedure" drift a rule at a time — a projection here, a docs string
+# there — and the number a release is qualified on stops matching the number a
+# retrain is judged on, with nothing to say which one moved.
+#
+# What stays here is what this script uniquely does: run the SAME evaluation
+# through both precisions and diff the DECISIONS, and probe the head's
+# permutation-equivariance against the real graph.
 
 
 def main() -> int:
@@ -126,26 +84,32 @@ def main() -> int:
     outputs = {}
     for quantized in (False, True):
         tag = "int8" if quantized else "fp32"
-        clf = SetwiseClassifier(artifact, quantized=quantized)
-        clf.sync(catalog)
-        summary, _results, picked, lat = run(clf, catalog, cases)
-        outputs[tag] = (summary, picked, lat)
-        lat_sorted = sorted(lat)
-        rp = sum(recall_pass_flags(cases, picked))
+        doc = run_local(artifact=artifact, catalog=catalog, cases=cases, quantized=quantized)
+        outputs[tag] = doc
+        summary = doc["summary"]
+        total = summary["spans_ms"]["total_ms"]
         print(
-            f"\n{tag}: recall-pass {rp}/{len(cases)} ({rp / len(cases) * 100:.1f}%)  "
+            f"\n{tag}: recall-pass {summary['recall_pass_cases']}/{summary['cases_total']} "
+            f"({summary['recall_pass_cases'] / summary['cases_total'] * 100:.1f}%)  "
             f"strict {summary['cases_passed']}/{summary['cases_total']}  "
             f"miss {summary['recall_miss_trials']} "
             f"extra {summary['precision_extra_trials']}  "
             f"docs {summary['docs']['correct_trials']}"
             f"/{summary['docs']['scored_trials']}  "
-            f"p50 {lat_sorted[len(lat_sorted) // 2]:.1f} ms  "
-            f"mean {statistics.mean(lat):.1f} ms"
+            f"p50 {total['p50']:.1f} ms  mean {total['mean']:.1f} ms"
+        )
+        stages = summary["stages"]
+        print(
+            "     lost to: "
+            + "  ".join(f"{name}={stages[name]}" for name in STAGES if stages[name])
+            + (f"  candidate_miss={stages['candidate_miss']}" if not any(stages.values()) else "")
         )
 
     diffs = [
         (c.id, a, b)
-        for c, a, b in zip(cases, outputs["fp32"][1], outputs["int8"][1], strict=True)
+        for c, a, b in zip(
+            cases, outputs["fp32"]["picked"], outputs["int8"]["picked"], strict=True
+        )
         if a != b
     ]
     print(f"\nfp32 vs int8 decision diff: {len(diffs)} of {len(cases)} cases")
@@ -155,31 +119,36 @@ def main() -> int:
             f"int8={[x.rsplit('.', 1)[-1] for x in b]}"
         )
 
-    flags = recall_pass_flags(cases, outputs["int8"][1])
+    int8 = outputs["int8"]
     print("\nby category (int8, recall-pass — the product metric):")
-    by: dict[str, list[bool]] = defaultdict(list)
-    for case, ok in zip(cases, flags, strict=True):
-        by[case.category].append(ok)
-    for cat in sorted(by):
-        rows = by[cat]
-        print(f"  {cat:22} {sum(rows):3d}/{len(rows)}")
+    for cat, block in sorted(int8["summary"]["recall_pass_categories"].items()):
+        print(f"  {cat:22} {block['passed']:3d}/{block['cases']}")
 
-    print("\nmisses (int8):")
-    for case, ok, picked in zip(cases, flags, outputs["int8"][1], strict=True):
-        if not ok:
-            print(
-                f"  {case.id:42} want={[x.rsplit('.', 1)[-1] for x in case.required]} "
-                f"got={[x.rsplit('.', 1)[-1] for x in picked]}"
-            )
+    print("\nlosses (int8), by the stage that lost them:")
+    for loss in int8["losses"]:
+        p = "  —  " if loss["p"] is None else f"{loss['p']:.3f}"
+        print(f"  {loss['case']:42} {loss['stage']:18} p={p}  {loss['skill']}")
 
     if args.ablate:
-        _ablate(artifact, catalog, cases, outputs["int8"][1])
+        _ablate(artifact, catalog, cases, outputs["int8"]["picked"])
 
-    int8_rp = sum(flags)
+    # The release gate, not a second opinion. `run_local` already stamped the
+    # full verdict — candidate recall, per-category floors, docs, latency — and
+    # ignoring it here would let a retrain pass this script while failing the
+    # dashboard on the same numbers, which is the split this whole suite exists
+    # to close. The recall-pass floor below stays as an explicit, separately
+    # movable line for the training loop.
+    ok = bool(int8["summary"].get("passed"))
+    if not ok:
+        print("\nQUALITY GATE: FAIL")
+        for failure in int8["summary"].get("quality_failures", []):
+            print(f"  - {failure}")
+
+    int8_rp = int(int8["summary"]["recall_pass_cases"])
     if int8_rp < RECALL_PASS_FLOOR:
         print(f"\nFAIL: int8 recall-pass {int8_rp} < floor {RECALL_PASS_FLOOR}")
         return 1
-    return 0
+    return 0 if ok else 1
 
 
 def _ablate(artifact: Path, catalog, cases, baseline_picked) -> None:  # type: ignore[no-untyped-def]

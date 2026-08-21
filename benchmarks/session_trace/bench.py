@@ -25,7 +25,6 @@ def _print(doc: dict[str, Any]) -> None:
           f"turns {s['turns_passed']}/{s['turns_total']}")
     print(f"cadence_accuracy       {s['cadence_accuracy']:.4f}")
     print(f"active_set_accuracy    {s['active_set_accuracy']:.4f}")
-    print(f"learn_trigger_accuracy {s['learn_trigger_accuracy']:.4f}")
     print(f"state_continuity_rate  {s['state_continuity_rate']:.4f}")
     print(f"selector_run_rate      {s['selector_run_rate']:.4f} (runs/turn cost lever)")
     for tr in doc["traces"]:
@@ -35,7 +34,7 @@ def _print(doc: dict[str, Any]) -> None:
             if not t["passed"]:
                 fails = [k for k, v in t["checks"].items() if not v]
                 print(f"        turn {t['turn_id']}: FAILED {fails}  active={t['active']} "
-                      f"selector_ran={t['selector_ran']} learn={t['learn_fired']}")
+                      f"selector_ran={t['selector_ran']}")
 
 
 def _cmd_run(args: argparse.Namespace) -> int:

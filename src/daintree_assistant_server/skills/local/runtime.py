@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -82,10 +83,29 @@ class PoolStats:
     rejected_full: int
     timed_out: int
     failed: int
+    #: How long admitted work spent waiting for a worker, in milliseconds.
+    #:
+    #: The span the classifier's own timings cannot see, and the one that
+    #: separates "the model got slower" from "the instance got busier" — a
+    #: distinction a single aggregate ``selection_ms`` erases, and the two want
+    #: opposite responses. Max as well as mean because contention is a tail
+    #: property: eight simultaneous rankings on one vCPU measured a 280ms worst
+    #: case against a p50 in the low teens, and a mean hides that entirely.
+    queue_wait_ms_total: float = 0.0
+    queue_wait_ms_max: float = 0.0
+    #: How many admitted jobs actually STARTED. The mean's denominator: dividing
+    #: by ``completed`` would inflate it by every job that timed out or raised
+    #: after waiting, which are exactly the jobs a contention investigation
+    #: cares about.
+    queue_waits: int = 0
 
     @property
     def degraded(self) -> int:
         return self.rejected_full + self.timed_out + self.failed
+
+    @property
+    def queue_wait_ms_mean(self) -> float:
+        return self.queue_wait_ms_total / self.queue_waits if self.queue_waits else 0.0
 
 
 class InferencePool:
@@ -114,6 +134,9 @@ class InferencePool:
         self._rejected_full = 0
         self._timed_out = 0
         self._failed = 0
+        self._queue_wait_ms_total = 0.0
+        self._queue_wait_ms_max = 0.0
+        self._queue_waits = 0
         self._closed = False
 
     async def run(self, fn: Callable[[], T]) -> T | None:
@@ -137,7 +160,31 @@ class InferencePool:
 
         await self._slots.acquire()
         loop = asyncio.get_running_loop()
-        future = loop.run_in_executor(self._executor, fn)
+
+        # THE WAIT IS INSIDE THE EXECUTOR, not on the semaphore.
+        #
+        # Timing `acquire()` measures nothing, which is how this was written
+        # first. The semaphore holds `queue_depth` permits and the `locked()`
+        # check above refuses the caller outright when they are gone, so
+        # `acquire()` either succeeds immediately or never runs. The real
+        # contention — the thing worth a metric — is the executor's own queue:
+        # `WORKER_THREADS` is 1, so the second concurrent ranking waits for the
+        # first forward pass to finish, and none of that is visible from out here.
+        #
+        # So the clock is started at submission and stopped by the worker itself,
+        # on the thread, immediately before `fn` runs. Written from the worker
+        # thread and read from the loop; a float assignment is atomic under the
+        # GIL and this is a diagnostic counter, so no lock.
+        submitted_at = time.perf_counter()
+
+        def timed() -> T:
+            waited_ms = (time.perf_counter() - submitted_at) * 1000.0
+            self._queue_wait_ms_total += waited_ms
+            self._queue_wait_ms_max = max(self._queue_wait_ms_max, waited_ms)
+            self._queue_waits += 1
+            return fn()
+
+        future = loop.run_in_executor(self._executor, timed)
         # The slot is released when the UNDERLYING work finishes, not when this
         # coroutine stops waiting for it. asyncio's timeout cannot interrupt a
         # thread mid-forward-pass; releasing in a `finally` here meant a wedged
@@ -178,6 +225,9 @@ class InferencePool:
             rejected_full=self._rejected_full,
             timed_out=self._timed_out,
             failed=self._failed,
+            queue_wait_ms_total=round(self._queue_wait_ms_total, 3),
+            queue_wait_ms_max=round(self._queue_wait_ms_max, 3),
+            queue_waits=self._queue_waits,
         )
 
     def close(self) -> None:

@@ -1,14 +1,13 @@
 """Drive the REAL ``ChatOrchestrator.complete`` over scripted multi-turn traces.
 
-Uses ``build_container`` (the exact production wiring) with a replay provider and a
-recording learner spy, feeding the response ``state`` token back each turn so the
-selector cadence, active-set resolution, and learning trigger are exercised exactly
-as they run in production — with no network and no paid call. Numbers produced:
+Uses ``build_container`` (the exact production wiring) with a replay provider,
+feeding the response ``state`` token back each turn so the selector cadence and
+active-set resolution are exercised exactly as they run in production — with no
+network and no paid call. Numbers produced:
 
 - ``cadence_accuracy`` — did the selector run on the turns it should (new
   instruction) and stay silent on continuation rounds?
 - ``active_set_accuracy`` — topic-shift replacement / continuation reuse / clear.
-- ``learn_trigger_accuracy`` — the learner fires ONLY on a final-answer round.
 - ``selector_run_rate`` — selector runs / total turns (the first-byte cost lever).
 - ``state_continuity_rate`` — every turn returns a verifiable state token.
 """
@@ -75,7 +74,7 @@ def _request(
     return RespondRequest.model_validate(payload)
 
 
-async def _run_trace(orchestrator: Any, spy: R.SpyLearner, provider: R.ReplayProvider,
+async def _run_trace(orchestrator: Any, provider: R.ReplayProvider,
                      codec: Any, trace: dict[str, Any]) -> dict[str, Any]:
     messages: list[dict[str, Any]] = []
     state: str | None = None
@@ -103,7 +102,6 @@ async def _run_trace(orchestrator: Any, spy: R.SpyLearner, provider: R.ReplayPro
         else:
             provider.next_main = R.main_final(main["final"])
 
-        runs_before = len(spy.runs)
         sel_before, main_before = provider.selector_calls, provider.main_calls
         req = _request(list(messages), state, session_id, turn["turn_id"])
         outcome = await orchestrator.complete(
@@ -112,8 +110,8 @@ async def _run_trace(orchestrator: Any, spy: R.SpyLearner, provider: R.ReplayPro
         body = outcome.body or {}
         sel_delta = provider.selector_calls - sel_before
         main_delta = provider.main_calls - main_before
-        # Learning is fired-and-forgotten via asyncio.create_task; yield the loop so
-        # the (instant) spy.run executes before we read whether it fired this turn.
+        # Yield the loop so any fire-and-forget task the turn started has run
+        # before the next request reads the state it left behind.
         for _ in range(3):
             await asyncio.sleep(0)
 
@@ -133,7 +131,6 @@ async def _run_trace(orchestrator: Any, spy: R.SpyLearner, provider: R.ReplayPro
 
         got_active = [s["id"] for s in body.get("skills", {}).get("active", [])]
         selector_ran = bool(body.get("skills", {}).get("selector", {}).get("ran"))
-        learn_fired = len(spy.runs) > runs_before
         new_state = body.get("state")
         # The returned state token must actually verify (session-bound), and carry the
         # active set forward — a nonempty-but-forged/unverifiable token is not continuity.
@@ -149,7 +146,6 @@ async def _run_trace(orchestrator: Any, spy: R.SpyLearner, provider: R.ReplayPro
             "selector_calls": sel_delta == (1 if expect_selector else 0),
             "main_called_once": main_delta == 1,
             "active_set": set(got_active) == set(exp.get("active", [])),
-            "learn": learn_fired == exp.get("learn"),
             # The state token verifies AND round-trips the active set (not just nonempty).
             "state_verifies": verification.valid and set(state_ids) == set(got_active),
         }
@@ -157,7 +153,6 @@ async def _run_trace(orchestrator: Any, spy: R.SpyLearner, provider: R.ReplayPro
             "turn_id": turn["turn_id"],
             "selector_ran": selector_ran,
             "active": got_active,
-            "learn_fired": learn_fired,
             "checks": checks,
             "passed": all(checks.values()),
             "expect": exp,
@@ -183,7 +178,6 @@ def _summ(traces: list[dict[str, Any]]) -> dict[str, Any]:
         "selector_call_accuracy": rate("selector_calls"),
         "main_call_accuracy": rate("main_called_once"),
         "active_set_accuracy": rate("active_set"),
-        "learn_trigger_accuracy": rate("learn"),
         "state_continuity_rate": rate("state_verifies"),
         "selector_run_rate": round(selector_runs / n, 4) if n else 0.0,
     }
@@ -215,14 +209,12 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
         settings,
     )
     container = build_container(settings, provider=provider, selector=seam)
-    spy = R.SpyLearner()
-    container.orchestrator.learner = spy  # inject the recording spy (default is None)
 
     results = []
     try:
         for trace in traces:
             results.append(await _run_trace(
-                container.orchestrator, spy, provider, container.state_codec, trace))
+                container.orchestrator, provider, container.state_codec, trace))
         await container.orchestrator.drain_background_tasks(timeout=5.0)
     finally:
         # The container's own teardown, not just the provider's: it owns a second

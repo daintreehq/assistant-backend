@@ -401,6 +401,27 @@ def _rate_at_most(
         )
 
 
+def _rate_at_least(
+    checks: _Checks, numerator: str, denominator: str, floor: float
+) -> None:
+    """``numerator/denominator`` clears ``floor``, naming both when it does not.
+
+    The mirror of :func:`_rate_at_most`. Kept as a rate for the same reason: a
+    fixed count silently encodes the corpus size it was measured at, so adding
+    cases to the suite would fail a gate for having collected more evidence.
+    """
+    top = checks.value(numerator)
+    bottom = checks.value(denominator)
+    if top is None or bottom is None:
+        checks.note(f"{numerator}/{denominator} are missing — nothing was graded")
+    elif bottom <= 0:
+        checks.note(f"{denominator}=0 — an empty run is not a passing one")
+    elif top / bottom < floor:
+        checks.note(
+            f"{numerator}={top:g}/{bottom:g} = {top / bottom:.3f}, expected >= {floor:g}"
+        )
+
+
 def _require_exact(
     checks: _Checks, meta: Mapping[str, Any], expected_key: str, actual_key: str
 ) -> None:
@@ -476,77 +497,88 @@ MIN_SELECTOR_TRIALS_PER_CASE = 3
 # at 4/5): in a 5-case category one case is 20 points, so a floor at the
 # measurement would flap on a single trial. 0.6 still catches losing three of five.
 MIN_SELECTOR_CATEGORY_PASS_RATE = 0.6
+# Wall-clock ceiling on ONE local selection, p90, measured single-threaded with a
+# warm process. Generous against the ~13ms observed (a docs turn, which pays a
+# second complete pass) because this runs on whatever CI box is free and a gate
+# that flaps on a noisy neighbour gets ignored. It is a PATHOLOGY bound — a
+# re-embedding catalog sync, a tokenizer cap change, a k that grew the head's
+# attention — not a target to tune against; the spans beside it are what a real
+# latency investigation reads.
+#
+# 5x the 29ms measured here, deliberately. This runs on whatever CI box is free,
+# beside a coverage run, and a latency gate that flaps on a noisy neighbour is a
+# gate people learn to re-run rather than read. At 5x it still catches the 5.3s
+# profile-alternation re-embed that motivated the vector memo, or any order-of-
+# magnitude regression, which is the whole job.
+MAX_SELECTOR_P90_MS = 150.0
+
+# ---- the LOCAL suite's own floors ----------------------------------------
+#
+# Measured against the shipped int8 artifact over all 177 cases, catalog
+# revision a35b32e7, on 2026-08-21. NOT copied from the paid selector's numbers
+# above: that selector grades an exact set and is stochastic, this one is
+# deterministic and trades precision for recall by design, and reusing its
+# thresholds made this gate fail a healthy run on its first execution.
+#
+# Deterministic means the slack can be tight — there is no resampling noise to
+# absorb, only real movement — so each floor sits roughly one case below the
+# measurement rather than the paid suite's 1.5x error-rate slack. Tightening as
+# the selector improves is the point; loosening one needs a reason in the commit
+# message.
+# Each floor is stated with the DISCRETE boundary it implies at today's 177
+# cases, because a rate is not what anyone reasons about when a run goes red:
+#
+#   recall-pass    164 measured, >= 160 passes   (4 further failures allowed)
+#   strict         146 measured, >= 139 passes   (7 further)
+#   recall misses   13 measured, <=  15 passes   (2 further)
+#   extras          27 measured, <=  35 passes   (8 further)
+#   docs misses    2/21 measured, <=  2 passes   (1 further)
+#
+# Re-derive that table when a floor moves or the corpus grows.
+LOCAL_SELECTOR_BASELINE = "int8, 177 cases, catalog a35b32e7, 2026-08-21"
+MIN_LOCAL_RECALL_PASS_RATE = 0.90     # measured 164/177 = 0.927
+MIN_LOCAL_STRICT_PASS_RATE = 0.78     # measured 146/177 = 0.825
+MAX_LOCAL_RECALL_MISS_RATE = 0.09     # measured  13/177 = 0.073
+# Extras are a DESIGNED trade here (see BONUS_FLOOR), so this is a blow-out
+# detector rather than a quality target: it catches the recall bonus running
+# away, not the handful it is meant to buy.
+MAX_LOCAL_EXTRA_RATE = 0.20           # measured  27/177 = 0.153
+# 0.10, so the boundary is DISCRETE and stated: 2 misses of 21 pass, 3 fail. The
+# first draft said 0.15 and claimed "a third miss fails", which was arithmetically
+# wrong — 3/21 = 0.143 cleared it and the fourth was the first to fail.
+MAX_LOCAL_MISSED_DOCS_RATE = 0.10     # measured   2/21  = 0.095
+# 0.55 rather than the paid suite's 0.6: on recall-pass the weakest category is
+# multi-skill at 3/5, and in a 5-case category one case is 20 points.
+MIN_LOCAL_CATEGORY_PASS_RATE = 0.55
 
 
-def skill_selection_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
-    summary = doc.get("summary") or {}
-    meta = doc.get("meta") or {}
-    checks = _Checks(summary)
+def _selector_coverage_checks(
+    checks: _Checks,
+    summary: Mapping[str, Any],
+    meta: Mapping[str, Any],
+) -> None:
+    """Did the corpus actually RUN whole? Shared by both selector suites.
 
+    Deliberately only the structural half. Every rate above these is computed
+    over whatever executed, so a two-case run reports a flawless sweep — and that
+    hole is identical whichever selector produced the numbers.
+
+    The accuracy thresholds are NOT shared, and that is not an oversight. The two
+    suites grade different systems against different contracts: the prompt
+    selector was asked for an exact set and is stochastic at temperature 0, while
+    the local one is deterministic and deliberately buys recall with precision
+    (``BONUS_FLOOR``). Copying one's numbers onto the other would be exactly the
+    unvalidated threshold this module warns about at the top.
+    """
     # A DEGRADED trial is not a routing mistake — it is the selector failing to
     # produce a parseable answer at all, after its retry and its one repair. It
     # fails open in production (the turn reuses the prior active set), which is
     # the right runtime behaviour and exactly why it must not be silent here.
     checks.exactly_zero("degraded_trials")
 
-    # A MISSED required skill is worse than an extra one: the turn runs without
-    # the runbook it needed, where an extra costs prompt bytes and some
-    # distraction. Graded separately for that reason, and never rolled into one
-    # accuracy figure that would let the cheap error mask the expensive one.
-    _rate_at_most(checks, "recall_miss_trials", "trials_total", MAX_SELECTOR_RECALL_MISS_RATE)
-    _rate_at_most(checks, "precision_extra_trials", "trials_total", MAX_SELECTOR_EXTRA_RATE)
-
-    cases_total = checks.value("cases_total")
-    cases_passed = checks.value("cases_passed")
-    if cases_total is None or cases_passed is None:
-        checks.note("cases_total/cases_passed are missing — nothing was graded")
-    elif cases_total <= 0:
-        checks.note("cases_total=0 — an empty run is not a passing one")
-    else:
-        rate = cases_passed / cases_total
-        if rate < MIN_SELECTOR_CASE_PASS_RATE:
-            checks.note(
-                f"case pass rate {rate:.3f} ({cases_passed:g}/{cases_total:g}), "
-                f"expected >= {MIN_SELECTOR_CASE_PASS_RATE}"
-            )
-
-    trials_total = checks.value("trials_total")
-    trials_passed = checks.value("trials_passed")
-    if trials_total is None or trials_passed is None:
-        checks.note("trials_total/trials_passed are missing — nothing was graded")
-    elif trials_total <= 0:
-        checks.note("trials_total=0 — an empty run is not a passing one")
-    else:
-        rate = trials_passed / trials_total
-        if rate < MIN_SELECTOR_TRIAL_PASS_RATE:
-            checks.note(
-                f"trial pass rate {rate:.3f} ({trials_passed:g}/{trials_total:g}), "
-                f"expected >= {MIN_SELECTOR_TRIAL_PASS_RATE}"
-            )
-
-    # Documentation classification rides the same call and has its own two
-    # opposite failures. A MISSED lookup answers a product question from memory,
-    # which is the one the base prompt cannot catch; a SPURIOUS one buys a
-    # third-party round-trip on the first-byte path of an operational turn.
-    docs = summary.get("docs")
-    if not isinstance(docs, Mapping):
-        checks.note("summary.docs is missing — documentation routing was not graded")
-    else:
-        docs_checks = _Checks(docs)
-        docs_checks.exactly_zero("missed_lookup_trials")
-        _rate_at_most(
-            docs_checks, "spurious_lookup_trials", "scored_trials",
-            MAX_SELECTOR_SPURIOUS_DOCS_RATE,
-        )
-        # `scored_trials` is the denominator of the rate above, so a run that
-        # graded ONE docs case reports a flawless documentation record on one
-        # sample. Every docs-scoring case, every trial.
-        _require_exact(docs_checks, meta, "docs_trials_expected", "scored_trials")
-        checks.failures.extend(f"docs.{f}" for f in docs_checks.failures)
-
     # The corpus has to have run whole. `--filter` is right for iterating on one
-    # case and wrong for qualifying a release: every rate above is computed over
-    # whatever executed, so a two-case run reports a flawless sweep.
+    # case and wrong for qualifying a release: every rate elsewhere is computed
+    # over whatever executed, so a two-case run reports a flawless sweep.
     if meta.get("filter"):
         checks.note(
             f"run was filtered to {meta['filter']!r} — a partial corpus cannot qualify "
@@ -559,6 +591,120 @@ def skill_selection_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
     # computed over a third of the evidence the gate believes it has.
     _require_exact(checks, meta, "trials_expected", "trials_total")
 
+    cases_total = checks.value("cases_total")
+    if cases_total is None:
+        checks.note("cases_total is missing — nothing was graded")
+    elif cases_total <= 0:
+        checks.note("cases_total=0 — an empty run is not a passing one")
+
+    # Documentation classification rides the same call and has its own two
+    # opposite failures. A MISSED lookup answers a product question from memory,
+    # which is the one the base prompt cannot catch; a SPURIOUS one buys a
+    # third-party round-trip on the first-byte path of an operational turn.
+    docs = summary.get("docs")
+    if not isinstance(docs, Mapping):
+        checks.note("summary.docs is missing — documentation routing was not graded")
+    else:
+        # `scored_trials` is the denominator of every docs rate, so a run that
+        # graded ONE docs case reports a flawless documentation record on one
+        # sample. Every docs-scoring case, every trial.
+        docs_checks = _Checks(docs)
+        _require_exact(docs_checks, meta, "docs_trials_expected", "scored_trials")
+        checks.failures.extend(f"docs.{f}" for f in docs_checks.failures)
+
+    # Every CATEGORY must be represented. The corpus is deliberately shaped around
+    # confusable neighbours, and its routing traps are the cases most likely to be
+    # dropped by a narrowing edit — the ones whose absence a headline number
+    # cannot show, because losing hard cases makes the average go UP.
+    expected_categories = meta.get("categories_expected")
+    if not isinstance(expected_categories, (list, tuple)):
+        checks.note("meta.categories_expected is missing — cannot tell which categories ran")
+    elif not isinstance(summary.get("categories"), Mapping):
+        checks.note("summary.categories is missing")
+    else:
+        missing = sorted(set(expected_categories) - set(summary["categories"]))
+        if missing:
+            checks.note(f"categories with no graded case: {', '.join(missing)}")
+
+
+def _category_floor(
+    checks: _Checks,
+    measured: Any,
+    floor: float,
+    *,
+    label: str,
+    expected: Any = None,
+) -> None:
+    """Every category clears ``floor``, so a small one cannot collapse unseen.
+
+    A global rate lets it: the corpus is 73 routing traps and 39 single-skill
+    matches against 5-case categories like background-wake and adversarial, so
+    the big categories carry the average. Measured on a losing prompt variant,
+    background-wake fell to 0.40 while the GLOBAL rate only moved to 0.897.
+    """
+    if not isinstance(measured, Mapping):
+        checks.note(f"{label} is missing")
+        return
+    # Against THIS block, not against some other one that happens to be complete.
+    # The coverage check reads `summary.categories`; if the block being graded
+    # lost an entry, only this notices.
+    if isinstance(expected, (list, tuple)):
+        absent = sorted(set(expected) - set(measured))
+        if absent:
+            checks.note(f"{label} has no entry for: {', '.join(absent)}")
+    for name, block in sorted(measured.items()):
+        if not isinstance(block, Mapping):
+            checks.note(f"{label}.{name} is not a block")
+            continue
+        cases = block.get("cases")
+        passed = block.get("passed")
+        if not isinstance(cases, int) or not isinstance(passed, int):
+            checks.note(f"{label}.{name} is missing its case counts")
+        elif cases <= 0:
+            checks.note(f"{label}.{name} graded no cases")
+        elif passed / cases < floor:
+            checks.note(
+                f"{label}.{name}={passed}/{cases} = {passed / cases:.2f}, "
+                f"expected >= {floor}"
+            )
+
+
+def skill_selection_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
+    """The PAID comparator suite: the prompt selector, live, three trials a case.
+
+    Graded on the EXACT set — nothing missing and nothing extra — because that is
+    what this selector's prompt asks for. The local suite grades recall-pass
+    instead; see ``skill_selection_local_verdict``.
+    """
+    summary = doc.get("summary") or {}
+    meta = doc.get("meta") or {}
+    checks = _Checks(summary)
+    _selector_coverage_checks(checks, summary, meta)
+
+    # A MISSED required skill is worse than an extra one: the turn runs without
+    # the runbook it needed, where an extra costs prompt bytes and some
+    # distraction. Graded separately for that reason, and never rolled into one
+    # accuracy figure that would let the cheap error mask the expensive one.
+    _rate_at_most(checks, "recall_miss_trials", "trials_total", MAX_SELECTOR_RECALL_MISS_RATE)
+    _rate_at_most(checks, "precision_extra_trials", "trials_total", MAX_SELECTOR_EXTRA_RATE)
+    _rate_at_least(checks, "cases_passed", "cases_total", MIN_SELECTOR_CASE_PASS_RATE)
+    _rate_at_least(checks, "trials_passed", "trials_total", MIN_SELECTOR_TRIAL_PASS_RATE)
+
+    docs = summary.get("docs")
+    if isinstance(docs, Mapping):
+        docs_checks = _Checks(docs)
+        docs_checks.exactly_zero("missed_lookup_trials")
+        _rate_at_most(
+            docs_checks, "spurious_lookup_trials", "scored_trials",
+            MAX_SELECTOR_SPURIOUS_DOCS_RATE,
+        )
+        checks.failures.extend(f"docs.{f}" for f in docs_checks.failures)
+
+    _category_floor(
+        checks, summary.get("categories"), MIN_SELECTOR_CATEGORY_PASS_RATE,
+        label="categories", expected=meta.get("categories_expected"),
+    )
+
     trials = meta.get("trials")
     valid_trials = isinstance(trials, int) and not isinstance(trials, bool)
     if not valid_trials or trials < MIN_SELECTOR_TRIALS_PER_CASE:
@@ -568,35 +714,98 @@ def skill_selection_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
             f"trial cannot separate a routing fix from a lucky draw"
         )
 
-    # Every CATEGORY must be represented. The corpus is deliberately shaped around
-    # confusable neighbours, and its routing traps are the cases most likely to be
-    # dropped by a narrowing edit — the ones whose absence a headline number
-    # cannot show, because losing hard cases makes the average go UP.
-    expected_categories = meta.get("categories_expected")
-    measured = summary.get("categories")
-    if not isinstance(expected_categories, (list, tuple)):
-        checks.note("meta.categories_expected is missing — cannot tell which categories ran")
-    elif not isinstance(measured, Mapping):
-        checks.note("summary.categories is missing")
+    return checks.verdict()
+
+
+def skill_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
+    """The suite that qualifies a release: the shipped ONNX artifact, offline.
+
+    Graded on RECALL-PASS — every required skill present — rather than on the
+    exact set. That is not a softer bar chosen to make the numbers work; it is
+    this selector's actual contract. ``BONUS_FLOOR`` admits a further skill above
+    0.45 beyond the cardinality head's answer on purpose, because a turn that
+    misses its runbook answers without it while a spare runbook costs prompt
+    bytes. Extras are designed behaviour here and a defect in the prompt
+    selector, so the two are gated on what each was built to do. The strict rate
+    is checked too, well below the measurement, so a precision collapse still
+    reddens this.
+
+    Two gates exist only here.
+
+    **Stage-1 candidate recall.** ``candidate_miss`` counts required skills that
+    never reached the head at all — not ranked low, absent. No admission floor
+    and no better head can recover one, so the ceiling is zero rather than a
+    rate. It is trivially satisfied at 38 skills against ``k=32``, and that is
+    the point of gating it now: it is the number that moves first as the catalog
+    grows, and no other suite can currently see it.
+
+    **Latency, decomposed.** The local selector sits on the first-byte path with
+    no fallback, so its p90 is a product property. Gated on the total rather than
+    a span, so a change that moves work between stages is not punished; the spans
+    are reported beside it to say which stage moved.
+    """
+    summary = doc.get("summary") or {}
+    meta = doc.get("meta") or {}
+    checks = _Checks(summary)
+    _selector_coverage_checks(checks, summary, meta)
+
+    _rate_at_least(checks, "recall_pass_cases", "cases_total", MIN_LOCAL_RECALL_PASS_RATE)
+    _rate_at_least(checks, "cases_passed", "cases_total", MIN_LOCAL_STRICT_PASS_RATE)
+    _rate_at_most(checks, "recall_miss_trials", "trials_total", MAX_LOCAL_RECALL_MISS_RATE)
+    _rate_at_most(checks, "precision_extra_trials", "trials_total", MAX_LOCAL_EXTRA_RATE)
+    _category_floor(
+        checks, summary.get("recall_pass_categories"), MIN_LOCAL_CATEGORY_PASS_RATE,
+        label="recall_pass_categories", expected=meta.get("categories_expected"),
+    )
+
+    docs = summary.get("docs")
+    if isinstance(docs, Mapping):
+        docs_checks = _Checks(docs)
+        # NOT zero, unlike the paid suite. The docs head is read off a bare-question
+        # second pass because the corpus taught it a context shortcut, and the two
+        # known misses are that artifact rather than a regression
+        # (``setwise.py``, the long note at the docs decision). Gated as a rate so
+        # a third miss fails, and left as a standing reminder that the corpus fix
+        # is the real repair.
+        _rate_at_most(
+            docs_checks, "missed_lookup_trials", "scored_trials",
+            MAX_LOCAL_MISSED_DOCS_RATE,
+        )
+        _rate_at_most(
+            docs_checks, "spurious_lookup_trials", "scored_trials",
+            MAX_SELECTOR_SPURIOUS_DOCS_RATE,
+        )
+        checks.failures.extend(f"docs.{f}" for f in docs_checks.failures)
+
+    checks.exactly_zero("candidate_miss_trials")
+
+    # Every missing skill must be attributed to exactly one stage. Without this
+    # the histogram can quietly under-count — which it did: a background-wake
+    # case never reaches the model, its losses were skipped, and the stages
+    # summed to one less than the miss count with nothing to say so. A
+    # decomposition that does not add up is worse than no decomposition, because
+    # the missing row is invisible while the ones present look complete.
+    stages = summary.get("stages")
+    misses = checks.value("recall_miss_trials")
+    if not isinstance(stages, Mapping):
+        checks.note("summary.stages is missing — losses were not attributed")
+    elif misses is None:
+        checks.note("recall_miss_trials is missing — losses cannot be reconciled")
     else:
-        missing = sorted(set(expected_categories) - set(measured))
-        if missing:
-            checks.note(f"categories with no graded case: {', '.join(missing)}")
-        for name, block in sorted(measured.items()):
-            if not isinstance(block, Mapping):
-                checks.note(f"categories.{name} is not a block")
-                continue
-            cases = block.get("cases")
-            passed = block.get("passed")
-            if not isinstance(cases, int) or not isinstance(passed, int):
-                checks.note(f"categories.{name} is missing its case counts")
-            elif cases <= 0:
-                checks.note(f"categories.{name} graded no cases")
-            elif passed / cases < MIN_SELECTOR_CATEGORY_PASS_RATE:
-                checks.note(
-                    f"categories.{name}={passed}/{cases} = {passed / cases:.2f}, "
-                    f"expected >= {MIN_SELECTOR_CATEGORY_PASS_RATE}"
-                )
+        attributed = sum(v for v in stages.values() if isinstance(v, int))
+        if attributed != misses:
+            checks.note(
+                f"stages sum to {attributed} but {misses:g} required skills were "
+                f"missed — the loss attribution does not account for every miss"
+            )
+
+    spans = summary.get("spans_ms")
+    if not isinstance(spans, Mapping) or not isinstance(spans.get("total_ms"), Mapping):
+        checks.note("summary.spans_ms.total_ms is missing — latency was not measured")
+    else:
+        total = _Checks(spans["total_ms"])
+        total.at_most("p90", MAX_SELECTOR_P90_MS)
+        checks.failures.extend(f"spans_ms.total_ms.{f}" for f in total.failures)
 
     return checks.verdict()
 
@@ -604,6 +813,7 @@ def skill_selection_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
 VERDICTS = {
     "injection_live": injection_verdict,
     "skill_selection": skill_selection_verdict,
+    "skill_selection_local": skill_selection_local_verdict,
     "workflow_intel": workflow_intel_verdict,
     "utility_json": utility_json_verdict,
 }

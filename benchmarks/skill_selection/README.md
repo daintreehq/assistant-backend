@@ -1,26 +1,74 @@
 # Skill-selection benchmark
 
-Measures the **accuracy and latency** of the automatic skill selector
-(`skills/selector.py`) against the live DeepSeek API, using the real production
-path end-to-end: the real `Selector` class, the real selector prompt template, the
-real catalog, `split_selector_evidence` (the two-window evidence bound), the
-DeepSeek adapter, and the retry policy.
-The only injectable seam is the prompts directory, which is how candidate prompts
-are benchmarked before being promoted into `src`.
+Two suites over one corpus, because there are two selectors and only one of them
+serves traffic.
+
+**`bench local` is the release authority.** It drives the shipped ONNX artifact
+(`skills/local/artifacts/selector/`) through the production decision procedure —
+the visible-active projection, the structural background-wake rule, the
+earn-your-place admission floors, the bare-question docs pass — offline,
+deterministically, and for free. It is gated in CI through
+`dashboard bench run --deterministic-only`.
+
+**`bench run` is a paid comparator.** It drives the prompt-based `Selector`
+against a live API (~450 calls per variant). That selector has not been on the
+serving path since selection moved local; it survives as a scriptable test seam
+and a reference baseline. Do not read its numbers as "the selector's accuracy".
+
+### What `local` reports that nothing else can
+
+A single end-to-end miss rate collapses four unrelated failures, and they want
+four different fixes. Every missing skill is attributed to the stage that lost it:
+
+| stage | meaning | where the fix is |
+|---|---|---|
+| `candidate_miss` | never reached the head | stage 1: `k`, evidence, retrieval |
+| `rank_miss` | scored, and scored too low | stage 2: the head, training data |
+| `floor_reject` | out-scored the cut, refused by a floor | calibration |
+| `cardinality_short` | the count head asked for fewer | the count head |
+| `cap_full` | the answer was already at `max_active_skills` | the cap |
+
+`candidate_miss` is the one to watch. It is nearly unreachable at 38 skills
+against `k=32` — 84% of the catalog is on the ballot regardless — and it is the
+first number to move as the catalog grows, which is exactly why it is gated at
+zero now rather than after it starts happening.
+
+Latency is decomposed the same way (`sync`, `retriever`, `search`, `ranker`,
+`head`, `docs`), because one aggregate cannot separate a tokenizer regression
+from a catalog re-embed. Measured today: `ranker_ms` p50 ~9ms dominates,
+`search_ms` p50 0.03ms is noise — which is the evidence behind not reaching for
+an ANN index.
+
+### Graded on recall-pass, not on the exact set
+
+`local` gates on **recall-pass** (every required skill present); `run` gates on
+the exact set. That is not a softer bar chosen to make numbers work — it is each
+selector's actual contract. The local selector's `BONUS_FLOOR` admits a further
+skill above 0.45 on purpose, because a turn that misses its runbook answers
+without it while a spare runbook costs prompt bytes. Extras are designed
+behaviour here and a defect there. The strict rate is reported and gated too,
+well below the measurement, so a precision collapse still reddens the suite.
 
 ## Quick start
 
 ```bash
-# from the repo root, venv active, CEREBRAS_API_KEY in .env (or exported)
+# from the repo root, venv active
+python -m benchmarks.skill_selection.bench local         # THE gate: shipped ONNX, free
+python -m benchmarks.skill_selection.bench local --fp32  # same, unquantised
 python -m benchmarks.skill_selection.bench list          # validate cases, no API calls
 python -m benchmarks.skill_selection.bench coverage      # per-skill coverage matrix, no API calls
+
+# paid comparator (needs CEREBRAS_API_KEY in .env or exported)
 python -m benchmarks.skill_selection.bench run           # baseline (production prompt)
 python -m benchmarks.skill_selection.bench run --variant my-idea
 python -m benchmarks.skill_selection.bench compare results/a.json results/b.json
 ```
 
-Only `run` costs money. `list`, `coverage`, `report`, and `compare` are offline
-and free — they work with `CEREBRAS_API_KEY=` blanked.
+Only `run` costs money. `local`, `list`, `coverage`, `report`, and `compare` are
+offline and free — they work with `CEREBRAS_API_KEY=` blanked. `report` reads
+which suite wrote the artifact and regrades it under that suite's gate, so a
+saved local run and a saved paid run are not graded against each other's
+thresholds.
 
 A full default run is `cases x trials` (currently 150 x 3 = 450) real selector
 calls per variant — cheap on deepseek-v4-flash, but not free, and it is the bulk

@@ -74,6 +74,36 @@ def _utility_json(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
     return asyncio.run(run_bench(trials=ctx.get("live_trials", 1), env_file=ctx.get("env_file")))
 
 
+def _skill_selection_local(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
+    """The selector that ships, scored offline. Free, deterministic, gated.
+
+    The release authority for routing quality. It drives the exported ONNX
+    artifact through the production decision procedure and reports which STAGE
+    lost each missing skill, so a candidate-recall regression — the one that
+    arrives first as the catalog grows — is separable from a head regression.
+    """
+    from daintree_assistant_server.skills.catalog import load_catalog
+
+    from ..skill_selection.cases import load_cases
+    from ..skill_selection.coverage import print_coverage
+    from ..skill_selection.local_runner import run_local
+
+    catalog = load_catalog()
+    cases = load_cases(catalog)
+    # Same free preflight the paid row runs, and it matters more here: this row
+    # is a release gate, and a skill nobody wrote a case for is invisible to it
+    # by construction.
+    rows = print_coverage(catalog, cases)
+    if not rows or not all(r.gate_ok for r in rows):
+        gaps = [r.skill_id for r in rows if not r.gate_ok]
+        raise RuntimeError(
+            "skill-selection routing coverage has gaps, so no run can qualify the "
+            f"catalog: {', '.join(gaps) or '<no skills>'}. "
+            "Run `python -m benchmarks.skill_selection.bench coverage`."
+        )
+    return run_local(catalog=catalog, cases=cases)
+
+
 def _skill_selection(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
     from daintree_assistant_server.skills.catalog import load_catalog
 
@@ -115,18 +145,32 @@ DETERMINISTIC: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     ("safety", _safety),
     ("microperf", _microperf),
     ("session_trace", _session_trace),
+    # THE routing-quality gate. Deterministic and free because selection is
+    # local: there is no reason for the number a release is judged on to cost
+    # money or to wait for a nightly.
+    ("skill_selection_local", _skill_selection_local),
 ]
+#: Suites that are REPORTED but do not decide whether a run passed.
+#:
+#: One entry, and it earns the concept. The prompt-based selector is a
+#: comparator: it has not been on the serving path since selection moved local,
+#: and the row that decides routing quality is `skill_selection_local`. Leaving
+#: it in the pass roll-up would mean a regression in a component nobody runs
+#: could block a release — which is the same mistake as gating on it, wearing a
+#: different hat. Its verdict is still computed and still printed; it simply
+#: does not vote.
+INFORMATIONAL = frozenset({"skill_selection"})
+
 LIVE: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     ("prompt_cost_live", _prompt_cost_live),
     ("workflow_intel", _workflow_intel),
     ("injection_live", _injection_live),
     ("utility_json", _utility_json),
-    # UPSTREAM COMPARATOR, not the serving path: this suite drives the
-    # prompt-based DeepSeek selector live (~450 paid calls) to keep a baseline
-    # the LOCAL classifier is compared against. The classifier that actually
-    # serves is scored deterministically and for free by
-    # `training/eval_classifier.py` (recall-pass gate) and its policy is
-    # unit-tested; do not read this row as "the selector's accuracy".
+    # UPSTREAM COMPARATOR, not the serving path: this drives the prompt-based
+    # selector live (~450 paid calls) to keep a baseline the local one is
+    # compared against. Do not read this row as "the selector's accuracy" — the
+    # classifier that actually serves is the `skill_selection_local` row above,
+    # which is free, deterministic, and where the release gate lives.
     ("skill_selection", _skill_selection),
 ]
 
@@ -179,7 +223,7 @@ def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
                     if k in s}
         if name == "session_trace":
             return {k: s.get(k) for k in
-                    ("cadence_accuracy", "active_set_accuracy", "learn_trigger_accuracy")}
+                    ("cadence_accuracy", "active_set_accuracy", "state_continuity_rate")}
         if name == "prompt_cost_live":
             return {"warm_tool_region_cache_ratio": s.get("warm_tool_region_cache_ratio"),
                     "composed_first_byte_p50_s": s.get("composed_first_byte_p50_s")}
@@ -195,6 +239,16 @@ def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
                 "cases": f"{s.get('cases_passed')}/{s.get('cases_total')}",
                 "recall_miss_trials": s.get("recall_miss_trials"),
                 "degraded_trials": s.get("degraded_trials"),
+            }
+        if name == "skill_selection_local":
+            spans = s.get("spans_ms") or {}
+            total = spans.get("total_ms") or {}
+            return {
+                "recall_pass": f"{s.get('recall_pass_cases')}/{s.get('cases_total')}",
+                # Beside the headline on purpose: it is the stage no other suite
+                # can see, and the first one to move as the catalog grows.
+                "candidate_miss": s.get("candidate_miss_trials"),
+                "p90_ms": total.get("p90"),
             }
     except Exception:  # noqa: BLE001 — a headline is best-effort
         return {}

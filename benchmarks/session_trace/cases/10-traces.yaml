@@ -1,8 +1,8 @@
 # Deterministic multi-turn traces through the REAL ChatOrchestrator with a replay
 # provider. Each turn scripts what the (replayed) selector and main model return and
 # asserts the orchestrator's non-model behavior: selector cadence, active-set
-# trajectory (topic-shift replacement vs continuation reuse), and the learning
-# trigger (fires only on a final-answer round, never a tool-continuation round).
+# trajectory (topic-shift replacement vs continuation reuse), and the signed
+# state token's round-trip across turns.
 #
 # Turn fields:
 #   turn_id      — reuse the previous turn_id to model a CONTINUATION round (selector
@@ -13,7 +13,7 @@
 #                  rounds where cadence skips the selector)
 #   main         — {tool_calls: [name]} (model asks for a tool → continuation) or
 #                  {final: "text"} (model gives the final answer → turn complete)
-#   expect       — {selector_ran, active: [ids], learn}
+#   expect       — {selector_ran, active: [ids]}
 cases:
   - id: single-skill-two-rounds
     session_id: s-rename
@@ -29,14 +29,12 @@ cases:
         expect:
           selector_ran: true
           active: [daintree.terminals.rename, daintree.foundation]
-          learn: false
       - turn_id: t1                       # SAME turn_id → continuation, selector must NOT run
         tool_result: "term-1: build agent\nterm-2: test agent"
         main: {final: "Renamed both terminals to match their agents."}
         expect:
           selector_ran: false
           active: [daintree.terminals.rename, daintree.foundation]
-          learn: true
 
   - id: topic-shift-replaces-active
     session_id: s-shift
@@ -48,7 +46,6 @@ cases:
         expect:
           selector_ran: true
           active: [daintree.terminals.rename, daintree.foundation]
-          learn: true
       - turn_id: t2                        # new instruction → selector runs, replaces the set
         user: "Now run a competition between three agents on this task."
         selector_pick: [daintree.orchestration.competition, daintree.foundation]
@@ -56,7 +53,6 @@ cases:
         expect:
           selector_ran: true
           active: [daintree.orchestration.competition, daintree.foundation]
-          learn: true
 
   - id: no-task-clears-active
     session_id: s-clear
@@ -68,9 +64,8 @@ cases:
         expect:
           selector_ran: true
           active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
-          learn: true
       - turn_id: t2                        # a chit-chat turn with no real task → selector clears
         user: "Thanks, that's all for now."
         selector_pick: []
         main: {final: "You're welcome!"}
-        expect: {selector_ran: true, active: [], learn: true}
+        expect: {selector_ran: true, active: []}

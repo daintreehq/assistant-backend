@@ -70,6 +70,24 @@ def _compare(a: dict[str, Any], b: dict[str, Any]) -> None:
             print(f"  {name}.{k}: {va} -> {vb}{mark}")
 
 
+def _gating_suites_passed(doc: dict[str, Any]) -> bool:
+    """Whether the run passed — over the suites that VOTE.
+
+    ``INFORMATIONAL`` rows are printed with their verdict and excluded here. The
+    prompt-selector comparator is the only one: it measures a component that has
+    not served a request since selection moved local, so letting it fail a
+    release qualification would give the retired implementation the authority
+    this whole split was meant to take away from it.
+    """
+    from .aggregate import INFORMATIONAL
+
+    return all(
+        block.get("ok") and block.get("passed", True)
+        for name, block in doc["suites"].items()
+        if name not in INFORMATIONAL
+    )
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     require_live = bool(getattr(args, "require_live", False))
     include_live = not args.deterministic_only
@@ -84,7 +102,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         label = doc["meta"]["mode"].replace("-", "_")
         path = save_doc(doc, __file__, label, Path(args.out) if args.out else None)
         print(f"\nsaved: {path}")
-    all_ok = all(b.get("ok") and b.get("passed", True) for b in doc["suites"].values())
+    all_ok = _gating_suites_passed(doc)
     return 0 if all_ok else 1
 
 
@@ -114,9 +132,12 @@ def _cmd_report(args: argparse.Namespace) -> int:
     _print(doc)
     # `passed` DEFAULTS TO FALSE for a live suite: a block for a gated suite with
     # no verdict is an ungraded one, and an ungraded security suite is not green.
+    from .aggregate import INFORMATIONAL
+
     all_ok = all(
         b.get("ok") and b.get("passed", name not in VERDICTS)
         for name, b in doc["suites"].items()
+        if name not in INFORMATIONAL
     )
     return 0 if all_ok else 1
 

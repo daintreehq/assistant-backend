@@ -2,6 +2,7 @@
 
 Run from the repo root (venv active, CEREBRAS_API_KEY in .env or the env):
 
+    python -m benchmarks.skill_selection.bench local                  # SHIPPED selector, free
     python -m benchmarks.skill_selection.bench run                    # baseline prompt
     python -m benchmarks.skill_selection.bench run --variant v2-foo   # a prompts/ variant
     python -m benchmarks.skill_selection.bench run --variant baseline --variant v2-foo
@@ -10,7 +11,14 @@ Run from the repo root (venv active, CEREBRAS_API_KEY in .env or the env):
     python -m benchmarks.skill_selection.bench report results/<run>.json
     python -m benchmarks.skill_selection.bench compare results/a.json results/b.json
 
-Only ``run`` makes API calls (REAL, paid DeepSeek: cases x trials per variant).
+``local`` is the one that qualifies a release: it drives the shipped ONNX
+artifact — the selector that actually serves — offline, deterministically, for
+free, and reports WHICH STAGE lost each missing skill. ``run`` drives the
+prompt-based selector live against a paid API; that selector has not been on the
+serving path since selection moved local, so it is a comparator, not the
+authority.
+
+Only ``run`` makes API calls (REAL, paid: cases x trials per variant). ``local``,
 ``list``, ``coverage``, ``report``, and ``compare`` are offline and free — they
 need no key, so they work with ``CEREBRAS_API_KEY=`` blanked.
 """
@@ -65,6 +73,40 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0 if passed else 1
 
 
+def _cmd_local(args: argparse.Namespace) -> int:
+    from daintree_assistant_server.skills.catalog import load_catalog
+
+    from .local_runner import print_categories, print_local, run_local
+
+    # The SAME free preflight the dashboard runs before this suite, and it
+    # belongs on both paths for the same reason: this command is advertised as
+    # the release gate, and it grades the cases that exist. A skill nobody wrote
+    # a case for is invisible to it by construction, so a catalog with a coverage
+    # hole could be qualified by a run that never mentioned the gap. Skipped
+    # under --filter, which is already refused by the verdict.
+    catalog = load_catalog()
+    cases = load_cases(catalog, id_filter=args.filter)
+    if not args.filter:
+        rows = print_coverage(catalog, cases)
+        if not rows or not all(r.gate_ok for r in rows):
+            gaps = [r.skill_id for r in rows if not r.gate_ok]
+            print(
+                "\nrouting coverage has gaps, so this run cannot qualify the "
+                f"catalog: {', '.join(gaps) or '<no skills>'}"
+            )
+            return 1
+
+    doc = run_local(
+        catalog=catalog, cases=cases, quantized=not args.fp32, id_filter=args.filter
+    )
+    print_local(doc)
+    print_categories(doc)
+    if not args.no_save:
+        path = save_doc(doc, Path(args.out) if args.out else None)
+        print(f"\nsaved: {path}")
+    return 0 if print_verdict(doc, "skill_selection_local") else 1
+
+
 def _cmd_list(args: argparse.Namespace) -> int:
     from daintree_assistant_server.skills.catalog import load_catalog
 
@@ -94,9 +136,26 @@ def _cmd_report(args: argparse.Namespace) -> int:
     # artifact saved before a threshold existed is graded against today's — and so
     # replaying a failed run in CI stays a failure.
     doc = load_doc(Path(args.path))
-    print_summary(doc)
-    print_failures(doc)
-    return 0 if print_verdict(doc, "skill_selection") else 1
+    # Both suites write into the same results directory, and they are graded by
+    # different gates. Read which one produced the file rather than assuming:
+    # regrading a local artifact against the paid selector's thresholds is how a
+    # healthy run gets reported as a failure, and the reverse is worse.
+    suite = str((doc.get("meta") or {}).get("benchmark") or "skill_selection")
+    if suite not in ("skill_selection", "skill_selection_local"):
+        # `print_verdict` returns True for a suite it does not know, so an
+        # artifact carrying an unrecognised `meta.benchmark` would report a pass
+        # having been graded by nothing at all.
+        print(f"unrecognised benchmark {suite!r} — this CLI cannot grade it")
+        return 1
+    if suite == "skill_selection_local":
+        from .local_runner import print_categories, print_local
+
+        print_local(doc)
+        print_categories(doc)
+    else:
+        print_summary(doc)
+        print_failures(doc)
+    return 0 if print_verdict(doc, suite) else 1
 
 
 def _cmd_compare(args: argparse.Namespace) -> int:
@@ -108,7 +167,26 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="benchmarks.skill_selection.bench")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run = sub.add_parser("run", help="run the benchmark against live DeepSeek")
+    local = sub.add_parser(
+        "local",
+        help="score the SHIPPED ONNX selector offline (free, deterministic) — the "
+        "release authority, with per-stage loss attribution and latency spans",
+    )
+    local.add_argument("--filter", help="substring filter on case id/category")
+    local.add_argument(
+        "--fp32",
+        action="store_true",
+        help="score the fp32 graphs instead of the int8 ones that ship",
+    )
+    local.add_argument("--out", help="explicit output JSON path")
+    local.add_argument("--no-save", action="store_true", help="do not write a results file")
+    local.set_defaults(func=_cmd_local)
+
+    run = sub.add_parser(
+        "run",
+        help="PAID comparator: the prompt-based selector against the live API. Not the "
+        "serving path — use `local` to qualify a release",
+    )
     run.add_argument("--variant", action="append",
                      help="prompt variant (repeatable; default: baseline)")
     run.add_argument("--trials", type=int, default=3, help="trials per case (default 3)")

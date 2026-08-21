@@ -22,6 +22,7 @@ from benchmarks._harness.quality import (
     utility_json_verdict,
     workflow_intel_verdict,
 )
+from benchmarks.skill_selection.local_runner import STAGES as LOCAL_STAGES
 
 CARRIERS = ["memory", "mcp_instructions", "terminal_title"]
 
@@ -151,6 +152,58 @@ def clean_skill_selection(**over: Any) -> dict[str, Any]:
 SELECTOR_CATEGORIES = ["continuation", "docs-classification", "routing-trap", "single-skill"]
 
 
+def clean_skill_selection_local(**over: Any) -> dict[str, Any]:
+    """A flawless run of the SHIPPED selector: deterministic, one trial a case.
+
+    Shaped like the real document rather than like the paid suite's: recall-pass
+    is the graded metric here, the stage histogram is present, and the latency
+    spans are the ones ``Selection.timings`` produces.
+    """
+    summary: dict[str, Any] = {
+        "cases_total": 177,
+        "cases_passed": 177,
+        "recall_pass_cases": 177,
+        "trials_total": 177,
+        "trials_passed": 177,
+        "degraded_trials": 0,
+        "recall_miss_trials": 0,
+        "precision_extra_trials": 0,
+        "candidate_miss_trials": 0,
+        "reserved_cases": 0,
+        "stages": dict.fromkeys(LOCAL_STAGES, 0),
+        "docs": {
+            "scored_trials": 21,
+            "correct_trials": 21,
+            "missed_lookup_trials": 0,
+            "spurious_lookup_trials": 0,
+        },
+        "categories": {
+            c: {"cases": 1, "passed": 1, "trials": 1, "trials_passed": 1}
+            for c in SELECTOR_CATEGORIES
+        },
+        "recall_pass_categories": {
+            c: {"cases": 1, "passed": 1} for c in SELECTOR_CATEGORIES
+        },
+        "spans_ms": {
+            name: {"p50": 1.0, "p90": 2.0, "max": 3.0, "mean": 1.2}
+            for name in ("retriever_ms", "search_ms", "ranker_ms", "head_ms", "total_ms")
+        },
+        "latency_s": {"mean": 0.01, "p50": 0.01, "p90": 0.02, "p99": 0.03, "max": 0.05},
+        "tokens": {"prompt_mean": None, "completion_mean": None},
+    }
+    summary.update(over)
+    return {
+        "meta": {
+            "filter": None,
+            "cases_expected": 177,
+            "trials_expected": 177,
+            "docs_trials_expected": 21,
+            "categories_expected": SELECTOR_CATEGORIES,
+        },
+        "summary": summary,
+    }
+
+
 # ---------------------------------------------------------------------------
 # The controls. Without these, a gate that failed everything would pass the
 # mutation tests below.
@@ -162,6 +215,7 @@ def test_a_clean_run_passes_each_gate() -> None:
     assert workflow_intel_verdict(clean_workflow()).passed
     assert utility_json_verdict(clean_utility()).passed
     assert VERDICTS["skill_selection"](clean_skill_selection()).passed
+    assert VERDICTS["skill_selection_local"](clean_skill_selection_local()).passed
 
 
 # ---------------------------------------------------------------------------
@@ -408,6 +462,7 @@ def test_attach_verdict_stamps_the_summary_the_dashboard_reads(suite: str) -> No
         "workflow_intel": clean_workflow(first_try_valid_rate=0.1),
         "utility_json": clean_utility(pass_rate=0.1),
         "skill_selection": clean_skill_selection(degraded_trials=7),
+        "skill_selection_local": clean_skill_selection_local(candidate_miss_trials=3),
     }
     stamped = attach_verdict(docs[suite], suite)
     assert stamped["summary"]["passed"] is False
@@ -497,6 +552,11 @@ def test_a_flawless_full_run_of_todays_corpus_passes_its_gate(suite: str) -> Non
     """
     import importlib
 
+    if suite == "skill_selection_local":
+        verdict = VERDICTS[suite](_selector_local_doc())
+        assert verdict.passed, f"a flawless full run of {suite} would fail: {verdict.failures}"
+        return
+
     runner = importlib.import_module(f"benchmarks.{suite}.runner")
     trials = 3
 
@@ -539,6 +599,11 @@ def test_a_filtered_run_cannot_declare_its_own_subset_to_be_the_corpus(suite: st
     against a filtered list and asserts the gate still sees the shortfall.
     """
     import importlib
+
+    if suite == "skill_selection_local":
+        doc = _selector_local_doc(ran=1)
+        assert not VERDICTS[suite](doc).passed, f"{suite} passed on a one-case run"
+        return
 
     runner = importlib.import_module(f"benchmarks.{suite}.runner")
     trials = 3
@@ -668,6 +733,43 @@ def test_zero_tolerance_reads_counts_not_rounded_rates() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _selector_local_doc(*, ran: int | None = None, clean: bool = True) -> dict[str, Any]:
+    """A local-selector document built by the runner's OWN assembly.
+
+    Same reasoning as ``_selector_doc``: hand-writing the expectations here would
+    make the test agree with a renamed key forever, and the first thing to notice
+    would be a permanently-red release gate. Built from the LIVE corpus so the
+    case count and category list are whatever the repository actually holds.
+    """
+    from benchmarks.skill_selection.cases import load_cases
+    from benchmarks.skill_selection.local_runner import ARTIFACT, build_local_doc
+    from benchmarks.skill_selection.scoring import TrialResult
+    from daintree_assistant_server.skills.catalog import load_catalog
+
+    catalog = load_catalog()
+    whole = load_cases(catalog)
+    graded = whole if ran is None else whole[:ran]
+
+    picked = [([] if not clean else list(c.required)) for c in graded]
+    results = [
+        TrialResult(
+            case_id=c.id, trial=0, picked=list(got),
+            missing=sorted(set(c.required) - set(got)), extra=[],
+            degraded=False, latency_s=0.01, confidence=None,
+            task_type=None, reason=None, prompt_tokens=None, completion_tokens=None,
+            docs_query="q" if c.expect_docs else None,
+            docs_ok=True if c.expect_docs is not None else None,
+        )
+        for c, got in zip(graded, picked, strict=True)
+    ]
+    return build_local_doc(
+        cases=graded, whole_corpus=whole, results=results, losses=[],
+        spans={"total_ms": [1.0] * len(graded), "ranker_ms": [0.8] * len(graded)},
+        picked=picked, reserved_cases=0, artifact=ARTIFACT, catalog=catalog,
+        candidates=32, id_filter=None if ran is None else graded[0].id,
+    )
+
+
 def _selector_doc(*, trials: int, ran: int | None = None, clean: bool = True) -> dict[str, Any]:
     """A selector results document shaped like the real runner's.
 
@@ -736,6 +838,12 @@ def _artifact(suite: str, *, clean: bool) -> dict[str, Any]:
     """
     import importlib
 
+    if suite == "skill_selection_local":
+        doc = _selector_local_doc(clean=clean)
+        doc["losses"] = []
+        doc["picked"] = []
+        return attach_verdict(doc, suite)
+
     runner = importlib.import_module(f"benchmarks.{suite}.runner")
     trials = 3
 
@@ -775,6 +883,18 @@ def _artifact(suite: str, *, clean: bool) -> dict[str, Any]:
     )
 
 
+def _bench_module(suite: str) -> str:
+    """Which CLI owns a suite's artifacts.
+
+    Not one module per verdict: the local selector suite is a subcommand of the
+    skill-selection CLI rather than a package of its own, because it grades the
+    same corpus and its `report` has to regrade either kind of artifact.
+    """
+    if suite == "skill_selection_local":
+        return "benchmarks.skill_selection.bench"
+    return f"benchmarks.{suite}.bench"
+
+
 @pytest.mark.parametrize("suite", sorted(VERDICTS))
 def test_the_standalone_report_command_exits_non_zero_on_a_failed_artifact(
     suite: str, tmp_path: Any
@@ -786,7 +906,7 @@ def test_the_standalone_report_command_exits_non_zero_on_a_failed_artifact(
 
     path = tmp_path / "bad.json"
     path.write_text(json.dumps(_artifact(suite, clean=False)))
-    assert importlib.import_module(f"benchmarks.{suite}.bench").main(["report", str(path)]) == 1
+    assert importlib.import_module(_bench_module(suite)).main(["report", str(path)]) == 1
 
 
 @pytest.mark.parametrize("suite", sorted(VERDICTS))
@@ -799,7 +919,7 @@ def test_the_standalone_report_command_exits_zero_on_a_clean_artifact(
 
     path = tmp_path / "good.json"
     path.write_text(json.dumps(_artifact(suite, clean=True)))
-    assert importlib.import_module(f"benchmarks.{suite}.bench").main(["report", str(path)]) == 0
+    assert importlib.import_module(_bench_module(suite)).main(["report", str(path)]) == 0
 
 
 def test_the_dashboard_report_regrades_an_artifact_saved_before_the_gates_existed(
