@@ -247,3 +247,52 @@ target]` field, or an inference from a case that requires one and forbids the
 other. Inferring it from `allowed` alone does not work: nearly every case
 excludes nearly every unrelated skill, so every trap would appear to cover every
 edge. `bench lint` ranks which edges to write cases for first.
+
+---
+
+## Stage the tool-projection rollout, then delete the percentage
+
+**Trigger: `TOOL_PROJECTION_MODE=enforced` has held at
+`TOOL_PROJECTION_ROLLOUT_PERCENT=100` for a sustained window with no rollback.**
+
+The gate, the telemetry and the fail-open paths all shipped with issue #64. What
+did NOT ship is the rollout itself, because it is a production measurement rather
+than a code change: the default stays `shadow`, and every deployment is measuring
+until somebody deliberately turns it on.
+
+**Promote** a stage (1 → 5 → 25 → 50 → 100) only when, over ≥24h and ≥1,000
+enforced turns including ≥200 measured tool-calling rounds:
+
+* `outside_proposed` is empty on every ENFORCED round — a nonzero one means the
+  model reached for something the turn had already taken away;
+* every `tool_projection_reason` other than `selector_degraded` is absent from the
+  fail-open population, and the aggregate fail-open rate is under 1%;
+* `measured=false` rounds are under 0.1% (an unmeasured round counted as clean is
+  a false all-clear, which is the one thing this number may not be);
+* no projection-attributable provider 4xx.
+
+**Read `outside_proposed` from the SHADOW window when deciding the FIRST stage.**
+An enforced turn cannot call a tool it was never offered, so enforced traffic
+grades itself clean by construction and cannot authorize its own expansion. That
+is why `tool_projection_result` stamps `enforced` on every record.
+
+**Roll back** — `TOOL_PROJECTION_ROLLOUT_PERCENT=0`, or `TOOL_PROJECTION_MODE=disabled`
+for the bigger hammer; both are Cloud Run environment updates, a config-only
+revision with no image rebuild — on any confirmed projection-caused failed turn,
+any `forced_tool_missing` / `unresolved_tool_missing`, or any `outside_proposed`
+call on an enforced round.
+
+**Note `cloudbuild.yaml` sets its env with `--set-env-vars`**, so the next release
+resets a hand-set rollout value. That resets it to `shadow`, which is the safe
+direction — but it means a stage held by hand does not survive a deploy, and the
+value belongs in the build's own substitutions once a stage is meant to stick.
+
+Two things follow the rollout out of the tree. The **percentage** is scaffolding
+for exactly this graduation and should be deleted at a stable 100% rather than
+left as config nobody sets; the three-mode switch stays, because the kill switch
+is the permanent part. And the **79.3 KiB → 34.9 KiB** figure in the issue needs
+replacing with what production actually reports (`tools_full_bytes` vs
+`tools_projected_bytes`, p50 over healthy assistant turns) — the deterministic
+projection measures 79.3 KiB → 22.2 KiB skill-less (72%) and → 46.8 KiB with a
+skill and its foundation (41%). The median depends entirely on the mix of those
+two shapes in real traffic, which is the thing only production can report.

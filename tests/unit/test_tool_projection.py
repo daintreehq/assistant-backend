@@ -1,14 +1,20 @@
-"""Skill-aware tool projection — shadow mode.
+"""Skill-aware tool projection — what a turn WOULD send.
 
 Tool schemas are ~61% of a request, and filtering them to the active skills'
-declared needs is the largest prompt saving available. It is not enabled, and
-these tests are mostly about *why not*.
+declared needs is the largest prompt saving available. These tests cover the
+projector: which tools survive, and why each one did.
 
-The projection is computed every turn and applied to nothing. What decides
-whether it can be applied is `outside_proposed` in the shadow log: how often the
-model calls a tool the projection would have withheld. Until that is durably
-empty in real usage, filtering would break turns in a way that reads as model
-failure rather than configuration.
+Whether the result is ever APPLIED is a separate question with its own suite
+(`test_tool_projection_enforcement.py` for the gate,
+`tests/integration/test_tool_projection_enforced.py` for the wiring). Nothing
+here depends on the mode — the projection is computed identically in `shadow` and
+`enforced`, and that is deliberate: the evidence that authorizes enforcement has
+to come from the same computation enforcement will use.
+
+What decides whether a stage may be promoted is `outside_proposed` in the result
+log: how often the model calls a tool the projection would have withheld. Read it
+from SHADOW traffic — an enforced turn cannot call a tool it was never offered,
+so enforced evidence grades itself clean by construction.
 
 `test_declared_tools_cover_what_skill_bodies_actually_use` is the offline half of
 that measurement. Read what it proves narrowly: it finds backticked registry
@@ -45,6 +51,7 @@ from daintree_assistant_server.contracts.openai import (
 from daintree_assistant_server.skills.catalog import load_catalog
 from daintree_assistant_server.skills.tool_projection import (
     ALWAYS_AVAILABLE,
+    SKILL_SCAFFOLD_TOOLS,
     project_tools,
     wire_name,
 )
@@ -85,13 +92,13 @@ def test_the_core_is_always_admitted(catalog) -> None:  # type: ignore[no-untype
     capability it was not given, and ask the user a question — the base prompt
     instructs it to do all three."""
     projection = project_tools(
-        offered=_tools(*ALWAYS_AVAILABLE, "git.push"),
+        offered=_tools(*ALWAYS_AVAILABLE, "forge.getPR"),
         active_skills=[],
         catalog=catalog,
         messages=_user(),
     )
     assert {wire_name(n) for n in ALWAYS_AVAILABLE} <= projection.proposed
-    assert wire_name("git.push") in projection.withheld
+    assert wire_name("forge.getPR") in projection.withheld
 
 
 def test_an_active_skills_declared_tools_are_admitted(catalog) -> None:  # type: ignore[no-untyped-def]
@@ -260,19 +267,21 @@ def test_the_projection_never_invents_a_tool(catalog) -> None:  # type: ignore[n
 
 
 def test_outside_reports_exactly_the_withheld_calls(catalog) -> None:  # type: ignore[no-untyped-def]
+    # Both withheld examples must be tools the catalog DECLARES: one it has no
+    # opinion about passes through as unclassified and is never outside anything.
     projection = project_tools(
-        offered=_tools("context.snapshot", "git.push", "forge.getPR"),
+        offered=_tools("context.snapshot", "recipe.run", "forge.getPR"),
         active_skills=[],
         catalog=catalog,
         messages=_user(),
     )
     assert projection.outside([wire_name("context.snapshot")]) == []
-    assert projection.outside([wire_name("git.push"), wire_name("context.snapshot")]) == [
-        wire_name("git.push")
+    assert projection.outside([wire_name("recipe.run"), wire_name("context.snapshot")]) == [
+        wire_name("recipe.run")
     ]
-    assert projection.outside([wire_name("git.push"), wire_name("forge.getPR")]) == [
+    assert projection.outside([wire_name("recipe.run"), wire_name("forge.getPR")]) == [
         wire_name("forge.getPR"),
-        wire_name("git.push"),
+        wire_name("recipe.run"),
     ]
     # A tool that was never offered is not a projection failure.
     assert projection.outside(["never.offered"]) == []
@@ -348,8 +357,7 @@ _REVIEWED_UNDECLARED = {
     # about the runbook's dependencies — `requiredTools` says what a skill NEEDS,
     # and this one needs the tool not to be used. (It would not actually withhold
     # anything: the foundation declares `daintree.call` and is projected alongside
-    # every specific, and projection is shadow-only regardless. The reason is
-    # metadata truth, not enforcement.)
+    # every specific. The reason is metadata truth, not enforcement.)
     ("daintree.worktree.create-plain-worktree", "daintree.call"),
     # PROHIBITION. `terminal.moveToWorktree` gained a typed wrapper, so its step 6
     # names `daintree.call` only to forbid routing the move through it — the raw
@@ -437,15 +445,23 @@ def test_the_undeclared_detector_can_actually_see_a_missing_tool(catalog) -> Non
     assert (stripped.id, tool) in _undeclared_references(_OneSkill())
 
 
-def test_the_core_set_is_small_and_real(catalog) -> None:  # type: ignore[no-untyped-def]
+def test_the_core_set_is_bounded_and_real(catalog) -> None:  # type: ignore[no-untyped-def]
     """Every core entry is a permanent cost on every request, and a name that no
-    longer exists in the registry would be dead weight nobody notices."""
+    longer exists in the registry would be dead weight nobody notices.
+
+    The core is not hand-chosen — `test_prompt_hygiene_tools.py` derives it from
+    what the always-present base prompt instructs, and that test is what stops it
+    shrinking below correctness. This one guards the other direction: the core
+    grows only because the PROMPT grew, so a jump well past the number of tools
+    the prompt names means something was added here without an instruction behind
+    it, and the saving is being given away for nothing.
+    """
     # Reuse the hygiene suite's registry loader and dotted->wire translation, so
     # the two cannot disagree about what "exists".
     from test_skill_catalog_hygiene import _known_tool_names, _wire_name
 
     known = _known_tool_names()
-    assert len(ALWAYS_AVAILABLE) <= 8, "the always-on core is growing; each entry is permanent"
+    assert len(ALWAYS_AVAILABLE) <= 30, "the always-on core is growing; each entry is permanent"
     unknown = sorted(n for n in ALWAYS_AVAILABLE if _wire_name(n) not in known)
     assert not unknown, f"core tools missing from the CLI registry: {unknown}"
 
@@ -500,10 +516,16 @@ def test_the_projection_matches_the_real_captured_inventory(catalog) -> None:  #
     foundation = catalog.get(foundation_id) if foundation_id and foundation_id != skill.id else None
     expected_dotted = (
         set(ALWAYS_AVAILABLE)
+        # A skill is active, so the loaded-skills block renders and instructs the
+        # run scaffold. No skill declares these — they belong to the template.
+        | set(SKILL_SCAFFOLD_TOOLS)
         | set(skill.meta.required_tools or ())
         | set(foundation.meta.required_tools or () if foundation else ())
     )
     expected = offered & {name.replace(".", "__") for name in expected_dotted}
+    # Plus everything the catalog has no opinion about. Withholding argues from a
+    # skill's metadata, and there is no metadata about a tool no skill declares.
+    expected |= offered - catalog.declared_tools
     assert projection.proposed == expected
 
     # And it must still be a real reduction, or there is nothing to gain.
@@ -569,7 +591,7 @@ def test_a_skill_declaring_no_tools_still_gets_the_core(catalog, declared) -> No
     exists: a skill that declares nothing still has to be able to orient and
     reach `tool.search` for what it needs.
     """
-    tools = _tools("context.snapshot", "tool.search", "git.push")
+    tools = _tools("context.snapshot", "tool.search", "forge.getPR")
     projection = project_tools(
         offered=tools,
         active_skills=[_skill_with(declared)],
@@ -577,7 +599,7 @@ def test_a_skill_declaring_no_tools_still_gets_the_core(catalog, declared) -> No
         messages=_user(),
     )
     assert wire_name("context.snapshot") in projection.proposed
-    assert wire_name("git.push") in projection.withheld
+    assert wire_name("forge.getPR") in projection.withheld
 
 
 def test_a_declared_tool_the_client_does_not_offer_is_not_invented(catalog) -> None:  # type: ignore[no-untyped-def]
@@ -619,12 +641,12 @@ def test_a_skill_that_is_its_own_foundation_does_not_recurse(catalog) -> None:  
 def test_a_skill_in_no_known_domain_is_not_a_crash(catalog) -> None:  # type: ignore[no-untyped-def]
     """An id whose domain has no foundation must degrade, not raise."""
     projection = project_tools(
-        offered=_tools("context.snapshot", "git.push"),
-        active_skills=[_skill_with(["git.push"], skill_id="nowhere.at.all")],
+        offered=_tools("context.snapshot", "forge.getPR"),
+        active_skills=[_skill_with(["forge.getPR"], skill_id="nowhere.at.all")],
         catalog=catalog,
         messages=_user(),
     )
-    assert wire_name("git.push") in projection.proposed
+    assert wire_name("forge.getPR") in projection.proposed
 
 
 def test_a_conversation_with_no_user_turn_is_handled(catalog) -> None:  # type: ignore[no-untyped-def]
@@ -678,19 +700,103 @@ def test_the_mandated_core_is_pinned_by_name() -> None:
     """`ALWAYS_AVAILABLE` asserted against literals.
 
     The other core test derives both the offered inventory and the expectation
-    from this same constant, so deleting an entry leaves it green. These are the
-    capabilities the base prompt tells the model it always has; losing one
-    silently would strand a skill-less turn with no way to orient or ask.
+    from this same constant, so deleting an entry leaves it green. Every name
+    below is instructed by an ALWAYS-PRESENT layer — the base prompt, or the turn
+    footer — which is why losing one silently is not a lost optimisation but a
+    turn told to call something it was never given.
+    `test_prompt_hygiene_tools.py` re-derives this list from those layers' text;
+    this one is the human-readable record of what that derivation currently
+    yields.
     """
     assert (
         frozenset(
             {
+                # Orient.
                 "context.snapshot",
                 "daintree.status",
+                # Read the workspace.
+                "fs.read",
+                "fs.list",
+                "fs.search",
+                # Page a large result, from any call.
+                "artifact.read",
+                # Delegate, and make file changes the only sanctioned way.
+                "subagent.run",
+                "agentTask.spawnForEdits",
+                # Discover and reach an unprojected capability.
                 "tool.search",
                 "daintree.listTools",
+                "daintree.call",
+                # Talk to the user; retire what was reported.
                 "user.askMultipleChoice",
+                "queue.resolve",
+                # Speak to work already running.
+                "terminal.sendCommand",
+                "terminal.close",
+                # Instructed in PROSE, so the hygiene scanner cannot see them —
+                # `_PROSE_INSTRUCTED` there carries the quote for each.
+                "terminal.read",
+                "queue.digest",
+                # See standing supervision.
+                "watcher.list",
+                "timer.list",
+                "worktree.list",
+                # Stop it — instructed by the TURN FOOTER, not the base prompt.
+                "async.cancel",
+                "watcher.cancel",
+                # Remember.
+                "memory.save",
             }
         )
         == ALWAYS_AVAILABLE
     )
+
+
+def test_the_scaffold_is_admitted_only_with_a_skill_active(catalog) -> None:  # type: ignore[no-untyped-def]
+    """`skill.step.advance` / `skill.run.get` follow the block that instructs them.
+
+    No skill declares either — they belong to `loaded_skills.md.j2` — so nothing
+    that reads `requiredTools` could admit them, and a skill-less turn never sees
+    the paragraph that names them.
+
+    The WITHHOLDING half is the load-bearing assertion, and it is the one that
+    nearly did not work: the unclassified pass-through admits anything the catalog
+    has no opinion about, and it has no opinion about these two either. So they
+    are classified explicitly, and without that this test would have asserted an
+    activation rule that changed nothing on the wire.
+    """
+    offered = _tools(*SKILL_SCAFFOLD_TOOLS, "terminal.rename")
+    skill = catalog.get("daintree.terminals.rename")
+    assert skill is not None
+
+    with_skill = project_tools(
+        offered=offered, active_skills=[skill], catalog=catalog, messages=_user()
+    )
+    assert {wire_name(n) for n in SKILL_SCAFFOLD_TOOLS} <= with_skill.proposed
+    assert all(with_skill.reasons[wire_name(n)] == "skill_scaffold" for n in SKILL_SCAFFOLD_TOOLS)
+
+    without = project_tools(offered=offered, active_skills=[], catalog=catalog, messages=_user())
+    assert {wire_name(n) for n in SKILL_SCAFFOLD_TOOLS} <= without.withheld, (
+        "a skill-less turn renders no scaffold paragraph, so it must not pay for "
+        "the schemas either — and `unclassified` must not smuggle them back in"
+    )
+
+
+def test_a_tool_no_skill_declares_is_never_withheld(catalog) -> None:  # type: ignore[no-untyped-def]
+    """Silence is not evidence that a turn does not need something.
+
+    Withholding argues from metadata, and the catalog has no metadata about a
+    tool nothing declares — a CLI release that ships a tool ahead of the skill
+    using it, or an integration contributing its own. The alternative is a tool
+    that is withheld by default and stays withheld until someone notices.
+    """
+    projection = project_tools(
+        offered=_tools("forge.getPR", "nobody.declaresThis"),
+        active_skills=[],
+        catalog=catalog,
+        messages=_user(),
+    )
+    assert projection.reasons[wire_name("nobody.declaresThis")] == "unclassified"
+    # And the rule does not swallow the point: a tool the catalog DOES know, that
+    # no active skill needs, is still withheld.
+    assert wire_name("forge.getPR") in projection.withheld

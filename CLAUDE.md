@@ -294,6 +294,81 @@ injection results and the prompt-selector comparison belong in a nightly run
 against a low-spend key — a baseline that cannot be checked offline either gets
 skipped or makes every push cost money.
 
+## Skill-aware tool projection
+
+Tool schemas are the largest region of a request (~65% of the deterministic
+fixture), and most of them are irrelevant to what a turn is doing.
+`skills/tool_projection.py` narrows them to the active skills' declared
+`requiredTools`, plus their domain foundations', plus a core, plus anything a
+pinned `tool_choice` or an unresolved tool call needs. Against the pinned 79.3 KiB inventory: 20.8 KiB on a skill-less turn (74% saved),
+46.8 KiB with a workflow skill and its foundation loaded (41%). Issue #64's ~56%
+median sits between the two — the saving is a function of how much a turn loaded,
+so a single number was always going to be a blend.
+
+**`TOOL_PROJECTION_MODE` is `disabled` | `shadow` | `enforced`, and it defaults to
+`shadow`** — every deployment measures, none enforces until somebody says so.
+`TOOL_PROJECTION_ROLLOUT_PERCENT` buckets on the SESSION (never the request: a
+percentage re-rolled per request would offer a continuation round a different
+inventory than the round that started the work). `TODO.md` carries the staged
+rollout, its promotion gates and its rollback triggers.
+
+**Three things about the design are load-bearing and easy to undo.**
+
+**The core is DERIVED, not chosen.** `ALWAYS_AVAILABLE` holds every tool the
+ALWAYS-PRESENT base prompt instructs, because withholding one is a contradiction
+the model cannot resolve — no skill is loaded to explain the absence, and on a
+skill-less turn there is no metadata in play at all. `10-hard-rules.md` says file
+changes go through `agentTask.spawnForEdits`; `20-tool-discipline.md` says every
+oversized result is paged through `artifact.read` and every expensive search is
+delegated with `subagent.run`. A projection that dropped those would leave a turn
+commanded to do something it has no legal move for.
+`tests/unit/test_prompt_hygiene_tools.py` re-derives the set from the prompt text
+and fails on drift — so the fix for a new instruction is to add the tool, or to
+stop naming it in the permanent prompt. The same applies to
+`SKILL_SCAFFOLD_TOOLS`: `loaded_skills.md.j2` instructs `skill.step.advance` and
+`skill.run.get` and no skill declares them, so no `requiredTools` audit could ever
+see that gap. **This is the single biggest hazard in the whole feature** — the
+core looks like an optimisation to be trimmed and is actually a correctness
+constraint.
+
+**A tool no skill declares is never withheld.** Withholding argues from metadata,
+and there is none about a tool the catalog has never heard of — a CLI release that
+ships a tool ahead of the skill using it, an integration contributing its own.
+Silence is not evidence a turn does not need something, and the failure would be
+invisible until a user noticed their own tool had stopped working.
+`Catalog.declared_tools` is that universe.
+
+**Withholding is FINAL for the turn.** The CLI reports an unoffered tool as
+`callable: false` — "calling them would do nothing" — and dynamic invocation of a
+withheld tool does not exist (CLI #368). `tool.search` discovers names; it does
+not recover capability. So every gate fails OPEN to the full inventory, and
+`EnforcementDecision.fail_open` is deliberately narrower than `not enforce`:
+shadow mode, an unselected cohort and a sub-agent turn all decline without
+anything having gone wrong, and counting them would bury the reasons a rollback
+triggers on.
+
+Enforcement is a post-assembly `replace(provider_request, tools=...)` in
+`_prepare_inner`, never a parameter on `build_main_request` — the full request
+already exists as the fallback, the names matched are the normalized ones actually
+going upstream, and the assembler keeps its one job. Everything downstream
+(retries, the bare-intent re-roll, both response paths) reads the same prepared
+request, so the filter is applied exactly once.
+
+**It costs prompt cache on a topic shift, and that is measured rather than
+assumed.** Under enforcement the tools array is a function of the ACTIVE SET, so a
+skill topic shift changes the schemas — which the `skill_topic_shift` transition
+in `benchmarks/prompt_cost` cannot see, because it calls the assembler directly
+and never reaches the orchestrator. `projected_tool_continuation` (gated at 1.0)
+and `projected_skill_topic_shift` (gated on the SYSTEM messages, which must not
+move) are the enforced twins. The trade: a one-time miss on a region already ~42%
+smaller, against a saving taken on every round in between — and continuation
+rounds measure byte-identical, which is where most rounds are.
+
+Sub-agents are held out of the first rollout: their menu is already narrowed and
+few skills survive `executable_with`, so most of their turns are skill-less —
+exactly the shape where a core tuned for the ASSISTANT base prompt is the wrong
+core.
+
 ## Deploying (Cloud Run)
 
 Nothing is ever built or pushed from a dev machine. **Pushing to `main` is the deploy** —
@@ -333,7 +408,7 @@ Output posture: **structural defects** (cycle, duplicate/unknown node id, moving
 
 ## Config & readiness
 
-`config.py` `Settings` is parsed once, immutable, env-driven (`.env`). The model is **hardcoded** (`CEREBRAS_MODEL`, `PUBLIC_MODEL_ID`) — a product decision, not config — and so is the **thinking posture**: `INTERACTIVE_THINKING_ENABLED = False`, and on Cerebras that is a property of the model rather than a flag held down. `gemma-4-31b` does not reason at all, and the wire has no field that could switch reasoning off, so a non-thinking call simply sends nothing. Nothing in this server thinks; the flag and `INTERACTIVE_REASONING_EFFORT` stay as the decision record and the switch a future reasoning-capable serving model would need. There are deliberately **no env toggles**; the server ships one optimum.
+`config.py` `Settings` is parsed once, immutable, env-driven (`.env`). The model is **hardcoded** (`CEREBRAS_MODEL`, `PUBLIC_MODEL_ID`) — a product decision, not config — and so is the **thinking posture**: `INTERACTIVE_THINKING_ENABLED = False`, and on Cerebras that is a property of the model rather than a flag held down. `gemma-4-31b` does not reason at all, and the wire has no field that could switch reasoning off, so a non-thinking call simply sends nothing. Nothing in this server thinks; the flag and `INTERACTIVE_REASONING_EFFORT` stay as the decision record and the switch a future reasoning-capable serving model would need. The server ships **one optimum** and there are deliberately no env toggles for PRODUCT decisions — which model, which posture, which prompt, which skills: things with one right answer we have already benchmarked. That rule is about quality, not about operations, and the handful of env-driven booleans beside it (`MAIN_OUTPUT_LINT_ENABLED`, `EXPOSE_DEBUG_SELECTOR_REASON`, `TOOL_PROJECTION_MODE`) are the other kind: switches whose right value is whatever production says this week. `TOOL_PROJECTION_MODE` is the sharpest case — it gates a behaviour that WITHHOLDS capability from the model, so being able to answer "turn it off" in the time Cloud Run takes to roll a config-only revision is the point of it existing (see "Skill-aware tool projection" below).
 
 The environment supplies exactly two secrets, **both server-owned**: `STATE_SIGNING_KEY_CURRENT` and `CEREBRAS_API_KEY`. Both are in `missing_secrets()` — the upstream key gates readiness because without it nothing can be answered at all, and discovering that on the first turn surfaces as an upstream 401 that reads like the caller's fault. There is still **no inbound API key** to configure: the door is open until account auth lands. Secrets are `SecretStr`. Missing required secrets — and, in a hardened environment (`production`/`staging`), weak/default ones, including a `CEREBRAS_BASE_URL` that is not the `https://api.cerebras.ai` origin, because the server key is forwarded there — **fail readiness** (`/readyz` → 503) rather than crashing the process; liveness (`/healthz`) stays green. `local_only_problems()` adds two more, both development-only: prompt dumping must be off in production, and so must `DAINTREE_SKILLS_OVERLAY_DIR` — a scratch directory of skill files merged over the packaged catalog so a skill can be authored against a running server (`POST /v1/daintree/skills/reload` rebuilds it live; that route is mounted only when the overlay is configured and the environment is not hardened). `main.py` builds the immutable service `Container` and validates it during lifespan startup; a malformed prompt or skill prevents readiness without taking down liveness.
 

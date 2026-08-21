@@ -32,9 +32,19 @@ def _print(doc: dict[str, Any]) -> None:
         print(f"min system+tools stable    : {s['min_system_tools_stable_continuity']:.4f} "
               "(continuation/runtime/startup/new-session — target 1.0)")
         print(f"topic-shift system+tools   : {s['topic_shift_system_tools_stable']} "
-              "(target 1.0 — the skill block sits below the schemas)")
+              "(target 1.0 — FULL-inventory track: the skill block sits below the "
+              "schemas)")
+        if s.get("full_tool_bytes"):
+            saved = 1 - s["projected_tool_bytes"] / s["full_tool_bytes"]
+            print(f"projected tool region      : {s['projected_tool_bytes']}B vs "
+                  f"{s['full_tool_bytes']}B full ({saved:.0%} smaller); system messages "
+                  f"identical={s['projected_system_messages_identical']}")
         for t in det["transitions"]:
-            print(f"  {t['transition']:24} sys+tools={t['system_tools_stable']:.4f}  "
+            # `projected_size` reports bytes, not stability — it has no prefix to
+            # measure, and printing it as one would need a number it never carries.
+            if "system_tools_stable" not in t:
+                continue
+            print(f"  {t['transition']:28} sys+tools={t['system_tools_stable']:.4f}  "
                   f"full={t['full_prefix']:.4f}")
         print("  layer budget (bytes):")
         for L in sorted(det["layer_budget"]["layers"], key=lambda x: -x["bytes"]):

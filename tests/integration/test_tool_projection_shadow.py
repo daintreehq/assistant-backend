@@ -20,8 +20,9 @@ from fakes import make_result, selection_result
 
 URL = "/v1/daintree/respond"
 
-# A skill-less turn proposes only the always-on core, so `forge__getPR` is a tool
-# the projection would withhold and `context__snapshot` is one it would keep.
+# A skill-less turn proposes the always-on core plus anything the catalog has no
+# opinion about, so the withheld example has to be a tool some skill DECLARES:
+# `forge__getPR` is one, and `context__snapshot` is one the core keeps.
 CORE_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
@@ -44,8 +45,8 @@ WITHHELD_TOOL: dict[str, Any] = {
 }
 
 
-def _shadow_records(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [r for r in logs if r.get("event") == "tool_projection_shadow"]
+def _result_records(logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [r for r in logs if r.get("event") == "tool_projection_result"]
 
 
 def _call(name: str, index: int = 0) -> dict[str, Any]:
@@ -74,7 +75,7 @@ def test_nonstream_grades_a_call_outside_the_projection(client, auth, fake_provi
             ),
         )
     assert r.status_code == 200
-    (record,) = _shadow_records(logs)
+    (record,) = _result_records(logs)
     assert record["outside_proposed"] == ["forge__getPR"]
     assert record["measured"] is True
     assert record["offered"] == 2
@@ -97,7 +98,7 @@ def test_nonstream_grades_a_call_inside_the_projection(client, auth, fake_provid
             ),
         )
     assert r.status_code == 200
-    (record,) = _shadow_records(logs)
+    (record,) = _result_records(logs)
     assert record["outside_proposed"] == []
     assert record["measured"] is True
 
@@ -193,7 +194,7 @@ def test_streaming_grades_a_call_whose_name_arrives_split(client, auth, fake_pro
     ):
         body = "".join(s.iter_text())
     assert "event: done" in body
-    (record,) = _shadow_records(logs)
+    (record,) = _result_records(logs)
     # The consolidated name, once — not two fragments.
     assert record["outside_proposed"] == ["forge__getPR"]
     assert record["called"] == 1
@@ -248,6 +249,6 @@ def test_an_unreadable_round_is_logged_indeterminate_not_clean(client, auth, fak
     assert "event: done" in body
     # The call still reached the client — passthrough is fail-open by design.
     assert "forge__getPR" in body
-    (record,) = _shadow_records(logs)
+    (record,) = _result_records(logs)
     assert record["measured"] is False, "an unread call must not be graded as measured"
     assert record["called"] == 0

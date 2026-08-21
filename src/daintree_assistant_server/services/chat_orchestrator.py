@@ -64,7 +64,17 @@ from ..skills.fast_path import can_skip_selection
 from ..skills.load_events import SkillLoadExecution
 from ..skills.local.selector import SkillSelector
 from ..skills.selector import SelectionDecision
-from ..skills.tool_projection import ToolProjection, project_tools
+from ..skills.tool_projection import (
+    REASON_DISABLED,
+    REASON_FILTER_ERROR,
+    REASON_INVENTORY_MISMATCH,
+    EnforcementDecision,
+    ToolProjection,
+    decide_enforcement,
+    filter_provider_tools,
+    project_tools,
+    tools_bytes,
+)
 from ..state.codec import StateCodec
 from ..text_utils import sanitize_line, utf8_len
 from .bare_intent import could_still_be_bare_intent, is_bare_tool_intent
@@ -149,7 +159,6 @@ _BARE_INTENT_NUDGE: dict[str, Any] = {
         "describe an action you are not taking in this same reply."
     ),
 }
-
 
 
 @dataclass
@@ -320,6 +329,22 @@ class _PreparedTurn:
     # a mutable `reasons` dict, and one instance shared by every default-built
     # turn is a foot-gun waiting for the first caller that writes to it.
     projection: ToolProjection = field(default_factory=ToolProjection)
+    # What the gate decided for this turn and why. Carried rather than recomputed
+    # because the response paths grade what the model CALLED, and that grading is
+    # only interpretable against the inventory the model was actually offered — an
+    # empty `outside_proposed` means something different when the withheld tools
+    # were never on the wire.
+    enforcement: EnforcementDecision = field(
+        default_factory=lambda: EnforcementDecision(enforce=False, reason=REASON_DISABLED)
+    )
+    # Whether `projection` is a real answer or the empty placeholder standing in
+    # for one that could not be built. Grading MUST know the difference: an empty
+    # projection withholds nothing, so a round graded against it reports
+    # `outside_proposed=[]` — a clean bill of health produced by the failure
+    # itself. That is the exact false all-clear `measured` exists to prevent, and
+    # it is worse than no evidence because this number's only job is to authorize
+    # withholding tools.
+    projection_computed: bool = False
     # Wall-clock marks for the phases preparation owns. Continues to be filled in
     # by the response paths, which is why it is mutable and travels with the turn.
     timings: _Timings = field(default_factory=_Timings)
@@ -432,15 +457,27 @@ class ChatOrchestrator:
         called: list[str],
         *,
         request_id: str,
+        profile: str = "assistant",
+        enforcement: EnforcementDecision | None = None,
+        projection_computed: bool = True,
+        offered_total: int | None = None,
         names_complete: bool = True,
     ) -> None:
-        """Log whether the shadow projection would have broken this turn.
+        """Log whether the projection would have broken — or did break — this turn.
 
-        `outside_proposed` is THE gate on enabling filtering: it names the calls
-        the projection would have withheld. Filtering is safe when that is
-        durably empty across real usage, and the admission reasons say which rule
-        should have covered a miss — almost always a skill whose `requiredTools`
-        is incomplete, which is a metadata fix rather than a design flaw.
+        `outside_proposed` names the calls the projection would have withheld. It
+        is THE promotion gate, and the admission reasons say which rule should
+        have covered a miss — almost always a skill whose `requiredTools` is
+        incomplete, which is a metadata fix rather than a design flaw.
+
+        **Read it from SHADOW traffic when deciding to promote.** Under
+        enforcement the withheld tools were never on the wire, so the model
+        mostly cannot call them and the number grades clean by construction —
+        which is a statement about what was offered, not about whether the
+        metadata is right. `enforced` is on every record precisely so the two
+        populations can be separated, and a nonzero `outside_proposed` on an
+        ENFORCED round is the strongest possible rollback signal: it means the
+        model tried to use something the turn had already taken away.
 
         `names_complete=False` means some call this round could not be read (the
         tool-call buffer fell back to passthrough and never consolidated it).
@@ -448,27 +485,51 @@ class ChatOrchestrator:
         unmeasured call that reads as "nothing outside the projection" is a false
         all-clear, and this number's only job is to authorize withholding tools.
 
-        Never raises. Shadow instrumentation that could fail a turn would cost
-        more than the measurement is worth.
+        A round that called nothing is not recorded. It has nothing to grade, and
+        the once-per-turn `respond` record already carries the enforcement
+        denominator — so emitting here would add volume without adding a rate.
+
+        Never raises. Instrumentation that could fail a turn would cost more than
+        the measurement is worth.
         """
         try:
             names = [name for name in called if name]
             if not names and names_complete:
                 return
+            outside = projection.outside(names)
+            # A projection that could not be BUILT withholds nothing, so grading
+            # against it manufactures a clean zero out of the failure. Fold that
+            # into `measured` alongside an unreadable call buffer: both mean "this
+            # round establishes nothing", and both must be excluded from the
+            # evidence that authorizes enforcement.
+            measured = names_complete and projection_computed
             logger.info(
-                "tool_projection_shadow",
+                "tool_projection_result",
                 request_id=request_id,
+                # Stamped here rather than joined from `respond`: `request_id` is
+                # caller-supplied, so it is neither guaranteed unique nor a safe
+                # join key, and this is the record `outside_proposed` lives on.
+                profile=profile,
                 called=len(names),
-                outside_proposed=projection.outside(names),
-                proposed=len(projection.proposed),
-                offered=len(projection.offered),
+                outside_proposed=outside,
+                outside_proposed_count=len(outside),
+                proposed=len(projection.proposed) if projection_computed else None,
+                # The count the request actually carried, which a failed projection
+                # does not know — reporting its empty `offered` as 0 would say the
+                # turn offered no tools when it offered every one of them.
+                offered=(offered_total if offered_total is not None else len(projection.offered)),
+                # Whether these calls were made against the projected inventory or
+                # the full one. Without it the two populations are one column of
+                # numbers that cannot be told apart.
+                enforced=bool(enforcement and enforcement.enforce),
+                reason=enforcement.reason if enforcement else None,
                 # Explicit on every record, so a query for "rounds with nothing
                 # outside the projection" cannot silently include rounds where
                 # that was never established.
-                measured=names_complete,
+                measured=measured,
             )
         except Exception:  # noqa: BLE001 — measurement must never break a turn
-            logger.warning("tool_projection_shadow_failed", request_id=request_id)
+            logger.warning("tool_projection_result_failed", request_id=request_id)
 
     @staticmethod
     def _forced_tool_name(tool_choice: object) -> str | None:
@@ -566,9 +627,7 @@ class ChatOrchestrator:
             # iterated), retrieve the exception so it can't surface as an orphaned
             # "exception was never retrieved" warning. The generator still sees it
             # via ``result()``.
-            prep_task.add_done_callback(
-                lambda t: None if t.cancelled() else t.exception()
-            )
+            prep_task.add_done_callback(lambda t: None if t.cancelled() else t.exception())
             # Shutdown backstop: drain_background_tasks waits for (then cancels)
             # any prep still in flight before the provider it uses is closed.
             self._background_tasks.add(prep_task)
@@ -688,6 +747,10 @@ class ChatOrchestrator:
             prepared.projection,
             [c.get("function", {}).get("name", "") for c in result.tool_calls],
             request_id=request_id,
+            profile=request.profile,
+            enforcement=prepared.enforcement,
+            projection_computed=prepared.projection_computed,
+            offered_total=len(prepared.provider_request.tools or ()),
         )
         lint_warnings = self._lint_final_output(
             result, request=request, request_id=request_id, had_tool_calls=had_tool_calls
@@ -765,9 +828,7 @@ class ChatOrchestrator:
                     budget=budget,
                 )
         except TimeoutError as exc:
-            phase = (
-                TurnPhase.TOTAL if budget.expired() else TurnPhase.PREPARATION
-            )
+            phase = TurnPhase.TOTAL if budget.expired() else TurnPhase.PREPARATION
             logger.warning(
                 "respond_deadline_exceeded",
                 request_id=request_id,
@@ -847,9 +908,7 @@ class ChatOrchestrator:
         # nothing forward.
         prior_docs_query: str | None = None
         if verification.valid and verification.payload is not None:
-            prior_active_ids = catalog_at_start.filter_known(
-                verification.payload.active_ids()
-            )
+            prior_active_ids = catalog_at_start.filter_known(verification.payload.active_ids())
             payload = verification.payload
             if (
                 payload.last_turn_id == request.session.turn_id
@@ -905,9 +964,7 @@ class ChatOrchestrator:
                 catalog_skills=len(catalog_at_start),
             )
 
-        no_task = not subagent and can_skip_selection(
-            request, prior_active_ids=prior_active_ids
-        )
+        no_task = not subagent and can_skip_selection(request, prior_active_ids=prior_active_ids)
         if no_task:
             logger.info(
                 "selector_fast_path",
@@ -944,9 +1001,7 @@ class ChatOrchestrator:
             ),
             turn_id=request.session.turn_id,
             instruction_revision=request.session.instruction_revision,
-            state_profile=(
-                verification.payload.profile if verification.payload else "assistant"
-            ),
+            state_profile=(verification.payload.profile if verification.payload else "assistant"),
             profile=request.profile,
         )
 
@@ -1099,7 +1154,8 @@ class ChatOrchestrator:
         skills = skills_catalog.get_many(active_ids)
         executions: list[SkillLoadExecution | DocsSearchExecution] = [
             SkillLoadExecution.from_skill(
-                new_call_id(), skills_catalog.get(sid)  # type: ignore[arg-type]
+                new_call_id(),
+                skills_catalog.get(sid),  # type: ignore[arg-type]
             )
             for sid in newly_loaded_ids
         ]
@@ -1118,9 +1174,7 @@ class ChatOrchestrator:
         # that takes one tool call to answer arrives at the answer with its
         # sources gone.
         t_docs = time.perf_counter()
-        docs = await self._lookup_docs(
-            docs_query, request_id=request_id, budget=budget
-        )
+        docs = await self._lookup_docs(docs_query, request_id=request_id, budget=budget)
         # Recorded even when the lookup returned nothing. A miss still spent
         # the user's wall clock, and a slow FAILING docs server is exactly the
         # thing this is meant to expose.
@@ -1172,25 +1226,97 @@ class ChatOrchestrator:
             catalog=resolved_catalog,
         )
 
+        # PROJECTION. Nothing below may fail the turn: every failure path leaves
+        # `provider_request` exactly as assembled, which is the full inventory.
+        #
+        # `computed` is `None` when the projection could not be built, and that is
+        # a different fact from an empty projection — an empty one proposes
+        # nothing, so treating a failure as one would turn a bug into a request
+        # that offers the model no tools at all. Only `projection` (never None) is
+        # carried onward for grading; `computed` is what the gate reasons about.
+        forced_tool = self._forced_tool_name(request.input.tool_choice)
+        mode = self.settings.tool_projection_mode
+        computed: ToolProjection | None = None
+        if mode != "disabled":
+            try:
+                computed = project_tools(
+                    offered=request.input.tools,
+                    active_skills=skills,
+                    # The catalog the caller actually selected from. With the full one, a
+                    # foundation filtered OUT of a sub-agent's menu is rediscovered here
+                    # and its tools counted as proposed — understating `outside_proposed`,
+                    # which is the one metric this measurement exists to produce.
+                    catalog=skills_catalog,
+                    messages=request.input.messages,
+                    forced_tool=forced_tool,
+                )
+            except Exception:  # noqa: BLE001 — projection must never break a turn
+                logger.warning("tool_projection_failed", request_id=request_id)
+        projection = computed if computed is not None else ToolProjection()
 
-        # Shadow measurement only — it must not be able to fail a turn. An empty
-        # projection grades as "nothing was withheld", which is the honest
-        # reading when the projection could not be computed.
         try:
-            projection = project_tools(
-                offered=request.input.tools,
-                active_skills=skills,
-                # The catalog the caller actually selected from. With the full one, a
-                # foundation filtered OUT of a sub-agent's menu is rediscovered here
-                # and its tools counted as proposed — understating `outside_proposed`,
-                # which is the one metric this measurement exists to produce.
-                catalog=skills_catalog,
+            enforcement = decide_enforcement(
+                mode=mode,
+                rollout_percent=self.settings.tool_projection_rollout_percent,
+                session_id=session_id,
+                profile=request.profile,
+                # The ONE health signal. Not `decision.ran`: a continuation round
+                # reuses a set that was authoritative when it was resolved, and
+                # demanding a fresh run would re-select on every tool round purely
+                # to justify a filter — which is the cadence rule this server
+                # deliberately does not have.
+                selector_degraded=decision.degraded,
+                projection=computed,
                 messages=request.input.messages,
-                forced_tool=self._forced_tool_name(request.input.tool_choice),
+                # From the REQUEST, not from the projection — the one input here
+                # the projection cannot have got wrong about itself.
+                offered_total=len(provider_request.tools or ()),
+                forced_tool=forced_tool,
             )
-        except Exception:  # noqa: BLE001 — measurement must never break a turn
-            logger.warning("tool_projection_failed", request_id=request_id)
-            projection = ToolProjection()
+        except Exception:  # noqa: BLE001 — the gate itself must never break a turn
+            logger.warning("tool_projection_gate_failed", request_id=request_id)
+            enforcement = EnforcementDecision(enforce=False, reason=REASON_FILTER_ERROR)
+
+        full_tools = provider_request.tools
+        if enforcement.enforce:
+            try:
+                # Post-assembly on purpose: the full request already exists as the
+                # fallback, the names being matched are the normalized ones actually
+                # going upstream, and the assembler keeps its single job. The swap is
+                # one `replace` AFTER every check passes, so there is no window in
+                # which a half-validated list is the request.
+                filtered = filter_provider_tools(full_tools, projection)
+                if {t["function"]["name"] for t in full_tools or ()} != projection.offered:
+                    # The assembled inventory is not the one the projection judged.
+                    # Whatever diverged, the proposal no longer describes this request.
+                    enforcement = replace(
+                        enforcement, enforce=False, reason=REASON_INVENTORY_MISMATCH
+                    )
+                elif not filtered:
+                    enforcement = replace(enforcement, enforce=False, reason=REASON_FILTER_ERROR)
+                else:
+                    provider_request = replace(provider_request, tools=filtered)
+            except Exception:  # noqa: BLE001 — filtering must never break a turn
+                logger.warning("tool_projection_filter_failed", request_id=request_id)
+                enforcement = replace(enforcement, enforce=False, reason=REASON_FILTER_ERROR)
+
+        # Sizes are measured in their own guard: a serialization failure is a lost
+        # metric, never a lost turn, and never a reason to widen the request that
+        # was already validated above.
+        sizes: dict[str, int | None] = {
+            "tools_full_bytes": None,
+            "tools_projected_bytes": None,
+            "tools_sent_bytes": None,
+        }
+        try:
+            sizes["tools_full_bytes"] = tools_bytes(full_tools)
+            if computed is not None:
+                sizes["tools_projected_bytes"] = tools_bytes(
+                    filter_provider_tools(full_tools, computed)
+                )
+            sizes["tools_sent_bytes"] = tools_bytes(provider_request.tools)
+        except Exception:  # noqa: BLE001 — a metric must never break a turn
+            logger.warning("tool_projection_metrics_failed", request_id=request_id)
 
         timings.preparation_ms = round((time.perf_counter() - t_start) * 1000)
         logger.info(
@@ -1219,19 +1345,52 @@ class ChatOrchestrator:
             # with these two alongside it.
             selector_endpoint=decision.endpoint,
             selector_calls=decision.calls,
-            # SHADOW tool projection: what a skill-aware filter WOULD have sent
-            # this turn. The full inventory still goes upstream — this is the
-            # measurement that decides whether filtering is safe to enable.
+            # TOOL PROJECTION. Emitted on every turn, which makes this record the
+            # denominator for every rate the rollout is judged on: enforcement rate
+            # is `enforced / assistant turns`, fail-open rate is
+            # `fail_open / cohort_selected`. The per-round `tool_projection_result`
+            # below carries the safety signal (`outside_proposed`) but only fires on
+            # rounds that called something, so it cannot supply a denominator.
+            #
+            # One record does not fit that ratio: a `filter_error` from the gate
+            # itself raising reports `cohort_selected=False` with `fail_open=True`,
+            # because the decision that would have recorded the bucket is the thing
+            # that failed. Filter it out by `reason` before dividing — it is a
+            # should-never-happen with its own alarm (`tool_projection_gate_failed`),
+            # not a fail-open the cohort produced.
+            #
             # `tools_proposed` vs `tools_offered` is the size of the prize;
-            # `tools_outside_proposed` (logged per-turn below, on the round that
-            # actually calls tools) is the safety signal.
-            tools_offered=len(projection.offered),
-            tools_proposed=len(projection.proposed),
+            # `tools_sent_*` is what was actually paid for, and the two differ on
+            # every turn that measured a projection without sending it.
+            # From the REQUEST. Reading the placeholder projection reported 0 in
+            # disabled mode and after any failure — "this turn offered no tools"
+            # when it offered every one of them, on exactly the turns someone is
+            # querying to find out what went wrong.
+            tools_offered=len(full_tools or ()),
+            # None, never 0: no projection was computed, which is a different
+            # statement from one that proposed nothing.
+            tools_proposed=len(computed.proposed) if computed is not None else None,
+            tools_sent=len(provider_request.tools or ()),
+            tool_projection_mode=mode,
+            # Sub-agents will never enforce, and in shadow mode they are decided as
+            # `shadow` before the profile is ever consulted — so without this their
+            # records are indistinguishable from assistant ones, and the first
+            # rollout stage would be promoted on evidence from a profile it does
+            # not cover.
+            profile=request.profile,
+            tool_projection_enforced=enforcement.enforce,
+            tool_projection_fail_open=enforcement.fail_open,
+            tool_projection_reason=enforcement.reason,
+            tool_projection_cohort_selected=enforcement.cohort_selected,
+            tool_projection_bucket=enforcement.cohort_bucket,
+            **sizes,
             pre_upstream_ms=timings.preparation_ms,
         )
 
         return _PreparedTurn(
             projection=projection,
+            enforcement=enforcement,
+            projection_computed=computed is not None,
             timings=timings,
             provider_request=provider_request,
             meta=meta,
@@ -1542,9 +1701,7 @@ class ChatOrchestrator:
         elif action == "find":
             run_selector = True
             conversation = [ChatMessage(role="user", content=query or "")]
-            decision = await self.selector.select(
-                conversation, prior_active_ids, api_key=api_key
-            )
+            decision = await self.selector.select(conversation, prior_active_ids, api_key=api_key)
             warnings.extend(decision.warnings)
             # A find re-selects: the selector result is authoritative, same as a turn.
             found = resolve_active_skills(
@@ -1725,9 +1882,7 @@ class ChatOrchestrator:
         return out
 
     @staticmethod
-    def _log_tool_call_repairs(
-        repairs: list[tuple[str, list[str]]], *, request_id: str
-    ) -> None:
+    def _log_tool_call_repairs(repairs: list[tuple[str, list[str]]], *, request_id: str) -> None:
         for tool, notes in repairs:
             logger.info(
                 "tool_call_arguments_repaired",
@@ -1759,9 +1914,7 @@ class ChatOrchestrator:
             while True:
                 if pending is None:
                     pending = asyncio.ensure_future(anext(inner))
-                done, _ = await asyncio.wait(
-                    {pending}, timeout=HEARTBEAT_INTERVAL_SECONDS
-                )
+                done, _ = await asyncio.wait({pending}, timeout=HEARTBEAT_INTERVAL_SECONDS)
                 if not done:
                     yield ": hb\n\n"
                     continue
@@ -1833,6 +1986,8 @@ class ChatOrchestrator:
             request=request,
             budget=budget,
             projection=prepared.projection,
+            enforcement=prepared.enforcement,
+            projection_computed=prepared.projection_computed,
             timings=prepared.timings,
         )
         try:
@@ -1879,6 +2034,8 @@ class ChatOrchestrator:
         request: RespondRequest,
         budget: RequestBudget | None = None,
         projection: ToolProjection,
+        enforcement: EnforcementDecision,
+        projection_computed: bool,
         timings: _Timings,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
@@ -1902,7 +2059,6 @@ class ChatOrchestrator:
             if not (delta.content or delta.tool_calls):
                 return
             timings.first_output_ms = round(budget.elapsed() * 1000)
-
 
         # Accumulate the VISIBLE reply. It is what the bare-intent detector reads
         # (a round that only announces an action is re-rolled rather than sent) and
@@ -2059,9 +2215,7 @@ class ChatOrchestrator:
                 # a PHASE duration, matching the wire contract — not from request
                 # start; preparation already owns everything before this point.
                 if timings.upstream_open_ms is None:
-                    timings.upstream_open_ms = round(
-                        (time.perf_counter() - t_open) * 1000
-                    )
+                    timings.upstream_open_ms = round((time.perf_counter() - t_open) * 1000)
                 logger.info(
                     "respond_upstream_open",
                     request_id=meta.request_id,
@@ -2079,9 +2233,7 @@ class ChatOrchestrator:
                     held = []
                 scanner = DeclarationScanner()
 
-                async for chunk in self._chunk_iter(
-                    opened_stream, first_event, budget=budget
-                ):
+                async for chunk in self._chunk_iter(opened_stream, first_event, budget=budget):
                     finish_reason = self._chunk_finish_reason(chunk) or finish_reason
                     delta = self._chunk_to_delta(chunk)
                     if delta is None:
@@ -2089,9 +2241,7 @@ class ChatOrchestrator:
                     if delta.content:
                         visible = scanner.feed(delta.content)
                         if visible != delta.content:
-                            delta = delta.model_copy(
-                                update={"content": visible or None}
-                            )
+                            delta = delta.model_copy(update={"content": visible or None})
                         # The instant the opening resolves to FINAL there is a
                         # whole generation left to run alongside — which is the
                         # entire reason the declaration goes first. Attempt 0
@@ -2227,9 +2377,7 @@ class ChatOrchestrator:
                         stream=True,
                         first_chars=len("".join(content_parts)),
                     )
-                    carried_usage = sum_usage(
-                        carried_usage, opened_stream.usage or ProviderUsage()
-                    )
+                    carried_usage = sum_usage(carried_usage, opened_stream.usage or ProviderUsage())
                     # Read at the FOLD, not at the open-timing log: the endpoint is
                     # named by the first chunk that carries it, so by now it is as
                     # complete as this attempt will ever make it. Kept as the
@@ -2276,9 +2424,7 @@ class ChatOrchestrator:
                         compaction_task = None
                     continue
 
-                carried_usage = sum_usage(
-                    carried_usage, opened_stream.usage or ProviderUsage()
-                )
+                carried_usage = sum_usage(carried_usage, opened_stream.usage or ProviderUsage())
                 main_endpoints.append(opened_stream.endpoint)
                 # Assigned, never OR-ed: an accepted attempt that named no host
                 # leaves this `None`, which is the truth. Falling back to the
@@ -2339,9 +2485,7 @@ class ChatOrchestrator:
                     declared=declared.value,
                     had_tool_calls=saw_tool_calls,
                     finish_reason=finish_reason,
-                    contradicted=(
-                        declared is Declaration.FINAL and saw_tool_calls
-                    )
+                    contradicted=(declared is Declaration.FINAL and saw_tool_calls)
                     or (declared is Declaration.TOOLS and not saw_tool_calls),
                 )
             if compaction_task is not None:
@@ -2432,6 +2576,10 @@ class ChatOrchestrator:
                 projection,
                 tool_call_buffer.called_names,
                 request_id=meta.request_id,
+                profile=request.profile,
+                enforcement=enforcement,
+                projection_computed=projection_computed,
+                offered_total=len(provider_request.tools or ()),
                 names_complete=tool_call_buffer.names_complete,
             )
 
@@ -2600,9 +2748,7 @@ class ChatOrchestrator:
         if source is None:
             return None
         task = asyncio.create_task(
-            self._run_compaction(
-                compactor, source, request_id=request_id, turn_id=turn_id
-            )
+            self._run_compaction(compactor, source, request_id=request_id, turn_id=turn_id)
         )
         # Same detached-task discipline as the streaming path's preparation task:
         # shutdown drains it (bounded) before the provider it may be calling
@@ -2665,9 +2811,7 @@ class ChatOrchestrator:
                 return None
             return StreamCompaction(
                 turn_id=turn_id,
-                replaces=CompactionSpan(
-                    start_index=source.start, end_index=source.end
-                ),
+                replaces=CompactionSpan(start_index=source.start, end_index=source.end),
                 block=CompactionBlock(content=content),
             )
         except asyncio.CancelledError:
@@ -2692,9 +2836,7 @@ class ChatOrchestrator:
         the one mistake this design cannot take back.
         """
         if not deliverable:
-            logger.info(
-                "compaction_discarded", request_id=request_id, reason="not_final"
-            )
+            logger.info("compaction_discarded", request_id=request_id, reason="not_final")
             self._drop_compaction(task)
             return None
         grace = _COMPACTION_GRACE_SECONDS
@@ -2754,9 +2896,7 @@ class ChatOrchestrator:
         if declaration is Declaration.MISSING:
             return
         message["content"] = visible
-        logger.debug(
-            "response_declaration", request_id=request_id, declaration=declaration.value
-        )
+        logger.debug("response_declaration", request_id=request_id, declaration=declaration.value)
 
     # ---- bare-tool-intent repair ----------------------------------------
 
@@ -2870,9 +3010,7 @@ class ChatOrchestrator:
         except DaintreeError as exc:
             # Fail open: the first reply is weak, but it is a real reply the user is
             # already owed. A repair error must never cost them the turn.
-            self._log_bare_intent(
-                "failed_open", request_id=request_id, stream=False, code=exc.code
-            )
+            self._log_bare_intent("failed_open", request_id=request_id, stream=False, code=exc.code)
             return result
 
         repaired.usage = sum_usage(result.usage, repaired.usage)
