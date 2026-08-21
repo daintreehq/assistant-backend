@@ -187,6 +187,11 @@ async def capabilities(
             "enabled": container.compactor.available,
             "stream_event": "compaction",
             "delivery": "before_done",
+            "at_most_once": True,
+            # Streaming only. The whole design is a call overlapped with
+            # generation, and a non-streamed turn is one await with no generation
+            # left to overlap — so that path strips the declaration and stops.
+            "streaming_only": True,
             "best_effort": True,
             "append_only": True,
             # The reserved `name` the spliced message carries. Sending it back
@@ -194,8 +199,21 @@ async def capabilities(
             # without any server-side state — and what stops it being compacted a
             # second time.
             "block_message_name": COMPACTION_BLOCK_NAME,
-            "span": {"collection": "input.messages", "end_exclusive": True},
-            "max_block_bytes": settings.cap_compaction_block_bytes,
+            "span": {
+                "collection": "input.messages",
+                "index_base": 0,
+                "end_exclusive": True,
+                # The assistant reply currently streaming is not in that array; it
+                # is appended after the splice, as usual.
+                "excludes_current_reply": True,
+            },
+            # Apply the splice only when this matches the turn asked about. A block
+            # is a statement about one conversation prefix at one moment.
+            "turn_id_match_required": True,
+            # `block.content` specifically, in UTF-8 bytes — not the block, and not
+            # the event. Named for what it measures because a client sizing the
+            # wrong thing rejects blocks it should have applied.
+            "max_block_content_bytes": settings.cap_compaction_block_bytes,
         },
         "tasks": container.task_runner.task_ids(),
         # Workflow intelligence: the CLI owns the durable execution graphs; the

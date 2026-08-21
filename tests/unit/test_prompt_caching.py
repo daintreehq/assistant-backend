@@ -33,7 +33,7 @@ SRC_PROMPTS = (
 
 def test_no_prompt_file_is_read_on_the_request_path(monkeypatch) -> None:  # type: ignore[no-untyped-def]
     """The point of the change. Every turn used to glob a directory and read
-    seven partials before the model was even contacted."""
+    eight partials before the model was even contacted."""
     loader = PromptLoader()
 
     reads: list[str] = []

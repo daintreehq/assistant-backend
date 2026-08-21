@@ -17,7 +17,7 @@ from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from .. import PROTOCOL_VERSION
 from ..config import DOCS_SKILL_ID, PUBLIC_MODEL_ID, Settings
@@ -670,12 +670,17 @@ class ChatOrchestrator:
         # A round that only announced a tool call it never emitted would end the turn
         # having performed nothing. Re-roll it once here, before anything is built or
         # sent, so neither the client nor the transcript ever sees the dead draft.
+        drafted = result
         result = await self._repair_bare_intent(
             prepared.provider_request, result, request_id=request_id
         )
-        # The re-roll opens with its own declaration. A no-op when the first draft
-        # was kept, since that text has already been stripped.
-        self._strip_declaration(result, request_id=request_id)
+        # ONLY when the repair actually produced a new result. Stripping is not
+        # idempotent — it removes the FIRST marker-shaped opening it finds — so
+        # running it twice over the same text would eat a second control line the
+        # model had written as visible content, and the two response modes would
+        # then disagree about what the user is owed.
+        if result is not drafted:
+            self._strip_declaration(result, request_id=request_id)
         # finish_reason is a second, independent signal: treat a continuation round as
         # such even if a malformed upstream drops the tool_calls payload.
         had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
@@ -2320,6 +2325,25 @@ class ChatOrchestrator:
             # inside `_collect_compaction`, and usually nothing at all: the call
             # started when the model declared itself final and has had the whole
             # remaining generation to finish in.
+            # Content-free telemetry on whether the model is actually keeping its
+            # side of the bargain. The declaration is a PROBABILISTIC contract —
+            # the prompt asks, the model may not comply — and until this is
+            # measured on real traffic nobody can say whether the mechanism is
+            # worth the prompt bytes it costs. Declared vs. what the round did is
+            # the whole signal; no reply text is logged.
+            declared = scanner.declaration
+            if declared is not None:
+                logger.info(
+                    "response_declaration",
+                    request_id=meta.request_id,
+                    declared=declared.value,
+                    had_tool_calls=saw_tool_calls,
+                    finish_reason=finish_reason,
+                    contradicted=(
+                        declared is Declaration.FINAL and saw_tool_calls
+                    )
+                    or (declared is Declaration.TOOLS and not saw_tool_calls),
+                )
             if compaction_task is not None:
                 compaction = await self._collect_compaction(
                     compaction_task,
@@ -2374,8 +2398,8 @@ class ChatOrchestrator:
             # An errored or abandoned stream can never deliver a block, so the
             # call it would have carried is pure waste. Idempotent: on the success
             # path `_collect_compaction` has already settled the task.
-            if compaction_task is not None and not compaction_task.done():
-                compaction_task.cancel()
+            if compaction_task is not None:
+                self._drop_compaction(compaction_task)
             if stream is not None:
                 await self._close_quietly(stream, request_id=meta.request_id)
 
@@ -2547,6 +2571,20 @@ class ChatOrchestrator:
         Returns ``None`` — cheaply, before anything is spent — whenever this turn
         has nothing to compact or no way to compact it.
         """
+        try:
+            return self._start_compaction_inner(request, request_id=request_id)
+        except Exception as exc:  # noqa: BLE001 - must never fail a turn
+            # `available` is a property a real producer may compute (a key, a
+            # provider health check), and every step below reads client-supplied
+            # messages. This runs INSIDE the delta loop, so an escaping exception
+            # would turn a reply the user is already reading into a terminal
+            # error — for an optimisation they never asked for.
+            logger.warning("compaction_start_failed", request_id=request_id, error=str(exc))
+            return None
+
+    def _start_compaction_inner(
+        self, request: RespondRequest, *, request_id: str
+    ) -> asyncio.Task[StreamCompaction | None] | None:
         compactor = self.compactor
         if compactor is None or not compactor.available:
             return None
@@ -2614,6 +2652,15 @@ class ChatOrchestrator:
         # ids, worktree paths, terminal ids and open blockers; a cut removes
         # exactly those and leaves prose that reads complete, which is worse than
         # having no block at all.
+        # `utf8_len` measures with replacement semantics so a size check can never
+        # raise — which means a lone surrogate SURVIVES it, and would then blow up
+        # in `_sse`'s own encode, at a `yield` no handler covers. Checked here, in
+        # the one place that is allowed to fail quietly.
+        try:
+            content.encode("utf-8")
+        except UnicodeEncodeError:
+            logger.warning("compaction_unencodable", request_id=request_id)
+            return None
         size = utf8_len(content)
         if size > self.settings.cap_compaction_block_bytes:
             logger.warning(
@@ -2623,11 +2670,21 @@ class ChatOrchestrator:
                 limit=self.settings.cap_compaction_block_bytes,
             )
             return None
-        return StreamCompaction(
-            turn_id=turn_id,
-            replaces=CompactionSpan(start_index=source.start, end_index=source.end),
-            block=CompactionBlock(content=content),
-        )
+        try:
+            return StreamCompaction(
+                turn_id=turn_id,
+                replaces=CompactionSpan(start_index=source.start, end_index=source.end),
+                block=CompactionBlock(content=content),
+            )
+        except ValidationError as exc:
+            # The wire models carry bounds of their own, and the byte cap is a
+            # SETTING — raised high enough, a block clears it and still fails the
+            # model's code-point limit. Landing here is what keeps this coroutine's
+            # "never raises" contract literally true: an escaping exception would
+            # sit unretrieved on a task the terminal path may have cancelled rather
+            # than awaited, and surface as a warning from nowhere.
+            logger.warning("compaction_invalid", request_id=request_id, error=str(exc))
+            return None
 
     async def _collect_compaction(
         self,
@@ -2645,10 +2702,10 @@ class ChatOrchestrator:
         the one mistake this design cannot take back.
         """
         if not deliverable:
-            task.cancel()
             logger.info(
                 "compaction_discarded", request_id=request_id, reason="not_final"
             )
+            self._drop_compaction(task)
             return None
         grace = _COMPACTION_GRACE_SECONDS
         if budget is not None:
@@ -2658,7 +2715,7 @@ class ChatOrchestrator:
         if not task.done() and grace > 0:
             await asyncio.wait({task}, timeout=grace)
         if not task.done():
-            task.cancel()
+            self._drop_compaction(task)
             logger.info("compaction_timed_out", request_id=request_id)
             return None
         if task.cancelled():
@@ -2668,6 +2725,23 @@ class ChatOrchestrator:
             logger.warning("compaction_failed", request_id=request_id, error=str(exc))
             return None
         return task.result()
+
+    @staticmethod
+    def _drop_compaction(task: asyncio.Task[StreamCompaction | None]) -> None:
+        """Abandon a compaction task without leaving its outcome unclaimed.
+
+        Cancelling a task that has already FINISHED is a no-op, so a discard that
+        only cancels leaves a completed-with-exception task unretrieved — and the
+        loop reports it later as an "exception was never retrieved" warning from
+        nowhere, long after the turn it belonged to. `_run_compaction` is written
+        to be total, but this is the guarantee's other half: it holds whatever a
+        future producer does.
+        """
+        if task.done():
+            if not task.cancelled():
+                task.exception()
+            return
+        task.cancel()
 
     @staticmethod
     def _strip_declaration(result: Any, *, request_id: str) -> None:

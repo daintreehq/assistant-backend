@@ -10,6 +10,35 @@ claim about today's behaviour against the source before acting on it.
 
 ---
 
+## Prove declaration compliance before compaction spends anything
+
+**Trigger: before #60's producer is switched on — i.e. before `context_compaction.enabled`
+is ever true in a real deployment.**
+
+The turn-finality declaration (#61) shipped as a PROBABILISTIC contract: the base prompt
+asks the model to open every reply with `[[DAINTREE:FINAL]]` or `[[DAINTREE:TOOLS]]`, and
+the backend strips it and acts on it. Nothing yet shows the serving model actually complies.
+The unit tests prove what happens WHEN a marker arrives; a fake emits it, so they cannot
+speak to whether `gemma-4-31b` does.
+
+That gap is cheap today and expensive later. With `NullCompactor` a wrong or missing
+declaration costs only the prompt bytes. Once a producer exists, a false `FINAL` buys a
+discarded upstream call, and a `FINAL` that is *believed* freezes a conversation prefix
+mid-task — and append-only means it does not unfreeze.
+
+The `response_declaration` log line already emits the raw material, content-free: `declared`,
+`had_tool_calls`, `finish_reason`, and `contradicted`. What is owed is reading it — over real
+traffic, broken out by turn shape: final prose, tool-only rounds, prose-plus-tools, JSON-mode
+turns, continuation rounds, and the adversarial cases (a user asking what the marker means, a
+prompt-injection attempt targeting it). A missing-declaration rate is tolerable and simply
+costs the optimisation; a CONTRADICTION rate is the number that gates enabling anything.
+
+Also unproven here: the CLI has never parsed a `compaction` event. The vendored submodule was
+not touched by #61, so the only client's handling of the new event is entirely untested. That
+is fine while the event can never be emitted, and is a blocker the moment it can.
+
+---
+
 ## Account authentication and sign-in
 
 **Trigger: now. This is the next piece of work, not a someday.**

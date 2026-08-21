@@ -99,8 +99,15 @@ class NullCompactor:
 
     Not a test double — this is the shipped implementation until #60 lands, and
     it is what makes "no compaction" a first-class state rather than a scatter of
-    ``None`` checks. Nothing is started, nothing is awaited, no event is emitted,
-    and the turn is byte-identical to one from before this feature existed.
+    ``None`` checks. Nothing is started, nothing is awaited, and no event is
+    emitted.
+
+    NOT a no-op, and the difference is worth stating plainly: the declaration rule
+    still ships in the base prompt, so every request pays its bytes and every reply
+    spends tokens on a control line whose only consumer is switched off. That cost
+    buys the compliance telemetry (``response_declaration``) that says whether the
+    mechanism works at all — which is what #60 needs before it starts spending on
+    a second model.
     """
 
     available = False
@@ -118,7 +125,9 @@ def select_source(messages: Sequence[ChatMessage]) -> CompactionSource | None:
     Two boundaries, each of which the append-only rule depends on:
 
     * the START resumes immediately after the last block the client has already
-      spliced in, so a frozen segment is never handed back to a compactor;
+      spliced in — recognised only on a USER message, the shape the server
+      actually emits — and is then advanced to the next user message, so a span
+      can never open on a `tool` result whose assistant call sits outside it;
     * the END stops at the user's current instruction, so the LIVE turn — the ask
       itself and every tool round it has spawned — stays raw. Reconciling a task
       that is still running would summarise a story whose ending has not been
@@ -127,10 +136,24 @@ def select_source(messages: Sequence[ChatMessage]) -> CompactionSource | None:
     Returns ``None`` when nothing sits between the two, which is every short
     conversation and every turn immediately after a block was delivered.
     """
+    # The reserved name only means anything on a USER message, because that is the
+    # only shape the server ever emits. Honouring it on an assistant or tool
+    # message would let a client — by accident or otherwise — move the boundary
+    # into the middle of a tool transaction, and the span would then begin on an
+    # orphaned `tool` result whose assistant call sits outside it. That is a 400
+    # from the compactor's own upstream, and a splice that leaves the CLIENT's
+    # next request malformed.
     start = 0
     for index, message in enumerate(messages):
-        if message.name == COMPACTION_BLOCK_NAME:
+        if message.role == "user" and message.name == COMPACTION_BLOCK_NAME:
             start = index + 1
+
+    # Belt and braces on the same failure: the span must OPEN on a user message.
+    # A prefix that begins mid-transaction is not a coherent unit to reconcile
+    # anyway, and starting at a turn boundary makes orphaning structurally
+    # impossible rather than merely unlikely.
+    while start < len(messages) and messages[start].role != "user":
+        start += 1
 
     end = -1
     for index in range(len(messages) - 1, start - 1, -1):

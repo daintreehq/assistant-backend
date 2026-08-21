@@ -227,8 +227,11 @@ async def test_a_reply_that_is_only_a_marker_and_tool_calls_emits_no_empty_delta
     ]
     events = await _run(orchestrator, _request())
     deltas = _of(events, "delta")
-    assert all(d.get("content") is None for d in deltas)
-    assert any(d.get("tool_calls") for d in deltas)
+    # EXACTLY one delta, carrying only the consolidated tool call. An extra empty
+    # `{}` delta would satisfy a "no content anywhere" assertion while still being
+    # the bug — a marker-only fragment forwarded as an empty event.
+    assert len(deltas) == 1
+    assert set(deltas[0]) == {"tool_calls"}
 
 
 # ---- what the declaration starts ---------------------------------------
@@ -252,7 +255,11 @@ async def test_compaction_starts_before_the_reply_has_finished(
     chunks = _chunks(f"{FINAL_MARKER}\n", "one ", "two ", "three ", "four")
     fake_provider.stream_factory = lambda _request: _YieldingStream(chunks)
     await _run(_with(orchestrator, compactor), _request())
-    assert compactor.observed and compactor.observed[0] < len(chunks)
+    # EXACT, not merely "before the end": the role chunk and the marker chunk are
+    # the only two consumed when the declaration resolves, so anything above 2
+    # means the call waited for generation it was supposed to run beside. `< len`
+    # would still pass if it started at the very last chunk.
+    assert compactor.observed == [2]
 
 
 @pytest.mark.asyncio
@@ -305,10 +312,16 @@ async def test_an_unavailable_compactor_is_never_called(
 
 
 @pytest.mark.asyncio
-async def test_the_null_compactor_leaves_the_turn_exactly_as_it_was(
+async def test_the_null_compactor_strips_the_line_and_emits_no_event(
     orchestrator: ChatOrchestrator, fake_provider: FakeProvider
 ) -> None:
-    """Today's only shipped state: the line is stripped, nothing else changes."""
+    """Today's only shipped state.
+
+    Deliberately NOT claiming the turn is unchanged: the declaration rule still
+    ships in the base prompt, so the request is larger and the reply spends tokens
+    on a control line. What this pins is the observable stream — the line is gone,
+    no task runs, no event is emitted, and `done` is still last.
+    """
     fake_provider.stream_chunks = _chunks(f"{FINAL_MARKER}\n", "green")
     events = await _run(_with(orchestrator, NullCompactor()), _request())
     assert _content(events) == "green"
@@ -396,10 +409,14 @@ async def test_a_truncated_reply_delivers_nothing(
     orchestrator: ChatOrchestrator, fake_provider: FakeProvider
 ) -> None:
     """`length` is a turn cut short, not a turn completed."""
+    compactor = FakeCompactor()
     fake_provider.stream_chunks = _chunks(
         f"{FINAL_MARKER}\n", "All gre", finish_reason="length"
     )
-    events = await _run(_with(orchestrator, FakeCompactor()), _request())
+    events = await _run(_with(orchestrator, compactor), _request())
+    # It must have been SPECULATED on, or this test would pass with declaration
+    # handling entirely broken.
+    assert compactor.calls
     assert "compaction" not in _kinds(events)
 
 
@@ -438,6 +455,29 @@ async def test_an_oversized_block_is_discarded_whole(
 
 
 @pytest.mark.asyncio
+async def test_a_block_the_wire_model_rejects_is_not_an_exception(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """`_run_compaction` must be total: nothing escapes onto a detached task.
+
+    The byte cap is a setting, so raising it far enough lets a block clear it and
+    still fail `CompactionBlock`'s own code-point limit. An exception escaping
+    there would sit unretrieved on a task the terminal path may have cancelled
+    rather than awaited.
+    """
+    orchestrator.settings = orchestrator.settings.model_copy(
+        update={"cap_compaction_block_bytes": 4 * 1024 * 1024}
+    )
+    fake_provider.stream_chunks = _chunks(f"{FINAL_MARKER}\n", "All green.")
+    events = await _run(
+        _with(orchestrator, FakeCompactor(content="x" * 300_000)), _request()
+    )
+    assert "compaction" not in _kinds(events)
+    assert _kinds(events)[-1] == "done"
+    assert _content(events) == "All green."
+
+
+@pytest.mark.asyncio
 async def test_a_slow_compaction_does_not_hold_the_terminal_event(
     orchestrator: ChatOrchestrator, fake_provider: FakeProvider
 ) -> None:
@@ -472,7 +512,127 @@ async def test_a_sub_agent_never_compacts(
     assert compactor.calls == []
 
 
+@pytest.mark.asyncio
+async def test_a_bare_intent_re_roll_cancels_the_speculative_call(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """Attempt 0 declared FINAL about a draft that is being thrown away.
+
+    The re-roll deliberately starts no replacement: a round whose output shape was
+    already wrong once is not the one to trust with freezing history.
+    """
+    compactor = FakeCompactor(delay=30.0)
+    dead = "All five votes are in. Let me read them, one read per terminal, batched."
+    # A YIELDING stream on both attempts: the speculative task has to actually be
+    # SCHEDULED for its cancellation to be observable at all, and `FakeStream`
+    # awaits nothing.
+    fake_provider.stream_factory = lambda request: _YieldingStream(
+        _chunks(f"{TOOLS_MARKER}\n", "Tallied.")
+        if any(
+            "previous draft was discarded" in (m.get("content") or "")
+            for m in request.messages
+        )
+        else _chunks(f"{FINAL_MARKER}\n", dead)
+    )
+    events = await _run(_with(orchestrator, compactor), _request())
+    assert len(fake_provider.stream_requests) == 2, "the re-roll must have happened"
+    assert len(compactor.calls) == 1, "and no second call was started"
+    assert compactor.cancellations == 1
+    assert "compaction" not in _kinds(events)
+    assert _content(events) == "Tallied."
+
+
+@pytest.mark.asyncio
+async def test_a_marker_sharing_a_delta_with_content_and_tool_calls(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """One chunk carrying all three is the case a naive early `continue` breaks."""
+    mixed = _tool_call_chunk()
+    mixed["choices"][0]["delta"]["content"] = f"{FINAL_MARKER}\nLooking now."
+    fake_provider.stream_chunks = [
+        _chunks("x")[0],
+        mixed,
+        _chunks("x", finish_reason="tool_calls")[-1],
+    ]
+    events = await _run(_with(orchestrator, FakeCompactor()), _request())
+    assert "DAINTREE" not in "".join(events)
+    assert _content(events) == "Looking now."
+    assert any(d.get("tool_calls") for d in _of(events, "delta"))
+    # Declared FINAL, then called a tool: speculated on, never delivered.
+    assert "compaction" not in _kinds(events)
+
+
+@pytest.mark.asyncio
+async def test_a_reply_that_ends_mid_marker_still_reaches_the_client(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """`scanner.finish()` owes the client every character it was holding."""
+    fake_provider.stream_chunks = _chunks("[[DAINT")
+    events = await _run(orchestrator, _request())
+    assert _content(events) == "[[DAINT"
+    assert _kinds(events)[-1] == "done"
+
+
+@pytest.mark.asyncio
+async def test_a_mid_stream_failure_abandons_the_speculative_call(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """An errored stream can never deliver, so the call it carried is pure waste."""
+    from daintree_assistant_server.errors import upstream_unavailable
+
+    compactor = FakeCompactor(delay=30.0)
+    chunks = _chunks(f"{FINAL_MARKER}\n", "one ", "two")
+    fake_provider.stream_factory = lambda _request: FakeStream(
+        chunks, error_at=3, error=upstream_unavailable("gone")
+    )
+    events = await _run(_with(orchestrator, compactor), _request())
+    assert _kinds(events)[-1] == "error"
+    assert "compaction" not in _kinds(events)
+    assert compactor.cancellations == 1
+
+
+@pytest.mark.asyncio
+async def test_the_block_limit_is_measured_in_bytes_not_characters(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """A multibyte block that fits by character count can still bust the budget."""
+    orchestrator.settings = orchestrator.settings.model_copy(
+        update={"cap_compaction_block_bytes": 64}
+    )
+    fake_provider.stream_chunks = _chunks(f"{FINAL_MARKER}\n", "All green.")
+    # 40 code points, 120 UTF-8 bytes.
+    events = await _run(_with(orchestrator, FakeCompactor(content="\u4f60" * 40)), _request())
+    assert "compaction" not in _kinds(events)
+    assert _kinds(events)[-1] == "done"
+
+
 # ---- the non-streaming path --------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_compactor_that_raises_on_availability_does_not_fail_the_turn(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """This runs INSIDE the delta loop, mid-reply.
+
+    `available` is a property a real producer computes — a key, a health check.
+    An exception escaping there would turn a reply the user is already reading
+    into a terminal error, for an optimisation they never asked for.
+    """
+
+    class _Exploding:
+        @property
+        def available(self) -> bool:
+            raise RuntimeError("config refresh failed")
+
+        async def compact(self, request: Any) -> None:  # pragma: no cover
+            return None
+
+    fake_provider.stream_chunks = _chunks(f"{FINAL_MARKER}\n", "All green.")
+    events = await _run(_with(orchestrator, _Exploding()), _request())
+    assert _content(events) == "All green."
+    assert _kinds(events)[-1] == "done"
+    assert "error" not in _kinds(events)
 
 
 @pytest.mark.asyncio
@@ -492,3 +652,27 @@ async def test_the_non_streaming_body_carries_no_control_line(
     assert outcome.body["message"]["content"] == "All three agents are green."
     # No SSE channel to deliver on, and nothing left to overlap with.
     assert compactor.calls == []
+
+
+@pytest.mark.asyncio
+async def test_the_non_streaming_path_strips_exactly_one_control_line(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    """Stripping is not idempotent, and the path runs it around the repair.
+
+    A reply that legitimately QUOTES the marker on its second line would lose
+    that line to a second pass — and the two response modes would then disagree
+    about what the user is owed, since streaming removes only the first.
+    """
+    fake_provider.complete_result = make_result(
+        content=f"{FINAL_MARKER}\n{TOOLS_MARKER}\nThat is the marker you asked about."
+    )
+    outcome = await orchestrator.complete(
+        _request(stream=False, tools=False),
+        upstream_model="deepseek-v4-flash",
+        api_key=TEST_API_KEY,
+    )
+    assert outcome.body is not None
+    assert outcome.body["message"]["content"] == (
+        f"{TOOLS_MARKER}\nThat is the marker you asked about."
+    )

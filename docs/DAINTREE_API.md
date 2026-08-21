@@ -437,16 +437,25 @@ Guarantees:
 ### Context compaction
 
 Long orchestration sessions resend their whole history every round at full input price.
-Most of that history is a stale snapshot of a mutable world, so the server may replace a
-settled prefix of the conversation with one block of reconciled **current state**.
+Most of that history is a stale snapshot of a mutable world, so the server may **propose**
+replacing a settled prefix of the conversation with one block of reconciled **current
+state**. The client owns its history and performs the replacement; the server stores nothing.
 
-The model declares on the first line of every reply whether the reply ends the turn. The
+The model declares on the first line of its reply whether that reply ends the turn. The
 server strips that line before any byte reaches the client — it never appears in a `delta` —
 and on a final reply starts the compaction call while the rest of the message is still
-streaming, which is what makes it nearly free.
+streaming, so the wait is usually hidden behind generation that was happening anyway. It is
+overlapped, not free: the call still costs, and a reply that then makes a tool call after all
+has its block discarded unsent.
 
-`compaction` is **optional on every turn**. Most turns emit none, and a client that receives
-none simply keeps the history it already holds. Handle it or ignore it; never wait for it.
+Scope, precisely: `profile: "assistant"`, **streaming** replies, and not a
+`response_format: "json_object"` turn (a bare JSON object carries no control line, since one
+would invalidate it). Non-streaming turns strip the declaration and never compact — a single
+awaited completion has no generation left to overlap with.
+
+`compaction` is **optional on every turn**, and at most one per turn. Most turns emit none,
+and a client that receives none simply keeps the history it already holds. Handle it or
+ignore it; never wait for it.
 
 Applying a block, exactly:
 
@@ -466,7 +475,8 @@ messages = messages.slice(0, replaces.start_index)
 - Nothing about a block is stored server-side, and none of it rides the state token.
 
 `/v1/daintree/capabilities` carries a `context_compaction` block: `enabled` is whether THIS
-deployment can actually produce one, `max_block_bytes` the largest it will send. The
+deployment can actually produce one, and `max_block_content_bytes` bounds `block.content`
+specifically — the content string in UTF-8 bytes, not the block and not the event. The
 `compaction` event is listed in `stream_events` regardless, because a parser that handles it
 is correct against every deployment.
 

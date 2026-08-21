@@ -398,8 +398,12 @@ class Settings(BaseSettings):
     # block is discarded whole and the turn keeps its raw history, because
     # truncating reconciled state cuts exactly the agent ids and worktree paths
     # that make the block worth having.
+    # The upper bound is not decoration: `CompactionBlock.content` carries its own
+    # code-point limit, and a byte cap set above it would let a block clear this
+    # check and then be rejected by the wire model — a failure mode reachable only
+    # by configuration, which is the kind nobody finds until production.
     cap_compaction_block_bytes: int = Field(
-        default=64 * 1024, ge=1, alias="CAP_COMPACTION_BLOCK_BYTES"
+        default=64 * 1024, ge=1, le=256 * 1024, alias="CAP_COMPACTION_BLOCK_BYTES"
     )
 
     # ---- Skill learning (LOCAL DEVELOPMENT ONLY) ------------------------

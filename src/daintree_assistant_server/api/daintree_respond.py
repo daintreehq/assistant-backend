@@ -2,7 +2,7 @@
 
 This is the Daintree-owned protocol (not OpenAI-compatible). It returns a native
 JSON response, or — when ``generation.stream`` is true — a named-event SSE stream
-(``meta`` / ``delta`` / ``done`` / ``error``).
+(``meta`` / ``status`` / ``delta`` / ``compaction`` / ``done`` / ``error``).
 """
 
 from __future__ import annotations

@@ -10,7 +10,7 @@ from fakes import FakeCompactor, make_result, selection_result
 from fastapi.testclient import TestClient
 from unit.test_task_runner import EXPECTED_TASK_IDS
 
-from daintree_assistant_server.main import build_container, create_app
+from daintree_assistant_server.main import create_app
 
 SKILL_PREP = "daintree.workflow.prep-branch-for-review"
 
@@ -82,18 +82,18 @@ def test_capabilities_reports_a_configured_compactor_as_enabled(
     feature dark the day a producer is finally wired in — the one failure that
     would look like nothing being wrong.
     """
-    seam = scripted_selector(fake_provider, settings)
     application = create_app(
         settings=settings,
         provider=fake_provider,
-        selector=seam,
+        selector=scripted_selector(fake_provider, settings),
         compactor=FakeCompactor(),
     )
-    container = build_container(settings, fake_provider, seam, FakeCompactor())
-    detach_docs_client(container)
-    application.state.container = container
-    application.state.ready = True
+    # The container the LIFESPAN builds, not one substituted afterwards —
+    # substituting it would let this pass even if `create_app` dropped the
+    # injected compactor on the floor, which is the exact wiring under test.
     with TestClient(application) as client:
+        container = application.state.container
+        detach_docs_client(container)
         body = client.get("/v1/daintree/capabilities").json()
     assert body["context_compaction"]["enabled"] is True
     assert container.orchestrator.compactor is container.compactor
@@ -176,11 +176,19 @@ def test_capabilities(client, auth, app) -> None:
         "enabled": False,
         "stream_event": "compaction",
         "delivery": "before_done",
+        "at_most_once": True,
+        "streaming_only": True,
         "best_effort": True,
         "append_only": True,
         "block_message_name": "daintree_compaction",
-        "span": {"collection": "input.messages", "end_exclusive": True},
-        "max_block_bytes": 65536,
+        "span": {
+            "collection": "input.messages",
+            "index_base": 0,
+            "end_exclusive": True,
+            "excludes_current_reply": True,
+        },
+        "turn_id_match_required": True,
+        "max_block_content_bytes": 65536,
     }
     assert body["context_compaction"]["stream_event"] in body["respond"]["stream_events"]
 

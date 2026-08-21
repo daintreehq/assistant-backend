@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .errors import ErrorDetail
 from .extensions import (
@@ -279,7 +279,8 @@ class RespondResponse(BaseModel):
 
 
 # --------------------------------------------------------------------------
-# Streaming event payloads (named SSE events: meta / status / delta / done / error).
+# Streaming event payloads (named SSE events: meta / status / delta /
+# compaction / done / error). `done` is terminal — nothing follows it.
 # --------------------------------------------------------------------------
 
 
@@ -374,6 +375,15 @@ class CompactionSpan(BaseModel):
     #: Exclusive. Always greater than ``start_index`` — an empty span is never
     #: emitted, because there would be nothing for the block to replace.
     end_index: int = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _span_is_non_empty(self) -> CompactionSpan:
+        # Enforced rather than merely documented: the field bounds alone admit
+        # `start=5, end=2`, and a client applying the splice literally would then
+        # DUPLICATE the messages between them instead of replacing anything.
+        if self.end_index <= self.start_index:
+            raise ValueError("end_index must be greater than start_index")
+        return self
 
 
 class CompactionBlock(BaseModel):

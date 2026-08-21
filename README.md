@@ -12,8 +12,8 @@ seam they land in.
 
 It exposes a **Daintree-native** API (`POST /v1/daintree/respond`) — purpose-built,
 not OpenAI-compatible. The session/skill envelope is first-class, skills are surfaced
-as their own response block, and streaming uses named SSE events (`meta`/`delta`/`done`/
-`error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
+as their own response block, and streaming uses named SSE events (`meta`/`status`/`delta`/
+`compaction`/`done`/`error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
 - **Upstream:** Cerebras Inference (OpenAI-format API spoken *internally*, behind a provider abstraction) — `gemma-4-31b` for the main completion and every utility task; skill selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Cerebras is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference. Requests are not collected for training ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, deliberately *not* a zero-retention claim <!-- privacy-copy-ok -->)

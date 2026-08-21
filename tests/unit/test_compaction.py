@@ -8,6 +8,9 @@ happened. So the boundaries are pinned here rather than left to the producer.
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from daintree_assistant_server.contracts.daintree_api import (
     COMPACTION_BLOCK_NAME,
     CompactionBlock,
@@ -107,6 +110,58 @@ def test_a_tool_round_is_never_split_from_its_call() -> None:
     assert roles == ["user", "assistant", "tool", "assistant"]
 
 
+def test_the_reserved_name_only_counts_on_a_user_message() -> None:
+    """Otherwise a client can walk the boundary into a tool transaction.
+
+    An assistant message wearing the reserved name would move `start` past the
+    call and onto its orphaned `tool` result — a 400 for the compactor's own
+    upstream, and a splice that leaves the CLIENT's next request malformed.
+    """
+    call = ChatMessage(
+        role="assistant",
+        name=COMPACTION_BLOCK_NAME,
+        tool_calls=[
+            {
+                "id": "c1",
+                "type": "function",
+                "function": {"name": "terminal__read", "arguments": "{}"},
+            }
+        ],
+    )
+    messages = [
+        _user("old task"),
+        call,
+        ChatMessage(role="tool", tool_call_id="c1", content="result"),
+        _assistant("done"),
+        _user("new task"),
+    ]
+    source = select_source(messages)
+    assert source is not None
+    # The name is ignored on an assistant message, so the span still opens at 0
+    # and the call keeps its result.
+    assert (source.start, source.end) == (0, 4)
+
+
+def test_a_span_never_opens_on_an_orphaned_tool_result() -> None:
+    """The span must start at a turn boundary, whatever precedes it."""
+    messages = [
+        _block(),
+        ChatMessage(role="tool", tool_call_id="c1", content="stray"),
+        _assistant("done"),
+        _user("a"),
+        _assistant("b"),
+        _user("live"),
+    ]
+    source = select_source(messages)
+    assert source is not None
+    assert messages[source.start].role == "user"
+    assert (source.start, source.end) == (3, 5)
+
+
+def test_advancing_past_a_non_user_tail_can_empty_the_span() -> None:
+    assert select_source([_block(), _assistant("only"), _user("live")]) is None
+
+
 # ---- the seam ----------------------------------------------------------
 
 
@@ -150,13 +205,15 @@ def test_the_event_splices_without_guessing() -> None:
 
 
 def test_the_event_is_strict_about_its_own_shape() -> None:
-    import pytest
-    from pydantic import ValidationError
-
     with pytest.raises(ValidationError):
         CompactionBlock(content="")
     with pytest.raises(ValidationError):
         CompactionSpan(start_index=0, end_index=0)
+    # Enforced, not merely documented: the field bounds alone admit this, and a
+    # client applying the splice literally would DUPLICATE messages 2..5 rather
+    # than replace anything.
+    with pytest.raises(ValidationError):
+        CompactionSpan(start_index=5, end_index=2)
     with pytest.raises(ValidationError):
         StreamCompaction(
             turn_id="t",

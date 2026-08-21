@@ -22,7 +22,7 @@ from daintree_assistant_server.skills.catalog import load_catalog
 # should require the same argument as adding a rule — what behaviour needs this,
 # and why does it have to hold on every turn rather than in a skill?
 #
-# Current: ~23 KB across seven partials, down from 31.7 KB.
+# Current: ~23 KB across eight partials, down from 31.7 KB.
 #
 # THE MOVE THIS ANTICIPATED HAS NOW LANDED. The reduction from ~27.5 KB came from
 # rules MOVED into `daintree.foundation`, not tighter wording. The earlier note
@@ -113,7 +113,7 @@ BASE_PARTIAL_CEILINGS = {
     # The turn-finality control line (issue #61). It fires on EVERY reply — a
     # zero-skill turn included — and the backend strips it before the client sees
     # a byte, so it is base by the split rule and cannot live anywhere else. Sized
-    # to the measured 750B; note the AGGREGATE ceiling binds well before this one
+    # to the measured 645B; note the AGGREGATE ceiling binds well before this one
     # does, which is the correct precedence for a partial this close to the line.
     "15-response-declaration.md": 1024,
     # Raised with BASE_PROMPT_CEILING above (see the argument there) — the

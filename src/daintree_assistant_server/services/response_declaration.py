@@ -10,13 +10,21 @@ terminating did not already say. A marker at the FRONT buys the entire remaining
 generation for work that can run in parallel with it, which is most of the latency
 budget a turn has.
 
-It is a CONTROL TOKEN, not content: it must never reach the client. Two failures
-matter and they are not the same size. A leaked ``[[DAINTREE:FINAL]]`` in the
-terminal is obvious and someone files it. A marker that is stripped but leaves a
-stray space or newline behind shifts the first visible character of every reply,
-renders as a subtly different paragraph, and nobody files anything — so the
-stripping here removes the marker AND the whitespace the model put around it,
-and touches nothing after that.
+It is a CONTROL TOKEN, not content, and the guarantee is precise: a marker
+written where the prompt asks for it — first, under ``MAX_LEADING_WHITESPACE``
+characters of whitespace — never reaches the client. Past that bound the reply is
+read as having no declaration and forwarded BYTE FOR BYTE, which is the
+conservative failure: no compaction is started, and nothing the model wrote is
+lost. Tolerating unbounded whitespace instead would mean either holding an
+unbounded prefix, or discarding leading spaces that a reply opening with an
+indented code block genuinely meant.
+
+Two failures matter and they are not the same size. A leaked
+``[[DAINTREE:FINAL]]`` in the terminal is obvious and someone files it. A marker
+that is stripped but leaves a stray space or newline behind shifts the first
+visible character of every reply, renders as a subtly different paragraph, and
+nobody files anything — so the stripping here removes the marker AND the
+whitespace the model put around it, and touches nothing after that.
 
 Two entry points that MUST agree, for the same reason ``bare_intent`` keeps its
 probe and its predicate in step: ``DeclarationScanner`` for the streaming path,
