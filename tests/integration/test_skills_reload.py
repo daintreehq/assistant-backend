@@ -163,9 +163,23 @@ def test_reload_applies_an_overlay_edit_live(
     assert "test.overlay.live" in _container(overlay_client).catalog
     assert "test.overlay.live" in _container(overlay_client).orchestrator.catalog
 
+    assert body["object"] == "skill_catalog_reload"
+
     listed = overlay_client.get("/v1/daintree/skills", headers=auth)
     assert listed.headers["ETag"] != before_etag
     assert any(s["id"] == "test.overlay.live" for s in listed.json()["data"])
+
+    # The conditional path has to move too. A cache that still answers 304 to the
+    # pre-reload ETag would hand a CLI the old catalog for as long as it kept
+    # asking politely — the one client most likely to be holding an ETag.
+    stale = overlay_client.get(
+        "/v1/daintree/skills", headers={**auth, "If-None-Match": before_etag}
+    )
+    assert stale.status_code == 200
+    fresh = overlay_client.get(
+        "/v1/daintree/skills", headers={**auth, "If-None-Match": listed.headers["ETag"]}
+    )
+    assert fresh.status_code == 304
 
 
 def test_reload_reports_an_unchanged_catalog(
@@ -231,3 +245,87 @@ def test_a_fixed_overlay_skill_reloads_after_a_failure(
     assert r.status_code == 200
     assert r.json()["changed"] is True
     assert "test.overlay.fixable" in _container(overlay_client).catalog
+
+
+def test_reload_picks_up_an_edit_to_an_existing_overlay_skill(
+    overlay: Path, fake_provider: Any, auth: dict[str, str]
+) -> None:
+    """The literal ask in the issue: EDIT a skill while the server runs.
+
+    Adding a file and editing one are different code paths to anything that
+    remembers what it has already read, and editing is the one an author does
+    fifty times an afternoon.
+    """
+    _write(overlay, "test.overlay.edited", "The first draft.")
+    for client in _serve(_app(_settings(overlay), fake_provider)):
+        before = _container(client).catalog.get("test.overlay.edited")
+        assert before is not None
+        assert before.summary == "The first draft."
+
+        _write(overlay, "test.overlay.edited", "The second draft.")
+        r = client.post(RELOAD_URL, headers=auth)
+
+        assert r.status_code == 200
+        assert r.json()["changed"] is True
+        after = _container(client).catalog.get("test.overlay.edited")
+        assert after is not None
+        assert after.summary == "The second draft."
+
+
+def test_an_overlay_directory_created_after_startup_is_picked_up(
+    tmp_path: Path, fake_provider: Any, auth: dict[str, str]
+) -> None:
+    """The first run: the variable is set before the directory exists.
+
+    Failing readiness here would make the feature hostile to the exact moment it
+    is being switched on, so a not-yet-created overlay is simply empty — and the
+    route is mounted anyway, ready for the directory to appear.
+    """
+    overlay = tmp_path / "not-yet"
+    for client in _serve(_app(_settings(overlay), fake_provider)):
+        assert client.post(RELOAD_URL, headers=auth).json()["changed"] is False
+
+        overlay.mkdir()
+        _write(overlay, "test.overlay.late", "Arrived after startup.")
+        r = client.post(RELOAD_URL, headers=auth)
+
+        assert r.status_code == 200
+        assert "test.overlay.late" in _container(client).catalog
+
+
+def test_an_overlay_path_that_is_a_file_fails_readiness(
+    tmp_path: Path, fake_provider: Any, auth: dict[str, str]
+) -> None:
+    """A typo'd path must not be indistinguishable from an empty directory.
+
+    Ignoring it silently is the worst outcome available: the author edits skills
+    into a path nothing reads and is told, correctly and uselessly, that nothing
+    changed.
+    """
+    not_a_directory = tmp_path / "overlay.md"
+    not_a_directory.write_text("this is a file, not a directory", encoding="utf-8")
+
+    for client in _serve(_app(_settings(not_a_directory), fake_provider)):
+        assert client.get("/readyz").status_code == 503
+        # Mounted (the overlay IS configured) but unready — 503, not 404, which
+        # is what tells the absence tests above apart from an unready server.
+        assert client.post(RELOAD_URL, headers=auth).status_code == 503
+
+
+def test_the_reload_route_is_503_not_500_on_an_unready_server(
+    overlay: Path, fake_provider: Any, auth: dict[str, str]
+) -> None:
+    """A malformed skill at STARTUP is still a readiness failure, not a reload.
+
+    There is no container to reload from in that state, so the route has to be
+    readiness-gated: without the dependency it would reach `container=None` and
+    answer a routine authoring mistake with a 500.
+    """
+    (overlay / "test.overlay.broken.md").write_text("not a skill", encoding="utf-8")
+
+    for client in _serve(_app(_settings(overlay), fake_provider)):
+        assert client.get("/readyz").status_code == 503
+        r = client.post(RELOAD_URL, headers=auth)
+        assert r.status_code == 503
+        assert r.json()["error"]["code"] == "service_unavailable"
+        assert r.headers["Retry-After"] == "5"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Iterator
 from typing import Any
 
@@ -30,11 +31,24 @@ API_KEY = "test-api-key"
 @pytest.fixture(autouse=True, scope="session")
 def _isolate_from_dotenv() -> Iterator[None]:
     """Tests must not read a developer's local ``.env``: it would override any
-    Settings field not explicitly passed and break test isolation."""
+    Settings field not explicitly passed and break test isolation.
+
+    The real process environment is the same hazard by a shorter route, and the
+    local-development-only paths are the ones a developer actually exports —
+    ``DAINTREE_SKILLS_OVERLAY_DIR`` is set for as long as they are authoring a
+    skill. A test asserting a field is unset by default must not fail because
+    the person running it happened to be using the feature.
+    """
     previous = Settings.model_config.get("env_file")
     Settings.model_config["env_file"] = None
+    exported = {
+        name: os.environ.pop(name)
+        for name in ("DAINTREE_SKILLS_OVERLAY_DIR", "DAINTREE_DUMP_UPSTREAM_DIR")
+        if name in os.environ
+    }
     yield
     Settings.model_config["env_file"] = previous
+    os.environ.update(exported)
 
 
 @pytest.fixture

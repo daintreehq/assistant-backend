@@ -120,3 +120,16 @@ def test_load_skill_file_uses_filename_as_id(tmp_path) -> None:
     path.write_text(VALID, encoding="utf-8")
     skill = load_skill_file(path)
     assert skill.id == "test.example"
+
+
+def test_a_yaml_scalar_that_pyyaml_cannot_construct_is_a_skill_error() -> None:
+    """PyYAML does not route every failure through ``yaml.YAMLError``.
+
+    An unquoted impossible date is constructed, not parsed, so it surfaces as a
+    bare ``ValueError``. Left uncaught it escapes this module entirely and an
+    ordinary typo reads as a server fault rather than "your frontmatter is
+    wrong" — which is the whole promise of loading strictly.
+    """
+    text = VALID.replace("title: Example", "title: 2025-02-29")
+    with pytest.raises(SkillLoadError, match="invalid YAML frontmatter"):
+        parse_skill(text)

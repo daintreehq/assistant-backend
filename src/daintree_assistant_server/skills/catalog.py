@@ -1,10 +1,12 @@
 """The immutable skill catalog.
 
-Built once at startup from the packaged skill files. Computes a deterministic
-catalog revision used for prompt-cache identity and skill-state validation. A
-``Catalog`` instance is immutable; where the catalog can change at runtime (the
-local skill-learning harness), a :class:`CatalogManager` holds the current
-instance and swaps in a freshly-loaded one — never mutating in place.
+Built at startup from the packaged skill files, plus a local overlay directory
+when one is configured. Computes a deterministic catalog revision used for
+prompt-cache identity and skill-state validation. A ``Catalog`` instance is
+immutable; the catalog changes at runtime only by REPLACEMENT — a
+:class:`CatalogManager` holds the current instance and swaps in a freshly-loaded
+one, never mutating in place. Today the one thing that asks for a swap is the
+local skill-overlay reload endpoint.
 """
 
 from __future__ import annotations
@@ -266,8 +268,13 @@ def load_catalog(
     rather than a startup failure.
     """
     primary = load_skills_dir(primary_dir or default_skills_dir())
-    if overlay_dir is None or not overlay_dir.is_dir():
+    if overlay_dir is None or not overlay_dir.exists():
         return Catalog(primary)
+    # An overlay path that exists but is not a directory is a typo, and the one
+    # thing worse than failing on it is succeeding: the developer edits skills
+    # into a path nothing reads, reloads, and is told nothing changed.
+    if not overlay_dir.is_dir():
+        raise SkillLoadError(f"skill overlay path is not a directory: {overlay_dir}")
     if primary_dir is not None and overlay_dir.resolve() == primary_dir.resolve():
         return Catalog(primary)
     merged: dict[str, Skill] = {s.id: s for s in primary}
@@ -297,6 +304,14 @@ class CatalogManager:
         self._catalog = catalog
         self._primary_dir = primary_dir
         self._overlay_dir = overlay_dir
+        # One reload at a time. Each load completes before it rebinds, so no
+        # interleaving can expose a half-built catalog — but two concurrent
+        # reloads can still FINISH out of order and leave the older one bound,
+        # which reads to an author as an edit that silently reverted. Held by
+        # the caller across its whole read-revision-then-reload critical
+        # section, so the revision a reload reports replacing is the one it
+        # actually replaced. `reload` does not take it: it is not reentrant.
+        self.reload_lock = asyncio.Lock()
 
     @property
     def catalog(self) -> Catalog:

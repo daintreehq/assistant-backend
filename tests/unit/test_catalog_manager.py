@@ -176,3 +176,32 @@ async def test_a_failed_async_reload_keeps_the_previous_catalog(tmp_path: Path) 
         await manager.reload()
 
     assert manager.catalog is before
+
+
+def test_an_overlay_path_that_is_a_file_is_rejected(tmp_path: Path) -> None:
+    """Distinct from a missing directory, and deliberately so.
+
+    A path that has not been created yet is a normal first-run state. A path
+    that exists and is not a directory is a typo, and silently ignoring it is
+    the failure mode that wastes an afternoon.
+    """
+    primary = tmp_path / "primary"
+    _write(primary, "test.alpha", "Alpha.")
+    not_a_directory = tmp_path / "overlay.md"
+    not_a_directory.write_text("a file", encoding="utf-8")
+
+    with pytest.raises(SkillLoadError, match="not a directory"):
+        load_catalog(primary, not_a_directory)
+
+
+def test_reload_serializes_on_the_manager_s_lock(tmp_path: Path) -> None:
+    """The lock is the manager's, not the endpoint's — one per catalog.
+
+    Two containers in one process (which the test suite routinely builds) must
+    not contend, and any future caller gets the same serialization for free.
+    """
+    primary = tmp_path / "primary"
+    _write(primary, "test.alpha", "Alpha.")
+    first = CatalogManager(load_catalog(primary), primary_dir=primary)
+    second = CatalogManager(load_catalog(primary), primary_dir=primary)
+    assert first.reload_lock is not second.reload_lock

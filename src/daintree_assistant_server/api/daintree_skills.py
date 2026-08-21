@@ -110,17 +110,20 @@ async def reload_skills(
     selection, keyed off the revision.
     """
     manager = request.app.state.container.catalog_manager
-    previous = manager.catalog.revision
-    try:
-        catalog = await manager.reload()
-    except (SkillLoadError, OSError) as exc:
-        logger.warning("skill_reload_failed", error=str(exc), catalog_revision=previous)
-        raise DaintreeError(
-            status_code=409,
-            message=f"Skill catalog reload failed; the previous catalog is still active: {exc}",
-            type="api_error",
-            code="skill_catalog_reload_failed",
-        ) from exc
+    async with manager.reload_lock:
+        previous = manager.catalog.revision
+        try:
+            catalog = await manager.reload()
+        except (SkillLoadError, OSError) as exc:
+            logger.warning("skill_reload_failed", error=str(exc), catalog_revision=previous)
+            raise DaintreeError(
+                status_code=409,
+                message=(
+                    f"Skill catalog reload failed; the previous catalog is still active: {exc}"
+                ),
+                type="api_error",
+                code="skill_catalog_reload_failed",
+            ) from exc
 
     changed = catalog.revision != previous
     logger.info(
