@@ -109,7 +109,12 @@ def test_capabilities(client, auth, app) -> None:
     # snapshot — it is what the list is keyed on.
     catalog = app.state.container.catalog
     assert body["skills"]["catalog_revision"] == catalog.revision
-    assert body["skills"]["catalog"] == [{"id": s.id, "title": s.title} for s in catalog.skills]
+    listing = body["skills"]["catalog"]
+    assert listing == [{"id": s.id, "title": s.title} for s in catalog.skills]
+    # Sorted-by-id is a DOCUMENTED property of the wire shape, and the equality
+    # above cannot pin it: it compares against `Catalog.skills`, so if the catalog
+    # stopped sorting, both sides would go unsorted together and still match.
+    assert [e["id"] for e in listing] == sorted(e["id"] for e in listing)
     wf = body["workflow_intelligence"]
     assert wf["turn_context_field"] == "workflow_state"
     assert wf["tasks"] == ["workflow_plan", "workflow_reconcile", "workflow_resume_digest"]
@@ -130,6 +135,24 @@ def test_skills_list_and_etag(client, auth, app) -> None:
 
     r304 = client.get("/v1/daintree/skills", headers={**auth, "If-None-Match": etag})
     assert r304.status_code == 304
+
+
+def test_capabilities_catalog_matches_skills_endpoint(client, auth) -> None:
+    """The two public catalog views must not drift apart.
+
+    `skills.catalog` on capabilities and `data` on /v1/daintree/skills project the
+    SAME catalog at two widths, and the API doc now sends clients from one to the
+    other for the full metadata. Nothing else would notice if they diverged — each
+    endpoint has its own test and both would stay green while the pair silently
+    disagreed about which skills exist.
+    """
+    caps = client.get("/v1/daintree/capabilities", headers=auth).json()
+    skills = client.get("/v1/daintree/skills", headers=auth).json()
+
+    assert caps["skills"]["catalog_revision"] == skills["catalog_revision"]
+    assert caps["skills"]["catalog"] == [
+        {"id": s["id"], "title": s["title"]} for s in skills["data"]
+    ]
 
 
 def test_skills_resolve_find(client, auth, fake_provider, app) -> None:

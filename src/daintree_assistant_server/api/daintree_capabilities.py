@@ -21,10 +21,14 @@ async def capabilities(
 ) -> dict[str, object]:
     container = request.app.state.container
     settings = request.app.state.settings
-    # Bound ONCE, not read twice. `Container.catalog` reads live through
-    # `CatalogManager`, which supports atomic replacement — so two property
-    # reads could pair one generation's revision with another's entries, and
-    # the whole point of the pair is that the revision keys the list.
+    # One snapshot, deliberately. `Container.catalog` reads live through
+    # `CatalogManager`, which supports atomic replacement, and the revision
+    # below is what keys the list beside it — so reading the property twice
+    # would be reading a pair that is only meaningful if it comes from one
+    # generation. NOT a live race today: nothing in production calls
+    # `reload()`, and this handler never awaits, so the async reload's
+    # rebind cannot interleave with it. A defensive invariant held cheaply,
+    # so that whenever runtime reload does arrive it is already correct.
     catalog = container.catalog
     return {
         "server_version": __version__,
@@ -95,10 +99,18 @@ async def capabilities(
             "manual_resolve": True,
             # Every skill the catalog holds, as the minimal {id, title} reference.
             # A client naming a skill — a CLI flag, a manual `resolve` load — can
-            # now check the id before it spends a turn, and suggest near misses on
-            # a typo instead of running a turn that looks fine and silently loaded
-            # nothing. Keyed by `catalog_revision` above: same snapshot, so a
-            # cached list is valid exactly as long as the revision it arrived with.
+            # now check the id BEFORE it spends a turn, and offer near misses. The
+            # server is not silent about a bad id (`load` warns
+            # `unknown_skill_id_ignored`), but that arrives after the turn ran, in
+            # a response field, with no idea what the user meant; preflight is a
+            # different thing from a post-hoc warning.
+            #
+            # Cache it against `catalog_revision` above — same snapshot. That is
+            # CONSERVATIVE rather than exact: the revision hashes every skill's
+            # metadata AND body, so a body-only edit moves it while this list stays
+            # byte-identical. Re-fetching more often than strictly needed is the
+            # right side to err on for a ~3.5KB array, and a second revision
+            # covering only ids and titles would be a version to maintain.
             #
             # Minimal on purpose. `/v1/daintree/skills` already serves the full
             # metadata (summary, when_to_use, risk, required_tools) with an ETag;

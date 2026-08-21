@@ -524,9 +524,11 @@ suggest near misses before spending a turn. It is the **canonical full catalog**
 capabilities has neither a `profile` nor a tool inventory, so it is not narrowed to a
 profile's executable menu, and server-pinned skills are included because manual `load`
 accepts them. Cache it against the `catalog_revision` alongside it: both come from one
-catalog snapshot. For the full metadata (summary, when-to-use, risk, required tools) use
-`/v1/daintree/skills`, which serves it with an ETag; `skills.catalog` deliberately does
-not repeat it.
+catalog snapshot. That keying is **conservative, not exact** — the revision hashes every
+skill's metadata *and body*, so it moves on a body-only edit that leaves the id/title list
+byte-identical; a client will occasionally re-fetch a list that did not change. For the
+full metadata (summary, when-to-use, risk, required tools) use `/v1/daintree/skills`,
+which serves it with an ETag; `skills.catalog` deliberately does not repeat it.
 
 ---
 
