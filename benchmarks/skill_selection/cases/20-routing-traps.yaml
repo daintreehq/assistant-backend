@@ -349,3 +349,19 @@ cases:
     expect:
       required: [daintree.workflow.follow-up-on-issue]
       optional: [daintree.foundation]
+
+  - id: immediate-spawn-is-not-a-timer
+    category: routing-trap
+    note: >-
+      The control for deferred-spawn-is-not-an-immediate-spawn. Without it, any rewrite that
+      "fixes" the deferred case by routing every spawn through watch-outcome would score as
+      an improvement. Same shape, no delay: the work starts now, so there is nothing to
+      schedule and no grant to mint, and watch-outcome is left out of required AND optional
+      so its presence is an actual failure rather than tolerated noise.
+    messages:
+      - role: user
+        content: >-
+          Put an agent on the migration script in the api worktree and get it going.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]

@@ -296,3 +296,37 @@ replacing with what production actually reports (`tools_full_bytes` vs
 projection measures 79.3 KiB → 22.2 KiB skill-less (72%) and → 46.8 KiB with a
 skill and its foundation (41%). The median depends entirely on the mix of those
 two shapes in real traffic, which is the thing only production can report.
+
+---
+
+## Retrain the selector for the deferred-action boundary
+
+**Trigger: the next selector retrain — this needs corpus rows, not prose, and the
+prose half is already spent.**
+
+`daintree.orchestration.watch-outcome` now declares deferred ACTIONS (not just deferred
+reports) and `daintree.edits.spawn-visible-agent` carries the matching negative, which
+moved the live failure — "create a new Claude Code terminal in 5 seconds" — from
+watch-outcome p=0.03 to p=0.87, enough to load. It is NOT robust. The same sentence with
+ordinary politeness and punctuation ("Please create a new Claude Code terminal in 5
+seconds.") still scores p=0.0003 and routes to spawn-visible-agent alone, and a
+worktree-flavoured phrasing ("in ten minutes, put an agent on the migration script in the
+api worktree") scores p=0.000. Casing and a trailing period should not decide this; that
+they do is the signature of a pattern the head has never trained on, and no further
+`whenToUse` wording buys it — the wording that fixed the incident was measured against two
+alternatives, one of which fixed the incident and broke a neighbour instead.
+
+`benchmarks/skill_selection/cases/20-routing-traps.yaml` carries only the CONTROL half
+(`immediate-spawn-is-not-a-timer`, passing), which stops a future rewrite from "fixing"
+this by routing every spawn through watch-outcome. The positive case is deliberately
+absent because it would land red. Write it with the retrain, using the verbatim request
+above plus a worktree-flavoured variant, `required: [daintree.orchestration.watch-outcome]`
+and spawn-visible-agent optional.
+
+One known cost to re-measure afterwards: the widened `whenToUse` took
+`cancel-one-named-watcher-is-foundation` from a pass to a rank_miss (foundation p=0.31),
+because watch-outcome now wins "kill the watcher I stuck on the deploy terminal". That case
+still gets `daintree.foundation` in production — `Catalog.domain_foundation` pairs it in on
+an authoritative run — so the real cost is one extra skill body, not a missing runbook. The
+benchmark measures raw classifier output, which is why it reads as a loss there and not in
+the served set.
