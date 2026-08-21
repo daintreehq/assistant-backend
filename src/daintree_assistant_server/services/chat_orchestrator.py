@@ -1008,10 +1008,12 @@ class ChatOrchestrator:
         # overrides the CLASSIFIER's judgement, not the capability boundary, and a
         # procedure whose every step calls a tool the caller lacks is worse than no
         # procedure. Requesting the same id twice is not an error; first mention wins.
-        requested_pins: list[str] = []
-        for sid in request.selection.pinned_skill_ids:
-            if sid not in requested_pins:
-                requested_pins.append(sid)
+        # `dict.fromkeys`, not `if sid not in requested_pins`: the list is
+        # client-supplied and uncapped, so a linear membership test inside the loop
+        # is quadratic work on an n the caller chooses — synchronous, on the request
+        # path, where no timeout can interrupt it. Linear here means the request
+        # body's own byte ceiling is the only bound the field needs.
+        requested_pins = list(dict.fromkeys(request.selection.pinned_skill_ids))
         eligible_pins = [sid for sid in requested_pins if sid in skills_catalog]
         if any(sid not in resolved_catalog for sid in requested_pins):
             # Same code the explicit `/skills/resolve` load path emits — one typo'd

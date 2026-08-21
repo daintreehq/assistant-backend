@@ -241,10 +241,11 @@ def resolve_active_skills(
     # survived to `pins` would be admitted once but stripped from the selection
     # twice, which is harmless, while a duplicate that reached `dropped` would be
     # reported twice, which is not.
-    pins: list[str] = []
-    for sid in client_pinned_ids:
-        if sid not in pins:
-            pins.append(sid)
+    #
+    # Set-backed, not `if sid not in pins` over a list: this list is client-supplied
+    # and uncapped, so a linear membership test inside the loop is quadratic work on
+    # an attacker-chosen n, synchronous, on the request path.
+    pins = list(dict.fromkeys(client_pinned_ids))
     pinned = set(pins)
     # Strip BOTH pin tiers out of the ordinary candidates before either branch, so a
     # skill the caller pinned (or the server did) cannot also be admitted at its own,
@@ -316,12 +317,24 @@ def resolve_active_skills(
     # answer does not use. A standalone usage question should load one runbook, not
     # two.
     #
-    # `pinned_id not in active` is the one guard the caller tier adds here. The strip
-    # above keeps the SELECTION from holding it, but a caller may pin the very skill
-    # the server was about to, and tier one will already have admitted it — paired,
-    # which is the right call when a human asked for it by name even though it is the
-    # wrong call for the automatic pin.
-    if pinned_id is not None and pinned_id in catalog and pinned_id not in active:
+    # Two guards the caller tier adds here, and they cover different halves of the
+    # same overlap: a caller may pin the very skill the server was about to.
+    #
+    # `pinned_id not in pinned` — tier one ALREADY ruled on this id, and its ruling
+    # stands either way. If it admitted it, re-admitting duplicates it; if it refused
+    # it (the unit did not fit), tier three would either report the same id in
+    # `dropped_over_cap` twice or, with one slot free, re-admit UNPAIRED the very
+    # unit tier one refused for being unaffordable whole. Both contradict rules
+    # stated above this function.
+    #
+    # `pinned_id not in active` — the id can also arrive as somebody else's domain
+    # foundation, pulled in by unit admission rather than named by anyone.
+    if (
+        pinned_id is not None
+        and pinned_id in catalog
+        and pinned_id not in pinned
+        and pinned_id not in active
+    ):
         if len(active) < max_active:
             active = active + [pinned_id]
         else:

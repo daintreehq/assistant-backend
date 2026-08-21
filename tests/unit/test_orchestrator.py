@@ -489,10 +489,33 @@ def test_a_pin_the_selector_also_chose_is_admitted_once_at_pin_priority(
     assert len(set(result.active)) == len(result.active), "an id was admitted twice"
 
 
-def test_a_pin_the_cap_refused_cannot_re_enter_via_the_selection(paired_catalog) -> None:
-    """The subtle half of the strip. The pin is stripped from the selection BEFORE
-    tier one runs, so a pin the cap refuses stays refused — it cannot quietly come
-    back at the lower priority it was promoted out of."""
+def test_a_pin_the_cap_refused_cannot_re_enter_via_the_reused_set(paired_catalog) -> None:
+    """The subtle half of the strip, on the branch where it is load-bearing.
+
+    Deliberately the REUSE branch. On the authoritative branch the strip is belt
+    and braces — `_admit_with_domain_foundations` keeps its own `considered` set,
+    so removing the strip entirely would not change the answer and a test there
+    proves nothing. `filter_dedup_cap` has no such memory: without the strip the
+    refused pin is just another prior id, and the leftover slot would re-admit it
+    BARE — the exact unit tier one refused as unaffordable whole.
+    """
+    prior = [_OTHER_ONE, _OTHER_BASE]
+    result = resolve_active_skills(
+        SelectionDecision.reuse(prior),
+        prior,
+        paired_catalog,
+        1,
+        client_pinned_ids=[_OTHER_ONE],
+    )
+    assert _OTHER_ONE not in result.active, (
+        f"a refused pin came back unpaired via the reused set; active={result.active}"
+    )
+    assert result.dropped_over_cap.count(_OTHER_ONE) == 1, "reported twice"
+
+
+def test_a_pin_the_selector_also_chose_is_not_double_reported(paired_catalog) -> None:
+    """The authoritative counterpart: an id both tiers want, refused by the cap, is
+    recorded once rather than once per tier."""
     result = resolve_active_skills(
         SelectionDecision(skill_ids=[_ONE, _OTHER_ONE], ran=True, degraded=False),
         [],
@@ -501,8 +524,39 @@ def test_a_pin_the_cap_refused_cannot_re_enter_via_the_selection(paired_catalog)
         client_pinned_ids=[_OTHER_ONE],
     )
     assert _OTHER_ONE not in result.active
-    assert _OTHER_ONE in result.dropped_over_cap
     assert result.dropped_over_cap.count(_OTHER_ONE) == 1, "reported twice"
+
+
+def test_pins_apply_on_a_degraded_round_too(paired_catalog) -> None:
+    """A degraded selector fails OPEN to the prior set — a different path from a
+    plain continuation, and one a caller pin must survive. The pin was an explicit
+    instruction on this round; a classifier that fell over is no reason to drop it."""
+    prior = [_ONE, _DOMAIN_BASE]
+    result = resolve_active_skills(
+        SelectionDecision(skill_ids=[], ran=True, degraded=True),
+        prior,
+        paired_catalog,
+        4,
+        client_pinned_ids=[_OTHER_ONE],
+    )
+    assert result.active[:2] == [_OTHER_ONE, _OTHER_BASE]
+    assert set(result.active) == {_OTHER_ONE, _OTHER_BASE, _ONE, _DOMAIN_BASE}
+
+
+def test_pins_that_fill_the_cap_leave_the_reused_set_nothing(paired_catalog) -> None:
+    """The exactly-zero remainder, which is reachable in production: at the legal
+    minimum cap of 2 a single paired pin consumes the whole budget. The prior set
+    must then be dropped cleanly rather than have one more id squeezed in."""
+    prior = [_ONE, _DOMAIN_BASE]
+    result = resolve_active_skills(
+        SelectionDecision.reuse(prior),
+        prior,
+        paired_catalog,
+        2,
+        client_pinned_ids=[_OTHER_ONE],
+    )
+    assert result.active == [_OTHER_ONE, _OTHER_BASE]
+    assert result.dropped_over_cap == [_ONE, _DOMAIN_BASE]
 
 
 def test_a_client_pin_applies_on_a_reuse_round_too(paired_catalog) -> None:
@@ -574,20 +628,45 @@ def test_duplicate_client_pins_are_collapsed(paired_catalog) -> None:
     assert result.active == [_ONE, _DOMAIN_BASE]
 
 
-@pytest.mark.parametrize("authoritative", [True, False])
-def test_no_pins_leaves_resolution_exactly_as_it_was(paired_catalog, authoritative) -> None:
-    """The compatibility assertion that matters: an ordinary turn sends no pins,
-    and both branches must reach the answer they reached before this tier existed
-    — same ids, same order, same drops."""
+def test_no_pins_leaves_resolution_exactly_as_it_was(paired_catalog) -> None:
+    """The compatibility assertion that matters: an ordinary turn sends no pins and
+    must reach the answer it reached before this tier existed.
+
+    Asserted against LITERAL expected values, deliberately. Comparing the no-kwarg
+    call to a `client_pinned_ids=[]` call would only prove the default argument
+    works — both sides are the new implementation, so a change of behaviour would
+    move them together and the test would still pass. These literals are what the
+    pre-pin code produced: authoritative admits `[_TWO, _DOMAIN_BASE]` then finds
+    `_OTHER_ONE`'s unit unaffordable and drops it; reuse truncates verbatim.
+    """
     prior = [_ONE, _DOMAIN_BASE]
-    decision = (
-        SelectionDecision(skill_ids=[_TWO, _OTHER_ONE], ran=True, degraded=False)
-        if authoritative
-        else SelectionDecision.reuse(prior)
+    authoritative = resolve_active_skills(
+        SelectionDecision(skill_ids=[_TWO, _OTHER_ONE], ran=True, degraded=False),
+        prior,
+        paired_catalog,
+        3,
     )
-    with_kwarg = resolve_active_skills(decision, prior, paired_catalog, 3, client_pinned_ids=[])
-    without = resolve_active_skills(decision, prior, paired_catalog, 3)
-    assert with_kwarg == without
+    assert authoritative.active == [_TWO, _DOMAIN_BASE]
+    assert authoritative.dropped_over_cap == [_OTHER_ONE]
+    assert authoritative.newly_loaded == [_TWO]
+
+    reuse = resolve_active_skills(
+        SelectionDecision.reuse([_ONE, _DOMAIN_BASE, _TWO]),
+        [_ONE, _DOMAIN_BASE, _TWO],
+        paired_catalog,
+        2,
+    )
+    assert reuse.active == [_ONE, _DOMAIN_BASE]
+    assert reuse.dropped_over_cap == [_TWO]
+
+    # And the default argument really is inert.
+    assert resolve_active_skills(
+        SelectionDecision(skill_ids=[_TWO, _OTHER_ONE], ran=True, degraded=False),
+        prior,
+        paired_catalog,
+        3,
+        client_pinned_ids=[],
+    ) == authoritative
 
 
 def _delta_chunk(delta: dict) -> dict:

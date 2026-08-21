@@ -1081,7 +1081,12 @@ def test_a_pinned_skill_loads_even_when_the_selector_wanted_something_else(
     body = r.json()
     active = [s["id"] for s in body["skills"]["active"]]
     assert active[0] == SKILL_PREP, f"the pin did not outrank the selection; {active}"
-    assert SKILL_PREP in _loaded_skills_message(fake_provider), (
+    # Against the real body text, not the id. The loaded-skills template prints
+    # "Skill id: …" for every entry, so asserting the id would pass even if the
+    # runbook itself were rendered empty — which is the failure that matters.
+    loaded = _loaded_skills_message(fake_provider)
+    prep_body = app.state.container.catalog.get(SKILL_PREP).body
+    assert prep_body.strip().splitlines()[0] in loaded, (
         "the pinned runbook's BODY never reached the model"
     )
     assert body["warnings"] == []
@@ -1183,3 +1188,44 @@ def test_an_ordinary_turn_sends_no_pins_and_is_unchanged(client, auth, fake_prov
     assert r.status_code == 200
     assert [s["id"] for s in r.json()["skills"]["active"]] == _paired(app, SKILL_PREP)
     assert r.json()["warnings"] == []
+
+
+def test_a_large_pin_list_does_not_stall_the_request(client, auth, fake_provider) -> None:
+    """Regression for quadratic de-duplication. The field is client-supplied and
+    uncapped, so `if sid not in seen_list` inside the loop was O(n^2) work on an n
+    the caller picks — synchronous, on the request path, where no timeout can
+    interrupt it. 20k distinct unknown ids is a few hundred KB of body and must
+    resolve to one warning, promptly."""
+    fake_provider.selection_result = selection_result([])
+    pins = [f"daintree.bogus.skill-{i}" for i in range(20_000)]
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}],
+        session_id="pin7", turn_id="t1",
+        selection={"pinned_skill_ids": pins},
+    ))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["warnings"].count("unknown_skill_id_ignored") == 1, (
+        f"one mistake, one warning; got {body['warnings']}"
+    )
+    assert body["skills"]["active"] == []
+
+
+def test_duplicate_and_unknown_pins_report_one_warning_each(
+    client, auth, fake_provider, app
+) -> None:
+    """Duplicates are not an error and unknowns are not fatal; mixing them must not
+    multiply either signal. First mention of a valid id still wins."""
+    fake_provider.selection_result = selection_result([])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}],
+        session_id="pin8", turn_id="t1",
+        selection={"pinned_skill_ids": [
+            SKILL_PREP, "daintree.nope.one", SKILL_PREP, "daintree.nope.two", "",
+        ]},
+    ))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["warnings"].count("unknown_skill_id_ignored") == 1
+    active = [s["id"] for s in body["skills"]["active"]]
+    assert active.count(SKILL_PREP) == 1, f"a repeated pin loaded twice; {active}"

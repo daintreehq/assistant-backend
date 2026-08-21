@@ -515,8 +515,10 @@ def test_a_caller_pin_outranks_the_docs_pin(catalog: Any) -> None:
         pinned_id=DOCS_SKILL_ID,
         client_pinned_ids=[WORKFLOW],
     )
-    assert result.active[0] == WORKFLOW, f"the caller pin lost its priority; {result.active}"
-    assert FOUNDATION in result.active, "the caller pin was admitted unpaired"
+    assert result.active == [WORKFLOW, FOUNDATION, OPERATIONAL], (
+        "the exact set matters: asserting only the pin would pass an implementation "
+        f"that dropped the selection entirely; active={result.active}"
+    )
     assert DOCS_SKILL_ID not in result.active
     assert DOCS_SKILL_ID in result.dropped_over_cap
 
@@ -566,3 +568,28 @@ def test_a_caller_pin_can_load_a_skill_the_selector_cannot_see(catalog: Any) -> 
         _authoritative([]), [], catalog, 3, client_pinned_ids=[DOCS_SKILL_ID]
     )
     assert DOCS_SKILL_ID in result.active
+
+
+def test_a_caller_pin_the_cap_refused_is_not_retried_by_the_server_tier(catalog: Any) -> None:
+    """The overlap the two tiers can both claim, at the moment tier one says no.
+
+    A caller pin is PAIRED, so at a cap of one its unit (runbook + foundation)
+    cannot fit and tier one refuses it. Tier three must then leave it alone — and
+    the slot is free, which is exactly what makes the bug reachable: retrying it
+    there would admit UNPAIRED the very unit tier one had just refused for being
+    unaffordable whole, and would report the same id in `dropped_over_cap` twice.
+    """
+    result = resolve_active_skills(
+        _authoritative([OPERATIONAL]),
+        [],
+        catalog,
+        1,
+        pinned_id=DOCS_SKILL_ID,
+        client_pinned_ids=[DOCS_SKILL_ID],
+    )
+    assert DOCS_SKILL_ID not in result.active, (
+        "tier three re-admitted, bare, the unit tier one refused as unaffordable"
+    )
+    assert result.dropped_over_cap.count(DOCS_SKILL_ID) == 1, (
+        f"the same refusal was reported twice: {result.dropped_over_cap}"
+    )

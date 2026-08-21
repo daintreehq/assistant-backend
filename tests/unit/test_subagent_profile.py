@@ -603,8 +603,15 @@ async def test_a_subagent_pin_inside_its_menu_loads(settings, fake_provider) -> 
     try:
         catalog = container.orchestrator.catalog
         menu = catalog.executable_with([t["function"]["name"] for t in _READ_ONLY_TOOLS])
-        inside = next(iter(s.id for s in menu.skills), None)
-        assert inside is not None, "precondition: the menu must offer something"
+        # Explicitly NOT `menu.skills[0]`: catalog order is incidental, and the first
+        # entry can be the selector-hidden docs runbook, which declares no required
+        # tools and so survives every narrowing. Pinning that would exercise the
+        # hidden-skill path rather than the capability boundary this test is about.
+        inside = next(
+            (s.id for s in menu.skills if s.id in menu.selectable_ids and not s.meta.foundation),
+            None,
+        )
+        assert inside is not None, "precondition: the menu must offer a selectable specific"
         outcome = await container.orchestrator.complete(
             _orchestrator_request(
                 "subagent",
