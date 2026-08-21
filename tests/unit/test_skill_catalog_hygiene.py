@@ -45,7 +45,11 @@ from pathlib import Path
 
 import pytest
 
-from daintree_assistant_server.skills.catalog import load_catalog
+from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
+from daintree_assistant_server.skills.local.documents import (
+    skill_document,
+    split_when_to_use,
+)
 
 # Snapshot of the CLI's tool registry. Never read cli/ at runtime: CI does not fetch
 # submodules, so a submodule-reading test would silently no-op or hard-fail there.
@@ -214,3 +218,183 @@ def test_the_fixtures_record_which_cli_commit_they_came_from() -> None:
         f"fixtures being refreshed — which is how a skill ends up declaring a tool "
         f"the CLI no longer has — or the header was not updated with them."
     )
+
+
+# ---------------------------------------------------------------------------
+# Routing-graph references.
+#
+# This catalog's routing quality does not live in the positive clause of a
+# whenToUse; it lives in the carve-outs after it — "do not use for X, use
+# `daintree.<other>` instead". Each one is a CLAIM that a specific confusion
+# exists and that the text resolves it, and `bench coverage` gates every such
+# claim on having a routing trap that tests it.
+#
+# That gate can only see carve-outs that NAME AN ID. Two ways to slip past it,
+# both silent:
+#
+#   * a reference to an id that does not exist — a typo, or a skill that was
+#     renamed or deleted. It resolves to nothing, the coverage gate does not
+#     count it as a neighbour, and the skill reads as owing no trap.
+#   * a carve-out written in shorthand — "use the competition skill". A human
+#     reads it fine; the gate reads a skill with no declared neighbours.
+#
+# Both leave an untested confusion claim in the catalog, and both look correct
+# in review. These count them.
+# ---------------------------------------------------------------------------
+
+#: Anything shaped like a dotted Daintree identifier — INCLUDING malformed ones.
+#:
+#: ``[a-z0-9_-]`` rather than ``[a-z0-9-]`` on purpose. A typo like
+#: ``daintree.orchestration.multi_agent`` would otherwise match only as far as
+#: ``daintree.orchestration``, which is a real namespace, and the exemption below
+#: would wave it through — a dangling reference hidden by the rule that exists to
+#: allow legitimate namespace prose.
+_DOTTED = re.compile(r"\bdaintree(?:\.[a-z0-9][a-z0-9_-]*)+\b")
+
+#: A carve-out that DEFERS to another skill: "…, use <target>".
+#:
+#: Matches whatever follows, so the target can be checked rather than assumed.
+#: The first version of this looked only for the exact phrase "use the X skill"
+#: and reported zero once those were fixed — while ten more carve-outs said
+#: "use poll-pinned-agents" in a spelling it could not see. A check that
+#: recognises one wording measures that wording, not the property.
+_DEFERRAL = re.compile(r"\buse\s+(?:the\s+)?([a-z0-9][a-z0-9 ./_-]{2,60}?)(?=[,.;)]|\s+skill\b|$)")
+
+#: Carve-out targets that are not a fully-qualified id. ZERO, and it stays there.
+#:
+#: It was 27 across two spellings, and `bench lint` showed why that mattered:
+#: ranking every skill pair by how alike the retriever finds them, the closest
+#: pairs with no id-level edge were almost exactly these —
+#: competition/runoff-tiebreaker (the closest pair in the catalog),
+#: poll-pinned-agents/competition, conversation/multi-agent. The catalog's most
+#: confusable neighbours were the ones written in a spelling its own tooling
+#: could not parse.
+#:
+#: Rewriting them left routing untouched: every one of the 177 benchmark cases
+#: returned a byte-identical selected-id list before and after.
+UNQUALIFIED_DEFERRALS = 0
+
+
+def _tool_namespace_names() -> set[str]:
+    """CLI tool names in their dotted spelling — ``daintree__status`` is
+    ``daintree.status``, which is shaped exactly like a skill id and is
+    legitimately quoted in runbook prose."""
+    return {name.replace("__", ".") for name in _known_tool_names()}
+
+
+def test_every_dotted_reference_in_a_whenToUse_resolves() -> None:
+    """A carve-out that points at nothing is an untestable claim.
+
+    Three things legitimately wear this shape and all three are accepted: a real
+    skill id, a real NAMESPACE with children under it ("the relevant
+    daintree.orchestration skill"), and a CLI tool quoted by name
+    (``daintree.status``). Anything else is a dangling reference — a typo, or a
+    skill that was renamed or deleted, leaving a claim nothing can test.
+    """
+    catalog = load_catalog(default_skills_dir())
+    known = set(catalog.known_ids)
+    namespaces = {sid.rsplit(".", 1)[0] for sid in known}
+    tools = _tool_namespace_names()
+
+    dangling: list[str] = []
+    for skill in catalog.skills:
+        for ref in _DOTTED.findall(skill.meta.when_to_use):
+            if ref in known or ref in namespaces or ref in tools:
+                continue
+            dangling.append(f"{skill.id} -> {ref}")
+    assert not dangling, (
+        "whenToUse references that resolve to no skill, namespace or tool: "
+        + ", ".join(dangling)
+    )
+
+
+def test_every_carve_out_defers_to_a_fully_qualified_id() -> None:
+    """"use competition" is invisible to the routing-trap gate; "use
+    daintree.orchestration.competition" is not.
+
+    ``bench coverage`` parses declared neighbours by scanning a whenToUse for
+    other catalog ids, so a carve-out written as a bare leaf name or as prose
+    reads to it as a skill claiming no confusion at all. The claim is still
+    there, still asserted to a human reader, and now untestable.
+
+    Bare namespaces and tool names are allowed as deferral targets only because
+    they are legitimate prose ("the relevant daintree.orchestration skill"); they
+    create no coverage edge either, which is why they are counted in the message
+    below rather than silently accepted.
+    """
+    catalog = load_catalog(default_skills_dir())
+    known = set(catalog.known_ids)
+    leaves = {sid.rsplit(".", 1)[-1] for sid in known}
+    namespaces = {sid.rsplit(".", 1)[0] for sid in known}
+    tools = _tool_namespace_names()
+
+    unqualified: list[str] = []
+    for skill in catalog.skills:
+        for target in _DEFERRAL.findall(skill.meta.when_to_use):
+            target = target.strip()
+            if target in known or target in namespaces or target in tools:
+                continue
+            # Only flag targets that plainly NAME a skill: a bare leaf id, or a
+            # phrase built from one. Ordinary English after "use" — "use one
+            # agent", "use it for" — is prose, not a deferral.
+            words = set(re.split(r"[ /-]+", target))
+            if target in leaves or (words & leaves):
+                unqualified.append(f"{skill.id}: use {target}")
+
+    assert len(unqualified) <= UNQUALIFIED_DEFERRALS, (
+        f"{len(unqualified)} carve-outs defer to something other than a full "
+        f"skill id, so `bench coverage` sees no neighbour and demands no trap:\n  "
+        + "\n  ".join(sorted(unqualified)[:12])
+    )
+
+
+def test_no_two_skills_share_a_routing_surface() -> None:
+    """Two identical routing documents are one vector in two shortlist slots.
+
+    The selector embeds title + summary + whenToUse and never reads a body, so
+    two skills whose metadata matches are indistinguishable to it however
+    different their procedures are — it will rank them together, and the
+    cardinality head will be asked to choose between two things it cannot tell
+    apart.
+    """
+    catalog = load_catalog(default_skills_dir())
+    seen: dict[str, str] = {}
+    clashes: list[str] = []
+    for skill in catalog.skills:
+        document = skill_document(skill.meta)
+        if document in seen:
+            clashes.append(f"{seen[document]} == {skill.id}")
+        seen[document] = skill.id
+    assert not clashes, f"skills with identical routing surfaces: {clashes}"
+
+
+def test_no_skills_positive_trigger_is_contained_in_anothers() -> None:
+    """A copy-and-extend detector, which is what it actually is.
+
+    Compares the 5+-letter word sets of the POSITIVE clauses — the carve-outs
+    after them are supposed to overlap, that is what makes them carve-outs — and
+    fires when one is a strict subset of another. It is not vacuous: the smallest
+    trigger in the catalog is seven words, so a skill written by copying a
+    neighbour's trigger and adding to it would trip it.
+
+    Claimed narrowly on purpose. Word-set containment is not semantic
+    containment: this drops the short words that often carry the distinction
+    ("tie", "poll", "one", "not"), and three skills use an exclusion marker the
+    splitter does not recognise ("Never load"), so their "positive" set includes
+    routing prose. Read a failure as "these two triggers were probably written
+    from each other", not as proof that one owns no requests.
+    """
+    catalog = load_catalog(default_skills_dir())
+    triggers = {
+        skill.id: set(
+            re.findall(r"[a-z]{5,}", split_when_to_use(skill.meta.when_to_use)[0].lower())
+        )
+        for skill in catalog.skills
+    }
+    contained = [
+        f"{a} ⊆ {b}"
+        for a, wa in triggers.items()
+        for b, wb in triggers.items()
+        if a != b and wa and wa < wb
+    ]
+    assert not contained, f"skills with no unique positive region: {contained}"

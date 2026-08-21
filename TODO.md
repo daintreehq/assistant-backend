@@ -194,3 +194,27 @@ one and two skills loaded, across the same phrasings the bare rows already cover
 The guard is a ratchet, not a tolerance: the ceiling is 20x against a measured
 17.6x, so losing even one of the seven positives fails it. The next augmentation
 cannot improve something else at this one's expense.
+
+---
+
+## Gate routing traps per EDGE, not per skill
+
+**Trigger: when the catalog passes ~75 skills, or sooner if a confusion pair
+starts failing the benchmark.**
+
+`bench coverage` requires a skill with any declared neighbour to have one
+routing-trap case that excludes one of them. Per SKILL, not per edge — so a skill
+that names six neighbours discharges the obligation with a single trap against
+whichever one somebody wrote a case for, and the other five confusion claims are
+readable but untested.
+
+That was invisible until the carve-outs were rewritten to name ids: the rewrite
+added 19 directed edges and moved the trap counts for four of the six skills not
+at all. The graph is now machine-readable, which is the precondition for gating
+it properly and was the point of the rewrite; the gate itself has not moved.
+
+What it needs is edge metadata on the trap cases — a `confuses_with: [source,
+target]` field, or an inference from a case that requires one and forbids the
+other. Inferring it from `allowed` alone does not work: nearly every case
+excludes nearly every unrelated skill, so every trap would appear to cover every
+edge. `bench lint` ranks which edges to write cases for first.

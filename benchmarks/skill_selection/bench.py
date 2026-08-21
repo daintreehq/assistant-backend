@@ -120,6 +120,13 @@ def _cmd_scale(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_lint(args: argparse.Namespace) -> int:
+    from .catalog_lint import confusion_pairs, print_lint
+
+    print_lint(confusion_pairs(), top=args.top)
+    return 0
+
+
 def _cmd_list(args: argparse.Namespace) -> int:
     from daintree_assistant_server.skills.catalog import load_catalog
 
@@ -231,6 +238,14 @@ def main(argv: list[str] | None = None) -> int:
     scale.add_argument("--out", help="explicit output JSON path")
     scale.add_argument("--no-save", action="store_true")
     scale.set_defaults(func=_cmd_scale)
+
+    lint = sub.add_parser(
+        "lint",
+        help="rank skill pairs by how confusable the retriever finds them, and "
+        "flag the ones the catalog declares no carve-out for (no API calls)",
+    )
+    lint.add_argument("--top", type=int, default=20, help="rows to print (default 20)")
+    lint.set_defaults(func=_cmd_lint)
 
     lst = sub.add_parser("list", help="list/validate cases and variants (no API calls)")
     lst.add_argument("--filter", help="substring filter on case id/category")

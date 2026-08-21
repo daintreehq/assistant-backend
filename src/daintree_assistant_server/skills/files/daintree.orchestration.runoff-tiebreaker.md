@@ -2,7 +2,7 @@
 id: daintree.orchestration.runoff-tiebreaker
 title: Run a runoff tie-breaker for an agent competition
 summary: Break a tie in an agent voting competition by getting new submissions from tied entrants, polling the original cohort, and tallying the runoff accurately.
-whenToUse: Use when an agent competition, poll, or peer-vote ends in a tie and the user asks for a tie-breaking round or runoff using the same cohort. Do not use to start a fresh competition or poll (use the competition or poll skill), and do not spawn new agents unless the user explicitly changes the electorate.
+whenToUse: Use when an agent competition, poll, or peer-vote ends in a tie and the user asks for a tie-breaking round or runoff using the same cohort. Do not use to start a fresh competition or poll (use daintree.orchestration.competition or daintree.agents.poll-pinned-agents), and do not spawn new agents unless the user explicitly changes the electorate.
 risk: project
 requiredTools:
   - context.snapshot
