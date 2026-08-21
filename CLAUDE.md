@@ -233,6 +233,19 @@ reached the ballot, and it is the first number to move as the catalog grows.
 `bench run` is the PAID comparator over the retired prompt selector; do not read
 it as the selector's accuracy.
 
+**`bench scale` answers the question the live catalog is too small to ask.** It
+pads the catalog with derived distractors (paraphrases, scope splits, siblings,
+exclusion-clause collisions) and re-measures oracle recall at 100/200/500/1,000
+skills; the numbers are in `training/EXPERIMENTS.md`. `k=32` takes its first
+candidate miss at 500 skills (2 of 154 target-bearing cases) and `k=48` is clean
+there, so the width is a `TODO.md` entry with a trigger rather than a standing
+worry. Read that as a re-measurement trigger and not a capacity limit: it is one
+synthetic pool and 154 cases. The same harness also says candidate reservation
+has **not** rescued anything measurable — dense retrieval alone keeps 13 of 13
+active-and-required skills at every size out to 1,000 — so it is insurance
+against a failure no floor could repair, not a fix for an observed loss. CI runs
+a 200-skill smoke (~24s).
+
 Not gated here, deliberately: anything needing a paid call. Live latency,
 injection results and the prompt-selector comparison belong in a nightly run
 against a low-spend key — a baseline that cannot be checked offline either gets

@@ -74,6 +74,20 @@ def _utility_json(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
     return asyncio.run(run_bench(trials=ctx.get("live_trials", 1), env_file=ctx.get("env_file")))
 
 
+def _skill_selection_scale(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
+    """Does the shortlist still hold the answer at 200 skills? ~20s, free.
+
+    The live catalog is 38 skills against k=32, so every recall number the other
+    suites report is 84%-of-the-catalog arithmetic rather than evidence that
+    retrieval filters. This pads the catalog with derived distractors and
+    re-measures. 200 rather than the full sweep's 1,000 because a thousand skill
+    documents cost ~220s to embed, which is not a per-push price.
+    """
+    from ..skill_selection.scale import smoke
+
+    return smoke()
+
+
 def _skill_selection_local(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
     """The selector that ships, scored offline. Free, deterministic, gated.
 
@@ -149,6 +163,7 @@ DETERMINISTIC: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     # local: there is no reason for the number a release is judged on to cost
     # money or to wait for a nightly.
     ("skill_selection_local", _skill_selection_local),
+    ("skill_selection_scale", _skill_selection_scale),
 ]
 #: Suites that are REPORTED but do not decide whether a run passed.
 #:
@@ -239,6 +254,17 @@ def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
                 "cases": f"{s.get('cases_passed')}/{s.get('cases_total')}",
                 "recall_miss_trials": s.get("recall_miss_trials"),
                 "degraded_trials": s.get("degraded_trials"),
+            }
+        if name == "skill_selection_scale":
+            return {
+                "size": s.get("size"),
+                # A count, not a rate: the denominator is 154 target-bearing
+                # cases and one of them is 0.65 points.
+                "candidate_misses": s.get("candidate_misses"),
+                # What dense retrieval alone keeps of the actives a turn SHOULD
+                # keep. Not "every active" — that counts topic shifts, where
+                # dropping the old runbook is the right answer.
+                "dense_retained": s.get("dense_retained"),
             }
         if name == "skill_selection_local":
             spans = s.get("spans_ms") or {}

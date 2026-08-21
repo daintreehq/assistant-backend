@@ -102,3 +102,50 @@ no further code change. What to check afterwards: active-skill retention on
 continuation rows where the ballot reserved, against topic-shift eviction on rows
 where it also reserved. Those two move in opposite directions and the point is to
 buy the first without paying for the second.
+
+
+---
+
+## Widen the shortlist to k=64
+
+**Trigger: when the catalog passes ~200 skills.** Measured, not guessed — and
+measurably NOT needed before then.
+
+`bench scale` sweeps candidate recall across synthetic catalog sizes
+(`training/EXPERIMENTS.md`, "Catalog scale"). Counted over the 154 cases that
+have a required skill, `k=32` misses 0 at 200, **2 at 500** and 4 at 1,000;
+`k=48` is clean at 500 and misses 3 at 1,000; `k=96` is clean throughout.
+
+So this is a real change with a real trigger rather than a standing worry. It is
+not free: `k` is baked into the exported head's graph (MultiheadAttention bakes
+the sequence length into its reshapes), so moving it is a retrain plus a
+re-export, and the admission floors are calibrated to the resulting sigmoid and
+must be re-derived with `training/calibrate_floors.py`. Fold it into the retrain
+that is already owed for candidate reservation rather than spending a separate one.
+
+Re-run `bench scale` first. The numbers above are against today's catalog padded
+with derived distractors; the real catalog at 200 skills will have its own
+confusion structure, and the point of the harness is that the decision comes from
+a measurement taken at the time.
+
+## Give the foundation tier its own domains
+
+**Trigger: the same ~200-skill mark, or sooner if `foundation-only` regresses.**
+
+The scale sweep's per-category breakdown shows `foundation-only` losing a case at
+500 skills (5/6) and holding there, and `daintree.foundation` is the deepest
+required skill at every size — rank 26 of 200 under int8, rank 31 under fp32,
+against a 32-slot shortlist. The cause is structural rather than a bug: there is one broad `daintree.foundation`, its
+routing document is deliberately the most generic in the catalog, and a generic
+document is the one a crowd of near-neighbours buries.
+
+Domain foundations (`daintree.orchestration.foundation`, and so on) would each
+carry a narrower, more distinctive routing surface. The catalog already supports
+them — `Catalog.domain_foundation` walks UP the dotted namespace nearest-first,
+so a domain foundation is picked up with no code change — and `active_set.py`
+already pairs a selected specific with whichever foundation it resolves to.
+
+What has to be decided rather than built is the ontology: which domains earn one,
+and how the prompt-byte budget behaves when a two-domain task pulls in two
+foundations plus two specifics against `max_active_skills` of 3. That budget
+question is the real work here, not the routing.

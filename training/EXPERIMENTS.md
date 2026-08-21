@@ -853,3 +853,120 @@ PR-search vocabulary to pick up.
 3. `docs-question-mid-workflow` still misses its skill: the mitigation strips
    context from OUTSIDE the message and cannot strip framing INSIDE one.
    `docs-negative-do-the-thing` remains.
+
+---
+
+# Catalog scale: what k costs, measured (2026-08-21)
+
+Everything above was measured on a 38-skill catalog against `k=32` — 84% of the
+catalog on every ballot. At that ratio retrieval is barely a filter, so no number
+in this log says what Stage 1 does when it has to be one. `bench scale` pads the
+catalog with derived distractors (`shadow_catalog.py`) and re-measures oracle
+recall — "did every required skill reach the head", the only Stage 1 contract
+that matters, because Stage 2 re-decides the order and nothing recovers an absent
+candidate.
+
+Seed 20260821, shipped int8 retriever. **154 of 177 cases count toward recall**:
+19 require no skill at all (chatter, no-task, most docs questions) and would be
+vacuous successes, and 4 are background wakes that production never sends to the
+model.
+
+## Candidate misses, by catalog size and shortlist width
+
+Counts, not rates. n is 154 and one case is 0.65 points, so a table of
+four-decimal rates invites distinctions the sample cannot support.
+
+| skills | k=16 | k=32 (ships) | k=48 | k=64 | k=96 |
+|---:|---:|---:|---:|---:|---:|
+| 39 | 0 | **0** | 0 | 0 | 0 |
+| 100 | 0 | **0** | 0 | 0 | 0 |
+| 200 | 1 | **0** | 0 | 0 | 0 |
+| 500 | 4 | **2** | 0 | 0 | 0 |
+| 1000 | 11 | **4** | 3 | 1 | 0 |
+
+`k=32` takes its first miss at 500. `k=48` is clean at 500 and takes 3 at 1,000;
+`k=96` is clean throughout.
+
+**State that as a trigger, not a capacity limit.** This is one fixed synthetic
+catalog and 154 target-bearing cases. Zero misses at 200 gives roughly a 98%
+one-sided lower bound, which is not a demonstration of 99.5%. The supportable
+claim is: *on this pool, k=32 produced no observed misses through 200, and the
+first two appeared at 500.* Treat 200 as the point to re-measure, and re-measure
+against the real catalog of the day rather than trusting this table.
+
+## What reservation actually buys — a correction
+
+The first version of this section claimed dense retrieval alone "loses the open
+runbook on 41% of turns that have one" by 200 skills. **That was the wrong
+denominator and the claim does not survive it.** It counted every visible active
+id on every active case — including topic shifts, where dropping the old runbook
+is the CORRECT answer, and optional foundations that active-set pairing restores
+anyway.
+
+Scored properly — actives that are also REQUIRED, i.e. the ones the turn should
+keep:
+
+| skills | dense alone | with reservation | every-active coverage, dense |
+|---:|---:|---:|---:|
+| 39 | 13/13 | 13/13 | 1.0000 |
+| 100 | 13/13 | 13/13 | 0.8261 |
+| 200 | 13/13 | 13/13 | 0.6087 |
+| 500 | 13/13 | 13/13 | 0.5217 |
+| 1000 | 13/13 | 13/13 | 0.4348 |
+
+**Dense retrieval keeps every active-and-required skill at every size measured.**
+The `[loaded: …]` prefix carries the active ids into the query and it holds up:
+on this corpus, reservation rescues nothing that was actually going to be lost.
+
+So candidate reservation is **insurance, not a repair**. It is still worth having
+— it costs nothing, it converts a failure mode that no downstream floor can fix
+into an impossibility, and the coverage column shows retrieval genuinely does
+start dropping actives as the catalog grows — but this benchmark has 13 cases
+where an active skill is also required, and none of them were at risk. Do not
+cite it as a measured save. The corpus work that would make this question
+answerable is more continuation rows with a workflow open, which is the same gap
+the docs head has.
+
+## Which categories break first
+
+At `k=32`: everything holds through 200. At 500, `foundation-only` (5/6) and
+`docs-classification` (7/8) each lose one. At 1,000, `routing-trap` loses two
+(70/72). `daintree.foundation` is the thin case throughout — it is deliberately
+the most generic document in the catalog, so it is what a crowd of near-neighbours
+buries. That is a concrete argument for domain foundations before the catalog
+gets there, and it is what the CI smoke's one-miss budget is sized around: at 200
+skills the foundation sits at rank 26 of 200 under int8 and rank **31** under
+fp32, the last slot `k=32` has.
+
+## Distractor quality is the measurement instrument
+
+The first pool was not one. Templates varied only the id, and the id is not
+rendered into a skill document — so 961 distractors produced **492 distinct
+documents**, one repeated seven times. Identical vectors still occupy separate
+shortlist slots, so "1,000 skills" meant ~530 routing surfaces crowding each
+other by multiplicity, and every conclusion past 200 rested on it. Generation now
+enforces distinct rendered documents and fails loudly when a template's variation
+space is exhausted (`tests/unit/test_shadow_catalog.py`).
+
+Two other instrument biases, both found by review rather than by the numbers
+looking wrong:
+
+* `_paraphrase` copied the source's summary and whenToUse verbatim. That is not a
+  distractor, it is an ALIAS — an entry that genuinely answers the same request,
+  scored as a miss when retrieved. It rewords now.
+* Three of five shapes named their source by dotted id in an exclusion clause,
+  so half the pool carried an exact token sequence that the target's own document
+  does not contain (a skill's document has no id in it) while the query does, via
+  `ACTIVE_PREFIX`. That biased the dense numbers harsh. One exclusion in four
+  names an id now, against the real catalog's 4.1 outgoing references per skill.
+
+## Cost
+
+Embedding 1,000 skill documents: **~250s**, once. Sizes are nested and the
+classifier's digest-keyed vector memo outlives each table, so every smaller size
+in a sweep is free (measured 0.00s). That figure is also the honest cold-start
+worst case for a 1,000-skill catalog with no packaged `vectors.npz`.
+
+CI runs a 200-skill, `k=32` smoke (~24s): a one-miss budget on candidate recall,
+and an exact 1.0 on active coverage, which is a construction guarantee rather
+than a measurement.

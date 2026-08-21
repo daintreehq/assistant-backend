@@ -3,6 +3,7 @@
 Run from the repo root (venv active, CEREBRAS_API_KEY in .env or the env):
 
     python -m benchmarks.skill_selection.bench local                  # SHIPPED selector, free
+    python -m benchmarks.skill_selection.bench scale                  # recall at 200/500/1000
     python -m benchmarks.skill_selection.bench run                    # baseline prompt
     python -m benchmarks.skill_selection.bench run --variant v2-foo   # a prompts/ variant
     python -m benchmarks.skill_selection.bench run --variant baseline --variant v2-foo
@@ -107,6 +108,18 @@ def _cmd_local(args: argparse.Namespace) -> int:
     return 0 if print_verdict(doc, "skill_selection_local") else 1
 
 
+def _cmd_scale(args: argparse.Namespace) -> int:
+    from .scale import print_sweep, sweep
+
+    sizes = tuple(int(x) for x in args.sizes.split(",")) if args.sizes else None
+    ks = tuple(int(x) for x in args.ks.split(",")) if args.ks else None
+    doc = sweep(**{k: v for k, v in (("sizes", sizes), ("ks", ks)) if v})
+    print_sweep(doc)
+    if not args.no_save:
+        print(f"\nsaved: {save_doc(doc, Path(args.out) if args.out else None)}")
+    return 0
+
+
 def _cmd_list(args: argparse.Namespace) -> int:
     from daintree_assistant_server.skills.catalog import load_catalog
 
@@ -205,6 +218,19 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--out", help="explicit output JSON path (single variant only)")
     run.add_argument("--no-save", action="store_true", help="do not write a results file")
     run.set_defaults(func=_cmd_run)
+
+    scale = sub.add_parser(
+        "scale",
+        help="oracle recall at 100/200/500/1000 skills (synthetic distractors, free). "
+        "Answers what k the shortlist needs before the catalog needs it",
+    )
+    scale.add_argument(
+        "--sizes", help="comma-separated catalog sizes (default 39,100,200,500,1000)"
+    )
+    scale.add_argument("--ks", help="comma-separated shortlist widths (default 16,32,48,64,96)")
+    scale.add_argument("--out", help="explicit output JSON path")
+    scale.add_argument("--no-save", action="store_true")
+    scale.set_defaults(func=_cmd_scale)
 
     lst = sub.add_parser("list", help="list/validate cases and variants (no API calls)")
     lst.add_argument("--filter", help="substring filter on case id/category")

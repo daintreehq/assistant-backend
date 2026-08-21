@@ -31,22 +31,29 @@ the full 38 is:
     3 actives, vague follow-up                                  ranks 0, 1, 6
     3 actives, long unrelated message                           ranks 8, 10, 11
 
-So the prefix protects a single active skill almost perfectly, and degrades as it
+So the prefix protects a single active skill almost perfectly and degrades as it
 is diluted — by more actives sharing it, and by more user text surrounding it.
-The worst measured case sits at rank 11 of 38, the 29th percentile of the
-catalog. That is comfortably inside ``k=32`` today and comfortably OUTSIDE it at
-any catalog where 32 is a real filter: the same 29th percentile is rank 58 at 200
-skills and rank 145 at 500.
 
-And the messages that produce it are exactly the ones a running workflow
-produces:
+It was tempting to extrapolate from there (rank 11 of 38 is the 29th percentile,
+which would be rank 145 at 500 skills) and that extrapolation turned out to be
+wrong. ``bench scale`` measures it directly against catalogs padded to 1,000
+skills, and the prefix keeps holding: every active-and-required skill reaches the
+ballot on dense retrieval alone at every size tested. See "What this deliberately
+is NOT" below — this is insurance against a failure mode, not a fix for one that
+has been observed.
+
+What is not extrapolation is the shape of the failure when it does occur. The
+messages that dilute the prefix are exactly the ones a running workflow produces:
 
     "how's that going?"      "try again, the other way"      "now verify it"
     "that failed — fix it"   "keep watching"                 "same for the second one"
 
-Because a SUCCESSFUL selection is authoritative — its ids become the whole active
-set (``skills/active_set.py``) — a retrieval miss on a turn like that does not
-merely fail to re-add the runbook. It **evicts** it, confidently, mid-workflow.
+And because a SUCCESSFUL selection is authoritative — its ids become the whole
+active set (``skills/active_set.py``) — a retrieval miss on a turn like that does
+not merely fail to re-add the runbook. It **evicts** it, confidently,
+mid-workflow. That is why the guarantee is worth having even with no measured
+save behind it: the cost is one displaced dense candidate, and the failure it
+removes is unrecoverable by anything downstream.
 
 No downstream calibration can repair that. A floor can only re-rank candidates
 that exist. So active skills are placed on the ballot by construction, and the
@@ -65,6 +72,20 @@ Nor is it a priority mechanism. There is no hand-maintained rank that lets a
 favoured skill win regardless of intent; the only thing that reserves a slot is
 a fact about the conversation (this runbook is open) that the head already has a
 trained feature for.
+
+And it is not, on the evidence available, a repair for a loss anyone has
+measured. ``bench scale`` pads the catalog to 1,000 skills with derived
+distractors and scores the actives a turn should KEEP — active and also required
+— against dense retrieval alone: 13 of 13 at every size, all the way out. The
+``ACTIVE_PREFIX`` holds. What does degrade is coverage of *every* visible active
+(1.00 → 0.43 across the same range), but most of that is topic-shift cases where
+dropping the old runbook is the right answer.
+
+So this is INSURANCE. It costs nothing, and it converts the one failure mode that
+no downstream floor can repair into an impossibility — but the honest reading of
+the numbers is that the benchmark has 13 continuation-shaped cases and none of
+them were at risk. The gap is the corpus, not the finding
+(``training/EXPERIMENTS.md``, "Catalog scale").
 
 ## What the SHIPPED weights do with a reserved candidate — and why a retrain is owed
 
