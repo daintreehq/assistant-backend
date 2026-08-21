@@ -701,11 +701,12 @@ def test_the_mandated_core_is_pinned_by_name() -> None:
 
     The other core test derives both the offered inventory and the expectation
     from this same constant, so deleting an entry leaves it green. Every name
-    below is instructed by the ALWAYS-PRESENT base prompt, which is why losing
-    one silently is not a lost optimisation but a turn told to call something it
-    was never given. `test_prompt_hygiene_tools.py` re-derives this list from the
-    prompt text; this one is the human-readable record of what that derivation
-    currently yields.
+    below is instructed by an ALWAYS-PRESENT layer — the base prompt, or the turn
+    footer — which is why losing one silently is not a lost optimisation but a
+    turn told to call something it was never given.
+    `test_prompt_hygiene_tools.py` re-derives this list from those layers' text;
+    this one is the human-readable record of what that derivation currently
+    yields.
     """
     assert (
         frozenset(
@@ -740,6 +741,9 @@ def test_the_mandated_core_is_pinned_by_name() -> None:
                 "watcher.list",
                 "timer.list",
                 "worktree.list",
+                # Stop it — instructed by the TURN FOOTER, not the base prompt.
+                "async.cancel",
+                "watcher.cancel",
                 # Remember.
                 "memory.save",
             }

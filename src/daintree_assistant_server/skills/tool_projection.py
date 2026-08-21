@@ -4,7 +4,7 @@ Tool schemas are ~61% of a representative request, and most of them are
 irrelevant to what the turn is doing: a rename-terminals turn does not need the
 forge, git or recipe families. Filtering them to the active skills' declared
 needs is the single largest prompt saving available. Measured against the pinned
-CLI inventory (79.3 KiB): 20.8 KiB on a skill-less turn (74% saved) and 46.8 KiB
+CLI inventory (79.3 KiB): 22.2 KiB on a skill-less turn (72% saved) and 46.8 KiB
 with a workflow skill and its domain foundation loaded (41% saved). Issue #64's
 ~56% median sits between the two, which is what a mix of both shapes looks like.
 
@@ -27,12 +27,14 @@ grades itself clean by construction and cannot authorize its own expansion.
 **What the proposed set always contains**, beyond the active skills' declared
 tools:
 
-* the always-on core — every tool the ALWAYS-PRESENT base prompt instructs, so
-  a turn can orient, read the workspace, delegate, page an artifact and talk to
-  the user whatever is loaded. This set is not a judgment call: withholding a
-  tool the server's own permanent prompt commands is a contradiction the model
-  cannot resolve, and ``tests/unit/test_prompt_hygiene_tools.py`` fails if the
-  prompt ever names one this set is missing;
+* the always-on core — every tool the ALWAYS-PRESENT layers instruct (the base
+  prompt, and the turn footer's conditional lines), so a turn can orient, read
+  the workspace, delegate, page an artifact, stop what is already running and
+  talk to the user whatever is loaded. This set is not a judgment call:
+  withholding a tool the server's own permanent prompt commands is a
+  contradiction the model cannot resolve, and
+  ``tests/unit/test_prompt_hygiene_tools.py`` fails if either layer ever names
+  one this set is missing;
 * the skill-run scaffold (``skill.step.advance``, ``skill.run.get``) whenever a
   skill is active, because the loaded-skills block instructs them and no skill
   declares them — they belong to the template, not to any runbook;
@@ -80,13 +82,14 @@ def wire_name(dotted: str) -> str:
     return dotted.replace(".", _WIRE_SEP)
 
 
-# Tools that must stay callable whatever is loaded — the ALWAYS-PRESENT base
-# prompt (``prompts/main/base/*.md``) instructs every one of them, on every turn,
-# with no skill involved. That is what makes this list derived rather than
-# chosen: a projection that withholds a tool the permanent prompt commands hands
-# the model an instruction it cannot follow, and no runbook is loaded to explain
-# the absence. `tests/unit/test_prompt_hygiene_tools.py` re-derives the set from
-# the prompt text and fails when the two drift.
+# Tools that must stay callable whatever is loaded — the ALWAYS-PRESENT layers
+# (``prompts/main/base/*.md`` and ``prompts/main/turn_footer.md.j2``) instruct
+# every one of them, on every turn, with no skill involved. That is what makes
+# this list derived rather than chosen: a projection that withholds a tool the
+# permanent prompt commands hands the model an instruction it cannot follow, and
+# no runbook is loaded to explain the absence.
+# `tests/unit/test_prompt_hygiene_tools.py` re-derives the set from both layers'
+# text and fails when they drift.
 #
 # It is not free — every entry is a permanent cost on every request — but the
 # alternative is not a smaller core, it is a smaller BASE PROMPT. Drop the
@@ -152,6 +155,20 @@ ALWAYS_AVAILABLE: frozenset[str] = frozenset(
         "watcher.list",
         "timer.list",
         "worktree.list",
+        # Stop it. These two are instructed by the TURN FOOTER rather than the
+        # base prompt — "do NOT re-run, await, or poll them; async.cancel stops
+        # one" and "use watcher.list to inspect or watcher.cancel to stop one" —
+        # and the footer is a server-owned layer that renders on a skill-less turn
+        # like any other. `daintree.foundation` declares both, so the catalog HAS
+        # an opinion about them and the unclassified pass-through does not rescue
+        # them; withholding is final, so `tool.search` cannot either.
+        #
+        # Admitted unconditionally, unlike the skill scaffold below: those footer
+        # lines render only when the turn carries async work or a resumed watcher,
+        # and `project_tools` is not given `turn_context` to mirror that. Two
+        # permanent entries is the cheaper end of that trade.
+        "async.cancel",
+        "watcher.cancel",
         # Remember. `memory.save` is instructed in the base prompt and belongs to
         # no domain.
         "memory.save",

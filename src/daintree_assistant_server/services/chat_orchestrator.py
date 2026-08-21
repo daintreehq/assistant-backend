@@ -1352,6 +1352,13 @@ class ChatOrchestrator:
             # below carries the safety signal (`outside_proposed`) but only fires on
             # rounds that called something, so it cannot supply a denominator.
             #
+            # One record does not fit that ratio: a `filter_error` from the gate
+            # itself raising reports `cohort_selected=False` with `fail_open=True`,
+            # because the decision that would have recorded the bucket is the thing
+            # that failed. Filter it out by `reason` before dividing — it is a
+            # should-never-happen with its own alarm (`tool_projection_gate_failed`),
+            # not a fail-open the cohort produced.
+            #
             # `tools_proposed` vs `tools_offered` is the size of the prize;
             # `tools_sent_*` is what was actually paid for, and the two differ on
             # every turn that measured a projection without sending it.
