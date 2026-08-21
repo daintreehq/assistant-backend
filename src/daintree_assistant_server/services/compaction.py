@@ -133,6 +133,10 @@ def select_source(messages: Sequence[ChatMessage]) -> CompactionSource | None:
       that is still running would summarise a story whose ending has not been
       written, which is exactly the state a model still needs verbatim.
 
+    A span that would split a tool transaction is then refused outright
+    (``_is_tool_closed``), because the request boundary permits an ordering these
+    two rules alone do not survive.
+
     Returns ``None`` when nothing sits between the two, which is every short
     conversation and every turn immediately after a block was delivered.
     """
@@ -163,4 +167,39 @@ def select_source(messages: Sequence[ChatMessage]) -> CompactionSource | None:
 
     if end <= start:
         return None
+    if not _is_tool_closed(messages, start, end):
+        return None
     return CompactionSource(start=start, end=end, messages=tuple(messages[start:end]))
+
+
+def _is_tool_closed(messages: Sequence[ChatMessage], start: int, end: int) -> bool:
+    """Whether every tool call in the span has its results there too, and vice versa.
+
+    Ending the span on a user message keeps calls and results together in a
+    well-ordered conversation, but the request boundary does not REQUIRE that
+    ordering — a result may legally arrive after the next user message. Compacting
+    such a span would delete an assistant's call while leaving its result behind
+    (or the reverse), and the client's next request would carry a tool result
+    answering nothing.
+
+    Refusing outright rather than trimming to fit: this is a conversation shaped
+    in a way nothing here expects, and skipping compaction for a turn costs
+    nothing at all.
+    """
+    inside_calls: set[str] = set()
+    outside_calls: set[str] = set()
+    for index, message in enumerate(messages):
+        if not message.tool_calls:
+            continue
+        target = inside_calls if start <= index < end else outside_calls
+        target.update(call.id for call in message.tool_calls)
+
+    for index, message in enumerate(messages):
+        if message.role != "tool" or not message.tool_call_id:
+            continue
+        result_inside = start <= index < end
+        if message.tool_call_id in inside_calls and not result_inside:
+            return False
+        if message.tool_call_id in outside_calls and result_inside:
+            return False
+    return True

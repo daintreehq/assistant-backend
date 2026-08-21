@@ -17,7 +17,7 @@ from collections.abc import AsyncGenerator, AsyncIterator, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
 from .. import PROTOCOL_VERSION
 from ..config import DOCS_SKILL_ID, PUBLIC_MODEL_ID, Settings
@@ -2272,7 +2272,7 @@ class ChatOrchestrator:
                         # away. The re-roll deliberately starts no replacement:
                         # a round whose output shape was already wrong once is
                         # not the one to trust with freezing history.
-                        compaction_task.cancel()
+                        self._drop_compaction(compaction_task)
                         compaction_task = None
                     continue
 
@@ -2621,11 +2621,16 @@ class ChatOrchestrator:
     ) -> StreamCompaction | None:
         """One compaction call, and the wire event it produces — or nothing.
 
-        Never raises anything but cancellation. Compaction is an optimisation
-        layered on a turn that is already answering correctly without it, so no
-        failure it can have is worth more than the turn: an exception, an empty
-        result and an oversized block all resolve to "no event", and the client
-        keeps the raw history it already holds.
+        TOTAL, and deliberately so: the only thing that escapes is cancellation.
+        This runs on a detached task, so an exception here does not merely lose a
+        block — it sits unretrieved and surfaces later as a warning from nowhere,
+        attributed to no turn. Everything after the call is inside the boundary
+        too, because `CompactionResult` is a plain dataclass whose annotation is
+        not enforced at runtime: a producer returning `content=None` would
+        otherwise raise on `.strip()`.
+
+        Compaction is layered on a turn that is already answering correctly
+        without it, so no failure it can have is worth more than the turn.
         """
         try:
             result = await compactor.compact(
@@ -2636,54 +2641,39 @@ class ChatOrchestrator:
                     max_output_bytes=self.settings.cap_compaction_block_bytes,
                 )
             )
+            if result is None:
+                return None
+            content = result.content.strip()
+            if not content:
+                return None
+            # `utf8_len` measures with replacement semantics so a size check can
+            # never raise — which means a lone surrogate SURVIVES it, and would
+            # then blow up in `_sse`'s own encode, at a `yield` no handler covers.
+            content.encode("utf-8")
+            # Discarded WHOLE rather than truncated. What a block is made of is
+            # agent ids, worktree paths, terminal ids and open blockers; a cut
+            # removes exactly those and leaves prose that reads complete, which is
+            # worse than having no block at all.
+            size = utf8_len(content)
+            if size > self.settings.cap_compaction_block_bytes:
+                logger.warning(
+                    "compaction_oversized",
+                    request_id=request_id,
+                    bytes=size,
+                    limit=self.settings.cap_compaction_block_bytes,
+                )
+                return None
+            return StreamCompaction(
+                turn_id=turn_id,
+                replaces=CompactionSpan(
+                    start_index=source.start, end_index=source.end
+                ),
+                block=CompactionBlock(content=content),
+            )
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001 - best-effort, never fails a turn
-            logger.warning(
-                "compaction_failed", request_id=request_id, error=str(exc)
-            )
-            return None
-        if result is None:
-            return None
-        content = result.content.strip()
-        if not content:
-            return None
-        # Discarded WHOLE rather than truncated. What a block is made of is agent
-        # ids, worktree paths, terminal ids and open blockers; a cut removes
-        # exactly those and leaves prose that reads complete, which is worse than
-        # having no block at all.
-        # `utf8_len` measures with replacement semantics so a size check can never
-        # raise — which means a lone surrogate SURVIVES it, and would then blow up
-        # in `_sse`'s own encode, at a `yield` no handler covers. Checked here, in
-        # the one place that is allowed to fail quietly.
-        try:
-            content.encode("utf-8")
-        except UnicodeEncodeError:
-            logger.warning("compaction_unencodable", request_id=request_id)
-            return None
-        size = utf8_len(content)
-        if size > self.settings.cap_compaction_block_bytes:
-            logger.warning(
-                "compaction_oversized",
-                request_id=request_id,
-                bytes=size,
-                limit=self.settings.cap_compaction_block_bytes,
-            )
-            return None
-        try:
-            return StreamCompaction(
-                turn_id=turn_id,
-                replaces=CompactionSpan(start_index=source.start, end_index=source.end),
-                block=CompactionBlock(content=content),
-            )
-        except ValidationError as exc:
-            # The wire models carry bounds of their own, and the byte cap is a
-            # SETTING — raised high enough, a block clears it and still fails the
-            # model's code-point limit. Landing here is what keeps this coroutine's
-            # "never raises" contract literally true: an escaping exception would
-            # sit unretrieved on a task the terminal path may have cancelled rather
-            # than awaited, and surface as a warning from nowhere.
-            logger.warning("compaction_invalid", request_id=request_id, error=str(exc))
+            logger.warning("compaction_failed", request_id=request_id, error=str(exc))
             return None
 
     async def _collect_compaction(
@@ -2721,7 +2711,7 @@ class ChatOrchestrator:
         if task.cancelled():
             return None
         exc = task.exception()
-        if exc is not None:  # pragma: no cover - _run_compaction swallows its own
+        if exc is not None:  # pragma: no cover - _run_compaction is total
             logger.warning("compaction_failed", request_id=request_id, error=str(exc))
             return None
         return task.result()

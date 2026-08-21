@@ -85,31 +85,6 @@ def test_a_conversation_with_no_user_message_yields_nothing() -> None:
     assert select_source([_assistant("unprompted")]) is None
 
 
-def test_a_tool_round_is_never_split_from_its_call() -> None:
-    """The span always ends on a user message, so a call keeps its results."""
-    messages = [
-        _user("do it"),
-        ChatMessage(
-            role="assistant",
-            tool_calls=[
-                {
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {"name": "terminal__read", "arguments": "{}"},
-                }
-            ],
-        ),
-        ChatMessage(role="tool", tool_call_id="call_1", content="output"),
-        _assistant("done"),
-        _user("and now this"),
-    ]
-    source = select_source(messages)
-    assert source is not None
-    assert (source.start, source.end) == (0, 4)
-    roles = [m.role for m in source.messages]
-    assert roles == ["user", "assistant", "tool", "assistant"]
-
-
 def test_the_reserved_name_only_counts_on_a_user_message() -> None:
     """Otherwise a client can walk the boundary into a tool transaction.
 
@@ -160,6 +135,62 @@ def test_a_span_never_opens_on_an_orphaned_tool_result() -> None:
 
 def test_advancing_past_a_non_user_tail_can_empty_the_span() -> None:
     assert select_source([_block(), _assistant("only"), _user("live")]) is None
+
+
+def _call(call_id: str) -> ChatMessage:
+    return ChatMessage(
+        role="assistant",
+        tool_calls=[
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {"name": "terminal__read", "arguments": "{}"},
+            }
+        ],
+    )
+
+
+def test_a_span_that_would_split_a_tool_transaction_is_refused() -> None:
+    """The request boundary permits a result arriving after the next user message.
+
+    `validation.py` only requires the call id to have appeared EARLIER, so this
+    conversation is accepted. Ending the span on a user message is therefore not
+    enough on its own: compacting [0,2) would delete the assistant's call and
+    leave its result behind, answering nothing.
+    """
+    messages = [
+        _user("old task"),
+        _call("c1"),
+        _user("current"),
+        ChatMessage(role="tool", tool_call_id="c1", content="late result"),
+    ]
+    assert select_source(messages) is None
+
+
+def test_a_result_inside_the_span_whose_call_is_outside_is_refused() -> None:
+    """The mirror case: the call would survive with its result deleted."""
+    messages = [
+        _block(),
+        _user("a"),
+        ChatMessage(role="tool", tool_call_id="c9", content="orphan"),
+        _user("live"),
+        _call("c9"),
+    ]
+    assert select_source(messages) is None
+
+
+def test_a_well_ordered_transaction_inside_the_span_is_still_compactable() -> None:
+    """The guard must refuse the pathological shape, not the ordinary one."""
+    messages = [
+        _user("do it"),
+        _call("c1"),
+        ChatMessage(role="tool", tool_call_id="c1", content="output"),
+        _assistant("done"),
+        _user("and now this"),
+    ]
+    source = select_source(messages)
+    assert source is not None
+    assert (source.start, source.end) == (0, 4)
 
 
 # ---- the seam ----------------------------------------------------------
@@ -214,6 +245,10 @@ def test_the_event_is_strict_about_its_own_shape() -> None:
     # than replace anything.
     with pytest.raises(ValidationError):
         CompactionSpan(start_index=5, end_index=2)
+    # Equality at a POSITIVE start. `(0, 0)` above fails on `gt=0` alone, so
+    # without this the relational rule could be deleted and the suite stay green.
+    with pytest.raises(ValidationError):
+        CompactionSpan(start_index=1, end_index=1)
     with pytest.raises(ValidationError):
         StreamCompaction(
             turn_id="t",
