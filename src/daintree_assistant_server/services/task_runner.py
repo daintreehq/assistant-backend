@@ -19,6 +19,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 from ..config import (
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
+    SERVING_MODEL,
     Settings,
 )
 from ..contracts.tasks import (
@@ -55,7 +56,6 @@ from ..errors import (
     turn_deadline_exceeded,
     unknown_task,
 )
-from ..modes import DEFAULT_MODE, NO_THINKING, ModeRegistry, ResolvedMode
 from ..observability import get_logger, new_task_run_id
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
@@ -583,21 +583,14 @@ def _p_workflow_resume(raw: str, req: TaskRequest) -> dict[str, Any]:
 _CACHE_AFFINITY_PREFIX = "daintree-task-"
 
 
-def _affinity_key(namespace: str, task_id: str) -> str:
+def _affinity_key(task_id: str) -> str:
     """The upstream cache-affinity key for a task call.
 
-    A pure function of the SERVER-owned mode namespace and task id — no caller
-    input reaches it, so it is safe to hand to a third party verbatim, unlike the
-    session-derived key on the main path which is hashed precisely because it is
-    not.
-
-    Namespaced by MODE because a Standard `workflow_plan` prompt and a Pro one
-    can be byte-identical and still belong to different upstream cache lineages.
-    The two providers keep separate caches today, so this changes nothing on the
-    wire; it makes a request dump say which tier produced it, and it is already
-    correct on the day two modes share a vendor account.
+    A pure function of the SERVER-owned task id — no caller input reaches it, so
+    it is safe to hand to a third party verbatim, unlike the session-derived key
+    on the main path which is hashed precisely because it is not.
     """
-    return f"{_CACHE_AFFINITY_PREFIX}{namespace}-{task_id}"
+    return f"{_CACHE_AFFINITY_PREFIX}{task_id}"
 
 
 # --------------------------------------------------------------------------
@@ -608,18 +601,16 @@ def _affinity_key(namespace: str, task_id: str) -> str:
 # Which adapter answers a task. A CLOSED two-value type, not a registry key: this
 # exists so ONE task can reach a cheaper model, and the type is what stops it
 # growing into the endpoint-selection policy that was deliberately deleted in the
-# move to Cerebras. Adding a third value should feel like a decision.
-#: "request_mode" means "wherever this REQUEST's mode routes" — Together for a
-#: Standard task, Cerebras for a Pro one. The profile does not care which vendor
-#: that is, only that the task runs on the same tier the user is paying for. A
-#: Pro turn whose planning, extraction and judging quietly ran on Standard would
-#: be a Pro label over Standard work.
-ProviderId = Literal["request_mode", "openrouter"]
+# move off OpenRouter. Adding a third value should feel like a decision.
+#: "serving" is the one host this server talks to — Together, on SERVING_MODEL.
+#: The profile does not care which vendor that is, only that it is the one
+#: funding ordinary turns.
+ProviderId = Literal["serving", "openrouter"]
 
-# No profile overrides the route today: every task follows its request's mode.
-# The second-provider mechanism below (`ProviderId`, `_provider_for`) is kept
-# because it is the seam that made moving compaction off the serving model
-# possible in the first place — it just has no user while both modes are cheap.
+# No profile overrides the provider today: every task runs on SERVING_MODEL. The
+# second-provider mechanism below (`ProviderId`, `_provider_for`) is kept because
+# it is the seam that made moving compaction off the serving model possible in
+# the first place — it just has no user while the serving model IS the cheap one.
 
 
 @dataclass(frozen=True)
@@ -638,12 +629,10 @@ class TaskProfile:
     # (the golden suite parametrizes over it) and must stay constructible without
     # building an HTTP client. `TaskRunner` resolves the name to an instance.
     #
-    # `model = None` means "the route's model", which is the right default now
-    # that there are two: a hardcoded default here would pin every task to one
-    # mode's model and make a Pro task report a model it never called. Only a
-    # profile that deliberately leaves the request's route sets this.
-    provider_id: ProviderId = "request_mode"
-    model: str | None = None
+    # Defaulting both together keeps every profile on the one serving identity:
+    # Together, on the one hardcoded model.
+    provider_id: ProviderId = "serving"
+    model: str = SERVING_MODEL
     # Appended to the generic repair instruction so the retry re-anchors on this
     # task's exact output shape (the selector does the same for select_skills).
     # Only used on the rare second attempt — no happy-path cost.
@@ -840,7 +829,7 @@ class TaskRunner:
         self,
         *,
         settings: Settings,
-        modes: ModeRegistry,
+        provider: ChatProvider,
         prompt_loader: PromptLoader,
         profiles: dict[str, TaskProfile] | None = None,
         # Read-only skill-outline source for workflow_plan; optional so the
@@ -854,7 +843,7 @@ class TaskRunner:
         openrouter_provider: ChatProvider | None = None,
     ) -> None:
         self.settings = settings
-        self.modes = modes
+        self.provider = provider
         self.openrouter_provider = openrouter_provider
         self.prompts = prompt_loader
         self.profiles = profiles if profiles is not None else build_profiles(catalog_manager)
@@ -862,7 +851,7 @@ class TaskRunner:
     def task_ids(self) -> list[str]:
         return sorted(self.profiles)
 
-    def _provider_for(self, profile: TaskProfile, route: ResolvedMode) -> ChatProvider:
+    def _provider_for(self, profile: TaskProfile) -> ChatProvider:
         """The adapter that answers this profile.
 
         Resolved ONCE per task run and then threaded through both the first
@@ -877,8 +866,8 @@ class TaskRunner:
         server down for it would be the wrong trade, while returning an empty
         compaction would be a lie about work that never happened.
         """
-        if profile.provider_id == "request_mode":
-            return route.provider
+        if profile.provider_id == "serving":
+            return self.provider
         if self.openrouter_provider is None:
             raise provider_not_configured("OpenRouter")
         return self.openrouter_provider
@@ -900,13 +889,7 @@ class TaskRunner:
             remaining_seconds=(budget.remaining_total if budget is not None else None),
         )
 
-    async def run(
-        self,
-        request: TaskRequest,
-        *,
-        route: ResolvedMode | None = None,
-        api_key: SecretStr | None = None,
-    ) -> TaskResult:
+    async def run(self, request: TaskRequest, *, api_key: SecretStr | None = None) -> TaskResult:
         """Run one named utility task under a finite total budget.
 
         The per-call `httpx` timeout on a profile is an inactivity bound; a task
@@ -920,14 +903,10 @@ class TaskRunner:
         if profile is None:
             raise unknown_task(request.task)
 
-        # Resolved once, here, and threaded through the attempt AND its repair.
-        route = route if route is not None else self.modes.resolve(DEFAULT_MODE)
         budget = RequestBudget(policy=self._budget_policy(profile))
         try:
             async with asyncio.timeout(budget.remaining_total()):
-                return await self._run_inner(
-                    request, route=route, api_key=api_key, budget=budget
-                )
+                return await self._run_inner(request, api_key=api_key, budget=budget)
         except TimeoutError as exc:
             logger.warning(
                 "task_deadline_exceeded",
@@ -968,12 +947,7 @@ class TaskRunner:
         )
 
     async def _run_inner(
-        self,
-        request: TaskRequest,
-        *,
-        route: ResolvedMode,
-        api_key: SecretStr | None,
-        budget: RequestBudget,
+        self, request: TaskRequest, *, api_key: SecretStr | None, budget: RequestBudget
     ) -> TaskResult:
         profile = self.profiles.get(request.task)
         if profile is None:
@@ -1005,12 +979,8 @@ class TaskRunner:
         # below. `model` reaches the client verbatim as `TaskResult.model`, so a
         # task that runs on the second provider says so honestly rather than
         # reporting the serving model it never touched.
-        model = profile.model or route.model
-        provider = self._provider_for(profile, route)
-        # A profile that leaves the request's route also leaves its posture — the
-        # override names another vendor's model, about which this route's policy
-        # says nothing.
-        thinking = route.spec.thinking if profile.provider_id == "request_mode" else NO_THINKING
+        model = profile.model
+        provider = self._provider_for(profile)
         timeout = profile.timeout_seconds or self.settings.utility_timeout_seconds
 
         messages = [
@@ -1028,15 +998,8 @@ class TaskRunner:
         # to keep its CoT from starving the answer into a finish_reason=length
         # truncation — but handing that same slack to a NON-thinking task just raises
         # its visible-output ceiling above the cap its profile deliberately set.
-        # The MODE's posture, AND-ed with the utility-task posture. Both are off,
-        # and they answer different questions: a mode says what its model does,
-        # `INTERACTIVE_THINKING_ENABLED` says these bounded extractions never need
-        # it whatever the model can do. A mode turning reasoning on must not
-        # silently turn it on for terminal summarisation too.
-        thinking_enabled = INTERACTIVE_THINKING_ENABLED and thinking.enabled
-        reasoning_effort = (
-            (thinking.effort or INTERACTIVE_REASONING_EFFORT) if thinking_enabled else None
-        )
+        thinking_enabled = INTERACTIVE_THINKING_ENABLED
+        reasoning_effort = INTERACTIVE_REASONING_EFFORT if thinking_enabled else None
         max_tokens = profile.max_output_tokens + (
             self.settings.thinking_headroom_tokens if thinking_enabled else 0
         )
@@ -1059,16 +1022,16 @@ class TaskRunner:
             # (auth.py ignores the Authorization header). Not latent for
             # benchmarks: `benchmarks/_harness/env.py::caller_api_key` returns
             # a serving credential and the utility-task benchmarks thread it into
-            # `TaskRunner.run`, so an unscoped forward would put the Cerebras key
+            # `TaskRunner.run`, so an unscoped forward would put the serving key
             # in an Authorization header bound for OpenRouter.
-            api_key=api_key if profile.provider_id == "request_mode" else None,
+            api_key=api_key if profile.provider_id == "serving" else None,
             # Cache affinity, keyed by TASK rather than by caller. A task's system
             # prompt is server-owned and identical for everyone who runs it, so the
             # calls that share a prefix are the ones that share a task id — not the
             # ones that share a session. Per task and not one key for all tasks, so
             # `terminal_summarize` and `checkpoint` are never described to the
             # upstream as one growing conversation.
-            cache_session_id=_affinity_key(route.spec.cache_namespace, profile.id),
+            cache_session_id=_affinity_key(profile.id),
         )
 
         result = await self._complete_with_retry(provider_request, provider, budget=budget)
@@ -1097,11 +1060,11 @@ class TaskRunner:
                 # here would silently swap the caller's key for the provider's
                 # configured default midway through a task, and a blind forward
                 # would misdirect it to another vendor.
-                api_key=api_key if profile.provider_id == "request_mode" else None,
+                api_key=api_key if profile.provider_id == "serving" else None,
                 # ...and the same affinity key: the repair replays the whole first
                 # attempt plus one instruction, so it is the same prefix and should
                 # say so.
-                cache_session_id=_affinity_key(route.spec.cache_namespace, profile.id),
+                cache_session_id=_affinity_key(profile.id),
             )
             # The SAME provider and model as the attempt being repaired. A repair
             # that fell back to the default provider would replay the prompt

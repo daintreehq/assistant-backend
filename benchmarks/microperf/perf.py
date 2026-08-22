@@ -37,9 +37,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.config import Settings
+from daintree_assistant_server.config import SERVING_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
-from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.observability import configure_logging
 from daintree_assistant_server.providers.base import (
     ProviderChatRequest,
@@ -559,7 +558,7 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         "meta": {
             "benchmark": "microperf",
             "mode": "deterministic",
-            "model": STANDARD_MODEL,
+            "model": SERVING_MODEL,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "platform": platform.platform(),
             "python_version": platform.python_version(),

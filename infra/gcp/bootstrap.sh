@@ -20,7 +20,7 @@
 # invalidate every outstanding state token, so that is a deliberate manual act.
 #
 # What the server needs at runtime is state-signing material PLUS the upstream
-# credential (CEREBRAS_API_KEY), which it holds itself and funds every turn from.
+# credential (TOGETHER_API_KEY), which it holds itself and funds every turn from.
 # Callers supply no key of their own (see README.md and docs/KEY_HANDLING.md).
 
 set -euo pipefail
@@ -103,7 +103,7 @@ say "Secrets"
 # STATE_SIGNING_KEY_CURRENT must be >=32 chars and STATE_SALT must not be the
 # packaged default, or production readiness fails (Settings.weak_secrets).
 #
-# cerebras-api-key is DIFFERENT IN KIND from the two below: it cannot be
+# together-api-key is DIFFERENT IN KIND from the two below: it cannot be
 # generated, only supplied. So this script creates the secret shell and stops —
 # a random value here would deploy a service that fails /readyz on a credential
 # nobody realised was fake.
@@ -126,11 +126,9 @@ gen_salt() { openssl rand -hex 16; }
 ensure_secret state-signing-key-current gen_key
 ensure_secret state-salt gen_salt
 
-# Both upstream credentials get a shell, and BOTH gate readiness: together-api-key
-# funds `standard` and cerebras-api-key funds `pro`, the deploy mounts both
-# unconditionally, and a service that advertises two modes and can serve one is
-# incomplete rather than reduced. A missing version therefore has to stop the
-# deploy here, not surface as a red /readyz two steps later.
+# The upstream credential gets a shell and it GATES: together-api-key funds every
+# turn, the deploy mounts it unconditionally, and a missing version has to stop
+# the deploy here rather than surface as a red /readyz two steps later.
 ensure_supplied_secret() {
   local name="$1" example="$2" gates="$3"
   if ! gcloud secrets describe "$name" --project="$PROJECT" >/dev/null 2>&1; then
@@ -149,7 +147,6 @@ ensure_supplied_secret() {
   fi
 }
 ensure_supplied_secret together-api-key 'tgp_v1_...' gates
-ensure_supplied_secret cerebras-api-key 'csk-...' gates
 
 # ---------------------------------------------------------------------------
 say "Runtime service account (what the container runs as)"
@@ -162,10 +159,10 @@ else
 fi
 # Scoped per-secret rather than project-wide: this identity can read exactly the
 # secrets it mounts and nothing else in the project.
-# together-api-key AND cerebras-api-key both appear here because the deploy mounts
-# both: one funds `standard`, the other `pro`, and a grant covering only one turns
-# a whole product tier into a permission error discovered at deploy time.
-RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key cerebras-api-key"
+# together-api-key appears here because the deploy mounts it: without the grant,
+# the runtime identity cannot read the key that funds every turn, and the
+# revision fails at startup.
+RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key"
 for s in $RUNTIME_SECRETS; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUNTIME_SA_EMAIL}" \

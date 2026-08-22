@@ -16,7 +16,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`status
 `compaction`/`done`/`error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Modes and upstreams:** two product modes, both live in every deployment — `standard` (Together AI, `deepseek-ai/DeepSeek-V4-Flash-0731`, the default) and `pro` (Cerebras, `gemma-4-31b`, the FAST tier at p50 486ms against 1100ms). A caller chooses a MODE, never a provider or model id; `modes.py` owns the mapping and the public response says `daintree-assistant` in both. Both are OpenAI-format APIs spoken *internally* behind a provider abstraction; both hosts are model *hosts*, not routers, so there is no endpoint-selection policy and no per-request routing preference — and pinning the host is what makes Standard fast, since the same weights via OpenRouter's default routing measured 3.1x slower (p50 3414ms against 1100ms). There is no automatic fallback between modes. Skill selection is LOCAL on both routes, an in-process two-stage ONNX selector making no upstream call. Requests are not collected for training ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, deliberately *not* a zero-retention claim <!-- privacy-copy-ok -->)
+- **Upstream:** Together AI (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-ai/DeepSeek-V4-Flash-0731` for the main completion and every utility task; skill selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Together is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference — and pinning the host is what makes it fast, since the same weights via OpenRouter's default routing measured 3.1x slower (p50 3414ms against 1100ms). **Data handling is currently UNVERIFIED for this host** — the no-training position this project used to state was its previous upstream's, and nobody has read Together's terms yet, so do not repeat it ([`docs/PROVIDER_POLICY.md` §4](docs/PROVIDER_POLICY.md))
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Authoritative documents
@@ -80,7 +80,7 @@ proof that the whole corpus is accurate.
 src/daintree_assistant_server/
   api/            # FastAPI routers (chat, models, capabilities, skills, tasks, health)
   contracts/      # Pydantic wire models (OpenAI subset, extension, tasks, errors)
-  providers/      # ChatProvider protocol + Together/OpenRouter/Cerebras adapters + SSE parser
+  providers/      # ChatProvider protocol + Together/OpenRouter adapters + SSE parser
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader
   skills/         # Skill models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed skill-state token codec
@@ -104,10 +104,9 @@ mypy src/
 # Regenerate prompt golden snapshots after an intentional change
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
-# Live provider-contract tests (skipped by default; make real Cerebras calls).
-# Pins the things mocks can't see — which parameters Cerebras accepts and which
-# it rejects with a 400, and that the serving model reports no reasoning tokens.
-RUN_LIVE_CEREBRAS=1 CEREBRAS_API_KEY=csk-... pytest tests/live -q
+# Live provider-contract tests: NONE ship today. The suite that existed pinned
+# the Cerebras wire and was deleted with that adapter, so what Together accepts,
+# what it 400s, and whether it reports cost are unpinned (see TODO.md).
 ```
 
 CI (`.github/workflows/ci.yml`) runs ruff + `mypy --strict` + pytest on every

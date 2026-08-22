@@ -15,18 +15,11 @@ present tense.
 
 ---
 
-## 1. Product modes, providers and models
+## 1. Provider and model
 
-Daintree serves **two product modes**, and both are active in every deployment:
-
-| Mode | Provider | Model | Character |
-|---|---|---|---|
-| `standard` | Together AI (`https://api.together.xyz/v1`) | `deepseek-ai/DeepSeek-V4-Flash-0731` | the default; the more capable model |
-| `pro` | Cerebras Inference (`https://api.cerebras.ai/v1`) | `gemma-4-31b` | the FAST tier — p50 486ms against Standard's 1100ms |
-
-Both are OpenAI-compatible wire formats, and both hosts are model **hosts**
-rather than routers: one endpoint serves each model and there is nothing to
-select between.
+The **only** upstream is **Together AI** (`https://api.together.xyz/v1`,
+OpenAI-compatible wire format). It is a model **host**, not a router: one
+endpoint serves the model, and there is nothing to select between.
 
 That single fact is why this document is much shorter than it used to be. Under
 OpenRouter, ~24 interchangeable endpoints served the same weights and a `provider`
@@ -34,51 +27,37 @@ block on every request decided which one answered — which meant a privacy filt
 a ranking axis, a latency floor, a fallback policy, an output-quality denylist, a
 sticky-affinity key and a caller-facing `routing` preference to expose all of it.
 None of that has a subject any more, so all of it is **deleted rather than
-neutered** (git history has the previous revision). Two hosts is not a return to
-routing: a caller names a MODE, the server owns the mapping, and there is exactly
-one route per mode with no fallback between them.
+neutered** (git history has the previous revision).
 
-| Call | Route | Source of truth |
+| Call | Model | Source of truth |
 |---|---|---|
-| Main completion | the request's mode | `modes.MODE_SPECS` |
-| Utility tasks | the request's mode | `TaskProfile.provider_id == "request_mode"` |
+| Main completion | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.SERVING_MODEL` |
+| Utility tasks | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.SERVING_MODEL` |
 | Skill selection | — local two-stage ONNX selector, no upstream call | `skills/local/setwise.py` |
 
-**A caller chooses a mode, never a provider or a model id.** `modes.py` owns the
-whole mapping — provider, model, thinking policy, cache namespace — and the
-public response says `daintree-assistant` in both modes. The product promise is
-Standard or Pro, not a permanent contract with Together, Cerebras, DeepSeek or
-Gemma. Swapping Gemma for Qwen 3.8 the day Cerebras serves it is editing
-`modes.PRO_MODEL`; no caller, wire shape, or stored preference moves with it.
+**A second product mode briefly lived here** — a `pro` tier on Cerebras serving
+`gemma-4-31b`, faster on the same benchmark payloads (p50 486ms against 1100ms).
+It is gone: Cerebras's pricing structure could not be made to work for this
+product, so there was no second route left to choose between. The registry, the
+per-mode credentials, the per-turn route threading and the wire rules specific to
+that host all went with it rather than being kept warm. Git history has the
+whole change. A genuine second tier lands there again as a deliberate piece of
+work, not as a flag.
 
-**No automatic cross-mode fallback exists, and none may be added.** If Pro's
-provider is unavailable, a Pro turn fails as Pro. Answering it from Standard
-would change expected quality, cost, latency, tool-call behaviour and cache
-lineage under a label the user chose deliberately — invisibly, which is the part
-that makes it indefensible rather than merely wrong. Retries stay inside the
-resolved route; switching mode is a new request the user authorizes.
+**The host is the latency decision, not the model.** These are the same weights
+`context_compact` reached through OpenRouter for months. OpenRouter is a router
+and this server sends it no routing preferences (there is no `provider` block —
+see above), so its endpoint choice is whatever the default is that minute.
+Replaying the 62 real utility-task payloads against both: Together p50 1100ms /
+p90 1702ms, OpenRouter p50 3414ms / p90 6013ms. Nothing about the model changed.
 
-**The host is the latency decision, not the model.** Standard's weights are the
-same ones `context_compact` reached through OpenRouter for months. OpenRouter is
-a router and this server sends it no routing preferences (there is no `provider`
-block — see above), so its endpoint choice is whatever the default is that
-minute. Replaying the 62 real utility-task payloads: Together p50 1100ms / p90
-1702ms, OpenRouter p50 3414ms / p90 6013ms. Nothing about the model changed.
+`config.SERVING_MODEL` names the model and `config.SERVING_ORIGIN` the host the
+credential is sent to; `main._build_provider` builds the adapter, readiness gates
+`TOGETHER_API_KEY`, and `weak_secrets` pins the origin in production.
 
-Readiness gates **both** credentials (`TOGETHER_API_KEY`, `CEREBRAS_API_KEY`) and
-`weak_secrets` pins **both** production origins, because the service advertises
-both modes unconditionally. A deployment that can serve only one is incomplete,
-not a single-mode deployment, and it must fail `/readyz` rather than discover the
-gap on a user's first Pro turn.
-
-Both model ids are **hardcoded** — a product decision, not deployment config.
-There is no environment override, and there must not be one: every prompt and
-benchmark in this repository is calibrated against these exact models.
-
-**`gemma-4-31b` is a preview model and Cerebras has said it will be replaced.**
-When that happens `modes.PRO_MODEL` is the whole code change, but not the whole
-job: see §9. Two properties of that specific model are load-bearing beyond
-quality — it does not reason (§2) and it is what Pro's budgets are sized against.
+The id is **hardcoded** — a product decision, not deployment config. There is no
+environment override, and there must not be one: every prompt and benchmark in
+this repository is calibrated against this exact model. Changing it is §9.
 
 > **Skill selection is not an upstream call.** It runs as a LOCAL in-process
 > two-stage selector (`skills/local/`, no credential, no endpoint, ~10ms). The
@@ -100,20 +79,16 @@ client never sees a real model id" without qualifying it.
 
 ## 2. Thinking posture
 
-**Nothing in this server thinks — and that is now a property of the model, not a
-flag held down.**
+**Nothing in this server thinks — and that is a flag genuinely held down, not a
+property of the model.**
 
-Under the previous stack it took an explicit `reasoning: {"enabled": false}` on
-every call, because a reasoning model reasons by default when the field is
-absent. Cerebras has no such switch: it accepts a bare `reasoning_effort` string
-with `low`/`medium`/`high` and **no off value**, and rejects OpenRouter's
-`reasoning` object outright with a 400. So the posture is not sent — it is
-inherited from `gemma-4-31b`, which does not reason at all (measured
-`reasoning_tokens: 0`).
+DeepSeek V4 Flash reasons by default when the field is absent, so every call
+sends the unified `reasoning: {"enabled": false}` object. Together honours it —
+measured: `reasoning_tokens` drops out of the usage block entirely.
 
 | Surface | Thinking | How |
 |---|---|---|
-| Main completion | off | model has no reasoning mode; `INTERACTIVE_THINKING_ENABLED = False` |
+| Main completion | off | `reasoning: {"enabled": false}`; `INTERACTIVE_THINKING_ENABLED = False` |
 | Utility tasks | off | same |
 | Skill selector | n/a | local classifier, no model call |
 
@@ -123,58 +98,46 @@ write a skill" was genuinely worth reasoning about. It has been removed, so no
 call in this system sets `reasoning_effort` at all.
 
 `INTERACTIVE_THINKING_ENABLED` stays in the code as the decision record and the
-switch a future reasoning-capable serving model would need;
-`INTERACTIVE_REASONING_EFFORT` sits beside it so flipping the flag does not also
-require choosing a tier. `tests/live/test_live_cerebras.py` asserts the serving
-model reports zero reasoning tokens, so a replacement model that *does* reason
-announces itself there rather than in an unexplained latency regression.
+switch a reasoning posture would flip; `INTERACTIVE_REASONING_EFFORT` sits beside
+it so flipping the flag does not also require choosing a tier.
+
+**This one is not pinned live.** There is no live contract suite (see §8), so
+"Together honours the disable" rests on a measurement taken by hand rather than
+on a test that would notice it stopping. A model or host that quietly began
+reasoning would announce itself as a latency and cost regression, not as a
+failure. `TODO.md` carries the suite.
 
 ## 3. Wire shape — what a request carries, and what it must never carry
 
-**Cerebras is not a router: one endpoint serves each model.** So there is no
+**Together is not a router: one endpoint serves the model.** So there is no
 endpoint-selection policy and no caller-facing `routing` block — a request
 carries the model, the messages, and the parameters the call actually needs, and
-nothing about where it should go. Four details are Cerebras-specific and each one is a hard failure if got
-wrong — they are pinned by `tests/unit/test_docs_drift.py` against the adapter's
-source and by `tests/live/test_live_cerebras.py` against the real API.
+nothing about where it should go.
 
-| Rule | Consequence of breaking it |
-|---|---|
-| `max_completion_tokens`, never `max_tokens` | Both spellings together is a 400. Either alone is fine, so this is a live trap: the normalized field is called `max_tokens` and passing it straight through *works* until something else also sets the other name. |
-| No `reasoning` object | `400 wrong_api_format`. Use the bare `reasoning_effort` string (§2). |
-| No `provider` block | `400 wrong_api_format`. |
-| No `session_id` | `400 wrong_api_format`. The affinity key is `prompt_cache_key` (§3a). |
+The adapter is `providers/together.py`: the OpenRouter one with three class
+attributes changed (base URL, key-probe path, no attribution headers) plus a
+key-record decoder, because Together's `/models` answers a bare JSON array where
+OpenRouter's `/key` answers `{"data": {...}}`. Same body, same SSE parsing, same
+error mapping.
 
-Error bodies are **flat** — `{"message", "type", "param", "code"}` — not wrapped
-in OpenAI's `{"error": {...}}` envelope. The adapter reads both shapes, flat
-first; reading only the nested one would silently discard every diagnostic this
-provider produces, which is the sort of failure that surfaces as "HTTP 400" and
-nothing else.
+**A table of four host-specific wire rules used to sit here.** They were
+Cerebras's — `max_completion_tokens` never `max_tokens`, no `reasoning` object,
+no `provider` block, no `session_id`, and flat error bodies — and every one of
+them is the OPPOSITE of, or absent from, what Together wants. They are deleted
+rather than kept as a switch-back note, because a reader who half-remembered one
+would send a request this host rejects. Git history has them.
 
-### 3a. Cache affinity — `prompt_cache_key`
+### 3a. Cache affinity — computed, and NOT sent
 
-Cerebras caches prompt prefixes **automatically**: matched in 128-token blocks,
-scoped to the organization, held in memory with a guaranteed 5-minute TTL (longer
-under light load). Nothing has to be configured, and there is no endpoint to
-steer traffic toward — the mechanism the previous adapter's sticky-key machinery
-existed to drive is simply built in here.
+Together caches prompt prefixes **automatically**, scoped to the organization and
+matched on the literal prompt prefix. Nothing has to be configured, and there is
+no endpoint to steer traffic toward — the mechanism an earlier adapter's
+sticky-key machinery existed to drive is simply built in here.
 
-Main conversation calls and utility tasks still name a key:
-
-```json
-{"prompt_cache_key": "daintree-main-<sha256(session id + salt)>"}
-```
-
-**It is a hint, not the mechanism.** The upstream is free to ignore it, and the
-honest expectation is that caching works identically without it. It is sent
-because it is the OpenAI-standard spelling for exactly this intent, it costs one
-short field, and it states which calls belong to one growing prefix — which is
-information a future provider may use and which no one can recover later.
-
-It is a salted digest, never the client's own session id: the field crosses to a
-third party, and a client session id is opaque local text we make no promises
-about. The salt is shared by every instance, so the key is stable across a
-stateless fleet without any instance storing it.
+**The server computes an affinity key and the adapter does not send it.** That
+is the honest state, and this section previously claimed the opposite. Every
+main conversation call and utility task carries a `cache_session_id` on the
+normalized `ProviderChatRequest`:
 
 | Call | Key | What it names |
 |---|---|---|
@@ -182,38 +145,57 @@ stateless fleet without any instance storing it.
 | Main, JSON mode | `daintree-main-json-<sha256(session id + salt)>` | ditto, minus the tool schemas |
 | Utility task | `daintree-task-<task id>` | that task's server-owned system prompt |
 
-Task keys are per task rather than one key for all of them: `terminal_summarize`
-and `checkpoint` have different prompts, and one shared key would describe two
-unrelated prefixes to the upstream as a single conversation.
+`_build_body` then drops it. OpenRouter's spelling (`session_id`) only ever meant
+anything as a way to pin a sticky record across the endpoint pool the routing
+block selected from, and that block is gone; `prompt_cache_key` was the retired
+Cerebras adapter's spelling and is not a parameter this host advertises. An
+unadvertised parameter is a needless 400 risk for a field that would buy nothing
+against automatic prefix caching, so it is computed and withheld rather than
+guessed at. `tests/unit/test_provider_openrouter.py` asserts neither name
+appears on the wire.
 
-**What prompt layout still buys.** Everything in
-[`prompt_assembler`](../src/daintree_assistant_server/services/prompt_assembler.py)
-about ordering rows widest-shared-first is *unchanged in value* by the provider
-move — arguably more valuable, since org-wide automatic prefix matching rewards a
-byte-stable head and nothing else. What is gone is only the part about keeping a
-conversation pinned to one node.
+The key is kept in the normalized request anyway because it costs nothing there,
+it states which calls belong to one growing prefix, and that is information no
+one can recover after the fact — so the day a host advertises a spelling, the
+answer is already computed. It is a salted digest, never the client's own session
+id: the field is built to cross to a third party, and a client session id is
+opaque local text we make no promises about. The salt is shared by every
+instance, so the key is stable across a stateless fleet without any instance
+storing it.
 
-## 4. Privacy — what is and is not promised
+## 4. Privacy — UNVERIFIED against the current host
 
-> **Daintree's promise is a no-training guarantee.**
-> **It is deliberately not a no-retention guarantee.**
+> ⚠️ **READ THIS BEFORE ANY LINE OF THIS SECTION.** Nothing here has been
+> verified against Together's terms, and Together is the only host this service
+> talks to. Every claim below — including the promise stated two paragraphs down
+> — was written when the upstream was Cerebras. **Do not repeat any of it,
+> anywhere, as a statement about the current deployment.** That includes the
+> summary in `README.md`, which currently makes the claim and should not until
+> this is closed.
+>
+> Closing it means reading <https://www.together.ai/privacy> and
+> <https://www.together.ai/terms-of-service>, writing what Together actually
+> commits to, and then DELETING the Cerebras material rather than keeping both —
+> that host is gone (§1) and a second published position beside the real one is
+> just an opportunity to quote the wrong one. Tracked in `TODO.md`.
 
-**The basis of this changed and the wording deliberately did not.** Under
-OpenRouter, the no-training floor was something this server *enforced* per
-request, by sending `data_collection: "deny"` and filtering the eligible endpoint
-pool. A single host has no pool, no filter, and no per-request data-handling
-parameter to send. What Daintree can say now rests entirely on the serving host's
-own published policy — which makes WHICH HOST a privacy fact, not just an
-operational one.
+**What the promise WAS, and why its basis moved.** Under OpenRouter the
+no-training floor was something this server *enforced* per request, by sending
+`data_collection: "deny"` and filtering the eligible endpoint pool. A single host
+has no pool, no filter, and no per-request data-handling parameter to send. So
+what Daintree can say rests entirely on the serving host's own published policy
+— which makes WHICH HOST a privacy fact, not just an operational one, and is
+exactly why a host change invalidates this section rather than merely dating it.
 
-> ⚠️ **The serving host is Together AI, and this section has not been re-verified
-> against Together's terms.** It was written for Cerebras and the material below
-> is Cerebras's. Do not repeat the claim below as a statement about the current
-> deployment until somebody has read Together's published position and rewritten
-> this section against it — <https://www.together.ai/privacy> and
-> <https://www.together.ai/terms-of-service> are the authoritative sources. The
-> Cerebras material is retained because `config.SERVING_HOST` can switch back.
-> Tracked in `TODO.md`.
+> **The intended shape of the promise** (unverified for Together, see above):
+> a no-training guarantee, deliberately NOT a no-retention guarantee.
+
+---
+
+### 4a. Historical — Cerebras's published position (NOT APPLICABLE)
+
+Retained only as the shape a verified section should take. This host no longer
+serves any Daintree request.
 
 **Cerebras publishes a stronger position than the copy below claims** — no
 training on inference inputs or outputs, and zero retention of them by default across all tiers <!-- privacy-copy-ok -->,
@@ -229,7 +211,7 @@ oversight. Understating a privacy guarantee cannot mislead a user; overstating
 one is the failure this section exists to prevent, and it becomes part of a
 tester's trust decision about source code, terminal output, issue text and
 project instructions. Raising the claim to "does not retain" is a deliberate act
-that needs a human to verify Cerebras's terms against Daintree's actual account
+that needs a human to verify the serving host's terms against Daintree's actual account
 tier, then relax the scan below — not a default that drifts in.
 
 | Phrase | Allowed? |
@@ -265,12 +247,12 @@ not a stacking bug, and neither may be "fixed" by assuming the other does not
 exist.
 
 ```
-  CLI  ──(hop 1: CLI → backend)──►  backend  ──(hop 2: backend → Cerebras)──►  model
+  CLI  ──(hop 1: CLI → backend)──►  backend  ──(hop 2: backend → Together)──►  model
         cli/internal/backend/retry.go          providers/retry.py
         ≤10 attempts / 2-minute window         MAX_UPSTREAM_RETRIES = 1
 ```
 
-### Hop 2 — backend → Cerebras (`MAX_UPSTREAM_RETRIES`, default 1)
+### Hop 2 — backend → Together (`MAX_UPSTREAM_RETRIES`, default 1)
 
 Applies to every **model** call: main completion, stream open, and utility
 tasks. It does **not** apply to the
@@ -443,12 +425,14 @@ actually exercised. The existing selector benchmark captures neither cached
 tokens nor endpoint attribution and runs at concurrency six, so it cannot answer
 this as written.
 
-## 5c. Cost reporting — built for a number the current provider does not send
+## 5c. Cost reporting — built for a number that may not arrive
 
-> **Cerebras reports no cost.** Every field described in this section is
-> therefore absent today. This is not a regression to route around: the rules
-> below were written so that "we do not know what this cost" is a first-class
-> answer, and a client that implemented them correctly already behaves correctly.
+> **Whether Together reports a billed cost is UNVERIFIED.** The adapter parses
+> `usage.cost` if it is there; nothing in this repository measures whether it is.
+> That is not a regression to route around: the rules below were written so that
+> "we do not know what this cost" is a first-class answer, and a client that
+> implemented them correctly behaves correctly either way. Confirming it needs
+> the live contract suite `TODO.md` carries.
 
 Two failure modes are unacceptable and stay unacceptable: reporting a cost we did
 not observe, and reporting **zero** for one we could not observe. The second is
@@ -458,10 +442,9 @@ someone's money with nothing behind it.
 **Where it would come from.** `ProviderUsage.cost` is whatever the provider says
 it billed, never a token-price estimate computed here. Anything we calculated
 ourselves would be a guess presented as a bill, and would be wrong in the
-direction that looks authoritative. Cerebras returns token counts and a
-`cached_tokens` figure but no billed amount, so `cost` parses to `None` on every
-call. Asking for one is not merely useless here — a `usage` key on the request is
-a hard 400 (§3).
+direction that looks authoritative. When the provider sends no billed amount,
+`cost` parses to `None` and every consumer treats that as "unknown" rather than
+zero — see the two unacceptable failure modes above.
 
 The plumbing is kept rather than deleted, and the reason is the same one that
 justifies the honesty rules: `None` already means exactly "not reported", so
@@ -486,9 +469,12 @@ A `/respond` request can bill **more calls than are obvious**:
 (Skill selection is local and bills nothing; `cost.selector` is null on
 production turns and populated only by the scripted test seam.)
 
-`cost.total` sums every one it can observe, because every one of them lands on
-the caller's card. The breakdown is kept because it answers the follow-up
-question ("why was that turn expensive?").
+`cost.total` sums every one it can observe. It no longer lands on the caller's
+card — Daintree holds the credential and pays (see `docs/KEY_HANDLING.md`) — and
+the figure is reported anyway, because a client that cannot see what a turn cost
+cannot budget, warn, or explain a slow expensive round to its user. The breakdown
+is kept because it answers the follow-up question ("why was that turn
+expensive?").
 
 **Absent means unknown.** When the provider reports no cost, the whole `cost`
 block is omitted rather than filled with zeros. A zero would read as "this turn
@@ -539,7 +525,7 @@ when a provider supplies them, are for proportion and trend.
 
 The caller must be able to tell *whose* problem a failure is: their key, their
 account balance, their key's permissions, Daintree's request, or the provider
-being down. `providers/cerebras.py` maps upstream status codes onto the stable
+being down. `providers/openrouter.py` maps upstream status codes onto the stable
 codes in [`DAINTREE_API.md`](DAINTREE_API.md#errors); the CLI branches on
 `error.code`, never on prose.
 
@@ -574,10 +560,11 @@ Two subtleties worth knowing before editing this:
   read as a permanent policy failure ("No endpoints found matching your data
   policy") must not be, and `tests/unit/test_error_taxonomy.py` pins that —
   misclassifying an outage as permanent kills a retry that would have worked.
-- **An in-band stream error may carry a symbolic code, not a numeric one.**
-  Cerebras sends `"wrong_api_key"` rather than `401`, so the streaming path
-  matches those markers explicitly; without that a rejected credential would fall
-  through to a generic retryable error and the CLI would replay a request that
+- **An in-band stream error may carry a symbolic code, not a numeric one.** Some
+  hosts send `"wrong_api_key"` rather than `401`, so the streaming path matches
+  numeric codes first and falls back to prose; without that a rejected credential
+  would fall through to a generic retryable error and the CLI would replay a
+  request that
   can never succeed.
 
 ### Diagnostics and content
@@ -599,10 +586,10 @@ upstream bodies are never echoed".
 ## 7. Readiness is *configuration* readiness, not provider readiness
 
 `/readyz` validates the server's own secrets, the prompt files, the skill catalog
-and provider-object construction. `CEREBRAS_API_KEY` being **present** is part of
+and provider-object construction. `TOGETHER_API_KEY` being **present** is part of
 that (`missing_secrets`) — without it nothing can be answered at all, and
 discovering that on the first turn surfaces as an upstream 401 that reads like the
-caller's fault. But presence is not validity: `/readyz` **cannot** prove Cerebras
+caller's fault. But presence is not validity: `/readyz` **cannot** prove Together
 is reachable or that the key works, and it deliberately does not try. A readiness
 probe that made a network call to a third party would fail this service for their
 outage.
@@ -620,43 +607,46 @@ tokenless model listing) and to release smoke — never to `/readyz`.
 The code proves exactly one class of fact: **which parameters we send**. That is
 what the drift tests pin.
 
-Everything else here is either a Cerebras behaviour or a measurement, and is
+Everything else here is either a host behaviour or a measurement, and is
 recorded as a **dated observation** rather than a timeless truth. Specifically:
 
-- what Cerebras retains and for how long (§4) — their published policy, not
+- what the host retains and for how long (§4) — their published policy, not
   something this repository can assert or enforce;
 - that `prompt_cache_key` is accepted but not required;
-- that `gemma-4-31b` does not reason;
-- the prefix-cache block size and TTL;
+- that the disable object actually suppresses reasoning (§2);
+- whether the host reports a billed cost (§5c);
 - every latency and token figure quoted above.
 
-The live suite (`tests/live/test_live_cerebras.py`) does pin the *wire* half
-against the real API — which parameters are accepted, which are rejected, and
-that the serving model reports zero reasoning tokens — so the facts most likely
-to break silently are checked rather than remembered. The rest comes from this
-repository's benchmark suites, which write their results to a gitignored
-directory, so those numbers cannot be traced back to a committed run. Treat a
-quoted figure as "what we saw on the date given", re-measure before relying on
-it, and prefer citing Cerebras's own documentation (with the date read) for
-provider semantics.
+**No live suite pins any of it.** There used to be one — it checked which
+parameters the upstream accepted, which it rejected, and that the serving model
+reported zero reasoning tokens — but it was written against Cerebras and was
+deleted with that adapter. So the facts most likely to break silently are now
+remembered rather than checked, which is a real gap and not a small one;
+`TODO.md` carries the replacement. The rest comes from this repository's
+benchmark suites, which write their results to a gitignored directory, so those
+numbers cannot be traced back to a committed run. Treat a quoted figure as "what
+we saw on the date given", re-measure before relying on it, and prefer citing the
+host's own documentation (with the date read) for provider semantics.
 
 ## 9. Changing the pinned model
 
-A model change requires, before merge: the full deterministic suite, the full live
-suite, a skill-selection comparison, an injection comparison, a latency
-comparison, a tool-call correctness comparison, a refreshed
-`benchmarks/baseline.json`, and an explicit release note. Do not switch to a
-floating alias during internal testing.
+A model change requires, before merge: the full deterministic suite, a
+skill-selection comparison, an injection comparison, a latency comparison, a
+tool-call correctness comparison, a refreshed `benchmarks/baseline.json`, and an
+explicit release note. Do not switch to a floating alias during internal testing.
 
-**`gemma-4-31b` is a preview model with a stated replacement coming**, so this is
-scheduled work rather than a hypothetical. Two things beyond quality have to be
-re-decided when it moves:
+**There is no live suite to run as part of that list** — it was deleted with the
+Cerebras adapter and has no replacement (§8, `TODO.md`). Write it before the next
+model change rather than as part of one: a live suite authored to make a
+candidate pass is not the same artifact as one authored to describe the incumbent.
 
-- **Thinking posture.** Nothing thinks because this model cannot reason, not
-  because a flag is set — and Cerebras offers no way to switch reasoning off. A
-  reasoning-capable replacement is therefore a *deliberate* posture decision, not
-  a drop-in (§2). The live suite asserts zero reasoning tokens so this cannot be
-  missed.
+Two things beyond quality have to be re-decided when the model moves:
+
+- **Thinking posture.** Nothing thinks because `reasoning: {"enabled": false}` is
+  sent on every call, not because the model cannot reason — DeepSeek V4 Flash
+  reasons by default. A replacement therefore inherits a posture that is actively
+  held rather than absent, and the question is whether the disable still works on
+  it and is still spelled the same way (§2). Nothing checks that today.
 - **Prompt budgets.** The per-file budget tests and `benchmarks/baseline.json`
   are sized against this model's context window and this model's behaviour under
   the current prompts.

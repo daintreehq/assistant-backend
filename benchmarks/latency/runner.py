@@ -1,6 +1,6 @@
 """Live end-to-end latency over the REAL request paths.
 
-Every number here comes from driving production classes against real Cerebras
+Every number here comes from driving production classes against the real serving
 endpoints — ``ChatOrchestrator.complete`` for turns, ``TaskRunner.run`` for utility
 tasks, ``Selector.select`` for selection — with the captured CLI tool inventory and
 a representative startup/runtime block. Nothing is stubbed, so a measured second is

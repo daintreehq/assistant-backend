@@ -13,8 +13,8 @@ Daintree credential *was* the caller's own OpenRouter key, playing two roles at
 once: authenticating the request, and funding that turn's model calls. The caller
 paid.
 
-Now there is exactly one credential — the one `config.SERVING_KEY_ENV` names,
-`TOGETHER_API_KEY` today — it belongs to the server, and **Daintree pays**. Consequences that follow directly, and that the
+Now there is exactly one credential — `TOGETHER_API_KEY`, named by
+`config.SERVING_KEY_ENV` — it belongs to the server, and **Daintree pays**. Consequences that follow directly, and that the
 code enforces:
 
 - **The serving backend holds the model credential.** `main._build_provider`
@@ -30,7 +30,7 @@ code enforces:
   written this way. A CLI mid-migration may still be sending the OpenRouter key
   it used to authenticate with. A door that *read* that header would carry the
   key on the principal, thread it to every provider call, and forward it to
-  Cerebras — which rejects a credential it never issued. The caller would see
+  Together — which rejects a credential it never issued. The caller would see
   `provider_invalid_api_key`: an error blaming their key for a header they were
   right to still be sending. Refusing to look at it is what makes an old client
   work rather than fail confusingly.
@@ -46,7 +46,7 @@ code enforces:
   provider call.
 - **A per-request credential is still possible, and still tested.**
   `ProviderChatRequest.api_key` overrides the server's default in
-  `CerebrasProvider._resolve_key`. Nothing on the serving path sets it —
+  `OpenRouterProvider._resolve_key`. Nothing on the serving path sets it —
   benchmarks and live tests are its only callers — and it is kept live precisely
   so per-account credentials become a *value* flowing through existing plumbing
   rather than new plumbing.
@@ -63,9 +63,9 @@ code enforces:
 | Structural validation | printable non-space ASCII (0x21–0x7E) only, ≤ 4096 bytes. **No prefix check** — the issuer is not our business, only that the value can ride an HTTP header safely | `auth._structurally_valid` |
 | In-process form | `pydantic.SecretStr` on a frozen `Principal`, `repr=False` | `auth.Principal` |
 | Propagation | threaded explicitly as `ProviderChatRequest.api_key` to every provider call | `providers/base.py` |
-| Header construction | a fresh per-call header dict; the shared `httpx` client's own headers are never mutated, so concurrent calls carrying different keys cannot bleed into one another | `cerebras._headers` |
-| Malformed value | rejected in `_resolve_key` **before** httpx sees it — h11's `LocalProtocolError` embeds the offending header value verbatim and httpcore logs it at DEBUG, so the permissive path would leak the key into logs | `cerebras._resolve_key` |
-| Upstream error bodies | the credential is scrubbed out; if it is still recoverable after scrubbing (a doubly-encoded echo) the whole diagnostic is dropped | `cerebras._extract_upstream_error`, `_still_reveals` |
+| Header construction | a fresh per-call header dict; the shared `httpx` client's own headers are never mutated, so concurrent calls carrying different keys cannot bleed into one another | `openrouter._headers` |
+| Malformed value | rejected in `_resolve_key` **before** httpx sees it — h11's `LocalProtocolError` embeds the offending header value verbatim and httpcore logs it at DEBUG, so the permissive path would leak the key into logs | `openrouter._resolve_key` |
+| Upstream error bodies | the credential is scrubbed out; if it is still recoverable after scrubbing (a doubly-encoded echo) the whole diagnostic is dropped | `openrouter._extract_upstream_error`, `_still_reveals` |
 
 **The server never persists a key.** Not to disk, not to a cache, not to a
 metrics label, not to a request id. It lives in memory for the lifetime of the
@@ -105,7 +105,7 @@ Daintree's own auth is **structural** — a well-formed string that no provider 
 issued passes it — so without this probe a bad key first surfaces at the first
 real turn, long after the user thought they had signed in.
 
-The probe is `GET /models` against Cerebras: the cheapest authenticated call
+The probe is `GET /models` against Together: the cheapest authenticated call
 endpoint, which answers for the credential rather than for a model and runs no
 inference. It has a short, hardcoded 10s read budget, deliberately *not*
 inheriting the main model's budget — a user is watching a sign-in spinner. It is

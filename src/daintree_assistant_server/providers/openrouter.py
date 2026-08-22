@@ -10,35 +10,33 @@ old OpenRouter adapter this one descends from (git history has it) grew a whole
 endpoint-selection apparatus — a ``provider`` block on every request, a privacy
 filter, a fallback pool, an output-quality denylist, a cohort-scoped
 sticky-affinity key, and a caller-facing routing preference. All of it was
-deleted in the move to Cerebras and **none of it comes back here**. This adapter
+deleted with the routing policy and **none of it comes back here**. This adapter
 sends no ``provider`` block at all, which leaves OpenRouter's own default
 price/throughput balancing in charge — the right answer for a single model
 pinned to a single internal task, and the reason there is no policy module
 beside this one.
 
-Where it differs from the Cerebras adapter it sits next to, each difference is
-load-bearing and each is the INVERSE of that one:
+Three details of the body it builds are load-bearing, and each was the INVERSE
+of a rule the retired Cerebras adapter enforced — worth knowing because the
+opposite convention is what a reader who saw that adapter will remember:
 
-* **``max_tokens``, the OpenAI-standard spelling.** Cerebras insists on
-  ``max_completion_tokens`` and 400s when both arrive; OpenRouter takes the
-  standard name. One spelling per adapter, resolved at the boundary.
+* **``max_tokens``, the OpenAI-standard spelling.** One spelling per adapter,
+  resolved at the boundary.
 * **The ``reasoning`` object is sent EXPLICITLY, and disabled.** DeepSeek V4
   Flash is a reasoning model and reasons by DEFAULT when the field is absent, so
-  ``{"enabled": false}`` is what actually keeps a compaction call non-thinking.
-  Cerebras is the mirror image: it rejects this object outright and its serving
-  model cannot reason, so omission is its non-thinking posture. Sending nothing
-  here would silently buy reasoning tokens and latency on every call.
+  ``{"enabled": false}`` is what actually keeps a call non-thinking. Sending
+  nothing would silently buy reasoning tokens and latency on every call.
 * **Error bodies are NESTED.** OpenRouter returns OpenAI's ``{"error": {...}}``
-  envelope, so ``_upstream_error_detail`` reads nested FIRST here and flat first
-  there. Both read both shapes; only the priority differs.
-* **No cache-affinity field.** Cerebras takes ``prompt_cache_key``; OpenRouter's
-  own spelling was ``session_id``, and it is deliberately NOT sent. That field
-  was only ever meaningful as a way to steer a sticky record across the pool of
-  endpoints the routing block selected from, and that block is gone. Prefix
-  caching at the serving endpoint is automatic, so it would buy nothing, and an
-  unadvertised parameter is a needless 400 risk.
+  envelope, so ``_upstream_error_detail`` reads nested FIRST. It reads the flat
+  shape too; only the priority differs.
+* **No cache-affinity field.** OpenRouter's own spelling was ``session_id``, and
+  it is deliberately NOT sent. That field was only ever meaningful as a way to
+  steer a sticky record across the pool of endpoints the routing block selected
+  from, and that block is gone. Prefix caching at the serving endpoint is
+  automatic, so it would buy nothing, and an unadvertised parameter is a
+  needless 400 risk.
 
-And one thing it DOES report that Cerebras does not: **cost**. ``usage.cost``
+And what it reports: **cost**. ``usage.cost``
 arrives on every response — automatically, since the old ``usage: {"include":
 true}`` opt-in is deprecated and ignored — so ``ProviderUsage.cost`` is a real
 number from here. Nothing above the provider boundary needed changing for that:
@@ -95,7 +93,7 @@ DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 
 _CHAT_PATH = "/chat/completions"
 # OpenRouter's own key-introspection endpoint, and the `verify_key` probe.
-# Unlike Cerebras's `/models` — a model listing that happens to be
+# Unlike a plain `/models` listing — which happens to be
 # authenticated — this one answers about the CREDENTIAL and nothing else.
 _KEY_PATH = "/key"
 
@@ -203,7 +201,7 @@ def _upstream_error_detail(raw: str) -> str:
     all is returned verbatim — there, escapes denote nothing and nothing decodes
     them.
 
-    BOTH error shapes are read, NESTED first — the mirror of the Cerebras
+    BOTH error shapes are read, NESTED first — the mirror of the flat-first
     adapter, which reads flat first because that is where its vendor puts the
     reason. OpenRouter wraps it in OpenAI's ``{"error": {...}}`` envelope; a
     flat body can still arrive from an intermediary (a proxy, a mock, a future
@@ -675,7 +673,7 @@ class OpenRouterProvider:
 
         ``GET /key`` is the right probe: it is OpenRouter's own key-introspection
         endpoint, costs no tokens, and answers for the credential rather than for
-        a generation. Cerebras's ``/models`` listing is the wrong shape here —
+        a generation. A plain ``/models`` listing is the wrong shape here —
         OpenRouter serves its model catalogue unauthenticated, so a listing would
         come back 200 for a key that is not usable at all.
 
@@ -801,7 +799,7 @@ class OpenRouterProvider:
         if request.temperature is not None:
             body["temperature"] = request.temperature
         if request.max_tokens is not None:
-            # The OpenAI-standard spelling, and the INVERSE of the Cerebras
+            # The OpenAI-standard spelling, and the INVERSE of the retired Cerebras
             # adapter's choice. OpenRouter accepts `max_completion_tokens` too, so
             # the rule that matters is that exactly one of them is ever sent —
             # each adapter resolves the normalized field to its own single name.
@@ -815,7 +813,7 @@ class OpenRouterProvider:
         # reasons by DEFAULT when the field is absent, so an omitted `reasoning`
         # does not mean "non-thinking" — it means "think, at the endpoint's
         # default depth", silently buying tokens and latency on a call whose whole
-        # purpose is to be cheap. This is the exact inverse of the Cerebras
+        # purpose is to be cheap. This is the exact inverse of the retired Cerebras
         # adapter, where the wire has no field that could express the disable and
         # omission IS the posture.
         if request.thinking_disabled:
@@ -832,7 +830,7 @@ class OpenRouterProvider:
         # whichever endpoint serves the call is automatic, so the field would buy
         # nothing and an unadvertised parameter is a needless 400 risk.
         #
-        # NOT `prompt_cache_key` either: that is the Cerebras adapter's spelling,
+        # NOT `prompt_cache_key` either: that was the retired Cerebras adapter's spelling,
         # and it is not a parameter OpenRouter advertises.
         if stream:
             body["stream"] = True

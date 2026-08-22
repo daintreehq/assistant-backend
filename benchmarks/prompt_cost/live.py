@@ -27,9 +27,8 @@ import time
 import uuid
 from typing import Any
 
-from daintree_assistant_server.config import Settings
+from daintree_assistant_server.config import SERVING_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
-from daintree_assistant_server.modes import STANDARD_MODEL
 
 from .._harness.env import caller_api_key, make_upstream_provider
 from .._harness.fixtures import build_respond_request
@@ -67,7 +66,7 @@ async def _prompt_request(
     if json_mode:
         gen = req.generation.model_copy(update={"response_format": "json_object"})
         req = req.model_copy(update={"generation": gen})
-    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=STANDARD_MODEL)
+    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=SERVING_MODEL)
     pr.max_tokens = 8  # bound completion cost; prompt tokens are the measurement
     pr.stream = stream
     pr.include_usage = stream
@@ -171,7 +170,7 @@ async def _affinity_sequence(
     **What this A/B can still tell you has narrowed**, and it is worth saying so
     rather than reading the old number off a new provider. Against a ROUTER the
     key decided which of many endpoints answered, so the arms could differ by a
-    whole cold prefill. Cerebras hosts one endpoint and caches prefixes
+    whole cold prefill. The serving host serves one endpoint and caches prefixes
     automatically, org-scoped, with no sticky record to steer — so
     ``prompt_cache_key`` is a hint it may ignore and the honest expectation is
     that the two arms agree. A DIFFERENCE here is now the finding; parity is the
@@ -240,7 +239,7 @@ async def _affinity_ab(settings: Settings) -> dict[str, Any]:
     """The issue #42 A/B: does naming the sticky key keep a session on one endpoint?
 
     Both arms are one sequential session at concurrency one, well inside the
-    upstream's prefix-cache TTL (Cerebras guarantees 5 minutes, often longer).
+    upstream's prefix-cache TTL (Together guarantees 5 minutes, often longer).
 
     The two arms take DISJOINT, run-randomized slices of the catalog. That is what
     makes the comparison WITHIN a run fair rather than ordered: the arms share no
@@ -251,7 +250,7 @@ async def _affinity_ab(settings: Settings) -> dict[str, Any]:
     second arm's favour.
 
     ACROSS runs it is weaker, and the limit is worth stating rather than papering
-    over. Cerebras matches prefixes ORG-WIDE, so any traffic from this account —
+    over. Together matches prefixes ORG-WIDE, so any traffic from this account —
     another bench, a dev server, a real turn — can have warmed the same base
     prompt and skill blocks already. The only freshness available is the offset,
     and the catalog affords a couple of dozen positions, so two runs can draw
@@ -337,7 +336,7 @@ async def run_live(
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "live",
-            "model": STANDARD_MODEL,
+            "model": SERVING_MODEL,
             "trials": trials,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },

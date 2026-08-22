@@ -1,6 +1,6 @@
 """The seam a context compactor plugs into, and the span it is allowed to see.
 
-Cerebras gives no discount on cached tokens, so every round of a turn pays full
+The serving host gives no measured discount on cached tokens, so every round of a turn pays full
 price for the whole conversation it resends. Daintree's history is unusually safe
 to compact — most of it is a stale snapshot of a mutable world, and snapshots
 supersede — so replacing settled history with reconciled CURRENT STATE is real

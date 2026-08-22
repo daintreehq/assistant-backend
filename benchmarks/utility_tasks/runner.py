@@ -20,11 +20,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from benchmarks._harness.env import bench_mode, make_upstream_provider
-from daintree_assistant_server.config import Settings
+from benchmarks._harness.env import make_upstream_provider
+from daintree_assistant_server.config import SERVING_KEY_ENV, SERVING_MODEL, Settings
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
-from daintree_assistant_server.modes import ResolvedMode, uniform_registry
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.task_runner import TaskRunner
 
@@ -46,9 +45,6 @@ class BenchConfig:
     trials: int = 3
     concurrency: int = 6
     id_filter: str | None = None
-    #: Which product mode to measure. Utility tasks follow their request's mode,
-    #: so a Pro run genuinely exercises a different provider and model.
-    mode: str | None = None
     env_file: str | None = None
     settings_overrides: dict[str, Any] = field(default_factory=dict)
 
@@ -95,15 +91,14 @@ def _build_settings(config: BenchConfig) -> Settings:
         default = ROOT / ".env"
         env_file = str(default) if default.is_file() else None
     settings = Settings(_env_file=env_file, **config.settings_overrides)
-    # The credential for the MODE being measured, not a hardcoded vendor. This
-    # line named CEREBRAS_API_KEY while the provider two functions down was
-    # Together's, which is how the wrong vendor's secret ended up in an
-    # Authorization header bound for the right vendor's endpoint.
-    spec = bench_mode(config.mode)
-    if not settings.provider_api_key(spec.provider_id).get_secret_value():
+    # The SERVING credential, read the same way production reads it. This line
+    # named a vendor while the provider two functions down was a different one,
+    # which is how the wrong secret ended up in an Authorization header bound
+    # for the right endpoint.
+    if not settings.serving_api_key.get_secret_value():
         raise BenchError(
-            f"{spec.key_env} is not set — export it or point --env-file at a .env "
-            f"that has it ({spec.mode.value} mode routes to {spec.provider_id})"
+            f"{SERVING_KEY_ENV} is not set — export it or point --env-file at a "
+            ".env that has it"
         )
     return settings
 
@@ -121,7 +116,6 @@ async def _run_trial(
     case: TaskCase,
     trial: int,
     semaphore: asyncio.Semaphore,
-    route: ResolvedMode,
 ) -> TrialResult:
     async with semaphore:
         started = time.perf_counter()
@@ -131,7 +125,7 @@ async def _run_trial(
         completion_tokens: int | None = None
         try:
             result = await runner.run(
-                TaskRequest(task=case.task, input=case.input), route=route
+                TaskRequest(task=case.task, input=case.input)
             )
             output = result.output
             prompt_tokens = result.usage.prompt_tokens
@@ -170,23 +164,17 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
     # a field removed with the DeepSeek-direct adapter, so this runner raised
     # AttributeError before its first call. Nothing caught it — a live benchmark
     # is not in the test suite, and the dashboard does not run the paid ones.
-    spec = bench_mode(config.mode)
-    provider = make_upstream_provider(
-        settings, timeout=settings.utility_timeout_seconds, spec=spec
-    )
-    # ONE object decides provider, model and credential: `uniform_registry` binds
-    # this provider under every spec, and resolving the measured mode hands back
-    # the pairing of THAT provider with THAT mode's model. Passing the route
-    # explicitly (rather than a per-call `api_key`) is what removes the class of
-    # bug this line had: a per-call key overrides the provider's own, so a
-    # hand-picked one can be the wrong vendor's while the provider is right.
-    runner = TaskRunner(settings=settings, modes=uniform_registry(provider), prompt_loader=loader)
-    route = runner.modes.resolve(spec.mode)
+    provider = make_upstream_provider(settings, timeout=settings.utility_timeout_seconds)
+    # No per-call `api_key`: the provider carries the server credential, exactly
+    # as production does. A hand-picked per-call key OVERRIDES the provider's
+    # own, which is how a secret meant for one vendor ended up in a header bound
+    # for another — the second bug this line shipped.
+    runner = TaskRunner(settings=settings, provider=provider, prompt_loader=loader)
 
     started_at = datetime.now(UTC)
     semaphore = asyncio.Semaphore(config.concurrency)
     jobs = [
-        _run_trial(runner, case, trial, semaphore, route)
+        _run_trial(runner, case, trial, semaphore)
         for trial in range(config.trials)
         for case in cases
     ]
@@ -204,8 +192,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
         "meta": {
             "benchmark": "utility_tasks",
             "variant": config.variant,
-            "mode": spec.mode.value,
-            "model": spec.upstream_model,
+            "model": SERVING_MODEL,
             "trials": config.trials,
             "concurrency": config.concurrency,
             "filter": config.id_filter,

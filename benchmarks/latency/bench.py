@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.modes import STANDARD_MODEL
+from daintree_assistant_server.config import SERVING_MODEL
 
 from .._harness.env import EnvError, require_api_key
 from .._harness.results import load_doc, save_doc
@@ -82,7 +82,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         return 2
     print(
         f"latency: {len(scenarios)} scenarios × {args.trials} trials "
-        f"(+1 discarded warmup) against {STANDARD_MODEL}"
+        f"(+1 discarded warmup) against {SERVING_MODEL}"
     )
 
     started = datetime.now(UTC).isoformat()
@@ -91,7 +91,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         "meta": {
             "benchmark": "latency",
             "mode": "live",
-            "model": STANDARD_MODEL,
+            "model": SERVING_MODEL,
             "trials": args.trials,
             "label": args.label,
             "started_at": started,

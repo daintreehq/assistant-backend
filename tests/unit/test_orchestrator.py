@@ -14,7 +14,6 @@ from pydantic import SecretStr
 
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import upstream_error
-from daintree_assistant_server.modes import DEFAULT_MODE
 from daintree_assistant_server.providers.base import (
     ProviderStream,
     ProviderUsage,
@@ -694,11 +693,6 @@ def test_chunk_to_delta_surfaces_content_and_reasoning() -> None:
 def test_chunk_to_delta_empty_delta_is_none() -> None:
     assert ChatOrchestrator._chunk_to_delta(_delta_chunk({})) is None
 
-
-
-def _standard_route(orchestrator: ChatOrchestrator):
-    """The route a `complete()` with no explicit mode resolves to."""
-    return orchestrator.modes.resolve(DEFAULT_MODE)
 
 
 @pytest.mark.asyncio
@@ -1923,7 +1917,7 @@ async def test_main_call_carries_a_pseudonymous_cache_session_key(
     # And it is the key the derivation actually produces, not merely a
     # plausibly-shaped string — this is what ties the wire value to
     # _cache_session_key, so a future edit cannot quietly attach a different one.
-    assert sent.cache_session_id == orchestrator._cache_session_key(request, _standard_route(orchestrator))
+    assert sent.cache_session_id == orchestrator._cache_session_key(request)
 
 
 @pytest.mark.asyncio
@@ -1970,13 +1964,11 @@ def test_json_mode_main_call_uses_its_own_affinity_namespace(
     #
     # Derivation only; the wire attachment for JSON mode is pinned by the test
     # below, which has to discriminate main from selector traffic.
-    plain = orchestrator._cache_session_key(_affinity_request(), _standard_route(orchestrator))
-    json_mode = orchestrator._cache_session_key(
-        _affinity_request(json_mode=True), _standard_route(orchestrator)
-    )
+    plain = orchestrator._cache_session_key(_affinity_request())
+    json_mode = orchestrator._cache_session_key(_affinity_request(json_mode=True))
     assert plain is not None and json_mode is not None
     assert json_mode != plain
-    assert json_mode.startswith("daintree-main-standard-json-")
+    assert json_mode.startswith("daintree-main-json-")
     # The longer namespace must still clear OpenRouter's 256-character cap.
     assert len(json_mode) <= 256
 
@@ -2015,9 +2007,9 @@ async def test_json_mode_main_request_reaches_the_wire_with_its_key(
     assert len(main_calls) == 1
     sent = main_calls[0]
     assert sent.response_format == {"type": "json_object"}
-    assert sent.cache_session_id == orchestrator._cache_session_key(request, _standard_route(orchestrator))
+    assert sent.cache_session_id == orchestrator._cache_session_key(request)
     assert sent.cache_session_id is not None
-    assert sent.cache_session_id.startswith("daintree-main-standard-json-")
+    assert sent.cache_session_id.startswith("daintree-main-json-")
 
 
 # ---------------------------------------------------------------------------
@@ -2209,7 +2201,7 @@ def _with_runaway_limit(orchestrator: ChatOrchestrator, limit: int) -> ChatOrche
         selector=orchestrator.selector,
         state_codec=orchestrator.state_codec,
         assembler=orchestrator.assembler,
-        modes=orchestrator.modes,
+        provider=orchestrator.provider,
     )
 
 

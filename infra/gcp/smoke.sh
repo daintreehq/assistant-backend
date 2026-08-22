@@ -10,7 +10,7 @@
 #                                            # Cloud Run URL discovered from gcloud
 #
 # NO BEARER TOKEN IS NEEDED. The server holds its own upstream credential
-# (CEREBRAS_API_KEY) and funds every turn from it, so the metadata routes answer
+# (TOGETHER_API_KEY) and funds every turn from it, so the metadata routes answer
 # an anonymous request. That is also why --full is opt-in and everything else
 # here is not: --full spends DAINTREE's money, not the caller's.
 #
@@ -122,7 +122,7 @@ fi
 
 # A header that IS present is ignored too, not merely tolerated. A CLI still
 # sending its old OpenRouter key must be served, not have that key forwarded to
-# Cerebras and rejected as the caller's own.
+# Together and rejected as the caller's own.
 code="$(req -H 'Authorization: Bearer sk-or-v1-a-stale-openrouter-key' "$URL/v1/daintree/capabilities")"; load_body
 if [ "$code" = "200" ]; then
   pass "a stale OpenRouter bearer is ignored, not forwarded"
@@ -261,7 +261,7 @@ print(','.join(s.get('id','') for s in (d.get('skills') or {}).get('active', [])
       pass "POST /v1/daintree/respond -> \"$reply\" (active skills: $active)"
     else
       # A 502 here points at the SERVER's credential, not the caller's: an
-      # invalid or unfunded CEREBRAS_API_KEY surfaces as the upstream's rejection
+      # invalid or unfunded TOGETHER_API_KEY surfaces as the upstream's rejection
       # relayed through this service, since there is nothing else to fall back on.
       fail "POST /v1/daintree/respond returned $code" "$BODY"
     fi

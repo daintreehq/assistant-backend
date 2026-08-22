@@ -1,1 +1,1 @@
-"""Provider abstraction and the Cerebras adapter."""
+"""Provider abstraction and the Together / OpenRouter adapters."""

@@ -8,7 +8,7 @@ That is stronger than "a key is optional", and the difference is the whole point
 of this module. A CLI mid-migration may still be sending the OpenRouter key it
 used to authenticate with. If this door read that header, the key would be
 carried on the `Principal`, threaded to every provider call, and forwarded to
-Cerebras — which would reject a credential it never issued, and the caller would
+Together — which would reject a credential it never issued, and the caller would
 see ``provider_invalid_api_key``: an error blaming their key for a header they
 were right to still be sending. Refusing to look at it is what makes an old
 client work rather than fail confusingly.
@@ -40,7 +40,7 @@ class Principal:
 
     Carries no credential. The upstream key is the server's own, held on
     ``Settings`` and resolved inside the provider
-    (``CerebrasProvider._resolve_key``) — it never travels on a per-request
+    (``OpenRouterProvider._resolve_key``) — it never travels on a per-request
     object, because there is no per-request credential to travel.
 
     ``ProviderChatRequest.api_key`` still exists and still overrides the

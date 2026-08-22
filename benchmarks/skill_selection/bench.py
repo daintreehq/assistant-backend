@@ -1,6 +1,6 @@
 """Skill-selection benchmark CLI.
 
-Run from the repo root (venv active, CEREBRAS_API_KEY in .env or the env):
+Run from the repo root (venv active, TOGETHER_API_KEY in .env or the env):
 
     python -m benchmarks.skill_selection.bench local                  # SHIPPED selector, free
     python -m benchmarks.skill_selection.bench scale                  # recall at 200/500/1000
@@ -21,7 +21,7 @@ authority.
 
 Only ``run`` makes API calls (REAL, paid: cases x trials per variant). ``local``,
 ``list``, ``coverage``, ``report``, and ``compare`` are offline and free — they
-need no key, so they work with ``CEREBRAS_API_KEY=`` blanked.
+need no key, so they work with ``TOGETHER_API_KEY=`` blanked.
 """
 
 from __future__ import annotations

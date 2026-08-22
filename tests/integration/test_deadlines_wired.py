@@ -17,7 +17,6 @@ import asyncio
 import pytest
 from fakes import FakeProvider, FakeStream
 
-from daintree_assistant_server.modes import DEFAULT_MODE
 from daintree_assistant_server.services.deadlines import BudgetPolicy, RequestBudget
 
 
@@ -70,7 +69,6 @@ async def test_a_stalled_preparation_becomes_an_attributable_error(
     with pytest.raises(DaintreeError) as exc:
         await container.orchestrator._prepare(
             body,
-            route=container.modes.resolve(DEFAULT_MODE),
             request_id="req_1",
             api_key=SecretStr("k"),
             budget=_tiny_budget(),

@@ -34,7 +34,7 @@ import json
 from collections.abc import Sequence
 from typing import Any
 
-from ..config import Settings
+from ..config import INTERACTIVE_REASONING_EFFORT, INTERACTIVE_THINKING_ENABLED, Settings
 from ..contracts.daintree_api import (
     COMPACTION_BLOCK_NAME,
     RespondRequest,
@@ -54,7 +54,6 @@ from ..contracts.openai import (
     ToolCall,
     ToolDef,
 )
-from ..modes import NO_THINKING, ThinkingPolicy
 from ..prompts.loader import (
     TEMPLATE_DISPLAY_CONTEXT,
     TEMPLATE_DOCS_CONTEXT,
@@ -914,14 +913,6 @@ class PromptAssembler:
         request: RespondRequest,
         skills: list[Skill],
         upstream_model: str,
-        # The MODE's thinking posture, supplied by the caller with the model it
-        # belongs to. Not read from a global here: two model families cannot
-        # share one flag honestly — Gemma 4 31B cannot reason at all, DeepSeek V4
-        # Flash reasons by default and has to be told not to — so a single
-        # constant would silently mean different things on each route. Defaulted
-        # to the product posture (off) so the many callers that only assemble a
-        # prompt need not care.
-        thinking: ThinkingPolicy = NO_THINKING,
         docs: DocsLookup | None = None,
     ) -> ProviderChatRequest:
         """Assemble the upstream request so the upstream prefix cache covers the base
@@ -1056,16 +1047,16 @@ class PromptAssembler:
         if gen.response_format == "json_object":
             response_format = {"type": "json_object"}
 
-        # Thinking is a MODE decision, hardcoded per route beside its model ids
-        # (`modes.ModeSpec.thinking`). Both modes ship it off: this workload routes
-        # requests onto skill runbooks and emits tool calls, which reasoning did not
-        # measurably improve while costing seconds of first-byte latency.
+        # Thinking is hardcoded OFF for the main call (posture lives with the model
+        # id in config.py — this workload routes requests onto skill runbooks and
+        # emits tool calls, which reasoning did not measurably improve while costing
+        # seconds of first-byte latency).
         #
         # The forced-tool_choice guard stays AND-ed in rather than replaced: it is an
         # independent upstream constraint (DeepSeek 400s on thinking + forced
-        # tool_choice), so a mode that turns the posture on cannot silently
-        # reintroduce that failure.
-        thinking_enabled = thinking.enabled and not self._is_forced_tool_choice(
+        # tool_choice), so keeping it here means flipping the posture back on cannot
+        # silently reintroduce that failure.
+        thinking_enabled = INTERACTIVE_THINKING_ENABLED and not self._is_forced_tool_choice(
             request.input.tool_choice
         )
 
@@ -1093,6 +1084,6 @@ class PromptAssembler:
             # reasoning_content round-trips through the wire contract so tool-call
             # turns can replay it. Thinking ignores temperature/top_p.
             thinking_disabled=not thinking_enabled,
-            reasoning_effort=thinking.effort if thinking_enabled else None,
+            reasoning_effort=INTERACTIVE_REASONING_EFFORT if thinking_enabled else None,
             timeout=self.settings.main_timeout_seconds,
         )

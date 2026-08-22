@@ -20,7 +20,7 @@ from typing import Any
 from pydantic import SecretStr
 
 from .. import PROTOCOL_VERSION
-from ..config import DOCS_SKILL_ID, PUBLIC_MODEL_ID, Settings
+from ..config import DOCS_SKILL_ID, PUBLIC_MODEL_ID, SERVING_MODEL, Settings
 from ..contracts.daintree_api import (
     CompactionBlock,
     CompactionSpan,
@@ -51,7 +51,6 @@ from ..errors import (
     upstream_runaway_output,
     upstream_timeout,
 )
-from ..modes import DEFAULT_MODE, ModeRegistry, ResolvedMode
 from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
@@ -314,10 +313,6 @@ class _Timings:
 class _PreparedTurn:
     """Everything selection/assembly produces before the provider is consumed."""
 
-    # The route this turn resolved to. Carried rather than re-derived so a
-    # bare-intent re-roll, an open retry and the terminal accounting all name the
-    # same provider and model as the attempt they follow.
-    route: ResolvedMode
     provider_request: ProviderChatRequest
     meta: _RespondMeta
     active_ids: list[str]
@@ -394,11 +389,7 @@ class ChatOrchestrator:
         selector: SkillSelector,
         state_codec: StateCodec,
         assembler: PromptAssembler,
-        # Both product routes. The orchestrator does NOT choose between them —
-        # the route is resolved once at the request boundary and arrives on
-        # `complete()`. The registry is held only so a turn started without an
-        # explicit route can fall back to the default one.
-        modes: ModeRegistry,
+        provider: ChatProvider,
         # The public documentation MCP. Optional so a turn is constructible
         # without one — a container built for a test or a benchmark simply never
         # looks anything up, which is the same outcome as a docs server that is
@@ -415,7 +406,7 @@ class ChatOrchestrator:
         self.selector = selector
         self.state_codec = state_codec
         self.assembler = assembler
-        self.modes = modes
+        self.provider = provider
         self.docs_client = docs_client
         self.compactor = compactor
         # In-flight detached tasks — today, the streaming path's preparation task.
@@ -597,12 +588,6 @@ class ChatOrchestrator:
         self,
         request: RespondRequest,
         *,
-        # The route this turn runs on, resolved ONCE at the request boundary from
-        # the caller's mode and their entitlement to it. Passed as an object
-        # rather than re-resolved deeper down: that is what makes it structurally
-        # impossible for a retry, a bare-intent re-roll or a stream re-open to
-        # land on a different provider or model than the attempt it repairs.
-        route: ResolvedMode | None = None,
         # NOT supplied on the serving path: the provider spends the SERVER's key.
         # Benchmarks and live tests pass one to name the credential they mean to
         # spend, and account authentication will pass one per caller — so the
@@ -611,11 +596,6 @@ class ChatOrchestrator:
         request_id: str | None = None,
     ) -> RespondOutcome:
         request_id = request_id or new_request_id()
-        # Resolved at the request boundary in production; defaulted here so a
-        # caller that has no opinion (a benchmark, a test, an internal replay)
-        # still runs on a real route rather than on None. Never re-resolved
-        # below this line.
-        route = route if route is not None else self.modes.resolve(DEFAULT_MODE)
         # ONE clock for the whole turn, started before any work. Every phase
         # deadline and every retry attempt reads from it, so they share a budget
         # instead of each getting a fresh one — the difference between a bounded
@@ -636,8 +616,7 @@ class ChatOrchestrator:
             prep_task = asyncio.create_task(
                 self._prepare(
                     request,
-                    route=route,
-                    request_id=request_id,
+                        request_id=request_id,
                     api_key=api_key,
                     budget=budget,
                 )
@@ -668,7 +647,6 @@ class ChatOrchestrator:
         try:
             return await self._complete_nonstream(
                 request,
-                route=route,
                 request_id=request_id,
                 api_key=api_key,
                 budget=budget,
@@ -690,7 +668,6 @@ class ChatOrchestrator:
         self,
         request: RespondRequest,
         *,
-        route: ResolvedMode,
         request_id: str,
         api_key: SecretStr | None,
         budget: RequestBudget,
@@ -708,8 +685,7 @@ class ChatOrchestrator:
             async with asyncio.timeout(budget.remaining_total()):
                 return await self._complete_nonstream_inner(
                     request,
-                    route=route,
-                    request_id=request_id,
+                        request_id=request_id,
                     api_key=api_key,
                     budget=budget,
                     headers=headers,
@@ -721,7 +697,6 @@ class ChatOrchestrator:
         self,
         request: RespondRequest,
         *,
-        route: ResolvedMode,
         request_id: str,
         api_key: SecretStr | None,
         budget: RequestBudget,
@@ -729,13 +704,12 @@ class ChatOrchestrator:
     ) -> RespondOutcome:
         prepared = await self._prepare(
             request,
-            route=route,
             request_id=request_id,
             api_key=api_key,
             budget=budget,
         )
         result = await self._complete_with_retry(
-            prepared.provider_request, provider=prepared.route.provider, budget=budget
+            prepared.provider_request, budget=budget
         )
         # Strip the control line FIRST, before anything reads the text. The
         # bare-intent detector, the output lint and the response body all consume
@@ -752,10 +726,7 @@ class ChatOrchestrator:
         # sent, so neither the client nor the transcript ever sees the dead draft.
         drafted = result
         result = await self._repair_bare_intent(
-            prepared.provider_request,
-            result,
-            provider=prepared.route.provider,
-            request_id=request_id,
+            prepared.provider_request, result, request_id=request_id
         )
         # ONLY when the repair actually produced a new result. Stripping is not
         # idempotent — it removes the FIRST marker-shaped opening it finds — so
@@ -821,7 +792,6 @@ class ChatOrchestrator:
         self,
         request: RespondRequest,
         *,
-        route: ResolvedMode,
         request_id: str,
         api_key: SecretStr | None,
         budget: RequestBudget | None = None,
@@ -837,7 +807,6 @@ class ChatOrchestrator:
         if budget is None:
             return await self._prepare_inner(
                 request,
-                route=route,
                 request_id=request_id,
                 api_key=api_key,
                 budget=None,
@@ -846,8 +815,7 @@ class ChatOrchestrator:
             async with asyncio.timeout(budget.remaining(TurnPhase.PREPARATION)):
                 return await self._prepare_inner(
                     request,
-                    route=route,
-                    request_id=request_id,
+                        request_id=request_id,
                     api_key=api_key,
                     budget=budget,
                 )
@@ -861,7 +829,7 @@ class ChatOrchestrator:
             )
             raise turn_deadline_exceeded(phase.value) from exc
 
-    def _cache_session_key(self, request: RespondRequest, route: ResolvedMode) -> str | None:
+    def _cache_session_key(self, request: RespondRequest) -> str | None:
         """The upstream cache-affinity key for this turn's MAIN calls.
 
         Derived, never carried: it comes from ``request.session.id``, which is
@@ -889,21 +857,14 @@ class ChatOrchestrator:
         digest = self.state_codec.session_hash(request.session.id)
         if not digest:
             return None
-        # Namespaced by MODE as well as by output kind. The two providers keep
-        # separate caches, so this changes nothing on the wire today; it is here
-        # because a switch between modes mid-session is a legal, expected thing
-        # for a user to do, and the two halves of that session are NOT one cache
-        # lineage — a key that said they were would be a false statement to a
-        # third party the day two modes share a vendor account.
-        kind = "json" if request.generation.response_format == "json_object" else ""
-        parts = [route.spec.cache_namespace, kind, digest]
-        return _CACHE_SESSION_PREFIX + "-".join(p for p in parts if p)
+        if request.generation.response_format == "json_object":
+            return f"{_CACHE_SESSION_PREFIX}json-{digest}"
+        return f"{_CACHE_SESSION_PREFIX}{digest}"
 
     async def _prepare_inner(
         self,
         request: RespondRequest,
         *,
-        route: ResolvedMode,
         request_id: str,
         api_key: SecretStr | None,
         # Only the docs lookup reads it: everything else in preparation is bounded
@@ -913,7 +874,7 @@ class ChatOrchestrator:
         budget: RequestBudget | None = None,
     ) -> _PreparedTurn:
         session_id = request.session.id
-        cache_session_id = self._cache_session_key(request, route)
+        cache_session_id = self._cache_session_key(request)
         t_start = time.perf_counter()
         # Phase marks for this turn. Returned on the prepared turn so the
         # response paths can finish filling it in (see `_Timings`).
@@ -1237,8 +1198,7 @@ class ChatOrchestrator:
             self.assembler.build_main_request(
                 request=request,
                 skills=skills,
-                upstream_model=route.model,
-                thinking=route.spec.thinking,
+                upstream_model=SERVING_MODEL,
                 docs=docs,
             ),
             api_key=api_key,
@@ -1419,7 +1379,6 @@ class ChatOrchestrator:
         )
 
         return _PreparedTurn(
-            route=route,
             projection=projection,
             enforcement=enforcement,
             projection_computed=computed is not None,
@@ -2014,7 +1973,6 @@ class ChatOrchestrator:
 
         body = self._stream_body(
             prepared.provider_request,
-            route=prepared.route,
             meta=prepared.meta,
             request=request,
             budget=budget,
@@ -2063,10 +2021,6 @@ class ChatOrchestrator:
         self,
         provider_request: ProviderChatRequest,
         *,
-        # The turn's resolved route. Every open in the loop below — including the
-        # bare-intent re-roll's — reads its provider from here, so a re-roll can
-        # never land on a different upstream than the attempt it replaces.
-        route: ResolvedMode,
         meta: _RespondMeta,
         request: RespondRequest,
         budget: RequestBudget | None = None,
@@ -2216,10 +2170,7 @@ class ChatOrchestrator:
                             first_event,
                             abandoned,
                         ) = await self._open_stream_with_retry(
-                            active_request,
-                            provider=route.provider,
-                            budget=budget,
-                            request_id=meta.request_id,
+                            active_request, budget=budget, request_id=meta.request_id
                         )
                         abandoned_opens += abandoned
                     except DaintreeError as exc:
@@ -3027,12 +2978,7 @@ class ChatOrchestrator:
         logger.info("main_bare_intent_retry", phase=phase, request_id=request_id, **fields)
 
     async def _repair_bare_intent(
-        self,
-        provider_request: ProviderChatRequest,
-        result: Any,
-        *,
-        provider: ChatProvider,
-        request_id: str,
+        self, provider_request: ProviderChatRequest, result: Any, *, request_id: str
     ) -> Any:
         """One re-roll of a non-streaming round that announced an action and took none.
 
@@ -3056,7 +3002,7 @@ class ChatOrchestrator:
         )
         try:
             repaired = await self._complete_with_retry(
-                self._bare_intent_repair_request(provider_request), provider=provider
+                self._bare_intent_repair_request(provider_request)
             )
         except DaintreeError as exc:
             # Fail open: the first reply is weak, but it is a real reply the user is
@@ -3079,14 +3025,10 @@ class ChatOrchestrator:
     # ---- retries (before any model output is emitted) -------------------
 
     async def _complete_with_retry(
-        self,
-        request: ProviderChatRequest,
-        *,
-        provider: ChatProvider,
-        budget: RequestBudget | None = None,
+        self, request: ProviderChatRequest, *, budget: RequestBudget | None = None
     ) -> Any:
         return await retry_upstream(
-            lambda: provider.complete(request),
+            lambda: self.provider.complete(request),
             retries=self.settings.max_upstream_retries,
             backoff_base_seconds=self.settings.retry_backoff_base_seconds,
             # Attempts share the turn's remaining time rather than each getting a
@@ -3098,7 +3040,6 @@ class ChatOrchestrator:
         self,
         request: ProviderChatRequest,
         *,
-        provider: ChatProvider,
         budget: RequestBudget | None = None,
         request_id: str,
     ) -> tuple[ProviderStream, dict[str, Any] | None, int]:
@@ -3118,7 +3059,7 @@ class ChatOrchestrator:
         abandoned = 0
 
         async def _open() -> tuple[ProviderStream, dict[str, Any] | None]:
-            stream = await provider.open_stream(request)
+            stream = await self.provider.open_stream(request)
             ok = False
             try:
                 first = await stream.prefetch_first_event()

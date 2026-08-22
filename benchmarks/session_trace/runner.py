@@ -19,8 +19,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from daintree_assistant_server.config import SERVING_MODEL
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
-from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.skills.catalog import load_catalog
 
 from .._harness.cases import CaseError, load_yaml_cases
@@ -236,7 +236,7 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
         "meta": {
             "benchmark": "session_trace",
             "mode": "deterministic",
-            "model": STANDARD_MODEL,
+            "model": SERVING_MODEL,
             "catalog_revision": load_catalog().revision,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },

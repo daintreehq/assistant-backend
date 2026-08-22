@@ -15,7 +15,7 @@ python -m benchmarks.dashboard.bench compare results/a.json results/b.json
   on: a prompt/skill/assembler edit that busts the cache, weakens a guard, adds a
   per-request CPU regression, or breaks the orchestrator spine reddens here.
 - the **live** suites (`prompt_cost` live, `workflow_intel`, `injection_live`) add
-  real, paid DeepSeek calls and only run when `CEREBRAS_API_KEY` is present.
+  real, paid DeepSeek calls and only run when `TOGETHER_API_KEY` is present.
 
 Each suite is isolated: if one raises, its slot records the error and the rest
 still run. Every suite keeps its own `summary` verbatim in the merged doc; the

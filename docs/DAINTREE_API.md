@@ -739,9 +739,8 @@ on its own first-byte argument.)
 
 **Nothing thinks, and on Together that is a flag genuinely held down.** DeepSeek V4 Flash
 reasons whenever the field is absent, so every call sends `reasoning: {"enabled": false}` —
-measured, that drops `reasoning_tokens` out of the usage block entirely. (On Cerebras it was
-the model's doing instead: `gemma-4-31b` has no reasoning mode, and that wire had no field
-that could switch one off. Noted because `SERVING_HOST` can switch back.)
+measured, that drops `reasoning_tokens` out of the usage block entirely — a flag genuinely
+held down, not a property of the model.
 
 `/respond` advertises the posture as `respond.thinking_enabled` on `/v1/daintree/capabilities`
 (currently `false`), which is what a client should gate any thinking UI on. Because

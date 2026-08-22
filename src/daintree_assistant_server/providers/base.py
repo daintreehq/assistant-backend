@@ -3,7 +3,7 @@
 Business logic depends only on these types, never on a vendor's wire shapes. A
 later provider (another hosted API, or a self-hosted PyTorch model) implements
 the same protocol without touching request validation, skill selection, state,
-prompt construction, or the public endpoints. Swapping OpenRouter for Cerebras
+prompt construction, or the public endpoints. Swapping one OpenAI-shaped host for another
 touched only ``providers/`` and the config that names the models, which is the
 property this file exists to keep.
 """
@@ -30,12 +30,12 @@ class ProviderUsage:
     # per-token estimate we compute: it is what the provider says it billed, so it
     # already accounts for any cache discount. `None` means "not reported".
     #
-    # **Cerebras reports no cost at all**, so on the serving path this is `None`
-    # on every call today. The field stays because "not reported" is exactly what
-    # `None` already means, and because the whole accounting chain below —
-    # `cost_complete`, the floor-vs-total rules, the client-facing `cost` block —
-    # was built to survive an unknown rather than invent a zero. A provider that
-    # does report one needs no change above this line.
+    # **Whether the serving host reports one is UNVERIFIED** — there is no live
+    # contract suite (see TODO.md), so `None` on every call is a possibility
+    # nothing here rules out. The field stays either way, because "not reported"
+    # is exactly what `None` already means, and because the whole accounting
+    # chain below — `cost_complete`, the floor-vs-total rules, the client-facing
+    # `cost` block — was built to survive an unknown rather than invent a zero.
     cost: float | None = None
     # Whether ``cost`` accounts for EVERY billed call folded into this record.
     #
@@ -98,10 +98,9 @@ class ProviderChatRequest:
     include_usage: bool = False
     thinking_disabled: bool = True
     # Reasoning effort, only meaningful when thinking is enabled
-    # (``thinking_disabled=False``) AND the model reasons at all. Cerebras takes
-    # "low"/"medium"/"high"; ``None`` lets the model's default apply. The serving
-    # model does not reason, so this is set only on the skill-learning calls that
-    # run on gpt-oss-120b.
+    # (``thinking_disabled=False``) AND the model reasons at all. ``None`` lets
+    # the model's default apply. Nothing in this server sets it: the posture is
+    # hardcoded off and the disable rides the unified ``reasoning`` object.
     reasoning_effort: str | None = None
     timeout: float | None = None
     # The upstream credential for THIS call — on the serving path, always the
@@ -119,10 +118,10 @@ class ProviderChatRequest:
     # An OPAQUE cache-affinity key for this call, or ``None`` to say nothing.
     #
     # A ROUTER that fronts many hosts for the same weights needs this to send a
-    # growing conversation back to the node already holding its prefix. Cerebras
-    # is a single host with automatic org-scoped prefix caching, so here the key
-    # is a hint the upstream may ignore rather than the mechanism the cache runs
-    # on — it is still sent, under the OpenAI-standard `prompt_cache_key`
+    # growing conversation back to the node already holding its prefix. The
+    # serving host is a single host with automatic org-scoped prefix caching, so
+    # here the key is a hint the upstream may ignore rather than the mechanism
+    # the cache runs on — it is still sent, under the OpenAI-standard `prompt_cache_key`
     # spelling, because it costs one short field and states the intent.
     #
     # WHAT IT NAMES depends on which calls share a prefix, and that is not always a
@@ -152,7 +151,7 @@ class ProviderChatResult:
     # Which upstream endpoint actually served this call, when the provider reports
     # one. Observability ONLY: nothing branches on it, and ``None`` simply means
     # "not reported" — a single-host provider never sets it, which is every call
-    # against Cerebras today. Kept for a future router, where a slow turn is
+    # against a single host today. Kept for a future router, where a slow turn is
     # otherwise undiagnosable: the log says the call took 10s but not which of
     # many interchangeable endpoints was responsible.
     endpoint: str | None = None

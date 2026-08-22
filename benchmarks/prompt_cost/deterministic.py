@@ -1,7 +1,7 @@
 """Deterministic cost/cache flagship — the free, CI-able scoreboard.
 
 Measures, over the REAL ``PromptAssembler.build_main_request`` and the EXACT bytes
-``CerebrasProvider`` would POST, the numbers the whole cost/latency story turns on:
+the serving adapter would POST, the numbers the whole cost/latency story turns on:
 
 1. **Cacheable-prefix stability per transition type.** DeepSeek's server-side
    prefix cache reuses the leading, byte-identical portion of a request. The
@@ -34,9 +34,8 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from daintree_assistant_server.config import Settings
+from daintree_assistant_server.config import SERVING_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
-from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.prompts.loader import (
     PromptLoader,
 )
@@ -95,7 +94,7 @@ def _body_for(
     *,
     enforced: bool = False,
 ) -> dict[str, Any]:
-    pr = assembler.build_main_request(request=request, skills=skills, upstream_model=STANDARD_MODEL)
+    pr = assembler.build_main_request(request=request, skills=skills, upstream_model=SERVING_MODEL)
     if enforced:
         # The PRODUCTION filter, not a re-implementation of it. A benchmark that
         # modelled enforcement separately would keep measuring its own model long
@@ -527,7 +526,7 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "deterministic",
-            "model": STANDARD_MODEL,
+            "model": SERVING_MODEL,
             "catalog_revision": catalog.revision,
             "tool_inventory_count": len(load_tool_inventory()),
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),

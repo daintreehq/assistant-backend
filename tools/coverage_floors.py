@@ -36,15 +36,20 @@ FLOORS: dict[str, int] = {
     "src/daintree_assistant_server/main.py": 95,
     "src/daintree_assistant_server/api/daintree_auth.py": 93,
     "src/daintree_assistant_server/providers/base.py": 92,
-    "src/daintree_assistant_server/providers/cerebras.py": 92,
-    # Added 2026-08-21 (measured 88.0%). A second provider adapter earns a floor
-    # for the same reason the first one has one: it holds a credential, scrubs it
-    # out of echoed upstream error bodies, and owns an error taxonomy the CLI
-    # branches on. It sits below its sibling's 92% because the mid-stream
-    # transport-failure handlers are awkward to drive through a mock transport,
-    # not because less of it matters — recorded honestly at its real number
-    # rather than rounded up, so the gap stays visible.
+    # The SERVING adapter's implementation. `providers/together.py` subclasses it
+    # and changes three class attributes plus a key decoder, so this is where
+    # almost every line a real request executes actually lives — it holds the
+    # credential, scrubs it out of echoed upstream error bodies, and owns the
+    # error taxonomy the CLI branches on.
+    #
+    # 88 rather than a sibling's 92 because the mid-stream transport-failure
+    # handlers are awkward to drive through a mock transport, not because less of
+    # it matters — recorded honestly at its real number rather than rounded up,
+    # so the gap stays visible. (A `providers/cerebras.py` floor of 92 sat above
+    # this line until that adapter was deleted; the runner fails on a named file
+    # that does not exist, which is how it was caught.)
     "src/daintree_assistant_server/providers/openrouter.py": 88,
+    "src/daintree_assistant_server/providers/together.py": 90,
     # Added 2026-08-20 (measured 94.70%). The orchestrator earned a floor when the
     # streaming fold became a COST-CONTAINMENT surface as well as a correctness
     # one: the runaway guard is the only thing standing between a degenerating

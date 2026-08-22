@@ -49,8 +49,7 @@ def _write(directory: Path, skill_id: str, summary: str) -> None:
 
 def _settings(overlay: Path | None, environment: str = "development") -> Settings:
     return Settings(
-        CEREBRAS_API_KEY="csk-test-key",
-        STATE_SIGNING_KEY_CURRENT="test-signing-key",
+                STATE_SIGNING_KEY_CURRENT="test-signing-key",
         STATE_SIGNING_KID="k1",
         STATE_SALT="test-salt",
         RETRY_BACKOFF_BASE_SECONDS=0.0,

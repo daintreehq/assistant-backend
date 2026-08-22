@@ -77,7 +77,7 @@ async def capabilities(
             # It is the provider's own reported figure, never a token-price
             # estimate computed here.
             #
-            # **Cerebras reports no cost**, so today this block is always absent.
+            # Whether the host reports a cost is unverified, so this block may be absent.
             # That is not a regression to paper over: the two rules below were
             # written for exactly this case and a client that implemented them
             # already behaves correctly. Advertising the capability with

@@ -957,3 +957,38 @@ async def test_stream_options_ride_the_include_usage_flag(include_usage: bool) -
         assert "stream_options" not in captured["body"]
     await stream.aclose()
     await provider.aclose()
+
+
+# ---------------------------------------------------------------------------
+# `ProviderChatResult` accessors on a degenerate body.
+# ---------------------------------------------------------------------------
+
+
+def test_a_response_with_no_choices_reads_as_empty_rather_than_raising() -> None:
+    """An upstream 200 carrying no `choices` must not take the turn down.
+
+    It happens: a truncated body, a provider returning `{"choices": []}` on an
+    internal filter, a proxy rewriting the envelope. Every consumer of `.text`
+    and `.message` is on the response path, so an IndexError here converts a
+    recoverable empty answer into a 500 the caller cannot act on.
+
+    Covered incidentally by the retired Cerebras adapter's suite until that
+    adapter was deleted; `tools/coverage_floors.py` caught the gap, which is the
+    entire reason `providers/base.py` carries a per-module floor.
+    """
+    from daintree_assistant_server.providers.base import ProviderChatResult, ProviderUsage
+
+    def _result(choices: list[dict[str, object]]) -> ProviderChatResult:
+        return ProviderChatResult(
+            id="r", created=0, model="m", usage=ProviderUsage(), choices=choices
+        )
+
+    empty = _result([])
+    assert empty.message == {}
+    assert empty.text == ""
+    assert empty.tool_calls == []
+
+    # A choice that is present but carries a null message is the same shape.
+    null_message = _result([{"message": None}])
+    assert null_message.message == {}
+    assert null_message.text == ""

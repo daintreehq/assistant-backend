@@ -31,24 +31,22 @@ from daintree_assistant_server.config import (
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
     PUBLIC_MODEL_ID,
+    SERVING_KEY_ENV,
+    SERVING_MODEL,
     Settings,
 )
 from daintree_assistant_server.errors import DaintreeError
-from daintree_assistant_server.modes import MODE_SPECS, STANDARD_SPEC
-from daintree_assistant_server.providers.cerebras import CerebrasProvider
 from daintree_assistant_server.providers.together import TogetherProvider
 from daintree_assistant_server.services.task_runner import TaskRunner
 
-#: Which adapter class serves a provider id. Both are live now — one per product
-#: mode — so both keep their wire-contract tests below.
-_ADAPTERS = {"together": TogetherProvider, "cerebras": CerebrasProvider}
+#: The adapter production builds. Named rather than inlined so the credential
+#: test below asserts the class as well as the key.
+_SERVING_PROVIDER_CLASS = TogetherProvider
 
-#: Where each host publishes its data-handling position. Written out rather than
-#: derived from the API origin, because they are genuinely different domains —
-#: Together serves from `api.together.xyz` and publishes at `together.ai`. A
-#: derivation that happened to work for one host would silently accept nothing
-#: at all for the other.
-_POLICY_DOMAINS = {"together": "together.ai", "cerebras": "cerebras.ai"}
+#: Where the host publishes its data-handling position. Written out rather than
+#: derived from the API origin, because they are genuinely different domains:
+#: Together serves from `api.together.xyz` and publishes at `together.ai`.
+_POLICY_DOMAIN = "together.ai"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src" / "daintree_assistant_server"
@@ -148,23 +146,6 @@ _OVERSTATED_PRIVACY = (
 _OPT_OUT = "privacy-copy-ok"
 
 
-def test_nothing_sends_a_per_request_privacy_preference() -> None:
-    """The code half, inverted.
-
-    There is no longer a privacy knob on the wire: Cerebras exposes no
-    per-request data-handling parameter, and the adapter must not invent one. If
-    a future edit starts sending something in this space, the copy above stops
-    describing the arrangement and this is where that shows up.
-    """
-    source = inspect.getsource(CerebrasProvider._build_body)
-    for token in ("data_collection", "zdr", "privacy"):
-        assert token not in source, (
-            f"_build_body now sends {token!r}. The privacy posture is documented "
-            "in docs/PROVIDER_POLICY.md section 4 as resting on Cerebras's own "
-            "policy, with nothing sent per request; update it in this commit."
-        )
-
-
 @pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
 def test_no_document_overstates_the_privacy_guarantee(path: Path) -> None:
     lines = _read(path).splitlines()
@@ -225,29 +206,21 @@ def test_provider_policy_names_the_upstream_whose_policy_this_now_is() -> None:
     per request, it is the serving host's published policy, so a reader has to
     know whose policy to read.
 
-    That makes WHICH HOST a privacy fact — and there are TWO of them now, one
-    per product mode. A doc naming only the mode a reader defaults into leaves
-    the other tier's data handling undocumented, which is the half a privacy
-    reviewer would actually be surprised by.
-
-    This test used to assert the literal string "cerebras", which meant it kept
-    passing after the host moved to Together and actively required the stale
-    name to stay — a drift gate holding the drift in place. It follows the mode
-    table now.
+    That makes WHICH HOST a privacy fact. This test used to assert the literal
+    string "cerebras", which meant it kept passing after the host moved to
+    Together and actively required the stale name to stay — a drift gate holding
+    the drift in place. It follows the serving constants now.
     """
     text = _read(DOC_PROVIDER).lower()
-    for mode, spec in MODE_SPECS.items():
-        host = spec.provider_id
-        assert host in text, (
-            f"docs/PROVIDER_POLICY.md does not name {host}, the host serving "
-            f"{mode.value} mode and whose published policy that tier's privacy "
-            "claim rests on."
-        )
-        assert _POLICY_DOMAINS[host] in text, (
-            f"docs/PROVIDER_POLICY.md must link {host}'s own authoritative "
-            "data-handling page. The privacy claim rests on it, so a reader has "
-            "to be able to reach it."
-        )
+    assert "together" in text, (
+        "docs/PROVIDER_POLICY.md does not name Together, the host whose published "
+        "policy the privacy claim rests on."
+    )
+    assert _POLICY_DOMAIN in text, (
+        "docs/PROVIDER_POLICY.md must link Together's own authoritative "
+        "data-handling page. The privacy claim rests on it, so a reader has to be "
+        "able to reach it."
+    )
 
 
 def test_provider_policy_states_the_privacy_posture_explicitly() -> None:
@@ -358,20 +331,15 @@ def test_task_runner_actually_sends_reasoning_disabled() -> None:
 
 def test_provider_policy_names_the_pinned_models() -> None:
     text = _read(DOC_PROVIDER)
-    pinned = [spec.upstream_model for spec in MODE_SPECS.values()]
-    for model in (*pinned, PUBLIC_MODEL_ID):
+    for model in (SERVING_MODEL, PUBLIC_MODEL_ID):
         assert model in text, (
             f"docs/PROVIDER_POLICY.md does not name {model!r}. The model table is "
             "the documented source of truth for what actually answers a call."
         )
 
 
-def test_readme_names_both_pinned_models() -> None:
-    readme = _read(README)
-    for mode, spec in MODE_SPECS.items():
-        assert spec.upstream_model in readme, (
-            f"README does not name the model serving {mode.value} mode."
-        )
+def test_readme_names_the_pinned_main_model() -> None:
+    assert SERVING_MODEL in _read(README)
 
 
 # ---------------------------------------------------------------------------
@@ -417,10 +385,11 @@ def test_serving_provider_is_built_with_the_server_credential() -> None:
     reordering and renaming of everything around it.
     """
     builder = inspect.getsource(main_module._build_provider)
-    assert "settings.provider_api_key(" in builder, (
-        "main._build_provider no longer passes a server credential. Readiness "
-        "gates on both provider keys precisely so this cannot be missing at "
-        "runtime; a provider built without one cannot answer anything."
+    expected = f"settings.{SERVING_KEY_ENV.lower()}"
+    assert expected in builder or "settings.serving_api_key" in builder, (
+        "main._build_provider no longer passes the server credential. Readiness "
+        f"gates on {SERVING_KEY_ENV} precisely so this cannot be missing at "
+        "runtime; a provider built without it cannot answer anything."
     )
 
 
@@ -430,14 +399,14 @@ def test_the_serving_provider_really_holds_the_credential() -> None:
     A request that arrives with no caller key must still be servable — that is the
     entire current credential model, and the thing an anonymous CLI depends on.
     """
-    for mode, spec in MODE_SPECS.items():
-        settings = Settings(**{
-            "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-            spec.key_env: "sk-server-owned",
-        })
-        provider = main_module._build_provider(settings, spec)
-        # No per-call key: the server's own is what gets resolved, on EVERY route.
-        assert provider._resolve_key(None).get_secret_value() == "sk-server-owned", mode
+    settings = Settings(**{
+        "STATE_SIGNING_KEY_CURRENT": "x" * 32,
+        SERVING_KEY_ENV: "sk-server-owned",
+    })
+    provider = main_module._build_provider(settings)
+    assert isinstance(provider, _SERVING_PROVIDER_CLASS)
+    # No per-call key: the server's own is what gets resolved.
+    assert provider._resolve_key(None).get_secret_value() == "sk-server-owned"
 
 
 def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
@@ -451,9 +420,9 @@ def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
 
     settings = Settings(**{
         "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-        STANDARD_SPEC.key_env: "sk-server-owned",
+        SERVING_KEY_ENV: "sk-server-owned",
     })
-    provider = main_module._build_provider(settings, STANDARD_SPEC)
+    provider = main_module._build_provider(settings)
     resolved = provider._resolve_key(_SecretStr("sk-caller-supplied"))
     assert resolved.get_secret_value() == "sk-caller-supplied"
 
@@ -574,17 +543,6 @@ def test_provider_policy_documents_both_retry_hops() -> None:
     )
 
 
-def test_provider_policy_excludes_key_verification_from_the_retry_scope() -> None:
-    """`verify_key` deliberately bypasses `retry_upstream`; the doc used to say
-    the retry policy covered "every upstream call", which swept it in."""
-    verify = inspect.getsource(CerebrasProvider.verify_key)
-    assert "retry_upstream" not in verify, (
-        "verify_key now retries. docs/PROVIDER_POLICY.md section 5 states it does "
-        "not; update the doc."
-    )
-    assert "verify" in _read(DOC_PROVIDER).lower()
-
-
 # ---------------------------------------------------------------------------
 # Wire shape: the parameters a single-host provider must and must not send.
 #
@@ -616,57 +574,6 @@ def doc_section(heading: str, *, ends_at: str, text: str | None = None) -> str:
     return body.split(heading)[1].split(ends_at)[0]
 
 
-# Sent on every request by the previous adapter; rejected outright by Cerebras
-# ("property is unsupported"). Reintroducing any of them breaks every call, so
-# they are checked at the source rather than discovered in production.
-_REJECTED_UPSTREAM_FIELDS = ("provider", "session_id", '"reasoning"')
-
-
-@pytest.mark.parametrize("field", _REJECTED_UPSTREAM_FIELDS)
-def test_the_adapter_sends_no_openrouter_only_parameter(field: str) -> None:
-    source = inspect.getsource(CerebrasProvider._build_body)
-    assert f'body[{field}]' not in source and f"body['{field}']" not in source, (
-        f"_build_body emits {field}, which Cerebras rejects with a 400. See "
-        "docs/PROVIDER_POLICY.md section 3."
-    )
-
-
-def test_the_adapter_sends_max_completion_tokens_and_never_max_tokens() -> None:
-    """One spelling, and the reason it has to be exactly one.
-
-    Cerebras accepts either name ALONE but 400s when both arrive. The normalized
-    request field is called ``max_tokens``, so the temptation to pass it straight
-    through is real and permanent — and the failure is total, on every request
-    that sets a budget, which is all of them.
-    """
-    source = inspect.getsource(CerebrasProvider._build_body)
-    assert 'body["max_completion_tokens"]' in source, (
-        "_build_body no longer sends max_completion_tokens"
-    )
-    assert 'body["max_tokens"]' not in source, (
-        "_build_body sends max_tokens as well. Cerebras 400s when both spellings "
-        "are present."
-    )
-
-
-def test_cache_affinity_rides_the_openai_standard_field() -> None:
-    """Section 3a's claim, asserted where it can actually break.
-
-    The spelling is the whole risk: `session_id` (OpenRouter's name for the same
-    idea) is a hard 400 here, and this field is attached to every main turn and
-    every utility task. Get it wrong and nothing works — which no mocked test
-    would notice, because the rejection lives at Cerebras.
-    """
-    source = inspect.getsource(CerebrasProvider._build_body)
-    assert 'body["prompt_cache_key"]' in source, (
-        "_build_body no longer emits prompt_cache_key. "
-        "docs/PROVIDER_POLICY.md section 3a says main calls carry one."
-    )
-    section = doc_section("### 3a.", ends_at="\n## ")
-    assert "prompt_cache_key" in section, (
-        "docs/PROVIDER_POLICY.md section 3a no longer documents the affinity key."
-    )
-
 
 def test_provider_policy_describes_a_single_host_upstream() -> None:
     """The structural fact the whole document now turns on.
@@ -690,11 +597,21 @@ def test_no_reasoning_effort_is_sent_by_anything() -> None:
     flag so that decision does not also require choosing a tier. With the flag
     off and skill learning gone, no call in the system sets ``reasoning_effort``
     at all — which is what the doc's thinking table now says.
+
+    The doc assertion moved with the host. It used to check that §2 called the
+    posture a property of the MODEL ("no reasoning mode"), which was Cerebras's
+    situation; on Together it is a flag genuinely held down, and a doc still
+    claiming the model cannot reason would be describing the wrong mechanism —
+    the one where forgetting to send the disable object costs nothing.
     """
     assert INTERACTIVE_THINKING_ENABLED is False
     assert INTERACTIVE_REASONING_EFFORT  # still defined, still unsent
     text = _read(DOC_PROVIDER).lower()
-    assert "no reasoning mode" in text or "does not reason" in text
+    assert 'reasoning: {"enabled": false}' in text, (
+        "docs/PROVIDER_POLICY.md §2 no longer names the object that actually "
+        "switches reasoning off. The serving model reasons by DEFAULT, so the "
+        "posture is a flag held down, not a property of the model."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -963,21 +880,17 @@ def test_the_adapter_asks_for_no_cost_opt_in() -> None:
     """There is no cost figure to opt into, and asking for one is a 400.
 
     OpenRouter had a (deprecated, inert) `usage: {include: true}` opt-in, and the
-    temptation to reach for it survives the provider swap because `cost` is still
-    on `ProviderUsage`. Here it is worse than useless: Cerebras rejects a `usage`
-    key outright, so a request that asked for cost would fail entirely rather
-    than come back without it.
+    temptation to reach for it survives a provider swap because `cost` is still
+    on `ProviderUsage`.
     """
     import inspect as _inspect
 
-    from daintree_assistant_server.providers import cerebras as _cb
+    from daintree_assistant_server.providers import openrouter as _or
 
-    source = _inspect.getsource(_cb.CerebrasProvider._build_body)
+    source = _inspect.getsource(_or.OpenRouterProvider._build_body)
     assert '"usage"' not in source, (
-        "_build_body sends a `usage` key. Cerebras rejects it with a 400 — and "
-        "reports no cost either way. See docs/PROVIDER_POLICY.md section 5c."
+        "_build_body sends a `usage` key. See docs/PROVIDER_POLICY.md section 5c."
     )
-    assert "reports no cost" in DOC_PROVIDER.read_text(encoding="utf-8").lower()
 
 
 def test_the_documented_total_is_a_sum_of_both_calls() -> None:
@@ -1388,4 +1301,76 @@ def test_no_document_states_a_retired_architecture_in_the_present_tense() -> Non
         + "\n  ".join(problems)
         + "\n\nEither correct the statement or mark the passage as history "
         "(a nearby 'historical', 'no longer', 'used to' … makes the intent explicit)."
+    )
+
+
+# ---------------------------------------------------------------------------
+# An UNVERIFIED privacy section must not be quoted as if it were verified.
+# ---------------------------------------------------------------------------
+
+#: The marker §4 carries while nobody has read the current host's terms. It is
+#: prose rather than a machine flag on purpose — a reader who reaches the section
+#: has to be stopped by the first thing they see, not by a comment.
+_PRIVACY_UNVERIFIED = "unverified against the current host"
+
+#: The claim itself, in the forms a summary reaches for. These are exactly what
+#: `README.md` said until this gate was written: an external trust statement,
+#: sourced from a section that is explicitly not about the host now serving.
+_NO_TRAINING_CLAIMS = (
+    "not collected for training",
+    "no-training guarantee",
+    "does not train on",
+    "not used for training",
+)
+
+#: Surfaces a reader takes a claim FROM. `PROVIDER_POLICY.md` is excluded because
+#: it is the section under caveat — it has to be able to describe the claim it is
+#: withholding, and it carries the warning that makes that safe.
+_SUMMARY_SURFACES = ("README.md", "CLAUDE.md", "docs/INTERNAL_BETA.md", "docs/KEY_HANDLING.md")
+
+
+def test_no_summary_repeats_a_privacy_claim_the_policy_has_not_verified() -> None:
+    """A caveat in one document does not travel to the documents quoting it.
+
+    §4 has carried an explicit "not verified for this host" warning since the
+    provider moved, and `README.md` went on asserting "Requests are not collected
+    for training" the whole time — a hard external trust statement, sourced from
+    a section that says in bold it is about a different vendor. That is the exact
+    failure mode a caveat has: it protects the page it sits on and nothing else.
+
+    So the gate is conditional, not absolute. While §4 says it is unverified, no
+    summary may state the claim. Once somebody reads Together's terms and rewrites
+    §4, this test stops applying by itself — which is the right shape, because the
+    claim becomes repeatable at exactly the moment it becomes true.
+    """
+    policy = _read(DOC_PROVIDER).lower()
+    if _PRIVACY_UNVERIFIED not in policy:
+        pytest.skip(
+            "docs/PROVIDER_POLICY.md §4 no longer declares itself unverified — the "
+            "claim is repeatable and this gate has done its job"
+        )
+
+    offenders: list[str] = []
+    for name in _SUMMARY_SURFACES:
+        path = REPO_ROOT / name
+        if not path.exists():
+            continue
+        for number, line in enumerate(_read(path).lower().splitlines(), start=1):
+            if _OPT_OUT in line:
+                continue
+            for claim in _NO_TRAINING_CLAIMS:
+                # "do not repeat it", "used to state" and similar are the honest
+                # way to MENTION the claim; only asserting it is the failure.
+                if claim in line and not re.search(
+                    r"\b(?:unverified|not verified|do not repeat|used to|previously|no longer|until)\b",
+                    line,
+                ):
+                    offenders.append(f"{name}:{number}: {claim!r}")
+
+    assert not offenders, (
+        "a summary asserts a privacy claim docs/PROVIDER_POLICY.md §4 says is "
+        "unverified for the current host:\n  " + "\n  ".join(offenders) + "\n\n"
+        "Either verify §4 against the host's published terms and rewrite it, or "
+        "stop stating the claim here. An external trust statement nobody has "
+        "checked is the worst thing in this repository to be wrong about."
     )

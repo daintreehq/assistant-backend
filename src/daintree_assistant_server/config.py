@@ -16,21 +16,40 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# THE serving identity now lives in `modes.py`, because there are TWO of them.
+# ---- THE serving identity — one host, one model, both hardcoded -----------
 #
-# Daintree serves two product modes — `standard` (Together / DeepSeek V4 Flash)
-# and `pro` (Cerebras / Gemma 4 31B) — and both are active in every deployment.
-# `modes.py` owns the mode->provider/model/thinking/cache mapping and the
-# per-provider origin and credential names; this module owns only the credentials
-# and base URLs themselves, and the readiness rules over them.
+# Together AI serves `deepseek-ai/DeepSeek-V4-Flash-0731`, and it serves
+# everything: the main completion and every utility task. Together is a model
+# HOST rather than a router, so one endpoint serves the weights and there is
+# nothing to select between. Skill selection makes no upstream call at all — it
+# is the local ONNX classifier in `skills/local/`.
 #
-# What used to be here was `SERVING_HOST` / `SERVING_MODEL`: one host, one model,
-# and a switch-back comment. That shape answered "which single provider is
-# active?", and there is no longer a single answer — so it was deleted rather
-# than left as a default that half the code would still believe.
-from .modes import PROVIDER_KEY_ENV, PROVIDER_ORIGINS, PROVIDER_URL_ENV, PUBLIC_MODEL_ID
+# This was briefly a two-mode registry (`modes.py`), with a `pro` tier on
+# Cerebras. That is gone: Cerebras's pricing structure could not be made to work
+# for this product, so there is no second route to choose between and a registry
+# over one entry was a lie about the shape of the thing. Git history has it, and
+# a genuine second tier would land there again rather than as a flag here.
+#
+# **The host is the latency decision, not the model.** These are the same weights
+# `context_compact` reached through OpenRouter for months. OpenRouter is a router
+# and this server sends it no routing preferences (there is no `provider` block
+# and policy.py is gone), so its endpoint choice is whatever the default is that
+# minute. Replaying the 62 real utility-task payloads: Together p50 1100ms / p90
+# 1702ms against OpenRouter's 3414ms / 6013ms — same model, same prompts, 3.1x.
+SERVING_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
 
-__all__ = ["PUBLIC_MODEL_ID", "Settings", "get_settings"]
+#: The credential, base URL and production origin for that one host. Named as
+#: constants rather than inlined so readiness messages, the doctor route and the
+#: tests that pin the credential model all read the same three strings.
+SERVING_KEY_ENV = "TOGETHER_API_KEY"
+SERVING_URL_ENV = "TOGETHER_BASE_URL"
+SERVING_ORIGIN = "api.together.xyz"
+
+#: The alias returned to clients. The product promise is Daintree, not a
+#: permanent contract with Together or DeepSeek.
+PUBLIC_MODEL_ID = "daintree-assistant"
+
+__all__ = ["PUBLIC_MODEL_ID", "SERVING_MODEL", "Settings", "get_settings"]
 
 # The runbook loaded whenever a turn produces a `docs_query` — i.e. whenever the
 # server is about to search the documentation MCP. SERVER-PINNED, not classified:
@@ -52,14 +71,13 @@ DOCS_SKILL_ID = "daintree.docs.answer-usage-question"
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
 # There is one optimum and the server ships it.
 #
-# NOTHING IN THIS SERVER THINKS, and on Cerebras that is now a property of the
-# model rather than a flag held down. Gemma 4 31B does not reason at all
-# (measured `reasoning_tokens: 0` on every probe), and the wire has no field that
-# could ask it to — Cerebras takes a bare `reasoning_effort` string with no "off"
-# value, and rejects OpenRouter's `reasoning` object outright. So a main or
-# utility call simply sends nothing, and cannot regress into spending 366
-# reasoning tokens and ~3.5s of an 11.5s wall-clock deciding how to answer
-# "Hello!" (measured 2026-08-08, turn_2c1bbc09, on the previous stack).
+# NOTHING IN THIS SERVER THINKS, and that is a flag genuinely held down rather
+# than a property of the model. DeepSeek V4 Flash reasons whenever the field is
+# absent, so every call sends the unified `reasoning: {"enabled": false}` object,
+# which Together honours — measured, `reasoning_tokens` leaves the usage block
+# entirely. Forgetting it therefore COSTS something: 366 reasoning tokens and
+# ~3.5s of an 11.5s wall-clock deciding how to answer "Hello!" (measured
+# 2026-08-08, turn_2c1bbc09, on the same weights).
 #
 # Skill learning used to be the one exception — it ran fire-and-forget after the
 # response, so its latency never reached a user. It has been removed, so there is
@@ -136,47 +154,40 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", alias="HOST")
     port: int = Field(default=8080, alias="PORT")
 
-    # ---- Upstream provider (Cerebras, OpenAI-compatible) -----------------
-    # Models are hardcoded (see the constants above). Only the key and base URL
+    # ---- Upstream provider (Together AI, OpenAI-compatible) --------------
+    # The model is hardcoded (see SERVING_MODEL above). Only the key and base URL
     # come from the environment.
-    cerebras_base_url: str = Field(default="https://api.cerebras.ai/v1", alias="CEREBRAS_BASE_URL")
+    together_base_url: str = Field(
+        default="https://api.together.xyz/v1", alias="TOGETHER_BASE_URL"
+    )
     # THE server's upstream credential, and the only one there is. Daintree funds
     # every turn from this key: callers no longer supply their own (see auth.py),
     # so this is required for the server to answer anything and is gated by
     # ``missing_secrets``. Local dev reads it from .env; Cloud Run injects it from
     # Secret Manager.
-    cerebras_api_key: SecretStr = Field(default=SecretStr(""), alias="CEREBRAS_API_KEY")
+    together_api_key: SecretStr = Field(default=SecretStr(""), alias="TOGETHER_API_KEY")
 
     # ---- Second provider (OpenRouter) — OPTIONAL, and deliberately not gating.
-    # Funds the ONE utility task that does not run on Cerebras: context
+    # Funds the ONE utility task that does not run on the serving model: context
     # compaction, which routes to a model an order of magnitude cheaper per input
     # token than the serving model precisely because it re-reads conversation
     # history (see OPENROUTER_COMPACTION_MODEL in services/task_runner.py).
     #
     # It is absent from ``missing_secrets`` ON PURPOSE, and that is the whole
-    # difference between the two credentials. Without CEREBRAS_API_KEY nothing
+    # difference between the two credentials. Without TOGETHER_API_KEY nothing
     # can be answered at all, so its absence must fail readiness. Without this
     # one everything still works except a single task that nothing on the serving
     # path calls yet — so a deployment that never sets it is a correct
     # deployment, not a broken one. Gating readiness on it would take the whole
     # server down over a feature it is not using.
     #
-    # There is no OPENROUTER_BASE_URL to match ``cerebras_base_url``: that one
+    # There is no OPENROUTER_BASE_URL to match ``together_base_url``: that one
     # exists so tests and local proxies can redirect the credential-bearing
     # serving path, and ``weak_secrets`` pins it back to the real origin in
     # production. This provider is constructed against its module default and
     # nothing has asked to move it.
     openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
 
-    # ---- Together AI — the SERVING host today (see SERVING_HOST above) ----
-    # Same shape as the Cerebras pair above and for the same reason: this key
-    # funds every turn, so `missing_secrets` gates readiness on it whenever
-    # Together is the serving host, and `weak_secrets` pins the base URL back to
-    # the real origin in production because the key is sent there.
-    together_base_url: str = Field(
-        default="https://api.together.xyz/v1", alias="TOGETHER_BASE_URL"
-    )
-    together_api_key: SecretStr = Field(default=SecretStr(""), alias="TOGETHER_API_KEY")
 
     # ---- Thinking headroom -----------------------------------------------
     # The thinking POSTURE itself is hardcoded (see INTERACTIVE_THINKING_ENABLED at
@@ -337,7 +348,7 @@ class Settings(BaseSettings):
     # forced tool call.
 
     # ---- Retries --------------------------------------------------------
-    # ONE HOP ONLY: backend -> Cerebras. Applies to every upstream call (main
+    # ONE HOP ONLY: backend -> Together. Applies to every upstream call (main
     # completion, stream open, selector, utility tasks): retries transient
     # failures only while no model output or replay-unsafe side effect has been
     # exposed. Streaming metadata may already be public during an open/prefetch
@@ -477,58 +488,35 @@ class Settings(BaseSettings):
         """
         return self.environment in ("production", "staging")
 
-    #: Per-provider credential and base-URL fields, by provider id. A TABLE
-    #: rather than an `if together else cerebras` pair, because that shape fails
-    #: OPEN: an unknown or misspelled id fell through to the Cerebras branch and
-    #: returned a real secret for a provider nobody had asked about. A lookup
-    #: that hands out the wrong vendor's key must raise, not guess.
-    _PROVIDER_FIELDS = {
-        "together": ("together_api_key", "together_base_url"),
-        "cerebras": ("cerebras_api_key", "cerebras_base_url"),
-    }
+    @property
+    def serving_api_key(self) -> SecretStr:
+        """The credential that funds every turn."""
+        return self.together_api_key
 
-    def provider_api_key(self, provider_id: str) -> SecretStr:
-        """The server-owned credential for one provider.
-
-        Both are server-owned and both fund turns; which one a given turn spends
-        is decided by the caller's MODE, resolved once at the request boundary.
-        """
-        key_field, _ = self._PROVIDER_FIELDS[provider_id]
-        value = getattr(self, key_field)
-        assert isinstance(value, SecretStr)
-        return value
-
-    def provider_base_url(self, provider_id: str) -> str:
-        """The origin one provider's credential is sent to."""
-        _, url_field = self._PROVIDER_FIELDS[provider_id]
-        value = getattr(self, url_field)
-        assert isinstance(value, str)
-        return value
+    @property
+    def serving_base_url(self) -> str:
+        """The origin the serving credential is sent to."""
+        return self.together_base_url
 
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty.
 
-        Every entry is SERVER-owned, which is the whole shape of the credential
-        model: Daintree holds the upstream keys and callers hold none (see
-        auth.py). There is still no INBOUND key to configure — the door is open
-        by design until account auth lands.
+        Both entries are SERVER-owned, which is the whole shape of the credential
+        model: Daintree holds the upstream key and callers hold none (see
+        auth.py). ``TOGETHER_API_KEY`` is therefore required for the server to
+        answer anything at all, and its absence must fail READINESS rather than
+        surface a turn later as an upstream 401 that reads like the caller's
+        fault. There is still no INBOUND key to configure — the door is open by
+        design until account auth lands.
 
-        BOTH provider credentials gate readiness, because the service advertises
-        both modes unconditionally. Reporting a mode as available and deferring
-        its missing key to the first request that selects it turns a
-        configuration error into an upstream 401 on some user's Pro turn, which
-        reads like the caller's fault and arrives at the worst moment to
-        diagnose. A deployment that cannot serve Pro is not a Standard-only
-        deployment; it is an incomplete one, and it should say so at /readyz.
-        (Contrast OPENROUTER_API_KEY, deliberately absent below: no mode routes
-        to it, so a deployment without it is complete.)
+        (Contrast OPENROUTER_API_KEY, deliberately absent: nothing on the serving
+        path routes there, so a deployment without it is complete.)
         """
         missing: list[str] = []
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
-        for provider_id in sorted(PROVIDER_KEY_ENV):
-            if not self.provider_api_key(provider_id).get_secret_value():
-                missing.append(PROVIDER_KEY_ENV[provider_id])
+        if not self.serving_api_key.get_secret_value():
+            missing.append(SERVING_KEY_ENV)
         return missing
 
     def local_only_problems(self) -> list[str]:
@@ -568,24 +556,18 @@ class Settings(BaseSettings):
         if not self.is_hardened:
             return []
         problems: list[str] = []
-        # Each provider base URL receives A SERVER credential on every request
-        # routed to it. A hardened deployment with a typo'd, plain-http or
-        # foreign host would disclose a key that funds Daintree turns while
-        # staying green, so production pins BOTH real origins. Development stays
+        # The upstream base URL receives THE SERVER's credential on every
+        # request. A hardened deployment with a typo'd, plain-http or foreign
+        # host would disclose the key that funds every Daintree turn while
+        # staying green, so production pins the real origin. Development stays
         # free to point at proxies and mocks.
-        #
-        # Both are checked whether or not anyone has sent a Pro request yet: an
-        # origin is wrong the moment it is configured, not the moment it is
-        # first used, and a check that only fires on use would pass every
-        # readiness probe on an instance holding a misdirected credential.
-        for provider_id in sorted(PROVIDER_ORIGINS):
-            problem = _origin_problem(
-                value=self.provider_base_url(provider_id),
-                expected_host=PROVIDER_ORIGINS[provider_id],
-                env_name=PROVIDER_URL_ENV[provider_id],
-            )
-            if problem is not None:
-                problems.append(problem)
+        problem = _origin_problem(
+            value=self.serving_base_url,
+            expected_host=SERVING_ORIGIN,
+            env_name=SERVING_URL_ENV,
+        )
+        if problem is not None:
+            problems.append(problem)
         if len(self.state_signing_key_current.get_secret_value()) < 32:
             problems.append("STATE_SIGNING_KEY_CURRENT is too short (<32 chars)")
         if self.state_salt.get_secret_value() == DEFAULT_STATE_SALT:

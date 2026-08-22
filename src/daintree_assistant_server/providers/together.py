@@ -21,14 +21,14 @@ this server runs and it is unaffected; re-measure before pinning a new snapshot.
 
 **Why Together rather than OpenRouter for the same weights.** OpenRouter is a
 router and this server sends it no routing preferences at all — ``policy.py`` was
-deleted in the Cerebras move and no ``provider`` block is built — so its endpoint
+deleted with the routing policy and no ``provider`` block is built — so its endpoint
 choice is whatever the default is that minute. Replaying the 62 real utility-task
 payloads: Together p50 1100ms / p90 1702ms, OpenRouter p50 3414ms / p90 6013ms.
 Same model, same prompts, 3.1x. Pinning the host IS the latency decision.
 
 **No key-probe endpoint.** Together has no ``/key`` route, so ``verify_key``
 probes ``/models`` instead — a 200 there means the credential is real, which is
-the same verdict ``/key`` gives and the same one the Cerebras adapter takes from
+the same verdict ``/key`` gives and the same one an adapter would take from
 its own model list.
 """
 
@@ -74,7 +74,7 @@ class TogetherProvider(OpenRouterProvider):
         just proved itself, which is the one answer this endpoint must never
         give when it does in fact know.
 
-        The record is shaped as ``{"models": [...]}`` to match what the Cerebras
+        The record is shaped as ``{"models": [...]}`` to match what a plain
         adapter returns from its own model listing, so a caller reading the
         diagnostic does not have to know which host answered.
         """

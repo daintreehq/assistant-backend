@@ -44,7 +44,7 @@ is fine while the event can never be emitted, and is a blocker the moment it can
 **Trigger: now. This is the next piece of work, not a someday.**
 
 The door is currently open. The server holds the upstream credential
-(`CEREBRAS_API_KEY`) and funds every turn from it, and `auth.py` serves a request
+(`TOGETHER_API_KEY`) and funds every turn from it, and `auth.py` serves a request
 with no `Authorization` header as an anonymous principal. Combined with a public
 Cloud Run service that is an open, Daintree-funded endpoint with no rate limiting
 — which is the accepted state for this stage and the reason this entry is first.
@@ -54,11 +54,11 @@ Cloud Run service that is an open, Daintree-funded endpoint with no rate limitin
 - `auth.authenticate` is the one place a request becomes a `Principal`. It
   currently ignores the `Authorization` header entirely — see `docs/KEY_HANDLING.md`
   for why *ignore* rather than *optional*: a CLI mid-migration is still sending
-  its old OpenRouter key, and reading it would forward that key to Cerebras and
+  its old OpenRouter key, and reading it would forward that key to Together and
   blame the caller for the rejection. When accounts land, this function starts
   reading the header again and the rest of the server does not move.
 - `ProviderChatRequest.api_key` still overrides the server's default in
-  `CerebrasProvider._resolve_key`. So a per-account credential is a **value**
+  `OpenRouterProvider._resolve_key`. So a per-account credential is a **value**
   flowing through existing plumbing, not new plumbing. Benchmarks and live tests
   are its only callers today, which is what keeps it from rotting before it is
   used.
@@ -72,28 +72,6 @@ lands, and they are written to be found:
 `test_no_route_hands_a_caller_supplied_key_to_the_provider`,
 `test_every_route_ignores_an_authorization_header_entirely`, and the smoke
 script's "Authentication posture" block.
-
----
-
-## Watch `gemma-4-31b`'s replacement
-
-**Trigger: when Cerebras retires the preview model.** Announced, not scheduled.
-
-`config.CEREBRAS_MODEL` is the whole code change, but not the whole job — see
-`docs/PROVIDER_POLICY.md` §9. Two things beyond output quality have to be
-re-decided:
-
-1. **Thinking posture.** Nothing in this server thinks, and that is a property of
-   *this model* rather than a flag: `gemma-4-31b` does not reason, and Cerebras
-   offers no way to switch reasoning off (a bare `reasoning_effort` string with no
-   "off" value). A reasoning-capable replacement is therefore a deliberate posture
-   decision with a real latency cost, not a drop-in.
-   `tests/live/test_live_cerebras.py::test_live_serving_model_reports_no_reasoning_tokens`
-   asserts zero reasoning tokens so this cannot be missed silently.
-2. **Prompt budgets and the baseline.** The per-file budget tests and
-   `benchmarks/baseline.json` are sized against this model's context window and
-   its behaviour under the current prompts. Refresh the baseline deliberately
-   (`python -m tools.baseline capture`) and explain the move.
 
 ---
 
@@ -430,7 +408,8 @@ the server ENFORCED it per request (`data_collection: "deny"` plus endpoint
 filtering). A single host has no such lever, so the claim now rests entirely on the
 host's published policy — which makes the identity of the host a privacy fact.
 
-The section was written against Cerebras and still cites Cerebras's trust centre.
+The section was written against Cerebras — a host this service no longer uses —
+and still cites Cerebras's trust centre.
 The serving host is Together. Nobody has read Together's terms and rewritten it, so
 the section is marked unverified rather than re-vendored: swapping the name would
 have produced a confident guarantee nobody had checked, which is the worst possible
@@ -439,28 +418,34 @@ form of this document to be wrong.
 To close it: read <https://www.together.ai/privacy> and
 <https://www.together.ai/terms-of-service>, state what Together actually commits to
 (training, retention, caching, sub-processors), and say plainly which parts Daintree
-can promise and which are the host's to change. Keep the Cerebras material as the
-switch-back case.
+can promise and which are the host's to change. Then DELETE the Cerebras
+material rather than keeping it: that host is gone and this service is not
+returning to it, so a second published position beside the real one is just an
+opportunity to quote the wrong one.
 
-## Point the live `/respond` cases at Pro once the wire carries a mode
+## Write the live provider-contract suite that no longer exists
 
-**Trigger:** the `mode` field lands on `RespondRequest` (the phase after the
-mode registry).
+**Trigger: before relying on any wire fact in `docs/PROVIDER_POLICY.md`, and
+before the next model or host change.**
 
-`tests/live/test_live_cerebras.py` builds a `CerebrasProvider` directly for the
-wire-contract cases — `max_completion_tokens`, the rejected `reasoning` object,
-the flat error body, zero reasoning tokens — and those still pin what they
-always pinned. Its four `/v1/daintree/respond` cases do not: with no `mode` on
-the request they resolve to the DEFAULT route, which is Standard on Together, so
-a file named for Cerebras tests Together end to end.
+`tests/live/` is EMPTY. The suite that lived there pinned the CEREBRAS wire —
+which parameters were accepted, which were rejected with a 400, the flat error
+body, and that the serving model reported zero reasoning tokens — and it was
+deleted with that adapter, correctly: every one of those rules was the opposite
+of, or absent from, what Together wants.
 
-Add `"mode": "pro"` to those four bodies. Nothing else in the file moves. Until
-then the file's own docstring says which half reaches which vendor, which is the
-honest state rather than a silent one.
+Nothing replaced it, so these are now remembered rather than checked:
 
-Also add the mirror suite: `tests/live/test_live_together.py` has never existed,
-so Standard's wire contract — the one every default turn actually uses — has no
-live pin at all. The Together adapter's unit tests cover the three overridden
-class attributes and the key decoder; nothing covers a real completion, a real
-stream, a real tool call, or the `reasoning: {"enabled": false}` object being
-honoured, all of which are measured claims in `docs/PROVIDER_POLICY.md`.
+- that `reasoning: {"enabled": false}` actually suppresses reasoning on
+  DeepSeek V4 Flash (§2 of the provider policy asserts it, from a hand
+  measurement);
+- whether Together reports a billed `cost`, which decides whether every
+  cost field in a response is populated or absent (§5c);
+- that `prompt_cache_key` is accepted rather than rejected;
+- the error-body shape the adapter parses;
+- streaming, tool calls, forced tool choice and JSON mode against the real API.
+
+A mocked test proves the adapter builds what we THINK the API wants. Only a live
+one proves the API agrees, and the gap is widest right after a host change —
+which is exactly when this one was removed.
+

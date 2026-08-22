@@ -24,8 +24,8 @@ from typing import Any
 
 from pydantic import SecretStr
 
+from daintree_assistant_server.config import SERVING_MODEL
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
-from daintree_assistant_server.modes import STANDARD_MODEL
 
 from .._harness.cases import CaseError, load_yaml_cases
 from .._harness.env import build_settings, caller_api_key, make_upstream_provider
@@ -336,7 +336,7 @@ async def run_bench(
         "meta": {
             "benchmark": "injection_live",
             "mode": "live",
-            "model": STANDARD_MODEL,
+            "model": SERVING_MODEL,
             "trials": trials,
             # What a COMPLETE run of this corpus looks like, recorded so the
             # quality gate can tell one from a --filter'd or interrupted run.

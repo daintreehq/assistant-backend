@@ -10,7 +10,6 @@ accepted, definitely rejected, and could-not-check.
 from __future__ import annotations
 
 from daintree_assistant_server.errors import invalid_api_key, upstream_error, upstream_timeout
-from daintree_assistant_server.modes import STANDARD_SPEC
 
 
 def test_verify_accepts_a_good_key(client, auth, fake_provider) -> None:
@@ -121,16 +120,13 @@ def test_verify_never_echoes_the_server_key(client, app, fake_provider) -> None:
     The stake went UP when the credential moved: this is the one key that funds
     all of Daintree, not one tester's account.
 
-    Read through ``provider_api_key`` for the VERIFIED MODE rather than a
-    vendor-named field on purpose.
+    Read through ``serving_api_key`` rather than a vendor-named field on purpose.
     Naming one host here made the test agree with a redaction path that named the
     same host, so both could be wrong together — and they were: with the serving
     host moved, the redaction was still scrubbing the credential of a provider it
     no longer talks to, and this test still passed.
     """
-    key = app.state.settings.provider_api_key(
-        STANDARD_SPEC.provider_id
-    ).get_secret_value()
+    key = app.state.settings.serving_api_key.get_secret_value()
     fake_provider.verify_key_result = {"label": key}
 
     r = client.post("/v1/daintree/auth/verify")
@@ -143,9 +139,7 @@ def test_verify_drops_a_label_that_is_a_prefix_of_the_server_key(
     client, app, fake_provider
 ) -> None:
     """A truncated key is still key material and must not be echoed."""
-    key = app.state.settings.provider_api_key(
-        STANDARD_SPEC.provider_id
-    ).get_secret_value()
+    key = app.state.settings.serving_api_key.get_secret_value()
     fake_provider.verify_key_result = {"label": key[: len(key) // 2]}
 
     r = client.post("/v1/daintree/auth/verify")

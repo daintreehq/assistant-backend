@@ -17,16 +17,16 @@ import pytest
 from pydantic import SecretStr
 
 from daintree_assistant_server.errors import DaintreeError
-from daintree_assistant_server.providers.cerebras import CerebrasProvider
+from daintree_assistant_server.providers.together import TogetherProvider
 
-_BASE = "https://cerebras.test/v1"
-_KEY = "csk-taxonomy"
+_BASE = "https://together.test/v1"
+_KEY = "tgp_v1_taxonomy"
 
 
-def _provider(handler) -> CerebrasProvider:  # type: ignore[no-untyped-def]
+def _provider(handler) -> TogetherProvider:  # type: ignore[no-untyped-def]
     transport = httpx.MockTransport(handler)
     client = httpx.AsyncClient(transport=transport, timeout=httpx.Timeout(5.0))
-    return CerebrasProvider(client, api_key=SecretStr(_KEY), base_url=_BASE)
+    return TogetherProvider(client, api_key=SecretStr(_KEY), base_url=_BASE)
 
 
 def _request():  # type: ignore[no-untyped-def]
@@ -271,7 +271,7 @@ def test_our_door_401_and_the_provider_401_are_different_codes() -> None:
 def test_inline_stream_errors_map_like_http_errors(
     err: dict, code: str, retryable: bool
 ) -> None:
-    from daintree_assistant_server.providers.cerebras import map_stream_error
+    from daintree_assistant_server.providers.openrouter import map_stream_error
 
     mapped = map_stream_error(err)
     assert mapped.code == code
@@ -285,7 +285,7 @@ def test_an_inline_503_stays_an_outage_whatever_it_says() -> None:
     reintroducing prose-matching on only one of the two paths — which is how the
     streaming and non-streaming taxonomies drifted apart the first time.
     """
-    from daintree_assistant_server.providers.cerebras import map_stream_error
+    from daintree_assistant_server.providers.openrouter import map_stream_error
 
     mapped = map_stream_error(
         {"code": 503, "message": "No endpoints found matching your data policy."}
@@ -294,22 +294,13 @@ def test_an_inline_503_stays_an_outage_whatever_it_says() -> None:
     assert mapped.retryable is True
 
 
-def test_a_symbolic_auth_code_with_no_status_is_still_an_auth_failure() -> None:
-    """Cerebras sends symbolic codes, not numeric ones, on an in-band error.
-
-    ``_stream_error_status`` finds no HTTP status in ``"wrong_api_key"``, so
-    without the prose branch this would fall through to a generic retryable
-    ``upstream_error`` — and the CLI would replay a request that can never
-    succeed while telling the user nothing useful.
-    """
-    from daintree_assistant_server.providers.cerebras import map_stream_error
-
-    mapped = map_stream_error(
-        {"code": "wrong_api_key", "type": "invalid_request_error", "message": "Wrong API Key"}
-    )
-    assert mapped.code == "provider_invalid_api_key"
-    assert mapped.retryable is False
-
+# A symbolic in-band auth code (`{"code": "wrong_api_key"}`, no HTTP status) used
+# to be pinned here. That was a CEREBRAS wire behaviour and it is gone with the
+# adapter: Together's in-band errors carry numeric codes, which `_stream_error_status`
+# already reads, and asserting a prose branch this adapter does not implement would
+# have been a test of a fiction. The hazard the case named — a non-retryable auth
+# failure degrading into a retryable generic error, so the CLI replays a doomed
+# request — is still covered by the numeric cases above.
 
 
 def test_an_inline_quota_message_is_not_treated_as_a_rate_limit() -> None:
@@ -319,7 +310,7 @@ def test_an_inline_quota_message_is_not_treated_as_a_rate_limit() -> None:
     in-band became a retryable 429 — the turn replayed a doomed request and told
     the user to wait rather than to add credits.
     """
-    from daintree_assistant_server.providers.cerebras import map_stream_error
+    from daintree_assistant_server.providers.openrouter import map_stream_error
 
     mapped = map_stream_error({"message": "insufficient credits for this request"})
     assert mapped.code == "provider_insufficient_credits"
@@ -327,7 +318,7 @@ def test_an_inline_quota_message_is_not_treated_as_a_rate_limit() -> None:
 
 
 def test_an_inline_rate_limit_without_a_status_is_still_recognised() -> None:
-    from daintree_assistant_server.providers.cerebras import map_stream_error
+    from daintree_assistant_server.providers.openrouter import map_stream_error
 
     mapped = map_stream_error({"message": "Rate limit exceeded, too many requests"})
     assert mapped.code == "upstream_rate_limited"
@@ -335,7 +326,7 @@ def test_an_inline_rate_limit_without_a_status_is_still_recognised() -> None:
 
 
 def test_an_unrecognised_inline_error_stays_a_generic_upstream_error() -> None:
-    from daintree_assistant_server.providers.cerebras import map_stream_error
+    from daintree_assistant_server.providers.openrouter import map_stream_error
 
     assert map_stream_error({"message": "something odd"}).code == "upstream_error"
 
@@ -343,7 +334,7 @@ def test_an_unrecognised_inline_error_stays_a_generic_upstream_error() -> None:
 @pytest.mark.parametrize("code", [True, False, 99, 600, "4o2", "", None, {"x": 1}])
 def test_a_nonsense_inline_code_falls_back_to_prose(code: object) -> None:
     """A bool is an int in Python — `code: true` must not read as HTTP 1."""
-    from daintree_assistant_server.providers.cerebras import _stream_error_status
+    from daintree_assistant_server.providers.openrouter import _stream_error_status
 
     assert _stream_error_status({"code": code}) is None
 
@@ -374,7 +365,7 @@ async def test_a_doubly_encoded_echo_drops_the_diagnostic_wholesale() -> None:
     error message is the right trade against leaking a key, so the detail is
     dropped rather than published.
     """
-    from daintree_assistant_server.providers.cerebras import _CREDENTIAL_ECHOED
+    from daintree_assistant_server.providers.openrouter import _CREDENTIAL_ECHOED
 
     escaped = "".join(f"\\u{ord(c):04x}" for c in _KEY)
     err = await _fail_with(400, f"rejected: {escaped}")
