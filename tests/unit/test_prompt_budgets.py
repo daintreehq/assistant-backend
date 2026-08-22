@@ -46,8 +46,8 @@ from daintree_assistant_server.skills.catalog import load_catalog
 #
 #   * A rule that can fire on a turn loading NO skill stays here. That is every
 #     safety and restraint rule (secrets, untrusted data, terminal.close, the
-#     irreversible class, confirmation), the turn mechanics, the formatting
-#     contract, and `40-communication.md`'s no-task rule — which governs precisely
+#     irreversible class, confirmation), the turn mechanics, the RENDERER rules in
+#     `50-formatting.md`, and `40-communication.md`'s no-task rule — which governs precisely
 #     the 7 zero-skill turns and could not live anywhere else.
 #   * A rule that only means anything once the turn IS Daintree work moved to the
 #     foundation: supervision modes, finish detection, agent-state vocabulary,
@@ -102,6 +102,11 @@ from daintree_assistant_server.skills.catalog import load_catalog
 #   relay a finding — lives in `daintree.foundation`, where the cheap-vs-capable
 #   delegation guidance already sits. Base carries one bullet: when to delegate,
 #   what never to delegate, and to relay a partial as partial.
+# NOTE the scope: this covers `main/base/*.md` only. Output SHAPE — length, lists
+# vs tables, status cues, the blocked format — is owned by `response_contract.md.j2`,
+# which is the SECOND static system message and is not measured here. A cleanup that
+# moves shape rules out of base lowers this number without lowering what the model
+# receives, so read a drop against the contract's size too.
 BASE_PROMPT_CEILING = 25 * 1024
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —

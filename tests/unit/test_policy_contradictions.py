@@ -30,6 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROMPTS = REPO_ROOT / "src" / "daintree_assistant_server" / "prompts"
 SCAFFOLD = PROMPTS / "main" / "loaded_skills.md.j2"
 CONSISTENCY_TASK = PROMPTS / "tasks" / "skill_step_consistency.md"
+BASE_DIR = PROMPTS / "main" / "base"
 TOOL_INVENTORY = REPO_ROOT / "benchmarks" / "_harness" / "fixtures" / "cli_tool_inventory.json"
 
 #: Phrases that assert the RETIRED turn-boundary contract. Any of them appearing
@@ -169,3 +170,89 @@ def test_the_declaration_partial_still_exists_to_be_omitted() -> None:
     assert "[[DAINTREE:FINAL]]" in with_rule
     assert "[[DAINTREE:" not in without_rule
     assert len(with_rule) > len(without_rule)
+
+
+# ---------------------------------------------------------------------------
+# One rule, one owner.
+# ---------------------------------------------------------------------------
+
+#: Long enough that ordinary English does not collide by accident, short enough
+#: that a copied sentence cannot hide behind a few edited words. Six matched every
+#: real duplication when this was written (the display-width preamble, the
+#: lead-with-the-answer rule, the status-cue rule) with no false hits across the
+#: eight partials plus the contract.
+_SHINGLE_WORDS = 6
+
+#: Windows that begin with a function word. This is NOISE SUPPRESSION, not a
+#: semantic judgement, and it is worth being honest about which: a six-word window
+#: opening "the ... of the ..." is usually a fragment of grammar two layers happen
+#: to share, and admitting them made the gate fire on prose nobody had copied. It
+#: will therefore also excuse a genuinely duplicated sentence that happens to start
+#: with "The", which is the price. Prefer fixing a false positive by giving the
+#: rule one owner over widening this tuple.
+_FUNCTION_WORD_STARTS = ("the ", "a ", "an ", "and ", "of ", "in ", "to ", "it ", "is ")
+
+#: Phrases two layers may legitimately share, each with the reason. A shared
+#: POINTER to the same block is not a restated rule — both layers have to be able
+#: to name the thing they are talking about.
+_ALLOWED_SHARED = {
+    "display context block": "both layers may name the block; only one interprets it",
+}
+
+
+def _shingles(text: str) -> set[str]:
+    import re
+
+    words = re.findall(r"[a-z']+", text.lower())
+    return {
+        " ".join(words[i : i + _SHINGLE_WORDS])
+        for i in range(len(words) - _SHINGLE_WORDS + 1)
+    }
+
+
+def test_no_permanent_layer_restates_another() -> None:
+    """Output policy had three owners and they had begun to disagree.
+
+    "Lead with the answer", the status-cue rule and the terminal-width preamble
+    were each stated in two of `40-communication.md`, `50-formatting.md` and
+    `response_contract.md.j2`. Duplication is not merely wasteful here: two copies
+    of a rule drift, and the model then has to decide which layer it believes.
+    The contract owns what the answer contains; formatting owns what survives the
+    renderer; communication owns tone and the continuation delta.
+
+    What this gate can and cannot do, stated plainly so nobody trusts it further
+    than it deserves: it finds text that was COPIED between layers. It does not
+    find a rule that was RESTATED in different words — "a single-level list" in the
+    contract and "keep lists one level deep" in formatting share no six-word window
+    and would both pass. Semantic duplication still needs a reader. What this stops
+    is the common case, where a rule is pasted into a second layer and the two
+    copies then drift until they disagree.
+
+    A phrase two layers may legitimately share goes in `_ALLOWED_SHARED` with its
+    reason — not into the opener filter, which is a blunt noise cut.
+    """
+    import itertools
+
+    layers = {p.name: p.read_text(encoding="utf-8") for p in sorted(BASE_DIR.glob("*.md"))}
+    layers["response_contract.md.j2"] = (PROMPTS / "main" / "response_contract.md.j2").read_text(
+        encoding="utf-8"
+    )
+    shingled = {name: _shingles(text) for name, text in layers.items()}
+
+    overlaps: list[str] = []
+    for left, right in itertools.combinations(sorted(shingled), 2):
+        shared = {
+            phrase
+            for phrase in shingled[left] & shingled[right]
+            if not phrase.startswith(_FUNCTION_WORD_STARTS)
+            and not any(allowed in phrase for allowed in _ALLOWED_SHARED)
+        }
+        for phrase in sorted(shared):
+            overlaps.append(f"{left} <-> {right}: …{phrase}…")
+
+    assert not overlaps, (
+        "A permanent prompt layer restates another:\n  "
+        + "\n  ".join(overlaps)
+        + "\n\nGive the rule ONE owner and have the other layer stop stating it. "
+        "See this test's docstring for which layer owns what."
+    )
