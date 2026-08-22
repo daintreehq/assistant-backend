@@ -8,9 +8,21 @@ would have executed itself — so it is rendered as one, using the same
 This is presentation, not protocol: the CLI never executes the call, and the
 main model is never shown it as a tool call either (the retrieved pages reach it
 as plain context in the injected tail, the same way skill bodies reach it as a
-framed user-role block). What the prelude buys is honesty in the transcript — the user
-sees that their question was answered from the docs, and which query found them,
-rather than watching the assistant produce cited pages from nowhere.
+framed user-role block).
+
+**And the presentation does not currently happen.** The intent was honesty in the
+transcript — the user seeing that their question was answered from the docs, and
+which query found them, rather than watching the assistant produce cited pages
+from nowhere. The CLI decodes `skills.prelude` and renders nothing:
+`internal/backend/contracts.go` calls the whole block "vestigial metadata the
+client neither replays nor renders", left in place pending a coordinated
+server-side drop. So today this costs a few hundred bytes on the wire and buys
+the user nothing.
+
+Kept rather than deleted because the drop has to be coordinated and the argument
+for showing a server-side retrieval has not changed — but do not read the
+paragraph above as describing what a user sees. Either the CLI starts rendering
+it or this goes; it should not stay a third thing indefinitely.
 """
 
 from __future__ import annotations

@@ -63,6 +63,7 @@ from ..errors import (
     provider_insufficient_credits,
     provider_invalid_api_key,
     provider_key_forbidden,
+    upstream_context_window_exceeded,
     upstream_error,
     upstream_protocol_error,
     upstream_rate_limited,
@@ -408,6 +409,25 @@ def map_stream_error(err: dict[str, Any]) -> DaintreeError:
         return provider_insufficient_credits()
     if any(marker in blob for marker in _INVALID_KEY_MARKERS):
         return provider_invalid_api_key()
+    # LENGTH, in-band and status-less. This branch is the expensive one to omit,
+    # and omitting it is easy to do by accident because the HTTP path gets the
+    # same reading for free through `_map_status`.
+    #
+    # `upstream_error` is the only fallback below, and the CLI RETRIES it on a
+    # stream (`internal/backend/retry.go`) — deliberately, because a mid-stream
+    # blip before any visible token is exactly what that retry layer is for. An
+    # oversized prompt is not a blip: it fails identically every time, and each
+    # replay is a fresh prefill of the ~128k tokens that were too many. Up to ten
+    # attempts, all billed, all doomed.
+    #
+    # Read against the whole blob rather than the message alone: a host that puts
+    # the reason in `code` (`context_length_exceeded`) rather than in prose is the
+    # likely shape, and the marker list already covers both spellings.
+    if _looks_context_length(blob):
+        return upstream_context_window_exceeded(
+            "This turn does not fit the model's context window. Shorten the "
+            "conversation, start a new session, or lower generation.max_tokens."
+        )
     if _looks_rate_limited(err):
         return upstream_rate_limited()
     return upstream_error("The upstream model stream reported an error.")
@@ -458,6 +478,17 @@ def _map_status(status: int, *, retry_after: str | None, detail: str | None) -> 
         # no model output is exposed.
         return upstream_unavailable()
 
+    # A 4xx whose reason is LENGTH is a different diagnosis from a 4xx whose
+    # reason is shape, and only the upstream's own prose separates them: both
+    # arrive as a 400. Collapsing them told a caller with a very long session to
+    # file a bug report about the server, when the fix was theirs. Checked before
+    # the generic branch below so the specific reading wins.
+    if _looks_context_length(detail):
+        return upstream_context_window_exceeded(
+            "This turn does not fit the model's context window. Shorten the "
+            "conversation, start a new session, or lower generation.max_tokens."
+        )
+
     # Any other 4xx (400, 404, 422, …) means the upstream rejected OUR request as
     # malformed: permanent, and almost always a server-side bug in what we sent.
     # Carry the upstream's own reason through so the failure is diagnosable
@@ -467,6 +498,36 @@ def _map_status(status: int, *, retry_after: str | None, detail: str | None) -> 
     return upstream_request_rejected(
         f"The upstream provider rejected this server's request (HTTP {status}).{suffix}"
     )
+
+
+# The phrasings hosts use for "your prompt is too long". Matched on the upstream's
+# own message because the status code cannot distinguish it from a malformed body.
+#
+# UNPINNED against Together: `tests/live/` is empty, so what that host actually
+# says here is unverified (`TODO.md`). The list is therefore written to be WIDE —
+# these are the OpenAI-compatible spellings in circulation, and matching one too
+# many costs a slightly wrong error code on an unrelated 400, while matching none
+# costs the whole point of the branch. Do not narrow it without a live capture.
+_CONTEXT_LENGTH_MARKERS = (
+    "context length",
+    "context_length",
+    "context window",
+    "context_window",
+    "maximum context",
+    "max_total_tokens",
+    "too many tokens",
+    "prompt is too long",
+    "input is too long",
+    "reduce the length",
+    "reduce your prompt",
+)
+
+
+def _looks_context_length(detail: str | None) -> bool:
+    if not detail:
+        return False
+    lowered = detail.lower()
+    return any(marker in lowered for marker in _CONTEXT_LENGTH_MARKERS)
 
 
 class OpenRouterStream(ProviderStream):

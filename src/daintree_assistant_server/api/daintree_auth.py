@@ -73,16 +73,23 @@ async def verify(
     # pasted the key they meant to; the limit fields let the CLI warn about an exhausted
     # key, which reads as a broken sign-in otherwise. Never echo the key itself.
     #
-    # Together returns none of them — its probe answers with a model listing — so
-    # in practice only `models` is populated today. The label/budget branches stay
-    # because they cost nothing to keep and are exactly what an account-mapped
-    # credential will want to report; `_usability` below is already written to
-    # treat their absence as "not known to be exhausted" rather than a failure.
+    # Together returns none of them — its probe answers with a model listing. The
+    # label/budget branches stay because they cost nothing to keep and are exactly
+    # what an account-mapped credential will want to report; `_usability` below is
+    # already written to treat their absence as "not known to be exhausted" rather
+    # than a failure.
+    #
+    # WHAT IS DELIBERATELY NOT ECHOED: the model listing itself. It was the one
+    # field Together actually populates, and it was answering a question nobody
+    # asks any more. Under caller-supplied keys the list described what YOUR key
+    # could reach, so it was yours to see; the key is the server's now, the serving
+    # model is hardcoded, and no caller chooses from that list — the CLI's own
+    # response struct has never had a field for it. What remained was an
+    # unauthenticated endpoint (`auth.py` ignores the header) publishing the
+    # deployment's full upstream model inventory to anyone who asked, for no
+    # consumer at all. A verdict is the whole answer this endpoint owes.
     out: dict[str, object] = {"valid": True}
     if isinstance(record, dict):
-        models = record.get("models")
-        if isinstance(models, list):
-            out["models"] = [m for m in models if isinstance(m, str)]
         # The credential ACTUALLY probed, read through `serving_api_key` rather
         # than a vendor-named field: redacting against a host we are not talking
         # to would let the live key through in a label that echoed it. That is

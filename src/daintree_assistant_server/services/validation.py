@@ -9,6 +9,8 @@ free-form-key scanner is retained for the task-input boundary.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import re
 
@@ -223,37 +225,273 @@ def _validate_tools(
 
 
 def _validate_message_sequence(messages: list[ChatMessage]) -> None:
-    """OpenAI-style sequencing checks, so a malformed transcript fails fast with a
-    clear 400 instead of a confusing upstream 502 (and a wasted upstream call)."""
-    opened: set[str] = set()  # tool_call ids introduced by earlier assistant messages
+    """Walk the transcript as a state machine, so a malformed one fails fast with
+    a clear 400 instead of a confusing upstream 502 (and a wasted upstream call).
+
+    The rule modelled here is the canonical tool-calling loop: an assistant turn
+    opens a BATCH of calls, every call in that batch is answered exactly once,
+    and only then may the conversation move on. Anything else is a client bug —
+    and one that this server, not just the upstream, is damaged by.
+
+    That last part is why the check is a state machine rather than the membership
+    test it used to be. `skills/tool_projection._unresolved_tool_calls` builds
+    `{call_id: tool_name}` to decide which tools a continuation round still needs
+    offered. Under the old rule a later assistant message could reuse a call id
+    that was still unanswered, and that dict silently OVERWRITES the first entry
+    — so under enforcement the projection withholds the tool the pending call
+    needs, and the model is left holding a call it has no legal way to make. A
+    permissive validator was therefore not merely untidy; it was the precondition
+    for a wrong tool inventory.
+
+    Deliberately NOT enforced: global uniqueness of call ids across the whole
+    transcript. Ids are minted by the MODEL, and one that reuses an id in a later
+    turn has produced a perfectly coherent conversation — every call answered
+    before the next began — that a global `seen` set would 400. Uniqueness is
+    only load-bearing while a call is OPEN, which is exactly the window the
+    pending map covers.
+
+    Ids are compared VERBATIM, and one carrying surrounding whitespace is
+    rejected outright. They travel upstream raw
+    (`prompt_assembler._tool_call_to_wire`), so pairing on a stripped value would
+    validate ` c1 ` against `c1` here and hand the provider a call nothing
+    answers — the validator agreeing with itself and with nothing else.
+
+    Order WITHIN a batch is not constrained: the CLI dispatches a parallel group
+    concurrently and appends results as they settle, so requiring call order
+    would reject its normal output. Every call answered before the batch closes
+    is the invariant; the sequence they are answered in is not.
+    """
+    pending: dict[str, int] = {}  # open call id -> index of the message that opened it
+
+    def _reject_unresolved(index: int, role: str) -> None:
+        call_id, opened_at = next(iter(pending.items()))
+        raise invalid_request(
+            f"A {role} message arrives while tool call {call_id!r} (opened by "
+            f"input.messages[{opened_at}]) has no result.",
+            param=f"input.messages[{index}]",
+            code="unresolved_tool_calls",
+        )
+
     for i, msg in enumerate(messages):
         if msg.role == "tool":
-            tool_call_id = (msg.tool_call_id or "").strip()
-            if not tool_call_id:
+            tool_call_id = msg.tool_call_id or ""
+            if not tool_call_id.strip():
                 raise invalid_request(
                     "A tool message requires a tool_call_id.",
                     param=f"input.messages[{i}].tool_call_id",
                     code="missing_tool_call_id",
                 )
-            if tool_call_id not in opened:
+            # Symmetrical with the call side: this id is forwarded raw too, so
+            # pairing on a stripped value here would hide the same mismatch.
+            if tool_call_id != tool_call_id.strip():
                 raise invalid_request(
-                    "A tool message must follow an assistant tool call with the same id.",
+                    "A tool_call_id must not be surrounded by whitespace.",
+                    param=f"input.messages[{i}].tool_call_id",
+                    code="malformed_tool_call_id",
+                )
+            if tool_call_id not in pending:
+                # One code for three shapes — an id no assistant message ever
+                # opened, a second result for a call already answered, and a
+                # result for a call closed by an earlier batch — because from the
+                # client's side they are the same bug (a reply with no open call)
+                # and the message names which one it was.
+                raise invalid_request(
+                    "A tool message must answer an open tool call from the "
+                    "immediately preceding assistant message, exactly once.",
                     param=f"input.messages[{i}].tool_call_id",
                     code="dangling_tool_message",
                 )
-        ids_in_msg: set[str] = set()
-        for j, call in enumerate(msg.tool_calls or []):
-            if call.id in ids_in_msg:
+            del pending[tool_call_id]
+            continue
+
+        # A non-tool message closes the batch, so the batch must BE closed. The
+        # check runs before this message's own calls are recorded, or an
+        # assistant turn would be judged against the calls it is making now.
+        if pending:
+            _reject_unresolved(i, msg.role)
+
+        calls = msg.tool_calls or []
+        # Only an ASSISTANT turn may open calls. The schema allows `tool_calls` on
+        # any role (`role: str`, so that `system`/`developer` can be rejected with
+        # a precise code), and the assembler forwards the field for every non-tool
+        # role — so a user message carrying `tool_calls` reaches the provider as an
+        # invalid transcript and comes back a 400 naming nothing we can act on.
+        if calls and msg.role != "assistant":
+            raise invalid_request(
+                f"Only an assistant message may carry tool_calls; this one is {msg.role!r}.",
+                param=f"input.messages[{i}].tool_calls",
+                code="tool_calls_on_non_assistant_message",
+            )
+
+        for j, call in enumerate(calls):
+            # Ids go upstream RAW (`prompt_assembler._tool_call_to_wire`), so an id
+            # that is not already its own stripped form pairs here and mismatches
+            # there: ` c1 ` opened against `c1` answered validates, then arrives at
+            # the provider as a call nothing replies to. Rejecting is the only
+            # reading that keeps this validator and the wire agreeing; stripping
+            # would fix the pairing and leave the provider seeing two ids.
+            if call.id != call.id.strip():
+                raise invalid_request(
+                    "A tool_call id must not be surrounded by whitespace.",
+                    param=f"input.messages[{i}].tool_calls[{j}].id",
+                    code="malformed_tool_call_id",
+                )
+            if call.id in pending:
                 raise invalid_request(
                     f"Duplicate tool_call id {call.id!r} within a single message.",
                     param=f"input.messages[{i}].tool_calls[{j}].id",
                     code="duplicate_tool_call_id",
                 )
-            ids_in_msg.add(call.id)
-            opened.add(call.id)
+            pending[call.id] = i
+
+
+def _validate_shape(req: RespondRequest, settings: Settings) -> None:
+    """Bound how MANY of each thing a request may carry.
+
+    The 8 MiB body ceiling bounds total bytes and nothing else, so a request of
+    a hundred thousand two-byte messages passes it and then costs CPU and
+    allocations in every stage that follows. Each cap below is set far above what
+    a healthy client sends (see ``config.py``): crossing one is evidence of a
+    malformed request, not of an unusually busy session, so the honest answer is
+    413 at the boundary rather than a slow turn nobody can explain.
+
+    413 rather than 400 throughout: nothing here is the wrong SHAPE, there is
+    simply too much of it — the same reading ``request_too_large`` already has.
+    """
+    messages = req.input.messages
+    if len(messages) > settings.cap_messages:
+        raise request_too_large(
+            f"The conversation carries more than {settings.cap_messages} messages.",
+            param="input.messages",
+        )
+    for i, msg in enumerate(messages):
+        if isinstance(msg.content, list) and len(msg.content) > settings.cap_content_parts:
+            raise request_too_large(
+                f"A message carries more than {settings.cap_content_parts} content parts.",
+                param=f"input.messages[{i}].content",
+            )
+        calls = msg.tool_calls or []
+        if len(calls) > settings.cap_tool_calls_per_message:
+            raise request_too_large(
+                f"A message carries more than {settings.cap_tool_calls_per_message} tool calls.",
+                param=f"input.messages[{i}].tool_calls",
+            )
+
+    stop = req.generation.stop
+    sequences = [stop] if isinstance(stop, str) else (stop or [])
+    if len(sequences) > settings.cap_stop_sequences:
+        raise request_too_large(
+            f"More than {settings.cap_stop_sequences} stop sequences were supplied.",
+            param="generation.stop",
+        )
+    for i, sequence in enumerate(sequences):
+        if utf8_len(sequence) > settings.cap_stop_sequence_bytes:
+            raise request_too_large(
+                "A stop sequence exceeds the size limit.",
+                param=f"generation.stop[{i}]",
+            )
+
+    pinned = req.selection.pinned_skill_ids
+    if len(pinned) > settings.cap_pinned_skill_ids:
+        raise request_too_large(
+            f"More than {settings.cap_pinned_skill_ids} skill ids were pinned.",
+            param="selection.pinned_skill_ids",
+        )
+
+
+# Image formats the serving path will carry. An allowlist rather than a denylist
+# because the interesting rejections are the ones nobody thought to name:
+# `image/svg+xml` is a scripting format, and `text/html` in an `image_url` is a
+# data URL that is not an image at all. Neither is a raster image the model can
+# read, and both are shapes a validator that only checked `data:` would accept.
+ALLOWED_IMAGE_MIME_TYPES = frozenset(
+    {"image/png", "image/jpeg", "image/webp", "image/gif"}
+)
+
+#: Case-insensitive, because the scheme is: `DATA:image/png;base64,...` is a
+#: perfectly good data URL and a case-sensitive check would classify it as REMOTE
+#: — harmless while remote URLs are off (it is refused), and a hole the moment an
+#: operator turns them on, since the whole image policy would then be skipped.
+_DATA_URL_SCHEME = "data:"
+
+# `data:<mediatype>[;param=value]*[;base64],<data>` — the media type is optional
+# in the RFC, so the group may be empty. Parameters are captured as a whole and
+# split below rather than substring-matched: `;base64x` CONTAINS `;base64` and is
+# not it.
+_DATA_URL_RE = re.compile(r"^data:([^;,]*)((?:;[^;,]*)*),", re.IGNORECASE)
+
+
+def _validate_image_data_url(url: str, *, param: str, settings: Settings) -> None:
+    """Enforce a real image policy on a data URL, not merely the `data:` prefix.
+
+    Until now any `data:` URL was accepted up to the body ceiling, so the request
+    boundary knew nothing about the media type, whether the payload was valid
+    base64, or how large it decoded to. Nothing currently SENDS images — the CLI
+    has no production caller for its own image-part constructor — which is
+    exactly why the policy lands now: writing it against a live producer means
+    writing it around whatever that producer already does.
+
+    Decoded size is bounded by bounding the ENCODED string first, so nothing
+    oversized is ever decoded: base64 expands by 4/3, so an encoded cap is a
+    decoded cap with no allocation required to discover it.
+    """
+    match = _DATA_URL_RE.match(url)
+    if not match:
+        raise invalid_request(
+            "An image data URL is malformed.",
+            param=param,
+            code="invalid_image",
+        )
+    media_type = (match.group(1) or "").strip().lower()
+    parameters = [p for p in (match.group(2) or "").lower().split(";") if p]
+    if media_type not in ALLOWED_IMAGE_MIME_TYPES:
+        raise invalid_request(
+            f"Image media type {media_type or '(none)'!r} is not supported. "
+            f"Supported: {', '.join(sorted(ALLOWED_IMAGE_MIME_TYPES))}.",
+            param=param,
+            code="invalid_image",
+        )
+    # An exact parameter, not a substring: `;base64x` contains `;base64`.
+    if "base64" not in parameters:
+        raise invalid_request(
+            "An image data URL must be base64-encoded.",
+            param=param,
+            code="invalid_image",
+        )
+    payload = url[match.end() :]
+    if not payload:
+        # `data:image/png;base64,` decodes to zero bytes, which `b64decode`
+        # accepts happily. An empty image is not an image.
+        raise invalid_request(
+            "An image data URL carries no data.",
+            param=param,
+            code="invalid_image",
+        )
+    # Bounded BEFORE decoding, which is the whole point of capping the encoded
+    # form: base64 expands by 4/3, so this bounds the decoded image without
+    # allocating it to find out.
+    if len(payload) > settings.cap_image_encoded_bytes:
+        raise request_too_large(
+            "An image exceeds the size limit.",
+            param=param,
+        )
+    # Validated, never decoded into a kept buffer: the bytes go upstream as the
+    # data URL they arrived as, so all we owe the caller is an early, precise
+    # rejection instead of a 400 from the provider naming nothing.
+    try:
+        base64.b64decode(payload, validate=True)
+    except (ValueError, binascii.Error):
+        raise invalid_request(
+            "An image data URL does not carry valid base64.",
+            param=param,
+            code="invalid_image",
+        ) from None
 
 
 def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
+    # Counted across the WHOLE request, not per message: a hundred one-image
+    # messages costs the prompt exactly what one hundred-image message does.
+    images = 0
     for i, msg in enumerate(messages):
         if isinstance(msg.content, str):
             if has_lone_surrogate(msg.content):
@@ -283,12 +521,31 @@ def _validate_content(messages: list[ChatMessage], settings: Settings) -> None:
                     )
             elif isinstance(part, ImageContentPart):
                 url = part.image_url.url
-                if not settings.allow_remote_image_urls and not url.startswith("data:"):
-                    raise invalid_request(
-                        "Remote image URLs are not allowed; supply a data URL.",
-                        param=f"input.messages[{i}].content[{j}].image_url.url",
-                        code="remote_image_not_allowed",
+                param = f"input.messages[{i}].content[{j}].image_url.url"
+                # Counted FIRST, and for remote URLs too. The cap is about how
+                # many images a prompt carries, which is true whether the bytes
+                # ride the request or the provider fetches them — an early
+                # `continue` past this line let the count be bypassed entirely by
+                # sending remote URLs.
+                images += 1
+                if images > settings.cap_images:
+                    raise request_too_large(
+                        f"A request may carry at most {settings.cap_images} images.",
+                        param=param,
                     )
+                if not url.lower().startswith(_DATA_URL_SCHEME):
+                    if not settings.allow_remote_image_urls:
+                        raise invalid_request(
+                            "Remote image URLs are not allowed; supply a data URL.",
+                            param=param,
+                            code="remote_image_not_allowed",
+                        )
+                    # A remote URL is only reachable when an operator turned that
+                    # on, and the server never fetches it — the provider does. So
+                    # there is nothing here to inspect and the data-URL policy
+                    # below does not apply.
+                    continue
+                _validate_image_data_url(url, param=param, settings=settings)
 
 
 def _validate_startup(req: RespondRequest, settings: Settings) -> None:
@@ -326,6 +583,7 @@ def validate_respond_request(req: RespondRequest, settings: Settings) -> None:
     guards it; validation is about whether the request is well-formed.
     """
     _validate_roles(req.input.messages)
+    _validate_shape(req, settings)
     _validate_message_sequence(req.input.messages)
     _validate_tools(req.input.tools, req.input.tool_choice, settings)
     _validate_content(req.input.messages, settings)

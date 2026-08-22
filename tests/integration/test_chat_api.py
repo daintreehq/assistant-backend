@@ -1213,12 +1213,17 @@ def test_an_ordinary_turn_sends_no_pins_and_is_unchanged(client, auth, fake_prov
     assert r.json()["warnings"] == []
 
 
-def test_a_large_pin_list_does_not_stall_the_request(client, auth, fake_provider) -> None:
-    """Regression for quadratic de-duplication. The field is client-supplied and
-    uncapped, so `if sid not in seen_list` inside the loop was O(n^2) work on an n
-    the caller picks — synchronous, on the request path, where no timeout can
-    interrupt it. 20k distinct unknown ids is a few hundred KB of body and must
-    resolve to one warning, promptly."""
+def test_a_large_pin_list_is_refused_at_the_boundary(client, auth, fake_provider) -> None:
+    """Originally a regression test for quadratic de-duplication: the field was
+    client-supplied and UNCAPPED, so `if sid not in seen_list` inside the loop was
+    O(n^2) work on an n the caller picks — synchronous, on the request path, where
+    no timeout could interrupt it.
+
+    The de-duplication is still linear, but the n is no longer the caller's to
+    choose: `cap_pinned_skill_ids` refuses the list before any of that code runs.
+    The test asserts the CAP now, because that is what makes the quadratic path
+    structurally unreachable — a fix at the boundary rather than one downstream of
+    it. Below the cap the resolver is exercised by the two tests that follow."""
     fake_provider.selection_result = selection_result([])
     pins = [f"daintree.bogus.skill-{i}" for i in range(20_000)]
     r = client.post(URL, headers=auth, json=respond_body(
@@ -1226,12 +1231,14 @@ def test_a_large_pin_list_does_not_stall_the_request(client, auth, fake_provider
         session_id="pin7", turn_id="t1",
         selection={"pinned_skill_ids": pins},
     ))
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["warnings"].count("unknown_skill_id_ignored") == 1, (
-        f"one mistake, one warning; got {body['warnings']}"
-    )
-    assert body["skills"]["active"] == []
+    assert r.status_code == 413, r.text
+    error = r.json()["error"]
+    assert error["code"] == "request_too_large"
+    # Names the field, so a client author is not left guessing which list was
+    # the oversized one.
+    assert error["param"] == "selection.pinned_skill_ids"
+    # Refused at the boundary means the turn never ran.
+    assert not fake_provider.requests
 
 
 def test_duplicate_and_unknown_pins_report_one_warning_each(
@@ -1252,3 +1259,88 @@ def test_duplicate_and_unknown_pins_report_one_warning_each(
     assert body["warnings"].count("unknown_skill_id_ignored") == 1
     active = [s["id"] for s in body["skills"]["active"]]
     assert active.count(SKILL_PREP) == 1, f"a repeated pin loaded twice; {active}"
+
+
+# --------------------------------------------------------------------------
+# The aggregate context budget, at the seam where it actually runs.
+#
+# `tests/unit/test_context_budget.py` pins the arithmetic. These pin that it is
+# WIRED — measured after tool projection has settled the inventory, refusing
+# before the provider is called rather than after — because the arithmetic being
+# right is worth nothing if nothing reaches it.
+# --------------------------------------------------------------------------
+
+
+def test_an_oversized_turn_is_refused_before_the_upstream_is_called(
+    client, auth, fake_provider
+) -> None:
+    """Not merely "an error happens": the provider must be untouched. The whole
+    value of catching this locally is the call that never gets paid for."""
+    fake_provider.selection_result = selection_result([])
+    # Well under the 8 MiB body cap and the 1 MiB per-message cap, and still far
+    # past any context window — which is exactly the gap this check closes.
+    huge = "word " * 200_000
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": huge}], session_id="ctx1", turn_id="t1",
+    ))
+    assert r.status_code == 413, r.text
+    body = r.json()
+    assert body["error"]["code"] == "context_window_exceeded"
+    assert body["error"]["param"] == "input.messages"
+    # The dimensions a caller can act on.
+    assert "context window" in body["error"]["message"]
+    assert not fake_provider.requests, "the upstream was called for a turn that cannot fit"
+
+
+def test_an_ordinary_turn_is_not_touched_by_the_budget(client, auth, fake_provider) -> None:
+    """The regression that matters most. A budget that fires on normal traffic is
+    worse than no budget: it fails turns the model would have answered."""
+    fake_provider.selection_result = selection_result([])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}], session_id="ctx2", turn_id="t1",
+    ))
+    assert r.status_code == 200, r.text
+
+
+def test_a_failed_measurement_does_not_fail_the_turn(
+    client, auth, fake_provider, monkeypatch
+) -> None:
+    """The guard around the measurement, exercised.
+
+    A lost estimate is a lost NUMBER; the raise beside it is deliberate and sits
+    outside the guard. Those two live one line apart, so a future edit that
+    widened the `try` to cover the refusal — or narrowed it away from the
+    measurement — would be invisible without this. Nothing else in the suite can
+    tell the two apart, because a healthy turn takes neither path.
+    """
+    from daintree_assistant_server.services import chat_orchestrator
+
+    def boom(_request: object) -> None:
+        raise RuntimeError("estimator exploded")
+
+    monkeypatch.setattr(chat_orchestrator, "measure_context", boom)
+    fake_provider.selection_result = selection_result([])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "hello"}], session_id="ctx4", turn_id="t1",
+    ))
+    assert r.status_code == 200, r.text
+    assert fake_provider.requests, "the turn should have reached the upstream"
+
+
+def test_an_oversized_streaming_turn_ends_with_a_terminal_error_event(
+    client, auth, fake_provider
+) -> None:
+    """Streaming commits HTTP 200 before preparation finishes, so the refusal can
+    only be reported in band — as a terminal `error`, never a fabricated `done`."""
+    fake_provider.selection_result = selection_result([])
+    r = client.post(URL, headers=auth, json=respond_body(
+        [{"role": "user", "content": "word " * 200_000}],
+        session_id="ctx3", turn_id="t1", generation={"stream": True},
+    ))
+    events = parse_sse(r.text)
+    names = [name for name, _ in events]
+    assert "done" not in names, f"a turn that never ran must not report done; {names}"
+    assert names[-1] == "error", names
+    payload = dict(events[-1][1])
+    assert payload["error"]["code"] == "context_window_exceeded"
+    assert not fake_provider.requests

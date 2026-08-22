@@ -222,3 +222,32 @@ def test_verify_reports_a_negative_balance_as_unusable(client, auth, fake_provid
 
     assert body["usable"] is False
     assert body["reason"] == "credits_exhausted"
+
+
+def test_verify_does_not_publish_the_upstream_model_inventory(
+    client, fake_provider
+) -> None:
+    """The probe reads a model listing; the response must not relay it.
+
+    It made sense once: under caller-supplied keys the list described what YOUR
+    key could reach. The key is the server's now and the serving model is
+    hardcoded, so no caller chooses from it — and `auth.py` ignores the
+    Authorization header, which made this an unauthenticated route publishing the
+    deployment's whole upstream inventory to anyone who asked. The CLI's response
+    struct has never had a field for it, so nothing loses anything.
+    """
+    fake_provider.verify_key_result = {
+        "models": ["deepseek-ai/DeepSeek-V4-Flash-0731", "some/other-model"]
+    }
+
+    r = client.post("/v1/daintree/auth/verify")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert "models" not in body
+    # Not merely absent under that key — absent from the payload entirely.
+    assert "other-model" not in r.text
+    # The verdict, which is the whole answer this endpoint owes, still arrives.
+    assert body["valid"] is True
+    assert body["usable"] is True
+    assert body["reason"] == "ok"

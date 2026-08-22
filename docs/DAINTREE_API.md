@@ -777,8 +777,11 @@ the problem, because that is the whole reason these are separate codes.
 | HTTP | Code | Meaning / action |
 |------|------|------------------|
 | 400  | `system_messages_not_allowed`, `reserved_tool_name`, `invalid_tool_schema`, `tool_choice_not_offered`, `invalid_request_error` | The request is malformed. Client bug. |
+| 400  | `missing_tool_call_id`, `dangling_tool_message`, `duplicate_tool_call_id`, `unresolved_tool_calls`, `malformed_tool_call_id`, `tool_calls_on_non_assistant_message` | The tool-call transcript is not a valid exchange. An assistant turn opens a BATCH of calls, every call is answered exactly once, and only then may a user/assistant message follow; order *within* a batch is free. Ids are compared verbatim — surrounding whitespace is rejected rather than trimmed, because they travel upstream raw. A trailing unresolved batch is legal. Client bug in every case: report it with the request id rather than retrying. |
+| 400  | `invalid_image`, `remote_image_not_allowed` | An image part failed the data-URL policy: media type outside the allowlist (`image/png`, `image/jpeg`, `image/webp`, `image/gif`), not `;base64`, empty, or not valid base64. |
 | 401  | `invalid_api_key` | Bearer missing or malformed **at Daintree's door**. Send a valid header. |
-| 413  | `request_too_large` | Body cap, or a per-message / per-tool cap. |
+| 413  | `request_too_large` | Body cap, a per-message / per-tool byte cap, or a request-SHAPE cap: too many messages, content parts, tool calls in one message, stop sequences, pinned skill ids or images. `param` names the field. |
+| 413  | `context_window_exceeded` | The assembled prompt does not fit the model's context window. Distinct from `request_too_large`, which is about the bytes the CLIENT sent: this one counts the whole prompt — base prompt, tool schemas, active skill bodies, startup and the transcript — so a small request can trip it in a long session. Not retryable; start a new session or shorten the conversation. Raised before the upstream call when the server can see it, and mapped from the host's own rejection when it cannot, so the code is the same either way. |
 | 426  | `unsupported_daintree_protocol` | Upgrade the client. |
 | 404  | `unknown_task` | `/v1/daintree/tasks` was asked for a task profile that does not exist. Read the available ids from `/v1/daintree/capabilities`. |
 | 503  | *(not ready)* | `/readyz` is failing; the instance has not finished starting or is misconfigured. |

@@ -113,7 +113,8 @@ resource "google_cloud_run_v2_service" "service" {
   }
 }
 
-# Staging: make the direct *.run.app URL reachable with just the app bearer key.
+# Staging: make the direct *.run.app URL reachable with NO credential at all —
+# the application does not read one (see auth.py) and this removes the IAM one.
 # Set allow_unauthenticated = false once the service sits behind the load
 # balancer / IAP and Google IAM gates invocation.
 resource "google_cloud_run_v2_service_iam_member" "invoker" {

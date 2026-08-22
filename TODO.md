@@ -423,6 +423,63 @@ material rather than keeping it: that host is gone and this service is not
 returning to it, so a second published position beside the real one is just an
 opportunity to quote the wrong one.
 
+## Shed context instead of only refusing it
+
+**Trigger: the first `context_window_exceeded` on real traffic, or the compaction
+producer landing — whichever comes first.**
+
+`services/context_budget.py` measures the assembled request and refuses a turn
+whose INPUT alone clears the window. That is the honest half of the job: it names
+a failure the caller can act on instead of spending an upstream call to be told
+the same thing in worse words. It does not make an oversized turn fit.
+
+The shape of the missing half is a priority order over semantic units, not a
+truncator:
+
+- **never dropped** — the permanent system layers, the current user instruction,
+  any unresolved tool call with its result as a complete transaction, a forced
+  tool, the active skill bodies as coherent wholes, the current turn's goal, and
+  enough of `startup` to know which project this is;
+- **dropped last** — recent settled conversation, active workflow digests,
+  relevant memories, retrieved documentation, integration instructions for tools
+  actually in play;
+- **shrunk first** — older settled history that has a compacted replacement,
+  low-ranked documentation sections, stale runtime snapshots, excess terminal
+  rows.
+
+Two reasons it is not built yet. It is a PRODUCER of prompts rather than a check
+on one, so it belongs beside compaction (#60) — which already owns "replace
+settled history with a summary" and would otherwise be reimplemented here. And
+the trigger matters: shedding is only worth its complexity once something says
+turns are actually hitting the ceiling, and nothing does yet. The
+`turn_usage.estimated_prompt_tokens` field logged beside the upstream's own
+`prompt_tokens` is what will say so, and it also calibrates the characters/4
+estimate the refusal currently rests on.
+
+---
+
+## Verify the serving model's real context window
+
+**Trigger: with the live provider-contract suite below.**
+
+`config.SERVING_CONTEXT_TOKENS` is 131,072 — the published figure for DeepSeek V4
+Flash, never asked of Together. That gap is why `exceeds_window` refuses only
+when the input alone clears the whole window rather than at the reservation
+boundary: an unverified ceiling is allowed to fail a paid turn only in the cases
+no reading of it could rescue.
+
+Verify it and two things follow: the budgeter can tighten to the reservation
+boundary and start catching turns that will fail rather than only turns that
+cannot possibly fit, and the `_TEMPLATE_OVERHEAD_TOKENS` guess can be replaced by
+a measurement (send a known payload, read the upstream's own `prompt_tokens`, and
+the difference is the template's real cost).
+
+Related and unpinned in the same way: `_CONTEXT_LENGTH_MARKERS` in
+`providers/openrouter.py` matches Together's length-rejection prose by guess. One
+deliberately oversized live request settles what that host actually says.
+
+---
+
 ## Write the live provider-contract suite that no longer exists
 
 **Trigger: before relying on any wire fact in `docs/PROVIDER_POLICY.md`, and

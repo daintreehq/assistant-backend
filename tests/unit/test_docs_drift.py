@@ -643,6 +643,11 @@ _ERROR_CODES = (
     "upstream_error",
     "internal_error",
     "request_too_large",
+    # Raised from BOTH sides of the upstream call: by `services/context_budget.py`
+    # when the assembled prompt is visibly too large, and by the provider adapter
+    # when the host says so first. One code either way, which is the contract the
+    # CLI branches on.
+    "context_window_exceeded",
     "unsupported_daintree_protocol",
     "system_messages_not_allowed",
     "reserved_tool_name",
@@ -1321,6 +1326,13 @@ _NO_TRAINING_CLAIMS = (
     "no-training guarantee",
     "does not train on",
     "not used for training",
+    # Added after `docs/INTERNAL_BETA.md` was found asserting exactly this to
+    # TESTERS — the highest-stakes surface of the four, since it is the copy
+    # onboarding reads out — while slipping past every phrasing above. The claim
+    # travels in more shapes than the ones it was first caught in.
+    "do not collect or train on",
+    "does not collect or train on",
+    "no training on",
 )
 
 #: Surfaces a reader takes a claim FROM. `PROVIDER_POLICY.md` is excluded because

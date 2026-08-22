@@ -800,3 +800,96 @@ def test_a_tool_no_skill_declares_is_never_withheld(catalog) -> None:  # type: i
     # And the rule does not swallow the point: a tool the catalog DOES know, that
     # no active skill needs, is still withheld.
     assert wire_name("forge.getPR") in projection.withheld
+
+
+# --------------------------------------------------------------------------
+# The invariant this module DEPENDS ON, and where it is enforced.
+#
+# `_unresolved_tool_calls` keys `{call_id: tool_name}` to decide which tools a
+# continuation round still needs offered. A dict cannot hold two entries for one
+# id, so the function is only correct while a call id is unique among the calls
+# that are still OPEN — otherwise the later name overwrites the earlier, and
+# under enforcement the projection withholds the tool a pending call needs.
+#
+# Nothing in this module can repair that: by the time the messages arrive the
+# first call's name is gone. The guarantee lives in
+# `services/validation._validate_message_sequence`, whose state machine refuses a
+# transcript that reuses an open id (pinned in `tests/unit/test_validation.py`).
+#
+# What is pinned HERE is the positive half — that distinct open calls all
+# survive — because that is the property this module actually needs and it stays
+# true however the validator is rewritten. An earlier draft asserted the
+# corruption itself as the expected result, which made a bug into a contract: a
+# future hardening of `_unresolved_tool_calls` would have failed a test for
+# improving it.
+# --------------------------------------------------------------------------
+
+
+def test_every_distinct_open_call_keeps_its_tool() -> None:
+    """A parallel batch with several calls unanswered must surface EVERY tool, not
+    the last one. This is the property enforcement depends on: a name lost here is
+    a tool withheld from a model that has already committed to calling it."""
+    from daintree_assistant_server.skills.tool_projection import _unresolved_tool_calls
+
+    messages = [
+        ChatMessage(role="user", content="go"),
+        ChatMessage(
+            role="assistant",
+            tool_calls=[
+                ToolCall(id="c1", function=FunctionCall(name="first__tool", arguments="{}")),
+                ToolCall(id="c2", function=FunctionCall(name="second__tool", arguments="{}")),
+                ToolCall(id="c3", function=FunctionCall(name="third__tool", arguments="{}")),
+            ],
+        ),
+        ChatMessage(role="tool", content="ok", tool_call_id="c2"),
+    ]
+    assert _unresolved_tool_calls(messages) == {"first__tool", "third__tool"}
+
+
+def test_the_same_tool_called_twice_survives_one_answer() -> None:
+    """Matched by id rather than by name, so answering one call does not strand
+    its namesake."""
+    from daintree_assistant_server.skills.tool_projection import _unresolved_tool_calls
+
+    messages = [
+        ChatMessage(role="user", content="go"),
+        ChatMessage(
+            role="assistant",
+            tool_calls=[
+                ToolCall(id="c1", function=FunctionCall(name="same__tool", arguments="{}")),
+                ToolCall(id="c2", function=FunctionCall(name="same__tool", arguments="{}")),
+            ],
+        ),
+        ChatMessage(role="tool", content="ok", tool_call_id="c1"),
+    ]
+    assert _unresolved_tool_calls(messages) == {"same__tool"}
+
+
+def test_request_validation_refuses_a_transcript_that_reuses_an_open_id() -> None:
+    """The guarantee, asserted from this side.
+
+    Duplicated deliberately from `tests/unit/test_validation.py`: that suite owns
+    the validator's rules, and this one records that THIS module is a consumer of
+    one of them. Deleting the rule as "over-strict validation" would fail a test
+    that names the mechanism it protects.
+    """
+    from daintree_assistant_server.config import Settings
+    from daintree_assistant_server.contracts.daintree_api import RespondRequest
+    from daintree_assistant_server.errors import DaintreeError
+    from daintree_assistant_server.services.validation import validate_respond_request
+
+    call = {"id": "c1", "type": "function", "function": {"name": "t", "arguments": "{}"}}
+    request = RespondRequest.model_validate({
+        "protocol_version": 2,
+        "session": {"id": "s", "turn_id": "t"},
+        "startup": {},
+        "input": {"messages": [
+            {"role": "user", "content": "go"},
+            {"role": "assistant", "content": None, "tool_calls": [call]},
+            {"role": "assistant", "content": None, "tool_calls": [call]},
+        ]},
+    })
+    settings = Settings(TOGETHER_API_KEY="sk", STATE_SIGNING_KEY_CURRENT="s")
+    with pytest.raises(DaintreeError) as exc:
+        validate_respond_request(request, settings)
+    assert exc.value.code == "unresolved_tool_calls"

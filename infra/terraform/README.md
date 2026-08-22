@@ -9,21 +9,25 @@ Create the Secret Manager secrets referenced by `var.secret_ids` (values managed
 out-of-band; never in Terraform state):
 
 ```bash
-for s in state-signing-key-current state-salt; do
+for s in state-signing-key-current state-salt together-api-key; do
   gcloud secrets create "$s" --replication-policy=automatic 2>/dev/null || true
 done
-# add a version to each, e.g.:
+# state-signing material can be GENERATED:
 printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add state-signing-key-current --data-file=-
 printf '%s' "$(openssl rand -hex 16)" | gcloud secrets versions add state-salt --data-file=-
+# the upstream credential cannot be — supply the real Together key:
+printf '%s' 'tgp_v1_...' | gcloud secrets versions add together-api-key --data-file=-
 ```
 
-State-signing material is the only secret the deployment mounts — there is **no
-server-side API key**. Each request's bearer token is the caller's own key, which
-both authenticates the request and funds its upstream calls.
+**The server holds the upstream credential.** `TOGETHER_API_KEY` funds every turn
+and is in `Settings.missing_secrets()`, so a deployment without it answers
+`/readyz` with 503 and never serves a request. Callers supply no key of their own
+and `auth.py` ignores the `Authorization` header entirely — **the door is open**
+(see `docs/KEY_HANDLING.md`); an inbound bearer is not what protects this service.
 
 `STATE_SALT` must be a real (non-default) value — production readiness fails
-otherwise (see `Settings.weak_secrets`), as does an `OPENROUTER_BASE_URL` that is
-not the `https://openrouter.ai` origin (caller keys are forwarded to it).
+otherwise (see `Settings.weak_secrets`), as does a `TOGETHER_BASE_URL` that is not
+the `https://api.together.xyz` origin (the server's key is forwarded to it).
 
 Build and push the image to Artifact Registry, then pass it as `var.image` (by
 immutable digest).
@@ -31,8 +35,15 @@ immutable digest).
 ## Staging (default)
 
 `ingress = "INGRESS_TRAFFIC_ALL"` and `allow_unauthenticated = true`: the direct
-`https://<service>-<hash>-<region>.run.app` URL is reachable, and the caller's
-bearer key is the gate.
+`https://<service>-<hash>-<region>.run.app` URL is reachable.
+
+**There is no gate.** `auth.py` ignores the `Authorization` header, so every
+request becomes the same anonymous principal and is funded by the server's own
+Together key. That combination is acceptable only for a URL that is not handed
+around: there is no per-caller rate limit or spend control in the application, so
+the only thing bounding spend is Cloud Run's max-instance count and whatever
+budget alerts the provider account carries. Set those, and prefer restricted
+ingress or IAM the moment this URL leaves a small internal group.
 
 ```bash
 terraform apply \
@@ -40,18 +51,17 @@ terraform apply \
   -var image=REGION-docker.pkg.dev/PROJECT/REPO/daintree-assistant@sha256:...
 ```
 
-Smoke test against the `service_uri` output. The bearer token is **your own
-OpenRouter key** — the server has none, and that key pays for the turn:
+Smoke test against the `service_uri` output. **No bearer is needed** — none is
+read — and the turn is billed to the SERVER's Together key, so the last command
+below costs real money:
 
 ```bash
 URL=$(terraform output -raw service_uri)
-CALLER_API_KEY=sk-or-v1-...
 # Not /healthz: Google's frontend reserves that path and answers it itself, so
 # the request never reaches the container. /readyz is the stronger check anyway.
 curl -s "$URL/readyz"                                    # {"status":"ready", ...}
-curl -s -o /dev/null -w '%{http_code}' "$URL/v1/daintree/capabilities"   # 401 (no auth)
-curl -s -H "Authorization: Bearer $CALLER_API_KEY" "$URL/v1/daintree/capabilities"
-curl -s -H "Authorization: Bearer $CALLER_API_KEY" -X POST "$URL/v1/daintree/respond" \
+curl -s -o /dev/null -w '%{http_code}' "$URL/v1/daintree/capabilities"   # 200 — the door is open
+curl -s -X POST "$URL/v1/daintree/respond" \
   -H 'content-type: application/json' \
   -d '{"protocol_version":2,"session":{"id":"s","turn_id":"t"},"startup":{},
        "input":{"messages":[{"role":"user","content":"hello"}]}}'

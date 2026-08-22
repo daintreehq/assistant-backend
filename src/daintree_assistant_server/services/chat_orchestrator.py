@@ -84,6 +84,8 @@ from .compaction import (
     Compactor,
     select_source,
 )
+from .context_budget import ContextMeasurement, context_window_exceeded, exceeds_window
+from .context_budget import measure as measure_context
 from .deadlines import DeadlineExceeded, RequestBudget, TurnPhase
 from .docs_events import DocsSearchExecution
 from .docs_mcp import (
@@ -345,6 +347,11 @@ class _PreparedTurn:
     # it is worse than no evidence because this number's only job is to authorize
     # withholding tools.
     projection_computed: bool = False
+    # This turn's context estimate, or ``None`` when measuring it failed. Carried
+    # so the usage log can print it beside the upstream's own `prompt_tokens` —
+    # the only place both numbers meet, and therefore the only place the
+    # characters/4 estimate can be calibrated against reality.
+    context: ContextMeasurement | None = None
     # Wall-clock marks for the phases preparation owns. Continues to be filled in
     # by the response paths, which is why it is mutable and travels with the turn.
     timings: _Timings = field(default_factory=_Timings)
@@ -773,6 +780,9 @@ class ChatOrchestrator:
             selector_usage=prepared.meta.selector_usage,
             selector_endpoint=prepared.meta.selector_endpoint,
             turn_cost=turn_cost,
+            estimated_prompt_tokens=(
+                prepared.context.input_tokens if prepared.context else None
+            ),
         )
         # A non-streamed call cannot separate opening the model from generating
         # with it — one await covers both — so the whole upstream wait is reported
@@ -1309,6 +1319,25 @@ class ChatOrchestrator:
         except Exception:  # noqa: BLE001 — a metric must never break a turn
             logger.warning("tool_projection_metrics_failed", request_id=request_id)
 
+        # CONTEXT BUDGET. Measured LAST, after projection has settled what the
+        # tools array actually is: an enforced turn sends a materially smaller
+        # inventory, and measuring the pre-projection request would report a size
+        # nothing was ever asked to accept.
+        #
+        # Measurement is guarded the same way the size metrics above are — a
+        # failed estimate is a lost number, never a lost turn — but the REFUSAL
+        # is not inside that guard, because a raise is exactly what it is for.
+        context: ContextMeasurement | None = None
+        try:
+            context = measure_context(provider_request)
+        except Exception:  # noqa: BLE001 — a lost estimate must not be a lost turn
+            logger.warning("context_measurement_failed", request_id=request_id)
+        if context is not None and exceeds_window(context):
+            logger.warning(
+                "context_window_exceeded", request_id=request_id, **context.log_fields()
+            )
+            raise context_window_exceeded(context)
+
         timings.preparation_ms = round((time.perf_counter() - t_start) * 1000)
         logger.info(
             "respond",
@@ -1382,6 +1411,7 @@ class ChatOrchestrator:
             projection=projection,
             enforcement=enforcement,
             projection_computed=computed is not None,
+            context=context,
             timings=timings,
             provider_request=provider_request,
             meta=meta,
@@ -1979,6 +2009,7 @@ class ChatOrchestrator:
             projection=prepared.projection,
             enforcement=prepared.enforcement,
             projection_computed=prepared.projection_computed,
+            context=prepared.context,
             timings=prepared.timings,
         )
         try:
@@ -2027,6 +2058,7 @@ class ChatOrchestrator:
         projection: ToolProjection,
         enforcement: EnforcementDecision,
         projection_computed: bool,
+        context: ContextMeasurement | None,
         timings: _Timings,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
@@ -2564,6 +2596,7 @@ class ChatOrchestrator:
                 selector_usage=meta.selector_usage,
                 selector_endpoint=meta.selector_endpoint,
                 turn_cost=turn_cost(final_usage, meta, complete=abandoned_opens == 0),
+                estimated_prompt_tokens=context.input_tokens if context else None,
             )
             # Consolidated names only, and only from the buffer that survived:
             # a re-rolled attempt got a fresh buffer, so its discarded calls are

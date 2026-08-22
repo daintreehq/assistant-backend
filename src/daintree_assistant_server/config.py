@@ -49,7 +49,27 @@ SERVING_ORIGIN = "api.together.xyz"
 #: permanent contract with Together or DeepSeek.
 PUBLIC_MODEL_ID = "daintree-assistant"
 
-__all__ = ["PUBLIC_MODEL_ID", "SERVING_MODEL", "Settings", "get_settings"]
+#: The serving model's input context window, in tokens. Hardcoded beside the
+#: model id for the same reason the model is: it is a property of the weights we
+#: chose, not an operational dial.
+#:
+#: **UNVERIFIED against the live host.** DeepSeek publishes this figure for V4
+#: Flash and Together serves those weights, but `tests/live/` is empty and
+#: nothing here has asked the API what it will actually accept (`TODO.md`). That
+#: is precisely why `services/context_budget.py` refuses a turn only when the
+#: INPUT alone clears the whole window rather than at the reservation boundary:
+#: an unverified ceiling may bound a paid turn, so it is allowed to bound only
+#: the ones no reading of it could rescue. Verify it with the live suite, then
+#: the budgeter can tighten.
+SERVING_CONTEXT_TOKENS = 131_072
+
+__all__ = [
+    "PUBLIC_MODEL_ID",
+    "SERVING_CONTEXT_TOKENS",
+    "SERVING_MODEL",
+    "Settings",
+    "get_settings",
+]
 
 # The runbook loaded whenever a turn produces a `docs_query` — i.e. whenever the
 # server is about to search the documentation MCP. SERVER-PINNED, not classified:
@@ -436,6 +456,37 @@ class Settings(BaseSettings):
     cap_workflow_state_bytes: int = Field(default=16 * 1024, alias="CAP_WORKFLOW_STATE_BYTES")
     cap_message_text_part: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT_PART")
     cap_message_text: int = Field(default=1024 * 1024, alias="CAP_MESSAGE_TEXT")
+
+    # ---- Request SHAPE caps (counts, not bytes) -------------------------
+    # The byte caps above bound how big one thing can be; these bound how MANY
+    # things there can be, which the 8 MiB body ceiling does not: a request of
+    # 100,000 two-byte messages is small on the wire and expensive everywhere
+    # afterwards — sequence validation, sanitization, assembly, serialization —
+    # and every one of those costs is paid before anything decides the prompt is
+    # unusable. Rejecting pathological STRUCTURE at the boundary is cheaper than
+    # discovering it downstream, and it makes the failure legible instead of
+    # arriving as a timeout.
+    #
+    # Every default is far above real traffic on purpose. These are not tuning
+    # knobs: crossing one means something is malformed, so the right value is the
+    # one a healthy client can never reach. (Real numbers to compare against: the
+    # CLI dispatches at most 6 tool calls in parallel, `max_active_skills` is 3,
+    # and the OpenAI wire allows 4 stop sequences.)
+    cap_messages: int = Field(default=2000, alias="CAP_MESSAGES")
+    cap_content_parts: int = Field(default=64, alias="CAP_CONTENT_PARTS")
+    cap_tool_calls_per_message: int = Field(default=64, alias="CAP_TOOL_CALLS_PER_MESSAGE")
+    cap_stop_sequences: int = Field(default=8, alias="CAP_STOP_SEQUENCES")
+    cap_stop_sequence_bytes: int = Field(default=256, alias="CAP_STOP_SEQUENCE_BYTES")
+    cap_pinned_skill_ids: int = Field(default=16, alias="CAP_PINNED_SKILL_IDS")
+
+    # ---- Images -----------------------------------------------------------
+    # Nothing sends images today (`multimodal_images.data_urls` is advertised,
+    # but the CLI has no production caller for its own image-part constructor),
+    # so these bound a path before it has a producer rather than after. The
+    # ENCODED cap is the one enforced: base64 expands by 4/3, so bounding the
+    # string bounds the decoded image without decoding anything to find out.
+    cap_images: int = Field(default=8, alias="CAP_IMAGES")
+    cap_image_encoded_bytes: int = Field(default=6 * 1024 * 1024, alias="CAP_IMAGE_ENCODED_BYTES")
 
     # ---- CLI-provided integrations (MCP servers) ------------------------
     # NOT a tool index: client tool schemas already ride the function-calling

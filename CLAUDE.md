@@ -86,7 +86,9 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    `preparation` budget (minus a reserve, enforced as wall-clock), and folds the top sections
    into the **volatile tail**. Best-effort throughout: no client, no budget, a failed call or
    an empty result all leave the turn to answer without docs (`_lookup_docs` never raises).
-   The search is surfaced to the CLI as a `docs__search` prelude execution, and
+   The search is surfaced to the CLI as a `docs__search` prelude execution — which
+   the CLI currently DECODES AND DISCARDS (its own contracts call the prelude block
+   vestigial), so nothing is shown to the user today — and
    the query rides the signed state token, scoped to the `turn_id`, so a usage question that
    takes a tool call to answer still has its sources on the continuation round. **The base
    base prompt is written for this** (`main/base/35-daintree-docs.md`) — it tells the model
@@ -100,6 +102,32 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    Required structured `startup` data becomes one stable framed user-role block before the
    visible conversation; typed `runtime.worktree`, retrieved documentation and other live
    state stay in the final volatile user-role tail.
+5b. **Context budget** (`services/context_budget.py`) — the one limit that asks
+   whether the WHOLE assembled prompt fits. Every other cap bounds a piece the
+   client sent (8 MiB of body, 1 MiB of message text, 128 tools); none of them
+   counts the base prompt, the ~21.5k tokens of tool schemas, the skill bodies,
+   startup or the injected tail, so a request can satisfy all of them and still
+   be several times too large. Measured LAST, after projection has settled what
+   the tools array actually is. **It measures every turn and refuses almost
+   none**: the estimate is characters/4 against a `SERVING_CONTEXT_TOKENS` that
+   is unverified on the live host, so `exceeds_window` fires only when the input
+   alone clears the window by `_REFUSAL_MARGIN` (1.25x) — everything short of that
+   is left to the upstream, whose own refusal maps to the same code. Two
+   measurement details are load-bearing rather than tidy: `ensure_ascii=False`
+   (the default escapes a CJK character to six, so a Japanese session read 5.2x
+   its size and would have been refused at a fifth of the window), and images
+   charged as a flat per-image constant rather than by byte (a base64 payload is
+   not text; counting it as text made the 6 MiB `cap_image_encoded_bytes` read as
+   1.57M tokens, so every legal image was an automatic 413). The refusal is a
+   typed 413 `context_window_exceeded` naming the dominant layer, and the SAME
+   code is mapped from the host's own length rejection (`_CONTEXT_LENGTH_MARKERS`
+   in `providers/openrouter.py`), which used to collapse into
+   `upstream_request_rejected` and tell a caller with a long session to file a
+   bug about the server. It does NOT shed context to make a turn fit; that is a
+   producer of prompts rather than a check on one and belongs beside compaction
+   (`TODO.md`). `turn_usage.estimated_prompt_tokens` logs the estimate beside the
+   upstream's real `prompt_tokens` — the pair that calibrates the constant.
+
 6. **Respond** — the skills/selection metadata is delivered first: as the response body's `skills` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential now — select → assemble → **one** upstream call; the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
 
 6b. **Turn-finality declaration and compaction** (`services/response_declaration.py`,
@@ -139,6 +167,38 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    prefix probe, and a model that emits the marker unprompted should still not show it
    to a user. Compaction is streaming-only; the non-streaming path strips and stops,
    having no generation left to overlap.
+
+**The transcript is validated as a state machine, not a membership test**
+(`services/validation.py`). An assistant turn opens a BATCH of tool calls, every
+call is answered exactly once, and only then may a user/assistant message follow;
+order *within* a batch is free, because the CLI dispatches a parallel group
+concurrently. That strictness is load-bearing rather than tidy:
+`tool_projection._unresolved_tool_calls` keys `{call_id: tool_name}`, so a
+transcript reusing an id while the first call is still open silently OVERWRITES
+the first entry — and under enforcement the projection then withholds the tool a
+pending call needs. Global id uniqueness is deliberately NOT required: ids come
+from the MODEL, and one reused in a later turn (every call answered before the
+next began) is a coherent conversation a global `seen` set would 400. A TRAILING
+unresolved batch stays legal — it is exactly the input `_unresolved_tool_calls`
+was written for, and the rule now guarantees it can only ever be the last one.
+Two smaller rules ride along, both because ids and roles reach the wire RAW:
+only an `assistant` message may carry `tool_calls` (the schema types `role` as a
+bare string so `system`/`developer` get a precise rejection, and the assembler
+forwards the field for every non-tool role), and an id surrounded by whitespace
+is REJECTED rather than trimmed — pairing on a stripped value would validate
+` c1 ` against `c1` here and hand the provider a call nothing answers.
+`tests/unit/test_tool_projection.py` pins the property this module depends on
+(every distinct open call keeps its tool) plus the validator rule that
+guarantees it.
+
+**Shape caps bound counts, not bytes** (`cap_messages`, `cap_content_parts`,
+`cap_tool_calls_per_message`, `cap_stop_sequences`, `cap_pinned_skill_ids`,
+`cap_images`). The 8 MiB body ceiling does not cover object count: a request of
+100,000 two-byte messages is small on the wire and expensive everywhere after it.
+Every default is far above real traffic on purpose — crossing one means malformed,
+not busy. Image data URLs get a real policy too (media-type allowlist, `;base64`
+required, base64 validated, encoded size capped so nothing oversized is decoded);
+until now any `data:` URL was accepted, including `image/svg+xml` and `text/html`.
 
 **Invariants to preserve** (also in README): client `system`/`developer` messages are rejected; `skill.find`/`skill.load` are never offered to the main model; only active skill *bodies* are injected (never the full catalog); selector failure fails open; state is portable via the signed token; required structured `startup` context reaches the main model only — the selector's evidence is sanitized `input.messages` plus bounded turn/workflow hints and tool names, and it never sees `startup`.
 

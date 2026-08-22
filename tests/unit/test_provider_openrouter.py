@@ -560,6 +560,18 @@ async def test_verify_key_rejects_a_200_that_is_not_a_key_record() -> None:
         ({"message": "Insufficient credit to run this model"}, "provider_insufficient_credits"),
         ({"message": "No auth credentials found"}, "provider_invalid_api_key"),
         ({"message": "rate limit exceeded"}, "upstream_rate_limited"),
+        # LENGTH, status-less, in both shapes a host uses: the reason in `code`,
+        # and the reason in prose. This branch is the expensive one to omit.
+        # `upstream_error` is the only other fallback, and the CLI RETRIES that
+        # one mid-stream (`internal/backend/retry.go`) — deliberately, because a
+        # blip before any visible token is what that layer is for. An oversized
+        # prompt is not a blip: it fails identically every time, so the replay
+        # would re-prefill the ~128k tokens that were too many, up to ten times,
+        # all billed.
+        ({"code": "context_length_exceeded", "message": "too long"},
+         "context_window_exceeded"),
+        ({"message": "This model's maximum context length is 131072 tokens"},
+         "context_window_exceeded"),
         # Nothing matched: a generic upstream error, not a guess.
         ({"message": "something else entirely"}, "upstream_error"),
     ],
@@ -918,6 +930,52 @@ async def test_a_404_is_a_rejected_request_not_a_routing_dead_end() -> None:
         await provider.complete(_req())
     assert exc.value.code == "upstream_request_rejected"
     assert "Model does not exist" in exc.value.message
+    await provider.aclose()
+
+
+@pytest.mark.parametrize(
+    "detail",
+    [
+        "This model's maximum context length is 131072 tokens.",
+        "Input validation error: `inputs` tokens + `max_new_tokens` must be <= max_total_tokens",
+        "Prompt is too long: 200000 tokens > 131072 maximum",
+        "Please reduce the length of the messages.",
+    ],
+)
+@pytest.mark.asyncio
+async def test_a_length_rejection_is_a_context_error_not_a_backend_bug(detail: str) -> None:
+    """A 400 that means "too long" and a 400 that means "malformed" arrive with
+    the same status, and only the upstream's own prose separates them.
+
+    Collapsing both into `upstream_request_rejected` told a caller with a very
+    long session to file a bug report about the server — when the fix was theirs.
+    The code matches the one `services/context_budget.py` raises when it catches
+    the same condition BEFORE the call, so a client needs one branch either way.
+    """
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": detail}})
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert exc.value.code == "context_window_exceeded"
+    assert exc.value.status_code == 413
+    # Deterministic. Replaying an oversized prompt produces an oversized prompt.
+    assert exc.value.retryable is False
+    await provider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_an_ordinary_400_is_still_a_rejected_request() -> None:
+    """The other direction: the length branch must not swallow every 400."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": {"message": "Unknown parameter: frobnicate"}})
+
+    provider = _provider(handler)
+    with pytest.raises(DaintreeError) as exc:
+        await provider.complete(_req())
+    assert exc.value.code == "upstream_request_rejected"
     await provider.aclose()
 
 

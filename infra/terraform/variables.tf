@@ -44,9 +44,13 @@ variable "concurrency" {
   default     = 8
 }
 
-# Ingress controls who can reach the service.
+# Ingress controls who can reach the service, and right now it is the ONLY thing
+# that does. There is no app-level gate: `auth.py` ignores the Authorization
+# header, so every request is the same anonymous principal funded by the server's
+# own Together key.
 #   - Staging smoke test: "INGRESS_TRAFFIC_ALL" makes the *.run.app URL directly
-#     reachable; app-level bearer auth is the gate.
+#     reachable BY ANYONE who learns it. Acceptable only for a URL that is not
+#     circulated, and only with a spend cap set on the provider account.
 #   - Production: "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" once the external
 #     Application Load Balancer + managed cert for var.domain are in place.
 variable "ingress" {
@@ -55,9 +59,11 @@ variable "ingress" {
   default     = "INGRESS_TRAFFIC_ALL"
 }
 
-# For a staging URL reachable with just the caller's bearer key, grant allUsers the
-# run.invoker role (the app's auth, not Google IAM, is the gate). Set false once
-# the service sits behind the load balancer / IAP.
+# Grant allUsers the run.invoker role to make the staging URL directly reachable.
+# NOTE WHAT THAT MEANS NOW: Google IAM was never the gate here, and neither is the
+# application — an anonymous request is served and billed to us. Setting this true
+# publishes a Daintree-funded model endpoint. Set false once the service sits
+# behind the load balancer / IAP.
 variable "allow_unauthenticated" {
   description = "Grant allUsers roles/run.invoker (staging direct-URL access)."
   type        = bool
@@ -71,11 +77,17 @@ variable "environment" {
 }
 
 # Secret Manager secret IDs (values are managed out-of-band, never in TF state).
-# State-signing material ONLY: the deployment holds no API key of either kind.
-# Every request's bearer token is the caller's own key — it authenticates the
-# request AND funds that turn's upstream calls — so there is no inbound key to
-# compare against and no upstream key to mount (the serving provider is built
-# with api_key=None; OPENROUTER_API_KEY is benchmark/live-test tooling only).
+#
+# THE SERVER HOLDS THE UPSTREAM CREDENTIAL. TOGETHER_API_KEY funds every turn and
+# is in `Settings.missing_secrets()`, so a deployment without it answers /readyz
+# with 503 and can never serve a request. It is listed here for that reason: this
+# map is the complete set of secrets the service mounts, and omitting the one
+# that gates readiness deploys a revision that cannot start.
+#
+# (This block used to say the opposite — that the deployment held no API key and
+# each caller's bearer both authenticated and funded their turn. That contract is
+# gone: `auth.py` ignores the Authorization header entirely. See docs/KEY_HANDLING.md.)
+#
 # STATE_SALT must be a real (non-default) value or production readiness fails.
 variable "secret_ids" {
   description = "Map of env var name -> Secret Manager secret id."
@@ -83,5 +95,6 @@ variable "secret_ids" {
   default = {
     STATE_SIGNING_KEY_CURRENT = "state-signing-key-current"
     STATE_SALT                = "state-salt"
+    TOGETHER_API_KEY          = "together-api-key"
   }
 }

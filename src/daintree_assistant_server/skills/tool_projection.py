@@ -304,10 +304,19 @@ def _unresolved_tool_calls(messages: list[ChatMessage]) -> set[str]:
     a turn with only one answered, and dropping it because a namesake was
     resolved would strand the other.
     """
-    # Ids are compared STRIPPED, matching how request validation pairs a tool
-    # result to its call (`services/validation.py`). Comparing raw here would
-    # leave a call whose result arrived as " c1 " looking unanswered, and admit
-    # its tool for no reason.
+    # Ids are compared STRIPPED, which is now belt-and-braces rather than the
+    # load-bearing rule it was. Validation used to PAIR on the stripped value, so
+    # a raw comparison here would have seen a call answered by " c1 " as still
+    # open; it now REJECTS a padded id outright, because the ids travel upstream
+    # raw and a stripped pairing agreed with nothing downstream of it. So this
+    # function can no longer be reached by a padded id — the strip stays because
+    # it costs nothing and this is not the only caller's problem to inherit.
+    #
+    # What this function DOES still depend on is the other half of that rule: a
+    # call id is unique while it is OPEN. Keyed by id, two calls open at once
+    # under one id would collapse to the later name and strand the earlier tool.
+    # `services/validation._validate_message_sequence` is what guarantees they
+    # cannot be.
     pending: dict[str, str] = {}
     for message in messages:
         if message.role == "assistant" and message.tool_calls:

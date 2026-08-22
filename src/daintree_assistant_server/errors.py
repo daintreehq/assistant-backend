@@ -307,6 +307,43 @@ def upstream_request_rejected(
     )
 
 
+def upstream_context_window_exceeded(
+    message: str = "This turn does not fit the model's context window.",
+) -> DaintreeError:
+    """The provider rejected the request because the prompt was too long.
+
+    Structurally this arrives as an ordinary 4xx — the same branch that produces
+    ``upstream_request_rejected`` — and collapsing it there was the bug: "the
+    provider rejected this server's request" tells a caller to file a bug report,
+    when the fix is theirs and is simply to send less. The two are opposite
+    diagnoses reached from the same status code, so only the upstream's own
+    reason text can separate them.
+
+    502 -> 413, because the fault is not the provider's and not a Daintree bug: a
+    turn genuinely was too large. It shares its code with the check
+    ``services/context_budget.py`` performs BEFORE the call, so a caller and an
+    operator see one code whether the size was caught here or there, and neither
+    has to know which side noticed.
+
+    Deterministic, so not retryable: replaying an oversized prompt produces an
+    oversized prompt.
+
+    NO ``param``, unlike the check in ``services/context_budget.py``. That one
+    measured the request and knows the transcript is what dominated it; this one
+    only has the host's word that the total was too big, and the total includes
+    the output reservation. A host rejecting ``inputs + max_new_tokens >
+    max_total_tokens`` is describing a turn a smaller ``generation.max_tokens``
+    would fix, so blaming ``input.messages`` would point a caller at the wrong
+    field with the same confidence as the case where it is right.
+    """
+    return DaintreeError(
+        status_code=413,
+        message=message,
+        type=TYPE_INVALID_REQUEST,
+        code="context_window_exceeded",
+    )
+
+
 def upstream_protocol_error(
     message: str = "The upstream model provider returned a malformed response.",
 ) -> DaintreeError:

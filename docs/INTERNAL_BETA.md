@@ -77,36 +77,61 @@ still caps each instance at its configured concurrency and the service at its
 maximum instance count — that is platform capacity, not Daintree policy, and it
 is not per-caller.)
 
-That is a decision, not an oversight. Model spend is caller-funded and therefore
-self-limiting, and the URL is not advertised. Be accurate about what is still
-consumable, though: not just CPU but memory (the outer middleware buffers a whole
-body — up to 8 MiB — before authentication runs), concurrency slots, connections,
-log volume, and therefore availability for real testers. Revisit it if — and only if — the beta produces evidence
-of abuse or capacity starvation. Anything built then belongs at the edge (Cloud
-Armor, an allowlist) before it belongs in application code.
+That was a decision when it was made, and **its premise has since inverted.** It
+rested on model spend being caller-funded and therefore self-limiting: each
+tester's key paid for each tester's turns, so the worst an abusive caller could
+do was exhaust their own balance. The credential moved to the server. Every turn
+is now billed to Daintree, the `Authorization` header is ignored entirely, and
+the application carries no per-caller, per-IP or global rate limit — so an
+unadvertised URL is the only thing between a discovered endpoint and unbounded
+spend on our account.
+
+Be accurate about what is consumable: model spend first, and then CPU, memory
+(the outer middleware buffers a whole body — up to 8 MiB — before any route
+dependency runs), concurrency slots, connections, log volume, and therefore
+availability for real testers.
+
+What follows is a **sequencing** point rather than a reversal. Application-level
+rate limiting is still the wrong layer, and account authentication is still the
+real answer. But "self-limiting" is no longer a reason to wait for it, so the
+interim control belongs at the edge and at the provider: restricted ingress or
+IAM on the Cloud Run service, and a hard spend cap plus alerting on the Together
+account. A billing ceiling is not something application correctness can
+substitute for.
 
 ## 5. Required tester disclosure
 
 Onboarding must state all of this, plainly, before the tester hands over a key:
 
-- The key is **theirs** and every token is billed to **their** OpenRouter account
-  — main completion, skill selector and utility tasks alike.
-- The exact privacy routing mode in force. Today: requests route only to endpoints
-  that **do not collect or train on** request data.
-  **Zero data retention is not enforced** <!-- privacy-copy-ok -->  — see
-  [`PROVIDER_POLICY.md` §4](PROVIDER_POLICY.md#4-privacy--what-is-and-is-not-promised).
-  Never say "does not store". <!-- privacy-copy-ok -->
+- Tokens are billed to **Daintree**, not to the tester — main completion, skill
+  selection and utility tasks alike. There is no key to hand over and none to
+  protect. (This bullet used to say the opposite, and the reversal is the single
+  most important thing on this page to get right: onboarding copy written for the
+  old model tells a tester they are paying for their own usage.)
+- **What is promised about their data, and what is not.** Requests go to Together
+  AI. Nobody has yet checked Together's published terms for the account tier we
+  actually run on, so make no data-handling promise at all — not retention, not
+  training, not deletion — until
+  [`PROVIDER_POLICY.md` §4](PROVIDER_POLICY.md#4-privacy--what-is-and-is-not-promised)
+  stops declaring itself unverified. An unchecked assurance is worse than
+  silence: silence a tester can weigh, and a promise they cannot. Never say
+  "does not store". <!-- privacy-copy-ok -->
+- **A second outbound flow.** On a documentation question the server sends a
+  cleaned version of the tester's question to Daintree's own public docs MCP
+  (`daintree.org`). It is first-party and the query is not logged, but it is a
+  separate destination from Together and belongs in any honest data-flow
+  statement.
 - That the CLI stores **no key at all** — the sign-in flow and the credential
   file it wrote were removed, so there is nothing on disk to protect, rotate or
-  delete. `DAINTREE_API_KEY` is the only way to set one, it is normally unset,
-  and an unset key sends no `Authorization` header. See
+  delete. `DAINTREE_API_KEY` is the only way to set one, it is normally unset, and
+  a value that IS set is ignored by the server rather than forwarded. See
   [`KEY_HANDLING.md` §5](KEY_HANDLING.md#5-client-side-storage-the-cli).
 - That Daintree logs **metadata but not prompt or tool content**, with one
-  exception: when OpenRouter rejects a request, a bounded excerpt of *its* error
-  body is logged and may appear in the error message, and a provider is free to
-  quote part of the offending request back at us. The caller's credential is
-  scrubbed from that excerpt (and the excerpt dropped entirely if the credential
-  survives scrubbing), but request content is not.
+  exception: when the upstream rejects a request, a bounded excerpt of *its* error
+  body is logged and may appear in the error message, and a host is free to quote
+  part of the offending request back at us. The credential is scrubbed from that
+  excerpt (and the excerpt dropped entirely if it survives scrubbing), but request
+  content is not.
 - That this is an internal beta, and that failures should be reported with the
   **request ID** and **build SHA**.
 

@@ -57,9 +57,18 @@ FLOORS: dict[str, int] = {
     # path (a mid-stream raise), and a global percentage would absorb its loss
     # without moving.
     "src/daintree_assistant_server/services/chat_orchestrator.py": 94,
+    # Added 2026-08-23 (measured 100%). A SPEND surface: it is the only thing
+    # that can refuse a turn before the upstream is paid for, and its arithmetic
+    # is the input to a 413 a caller sees. Small enough that a global percentage
+    # would never notice it regressing, and easy to break by accident — a role
+    # check that stops matching, or a `max_tokens` change that quietly folds the
+    # reservation back into the refusal, both leave every existing test passing.
+    "src/daintree_assistant_server/services/context_budget.py": 100,
     "src/daintree_assistant_server/services/deadlines.py": 99,
     "src/daintree_assistant_server/services/result_schema.py": 83,
-    "src/daintree_assistant_server/services/validation.py": 92,
+    # Ratcheted 2026-08-23 to 94 (measured 94.96, rounded down) with the transcript state
+    # machine, the shape caps and the image data-URL policy.
+    "src/daintree_assistant_server/services/validation.py": 94,
     "src/daintree_assistant_server/services/turn_accounting.py": 99,
     "src/daintree_assistant_server/state/codec.py": 93,
     "src/daintree_assistant_server/text_utils.py": 90,

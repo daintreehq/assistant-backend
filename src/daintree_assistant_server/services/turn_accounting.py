@@ -129,6 +129,7 @@ def log_turn_usage(
     selector_usage: ProviderUsage | None,
     selector_endpoint: str | None,
     turn_cost: TurnCost | None = None,
+    estimated_prompt_tokens: int | None = None,
 ) -> None:
     """What this turn cost the caller, as metadata.
 
@@ -238,6 +239,14 @@ def log_turn_usage(
         # upstream call the turn made, including the selector.
         turn_cost_usd=turn_cost.total if turn_cost else None,
         selector_cost_usd=turn_cost.selector if turn_cost else None,
+        # What `services/context_budget.py` estimated for this same prompt,
+        # beside what the upstream actually charged for it. The pair is the whole
+        # point: the budgeter runs on characters/4 against an UNVERIFIED window,
+        # and this is the only place both numbers exist for one request, so it is
+        # the log line that says how wrong the estimate is and in which direction.
+        # `None` when the measurement failed, which must stay distinguishable
+        # from a genuine zero.
+        estimated_prompt_tokens=estimated_prompt_tokens,
     )
 
 
