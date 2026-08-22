@@ -10,8 +10,9 @@ routing, privacy, retries, errors), [`KEY_HANDLING.md`](KEY_HANDLING.md)
 
 ## 1. The contract in one paragraph
 
-A tester pastes their own OpenRouter key. Daintree verifies it before the first
-turn. The key never leaves the request path except to OpenRouter. The backend
+A tester needs no key of their own — the server holds the upstream credential and
+funds every turn (this replaced the paste-your-own-OpenRouter-key contract; see the
+superseded rows below). The backend
 responds quickly and predictably, common Daintree workflows are covered by
 server-owned skills, failures say whose problem they are, and a bad revision can
 be rolled back.
@@ -25,13 +26,19 @@ is not a description of today's build, so every line carries a status:
 - ⏳ **required, not yet implemented** — a release gate, and *not* something to
   describe in the present tense anywhere else
 
+> **Rows 1-4 were SUPERSEDED and are kept as history.** They describe the
+> caller-funded credential model this service no longer has: the server now holds
+> the upstream key and funds every turn, and callers send none (`auth.py` ignores
+> the `Authorization` header entirely). Re-decide what the beta contract should say
+> about credentials before inviting testers; do not read these four rows as current.
+
 | | Requirement | Status |
 |---|---|---|
-| 1 | **OpenRouter is the sole provider.** | ✅ |
-| 2 | **The tester supplies an OpenRouter key**, and it is theirs. | ✅ |
-| 3 | **That key is the HTTP bearer** and funds every upstream call the turn makes. | ✅ |
+| 1 | ~~**OpenRouter is the sole provider.**~~ *(superseded — the serving host is `config.SERVING_HOST`)* | — |
+| 2 | ~~**The tester supplies an OpenRouter key**, and it is theirs.~~ *(superseded — no caller key exists)* | — |
+| 3 | ~~**That key is the HTTP bearer** and funds every upstream call the turn makes.~~ *(superseded — the server's key funds every call)* | — |
 | 4 | **The serving backend holds no shared model credential** — not as a fallback, not as a default, not for "just the selector". | ✅ `main._build_provider(api_key=None)` |
-| 5 | **The primary model stays pinned**, and is not a floating alias. | ✅ `config.CEREBRAS_MODEL` |
+| 5 | **The primary model stays pinned**, and is not a floating alias. | ✅ `config.SERVING_MODEL` |
 | 6 | **The backend owns** prompts, the skill catalog and bodies, automatic skill selection, prompt assembly, and the utility-task prompts. | ✅ |
 | 7 | **The CLI owns** the visible conversation, local state, permissions and tool execution. | ✅ |
 | 8 | **The backend is stateless across instances**, apart from process-local caches; skill state travels in a signed, opaque token. | ✅ `state/codec.py` |
@@ -59,9 +66,12 @@ experience.
 
 ## 4. Deliberately not defended
 
-The backend is a **pass-through for the caller's own OpenRouter key**. It holds no
-credential worth stealing and funds no spend of its own, so it deliberately has
-**no admission control**: no per-key rate limits, no per-key in-flight caps, no
+This section was written when the backend was a **pass-through for the caller's own
+key** — holding no credential worth stealing and funding no spend of its own, which
+is what justified having **no admission control**. That premise is GONE: the server
+now holds the credential and pays for every turn, so an open door is an open door
+onto Daintree's own spend. Re-decide this before testers are invited. What follows
+is the original reasoning, retained for that decision: no per-key rate limits, no per-key in-flight caps, no
 per-IP throttling, no verified-key gate in front of prompt assembly. (Cloud Run
 still caps each instance at its configured concurrency and the service at its
 maximum instance count — that is platform capacity, not Daintree policy, and it
@@ -123,7 +133,7 @@ These are load-bearing. Breaking one is a release blocker, not a regression.
   selector never sees it. What it *does* see: sanitized `input.messages`, plus
   bounded turn/workflow hints and the available tool names.
 - The serving provider is built **with the server's own credential**
-  (`CEREBRAS_API_KEY`), and `/readyz` gates on its presence.
+  (the credential `config.SERVING_KEY_ENV` names), and `/readyz` gates on its presence.
 - Prompt order is cache-critical. The base prompt and the response contract are the
   **only** system messages; everything else the server injects sits below the tool
   schemas as a framed **user-role** row, ordered by how widely it can be shared,

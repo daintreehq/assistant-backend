@@ -7,18 +7,18 @@ and everywhere it must never appear.
 
 ## 1. There is one key, and the SERVER owns it
 
-**This inverted with the move to Cerebras**, and it inverted in the direction
+**This inverted when callers stopped supplying keys**, and it inverted in the direction
 that costs money if a reader remembers the old rule. It used to be that a
 Daintree credential *was* the caller's own OpenRouter key, playing two roles at
 once: authenticating the request, and funding that turn's model calls. The caller
 paid.
 
-Now there is exactly one credential, `CEREBRAS_API_KEY`, it belongs to the
-server, and **Daintree pays**. Consequences that follow directly, and that the
+Now there is exactly one credential — the one `config.SERVING_KEY_ENV` names,
+`TOGETHER_API_KEY` today — it belongs to the server, and **Daintree pays**. Consequences that follow directly, and that the
 code enforces:
 
 - **The serving backend holds the model credential.** `main._build_provider`
-  passes `settings.cerebras_api_key`, and `missing_secrets()` gates `/readyz` on
+  passes `settings.serving_api_key`, and `missing_secrets()` gates `/readyz` on
   its presence — without it nothing can be answered at all, and discovering that
   on the first turn surfaces as an upstream 401 that reads like the caller's
   fault. Unit tests pin both halves.

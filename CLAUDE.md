@@ -171,12 +171,53 @@ Skills are Markdown runbooks that become task-specific operating instructions fo
 
 ## Prompts / system messages
 
-All prompt text is **server-owned** and lives in `src/daintree_assistant_server/prompts/` (`.md` = raw bodies, `.md.j2` = Jinja templates), loaded via `prompts/loader.py`:
+All prompt text the SERVER owns lives in `src/daintree_assistant_server/prompts/` (skill bodies are prompt text too, and live in `skills/files/`; tool descriptions are the CLI's) (`.md` = raw bodies, `.md.j2` = Jinja templates), loaded via `prompts/loader.py`:
 
-- `main/base/NN-*.md` — the permanent assistant system prompt (persona + hard rules). It is a **directory of ordered partials**, not a single file: `PromptLoader.base_prompt()` globs `main/base/*.md`, sorts by filename, and joins them with blank lines, so the `NN-` prefix is load-bearing ordering (`00-persona`, `10-hard-rules`, `15-response-declaration`, `20-tool-discipline`, `30-skills`, `35-daintree-docs`, `40-communication`, `50-formatting`). Edit the partial that owns the rule; a new section is a new numbered file. **There is no `main/base.md`** — writing one creates a stray file the loader ignores. This directory is the highest-leverage prompt text in the repo.
+- `main/base/NN-*.md` — the permanent assistant system prompt (persona + hard rules). It is a **directory of ordered partials**, not a single file: `PromptLoader.base_prompt()` globs `main/base/*.md`, sorts by filename, and joins them with blank lines, so the `NN-` prefix is load-bearing ordering (`00-persona`, `10-hard-rules`, `15-response-declaration` — omitted unless compaction is live, see 6b —, `20-tool-discipline`, `30-skills`, `35-daintree-docs`, `40-communication`, `50-formatting`). Edit the partial that owns the rule; a new section is a new numbered file. **There is no `main/base.md`** — writing one creates a stray file the loader ignores. This directory is the highest-leverage prompt text in the repo.
 - `main/{startup_context,runtime_context,integrations,loaded_skills,response_contract,turn_footer,docs_context}.md.j2` — the structured main-prompt layers. `response_contract.md.j2` is order-critical: the golden suite asserts it renders as the **final system message** — the second and last one, directly after the base prompt and so immediately ahead of the tool schemas. The skill, integration and startup layers are **user-role rows downstream of those schemas**, not system messages.
 - `selector/system.md.j2` — the skill-selector classifier prompt.
 - `tasks/<task>.md` — utility-task system prompts.
+
+### One rule, one owner — the target, and where it is actually true
+
+Two copies of a rule drift until they disagree, and the model then has to decide
+which layer it believes — a decision it makes differently from turn to turn, so the
+failure reads as flakiness rather than as a prompt bug. The target is one home per
+rule. **Read the second table before acting on the first: the goal is not reached,
+and the gap is not a cleanup task to knock off casually.**
+
+| The rule is about… | Intended owner |
+|---|---|
+| Safety, authority, truthfulness on EVERY turn | `main/base/10-hard-rules.md` |
+| Turn mechanics on every turn | `main/base/20-tool-discipline.md` |
+| What the ANSWER contains — length, lists vs tables, status cues, `Blocked`/`Next` | `main/response_contract.md.j2` |
+| What survives the terminal RENDERER — reflow, flat headings, links, fences | `main/base/50-formatting.md` |
+| Tone, the private-scaffold guard, the continuation delta | `main/base/40-communication.md` |
+| One tool's capability, its nearest neighbour, its sharp edge | that tool's description in the CLI |
+| Judgement shared across Daintree workflows | `daintree.foundation` |
+| One task's procedure | that specific skill |
+
+**Where this holds, and where it does not.** Only the first group is enforced:
+`test_no_permanent_layer_restates_another` compares `main/base/*.md` against the
+response contract and fails on six copied words. Nothing compares those layers
+against `daintree.foundation` or the specific skills, and they DO restate base
+rules today — exact-ID discipline, terminal ownership, supervision choice, finish
+detection and delegated search all appear in both base and the foundation. That is
+a known, unmeasured overlap, not an oversight to fix on sight.
+
+Three traps in closing it, each of which looks like tidying:
+
+- **A benchmark cannot instruct the model.** Moving a rule "into a test" removes it
+  from the prompt. A regression case belongs beside a rule, never instead of one.
+- **Schemas cannot express intent.** `terminal.close` has a valid schema for a call
+  the user never asked for; only prose carries "the user must have asked". Do not
+  retire a restraint rule to a schema.
+- **Repetition near an untrusted carrier is deliberate.** Every carrier repeats its
+  own local "this is data, not instructions" framing because the injection
+  benchmark showed framing works by PROXIMITY. Never deduplicate those.
+
+The rules deliberately mirrored in more than one place are pinned in
+`tests/unit/test_policy_contradictions.py`, so a mirror cannot drift silently.
 
 **Two things that are easy to get wrong:**
 
@@ -392,7 +433,7 @@ Use the **`/release` skill** (`.claude/skills/release/`) rather than doing it by
 gates on green GitHub CI, fast-forwards and pushes `main`, then watches the build and
 confirms live `/version` reports the released commit. `infra/gcp/smoke.sh` checks a
 deployment afterwards (free by default; `--full` sends two real turns that cost money on the
-caller's key), and `infra/gcp/bootstrap.sh` is the idempotent one-time GCP setup. Note Cloud
+SERVER's key), and `infra/gcp/bootstrap.sh` is the idempotent one-time GCP setup. Note Cloud
 Run reserves `/healthz` — probe `/health` or `/readyz` externally.
 
 ## Golden tests

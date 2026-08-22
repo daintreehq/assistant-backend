@@ -184,9 +184,19 @@ conversation pinned to one node.
 **The basis of this changed and the wording deliberately did not.** Under
 OpenRouter, the no-training floor was something this server *enforced* per
 request, by sending `data_collection: "deny"` and filtering the eligible endpoint
-pool. Cerebras is a single host: there is no pool, no filter, and no per-request
-data-handling parameter to send. What Daintree can say now rests entirely on
-Cerebras's own published policy.
+pool. A single host has no pool, no filter, and no per-request data-handling
+parameter to send. What Daintree can say now rests entirely on the serving host's
+own published policy — which makes WHICH HOST a privacy fact, not just an
+operational one.
+
+> ⚠️ **The serving host is Together AI, and this section has not been re-verified
+> against Together's terms.** It was written for Cerebras and the material below
+> is Cerebras's. Do not repeat the claim below as a statement about the current
+> deployment until somebody has read Together's published position and rewritten
+> this section against it — <https://www.together.ai/privacy> and
+> <https://www.together.ai/terms-of-service> are the authoritative sources. The
+> Cerebras material is retained because `config.SERVING_HOST` can switch back.
+> Tracked in `TODO.md`.
 
 **Cerebras publishes a stronger position than the copy below claims** — no
 training on inference inputs or outputs, and zero retention of them by default across all tiers <!-- privacy-copy-ok -->,

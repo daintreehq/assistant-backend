@@ -399,7 +399,12 @@ Most of that history is a stale snapshot of a mutable world, so the server may *
 replacing a settled prefix of the conversation with one block of reconciled **current
 state**. The client owns its history and performs the replacement; the server stores nothing.
 
-The model declares on the first line of its reply whether that reply ends the turn. The
+When compaction is live, the model declares on the first line of its reply whether that
+reply ends the turn. **It is not live in any current deployment**: the rule that asks for
+the control line ships only when a compaction producer is configured
+(`compactor.available`), and every deployment holds `NullCompactor`, so no reply is asked
+for one and `/v1/daintree/capabilities` reports the feature unavailable. Everything in this
+section describes the mechanism once a producer exists. The
 server strips that line before any byte reaches the client — it never appears in a `delta` —
 and on a final reply starts the compaction call while the rest of the message is still
 streaming, so the wait is usually hidden behind generation that was happening anyway. It is

@@ -69,10 +69,15 @@ def _tool_description(name: str) -> str:
 def test_the_scaffold_does_not_contradict_the_tool_it_instructs() -> None:
     """The scaffold and the tool schema are read together; they must agree.
 
-    Asserted as the ABSENCE of the retired claim rather than the presence of a
-    blessed sentence: the wording will be edited for other reasons, and a test
-    that pins prose exactly gets updated reflexively without anyone rereading
-    what it protects.
+    Asserted mostly as the ABSENCE of the retired claim rather than the presence
+    of a blessed sentence: the wording will be edited for other reasons, and a
+    test that pins prose exactly gets updated reflexively without anyone
+    rereading what it protects.
+
+    One positive assertion is unavoidable, though — that the paragraph still says
+    "as you complete". Absence alone is satisfiable by saying nothing, and a
+    scaffold rewritten to "record the last completed step before yielding" trips
+    none of the forbidden phrases while meaning exactly what they meant.
     """
     scaffold = SCAFFOLD.read_text(encoding="utf-8").lower()
     assert _PER_STEP_INSTRUCTION in scaffold, (

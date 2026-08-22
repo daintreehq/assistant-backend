@@ -213,19 +213,27 @@ def test_the_privacy_scan_catches_its_own_motivating_phrase() -> None:
 
 
 def test_provider_policy_names_the_upstream_whose_policy_this_now_is() -> None:
-    """The promise has a source, and the doc must name it.
+    """The promise has a source, and the doc must name the CURRENT one.
 
     This is the substantive difference from the old arrangement, and the one a
-    reader most needs. The guarantee is no longer something this server enforces
-    per request — it is Cerebras's published policy, and a reader who wants to
-    check it needs to know whose policy to read.
+    reader most needs: the guarantee is no longer something this server enforces
+    per request, it is the serving host's published policy, so a reader has to
+    know whose policy to read.
+
+    That makes WHICH HOST a privacy fact. This test used to assert the literal
+    string "cerebras", which meant it kept passing after the host moved to
+    Together and actively required the stale name to stay — a drift gate holding
+    the drift in place. It follows `SERVING_HOST` now.
     """
-    text = _read(DOC_PROVIDER)
-    assert "cerebras" in text.lower()
-    assert "trust.cerebras.ai" in text or "cerebras.ai/privacy" in text, (
-        "docs/PROVIDER_POLICY.md section 4 must link Cerebras's own authoritative "
-        "data-handling page. The privacy claim now rests on it, so a reader has to "
-        "be able to reach it."
+    text = _read(DOC_PROVIDER).lower()
+    assert SERVING_HOST in text, (
+        f"docs/PROVIDER_POLICY.md does not name {SERVING_HOST}, the host whose "
+        "published policy the privacy claim now rests on."
+    )
+    assert f"{SERVING_HOST}.ai" in text or f"www.{SERVING_HOST}.ai" in text, (
+        "docs/PROVIDER_POLICY.md section 4 must link the serving host's own "
+        "authoritative data-handling page. The privacy claim rests on it, so a "
+        "reader has to be able to reach it."
     )
 
 
@@ -1279,6 +1287,10 @@ _RETIRED_CLAIMS = (
     "endpoint-selection policy",
     "throughput-sorted",
     "caller owns the key and pays the bill",
+    "openrouter is the sole provider",
+    "pass-through for the caller's own",
+    "tester pastes their own",
+    "the key never leaves the request path",
 )
 
 #: A line may discuss a retired design when it says so. Kept deliberately small:
@@ -1293,6 +1305,10 @@ _HISTORY_MARKERS = (
     "git history",
     "retired",
     "before the",
+    # Struck-through text is history by typography; a reader cannot mistake it.
+    "~~",
+    "superseded",
+    "was written when",
 )
 
 
@@ -1313,10 +1329,16 @@ def test_no_document_states_a_retired_architecture_in_the_present_tense() -> Non
             # license a live claim on this line.
             wrapped = "" if not previous.rstrip() else previous.rstrip()[-40:]
             lowered = (wrapped + " " + line).lower()
-            # A history marker excuses the line it appears ON, not its neighbour:
-            # a previous line ending "This was deleted previously." would
-            # otherwise wave through every claim on the line after it.
-            if any(marker in line.lower() for marker in _HISTORY_MARKERS):
+            # A history marker excuses its own SENTENCE. Normally that is the line
+            # it appears on — a previous line ending "This was deleted previously."
+            # must not wave through a fresh claim on the next one. But prose here
+            # is hard-wrapped, so when the claim itself only completes by spanning
+            # the wrap, the sentence began on the previous line and that line's
+            # marker governs it.
+            here = line.lower()
+            marked_here = any(marker in here for marker in _HISTORY_MARKERS)
+            marked_before = any(marker in previous.lower() for marker in _HISTORY_MARKERS)
+            if marked_here:
                 continue
             for claim in _RETIRED_CLAIMS:
                 index = lowered.find(claim)
@@ -1338,6 +1360,10 @@ def test_no_document_states_a_retired_architecture_in_the_present_tense() -> Non
                     preceding.endswith(negation)
                     for negation in ("no", "not", "never", "nor", "neither")
                 ):
+                    continue
+                # Found only by spanning the wrap: the sentence started on the
+                # previous line, so that line's history marker applies to it.
+                if marked_before and claim not in here:
                     continue
                 problems.append(f"{path.name}:{number} states {claim!r}")
     assert not problems, (

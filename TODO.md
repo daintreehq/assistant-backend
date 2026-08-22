@@ -417,3 +417,27 @@ apparent bug: it would offer the model exactly what the runbook tells it not to
 reach for. A regex cannot tell "call X" from "never call X", which is why that set
 is reviewed by a person and why a detector built on backtick matching should not be
 added beside it.
+
+---
+
+## Re-establish the privacy claim against Together
+
+**Trigger: before any external statement about data handling.** Blocking for that,
+not for engineering.
+
+`docs/PROVIDER_POLICY.md` §4 carries Daintree's no-training claim. Under OpenRouter
+the server ENFORCED it per request (`data_collection: "deny"` plus endpoint
+filtering). A single host has no such lever, so the claim now rests entirely on the
+host's published policy — which makes the identity of the host a privacy fact.
+
+The section was written against Cerebras and still cites Cerebras's trust centre.
+The serving host is Together. Nobody has read Together's terms and rewritten it, so
+the section is marked unverified rather than re-vendored: swapping the name would
+have produced a confident guarantee nobody had checked, which is the worst possible
+form of this document to be wrong.
+
+To close it: read <https://www.together.ai/privacy> and
+<https://www.together.ai/terms-of-service>, state what Together actually commits to
+(training, retention, caching, sub-processors), and say plainly which parts Daintree
+can promise and which are the host's to change. Keep the Cerebras material as the
+switch-back case.
