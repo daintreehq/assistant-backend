@@ -102,9 +102,15 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
 6. **Respond** — the skills/selection metadata is delivered first: as the response body's `skills` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential now — select → assemble → **one** upstream call; the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
 
 6b. **Turn-finality declaration and compaction** (`services/response_declaration.py`,
-   `services/compaction.py`) — the model opens its reply with one control line,
-   `[[DAINTREE:FINAL]]` or `[[DAINTREE:TOOLS]]` (`main/base/15-response-declaration.md`),
-   and the backend strips it before any byte reaches the client. The rule is in the
+   `services/compaction.py`) — when compaction is live the model opens its reply with
+   one control line, `[[DAINTREE:FINAL]]` or `[[DAINTREE:TOOLS]]`
+   (`main/base/15-response-declaration.md`), and the backend strips it before any byte
+   reaches the client. **That rule is CONDITIONAL and today it is off**: the container
+   builds the assembler with `response_declaration=compactor.available`, and every
+   deployment holds `NullCompactor`, so the partial is omitted from the base prompt
+   (646 bytes — the partial plus its join separator) and no reply is asked for a
+   control line. Everything below describes
+   the mechanism as it behaves once a producer exists. The rule is in the
    ASSISTANT base prompt only — a sub-agent is never asked for it — and carves out
    a bare-JSON reply, which a control line would invalidate. Position is the whole
    point: a marker at the end says nothing the stream terminating did not, while one at
@@ -123,12 +129,15 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    the span start is re-derived each turn from the reserved `daintree_compaction` message
    name the client splices back in, so a frozen segment is never re-compacted without any
    server-side state. **The PRODUCER does not exist yet** (issue #60): `Compactor` is a
-   Protocol and every deployment holds `NullCompactor`, so today the line is stripped and
-   nothing else happens. That is NOT free — the prompt bytes and the marker tokens are
-   paid on every turn — and what it buys meanwhile is the `response_declaration` log
-   line, which measures whether the model actually complies before #60 starts spending
-   on a second model. Compaction is streaming-only; the non-streaming path strips and
-   stops, having no generation left to overlap.
+   Protocol and every deployment holds `NullCompactor` — which is now what SWITCHES THE
+   RULE OFF rather than merely idling behind it. It used to ship regardless, paying its
+   bytes and a marker token on every turn to buy the `response_declaration` compliance
+   log; that trade stopped making sense once the serving model was measured emitting the
+   marker on 0 of 20 tool-calling turns, so the telemetry only reported that an unread
+   contract was also unhonoured. The scanner and stripper stay wired — they cost a
+   prefix probe, and a model that emits the marker unprompted should still not show it
+   to a user. Compaction is streaming-only; the non-streaming path strips and stops,
+   having no generation left to overlap.
 
 **Invariants to preserve** (also in README): client `system`/`developer` messages are rejected; `skill.find`/`skill.load` are never offered to the main model; only active skill *bodies* are injected (never the full catalog); selector failure fails open; state is portable via the signed token; required structured `startup` context reaches the main model only — the selector's evidence is sanitized `input.messages` plus bounded turn/workflow hints and tool names, and it never sees `startup`.
 

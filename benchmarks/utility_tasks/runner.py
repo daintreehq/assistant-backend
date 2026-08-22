@@ -23,7 +23,7 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
+from daintree_assistant_server.config import SERVING_MODEL, Settings
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.prompts.loader import PromptLoader
@@ -195,7 +195,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
         "meta": {
             "benchmark": "utility_tasks",
             "variant": config.variant,
-            "model": CEREBRAS_MODEL,
+            "model": SERVING_MODEL,
             "trials": config.trials,
             "concurrency": config.concurrency,
             "filter": config.id_filter,

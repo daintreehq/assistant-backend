@@ -317,10 +317,11 @@ async def test_the_null_compactor_strips_the_line_and_emits_no_event(
 ) -> None:
     """Today's only shipped state.
 
-    Deliberately NOT claiming the turn is unchanged: the declaration rule still
-    ships in the base prompt, so the request is larger and the reply spends tokens
-    on a control line. What this pins is the observable stream — the line is gone,
-    no task runs, no event is emitted, and `done` is still last.
+    The rule is not even shipped in this state — the container omits the partial
+    when `compactor.available` is False — so a real reply would carry no marker at
+    all. What this pins is what happens if one arrives anyway (a stale client
+    prompt, a model volunteering it): the observable stream is still clean. The
+    line is gone, no task runs, no event is emitted, and `done` is still last.
     """
     fake_provider.stream_chunks = _chunks(f"{FINAL_MARKER}\n", "green")
     events = await _run(_with(orchestrator, NullCompactor()), _request())

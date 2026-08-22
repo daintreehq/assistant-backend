@@ -179,6 +179,7 @@ class PromptLoader:
         # and the loader is a process-wide singleton, so the only thing per-request
         # reads bought was latency.
         self._base_prompt = self._load_base()
+        self._base_prompt_no_declaration = self._load_base_without_declaration()
         self._subagent_prompt = self._load_parts("main/subagent")
         self._task_prompts = self._load_dir("tasks")
 
@@ -191,10 +192,18 @@ class PromptLoader:
 
     # ---- eager loading --------------------------------------------------
 
+    #: The partial that instructs the `[[DAINTREE:FINAL]]`/`[[DAINTREE:TOOLS]]`
+    #: control line. Dropped from the base prompt unless a compaction producer is
+    #: actually configured — see :meth:`base_prompt`.
+    DECLARATION_PART = "15-response-declaration"
+
     def _load_base(self) -> str:
         return self._load_parts("main/base")
 
-    def _load_parts(self, relative: str) -> str:
+    def _load_base_without_declaration(self) -> str:
+        return self._load_parts("main/base", skip={self.DECLARATION_PART})
+
+    def _load_parts(self, relative: str, *, skip: frozenset[str] | set[str] = frozenset()) -> str:
         # A persona prompt is authored as ordered section partials
         # (``<relative>/NN-*.md``) and assembled here into one stable block;
         # filename order is load-bearing, so partials are read sorted by name.
@@ -207,7 +216,19 @@ class PromptLoader:
         parts = sorted(parts_dir.glob("*.md"))
         if not parts:
             raise PromptError(f"no prompt parts in {parts_dir}")
-        return "\n\n".join(_read(p).strip("\n") for p in parts)
+        # Omission is by filename stem and stays quiet when the stem is absent: a
+        # prompt directory legitimately varies (the variant benchmarks ship one
+        # template, tests ship one partial), so a missing partial is not evidence
+        # of a rename here. That alarm belongs where the PACKAGED set is the
+        # subject — see test_the_declaration_partial_still_exists_to_be_omitted.
+        kept = [p for p in parts if p.stem not in skip]
+        if not kept:
+            # Omitting the only partial leaves an EMPTY system prompt, which is a
+            # far worse outcome than the missing partial the caller asked about:
+            # the model would run with no persona, no hard rules and no contract,
+            # and nothing downstream inspects the prompt for emptiness.
+            raise PromptError(f"omitting {sorted(skip)} would empty {parts_dir}")
+        return "\n\n".join(_read(p).strip("\n") for p in kept)
 
     def _load_dir(self, name: str) -> dict[str, str]:
         """Every ``.md`` in a prompt subdirectory, keyed by filename stem.
@@ -224,8 +245,24 @@ class PromptLoader:
 
     # ---- raw bodies -----------------------------------------------------
 
-    def base_prompt(self) -> str:
-        return self._base_prompt
+    def base_prompt(self, *, response_declaration: bool = True) -> str:
+        """The permanent assistant prompt, with the declaration rule optional.
+
+        The `[[DAINTREE:FINAL]]`/`[[DAINTREE:TOOLS]]` control line only pays for
+        itself when something CONSUMES it. Its consumer is compaction, and until a
+        producer ships every deployment holds ``NullCompactor`` — which is exactly
+        when this argument is False, so the rule is omitted rather than paid for.
+        Omitting it saves 646 bytes: the partial plus the blank line that joined
+        it to its neighbours.
+
+        Both variants are built at load, not per call: the choice is
+        deployment-wide (a container holds one compactor for its lifetime), so the
+        rendered prompt stays byte-identical across callers and the prefix cache
+        does not split. Selecting per request would be the bug this avoids.
+        """
+        if response_declaration:
+            return self._base_prompt
+        return self._base_prompt_no_declaration
 
     def subagent_prompt(self) -> str:
         """The read-only sub-agent persona (``profile="subagent"``).

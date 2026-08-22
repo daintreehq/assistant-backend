@@ -168,9 +168,22 @@ def _cap_list_combined(
 class PromptAssembler:
     """Builds the normalized upstream request from validated inputs."""
 
-    def __init__(self, prompt_loader: PromptLoader, settings: Settings) -> None:
+    def __init__(
+        self,
+        prompt_loader: PromptLoader,
+        settings: Settings,
+        *,
+        response_declaration: bool = False,
+    ) -> None:
         self.prompts = prompt_loader
         self.settings = settings
+        # Whether the base prompt carries the `[[DAINTREE:FINAL]]`/`[[DAINTREE:TOOLS]]`
+        # rule. Defaults OFF to match the shipped compactor (`NullCompactor`): the
+        # control line is only worth its bytes when something reads it, and the
+        # container turns it on from `compactor.available` when a producer exists.
+        # Deployment-wide, never per request — a prompt that varied by caller would
+        # split the prefix cache on its very first block.
+        self.response_declaration = response_declaration
         # Bounded: a runaway key space would be a slow memory leak in a process
         # that is meant to be stateless. Sized well above the number of distinct
         # active-skill sets a busy instance sees.
@@ -947,7 +960,12 @@ class PromptAssembler:
 
         # 1. static base prompt → cacheable across all sessions.
         messages: list[dict[str, Any]] = [
-            {"role": "system", "content": self.prompts.base_prompt()},
+            {
+                "role": "system",
+                "content": self.prompts.base_prompt(
+                    response_declaration=self.response_declaration
+                ),
+            },
         ]
         # 2. response contract: static output-shape rules, and the LAST system row.
         #    Genuinely static — the per-request width it used to carry moved to the

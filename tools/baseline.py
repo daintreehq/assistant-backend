@@ -64,6 +64,7 @@ def capture() -> dict[str, Any]:
         SERVING_MODEL,
     )
     from daintree_assistant_server.prompts.loader import PromptLoader
+    from daintree_assistant_server.services.compaction import default_compactor
     from daintree_assistant_server.skills.catalog import load_catalog
     from daintree_assistant_server.skills.local.documents import routing_revision
     from daintree_assistant_server.skills.local.paths_local import selector_artifact_dir
@@ -115,7 +116,16 @@ def capture() -> dict[str, Any]:
             ),
         },
         "prompt": {
-            "base_prompt_bytes": len(loader.base_prompt().encode("utf-8")),
+            # What the container ACTUALLY builds. `default_compactor()` is the
+            # same call `build_container` makes, so the declaration rule is in or
+            # out of this measurement exactly when it is in or out of production —
+            # calling `base_prompt()` bare would record the other variant and
+            # quietly misreport every request by 646 bytes.
+            "base_prompt_bytes": len(
+                loader.base_prompt(
+                    response_declaration=default_compactor().available
+                ).encode("utf-8")
+            ),
             "subagent_prompt_bytes": len(loader.subagent_prompt().encode("utf-8")),
             "skill_body_bytes_total": sum(
                 len(s.body.encode("utf-8")) for s in catalog.skills

@@ -110,11 +110,12 @@ BASE_PROMPT_CEILING = 25 * 1024
 BASE_PARTIAL_CEILINGS = {
     "00-persona.md": 1024,
     "10-hard-rules.md": 4 * 1024,
-    # The turn-finality control line (issue #61). It fires on EVERY reply — a
-    # zero-skill turn included — and the backend strips it before the client sees
-    # a byte, so it is base by the split rule and cannot live anywhere else. Sized
-    # to the measured 645B; note the AGGREGATE ceiling binds well before this one
-    # does, which is the correct precedence for a partial this close to the line.
+    # The turn-finality control line (issue #61). CONDITIONAL now: the container
+    # ships this partial only when a compaction producer exists, which today is
+    # never, so it costs nothing on a real request — but it is still base by the
+    # split rule (it would fire on every reply, a zero-skill turn included) and
+    # cannot live anywhere else. Sized to the measured 645B; the AGGREGATE ceiling
+    # binds well before this one does, which is the correct precedence.
     "15-response-declaration.md": 1024,
     # Raised with BASE_PROMPT_CEILING above (see the argument there) — the
     # delegation bullet lands in this partial.

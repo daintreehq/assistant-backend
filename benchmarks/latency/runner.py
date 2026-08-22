@@ -58,7 +58,7 @@ from typing import Any
 
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
+from daintree_assistant_server.config import SERVING_MODEL, Settings
 from daintree_assistant_server.contracts.openai import ChatMessage
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.main import build_container
@@ -159,7 +159,7 @@ async def _prime_state(
         stream=False,
     )
     outcome = await container.orchestrator.complete(
-        request, upstream_model=CEREBRAS_MODEL, api_key=api_key
+        request, upstream_model=SERVING_MODEL, api_key=api_key
     )
     body = outcome.body or {}
     state = body.get("state")
@@ -192,7 +192,7 @@ async def _run_turn_trial(
 
     t0 = time.perf_counter()
     outcome = await container.orchestrator.complete(
-        request, upstream_model=CEREBRAS_MODEL, api_key=api_key
+        request, upstream_model=SERVING_MODEL, api_key=api_key
     )
 
     if not stream:

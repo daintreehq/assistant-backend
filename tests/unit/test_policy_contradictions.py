@@ -137,3 +137,35 @@ def test_the_gate_reads_the_cli_source_when_the_submodule_is_present() -> None:
         "turn-boundary checkpointing, the scaffold, skill_step_consistency and this "
         "gate move with it — see this module's docstring and TODO.md."
     )
+
+
+#: The base partial the container omits when no compaction producer is configured.
+_DECLARATION_PARTIAL = PROMPTS / "main" / "base" / "15-response-declaration.md"
+
+
+def test_the_declaration_partial_still_exists_to_be_omitted() -> None:
+    """Omission is by FILENAME, so a rename silently un-omits the rule.
+
+    `PromptLoader.base_prompt(response_declaration=False)` drops the partial whose
+    stem matches `DECLARATION_PART`. It stays quiet when the stem is absent,
+    because a prompt directory legitimately varies — the variant benchmarks ship a
+    single template, and tests ship a single partial. That tolerance is right
+    there and wrong here: rename this file and every deployment starts shipping
+    the control-line rule again, with the flag still reading False and no error
+    anywhere.
+    """
+    from daintree_assistant_server.prompts.loader import PromptLoader
+
+    assert _DECLARATION_PARTIAL.exists(), (
+        f"{_DECLARATION_PARTIAL.name} is gone. If the declaration rule was deleted "
+        "outright, delete PromptLoader.DECLARATION_PART and the assembler flag with "
+        "it — leaving them behind means the off switch silently does nothing."
+    )
+    assert _DECLARATION_PARTIAL.stem == PromptLoader.DECLARATION_PART
+
+    loader = PromptLoader()
+    with_rule = loader.base_prompt(response_declaration=True)
+    without_rule = loader.base_prompt(response_declaration=False)
+    assert "[[DAINTREE:FINAL]]" in with_rule
+    assert "[[DAINTREE:" not in without_rule
+    assert len(with_rule) > len(without_rule)

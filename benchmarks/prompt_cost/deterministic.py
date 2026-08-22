@@ -34,12 +34,13 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
+from daintree_assistant_server.config import SERVING_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.prompts.loader import (
     TEMPLATE_SELECTOR_SYSTEM,
     PromptLoader,
 )
+from daintree_assistant_server.services.compaction import default_compactor
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from daintree_assistant_server.skills.catalog import load_catalog
 from daintree_assistant_server.skills.models import Skill
@@ -95,7 +96,7 @@ def _body_for(
     *,
     enforced: bool = False,
 ) -> dict[str, Any]:
-    pr = assembler.build_main_request(request=request, skills=skills, upstream_model=CEREBRAS_MODEL)
+    pr = assembler.build_main_request(request=request, skills=skills, upstream_model=SERVING_MODEL)
     if enforced:
         # The PRODUCTION filter, not a re-implementation of it. A benchmark that
         # modelled enforcement separately would keep measuring its own model long
@@ -358,7 +359,7 @@ def _layer_budget(
     request = build_respond_request(messages=[_USER, _ASSIST_TOOL, _TOOL_RESULT])
     tools = load_tool_inventory()
 
-    base = loader.base_prompt()
+    base = loader.base_prompt(response_declaration=default_compactor().available)
     integrations = assembler.render_integrations(request.runtime)
     skills_block = assembler.render_loaded_skills(skills)
     contract = assembler.render_response_contract()
@@ -548,7 +549,7 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "deterministic",
-            "model": CEREBRAS_MODEL,
+            "model": SERVING_MODEL,
             "catalog_revision": catalog.revision,
             "tool_inventory_count": len(load_tool_inventory()),
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),

@@ -102,12 +102,17 @@ class NullCompactor:
     ``None`` checks. Nothing is started, nothing is awaited, and no event is
     emitted.
 
-    NOT a no-op, and the difference is worth stating plainly: the declaration rule
-    still ships in the base prompt, so every request pays its bytes and every reply
-    spends tokens on a control line whose only consumer is switched off. That cost
-    buys the compliance telemetry (``response_declaration``) that says whether the
-    mechanism works at all — which is what #60 needs before it starts spending on
-    a second model.
+    It is also what switches the declaration rule OFF. ``available`` is False, and
+    the container reads exactly that when building the assembler, so the base prompt
+    omits ``15-response-declaration.md`` (646 bytes on every request, the partial
+    plus its join separator) and no reply
+    is asked for a control line. The rule used to ship regardless, to buy compliance
+    telemetry — but a marker with no consumer is prompt tax, and the serving model
+    was measured emitting it on 0 of 20 tool-calling turns, so the telemetry said
+    only that an unread contract was also unhonoured.
+
+    The scanner and the stripper stay wired anyway: they cost a prefix probe, and a
+    model that emits the marker unprompted should still not show it to a user.
     """
 
     available = False
@@ -203,3 +208,16 @@ def _is_tool_closed(messages: Sequence[ChatMessage], start: int, end: int) -> bo
         if message.tool_call_id in outside_calls and result_inside:
             return False
     return True
+
+
+def default_compactor() -> Compactor:
+    """The compactor a deployment gets when nothing is injected.
+
+    One function so the answer cannot be given twice. `main.build_container` and
+    `tools/baseline.py` both need it — the container to decide whether the base
+    prompt carries the declaration rule, the baseline to record how many bytes
+    that prompt actually is — and if they answered it separately, the day a real
+    producer ships would be the day production started sending a prompt the
+    release baseline had never measured.
+    """
+    return NullCompactor()

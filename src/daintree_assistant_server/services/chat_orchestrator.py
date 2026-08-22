@@ -2099,9 +2099,11 @@ class ChatOrchestrator:
         # attempt's content is already public and can never be discarded.
         tools_callable = self._tools_callable(provider_request)
         held: list[StreamDelta] | None = None
-        # THE DECLARATION GATE. The reply opens with a control line saying whether
-        # it is the turn's last (`response_declaration.py`), and that line must
-        # never reach the client. Rebuilt per attempt, just below, because each
+        # THE DECLARATION GATE. When the rule is shipped (only with a live
+        # compactor) the reply opens with a control line saying whether it is the
+        # turn's last (`response_declaration.py`), and that line must never reach
+        # the client. Kept unconditional: an unprompted marker must be stripped
+        # too. Rebuilt per attempt, just below, because each
         # attempt writes its own opening.
         #
         # It sits AHEAD of the commit gate rather than duplicating it: the scanner
@@ -2478,7 +2480,11 @@ class ChatOrchestrator:
             # worth the prompt bytes it costs. Declared vs. what the round did is
             # the whole signal; no reply text is logged.
             declared = scanner.declaration
-            if declared is not None:
+            # Only when the rule was actually SHIPPED. `Declaration.MISSING` is a
+            # verdict, not an absence, so an un-prompted reply resolves to it and
+            # would otherwise log a compliance failure on every turn — measuring a
+            # contract nobody was asked to keep.
+            if declared is not None and self.assembler.response_declaration:
                 logger.info(
                     "response_declaration",
                     request_id=meta.request_id,

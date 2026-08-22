@@ -27,7 +27,7 @@ import time
 import uuid
 from typing import Any
 
-from daintree_assistant_server.config import CEREBRAS_MODEL, Settings
+from daintree_assistant_server.config import SERVING_MODEL, Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 
 from .._harness.env import caller_api_key, make_upstream_provider
@@ -66,7 +66,7 @@ async def _prompt_request(
     if json_mode:
         gen = req.generation.model_copy(update={"response_format": "json_object"})
         req = req.model_copy(update={"generation": gen})
-    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=CEREBRAS_MODEL)
+    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=SERVING_MODEL)
     pr.max_tokens = 8  # bound completion cost; prompt tokens are the measurement
     pr.stream = stream
     pr.include_usage = stream
@@ -131,7 +131,7 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
             )
             t0 = time.perf_counter()
             outcome = await container.orchestrator.complete(
-                req, upstream_model=CEREBRAS_MODEL, api_key=caller_api_key(settings)
+                req, upstream_model=SERVING_MODEL, api_key=caller_api_key(settings)
             )
             assert outcome.stream is not None
             async for _chunk in outcome.stream:
@@ -336,7 +336,7 @@ async def run_live(
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "live",
-            "model": CEREBRAS_MODEL,
+            "model": SERVING_MODEL,
             "trials": trials,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },

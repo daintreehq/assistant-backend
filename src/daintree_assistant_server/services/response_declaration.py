@@ -2,8 +2,14 @@
 
 The backend cannot know a turn is over until it is over, and by then there is no
 generation time left to spend on anything. The only party that knows whether more
-tool calls are coming is the model, so it says — on the first line of every reply,
+tool calls are coming is the model, so it says — on the first line of the reply,
 before a single visible character.
+
+**Whether it is ASKED to say so is conditional.** The rule ships only when a
+compaction producer exists (`PromptAssembler.response_declaration`, wired from
+`compactor.available`), which today is never. This module stays wired regardless:
+scanning is a prefix probe, and a model that emits the marker unprompted must
+still not show it to a user.
 
 That position is the whole point. A marker at the END tells us nothing the stream
 terminating did not already say. A marker at the FRONT buys the entire remaining

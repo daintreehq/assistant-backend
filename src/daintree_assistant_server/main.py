@@ -44,7 +44,7 @@ from .providers.cerebras import CerebrasProvider
 from .providers.openrouter import OpenRouterProvider
 from .providers.together import TogetherProvider
 from .services.chat_orchestrator import ChatOrchestrator
-from .services.compaction import Compactor, NullCompactor
+from .services.compaction import Compactor, NullCompactor, default_compactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
 from .services.prompt_assembler import PromptAssembler
 from .services.task_runner import TaskRunner
@@ -433,13 +433,27 @@ def build_container(
     # pointing the compaction task at the same fake would hide the fact that it
     # runs somewhere else entirely.
     openrouter_provider = _build_openrouter_provider(settings)
-    assembler = PromptAssembler(prompt_loader, settings)
-
     docs_http_client, docs_client = _build_docs_client()
     # No producer exists yet (issue #60), so this is the null one on every real
-    # deployment: declarations are still stripped, but nothing is started, nothing
-    # is awaited, and no `compaction` event is ever emitted.
-    chat_compactor: Compactor = compactor if compactor is not None else NullCompactor()
+    # deployment: nothing is started, nothing is awaited, and no `compaction`
+    # event is ever emitted.
+    chat_compactor: Compactor = compactor if compactor is not None else default_compactor()
+    # ...which is also why the base prompt does not carry the declaration rule
+    # here. The control line exists to let compaction start while the reply is
+    # still being written; with no consumer it is bytes on every request and a
+    # generated line on every reply, buying one log field. The assembler is built
+    # AFTER the compactor for this reason alone — the flag has to come from it.
+    #
+    # Read ONCE, at startup, unlike `/capabilities` and the orchestrator which
+    # re-read `available` per operation. That asymmetry is deliberate: a prompt
+    # that changed mid-process would split the prefix cache between the requests
+    # either side of the flip, and the flip cannot help the requests already in
+    # flight anyway — a model can only declare what it was asked to declare. A
+    # compactor whose availability genuinely varies at runtime therefore needs a
+    # container rebuild to change the prompt, not just a property returning True.
+    assembler = PromptAssembler(
+        prompt_loader, settings, response_declaration=chat_compactor.available
+    )
     orchestrator = ChatOrchestrator(
         settings=settings,
         catalog_manager=catalog_manager,
