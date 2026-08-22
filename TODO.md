@@ -371,3 +371,49 @@ not run on tool-continuation rounds, so a turn that starts reasoning has no fres
 signal on its later rounds. The posture has to ride the state token or be fixed for
 the turn — flipping mid-turn means a model that reasons about a plan and then
 executes it without.
+
+---
+
+## Shrinking `daintree.foundation`: measured, and the obvious target is wrong
+
+**Trigger: a behavioural eval for the main assistant.** Blocked on that, not on
+appetite.
+
+The foundation is 14.7 KB of body and 25 `requiredTools`, paired onto almost every
+Daintree turn, so it is the largest single text lever in the catalog and an obvious
+place to cut. Two measurements say the obvious cut is the wrong one.
+
+**Its tool list is not padding.** Every one of the 25 is named by the body, so tools
+and text can only move together. Of the 25, **15 are already in the always-available
+core** (`tool_projection.ALWAYS_AVAILABLE` + `SKILL_SCAFFOLD_TOOLS`), so declaring
+them costs zero projection bytes. The foundation ADDS 18.8 KiB of schemas through
+ten tools, half of that in two: `watcher.terminal.create` (5.3 KiB) and
+`terminal.extract` (4.4 KiB).
+
+**The standard test for trimming it does not apply.** The advice is "can a
+foundation-ONLY turn legitimately need this capability?" — and by that test the
+supervision and wait tools should go, since the foundation's own `whenToUse` routes
+watching to `watch-outcome` and cohorts to the orchestration skills. But the
+foundation is loaded ALONE on **7% of benchmark turns** (12 of 177). It is a layer,
+not a standalone skill. Cutting to fit the 7% removes the concrete mechanism from
+the supervision, finish-detection and bounded-wait rules on the other 93%, where
+those rules are the point of loading it. The right test for a layer is "does the
+paired turn need this", and by that test the list is close to correct.
+
+What a real reduction needs is the thing that is actually missing: an end-to-end
+behavioural eval for the assistant prompt. Body text can then be moved into specific
+skills and the trade measured, instead of trading a known 18.8 KiB against an
+unmeasured quality risk. Until that exists, cutting the foundation is a guess with a
+number attached.
+
+A false lead worth recording, because it looks like a bug every time: twelve skills
+reference fifteen tools they do not declare, which reads as runbooks steering the
+model at tools enforcement would withhold. It is not. Those references are
+deliberate and already classified by hand in
+`tests/unit/test_tool_projection.py::_REVIEWED_UNDECLARED` — most are PROHIBITIONS
+(`fan-out-work` names `terminal.awaitAll` precisely to forbid it) or EXPLANATORY
+(describing how a sibling tool differs). Declaring them would be worse than the
+apparent bug: it would offer the model exactly what the runbook tells it not to
+reach for. A regex cannot tell "call X" from "never call X", which is why that set
+is reviewed by a person and why a detector built on backtick matching should not be
+added beside it.
