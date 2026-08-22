@@ -970,3 +970,59 @@ worst case for a 1,000-skill catalog with no packaged `vectors.npz`.
 CI runs a 200-skill, `k=32` smoke (~24s): a one-miss budget on candidate recall,
 and an exact 1.0 on active coverage, which is a construction guarantee rather
 than a measurement.
+
+---
+
+# Selector confidence cannot gate reasoning (2026-08-22)
+
+**Question.** The serving model is non-thinking on every call. Should it reason on
+turns where skill routing looks WEAK — a runbook the classifier is unsure about
+means the model has to work the steps out for itself — and stay non-thinking when a
+skill matches cleanly? The proposal was a threshold on `SelectionDecision.confidence`
+(the first admitted skill's probability): ~1.0 → no reasoning, below ~0.65 → reason.
+
+**Answer: no. The signal does not exist.** Measured over the 177-case routing corpus
+with the shipped artifact, on the 154 turns that require a skill:
+
+| population | n | min | p25 | median | max |
+|---|---:|---:|---:|---:|---:|
+| selection CORRECT | 142 | 0.82 | 1.00 | 1.00 | 1.00 |
+| selection MISSED a required skill | 12 | 0.00 | 0.99 | **1.00** | 1.00 |
+| turn needs no skill at all | 19 | 0.00 | 0.00 | 0.00 | 0.00 |
+
+The head is confident when it is wrong. Eleven of the twelve misses scored ≥ 0.98 —
+`review-the-branch`, `sweep-now-plus-wake-later` and `search-closed-prs-is-find-work`
+all missed a required skill at exactly 1.00. A 0.65 threshold turns reasoning on for
+**1 of 154 turns** and catches **8%** of the misses. Every threshold from 0.50 to
+0.80 selects the same single turn.
+
+Two other candidate signals were measured and fail the same way:
+
+* **Top1−top2 margin.** Correct p10 0.128 / median 0.997; missed p10 0.024 / median
+  0.933. Overlapping, not separating.
+* **The cardinality head.** Correct `{1: 138, 2: 4}`; missed `{0: 1, 1: 10, 2: 1}`.
+  The same distribution.
+
+The one cleanly separated population is "nothing was selected" — exactly 0.00,
+20 turns. But it is not the population the idea wanted: 11 are docs questions and 6
+are contentless greetings, both the cheapest turn shapes there are, and only 1 of
+the 20 actually needed a skill. After excluding docs and greetings it is 3 turns of
+173, so there is nothing there to serve either.
+
+**Why this was predictable, and the general lesson.** A sigmoid output is not a
+probability until someone measures that it is. This head was trained to rank, and
+ranking is all it does well: it puts the right skill first far more often than its
+score says anything about whether it did. Calibration is a separate property and it
+was never trained for, so reading the score as a confidence is reading a number that
+was never fitted to mean that.
+
+**Do not build the gate on this artifact.** If the idea is wanted, it needs a head
+whose scores are calibrated first — measure expected calibration error or a Brier
+score on held-out cases, not on this corpus, which the head has effectively seen.
+The cheaper alternative is to stop asking the classifier: a discrete
+`clear | ambiguous | insufficient` output trained as its own target would at least
+be fitted to the question being asked of it. `TODO.md` carries the trigger.
+
+Reproduce: `benchmarks/skill_selection/local_runner.py` drives the same artifact;
+the distribution above comes from `SetwiseClassifier.select(...).scores` for the
+first admitted id, scored against each case's `required` set.

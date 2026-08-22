@@ -335,3 +335,39 @@ Reviving it needs, in order:
    together, in one release pair.
 
 Doing (3) alone is what created the contradiction in the first place.
+
+---
+
+## Reason on hard turns, once something can tell us which they are
+
+**Trigger: the next selector retrain, if calibration is added to it.** Not
+scheduled on its own.
+
+The serving model is non-thinking on every call. The wanted behaviour is that it
+reasons when routing is weak — no runbook, or one the classifier is unsure of —
+and stays fast when a skill matches cleanly, so quality is bought only where it is
+needed. The MECHANISM is nearly free: DeepSeek V4 Flash reasons unless told not
+to, `ProviderChatRequest.thinking_disabled` already exists, and it is decided per
+request. What is missing is a trustworthy input.
+
+`SelectionDecision.confidence` is not it, and that is measured rather than
+suspected — see "Selector confidence cannot gate reasoning" in
+`training/EXPERIMENTS.md`. The head scores 1.00 on turns where it MISSED a required
+skill just as readily as on turns it got right, so a 0.65 threshold reasons on 1 of
+154 turns and catches 8% of the errors. Margin and the cardinality head are no
+better.
+
+What would make this shippable, cheapest first:
+
+1. Train the head for calibration as well as rank, and gate on measured ECE or a
+   Brier score over HELD-OUT cases. The current corpus cannot answer this — the
+   head has effectively seen it.
+2. Or give it a discrete difficulty target (`clear` / `ambiguous` / `insufficient`)
+   that is fitted to the question actually being asked, instead of reading a
+   ranking score as a probability.
+
+Whichever lands, note the continuation problem before wiring it: the selector does
+not run on tool-continuation rounds, so a turn that starts reasoning has no fresh
+signal on its later rounds. The posture has to ride the state token or be fixed for
+the turn — flipping mid-turn means a model that reasons about a plan and then
+executes it without.
