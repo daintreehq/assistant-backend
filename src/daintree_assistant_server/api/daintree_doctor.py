@@ -37,8 +37,9 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
-from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID, SERVING_HOST
+from ..config import PUBLIC_MODEL_ID
 from ..errors import DaintreeError
+from ..modes import MODE_SPECS, ModeSpec, OperationMode
 from ..observability import get_logger
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from .daintree_auth import REASON_OK, REASON_REJECTED, _usability
@@ -80,74 +81,110 @@ async def doctor(
         bundle["ready_error"] = ("configuration" if hardened else error) if error else None
         warnings.append("server_not_ready")
 
-    bundle["provider"] = await _provider_section(container, principal, warnings)
+    bundle["modes"] = await _modes_section(container, principal, warnings)
     bundle["catalog"] = _catalog_section(container, warnings)
     bundle["limits"] = _limits_section(settings)
     bundle["warnings"] = warnings
     return bundle
 
 
-async def _provider_section(
+async def _modes_section(
     container: Any, principal: Principal, warnings: list[str]
 ) -> dict[str, Any]:
-    """Provider identity and a live verdict on the credential this turn would use.
+    """Both routes: identity, and a live verdict on each credential.
 
-    ``verify_key`` is a tokenless model-listing call: no generation, no spend. The
-    distinction between "rejected" and "we could not ask" is preserved — a network
-    failure reports ``key_valid: null``, never ``false``, because telling a tester
-    the key is bad when we simply could not reach the provider sends them to
-    re-paste a credential that was fine.
+    Both are verified, sequentially, rather than only the default one. The
+    question a tester brings here is "can this backend answer for me?", and with
+    two product modes that has two answers — an instance whose Pro key was never
+    granted looks perfectly healthy right up until the first Pro turn, which is
+    precisely the failure this endpoint exists to find before a user does.
 
-    The key under test is the one this request would actually spend: the caller's
-    if they sent one, the SERVER's otherwise — which is every request today. That
-    is the useful question either way ("can this backend answer for me?"), and it
-    is why the verdict is still worth reporting now that callers hold no key.
+    ``verify_key`` is a tokenless model-listing call: no generation, no spend, so
+    checking both costs one extra round trip on a rarely-called diagnostic and
+    nothing at all in tokens.
+
+    Warnings are namespaced by mode (`provider_key_rejected:pro`) because an
+    unqualified warning across two routes cannot say which one is broken — and
+    "one of your two providers is unreachable" is not an actionable report.
     """
+    section: dict[str, Any] = {}
+    for mode, spec in MODE_SPECS.items():
+        section[mode.value] = await _one_mode(container, spec, principal, warnings)
+    return section
+
+
+async def _one_mode(
+    container: Any, spec: ModeSpec, principal: Principal, warnings: list[str]
+) -> dict[str, Any]:
+    """One route's identity and credential verdict.
+
+    The distinction between "rejected" and "we could not ask" is preserved — a
+    network failure reports ``key_valid: null``, never ``false``, because telling
+    a tester the key is bad when we simply could not reach the provider sends
+    them to re-paste a credential that was fine.
+
+    ``provider`` and ``upstream_model`` are named here and nowhere public: the
+    respond and task surfaces both say ``daintree-assistant`` in either mode, and
+    this is the operator's view. No key, key prefix, or base URL appears — a base
+    URL is the one field of the three that could carry userinfo.
+    """
+    mode: OperationMode = spec.mode
     section: dict[str, Any] = {
-        "name": SERVING_HOST,
-        "model": PUBLIC_MODEL_ID,
-        "thinking_enabled": INTERACTIVE_THINKING_ENABLED,
-        # The server now holds the upstream credential and funds every turn from
-        # it. Stated here because it is the fact a tester most often needs
-        # confirmed, and it inverted when the backend moved to Cerebras.
+        "provider": spec.provider_id,
+        "upstream_model": spec.upstream_model,
+        "public_model": PUBLIC_MODEL_ID,
+        "thinking_enabled": spec.thinking.enabled,
+        # The server holds BOTH upstream credentials and funds every turn from
+        # them. Stated here because it is the fact a tester most often needs
+        # confirmed, and it inverted when the backend stopped taking caller keys.
         "server_holds_credential": True,
         "key_valid": None,
         "key_usable": None,
         "reason": None,
         "verify_ms": None,
     }
-    if container is None:
-        warnings.append("provider_unavailable")
+    # A doctor must survive what it diagnoses, and "the container is half-built"
+    # is squarely in that class: readiness can leave a container behind whose
+    # registry never finished, and a 500 here would replace the diagnosis with
+    # the symptom. Any failure to reach a route is reported as that route being
+    # unavailable, which is exactly what it is.
+    try:
+        provider = container.modes.resolve(mode).provider
+    except Exception:  # noqa: BLE001 — see above
+        warnings.append(f"provider_unavailable:{mode.value}")
+        return section
+    if provider is None:
+        warnings.append(f"provider_unavailable:{mode.value}")
         return section
 
     started = time.perf_counter()
     try:
-        record = await container.provider.verify_key()
+        record = await provider.verify_key()
     except DaintreeError as exc:
         section["verify_ms"] = round((time.perf_counter() - started) * 1000)
         if exc.code in ("invalid_api_key", "provider_invalid_api_key"):
             section["key_valid"] = False
             section["key_usable"] = False
             section["reason"] = REASON_REJECTED
-            warnings.append("provider_key_rejected")
+            warnings.append(f"provider_key_rejected:{mode.value}")
         else:
             # Unknown, not bad. `key_valid` stays None.
             section["reason"] = exc.code
-            warnings.append("provider_unreachable")
+            warnings.append(f"provider_unreachable:{mode.value}")
         return section
     except Exception:  # noqa: BLE001 — a doctor must survive what it diagnoses
-        logger.warning("doctor_verify_failed", exc_info=True)
+        logger.warning("doctor_verify_failed", mode=mode.value, exc_info=True)
         section["verify_ms"] = round((time.perf_counter() - started) * 1000)
-        warnings.append("provider_unreachable")
+        warnings.append(f"provider_unreachable:{mode.value}")
         return section
 
     section["verify_ms"] = round((time.perf_counter() - started) * 1000)
     section["key_valid"] = True
     # Reuse the sign-in endpoint's budget arithmetic rather than restating it, so
-    # the two can never disagree about what "usable" means. Cerebras reports no
-    # budget figures at all, so `_usability` sees an empty record and answers
-    # "not known to be exhausted" — which is the honest verdict, and exactly the
-    # asymmetry that helper documents.
+    # the two can never disagree about what "usable" means. Neither host reports
+    # budget figures, so `_usability` sees an empty record and answers "not known
+    # to be exhausted" — the honest verdict, and exactly the asymmetry that
+    # helper documents.
     budget: dict[str, object] = {}
     if isinstance(record, dict):
         for field in ("limit", "usage", "limit_remaining"):
@@ -158,7 +195,7 @@ async def _provider_section(
     section["key_usable"] = usable
     section["reason"] = reason
     if reason != REASON_OK:
-        warnings.append("provider_key_unusable")
+        warnings.append(f"provider_key_unusable:{mode.value}")
     return section
 
 

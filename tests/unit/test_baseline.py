@@ -59,29 +59,38 @@ def test_the_band_check_actually_fails_on_a_regression() -> None:
     assert any("base_prompt_bytes" in p for p in problems), problems
 
 
-def test_the_identity_block_records_the_pinned_posture() -> None:
-    """The model and the upstream are release facts, not measurements.
+def test_the_identity_block_records_both_pinned_routes() -> None:
+    """The two routes are release facts, not measurements.
 
     They are in the baseline so a diff shows a posture change explicitly — the
     kind of thing that must never move by accident. Asserted, not merely
     captured: ``compare()`` only checks the BANDED numeric metrics, so an
     identity string nobody asserts drifts in silence.
+
+    BOTH routes, and that pairing is the point. A baseline that recorded only
+    the mode a reviewer happens to think of as "the" route would pass a change
+    that re-pointed the other one — which, with the Pro tier being the one
+    nobody exercises by default, is the more likely direction of the accident.
     """
-    from daintree_assistant_server.config import SERVING_HOST, SERVING_MODEL
+    from daintree_assistant_server.modes import MODE_SPECS
 
     identity = _baseline()["identity"]
-    assert identity["model"] == SERVING_MODEL  # type: ignore[index]
-    # The upstream itself, and it is a REAL posture field now rather than a
-    # constant: the host moved to Together and the same weights measured 3.1x
-    # faster than through OpenRouter's default routing, so which host serves is
-    # exactly the kind of change this block exists to make explicit in a diff.
-    # There is still no endpoint-selection posture to record — a model host
-    # serves one endpoint per model, so privacy mode, sort axis and denylist
-    # have no subject.
-    assert identity["provider"] == SERVING_HOST  # type: ignore[index]
-    # There is likewise no first-byte endpoint sort: the call that sat on the
-    # first-byte path (the upstream skill selector) was replaced by the LOCAL
-    # two-stage selector, whose release facts are asserted below instead.
+    recorded = identity["modes"]  # type: ignore[index]
+    assert set(recorded) == {mode.value for mode in MODE_SPECS}, (
+        "the baseline records a different set of modes than the server serves"
+    )
+    for mode, spec in MODE_SPECS.items():
+        row = recorded[mode.value]
+        assert row["provider"] == spec.provider_id
+        assert row["model"] == spec.upstream_model
+        # Thinking is per MODE now, not one global posture: two model families
+        # mean a single flag would be silently different things on each route.
+        assert row["thinking_enabled"] == spec.thinking.enabled
+    # There is no endpoint-selection posture to record on either route — a model
+    # host serves one endpoint per model, so privacy mode, sort axis and
+    # denylist have no subject. Nor is there a first-byte endpoint sort: the
+    # call that sat on that path (the upstream skill selector) was replaced by
+    # the LOCAL two-stage selector, whose release facts are asserted below.
 
 
 def test_the_selector_block_describes_the_shipped_artifact() -> None:

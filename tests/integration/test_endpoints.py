@@ -517,11 +517,11 @@ def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
     """
     from fastapi.testclient import TestClient
 
-    from daintree_assistant_server.config import SERVING_KEY_ENV, Settings
+    from daintree_assistant_server.config import Settings
     from daintree_assistant_server.main import create_app
 
     settings = Settings(**{
-        "ENVIRONMENT": "development", SERVING_KEY_ENV: "",
+        "ENVIRONMENT": "development", "TOGETHER_API_KEY": "", "CEREBRAS_API_KEY": "",
         "STATE_SIGNING_KEY_CURRENT": "sk", "STATE_SALT": "x",
     })
     app = create_app(settings=settings)  # real lifespan (no injected provider)
@@ -534,15 +534,20 @@ def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
 def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
     """Production readiness needs no INBOUND key: there is nothing to configure
     on the door. Only the server's own material — the signing key, the salt, and
-    the upstream credential — is validated."""
+    BOTH upstream credentials — is validated. Both, because the service
+    advertises both product modes unconditionally; an instance that can serve
+    only Standard is incomplete, not a Standard-only deployment."""
     from fastapi.testclient import TestClient
 
     from daintree_assistant_server.config import Settings
     from daintree_assistant_server.main import create_app
 
     settings = Settings(
-        ENVIRONMENT="production", TOGETHER_API_KEY="sk-server-owned",
-        STATE_SIGNING_KEY_CURRENT="s" * 48, STATE_SALT="a-real-salt-value",
+        ENVIRONMENT="production",
+        TOGETHER_API_KEY="sk-server-owned",
+        CEREBRAS_API_KEY="sk-server-owned-pro",
+        STATE_SIGNING_KEY_CURRENT="s" * 48,
+        STATE_SALT="a-real-salt-value",
     )
     app = create_app(settings=settings)
     with TestClient(app) as client:

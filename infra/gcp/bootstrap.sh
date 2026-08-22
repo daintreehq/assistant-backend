@@ -126,10 +126,11 @@ gen_salt() { openssl rand -hex 16; }
 ensure_secret state-signing-key-current gen_key
 ensure_secret state-salt gen_salt
 
-# Both upstream credentials get a shell. together-api-key is the one that gates
-# readiness today (config.SERVING_HOST); cerebras-api-key is the switch-back, and
-# a deploy mounts both so flipping the host is a config change rather than a
-# config change plus an infra change.
+# Both upstream credentials get a shell, and BOTH gate readiness: together-api-key
+# funds `standard` and cerebras-api-key funds `pro`, the deploy mounts both
+# unconditionally, and a service that advertises two modes and can serve one is
+# incomplete rather than reduced. A missing version therefore has to stop the
+# deploy here, not surface as a red /readyz two steps later.
 ensure_supplied_secret() {
   local name="$1" example="$2" gates="$3"
   if ! gcloud secrets describe "$name" --project="$PROJECT" >/dev/null 2>&1; then
@@ -144,11 +145,11 @@ ensure_supplied_secret() {
     echo "    printf '%s' '$example' | gcloud secrets versions add $name \\"
     echo "      --data-file=- --project=$PROJECT"
   else
-    ok "$name has no version (fine — it is not the serving host right now)"
+    ok "$name has no version (not gating)"
   fi
 }
 ensure_supplied_secret together-api-key 'tgp_v1_...' gates
-ensure_supplied_secret cerebras-api-key 'csk-...' optional
+ensure_supplied_secret cerebras-api-key 'csk-...' gates
 
 # ---------------------------------------------------------------------------
 say "Runtime service account (what the container runs as)"
@@ -161,10 +162,9 @@ else
 fi
 # Scoped per-secret rather than project-wide: this identity can read exactly the
 # secrets it mounts and nothing else in the project.
-# together-api-key AND cerebras-api-key both appear here because the deploy
-# mounts whichever ones exist: the grant has to cover the host we might switch
-# TO, not only the one serving today, or the switch-back is a permission error
-# discovered at deploy time.
+# together-api-key AND cerebras-api-key both appear here because the deploy mounts
+# both: one funds `standard`, the other `pro`, and a grant covering only one turns
+# a whole product tier into a permission error discovered at deploy time.
 RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key cerebras-api-key"
 for s in $RUNTIME_SECRETS; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
@@ -181,10 +181,10 @@ ok "granted secretAccessor on $RUNTIME_SECRETS"
 # hardcoded; skipped with a warning if the connection is not set up yet.
 GH_TOKEN_SECRET=$(gcloud secrets list --project="$PROJECT"   --filter="name~daintree-github-github-oauthtoken"   --format="value(name)" --limit=1 || true)
 if [ -n "$GH_TOKEN_SECRET" ]; then
-  retry 12 gcloud secrets add-iam-policy-binding "$GH_TOKEN_SECRET"     --member="serviceAccount:${DEPLOY_SA_EMAIL}"     --role=roles/secretmanager.secretAccessor     --project="$PROJECT" --quiet >/dev/null
+  retry 12 gcloud secrets add-iam-policy-binding "$GH_TOKEN_SECRET"     --member="serviceAccount:${BUILD_SA_EMAIL}"     --role=roles/secretmanager.secretAccessor     --project="$PROJECT" --quiet >/dev/null
   ok "granted deploy SA secretAccessor on $GH_TOKEN_SECRET (LFS fetch)"
 else
-  warn "no daintree-github oauthtoken secret found — LFS fetch will fail until granted"
+  ok "!! no daintree-github oauthtoken secret found — LFS fetch will fail until granted"
 fi
 
 # The rotation-overlap secret, granted only if it exists. It is created by hand at

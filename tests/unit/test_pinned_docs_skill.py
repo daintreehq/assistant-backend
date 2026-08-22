@@ -301,7 +301,7 @@ async def test_a_docs_question_loads_the_runbook_through_the_orchestrator(
         respond_body([{"role": "user", "content": "what is a watcher?"}])
     )
     outcome = await orchestrator.complete(
-        body, upstream_model="m", api_key=SecretStr("k"), request_id="req-docs"
+        body, api_key=SecretStr("k"), request_id="req-docs"
     )
     active = [s["id"] for s in outcome.body["skills"]["active"]]
     assert DOCS_SKILL_ID in active, f"the docs runbook was not pinned; active={active}"
@@ -320,7 +320,7 @@ async def test_an_operational_turn_does_not_load_the_docs_runbook(
         respond_body([{"role": "user", "content": "rename my terminals"}])
     )
     outcome = await orchestrator.complete(
-        body, upstream_model="m", api_key=SecretStr("k"), request_id="req-op"
+        body, api_key=SecretStr("k"), request_id="req-op"
     )
     active = [s["id"] for s in outcome.body["skills"]["active"]]
     assert DOCS_SKILL_ID not in active, f"the docs runbook loaded on an operational turn; {active}"
@@ -342,7 +342,7 @@ async def test_the_body_reaches_the_main_prompt(
         respond_body([{"role": "user", "content": "what is a watcher?"}])
     )
     await orchestrator.complete(
-        body, upstream_model="m", api_key=SecretStr("k"), request_id="req-body"
+        body, api_key=SecretStr("k"), request_id="req-body"
     )
     sent = _prompt_text(fake_provider.requests[0])
     assert "## Docs" in sent, "the pinned runbook's body never reached the main prompt"
@@ -371,7 +371,7 @@ async def test_the_selector_is_never_told_a_pinned_skill_is_active(
     )
     fake_provider.selection_result = selection_result([], docs_query="what is a watcher")
     outcome = await orchestrator.complete(
-        first, upstream_model="m", api_key=SecretStr("k"), request_id="req-1"
+        first, api_key=SecretStr("k"), request_id="req-1"
     )
     assert DOCS_SKILL_ID in [s["id"] for s in outcome.body["skills"]["active"]]
 
@@ -386,7 +386,7 @@ async def test_the_selector_is_never_told_a_pinned_skill_is_active(
         )
     )
     await orchestrator.complete(
-        second, upstream_model="m", api_key=SecretStr("k"), request_id="req-2"
+        second, api_key=SecretStr("k"), request_id="req-2"
     )
     prompt = _prompt_text(fake_provider.selection_requests[-1])
     assert DOCS_SKILL_ID not in prompt, "the selector was shown a hidden skill id"
@@ -406,7 +406,7 @@ async def test_the_pin_survives_a_tool_continuation_round(
         respond_body([{"role": "user", "content": "what is a watcher?"}])
     )
     outcome = await orchestrator.complete(
-        first, upstream_model="m", api_key=SecretStr("k"), request_id="req-1"
+        first, api_key=SecretStr("k"), request_id="req-1"
     )
 
     # Same turn, next round — the continuation the selector deliberately skips.
@@ -419,7 +419,7 @@ async def test_the_pin_survives_a_tool_continuation_round(
         )
     )
     again = await orchestrator.complete(
-        second, upstream_model="m", api_key=SecretStr("k"), request_id="req-1b"
+        second, api_key=SecretStr("k"), request_id="req-1b"
     )
     active = [s["id"] for s in again.body["skills"]["active"]]
     assert DOCS_SKILL_ID in active, f"the runbook was lost on continuation; active={active}"

@@ -302,7 +302,7 @@ async def test_a_greeting_skips_the_selector_and_clears_the_active_set(
     container = build_container(settings, fake_provider)
     outcome = await container.orchestrator.complete(
         _request("thanks!"),
-        upstream_model="m",
+
         api_key=SecretStr("k"),
         request_id="req_fp",
     )
@@ -380,7 +380,7 @@ async def test_selection_force_still_runs_the_selector(settings, fake_provider) 
         }
     )
     await container.orchestrator.complete(
-        body, upstream_model="m", api_key=SecretStr("k"), request_id="req_fp2"
+        body, api_key=SecretStr("k"), request_id="req_fp2"
     )
     assert calls, "selection.force was ignored"
     await container.aclose()

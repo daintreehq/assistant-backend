@@ -29,8 +29,9 @@ from .api import (
     health,
     root,
 )
-from .config import SERVING_HOST, Settings, get_settings
+from .config import Settings, get_settings
 from .errors import register_exception_handlers, request_too_large
+from .modes import MODE_SPECS, ModeRegistry, ModeSpec, ResolvedMode, uniform_registry
 from .observability import (
     bind_request_context,
     clear_request_context,
@@ -206,7 +207,10 @@ class Container:
     settings: Settings
     prompt_loader: PromptLoader
     catalog_manager: CatalogManager
-    provider: ChatProvider
+    # Both product routes. Replaces the single `provider` field: there is no
+    # longer one answer to "which adapter serves this process", only one answer
+    # per request, resolved at the route boundary from the caller's mode.
+    modes: ModeRegistry
     state_codec: StateCodec
     selector: SkillSelector
     assembler: PromptAssembler
@@ -247,7 +251,7 @@ class Container:
             # the provider they are calling through is torn down.
             await self.orchestrator.drain_background_tasks()
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
-            await self.provider.aclose()
+            await self.modes.aclose()
         if self.openrouter_provider is not None:
             with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
                 await self.openrouter_provider.aclose()
@@ -287,8 +291,16 @@ def _build_docs_client() -> tuple[httpx.AsyncClient, DocsMcpClient]:
     return client, DocsMcpClient(client)
 
 
-def _build_provider(settings: Settings) -> ChatProvider:
-    client = httpx.AsyncClient(
+def _provider_client(settings: Settings) -> httpx.AsyncClient:
+    """One HTTP client per provider — never shared between modes.
+
+    Isolation, the same argument the docs and OpenRouter clients already make
+    here: a long Pro stream must not occupy Standard's connection pool, and a
+    Cerebras incident must not exhaust the pool Together turns depend on. The
+    cost is one extra idle pool per process, which is nothing next to a mode
+    outage that spreads.
+    """
+    return httpx.AsyncClient(
         timeout=httpx.Timeout(
             connect=settings.upstream_connect_timeout_seconds,
             read=settings.main_timeout_seconds,
@@ -297,30 +309,46 @@ def _build_provider(settings: Settings) -> ChatProvider:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    if SERVING_HOST == "together":
-        # The OpenAI-shape adapter, pointed at Together. Same body, same SSE, same
-        # unified `reasoning` object (measured — Together honours `{"enabled":
-        # false}`), so the vendor difference is three class attributes rather than
-        # a third parsing implementation. See providers/together.py.
+
+
+def _build_provider(settings: Settings, spec: ModeSpec) -> ChatProvider:
+    """The adapter one mode routes to, pointed at that provider's own origin.
+
+    Both adapters speak the OpenAI wire shape, but not the same dialect of it —
+    Cerebras takes `max_completion_tokens` and rejects the unified `reasoning`
+    object that Together honours — so this is a class choice, not a base-URL
+    choice. `providers/cerebras.py` documents the four differences.
+    """
+    api_key = settings.provider_api_key(spec.provider_id)
+    base_url = settings.provider_base_url(spec.provider_id)
+    if spec.provider_id == "together":
         return TogetherProvider(
-            client,
-            api_key=settings.together_api_key,
-            base_url=settings.together_base_url,
+            _provider_client(settings),
+            api_key=api_key,
+            base_url=base_url,
             default_timeout=settings.main_timeout_seconds,
             dump_dir=settings.dump_upstream_dir,
         )
     return CerebrasProvider(
-        client,
-        # THE server credential. Daintree funds every turn from this key: callers
-        # supply none of their own any more (see auth.py), so a provider built
-        # without one cannot answer at all — which is why `missing_secrets` gates
-        # readiness on it rather than letting the first turn discover it. A
-        # request may still carry its own key and override this; nothing on the
-        # serving path does today.
-        api_key=settings.cerebras_api_key,
-        base_url=settings.cerebras_base_url,
+        _provider_client(settings),
+        # A SERVER credential. Daintree funds every turn on both routes; callers
+        # supply none of their own (see auth.py), so a provider built without one
+        # cannot answer at all — which is why `missing_secrets` gates readiness on
+        # BOTH keys rather than letting the first Pro turn discover the gap.
+        api_key=api_key,
+        base_url=base_url,
         default_timeout=settings.main_timeout_seconds,
         dump_dir=settings.dump_upstream_dir,
+    )
+
+
+def _build_mode_registry(settings: Settings) -> ModeRegistry:
+    """Both routes, built together, from the one static spec table."""
+    return ModeRegistry(
+        {
+            spec.mode: ResolvedMode(spec, _build_provider(settings, spec))
+            for spec in MODE_SPECS.values()
+        }
     )
 
 
@@ -427,7 +455,13 @@ def build_container(
         classifier.sync(catalog_manager.catalog)
         inference_pool = InferencePool()
         selector = LocalSelector(classifier, inference_pool, catalog_manager, settings)
-    chat_provider = provider if provider is not None else _build_provider(settings)
+    # An injected provider answers BOTH modes. That is right for the callers
+    # that use it — tests and deterministic benchmarks replacing the upstream
+    # wholesale — and deliberately wrong for testing ROUTING, which needs one
+    # recording fake per mode and should build its own registry.
+    mode_registry = (
+        uniform_registry(provider) if provider is not None else _build_mode_registry(settings)
+    )
     # Never substituted by the `provider` override: that argument exists so tests
     # and deterministic benchmarks can replace the SERVING provider, and silently
     # pointing the compaction task at the same fake would hide the fact that it
@@ -460,13 +494,13 @@ def build_container(
         selector=selector,
         state_codec=state_codec,
         assembler=assembler,
-        provider=chat_provider,
+        modes=mode_registry,
         docs_client=docs_client,
         compactor=chat_compactor,
     )
     task_runner = TaskRunner(
         settings=settings,
-        provider=chat_provider,
+        modes=mode_registry,
         prompt_loader=prompt_loader,
         catalog_manager=catalog_manager,
         openrouter_provider=openrouter_provider,
@@ -476,7 +510,7 @@ def build_container(
         settings=settings,
         prompt_loader=prompt_loader,
         catalog_manager=catalog_manager,
-        provider=chat_provider,
+        modes=mode_registry,
         openrouter_provider=openrouter_provider,
         state_codec=state_codec,
         selector=selector,

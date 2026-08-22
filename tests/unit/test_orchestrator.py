@@ -14,6 +14,7 @@ from pydantic import SecretStr
 
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import upstream_error
+from daintree_assistant_server.modes import DEFAULT_MODE
 from daintree_assistant_server.providers.base import (
     ProviderChatResult,
     ProviderStream,
@@ -695,6 +696,12 @@ def test_chunk_to_delta_empty_delta_is_none() -> None:
     assert ChatOrchestrator._chunk_to_delta(_delta_chunk({})) is None
 
 
+
+def _standard_route(orchestrator: ChatOrchestrator):
+    """The route a `complete()` with no explicit mode resolves to."""
+    return orchestrator.modes.resolve(DEFAULT_MODE)
+
+
 @pytest.mark.asyncio
 async def test_stream_meta_is_yielded_before_upstream_open(
     orchestrator: ChatOrchestrator, fake_provider: FakeProvider
@@ -711,7 +718,7 @@ async def test_stream_meta_is_yielded_before_upstream_open(
         }
     )
 
-    outcome = await orchestrator.complete(request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY)
+    outcome = await orchestrator.complete(request, api_key=TEST_API_KEY)
     assert outcome.stream is not None
     assert fake_provider.stream_requests == []
 
@@ -875,7 +882,7 @@ async def test_respond_log_reports_the_ids_the_cap_dropped(
 
     monkeypatch.setattr(orchestrator_module, "logger", _Recorder())
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     await _drain(outcome.stream)
@@ -1030,7 +1037,7 @@ async def test_streaming_complete_returns_before_selection_finishes(
     )
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.streaming and outcome.stream is not None
     assert outcome.headers["X-Request-Id"]
@@ -1057,7 +1064,7 @@ async def test_heartbeat_comments_flow_while_selection_is_quiet(
     )
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     # With the selector gated, the first thing on the wire is a comment heartbeat,
@@ -1085,7 +1092,7 @@ async def test_prep_failure_streams_terminal_error_event(
     monkeypatch.setattr(orchestrator.assembler, "build_main_request", boom)
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
@@ -1108,7 +1115,7 @@ async def test_unexpected_prep_exception_streams_internal_error(
     monkeypatch.setattr(orchestrator.assembler, "build_main_request", boom)
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
@@ -1128,7 +1135,7 @@ async def test_unexpected_midstream_exception_emits_terminal_error(
     )
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
@@ -1161,7 +1168,7 @@ async def test_disconnect_during_prep_cancels_selection(
     monkeypatch.setattr(orchestrator.selector, "select", select)
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     pull = asyncio.create_task(anext(outcome.stream))
@@ -1193,7 +1200,7 @@ async def test_aclose_before_first_poll_cancels_prep(
     monkeypatch.setattr(orchestrator.selector, "select", select)
 
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     await started.wait()
@@ -1219,7 +1226,7 @@ async def test_provider_close_failure_after_done_emits_nothing_extra(
         make_text_chunks("fine")
     )
     outcome = await orchestrator.complete(
-        _basic_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _basic_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = [e for e in await _drain(outcome.stream) if not e.startswith(":")]
@@ -1298,7 +1305,7 @@ async def test_stream_reroll_that_half_reported_cost_is_not_labelled_complete(
         else make_text_chunks(_DEAD_ROUND, cost=0.002)
     )
     outcome = await orchestrator.complete(
-        _intent_stream_request("bi-cost"), upstream_model="deepseek-v4-flash",
+        _intent_stream_request("bi-cost"),
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
@@ -1321,7 +1328,7 @@ async def test_stream_reroll_with_both_attempts_reported_stays_complete(
         else make_text_chunks(_DEAD_ROUND, cost=0.002)
     )
     outcome = await orchestrator.complete(
-        _intent_stream_request("bi-cost-ok"), upstream_model="deepseek-v4-flash",
+        _intent_stream_request("bi-cost-ok"),
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
@@ -1347,7 +1354,7 @@ async def test_stream_single_attempt_cost_is_still_complete(
         "Read five votes; here is the tally.", cost=0.004
     )
     outcome = await orchestrator.complete(
-        _intent_stream_request("bi-cost-single"), upstream_model="deepseek-v4-flash",
+        _intent_stream_request("bi-cost-single"),
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
@@ -1392,7 +1399,7 @@ async def test_body_reroll_that_half_reported_cost_is_not_labelled_complete(
         make_result(content="Read five votes; here is the tally."),
     ]
     outcome = await orchestrator.complete(
-        _intent_body_request("bi-body-cost"), upstream_model="deepseek-v4-flash",
+        _intent_body_request("bi-body-cost"),
         api_key=TEST_API_KEY,
     )
     assert outcome.body is not None
@@ -1415,7 +1422,7 @@ async def test_body_reroll_with_both_attempts_reported_stays_complete(
         ),
     ]
     outcome = await orchestrator.complete(
-        _intent_body_request("bi-body-ok"), upstream_model="deepseek-v4-flash",
+        _intent_body_request("bi-body-ok"),
         api_key=TEST_API_KEY,
     )
     assert outcome.body is not None
@@ -1462,7 +1469,7 @@ async def test_body_turn_usage_names_the_endpoint_that_served_it(
     )
     with capture_logs() as logs:
         await orchestrator.complete(
-            _intent_body_request("bi-endpoint"), upstream_model="deepseek-v4-flash",
+            _intent_body_request("bi-endpoint"),
             api_key=TEST_API_KEY,
         )
     entry = _turn_usage(logs)
@@ -1510,7 +1517,7 @@ async def test_body_reroll_keeps_the_discarded_drafts_endpoint(
     ]
     with capture_logs() as logs:
         await orchestrator.complete(
-            _intent_body_request("bi-endpoint-reroll"), upstream_model="deepseek-v4-flash",
+            _intent_body_request("bi-endpoint-reroll"),
             api_key=TEST_API_KEY,
         )
     assert len(fake_provider.requests) == 2, "the draft must actually have been re-rolled"
@@ -1545,7 +1552,7 @@ async def test_body_reroll_onto_the_same_endpoint_is_not_a_switch(
     ]
     with capture_logs() as logs:
         await orchestrator.complete(
-            _intent_body_request("bi-endpoint-same"), upstream_model="deepseek-v4-flash",
+            _intent_body_request("bi-endpoint-same"),
             api_key=TEST_API_KEY,
         )
     entry = _turn_usage(logs)
@@ -1570,7 +1577,7 @@ async def test_stream_turn_usage_names_the_endpoint_that_served_it(
     with capture_logs() as logs:
         outcome = await orchestrator.complete(
             _intent_stream_request("bi-endpoint-stream"),
-            upstream_model="deepseek-v4-flash",
+
             api_key=TEST_API_KEY,
         )
         assert outcome.stream is not None
@@ -1604,7 +1611,7 @@ async def test_stream_reroll_counts_both_endpoints(
     with capture_logs() as logs:
         outcome = await orchestrator.complete(
             _intent_stream_request("bi-endpoint-stream-reroll"),
-            upstream_model="deepseek-v4-flash",
+
             api_key=TEST_API_KEY,
         )
         assert outcome.stream is not None
@@ -1631,7 +1638,7 @@ async def test_a_provider_that_names_no_endpoint_reports_none_not_a_switch(
     fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
     with capture_logs() as logs:
         await orchestrator.complete(
-            _intent_body_request("bi-endpoint-silent"), upstream_model="deepseek-v4-flash",
+            _intent_body_request("bi-endpoint-silent"),
             api_key=TEST_API_KEY,
         )
     entry = _turn_usage(logs)
@@ -1664,7 +1671,7 @@ async def test_an_accepted_reroll_that_named_no_host_does_not_inherit_the_drafts
     with capture_logs() as logs:
         outcome = await orchestrator.complete(
             _intent_stream_request("bi-endpoint-stale"),
-            upstream_model="deepseek-v4-flash",
+
             api_key=TEST_API_KEY,
         )
         assert outcome.stream is not None
@@ -1702,7 +1709,7 @@ async def test_a_reroll_that_never_opened_keeps_the_drafts_endpoint(
     with capture_logs() as logs:
         outcome = await orchestrator.complete(
             _intent_stream_request("bi-endpoint-failopen"),
-            upstream_model="deepseek-v4-flash",
+
             api_key=TEST_API_KEY,
         )
         assert outcome.stream is not None
@@ -1744,7 +1751,7 @@ async def test_a_repaired_selection_that_named_no_host_reports_none(
     with capture_logs() as logs:
         await orchestrator.complete(
             _intent_body_request("bi-endpoint-sel-repair"),
-            upstream_model="deepseek-v4-flash",
+
             api_key=TEST_API_KEY,
         )
     assert len(fake_provider.selection_requests) == 2, "the selection must have been repaired"
@@ -1771,7 +1778,7 @@ async def test_a_repaired_selection_reports_the_host_that_answered(
     with capture_logs() as logs:
         await orchestrator.complete(
             _intent_body_request("bi-endpoint-sel-repair-ok"),
-            upstream_model="deepseek-v4-flash",
+
             api_key=TEST_API_KEY,
         )
     entry = _turn_usage(logs)
@@ -1814,7 +1821,7 @@ async def test_the_turn_key_reaches_the_log_from_a_real_continuation_round(
     fake_provider.complete_result = make_result(content="Tallied.", endpoint="deepinfra")
     with capture_logs() as logs:
         await orchestrator.complete(
-            request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+            request, api_key=TEST_API_KEY
         )
     entry = _turn_usage(logs)
     assert entry["session_id"] == "sess-cont"
@@ -1845,7 +1852,7 @@ async def test_a_repaired_selection_that_half_reported_makes_the_turn_a_floor(
         content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
     )
     outcome = await orchestrator.complete(
-        _intent_body_request("sel-cost"), upstream_model="deepseek-v4-flash",
+        _intent_body_request("sel-cost"),
         api_key=TEST_API_KEY,
     )
     assert outcome.body is not None
@@ -1868,7 +1875,7 @@ async def test_a_repaired_selection_that_reported_twice_stays_complete(
         content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
     )
     outcome = await orchestrator.complete(
-        _intent_body_request("sel-cost-ok"), upstream_model="deepseek-v4-flash",
+        _intent_body_request("sel-cost-ok"),
         api_key=TEST_API_KEY,
     )
     assert outcome.body is not None
@@ -1900,7 +1907,7 @@ async def test_a_selector_that_never_parsed_still_reports_what_it_billed(
     )
     outcome = await orchestrator.complete(
         _intent_body_request(f"sel-degraded-{priced_first}"),
-        upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY,
+        api_key=TEST_API_KEY,
     )
     assert outcome.body is not None
     assert len(fake_provider.selection_requests) == 2
@@ -1928,7 +1935,7 @@ async def test_a_degraded_selector_that_reported_both_calls_stays_complete(
         content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
     )
     outcome = await orchestrator.complete(
-        _intent_body_request("sel-degraded-ok"), upstream_model="deepseek-v4-flash",
+        _intent_body_request("sel-degraded-ok"),
         api_key=TEST_API_KEY,
     )
     assert outcome.body is not None
@@ -1953,7 +1960,7 @@ async def test_a_reported_zero_survives_the_stream_as_an_exact_total(
         "Read five votes; here is the tally.", cost=0.0
     )
     outcome = await orchestrator.complete(
-        _intent_stream_request("zero-cost"), upstream_model="deepseek-v4-flash",
+        _intent_stream_request("zero-cost"),
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
@@ -1980,7 +1987,7 @@ async def test_stream_bare_intent_holds_content_until_the_reply_ends(
         make_text_chunks("Tallied.") if _nudged(request) else make_text_chunks(_DEAD_ROUND)
     )
     outcome = await orchestrator.complete(
-        _intent_stream_request("bi-hold"), upstream_model="deepseek-v4-flash",
+        _intent_stream_request("bi-hold"),
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
@@ -2030,7 +2037,7 @@ async def test_main_call_carries_a_pseudonymous_cache_session_key(
 
     request = _affinity_request()
     await orchestrator.complete(
-        request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        request, api_key=TEST_API_KEY
     )
 
     sent = fake_provider.requests[-1]
@@ -2043,7 +2050,7 @@ async def test_main_call_carries_a_pseudonymous_cache_session_key(
     # And it is the key the derivation actually produces, not merely a
     # plausibly-shaped string — this is what ties the wire value to
     # _cache_session_key, so a future edit cannot quietly attach a different one.
-    assert sent.cache_session_id == orchestrator._cache_session_key(request)
+    assert sent.cache_session_id == orchestrator._cache_session_key(request, _standard_route(orchestrator))
 
 
 @pytest.mark.asyncio
@@ -2060,12 +2067,12 @@ async def test_cache_session_key_is_stable_across_turns_and_unique_per_session(
     for turn in ("turn-1", "turn-2"):
         await orchestrator.complete(
             _affinity_request(turn_id=turn),
-            upstream_model="deepseek-v4-flash",
+
             api_key=TEST_API_KEY,
         )
     await orchestrator.complete(
         _affinity_request("other-session"),
-        upstream_model="deepseek-v4-flash",
+
         api_key=TEST_API_KEY,
     )
 
@@ -2099,10 +2106,10 @@ async def test_selector_call_is_keyed_by_catalog_not_by_session(
 
     request = _affinity_request()
     await orchestrator.complete(
-        request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        request, api_key=TEST_API_KEY
     )
 
-    session_key = orchestrator._cache_session_key(request)
+    session_key = orchestrator._cache_session_key(request, _standard_route(orchestrator))
     assert session_key is not None
     assert fake_provider.selection_requests
     for req in fake_provider.selection_requests:
@@ -2121,12 +2128,14 @@ def test_json_mode_main_call_uses_its_own_affinity_namespace(
     # other's sticky endpoint for a prefix that endpoint does not hold.
     #
     # Derivation only; the wire attachment for JSON mode is pinned by the test
-    # below, which has to discriminate main from selector traffic by model id.
-    plain = orchestrator._cache_session_key(_affinity_request())
-    json_mode = orchestrator._cache_session_key(_affinity_request(json_mode=True))
+    # below, which has to discriminate main from selector traffic.
+    plain = orchestrator._cache_session_key(_affinity_request(), _standard_route(orchestrator))
+    json_mode = orchestrator._cache_session_key(
+        _affinity_request(json_mode=True), _standard_route(orchestrator)
+    )
     assert plain is not None and json_mode is not None
     assert json_mode != plain
-    assert json_mode.startswith("daintree-main-json-")
+    assert json_mode.startswith("daintree-main-standard-json-")
     # The longer namespace must still clear OpenRouter's 256-character cap.
     assert len(json_mode) <= 256
 
@@ -2144,23 +2153,30 @@ async def test_json_mode_main_request_reaches_the_wire_with_its_key(
     # json_object call to `selection_requests` only when a selection result IS set
     # (tests/fakes.py), which would swallow the JSON main call too. With it unset
     # both land in `requests`, and the model id separates them — the selector
-    # always calls CEREBRAS_MODEL, while the main call uses the upstream model
-    # passed to `complete`. The selector then fails to parse "done" and degrades
+    # With it unset both land in `requests`, and the AFFINITY KEY separates them:
+    # only main conversation calls carry the `daintree-main-` namespace (the
+    # comparator selector keys its own by catalog revision). Model id no longer
+    # discriminates, because that selector runs on the Standard model too. The selector then fails to parse "done" and degrades open, which is
+    # its documented posture and does not stop the main call. The selector then fails to parse "done" and degrades
     # open, which is its documented posture and does not stop the main call.
     fake_provider.complete_result = make_result(content="done")
 
     request = _affinity_request(json_mode=True)
     await orchestrator.complete(
-        request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        request, api_key=TEST_API_KEY
     )
 
-    main_calls = [r for r in fake_provider.requests if r.model == "deepseek-v4-flash"]
+    main_calls = [
+        r
+        for r in fake_provider.requests
+        if (r.cache_session_id or "").startswith("daintree-main-")
+    ]
     assert len(main_calls) == 1
     sent = main_calls[0]
     assert sent.response_format == {"type": "json_object"}
-    assert sent.cache_session_id == orchestrator._cache_session_key(request)
+    assert sent.cache_session_id == orchestrator._cache_session_key(request, _standard_route(orchestrator))
     assert sent.cache_session_id is not None
-    assert sent.cache_session_id.startswith("daintree-main-json-")
+    assert sent.cache_session_id.startswith("daintree-main-standard-json-")
 
 
 # ---------------------------------------------------------------------------
@@ -2196,7 +2212,7 @@ async def test_nonstreaming_timings_are_measured_not_merely_present(
     fake_provider.complete_result = make_result(content="done")
 
     outcome = await orchestrator.complete(
-        _timing_request(stream=False), upstream_model="m", api_key=TEST_API_KEY
+        _timing_request(stream=False), api_key=TEST_API_KEY
     )
 
     t = outcome.body["timings"]
@@ -2229,7 +2245,7 @@ async def test_streaming_timings_ride_the_terminal_event(
     fake_provider.stream_result = FakeStream(make_text_chunks("hello there"))
 
     outcome = await orchestrator.complete(
-        _timing_request(stream=True), upstream_model="m", api_key=TEST_API_KEY
+        _timing_request(stream=True), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = await _drain(outcome.stream)
@@ -2269,7 +2285,7 @@ async def test_a_skipped_selector_reports_no_selection_time(
             "generation": {"stream": False},
         }
     )
-    outcome = await orchestrator.complete(request, upstream_model="m", api_key=TEST_API_KEY)
+    outcome = await orchestrator.complete(request, api_key=TEST_API_KEY)
 
     assert outcome.body["skills"]["selector"]["ran"] is False
     assert "selection_ms" not in outcome.body["timings"]
@@ -2352,7 +2368,7 @@ def _with_runaway_limit(orchestrator: ChatOrchestrator, limit: int) -> ChatOrche
         selector=orchestrator.selector,
         state_codec=orchestrator.state_codec,
         assembler=orchestrator.assembler,
-        provider=orchestrator.provider,
+        modes=orchestrator.modes,
     )
 
 
@@ -2439,7 +2455,7 @@ async def test_stream_runaway_is_cut_off_and_reported_as_an_error(
     stream = FakeStream(make_text_chunks("degenerate " * limit))
     fake_provider.stream_factory = lambda _request: stream
     outcome = await orchestrator.complete(
-        _plain_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _plain_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = await _drain(outcome.stream)
@@ -2467,7 +2483,7 @@ async def test_stream_runaway_delivers_nothing_past_the_limit(
     stream = FakeStream(make_text_chunks("degenerate " * limit))  # ~11x the limit
     fake_provider.stream_factory = lambda _request: stream
     outcome = await orchestrator.complete(
-        _plain_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _plain_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     delivered = _streamed_content(await _drain(outcome.stream))
@@ -2501,7 +2517,7 @@ async def test_a_tool_call_does_not_exempt_the_rest_of_the_reply(
     fake_provider.stream_factory = lambda _request: FakeStream(chunks)
     outcome = await orchestrator.complete(
         _intent_stream_request("runaway-after-tool-call"),
-        upstream_model="deepseek-v4-flash",
+
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
@@ -2531,7 +2547,7 @@ async def test_large_tool_call_arguments_do_not_count_toward_the_prose_ceiling(
     fake_provider.stream_factory = lambda _request: FakeStream(chunks)
     outcome = await orchestrator.complete(
         _intent_stream_request("big-tool-args"),
-        upstream_model="deepseek-v4-flash",
+
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None
@@ -2551,7 +2567,7 @@ async def test_an_ordinary_long_reply_is_not_treated_as_a_runaway(
     body = ("a real answer. " * (limit // 30)).strip()  # ~half the limit
     fake_provider.stream_factory = lambda _request: FakeStream(make_text_chunks(body))
     outcome = await orchestrator.complete(
-        _plain_stream_request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        _plain_stream_request(), api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     events = await _drain(outcome.stream)
@@ -2574,7 +2590,7 @@ async def test_the_limit_itself_is_allowed_and_one_character_more_is_not(
         _exact_content_chunks(["x"] * limit)
     )
     at_limit = await small.complete(
-        _plain_stream_request("at-limit"), upstream_model="deepseek-v4-flash",
+        _plain_stream_request("at-limit"),
         api_key=TEST_API_KEY,
     )
     assert at_limit.stream is not None
@@ -2586,7 +2602,7 @@ async def test_the_limit_itself_is_allowed_and_one_character_more_is_not(
         _exact_content_chunks(["x"] * (limit + 1))
     )
     over = await small.complete(
-        _plain_stream_request("over-limit"), upstream_model="deepseek-v4-flash",
+        _plain_stream_request("over-limit"),
         api_key=TEST_API_KEY,
     )
     assert over.stream is not None
@@ -2609,7 +2625,7 @@ async def test_a_zero_limit_disables_the_guard(
     body = "degenerate " * 4000
     fake_provider.stream_factory = lambda _request: FakeStream(make_text_chunks(body))
     outcome = await disabled.complete(
-        _plain_stream_request("guard-off"), upstream_model="deepseek-v4-flash",
+        _plain_stream_request("guard-off"),
         api_key=TEST_API_KEY,
     )
     assert outcome.stream is not None

@@ -34,8 +34,9 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from daintree_assistant_server.config import SERVING_MODEL, Settings
+from daintree_assistant_server.config import Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
+from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.prompts.loader import (
     TEMPLATE_SELECTOR_SYSTEM,
     PromptLoader,
@@ -96,7 +97,7 @@ def _body_for(
     *,
     enforced: bool = False,
 ) -> dict[str, Any]:
-    pr = assembler.build_main_request(request=request, skills=skills, upstream_model=SERVING_MODEL)
+    pr = assembler.build_main_request(request=request, skills=skills, upstream_model=STANDARD_MODEL)
     if enforced:
         # The PRODUCTION filter, not a re-implementation of it. A benchmark that
         # modelled enforcement separately would keep measuring its own model long
@@ -549,7 +550,7 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         "meta": {
             "benchmark": "prompt_cost",
             "mode": "deterministic",
-            "model": SERVING_MODEL,
+            "model": STANDARD_MODEL,
             "catalog_revision": catalog.revision,
             "tool_inventory_count": len(load_tool_inventory()),
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),

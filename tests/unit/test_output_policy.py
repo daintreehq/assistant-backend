@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
+from daintree_assistant_server.modes import uniform_registry
 from daintree_assistant_server.providers.base import ProviderChatResult, ProviderUsage
 from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
 from daintree_assistant_server.services.output_policy import (
@@ -180,7 +181,7 @@ def _orch_with(settings: Settings, **fixtures: object) -> ChatOrchestrator:
         selector=fixtures["selector"],  # type: ignore[arg-type]
         state_codec=fixtures["state_codec"],  # type: ignore[arg-type]
         assembler=fixtures["assembler"],  # type: ignore[arg-type]
-        provider=fixtures["fake_provider"],  # type: ignore[arg-type]
+        modes=uniform_registry(fixtures["fake_provider"]),  # type: ignore[arg-type]
     )
 
 

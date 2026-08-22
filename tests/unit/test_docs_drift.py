@@ -31,19 +31,24 @@ from daintree_assistant_server.config import (
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
     PUBLIC_MODEL_ID,
-    SERVING_HOST,
-    SERVING_KEY_ENV,
-    SERVING_MODEL,
     Settings,
 )
 from daintree_assistant_server.errors import DaintreeError
+from daintree_assistant_server.modes import MODE_SPECS, STANDARD_SPEC
 from daintree_assistant_server.providers.cerebras import CerebrasProvider
 from daintree_assistant_server.providers.together import TogetherProvider
 from daintree_assistant_server.services.task_runner import TaskRunner
 
-#: The adapter SERVING_HOST currently selects. The Cerebras one keeps its own
-#: wire-contract tests below either way — it is the host we switch back to.
-_SERVING_PROVIDER_CLASS = TogetherProvider if SERVING_HOST == "together" else CerebrasProvider
+#: Which adapter class serves a provider id. Both are live now — one per product
+#: mode — so both keep their wire-contract tests below.
+_ADAPTERS = {"together": TogetherProvider, "cerebras": CerebrasProvider}
+
+#: Where each host publishes its data-handling position. Written out rather than
+#: derived from the API origin, because they are genuinely different domains —
+#: Together serves from `api.together.xyz` and publishes at `together.ai`. A
+#: derivation that happened to work for one host would silently accept nothing
+#: at all for the other.
+_POLICY_DOMAINS = {"together": "together.ai", "cerebras": "cerebras.ai"}
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src" / "daintree_assistant_server"
@@ -220,21 +225,29 @@ def test_provider_policy_names_the_upstream_whose_policy_this_now_is() -> None:
     per request, it is the serving host's published policy, so a reader has to
     know whose policy to read.
 
-    That makes WHICH HOST a privacy fact. This test used to assert the literal
-    string "cerebras", which meant it kept passing after the host moved to
-    Together and actively required the stale name to stay — a drift gate holding
-    the drift in place. It follows `SERVING_HOST` now.
+    That makes WHICH HOST a privacy fact — and there are TWO of them now, one
+    per product mode. A doc naming only the mode a reader defaults into leaves
+    the other tier's data handling undocumented, which is the half a privacy
+    reviewer would actually be surprised by.
+
+    This test used to assert the literal string "cerebras", which meant it kept
+    passing after the host moved to Together and actively required the stale
+    name to stay — a drift gate holding the drift in place. It follows the mode
+    table now.
     """
     text = _read(DOC_PROVIDER).lower()
-    assert SERVING_HOST in text, (
-        f"docs/PROVIDER_POLICY.md does not name {SERVING_HOST}, the host whose "
-        "published policy the privacy claim now rests on."
-    )
-    assert f"{SERVING_HOST}.ai" in text or f"www.{SERVING_HOST}.ai" in text, (
-        "docs/PROVIDER_POLICY.md section 4 must link the serving host's own "
-        "authoritative data-handling page. The privacy claim rests on it, so a "
-        "reader has to be able to reach it."
-    )
+    for mode, spec in MODE_SPECS.items():
+        host = spec.provider_id
+        assert host in text, (
+            f"docs/PROVIDER_POLICY.md does not name {host}, the host serving "
+            f"{mode.value} mode and whose published policy that tier's privacy "
+            "claim rests on."
+        )
+        assert _POLICY_DOMAINS[host] in text, (
+            f"docs/PROVIDER_POLICY.md must link {host}'s own authoritative "
+            "data-handling page. The privacy claim rests on it, so a reader has "
+            "to be able to reach it."
+        )
 
 
 def test_provider_policy_states_the_privacy_posture_explicitly() -> None:
@@ -345,15 +358,20 @@ def test_task_runner_actually_sends_reasoning_disabled() -> None:
 
 def test_provider_policy_names_the_pinned_models() -> None:
     text = _read(DOC_PROVIDER)
-    for model in (SERVING_MODEL, PUBLIC_MODEL_ID):
+    pinned = [spec.upstream_model for spec in MODE_SPECS.values()]
+    for model in (*pinned, PUBLIC_MODEL_ID):
         assert model in text, (
             f"docs/PROVIDER_POLICY.md does not name {model!r}. The model table is "
             "the documented source of truth for what actually answers a call."
         )
 
 
-def test_readme_names_the_pinned_main_model() -> None:
-    assert SERVING_MODEL in _read(README)
+def test_readme_names_both_pinned_models() -> None:
+    readme = _read(README)
+    for mode, spec in MODE_SPECS.items():
+        assert spec.upstream_model in readme, (
+            f"README does not name the model serving {mode.value} mode."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -384,7 +402,7 @@ def test_no_document_claims_the_caller_funds_the_turn(path: Path) -> None:
             continue
         pytest.fail(
             f"{path.name}:{number} says {match.group(0)!r}. The server holds the "
-            f"upstream credential ({SERVING_KEY_ENV}) and funds every turn from it; "
+            "upstream credentials and funds every turn from them; "
             "callers supply no key. See docs/KEY_HANDLING.md."
         )
 
@@ -399,11 +417,10 @@ def test_serving_provider_is_built_with_the_server_credential() -> None:
     reordering and renaming of everything around it.
     """
     builder = inspect.getsource(main_module._build_provider)
-    expected = f"settings.{SERVING_KEY_ENV.lower()}"
-    assert expected in builder, (
-        "main._build_provider no longer passes the server credential. Readiness "
-        f"gates on {SERVING_KEY_ENV} precisely so this cannot be missing at "
-        "runtime; a provider built without it cannot answer anything."
+    assert "settings.provider_api_key(" in builder, (
+        "main._build_provider no longer passes a server credential. Readiness "
+        "gates on both provider keys precisely so this cannot be missing at "
+        "runtime; a provider built without one cannot answer anything."
     )
 
 
@@ -413,14 +430,14 @@ def test_the_serving_provider_really_holds_the_credential() -> None:
     A request that arrives with no caller key must still be servable — that is the
     entire current credential model, and the thing an anonymous CLI depends on.
     """
-    settings = Settings(**{
-        "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-        SERVING_KEY_ENV: "sk-server-owned",
-    })
-    provider = main_module._build_provider(settings)
-    assert isinstance(provider, _SERVING_PROVIDER_CLASS)
-    # No per-call key: the server's own is what gets resolved.
-    assert provider._resolve_key(None).get_secret_value() == "sk-server-owned"
+    for mode, spec in MODE_SPECS.items():
+        settings = Settings(**{
+            "STATE_SIGNING_KEY_CURRENT": "x" * 32,
+            spec.key_env: "sk-server-owned",
+        })
+        provider = main_module._build_provider(settings, spec)
+        # No per-call key: the server's own is what gets resolved, on EVERY route.
+        assert provider._resolve_key(None).get_secret_value() == "sk-server-owned", mode
 
 
 def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
@@ -434,9 +451,9 @@ def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
 
     settings = Settings(**{
         "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-        SERVING_KEY_ENV: "sk-server-owned",
+        STANDARD_SPEC.key_env: "sk-server-owned",
     })
-    provider = main_module._build_provider(settings)
+    provider = main_module._build_provider(settings, STANDARD_SPEC)
     resolved = provider._resolve_key(_SecretStr("sk-caller-supplied"))
     assert resolved.get_secret_value() == "sk-caller-supplied"
 

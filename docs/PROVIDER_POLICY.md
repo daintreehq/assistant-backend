@@ -15,11 +15,18 @@ present tense.
 
 ---
 
-## 1. Provider and models
+## 1. Product modes, providers and models
 
-The **only** upstream is **Cerebras Inference** (`https://api.cerebras.ai/v1`,
-OpenAI-compatible wire format). It is a model **host**, not a router: one endpoint
-serves each model, and there is nothing to select between.
+Daintree serves **two product modes**, and both are active in every deployment:
+
+| Mode | Provider | Model | Character |
+|---|---|---|---|
+| `standard` | Together AI (`https://api.together.xyz/v1`) | `deepseek-ai/DeepSeek-V4-Flash-0731` | the default; the more capable model |
+| `pro` | Cerebras Inference (`https://api.cerebras.ai/v1`) | `gemma-4-31b` | the FAST tier — p50 486ms against Standard's 1100ms |
+
+Both are OpenAI-compatible wire formats, and both hosts are model **hosts**
+rather than routers: one endpoint serves each model and there is nothing to
+select between.
 
 That single fact is why this document is much shorter than it used to be. Under
 OpenRouter, ~24 interchangeable endpoints served the same weights and a `provider`
@@ -27,42 +34,51 @@ block on every request decided which one answered — which meant a privacy filt
 a ranking axis, a latency floor, a fallback policy, an output-quality denylist, a
 sticky-affinity key and a caller-facing `routing` preference to expose all of it.
 None of that has a subject any more, so all of it is **deleted rather than
-neutered** (git history has the previous revision). What remains is the part that
-was never about routing: which model answers, what the upstream promises about
-data, how failures are retried, and what error the caller gets back.
+neutered** (git history has the previous revision). Two hosts is not a return to
+routing: a caller names a MODE, the server owns the mapping, and there is exactly
+one route per mode with no fallback between them.
 
-| Call | Model | Source of truth |
+| Call | Route | Source of truth |
 |---|---|---|
-| Main completion | `deepseek-ai/DeepSeek-V4-Flash-0731` on Together | `config.SERVING_MODEL` |
-| Utility tasks | `deepseek-ai/DeepSeek-V4-Flash-0731` on Together | `config.SERVING_MODEL` |
+| Main completion | the request's mode | `modes.MODE_SPECS` |
+| Utility tasks | the request's mode | `TaskProfile.provider_id == "request_mode"` |
 | Skill selection | — local two-stage ONNX selector, no upstream call | `skills/local/setwise.py` |
 
-**The host is the latency decision, not the model.** These are the same weights
-`context_compact` reached through OpenRouter for months. OpenRouter is a router
-and this server sends it no routing preferences (there is no `provider` block —
-see above), so its endpoint choice is whatever the default is that minute.
-Replaying the 62 real utility-task payloads against both: Together p50 1100ms /
-p90 1702ms, OpenRouter p50 3414ms / p90 6013ms. Nothing about the model changed.
+**A caller chooses a mode, never a provider or a model id.** `modes.py` owns the
+whole mapping — provider, model, thinking policy, cache namespace — and the
+public response says `daintree-assistant` in both modes. The product promise is
+Standard or Pro, not a permanent contract with Together, Cerebras, DeepSeek or
+Gemma. Swapping Gemma for Qwen 3.8 the day Cerebras serves it is editing
+`modes.PRO_MODEL`; no caller, wire shape, or stored preference moves with it.
 
-`config.SERVING_HOST` names the host and `config.SERVING_MODEL` the model;
-switching back to Cerebras and `gemma-4-31b` is those two lines. The adapters are
-selected from `SERVING_HOST` in `main._build_provider`, readiness gates the
-matching credential (`SERVING_KEY_ENV`), and `weak_secrets` pins the matching
-origin in production.
+**No automatic cross-mode fallback exists, and none may be added.** If Pro's
+provider is unavailable, a Pro turn fails as Pro. Answering it from Standard
+would change expected quality, cost, latency, tool-call behaviour and cache
+lineage under a label the user chose deliberately — invisibly, which is the part
+that makes it indefensible rather than merely wrong. Retries stay inside the
+resolved route; switching mode is a new request the user authorizes.
 
-**One model, singular.** The second one existed for skill learning — a background
-pass that read a completed workflow and wrote or rewrote a skill file from model
-output. That feature has been removed: it spent a large thinking budget per turn
-on a catalog a human curates anyway.
+**The host is the latency decision, not the model.** Standard's weights are the
+same ones `context_compact` reached through OpenRouter for months. OpenRouter is
+a router and this server sends it no routing preferences (there is no `provider`
+block — see above), so its endpoint choice is whatever the default is that
+minute. Replaying the 62 real utility-task payloads: Together p50 1100ms / p90
+1702ms, OpenRouter p50 3414ms / p90 6013ms. Nothing about the model changed.
 
-The id is **hardcoded** — a product decision, not deployment config. There is no
-environment override, and there must not be one: every prompt and benchmark in
-this repository is calibrated against this exact model.
+Readiness gates **both** credentials (`TOGETHER_API_KEY`, `CEREBRAS_API_KEY`) and
+`weak_secrets` pins **both** production origins, because the service advertises
+both modes unconditionally. A deployment that can serve only one is incomplete,
+not a single-mode deployment, and it must fail `/readyz` rather than discover the
+gap on a user's first Pro turn.
+
+Both model ids are **hardcoded** — a product decision, not deployment config.
+There is no environment override, and there must not be one: every prompt and
+benchmark in this repository is calibrated against these exact models.
 
 **`gemma-4-31b` is a preview model and Cerebras has said it will be replaced.**
-When that happens the constant is the whole code change, but not the whole job:
-see §9. Two properties of this specific model are load-bearing beyond quality —
-it does not reason (§2) and it is what the prompt budgets are sized against.
+When that happens `modes.PRO_MODEL` is the whole code change, but not the whole
+job: see §9. Two properties of that specific model are load-bearing beyond
+quality — it does not reason (§2) and it is what Pro's budgets are sized against.
 
 > **Skill selection is not an upstream call.** It runs as a LOCAL in-process
 > two-stage selector (`skills/local/`, no credential, no endpoint, ~10ms). The

@@ -24,8 +24,8 @@ from typing import Any
 
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import SERVING_MODEL
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
+from daintree_assistant_server.modes import STANDARD_MODEL
 
 from .._harness.cases import CaseError, load_yaml_cases
 from .._harness.env import build_settings, caller_api_key, make_upstream_provider
@@ -188,7 +188,7 @@ async def _run_case(
     req = _build_request(case, payload, i)
     t0 = time.perf_counter()
     outcome = await orchestrator.complete(
-        req, upstream_model=SERVING_MODEL, api_key=api_key
+        req, api_key=api_key
     )
     latency = time.perf_counter() - t0
     body = outcome.body or {}
@@ -336,7 +336,7 @@ async def run_bench(
         "meta": {
             "benchmark": "injection_live",
             "mode": "live",
-            "model": SERVING_MODEL,
+            "model": STANDARD_MODEL,
             "trials": trials,
             # What a COMPLETE run of this corpus looks like, recorded so the
             # quality gate can tell one from a --filter'd or interrupted run.

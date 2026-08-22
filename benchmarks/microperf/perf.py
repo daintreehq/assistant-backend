@@ -37,8 +37,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.config import SERVING_MODEL, Settings
+from daintree_assistant_server.config import Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
+from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.observability import configure_logging
 from daintree_assistant_server.providers.base import (
     ProviderChatRequest,
@@ -377,7 +378,7 @@ async def measure_concurrency(
     ) -> float:
         nonlocal warning_count, warning_count_at_cap
         outcome = await orchestrator.complete(
-            request, upstream_model=SERVING_MODEL, api_key=BENCH_CALLER_KEY
+            request, api_key=BENCH_CALLER_KEY
         )
         elapsed = time.perf_counter() - t_submit
         n_warn = len((outcome.body or {}).get("warnings") or [])
@@ -558,7 +559,7 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         "meta": {
             "benchmark": "microperf",
             "mode": "deterministic",
-            "model": SERVING_MODEL,
+            "model": STANDARD_MODEL,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
             "platform": platform.platform(),
             "python_version": platform.python_version(),

@@ -17,6 +17,7 @@ import asyncio
 import pytest
 from fakes import FakeProvider, FakeStream
 
+from daintree_assistant_server.modes import DEFAULT_MODE
 from daintree_assistant_server.services.deadlines import BudgetPolicy, RequestBudget
 
 
@@ -69,7 +70,7 @@ async def test_a_stalled_preparation_becomes_an_attributable_error(
     with pytest.raises(DaintreeError) as exc:
         await container.orchestrator._prepare(
             body,
-            upstream_model="m",
+            route=container.modes.resolve(DEFAULT_MODE),
             request_id="req_1",
             api_key=SecretStr("k"),
             budget=_tiny_budget(),
@@ -155,7 +156,7 @@ async def test_a_stalled_stream_ends_with_a_terminal_error_not_a_fabricated_done
         }
     )
     outcome = await container.orchestrator.complete(
-        body, upstream_model="m", api_key=SecretStr("k"), request_id="req_2"
+        body, api_key=SecretStr("k"), request_id="req_2"
     )
     assert outcome.stream is not None
 
@@ -580,7 +581,7 @@ async def _drain(container, *, request_id: str) -> str:  # type: ignore[no-untyp
         }
     )
     outcome = await container.orchestrator.complete(
-        body, upstream_model="m", api_key=SecretStr("k"), request_id=request_id
+        body, api_key=SecretStr("k"), request_id=request_id
     )
     assert outcome.stream is not None
     parts: list[str] = []

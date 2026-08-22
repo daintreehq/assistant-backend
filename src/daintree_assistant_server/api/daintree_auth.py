@@ -6,11 +6,16 @@ supplied the credential that funded their turns and our own auth was structural
 and only failed minutes later, mid-task.
 
 The credential moved to the server, so the question moved with it. What this
-endpoint verifies now is **whichever key this request would actually spend**: the
-caller's if they sent one, the server's ``CEREBRAS_API_KEY`` otherwise — which is
-every request today. Same probe, same verdict shape, and still the only honest
-answer available before a real turn: it costs no tokens (a model listing, not a
-generation).
+endpoint verifies now is **the key the named MODE would actually spend** — the
+server's, on the provider that mode routes to. Same probe, same verdict shape,
+and still the only honest answer available before a real turn: it costs no
+tokens (a model listing, not a generation).
+
+The mode is part of the question, not decoration. Standard and Pro spend
+different credentials at different vendors, so "is the backend able to run a
+turn for me?" has two answers, and verifying one of them says nothing about the
+other. An omitted mode verifies Standard, matching what an omitted mode does on
+every other surface.
 
 It is deliberately kept rather than deleted while the door is open. Account
 authentication is being built next, and this is where a caller learns their
@@ -22,17 +27,28 @@ from __future__ import annotations
 import math
 
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, ConfigDict
 
 from ..auth import Principal, require_auth
 from ..errors import DaintreeError
+from ..modes import DEFAULT_MODE, OperationMode
 from .deps import require_ready
 
 router = APIRouter()
 
 
+class VerifyRequest(BaseModel):
+    """Which mode's credential to verify. The whole body, and it is optional."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: OperationMode = DEFAULT_MODE
+
+
 @router.post("/v1/daintree/auth/verify")
 async def verify(
     request: Request,
+    body: VerifyRequest | None = None,
     principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
 ) -> dict[str, object]:
@@ -52,8 +68,16 @@ async def verify(
     we genuinely do not know and must not imply a verdict.
     """
     container = request.app.state.container
-    provider = container.provider
     settings = request.app.state.settings
+    mode = body.mode if body is not None else DEFAULT_MODE
+    # ONE resolution, held as an object. The scrub below reads `route.spec`, so
+    # the credential it removes is by construction the one the provider it just
+    # probed was built with. Deriving the two independently — resolving the
+    # provider from the registry and the key from the global spec table — was
+    # correct only while the two agreed, and this file has already shipped the
+    # version of that bug where they did not.
+    route = container.modes.resolve(mode)
+    provider = route.provider
 
     try:
         record = await provider.verify_key()
@@ -63,6 +87,7 @@ async def verify(
             # as our own 401 — our door already accepted this request, and reusing the
             # 401 code here would tell the CLI to re-send the same header.
             return {
+                "mode": mode.value,
                 "valid": False,
                 "usable": False,
                 "reason": REASON_REJECTED,
@@ -79,15 +104,19 @@ async def verify(
     # because they cost nothing to keep and are exactly what an account-mapped
     # credential will want to report; `_usability` below is already written to
     # treat their absence as "not known to be exhausted" rather than a failure.
-    out: dict[str, object] = {"valid": True}
+    out: dict[str, object] = {"mode": mode.value, "valid": True}
     if isinstance(record, dict):
         models = record.get("models")
         if isinstance(models, list):
             out["models"] = [m for m in models if isinstance(m, str)]
-        # The credential ACTUALLY probed, not a vendor-named field: `verify_key`
-        # runs against the serving adapter, so redacting against a host we are not
-        # talking to would let the live key through in a label that echoed it.
-        label = _safe_label(record.get("label"), settings.serving_api_key.get_secret_value())
+        # The credential ACTUALLY probed, resolved from the SAME mode that chose
+        # the adapter two lines above. Redacting against the other mode's key
+        # would let this one through verbatim in a label that echoed it — the
+        # scrub would run, find nothing to remove, and report success. That is
+        # not hypothetical: it is the shape of a bug this file has already had,
+        # when the redaction named a vendor while the probe followed the config.
+        probed_key = settings.provider_api_key(route.spec.provider_id)
+        label = _safe_label(record.get("label"), probed_key.get_secret_value())
         if label:
             out["label"] = label
         for field in ("limit", "usage", "limit_remaining"):

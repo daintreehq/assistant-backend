@@ -29,9 +29,9 @@ from typing import Any
 
 from pydantic import SecretStr, ValidationError
 
-from daintree_assistant_server.config import SERVING_MODEL
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
+from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.services.task_runner import build_profiles
 
 from .._harness.cases import CaseError, load_yaml_cases
@@ -214,7 +214,7 @@ async def run_bench(
         "meta": {
             "benchmark": "workflow_intel",
             "mode": "live",
-            "model": SERVING_MODEL,
+            "model": STANDARD_MODEL,
             "trials": trials,
             # What a COMPLETE run looks like, so the quality gate can tell one
             # from a --filter'd or interrupted run rather than grading whatever

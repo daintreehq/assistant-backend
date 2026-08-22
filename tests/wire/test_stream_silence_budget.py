@@ -151,7 +151,7 @@ async def test_a_stalled_open_still_heartbeats(
         }
     )
     outcome = await container.orchestrator.complete(
-        body, upstream_model="m", api_key=SecretStr("k"), request_id="req_hb"
+        body, api_key=SecretStr("k"), request_id="req_hb"
     )
     assert outcome.stream is not None
     parts: list[str] = []

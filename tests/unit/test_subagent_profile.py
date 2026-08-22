@@ -130,8 +130,9 @@ def test_subagent_drops_the_orchestration_context_blocks(assembler: PromptAssemb
             },
             turn={"goal": "the orchestrator's goal", "workflow_runs": ["wfr_1"]},
         ),
-        upstream_model="m",
+
         skills=[],
+        upstream_model="m",
     )
     text = _all_text(out)
     for absent in ("# Open terminals", "# Current turn", "# Display context", "wfr_1"):
@@ -145,8 +146,9 @@ def test_subagent_keeps_the_startup_block(assembler: PromptAssembler) -> None:
             profile="subagent",
             startup={"project": {"id": "p", "name": "Terrain", "path": "/repo/terrain"}},
         ),
-        upstream_model="m",
+
         skills=[],
+        upstream_model="m",
     )
     assert "/repo/terrain" in _all_text(out)
 
@@ -159,7 +161,7 @@ def test_subagent_forwards_its_tool_inventory(assembler: PromptAssembler) -> Non
         }
     ]
     out = assembler.build_main_request(
-        request=_req(profile="subagent", tools=tools), upstream_model="m", skills=[]
+        request=_req(profile="subagent", tools=tools), skills=[], upstream_model="m"
     )
     assert [t["function"]["name"] for t in out.tools] == ["fs__search"]
 
@@ -254,7 +256,7 @@ async def test_subagent_selects_from_a_narrowed_menu(settings, fake_provider) ->
     try:
         outcome = await container.orchestrator.complete(
             _orchestrator_request("subagent", tools=_READ_ONLY_TOOLS),
-            upstream_model="m",
+
             api_key=SecretStr("k"),
             request_id="req_sub",
         )
@@ -312,7 +314,7 @@ async def test_an_empty_menu_skips_the_selector_entirely(settings, fake_provider
                     "function": {"name": "nothing__at__all", "description": "x", "parameters": {"type": "object"}},
                 }],
             ),
-            upstream_model="m",
+
             api_key=SecretStr("k"),
             request_id="req_empty",
         )
@@ -340,7 +342,7 @@ async def test_the_same_text_DOES_run_the_selector_for_the_assistant(
     try:
         outcome = await container.orchestrator.complete(
             _orchestrator_request(None),
-            upstream_model="m",
+
             api_key=SecretStr("k"),
             request_id="req_main",
         )
@@ -571,7 +573,7 @@ async def test_a_subagent_pin_outside_its_menu_is_refused_and_warned(
                 tools=_READ_ONLY_TOOLS,
                 selection={"pinned_skill_ids": [outside]},
             ),
-            upstream_model="m",
+
             api_key=SecretStr("k"),
             request_id="req_pin_denied",
         )
@@ -618,7 +620,7 @@ async def test_a_subagent_pin_inside_its_menu_loads(settings, fake_provider) -> 
                 tools=_READ_ONLY_TOOLS,
                 selection={"pinned_skill_ids": [inside]},
             ),
-            upstream_model="m",
+
             api_key=SecretStr("k"),
             request_id="req_pin_ok",
         )

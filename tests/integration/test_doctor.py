@@ -11,13 +11,14 @@ Two properties carry this endpoint, and both are easy to lose:
 
 from __future__ import annotations
 
+import contextlib
 import json
 
 import pytest
 from fastapi.testclient import TestClient
 
-from daintree_assistant_server.config import SERVING_HOST
 from daintree_assistant_server.errors import invalid_api_key, upstream_error
+from daintree_assistant_server.modes import MODE_SPECS
 
 URL = "/v1/daintree/doctor"
 
@@ -30,9 +31,9 @@ def test_doctor_reports_a_healthy_server(client, auth, fake_provider) -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["ready"] is True
-    assert body["provider"]["key_valid"] is True
-    assert body["provider"]["key_usable"] is True
-    assert body["provider"]["server_holds_credential"] is True
+    assert body["modes"]["standard"]["key_valid"] is True
+    assert body["modes"]["standard"]["key_usable"] is True
+    assert body["modes"]["standard"]["server_holds_credential"] is True
     assert body["catalog"]["revision"]
     assert body["catalog"]["skills"] > 0
     assert body["warnings"] == []
@@ -48,7 +49,9 @@ def test_doctor_verifies_the_server_credential(client, auth, fake_provider) -> N
     """
     client.post(URL, headers=auth)
 
-    assert len(fake_provider.verify_key_calls) == 1
+    # One probe PER MODE: both credentials are verified, because an instance
+    # whose Pro key was never granted looks healthy on every other check.
+    assert len(fake_provider.verify_key_calls) == 2
     # No argument: the provider falls back to its configured credential.
     assert fake_provider.verify_key_calls[0] is None
 
@@ -60,9 +63,9 @@ def test_a_rejected_key_is_a_verdict_not_an_error(client, auth, fake_provider) -
 
     assert r.status_code == 200
     body = r.json()
-    assert body["provider"]["key_valid"] is False
-    assert body["provider"]["key_usable"] is False
-    assert "provider_key_rejected" in body["warnings"]
+    assert body["modes"]["standard"]["key_valid"] is False
+    assert body["modes"]["standard"]["key_usable"] is False
+    assert "provider_key_rejected:standard" in body["warnings"]
 
 
 def test_an_unreachable_provider_does_not_blame_the_key(client, auth, fake_provider) -> None:
@@ -78,9 +81,9 @@ def test_an_unreachable_provider_does_not_blame_the_key(client, auth, fake_provi
 
     assert r.status_code == 200
     body = r.json()
-    assert body["provider"]["key_valid"] is None
-    assert "provider_unreachable" in body["warnings"]
-    assert "provider_key_rejected" not in body["warnings"]
+    assert body["modes"]["standard"]["key_valid"] is None
+    assert "provider_unreachable:standard" in body["warnings"]
+    assert not any(w.startswith("provider_key_rejected") for w in body["warnings"])
 
 
 def test_an_exhausted_key_is_valid_but_unusable(client, auth, fake_provider) -> None:
@@ -90,10 +93,10 @@ def test_an_exhausted_key_is_valid_but_unusable(client, auth, fake_provider) -> 
     r = client.post(URL, headers=auth)
 
     body = r.json()
-    assert body["provider"]["key_valid"] is True
-    assert body["provider"]["key_usable"] is False
-    assert body["provider"]["reason"] == "credits_exhausted"
-    assert "provider_key_unusable" in body["warnings"]
+    assert body["modes"]["standard"]["key_valid"] is True
+    assert body["modes"]["standard"]["key_usable"] is False
+    assert body["modes"]["standard"]["reason"] == "credits_exhausted"
+    assert "provider_key_unusable:standard" in body["warnings"]
 
 
 def test_doctor_answers_on_a_server_that_never_became_ready(app, auth) -> None:
@@ -146,7 +149,7 @@ def test_doctor_is_reachable_without_a_bearer(client) -> None:
     with no credential goes first to find out what is wrong."""
     r = client.post(URL)
     assert r.status_code == 200
-    assert r.json()["provider"]["server_holds_credential"] is True
+    assert r.json()["modes"]["standard"]["server_holds_credential"] is True
 
 
 @pytest.mark.parametrize(
@@ -177,7 +180,7 @@ def test_the_bundle_carries_nothing_that_must_not_be_pasted(
 
 def test_the_bundle_reports_the_public_model_alias(client, auth) -> None:
     body = client.post(URL, headers=auth).json()
-    assert body["provider"]["model"] == "daintree-assistant"
+    assert body["modes"]["standard"]["public_model"] == "daintree-assistant"
 
 
 def test_the_bundle_states_who_holds_the_credential(client, auth) -> None:
@@ -189,9 +192,10 @@ def test_the_bundle_states_who_holds_the_credential(client, auth) -> None:
     What the bundle reports instead is who is paying.
     """
     body = client.post(URL, headers=auth).json()
-    assert body["provider"]["name"] == SERVING_HOST
-    assert body["provider"]["server_holds_credential"] is True
-    assert "privacy_mode" not in body["provider"]
+    for mode, spec in MODE_SPECS.items():
+        assert body["modes"][mode.value]["provider"] == spec.provider_id
+    assert body["modes"]["standard"]["server_holds_credential"] is True
+    assert "privacy_mode" not in body["modes"]["standard"]
 
 
 def test_doctor_survives_a_server_with_no_container_at_all(app, auth) -> None:
@@ -211,8 +215,8 @@ def test_doctor_survives_a_server_with_no_container_at_all(app, auth) -> None:
     body = r.json()
     assert body["ready"] is False
     assert body["catalog"]["revision"] is None
-    assert body["provider"]["key_valid"] is None
-    assert "provider_unavailable" in body["warnings"]
+    assert body["modes"]["standard"]["key_valid"] is None
+    assert "provider_unavailable:standard" in body["warnings"]
     assert "catalog_unavailable" in body["warnings"]
     # Build identity does not depend on the container and must still be there —
     # it is the first thing anyone triaging asks for.
@@ -227,7 +231,7 @@ def test_a_catalog_that_raises_is_a_finding_not_a_500(app, auth) -> None:
         def catalog(self):  # type: ignore[no-untyped-def]
             raise RuntimeError("catalog reload left the manager in a bad state")
 
-        provider = None
+        modes = None
 
         async def aclose(self) -> None:
             """Only so lifespan teardown does not fail the test for us."""
@@ -238,3 +242,101 @@ def test_a_catalog_that_raises_is_a_finding_not_a_500(app, auth) -> None:
 
     assert r.status_code == 200
     assert "catalog_unavailable" in r.json()["warnings"]
+
+
+# ---------------------------------------------------------------------------
+# Per-mode isolation. Everything above uses ONE fake under both modes, so it
+# cannot tell "both routes were probed" from "the Standard fake was probed
+# twice" — which is the regression that matters, because the mode nobody
+# exercises by default is the one a wiring mistake survives in.
+# ---------------------------------------------------------------------------
+
+
+@contextlib.contextmanager
+def _split_mode_client(settings, healthy, broken):
+    """A client whose two modes hold DIFFERENT providers.
+
+    The swap happens AFTER entering `TestClient`, not before. Entering runs the
+    app lifespan, which builds its own container and discards whatever was
+    installed beforehand — the same trap `conftest.client` documents for the
+    docs-client detachment, and one that would have left this whole section
+    passing while testing a single shared fake.
+    """
+    from conftest import detach_docs_client, scripted_selector
+    from fastapi.testclient import TestClient
+
+    from daintree_assistant_server.main import create_app
+    from daintree_assistant_server.modes import (
+        MODE_SPECS,
+        ModeRegistry,
+        OperationMode,
+        ResolvedMode,
+    )
+
+    seam = scripted_selector(healthy, settings)
+    application = create_app(settings=settings, provider=healthy, selector=seam)
+    with TestClient(application) as client:
+        container = application.state.container
+        detach_docs_client(container)
+        container.modes = ModeRegistry(
+            {
+                OperationMode.STANDARD: ResolvedMode(
+                    MODE_SPECS[OperationMode.STANDARD], healthy
+                ),
+                OperationMode.PRO: ResolvedMode(MODE_SPECS[OperationMode.PRO], broken),
+            }
+        )
+        yield client
+
+
+def test_a_broken_pro_key_is_reported_as_pro_and_leaves_standard_healthy(
+    settings, fake_provider, auth
+) -> None:
+    """A per-mode failure must be attributed to that mode and contained there.
+
+    Two things are wrong with an unnamespaced report here: an operator reading
+    "provider_key_rejected" cannot tell which tier to fix, and a Standard row
+    marked unhealthy because Pro is would send them to re-paste a working key.
+    """
+    from fakes import FakeProvider
+
+    from daintree_assistant_server.errors import invalid_api_key
+
+    broken = FakeProvider()
+    broken.verify_key_error = invalid_api_key("nope")
+
+    with _split_mode_client(settings, fake_provider, broken) as client:
+        body = client.post(URL, headers=auth).json()
+
+    assert body["modes"]["pro"]["key_valid"] is False
+    assert body["modes"]["standard"]["key_valid"] is True
+    assert "provider_key_rejected:pro" in body["warnings"]
+    assert "provider_key_rejected:standard" not in body["warnings"]
+    # Each fake saw exactly its own probe — this is what "one fake under both
+    # modes" could never show.
+    assert len(broken.verify_key_calls) == 1
+    assert len(fake_provider.verify_key_calls) == 1
+
+
+def test_a_provider_raising_an_untyped_error_does_not_500(settings, fake_provider, auth) -> None:
+    """The `except Exception` arm, which nothing pinned.
+
+    A doctor must survive what it diagnoses; an adapter raising something that is
+    not a DaintreeError (a malformed body crashing a parser, say) is exactly the
+    situation this endpoint exists for, and it must degrade rather than become
+    the outage it is reporting on.
+    """
+    from fakes import FakeProvider
+
+    class _Exploding(FakeProvider):
+        async def verify_key(self, api_key=None):  # type: ignore[no-untyped-def]
+            raise RuntimeError("the provider client is in a bad state")
+
+    with _split_mode_client(settings, fake_provider, _Exploding()) as client:
+        response = client.post(URL, headers=auth)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["modes"]["pro"]["key_valid"] is None, "unreachable is not the same as rejected"
+    assert "provider_unreachable:pro" in body["warnings"]
+    assert body["modes"]["standard"]["key_valid"] is True

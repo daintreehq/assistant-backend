@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import build_container, create_app
+from daintree_assistant_server.modes import uniform_registry
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
@@ -54,6 +55,13 @@ def _isolate_from_dotenv() -> Iterator[None]:
 @pytest.fixture
 def settings(tmp_path: Any) -> Settings:
     return Settings(
+        # BOTH provider credentials, explicitly. Supplying only one meant the
+        # other fell through to whatever `.env` held — so a developer with a real
+        # TOGETHER_API_KEY ran the redaction tests against their live secret and
+        # CI, having no `.env`, ran them against the empty string, where
+        # `assert key not in body` is unsatisfiable rather than merely weak.
+        # Sentinels here make both environments run the same test.
+        TOGETHER_API_KEY="tgp_v1_test-key",
         CEREBRAS_API_KEY="csk-test-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         STATE_SIGNING_KID="k1",
@@ -130,7 +138,7 @@ def orchestrator(
         selector=selector,
         state_codec=state_codec,
         assembler=assembler,
-        provider=fake_provider,
+        modes=uniform_registry(fake_provider),
     )
 
 
@@ -143,7 +151,7 @@ def task_runner(
 ) -> TaskRunner:
     return TaskRunner(
         settings=settings,
-        provider=fake_provider,
+        modes=uniform_registry(fake_provider),
         prompt_loader=prompt_loader,
         catalog_manager=catalog_manager,
     )

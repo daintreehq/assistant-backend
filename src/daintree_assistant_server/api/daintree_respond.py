@@ -46,11 +46,10 @@ async def respond(
 
     check_protocol_value(body.protocol_version)
 
-    upstream_model = validate_respond_request(body, settings)
+    validate_respond_request(body, settings)
 
     outcome = await container.orchestrator.complete(
         body,
-        upstream_model=upstream_model,
         # No per-call credential: the provider spends the SERVER's key. The
         # parameter is still there for benchmarks and live tests, which name the
         # credential they mean to spend; the serving path never does.

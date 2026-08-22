@@ -23,9 +23,10 @@ from typing import Any
 
 from pydantic import SecretStr
 
-from ..config import SERVING_MODEL, Settings
+from ..config import Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
+from ..modes import STANDARD_MODEL
 from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader, RenderCache
 from ..providers.base import (
     ChatProvider,
@@ -689,7 +690,10 @@ class Selector:
         # first-byte latency specifically and holds regardless of the main posture.
         # json_object output, never a forced tool_choice.
         return ProviderChatRequest(
-            model=SERVING_MODEL,
+            # The PAID comparator, pinned to Standard: it is measured against the
+            # local selector, and a comparator whose model moved with a caller's
+            # mode would not be one baseline.
+            model=STANDARD_MODEL,
             messages=messages,
             temperature=0.0,
             max_tokens=self.settings.selector_max_output_tokens,

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import re
 
-from ..config import SERVING_MODEL, Settings
+from ..config import Settings
 from ..contracts.daintree_api import RespondRequest, RespondToolChoice
 from ..contracts.openai import (
     ChatMessage,
@@ -316,12 +316,18 @@ def _validate_generation(req: RespondRequest) -> None:
         )
 
 
-def validate_respond_request(req: RespondRequest, settings: Settings) -> str:
-    """Run all semantic validation. Returns the (hardcoded) upstream model name."""
+def validate_respond_request(req: RespondRequest, settings: Settings) -> None:
+    """Run all semantic validation.
+
+    Returns nothing. It used to return the one hardcoded ``SERVING_MODEL``, which
+    made model resolution a side effect of validation — defensible while there
+    was exactly one model, and wrong the moment a caller's MODE decides it.
+    Resolution belongs at the route boundary, next to the entitlement check that
+    guards it; validation is about whether the request is well-formed.
+    """
     _validate_roles(req.input.messages)
     _validate_message_sequence(req.input.messages)
     _validate_tools(req.input.tools, req.input.tool_choice, settings)
     _validate_content(req.input.messages, settings)
     _validate_startup(req, settings)
     _validate_generation(req)
-    return SERVING_MODEL

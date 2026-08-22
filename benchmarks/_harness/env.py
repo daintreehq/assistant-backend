@@ -14,16 +14,31 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import SERVING_HOST, SERVING_KEY_ENV, Settings
+from daintree_assistant_server.config import Settings
+from daintree_assistant_server.modes import DEFAULT_MODE, MODE_SPECS, ModeSpec, OperationMode
 from daintree_assistant_server.providers.base import ChatProvider, ProviderChatRequest
 from daintree_assistant_server.providers.cerebras import CerebrasProvider
 from daintree_assistant_server.providers.together import TogetherProvider
 
-#: The adapter class ``config.SERVING_HOST`` selects. Benchmarks MUST build the
-#: same one production does: a suite that measured wire bytes or latency through
-#: a host the server does not use is reporting a number about nothing, and the
-#: failure is silent because both adapters answer the same calls.
-_SERVING_PROVIDER_CLASS = TogetherProvider if SERVING_HOST == "together" else CerebrasProvider
+#: Which adapter class serves a provider id. Benchmarks MUST build the same one
+#: production does: a suite that measured wire bytes or latency through a host
+#: the server does not use is reporting a number about nothing, and the failure
+#: is silent because both adapters answer the same calls.
+_ADAPTERS = {"together": TogetherProvider, "cerebras": CerebrasProvider}
+
+
+def bench_mode(mode: str | OperationMode | None = None) -> ModeSpec:
+    """The route a benchmark measures.
+
+    Defaults to Standard rather than "whatever is configured", because a
+    benchmark's job is to produce a comparable number: a suite whose route
+    followed a mutable setting would report two incomparable series under one
+    name. A suite measuring Pro passes it explicitly (``--mode pro``), and its
+    artifact should stamp the mode it ran.
+    """
+    if mode is None:
+        return MODE_SPECS[DEFAULT_MODE]
+    return MODE_SPECS[OperationMode(mode)]
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -72,63 +87,77 @@ def build_settings(
 BENCH_CALLER_KEY = SecretStr("benchmark-caller-key-not-a-secret")
 
 
-def caller_api_key(settings: Settings) -> SecretStr:
+def caller_api_key(settings: Settings, spec: ModeSpec | None = None) -> SecretStr:
+    spec = spec or bench_mode()
     """The per-call credential for service-level benchmark calls.
 
-    The real SERVING credential when the environment has one (live suites), else
-    the bench sentinel (deterministic suites, whose fake providers never build a
-    header from it). Follows ``config.SERVING_HOST`` rather than naming a vendor:
-    a benchmark holding the wrong host's key does not fail, it silently measures
-    a model production does not serve.
+    The real credential for the measured MODE when the environment has one (live
+    suites), else the bench sentinel (deterministic suites, whose fake providers
+    never build a header from it). Resolved from the mode rather than named as a
+    vendor: a benchmark holding the wrong host's key does not fail, it silently
+    measures a model that route does not serve.
     """
-    if settings.serving_api_key.get_secret_value():
-        return settings.serving_api_key
+    key = settings.provider_api_key(spec.provider_id)
+    if key.get_secret_value():
+        return key
     return BENCH_CALLER_KEY
 
 
-def require_api_key(settings: Settings) -> SecretStr:
-    """Validate the key is present and return it still wrapped.
+def require_api_key(settings: Settings, spec: ModeSpec | None = None) -> SecretStr:
+    """Validate the measured mode's key is present and return it still wrapped.
 
     Returned as a SecretStr so the plaintext is never carried around by a caller;
     the provider unwraps it only to build a header or to scrub an echoed key out of
     upstream error text.
     """
-    if not settings.serving_api_key.get_secret_value():
+    spec = spec or bench_mode()
+    key = settings.provider_api_key(spec.provider_id)
+    if not key.get_secret_value():
         raise EnvError(
-            f"{SERVING_KEY_ENV} is not set — export it or point --env-file at a .env "
-            "that has it (live suites make real calls)."
+            f"{spec.key_env} is not set — export it or point --env-file at a .env "
+            f"that has it (live suites make real calls; {spec.mode.value} mode "
+            f"routes to {spec.provider_id})."
         )
-    return settings.serving_api_key
+    return key
 
 
 def build_provider_body(
-    request: ProviderChatRequest, settings: Settings, *, stream: bool = False
+    request: ProviderChatRequest,
+    settings: Settings,
+    *,
+    stream: bool = False,
+    spec: ModeSpec | None = None,
 ) -> dict[str, Any]:
-    """The EXACT upstream body the SERVING adapter would POST — built through the
-    real provider (no network, no key needed) so the deterministic cache metric is
-    measured over production's wire bytes, not a hand-rebuilt dict."""
-    provider = _SERVING_PROVIDER_CLASS(
+    """The EXACT upstream body the measured mode's adapter would POST — built
+    through the real provider (no network, no key needed) so the deterministic
+    cache metric is measured over production's wire bytes, not a hand-rebuilt
+    dict. The two adapters do NOT produce the same body, so the mode matters
+    here: Cerebras sends `max_completion_tokens` and no `reasoning` object."""
+    spec = spec or bench_mode()
+    provider = _ADAPTERS[spec.provider_id](
         None,  # type: ignore[arg-type]  # _build_body never touches the client
         api_key=SecretStr(""),  # no network: _build_body never builds a header
-        base_url=settings.serving_base_url,
+        base_url=settings.provider_base_url(spec.provider_id),
     )
     return provider._build_body(request, stream=stream)
 
 
 def make_upstream_provider(
-    settings: Settings, *, timeout: float | None = None
+    settings: Settings, *, timeout: float | None = None, spec: ModeSpec | None = None
 ) -> ChatProvider:
-    """A real SERVING provider over a fresh httpx client — identical wiring to
-    the production ``Container``/existing benches (never a bespoke client)."""
-    key = require_api_key(settings)
+    """A real provider for the measured mode over a fresh httpx client —
+    identical wiring to the production ``Container``/existing benches (never a
+    bespoke client)."""
+    spec = spec or bench_mode()
+    key = require_api_key(settings, spec)
     t = timeout or settings.utility_timeout_seconds
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(t, connect=settings.upstream_connect_timeout_seconds),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    return _SERVING_PROVIDER_CLASS(
+    return _ADAPTERS[spec.provider_id](
         client,
         api_key=key,
-        base_url=settings.serving_base_url,
+        base_url=settings.provider_base_url(spec.provider_id),
         default_timeout=t,
     )

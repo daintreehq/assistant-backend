@@ -21,7 +21,8 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import SERVING_MODEL, Settings
+from daintree_assistant_server.config import Settings
+from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
 from daintree_assistant_server.providers.base import (
     ChatProvider,
@@ -60,7 +61,7 @@ class BenchConfig:
     env_file: str | None = None
     settings_overrides: dict[str, Any] = field(default_factory=dict)
     #: Route this run at a DIFFERENT model than the pinned one. ``None`` uses
-    #: ``SERVING_MODEL``, which is what a normal run must always do.
+    #: ``STANDARD_MODEL``, which is what a normal run must always do.
     #:
     #: The pinned id is hardcoded in `config.py` on purpose, and trying a
     #: candidate must not mean editing it: an experiment that starts by changing
@@ -74,17 +75,17 @@ class BenchConfig:
 class _ModelOverride:
     """A provider that rewrites the model id on the way out, and nothing else.
 
-    The selector hardcodes ``SERVING_MODEL`` inside ``_build_request``, which
+    The selector hardcodes ``STANDARD_MODEL`` inside ``_build_request``, which
     is correct — the pinned model is a product decision, not a parameter. So to
     score a CANDIDATE model the substitution has to happen below the selector,
     and this is the narrowest place it can: one field, on the request, in the
     harness.
 
-    Deliberately a wrapper rather than a patch of `config.SERVING_MODEL`. A
+    Deliberately a wrapper rather than a patch of `config.STANDARD_MODEL`. A
     module-level monkeypatch would also change the id the results document
     records and every other read in the process, so a run could report the model
     it *meant* to use rather than the one it sent. Here the two cannot disagree:
-    `run_bench` records `config.model or SERVING_MODEL`, and this class is the
+    `run_bench` records `config.model or STANDARD_MODEL`, and this class is the
     only thing that puts a model id on the wire.
     """
 
@@ -293,7 +294,7 @@ def build_results_doc(
             ) * config.trials,
             "categories_expected": sorted({c.category for c in whole_corpus}),
             "variant": config.variant,
-            "model": config.model or SERVING_MODEL,
+            "model": config.model or STANDARD_MODEL,
             "trials": config.trials,
             "concurrency": config.concurrency,
             "filter": config.id_filter,

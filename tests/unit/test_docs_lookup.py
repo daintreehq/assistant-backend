@@ -86,7 +86,7 @@ def _asking(fake_provider: FakeProvider, query: str | None = "create worktree") 
 
 async def _run(orchestrator: ChatOrchestrator, request: RespondRequest | None = None) -> Any:
     return await orchestrator.complete(
-        request or _request(), upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        request or _request(), api_key=TEST_API_KEY
     )
 
 

@@ -19,8 +19,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from daintree_assistant_server.config import SERVING_MODEL
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
+from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.skills.catalog import load_catalog
 
 from .._harness.cases import CaseError, load_yaml_cases
@@ -105,7 +105,7 @@ async def _run_trace(orchestrator: Any, provider: R.ReplayProvider,
         sel_before, main_before = provider.selector_calls, provider.main_calls
         req = _request(list(messages), state, session_id, turn["turn_id"])
         outcome = await orchestrator.complete(
-            req, upstream_model=SERVING_MODEL, api_key=BENCH_CALLER_KEY
+            req, api_key=BENCH_CALLER_KEY
         )
         body = outcome.body or {}
         sel_delta = provider.selector_calls - sel_before
@@ -226,7 +226,7 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
         "meta": {
             "benchmark": "session_trace",
             "mode": "deterministic",
-            "model": SERVING_MODEL,
+            "model": STANDARD_MODEL,
             "catalog_revision": load_catalog().revision,
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },

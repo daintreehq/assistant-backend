@@ -58,11 +58,8 @@ BANDS: dict[str, float] = {
 
 def capture() -> dict[str, Any]:
     sys.path.insert(0, str(REPO_ROOT / "src"))
-    from daintree_assistant_server.config import (
-        PUBLIC_MODEL_ID,
-        SERVING_HOST,
-        SERVING_MODEL,
-    )
+    from daintree_assistant_server.config import PUBLIC_MODEL_ID
+    from daintree_assistant_server.modes import MODE_SPECS
     from daintree_assistant_server.prompts.loader import PromptLoader
     from daintree_assistant_server.services.compaction import default_compactor
     from daintree_assistant_server.skills.catalog import load_catalog
@@ -84,14 +81,21 @@ def capture() -> dict[str, Any]:
 
     return {
         "identity": {
-            "model": SERVING_MODEL,
             "public_model": PUBLIC_MODEL_ID,
-            # The upstream this server talks to. A release fact, and the one
-            # that moved when the intelligence layer did: Cerebras hosts one
-            # endpoint per model, so the endpoint-selection posture the old
-            # baseline recorded (privacy mode, sort axis, denylist) has no
-            # subject any more and is gone rather than reported as a constant.
-            "provider": SERVING_HOST,
+            # BOTH routes, keyed by mode. A release fact each, and the pair is
+            # the fact: a baseline recording one route would go green through a
+            # change that re-pointed the other. (Each host serves one endpoint
+            # per model, so the endpoint-selection posture the old baseline
+            # recorded — privacy mode, sort axis, denylist — has no subject any
+            # more and is gone rather than reported as a constant.)
+            "modes": {
+                mode.value: {
+                    "provider": spec.provider_id,
+                    "model": spec.upstream_model,
+                    "thinking_enabled": spec.thinking.enabled,
+                }
+                for mode, spec in MODE_SPECS.items()
+            },
         },
         "selector": {
             # Selection is LOCAL and two-stage: these describe the shipped

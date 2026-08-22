@@ -21,8 +21,9 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import SERVING_HOST, Settings
+from daintree_assistant_server.config import Settings
 from daintree_assistant_server.errors import DaintreeError
+from daintree_assistant_server.modes import MODE_SPECS, OperationMode
 from daintree_assistant_server.providers.cerebras import CerebrasProvider
 from daintree_assistant_server.providers.together import TogetherProvider
 
@@ -113,12 +114,14 @@ async def test_no_openrouter_attribution_headers_are_sent() -> None:
     assert "x-title" not in seen["headers"]  # type: ignore[operator]
 
 
-def test_the_container_builds_the_adapter_serving_host_names() -> None:
-    """The claim ``SERVING_HOST`` makes must be true of the object built.
+def test_every_mode_builds_the_adapter_and_origin_its_spec_names() -> None:
+    """The claim each ``ModeSpec`` makes must be true of the object built for it.
 
     A mismatch here does not fail loudly — both adapters answer the same calls —
-    it just sends every turn to a host the configuration says we left, with the
-    other host's credential.
+    it just sends a mode's turns to the other vendor, with the other vendor's
+    credential, under the label the user chose. Parametrized over every mode
+    rather than checking "the" route, because the mode nobody exercises by
+    default is the one a wiring mistake survives in.
     """
     from daintree_assistant_server.main import _build_provider
 
@@ -127,10 +130,51 @@ def test_the_container_builds_the_adapter_serving_host_names() -> None:
         TOGETHER_API_KEY="tgp_v1_test",
         CEREBRAS_API_KEY="csk-test",
     )
-    provider = _build_provider(settings)
-    expected = TogetherProvider if SERVING_HOST == "together" else CerebrasProvider
-    assert isinstance(provider, expected)
-    # And it is pointed at that host, not merely an instance of its class.
-    assert provider._base_url.startswith(  # noqa: SLF001
-        "https://api.together.xyz" if SERVING_HOST == "together" else "https://api.cerebras.ai"
+    assert MODE_SPECS, "no modes to check — this loop would pass vacuously"
+    adapters = {"together": TogetherProvider, "cerebras": CerebrasProvider}
+    keys = {"together": "tgp_v1_test", "cerebras": "csk-test"}
+    for mode, spec in MODE_SPECS.items():
+        provider = _build_provider(settings, spec)
+        assert isinstance(provider, adapters[spec.provider_id]), mode
+        # Pointed at that host EXACTLY. `startswith` would accept
+        # `https://api.together.xyz.evil.example`, which is precisely the shape a
+        # misdirected credential takes.
+        assert provider._base_url == f"https://{spec.origin}/v1", mode  # noqa: SLF001
+        # And carrying that provider's OWN credential. Right adapter, right URL,
+        # wrong key is a cross-vendor disclosure that every other assertion here
+        # passes through.
+        assert (
+            provider._resolve_key(None).get_secret_value()  # noqa: SLF001
+            == keys[spec.provider_id]
+        ), mode
+
+
+def test_the_registry_holds_one_distinct_provider_per_mode() -> None:
+    """Two modes, two adapters, two connection pools — asserted, not assumed.
+
+    Sharing one client between the routes would be invisible until a long Pro
+    stream occupied the pool a Standard turn needed, which is the failure mode
+    that made per-provider clients the rule in the first place.
+    """
+    from daintree_assistant_server.main import _build_mode_registry
+
+    settings = Settings(
+        STATE_SIGNING_KEY_CURRENT="x" * 32,
+        TOGETHER_API_KEY="tgp_v1_test",
+        CEREBRAS_API_KEY="csk-test",
     )
+    registry = _build_mode_registry(settings)
+    standard = registry.resolve(OperationMode.STANDARD)
+    pro = registry.resolve(OperationMode.PRO)
+    assert isinstance(standard.provider, TogetherProvider)
+    assert isinstance(pro.provider, CerebrasProvider)
+    assert standard.provider is not pro.provider
+    # The POOLS, not just the wrapper objects. Two provider instances sharing one
+    # `httpx.AsyncClient` satisfies `is not` and still lets a long Pro stream
+    # occupy the connections a Standard turn needs — which is the entire reason
+    # these are built separately.
+    assert standard.provider._client is not pro.provider._client  # noqa: SLF001
+    # Exact models, named as literals. Comparing the two to each other only
+    # proves they differ, which a pair of wrong-but-different models satisfies.
+    assert standard.model == "deepseek-ai/DeepSeek-V4-Flash-0731"
+    assert pro.model == "gemma-4-31b"

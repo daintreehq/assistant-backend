@@ -6,38 +6,53 @@ import pytest
 from pydantic import ValidationError
 
 from daintree_assistant_server.auth import authenticate
-from daintree_assistant_server.config import (
-    _SERVING_KEY_ENV,
-    _SERVING_ORIGIN,
-    _SERVING_URL_ENV,
-    SERVING_HOST,
-    SERVING_KEY_ENV,
-    SERVING_ORIGIN,
-    SERVING_URL_ENV,
-    Settings,
+from daintree_assistant_server.config import Settings
+from daintree_assistant_server.modes import (
+    MODE_SPECS,
+    PROVIDER_KEY_ENV,
+    PROVIDER_ORIGINS,
+    PROVIDER_URL_ENV,
+    STANDARD_SPEC,
 )
+
+#: Every server-owned provider credential, present. BOTH, because both gate
+#: readiness: a base fixture that filled only one would make every test below
+#: implicitly a test about the other one being absent.
+_ALL_KEYS = dict.fromkeys(PROVIDER_KEY_ENV.values(), "sk-test")
 
 
 def _settings(**overrides: object) -> Settings:
-    base = {"STATE_SIGNING_KEY_CURRENT": "sk", SERVING_KEY_ENV: "sk-test"}
+    base: dict[str, object] = {"STATE_SIGNING_KEY_CURRENT": "sk", **_ALL_KEYS}
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
 
 
-def test_missing_secrets_reports_both_server_owned_secrets() -> None:
-    # Both are the SERVER's own material, which is the whole shape of the current
-    # credential model: Daintree holds the upstream key and callers hold none.
-    # The SERVING key must fail READINESS — without it nothing can be answered,
-    # and discovering that on the first turn surfaces as an upstream 401 that
-    # reads like the caller's fault. Named off SERVING_HOST rather than a vendor,
-    # so switching hosts moves the gate instead of stranding this assertion.
-    s = Settings(**{SERVING_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": ""})
-    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT", SERVING_KEY_ENV]
+def test_missing_secrets_reports_every_server_owned_secret() -> None:
+    # All of them are the SERVER's own material, which is the whole shape of the
+    # current credential model: Daintree holds the upstream keys and callers hold
+    # none. Each provider key must fail READINESS — without it the mode routing
+    # there cannot be answered, and discovering that on a user's first Pro turn
+    # surfaces as an upstream 401 that reads like the caller's fault.
+    empty = dict.fromkeys(PROVIDER_KEY_ENV.values(), "")
+    s = Settings(**{**empty, "STATE_SIGNING_KEY_CURRENT": ""})  # type: ignore[arg-type]
+    assert s.missing_secrets() == [
+        "STATE_SIGNING_KEY_CURRENT",
+        *sorted(PROVIDER_KEY_ENV[p] for p in sorted(PROVIDER_KEY_ENV)),
+    ]
 
 
-def test_missing_upstream_key_alone_still_fails_readiness() -> None:
-    s = Settings(**{SERVING_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": "sk"})
-    assert s.missing_secrets() == [SERVING_KEY_ENV]
+def test_each_provider_key_alone_fails_readiness() -> None:
+    """Per provider, not just "some key is missing".
+
+    Pro is the mode nobody exercises by default, so an instance that advertises
+    it and cannot serve it looks healthy on every probe. Readiness is where that
+    has to be caught, and it is caught only if the check is per-credential.
+    """
+    for provider_id, env in PROVIDER_KEY_ENV.items():
+        s = Settings(
+            **{**_ALL_KEYS, env: "", "STATE_SIGNING_KEY_CURRENT": "sk"}  # type: ignore[arg-type]
+        )
+        assert s.missing_secrets() == [env], provider_id
 
 
 def test_missing_secrets_empty_when_present() -> None:
@@ -64,42 +79,56 @@ def test_server_provider_is_built_with_the_configured_credential() -> None:
     # keyless would fail every request in `_resolve_key`.
     from daintree_assistant_server.main import _build_provider
 
-    s = _settings(**{SERVING_KEY_ENV: "sk-server-owned"})
-    provider = _build_provider(s)
-    assert provider._resolve_key(None).get_secret_value() == "sk-server-owned"  # noqa: SLF001
+    for mode, spec in MODE_SPECS.items():
+        s = _settings(**{spec.key_env: f"sk-server-owned-{mode.value}"})
+        provider = _build_provider(s, spec)
+        assert (
+            provider._resolve_key(None).get_secret_value()  # noqa: SLF001
+            == f"sk-server-owned-{mode.value}"
+        ), mode
 
 
-def test_the_serving_host_table_is_pinned_to_literals() -> None:
-    """The independent oracle behind every SERVING_*-parameterised assertion.
+def test_the_provider_tables_are_pinned_to_literals() -> None:
+    """The independent oracle behind every table-parameterised assertion.
 
     Those tests read the same constants the code reads, which is what lets them
-    survive a host switch — and also means a mutation of the TABLE moves the test
-    with it. Both such mutations happen to be caught elsewhere today
-    (a misspelled key name by the provider-credential test, a wrong origin by the
-    strong-secrets test), but only incidentally: neither of those tests is about
-    this table, and either could stop covering it for reasons of its own.
-
-    So the literals live here, once, for BOTH hosts — asserting the whole table
-    rather than the active row, so switching SERVING_HOST does not strand it. A
-    wrong origin is the one that matters: this is the host the server's own
-    upstream credential is sent to on every request.
+    cover both modes without naming a vendor — and also means a mutation of the
+    TABLE moves the test with it. So the literals live here, once, for both
+    providers. A wrong origin is the one that matters: it is where a server
+    credential is sent on every request routed to that mode.
     """
-    assert _SERVING_KEY_ENV == {
+    assert PROVIDER_KEY_ENV == {
         "together": "TOGETHER_API_KEY",
         "cerebras": "CEREBRAS_API_KEY",
     }
-    assert _SERVING_URL_ENV == {
+    assert PROVIDER_URL_ENV == {
         "together": "TOGETHER_BASE_URL",
         "cerebras": "CEREBRAS_BASE_URL",
     }
-    assert _SERVING_ORIGIN == {
+    assert PROVIDER_ORIGINS == {
         "together": "api.together.xyz",
         "cerebras": "api.cerebras.ai",
     }
-    # And the resolved names really are the active row, not a stale copy.
-    assert _SERVING_KEY_ENV[SERVING_HOST] == SERVING_KEY_ENV
-    assert _SERVING_URL_ENV[SERVING_HOST] == SERVING_URL_ENV
-    assert _SERVING_ORIGIN[SERVING_HOST] == SERVING_ORIGIN
+    # The mode -> provider/model pairing itself, as LITERALS. Asserting a spec
+    # against the tables it derives from is self-referential: it proves the
+    # derivation, never the choice, so `pro -> together` would pass.
+    assert {mode.value: spec.provider_id for mode, spec in MODE_SPECS.items()} == {
+        "standard": "together",
+        "pro": "cerebras",
+    }
+    assert {mode.value: spec.upstream_model for mode, spec in MODE_SPECS.items()} == {
+        "standard": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "pro": "gemma-4-31b",
+    }
+    # Distinct cache namespaces, or the two tiers claim one upstream cache lineage.
+    namespaces = [spec.cache_namespace for spec in MODE_SPECS.values()]
+    assert len(set(namespaces)) == len(namespaces), namespaces
+    # And every mode routes to a provider these tables actually describe.
+    for mode, spec in MODE_SPECS.items():
+        assert spec.provider_id in PROVIDER_KEY_ENV, mode
+        assert spec.key_env == PROVIDER_KEY_ENV[spec.provider_id]
+        assert spec.url_env == PROVIDER_URL_ENV[spec.provider_id]
+        assert spec.origin == PROVIDER_ORIGINS[spec.provider_id]
 
 
 def test_production_rejects_a_valid_https_origin_that_is_not_the_serving_host() -> None:
@@ -110,13 +139,14 @@ def test_production_rejects_a_valid_https_origin_that_is_not_the_serving_host() 
     http, userinfo, odd port, lookalike suffix). This one is clean, valid, and
     simply somewhere else, which is what a misdirected key actually looks like.
     """
-    s = _settings(
-        **{SERVING_URL_ENV: "https://api.openai.com/v1"},
-        ENVIRONMENT="production",
-        STATE_SIGNING_KEY_CURRENT="y" * 48,
-        STATE_SALT="a-real-random-salt-value",
-    )
-    assert any(SERVING_URL_ENV in p for p in s.weak_secrets())
+    for env in PROVIDER_URL_ENV.values():
+        s = _settings(
+            **{env: "https://api.openai.com/v1"},
+            ENVIRONMENT="production",
+            STATE_SIGNING_KEY_CURRENT="y" * 48,
+            STATE_SALT="a-real-random-salt-value",
+        )
+        assert any(env in p for p in s.weak_secrets()), env
 
 
 def test_production_requires_the_real_serving_origin() -> None:
@@ -129,27 +159,28 @@ def test_production_requires_the_real_serving_origin() -> None:
         "STATE_SIGNING_KEY_CURRENT": "y" * 48,
         "STATE_SALT": "a-real-random-salt-value",
     }
-    host = SERVING_ORIGIN
-    for bad in (
-        f"http://{host}/v1",
-        f"https://{host}.evil.example/v1",
-        f"https://{host}@evil.example/v1",
-        f"https://user@{host}/v1",  # userinfo never belongs here
-        f"https://{host}:444/v1",  # non-default port = different origin
-        f"https://{host}:bogus/v1",  # malformed port fails readiness, not requests
-    ):
-        s = _settings(**{SERVING_URL_ENV: bad}, **base)
-        assert any(SERVING_URL_ENV in p for p in s.weak_secrets()), bad
-    for ok_url in (
-        f"https://{host}/v1",
-        f"https://{host.upper()}/v1",  # hostname compares case-insensitively
-        f"https://{host}:443/v1",  # explicit default port
-    ):
-        ok = _settings(**{SERVING_URL_ENV: ok_url}, **base)
-        assert ok.weak_secrets() == [], ok_url
-    # Development stays free to point at proxies/mocks.
-    dev = _settings(**{SERVING_URL_ENV: "http://127.0.0.1:9999/v1"})
-    assert dev.weak_secrets() == []
+    for provider_id, env in sorted(PROVIDER_URL_ENV.items()):
+        host = PROVIDER_ORIGINS[provider_id]
+        for bad in (
+            f"http://{host}/v1",
+            f"https://{host}.evil.example/v1",
+            f"https://{host}@evil.example/v1",
+            f"https://user@{host}/v1",  # userinfo never belongs here
+            f"https://{host}:444/v1",  # non-default port = different origin
+            f"https://{host}:bogus/v1",  # malformed port fails readiness, not requests
+        ):
+            s = _settings(**{env: bad}, **base)
+            assert any(env in p for p in s.weak_secrets()), bad
+        for ok_url in (
+            f"https://{host}/v1",
+            f"https://{host.upper()}/v1",  # hostname compares case-insensitively
+            f"https://{host}:443/v1",  # explicit default port
+        ):
+            ok = _settings(**{env: ok_url}, **base)
+            assert ok.weak_secrets() == [], ok_url
+        # Development stays free to point at proxies/mocks.
+        dev = _settings(**{env: "http://127.0.0.1:9999/v1"})
+        assert dev.weak_secrets() == []
 
 
 def test_weak_secrets_allowed_in_development() -> None:
@@ -187,7 +218,7 @@ def test_production_previous_key_must_pair_with_kid() -> None:
 
 
 def test_secret_not_in_repr() -> None:
-    s = _settings(**{SERVING_KEY_ENV: "sk-should-not-appear"})
+    s = _settings(**{STANDARD_SPEC.key_env: "sk-should-not-appear"})
     assert "sk-should-not-appear" not in repr(s)
 
 

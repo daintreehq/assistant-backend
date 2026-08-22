@@ -40,12 +40,14 @@ if [[ -f "$ROOT/.env" ]]; then
 fi
 
 # Friendly heads-up: the server always boots, but /readyz stays 503 without the
-# two required secrets. TOGETHER_API_KEY is one of them — the SERVER holds the
-# upstream credential and funds every turn from it, so a request no longer brings
-# its own key and there is nothing to fall back on if this is missing.
+# three required secrets. Both provider keys are among them — the SERVER holds
+# the upstream credentials and funds every turn from them, so a request brings no
+# key of its own and there is nothing to fall back on. Both gate because the
+# service advertises both product modes: standard (Together) and pro (Cerebras).
 missing=()
 [[ -z "${STATE_SIGNING_KEY_CURRENT:-}" ]] && missing+=("STATE_SIGNING_KEY_CURRENT")
 [[ -z "${TOGETHER_API_KEY:-}" ]] && missing+=("TOGETHER_API_KEY")
+[[ -z "${CEREBRAS_API_KEY:-}" ]] && missing+=("CEREBRAS_API_KEY")
 if (( ${#missing[@]} )); then
   echo "⚠  Missing: ${missing[*]} — server will boot but /readyz will be 503." >&2
   [[ -f "$ROOT/.env" ]] || echo "   Run:  cp .env.example .env   then fill them in." >&2
@@ -60,6 +62,7 @@ export DAINTREE_LOG_CONSOLE="${DAINTREE_LOG_CONSOLE:-1}"
 echo "▶ Daintree Assistant Server"
 echo "  python: $PY   logs: console (DAINTREE_LOG_CONSOLE=$DAINTREE_LOG_CONSOLE)"
 # Presence only — never the value.
-echo "  upstream: together   key: $([[ -n "${TOGETHER_API_KEY:-}" ]] && echo set || echo MISSING)"
+echo "  standard: together   key: $([[ -n "${TOGETHER_API_KEY:-}" ]] && echo set || echo MISSING)"
+echo "  pro:      cerebras   key: $([[ -n "${CEREBRAS_API_KEY:-}" ]] && echo set || echo MISSING)"
 
 exec "$PY" -m daintree_assistant_server

@@ -441,3 +441,26 @@ To close it: read <https://www.together.ai/privacy> and
 (training, retention, caching, sub-processors), and say plainly which parts Daintree
 can promise and which are the host's to change. Keep the Cerebras material as the
 switch-back case.
+
+## Point the live `/respond` cases at Pro once the wire carries a mode
+
+**Trigger:** the `mode` field lands on `RespondRequest` (the phase after the
+mode registry).
+
+`tests/live/test_live_cerebras.py` builds a `CerebrasProvider` directly for the
+wire-contract cases — `max_completion_tokens`, the rejected `reasoning` object,
+the flat error body, zero reasoning tokens — and those still pin what they
+always pinned. Its four `/v1/daintree/respond` cases do not: with no `mode` on
+the request they resolve to the DEFAULT route, which is Standard on Together, so
+a file named for Cerebras tests Together end to end.
+
+Add `"mode": "pro"` to those four bodies. Nothing else in the file moves. Until
+then the file's own docstring says which half reaches which vendor, which is the
+honest state rather than a silent one.
+
+Also add the mirror suite: `tests/live/test_live_together.py` has never existed,
+so Standard's wire contract — the one every default turn actually uses — has no
+live pin at all. The Together adapter's unit tests cover the three overridden
+class attributes and the key decoder; nothing covers a real completion, a real
+stream, a real tool call, or the `reasoning: {"enabled": false}` object being
+honoured, all of which are measured claims in `docs/PROVIDER_POLICY.md`.

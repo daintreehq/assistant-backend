@@ -11,13 +11,17 @@ import pytest
 from fakes import FakeProvider, make_result
 from pydantic import SecretStr, ValidationError
 
-from daintree_assistant_server.config import SERVING_MODEL
 from daintree_assistant_server.contracts.tasks import (
     CompactedAgentOut,
     ContextCompactOutput,
     TaskRequest,
 )
 from daintree_assistant_server.errors import DaintreeError, upstream_error, upstream_timeout
+from daintree_assistant_server.modes import (
+    MODE_SPECS,
+    STANDARD_MODEL,
+    uniform_registry,
+)
 from daintree_assistant_server.providers.base import ProviderUsage
 from daintree_assistant_server.services.task_runner import (
     TaskProfile,
@@ -85,7 +89,7 @@ async def test_utility_task_runs_non_thinking_without_headroom(
     # self-contained call over text the client supplied, so the calls that share a
     # prefix are the ones that share a task id. Per task rather than one key for
     # all of them, so two tasks cannot evict each other's sticky endpoint.
-    assert req.cache_session_id == "daintree-task-terminal_summarize"
+    assert req.cache_session_id == "daintree-task-standard-terminal_summarize"
 
 
 @pytest.mark.asyncio
@@ -213,14 +217,15 @@ def test_every_task_affinity_key_is_safe_to_send_upstream() -> None:
     gate on that: a profile added with a space, a slash or unbounded length would
     otherwise surface as an inscrutable upstream 400 on that task alone.
     """
-    for task_id in build_profiles():
-        key = _affinity_key(task_id)
-        assert key.startswith("daintree-task-")
-        assert len(key) <= 256, "the affinity key must stay legible upstream"
-        assert re.fullmatch(r"[A-Za-z0-9._-]+", key), (
-            f"task id {task_id!r} produces an affinity key with characters that are "
-            "not safe to send verbatim as a router-level identifier"
-        )
+    for mode, spec in MODE_SPECS.items():
+        for task_id in build_profiles():
+            key = _affinity_key(spec.cache_namespace, task_id)
+            assert key.startswith(f"daintree-task-{mode.value}-")
+            assert len(key) <= 256, "the affinity key must stay legible upstream"
+            assert re.fullmatch(r"[A-Za-z0-9._-]+", key), (
+                f"task id {task_id!r} produces an affinity key with characters that "
+                "are not safe to send verbatim as a router-level identifier"
+            )
 
 
 @pytest.mark.asyncio
@@ -243,7 +248,7 @@ async def test_json_repair_path(task_runner: TaskRunner, fake_provider: FakeProv
     # this request is rebuilt field by field, which is where a key gets dropped.
     first, repair = fake_provider.requests
     assert repair.cache_session_id == first.cache_session_id
-    assert repair.cache_session_id == "daintree-task-terminal_judge"
+    assert repair.cache_session_id == "daintree-task-standard-terminal_judge"
 
 
 @pytest.mark.asyncio
@@ -520,7 +525,9 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
     result = await task_runner.run(TaskRequest(task="terminal_summarize", input={"tail": "x"}), api_key=TEST_API_KEY)
     assert result.prompt_version == "terminal_summarize"
     assert result.usage.total_tokens >= 0
-    assert result.model == SERVING_MODEL
+    # The route's model, since no profile overrides it — and the default route
+    # is Standard.
+    assert result.model == STANDARD_MODEL
 
 
 # The task ids are a FROZEN WIRE CONTRACT shared with the Go CLI, which hardcodes
@@ -712,7 +719,7 @@ def dual_runner(
 ) -> TaskRunner:
     return TaskRunner(
         settings=settings,
-        provider=fake_provider,
+        modes=uniform_registry(fake_provider),
         prompt_loader=prompt_loader,
         catalog_manager=catalog_manager,
         openrouter_provider=openrouter_provider,
@@ -721,7 +728,7 @@ def dual_runner(
 
 
 #: The model the synthetic second-provider profile claims. Deliberately not a
-#: real id: the point is that it is NOT SERVING_MODEL, so a request landing on
+#: real id: the point is that it is NOT either mode's model, so a request landing on
 #: the wrong adapter is visible in one assertion.
 SECOND_PROVIDER_MODEL = "vendor-b/second-model"
 
@@ -834,7 +841,7 @@ async def test_an_unconfigured_openrouter_key_fails_only_that_task(
     """
     runner = TaskRunner(
         settings=settings,
-        provider=fake_provider,
+        modes=uniform_registry(fake_provider),
         prompt_loader=prompt_loader,
         catalog_manager=catalog_manager,
         openrouter_provider=None,
@@ -892,7 +899,7 @@ async def test_a_reported_cost_survives_to_the_client(
     assert result.usage.cost == 0.00009
 
 
-def test_no_profile_leaves_the_serving_provider() -> None:
+def test_no_profile_leaves_the_request_s_own_route() -> None:
     """A guard on scope, not on behaviour.
 
     Provider selection is one field on a dataclass, which makes it cheap to add a
@@ -903,10 +910,12 @@ def test_no_profile_leaves_the_serving_provider() -> None:
     again should require deleting this assertion, deliberately.
     """
     profiles = build_profiles()
-    off_default = {p.id for p in profiles.values() if p.provider_id != "serving"}
+    off_default = {p.id for p in profiles.values() if p.provider_id != "request_mode"}
     assert off_default == set()
     for profile in profiles.values():
-        assert profile.model == SERVING_MODEL, profile.id
+        # `None` means 'the request's route decides', which is what every
+        # profile must say now that there are two models to be wrong about.
+        assert profile.model is None, profile.id
 
 
 def test_the_compaction_budget_fits_a_busy_orchestration_session() -> None:

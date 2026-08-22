@@ -2,7 +2,8 @@
 
 Skipped by default. To run::
 
-    RUN_LIVE_CEREBRAS=1 CEREBRAS_API_KEY=csk-... pytest tests/live -q
+    RUN_LIVE_CEREBRAS=1 TOGETHER_API_KEY=tgp_v1_... CEREBRAS_API_KEY=csk-... \
+        pytest tests/live -q
 
 These pin the *provider contract* that mocked tests cannot see, and against
 Cerebras that contract is narrow and sharp-edged. Four of its rules are
@@ -24,6 +25,17 @@ enforced by the upstream with a 400 and by nothing else in this repo:
 
 A mocked test proves the adapter builds what we *think* the API wants. Only
 these prove the API agrees. They make real API calls, so they are gated.
+
+**Read which tests reach Cerebras.** Since the dual-mode split, Cerebras serves
+`pro` and Together serves `standard`. The tests that build a ``CerebrasProvider``
+directly still pin the Cerebras wire contract — that is most of this file and all
+of the sharp-edged parts. The ones that go through ``/v1/daintree/respond``
+currently exercise the DEFAULT route, which is Standard/Together, because the
+request has no `mode` field yet to say otherwise; they are an end-to-end check of
+the app, not of Cerebras. Both keys are therefore required to run this file at
+all: readiness gates both, so the app will not come up with one. See TODO.md —
+the `/respond` cases gain `"mode": "pro"` when the field lands, and only then do
+they test what their names suggest.
 """
 
 from __future__ import annotations
@@ -177,7 +189,7 @@ def test_live_serving_model_reports_no_reasoning_tokens() -> None:
     # replacement announces itself here instead of in a latency regression.
     import httpx as _httpx
 
-    from daintree_assistant_server.config import CEREBRAS_MODEL
+    from daintree_assistant_server.modes import PRO_MODEL as CEREBRAS_MODEL
     from daintree_assistant_server.providers.base import ProviderChatRequest
     from daintree_assistant_server.providers.cerebras import CerebrasProvider
 
@@ -221,7 +233,7 @@ def test_live_cache_affinity_key_is_accepted() -> None:
 
     import httpx as _httpx
 
-    from daintree_assistant_server.config import CEREBRAS_MODEL
+    from daintree_assistant_server.modes import PRO_MODEL as CEREBRAS_MODEL
     from daintree_assistant_server.providers.base import ProviderChatRequest
     from daintree_assistant_server.providers.cerebras import CerebrasProvider
 
@@ -270,7 +282,7 @@ def test_live_rejected_parameters_stay_rejected() -> None:
     # provider's whole job is to never send them.
     import httpx as _httpx
 
-    from daintree_assistant_server.config import CEREBRAS_MODEL
+    from daintree_assistant_server.modes import PRO_MODEL as CEREBRAS_MODEL
 
     base = {
         "model": CEREBRAS_MODEL,
@@ -344,7 +356,7 @@ def test_live_verify_key_probe_lists_the_serving_model() -> None:
     # server is pinned to, which is the failure a bare 200 would hide.
     import httpx as _httpx
 
-    from daintree_assistant_server.config import CEREBRAS_MODEL
+    from daintree_assistant_server.modes import PRO_MODEL as CEREBRAS_MODEL
     from daintree_assistant_server.providers.cerebras import CerebrasProvider
 
     async def _call() -> dict:

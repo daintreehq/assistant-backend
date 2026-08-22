@@ -176,7 +176,7 @@ async def _run(
     orchestrator: ChatOrchestrator, request: RespondRequest
 ) -> list[str]:
     outcome = await orchestrator.complete(
-        request, upstream_model="deepseek-v4-flash", api_key=TEST_API_KEY
+        request, api_key=TEST_API_KEY
     )
     assert outcome.stream is not None
     return await _drain(outcome.stream)
@@ -646,7 +646,7 @@ async def test_the_non_streaming_body_carries_no_control_line(
     )
     outcome = await _with(orchestrator, compactor).complete(
         _request(stream=False),
-        upstream_model="deepseek-v4-flash",
+
         api_key=TEST_API_KEY,
     )
     assert outcome.body is not None
@@ -670,7 +670,7 @@ async def test_the_non_streaming_path_strips_exactly_one_control_line(
     )
     outcome = await orchestrator.complete(
         _request(stream=False, tools=False),
-        upstream_model="deepseek-v4-flash",
+
         api_key=TEST_API_KEY,
     )
     assert outcome.body is not None
