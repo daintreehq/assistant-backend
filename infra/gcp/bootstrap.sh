@@ -126,18 +126,29 @@ gen_salt() { openssl rand -hex 16; }
 ensure_secret state-signing-key-current gen_key
 ensure_secret state-salt gen_salt
 
-if ! gcloud secrets describe cerebras-api-key --project="$PROJECT" >/dev/null 2>&1; then
-  gcloud secrets create cerebras-api-key --replication-policy=automatic \
-    --project="$PROJECT" >/dev/null
-  ok "created secret cerebras-api-key"
-fi
-if has_version cerebras-api-key; then
-  ok "cerebras-api-key already has a version (left alone — rotation is manual)"
-else
-  ok "!! cerebras-api-key has NO version. The deploy will fail until you add one:"
-  echo "    printf '%s' 'csk-...' | gcloud secrets versions add cerebras-api-key \\"
-  echo "      --data-file=- --project=$PROJECT"
-fi
+# Both upstream credentials get a shell. together-api-key is the one that gates
+# readiness today (config.SERVING_HOST); cerebras-api-key is the switch-back, and
+# a deploy mounts both so flipping the host is a config change rather than a
+# config change plus an infra change.
+ensure_supplied_secret() {
+  local name="$1" example="$2" gates="$3"
+  if ! gcloud secrets describe "$name" --project="$PROJECT" >/dev/null 2>&1; then
+    gcloud secrets create "$name" --replication-policy=automatic \
+      --project="$PROJECT" >/dev/null
+    ok "created secret $name"
+  fi
+  if has_version "$name"; then
+    ok "$name already has a version (left alone — rotation is manual)"
+  elif [ "$gates" = "gates" ]; then
+    ok "!! $name has NO version. The deploy will fail until you add one:"
+    echo "    printf '%s' '$example' | gcloud secrets versions add $name \\"
+    echo "      --data-file=- --project=$PROJECT"
+  else
+    ok "$name has no version (fine — it is not the serving host right now)"
+  fi
+}
+ensure_supplied_secret together-api-key 'tgp_v1_...' gates
+ensure_supplied_secret cerebras-api-key 'csk-...' optional
 
 # ---------------------------------------------------------------------------
 say "Runtime service account (what the container runs as)"
@@ -150,13 +161,18 @@ else
 fi
 # Scoped per-secret rather than project-wide: this identity can read exactly the
 # secrets it mounts and nothing else in the project.
-for s in state-signing-key-current state-salt cerebras-api-key; do
+# together-api-key AND cerebras-api-key both appear here because the deploy
+# mounts whichever ones exist: the grant has to cover the host we might switch
+# TO, not only the one serving today, or the switch-back is a permission error
+# discovered at deploy time.
+RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key cerebras-api-key"
+for s in $RUNTIME_SECRETS; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
     --role=roles/secretmanager.secretAccessor \
     --project="$PROJECT" --quiet >/dev/null
 done
-ok "granted secretAccessor on state-signing-key-current, state-salt, cerebras-api-key"
+ok "granted secretAccessor on $RUNTIME_SECRETS"
 
 # The Developer Connect connection's GitHub OAuth token. The fetch-lfs build
 # step reads it to pull LFS content (the model artifact) from the PRIVATE repo

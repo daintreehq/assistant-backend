@@ -37,7 +37,7 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
-from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
+from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID, SERVING_HOST
 from ..errors import DaintreeError
 from ..observability import get_logger
 from ..prompts.loader import MAIN_PROMPT_VERSION
@@ -104,7 +104,7 @@ async def _provider_section(
     is why the verdict is still worth reporting now that callers hold no key.
     """
     section: dict[str, Any] = {
-        "name": "cerebras",
+        "name": SERVING_HOST,
         "model": PUBLIC_MODEL_ID,
         "thinking_enabled": INTERACTIVE_THINKING_ENABLED,
         # The server now holds the upstream credential and funds every turn from

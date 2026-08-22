@@ -6,11 +6,20 @@ import pytest
 from pydantic import ValidationError
 
 from daintree_assistant_server.auth import authenticate
-from daintree_assistant_server.config import Settings
+from daintree_assistant_server.config import (
+    _SERVING_KEY_ENV,
+    _SERVING_ORIGIN,
+    _SERVING_URL_ENV,
+    SERVING_HOST,
+    SERVING_KEY_ENV,
+    SERVING_ORIGIN,
+    SERVING_URL_ENV,
+    Settings,
+)
 
 
 def _settings(**overrides: object) -> Settings:
-    base = {"STATE_SIGNING_KEY_CURRENT": "sk", "CEREBRAS_API_KEY": "csk-test"}
+    base = {"STATE_SIGNING_KEY_CURRENT": "sk", SERVING_KEY_ENV: "sk-test"}
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
 
@@ -18,16 +27,17 @@ def _settings(**overrides: object) -> Settings:
 def test_missing_secrets_reports_both_server_owned_secrets() -> None:
     # Both are the SERVER's own material, which is the whole shape of the current
     # credential model: Daintree holds the upstream key and callers hold none.
-    # CEREBRAS_API_KEY must fail READINESS — without it nothing can be answered,
+    # The SERVING key must fail READINESS — without it nothing can be answered,
     # and discovering that on the first turn surfaces as an upstream 401 that
-    # reads like the caller's fault.
-    s = Settings(CEREBRAS_API_KEY="", STATE_SIGNING_KEY_CURRENT="")
-    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT", "CEREBRAS_API_KEY"]
+    # reads like the caller's fault. Named off SERVING_HOST rather than a vendor,
+    # so switching hosts moves the gate instead of stranding this assertion.
+    s = Settings(**{SERVING_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": ""})
+    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT", SERVING_KEY_ENV]
 
 
 def test_missing_upstream_key_alone_still_fails_readiness() -> None:
-    s = Settings(CEREBRAS_API_KEY="", STATE_SIGNING_KEY_CURRENT="sk")
-    assert s.missing_secrets() == ["CEREBRAS_API_KEY"]
+    s = Settings(**{SERVING_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": "sk"})
+    assert s.missing_secrets() == [SERVING_KEY_ENV]
 
 
 def test_missing_secrets_empty_when_present() -> None:
@@ -54,12 +64,62 @@ def test_server_provider_is_built_with_the_configured_credential() -> None:
     # keyless would fail every request in `_resolve_key`.
     from daintree_assistant_server.main import _build_provider
 
-    s = _settings(CEREBRAS_API_KEY="csk-server-owned")
+    s = _settings(**{SERVING_KEY_ENV: "sk-server-owned"})
     provider = _build_provider(s)
-    assert provider._resolve_key(None).get_secret_value() == "csk-server-owned"  # noqa: SLF001
+    assert provider._resolve_key(None).get_secret_value() == "sk-server-owned"  # noqa: SLF001
 
 
-def test_production_requires_the_real_cerebras_origin() -> None:
+def test_the_serving_host_table_is_pinned_to_literals() -> None:
+    """The independent oracle behind every SERVING_*-parameterised assertion.
+
+    Those tests read the same constants the code reads, which is what lets them
+    survive a host switch — and also means a mutation of the TABLE moves the test
+    with it. Both such mutations happen to be caught elsewhere today
+    (a misspelled key name by the provider-credential test, a wrong origin by the
+    strong-secrets test), but only incidentally: neither of those tests is about
+    this table, and either could stop covering it for reasons of its own.
+
+    So the literals live here, once, for BOTH hosts — asserting the whole table
+    rather than the active row, so switching SERVING_HOST does not strand it. A
+    wrong origin is the one that matters: this is the host the server's own
+    upstream credential is sent to on every request.
+    """
+    assert _SERVING_KEY_ENV == {
+        "together": "TOGETHER_API_KEY",
+        "cerebras": "CEREBRAS_API_KEY",
+    }
+    assert _SERVING_URL_ENV == {
+        "together": "TOGETHER_BASE_URL",
+        "cerebras": "CEREBRAS_BASE_URL",
+    }
+    assert _SERVING_ORIGIN == {
+        "together": "api.together.xyz",
+        "cerebras": "api.cerebras.ai",
+    }
+    # And the resolved names really are the active row, not a stale copy.
+    assert _SERVING_KEY_ENV[SERVING_HOST] == SERVING_KEY_ENV
+    assert _SERVING_URL_ENV[SERVING_HOST] == SERVING_URL_ENV
+    assert _SERVING_ORIGIN[SERVING_HOST] == SERVING_ORIGIN
+
+
+def test_production_rejects_a_valid_https_origin_that_is_not_the_serving_host() -> None:
+    """Hardening must pin THE origin, not merely require https.
+
+    A check that accepted any well-formed https URL would pass every case in the
+    test above it — every rejection there is malformed in some other way (plain
+    http, userinfo, odd port, lookalike suffix). This one is clean, valid, and
+    simply somewhere else, which is what a misdirected key actually looks like.
+    """
+    s = _settings(
+        **{SERVING_URL_ENV: "https://api.openai.com/v1"},
+        ENVIRONMENT="production",
+        STATE_SIGNING_KEY_CURRENT="y" * 48,
+        STATE_SALT="a-real-random-salt-value",
+    )
+    assert any(SERVING_URL_ENV in p for p in s.weak_secrets())
+
+
+def test_production_requires_the_real_serving_origin() -> None:
     # THE SERVER's key rides every request to this origin, so a hardened
     # deployment must not be able to point it anywhere else (or downgrade to
     # plain http). The stake went UP with the credential move: a misdirected
@@ -69,25 +129,26 @@ def test_production_requires_the_real_cerebras_origin() -> None:
         "STATE_SIGNING_KEY_CURRENT": "y" * 48,
         "STATE_SALT": "a-real-random-salt-value",
     }
+    host = SERVING_ORIGIN
     for bad in (
-        "http://api.cerebras.ai/v1",
-        "https://api.cerebras.ai.evil.example/v1",
-        "https://api.cerebras.ai@evil.example/v1",
-        "https://user@api.cerebras.ai/v1",  # userinfo never belongs here
-        "https://api.cerebras.ai:444/v1",  # non-default port = different origin
-        "https://api.cerebras.ai:bogus/v1",  # malformed port fails readiness, not requests
+        f"http://{host}/v1",
+        f"https://{host}.evil.example/v1",
+        f"https://{host}@evil.example/v1",
+        f"https://user@{host}/v1",  # userinfo never belongs here
+        f"https://{host}:444/v1",  # non-default port = different origin
+        f"https://{host}:bogus/v1",  # malformed port fails readiness, not requests
     ):
-        s = _settings(CEREBRAS_BASE_URL=bad, **base)
-        assert any("CEREBRAS_BASE_URL" in p for p in s.weak_secrets()), bad
+        s = _settings(**{SERVING_URL_ENV: bad}, **base)
+        assert any(SERVING_URL_ENV in p for p in s.weak_secrets()), bad
     for ok_url in (
-        "https://api.cerebras.ai/v1",
-        "https://API.CEREBRAS.AI/v1",  # hostname compares case-insensitively
-        "https://api.cerebras.ai:443/v1",  # explicit default port
+        f"https://{host}/v1",
+        f"https://{host.upper()}/v1",  # hostname compares case-insensitively
+        f"https://{host}:443/v1",  # explicit default port
     ):
-        ok = _settings(CEREBRAS_BASE_URL=ok_url, **base)
+        ok = _settings(**{SERVING_URL_ENV: ok_url}, **base)
         assert ok.weak_secrets() == [], ok_url
     # Development stays free to point at proxies/mocks.
-    dev = _settings(CEREBRAS_BASE_URL="http://127.0.0.1:9999/v1")
+    dev = _settings(**{SERVING_URL_ENV: "http://127.0.0.1:9999/v1"})
     assert dev.weak_secrets() == []
 
 
@@ -126,8 +187,8 @@ def test_production_previous_key_must_pair_with_kid() -> None:
 
 
 def test_secret_not_in_repr() -> None:
-    s = _settings(CEREBRAS_API_KEY="csk-should-not-appear")
-    assert "csk-should-not-appear" not in repr(s)
+    s = _settings(**{SERVING_KEY_ENV: "sk-should-not-appear"})
+    assert "sk-should-not-appear" not in repr(s)
 
 
 @pytest.mark.parametrize(

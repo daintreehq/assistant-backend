@@ -151,12 +151,31 @@ steps:
         # be set together", so mounting the secret alone would fail the candidate's
         # /readyz and abort the release.
         ENV_FLAGS="ENVIRONMENT=production,LOG_LEVEL=INFO,STATE_SIGNING_KID=${_CURRENT_KID}"
-        # cerebras-api-key is REQUIRED, not optional like the previous signing key:
+        # together-api-key is REQUIRED, not optional like the previous signing key:
         # the server holds the upstream credential now and `missing_secrets()` gates
         # /readyz on it, so a deploy without it would build a candidate that can never
         # pass its own smoke check. Mounting it unconditionally means a missing secret
         # fails the deploy loudly here rather than as a red /readyz two steps later.
-        SECRET_FLAGS="STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest,CEREBRAS_API_KEY=cerebras-api-key:latest"
+        #
+        # It is TOGETHER because config.SERVING_HOST is "together".
+        SECRET_FLAGS="STATE_SIGNING_KEY_CURRENT=state-signing-key-current:latest,STATE_SALT=state-salt:latest,TOGETHER_API_KEY=together-api-key:latest"
+
+        # The NON-serving credential rides along too, so flipping SERVING_HOST back
+        # is the one-line config change it claims to be rather than a config change
+        # plus a cloudbuild change. But only when it actually has an enabled
+        # version: bootstrap.sh creates the shell for both hosts and requires a
+        # version only for the serving one, so on a fresh project cerebras-api-key
+        # exists and is EMPTY — and `secret:latest` against a versionless secret
+        # fails the whole deploy. Mounting it conditionally is what keeps those two
+        # scripts telling the same story.
+        if gcloud secrets versions list cerebras-api-key --filter='state:ENABLED' \
+             --format='value(name)' --limit=1 --project="$PROJECT_ID" 2>/dev/null \
+             | grep -q .; then
+          echo "cerebras-api-key has an enabled version — mounting it for switch-back."
+          SECRET_FLAGS="$$SECRET_FLAGS,CEREBRAS_API_KEY=cerebras-api-key:latest"
+        else
+          echo "cerebras-api-key has no enabled version — not mounting it."
+        fi
 
         # `describe` distinguishes ABSENT from FORBIDDEN. Treating every failure as
         # "no previous key" would turn a missing IAM grant into a silently

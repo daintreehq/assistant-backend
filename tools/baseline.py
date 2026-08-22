@@ -59,8 +59,9 @@ BANDS: dict[str, float] = {
 def capture() -> dict[str, Any]:
     sys.path.insert(0, str(REPO_ROOT / "src"))
     from daintree_assistant_server.config import (
-        CEREBRAS_MODEL,
         PUBLIC_MODEL_ID,
+        SERVING_HOST,
+        SERVING_MODEL,
     )
     from daintree_assistant_server.prompts.loader import PromptLoader
     from daintree_assistant_server.skills.catalog import load_catalog
@@ -82,14 +83,14 @@ def capture() -> dict[str, Any]:
 
     return {
         "identity": {
-            "model": CEREBRAS_MODEL,
+            "model": SERVING_MODEL,
             "public_model": PUBLIC_MODEL_ID,
             # The upstream this server talks to. A release fact, and the one
             # that moved when the intelligence layer did: Cerebras hosts one
             # endpoint per model, so the endpoint-selection posture the old
             # baseline recorded (privacy mode, sort axis, denylist) has no
             # subject any more and is gone rather than reported as a constant.
-            "provider": "cerebras",
+            "provider": SERVING_HOST,
         },
         "selector": {
             # Selection is LOCAL and two-stage: these describe the shipped

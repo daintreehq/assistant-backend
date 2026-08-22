@@ -17,9 +17,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from ..config import (
-    CEREBRAS_MODEL,
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
+    SERVING_MODEL,
     Settings,
 )
 from ..contracts.tasks import (
@@ -602,17 +602,14 @@ def _affinity_key(task_id: str) -> str:
 # exists so ONE task can reach a cheaper model, and the type is what stops it
 # growing into the endpoint-selection policy that was deliberately deleted in the
 # move to Cerebras. Adding a third value should feel like a decision.
-ProviderId = Literal["cerebras", "openrouter"]
+#: "serving" is whichever host config.SERVING_HOST names — the profile does not
+#: care which vendor that is, only that it is the one funding ordinary turns.
+ProviderId = Literal["serving", "openrouter"]
 
-# The compaction model, hardcoded beside the task that uses it exactly as
-# CEREBRAS_MODEL is hardcoded in config.py — no env toggle, one optimum.
-#
-# The whole reason a second provider exists: at ~$0.08 per million input tokens
-# it is an order of magnitude below the serving model's ~$0.99, and compaction is
-# the one task whose cost is dominated by RE-READING history it has already been
-# paid to read. Running it on the serving model would spend more than the
-# resend it exists to avoid.
-OPENROUTER_COMPACTION_MODEL = "deepseek/deepseek-v4-flash"
+# No profile overrides the provider today: every task runs on SERVING_MODEL. The
+# second-provider mechanism below (`ProviderId`, `_provider_for`) is kept because
+# it is the seam that made moving compaction off the serving model possible in
+# the first place — it just has no user while the serving model IS the cheap one.
 
 
 @dataclass(frozen=True)
@@ -633,8 +630,8 @@ class TaskProfile:
     #
     # Defaulting both together keeps every existing profile byte-identical in
     # behaviour: Cerebras, on the one hardcoded serving model.
-    provider_id: ProviderId = "cerebras"
-    model: str = CEREBRAS_MODEL
+    provider_id: ProviderId = "serving"
+    model: str = SERVING_MODEL
     # Appended to the generic repair instruction so the retry re-anchors on this
     # task's exact output shape (the selector does the same for select_skills).
     # Only used on the rare second attempt — no happy-path cost.
@@ -691,7 +688,12 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 # well under a hundredth of a cent per call.
                 max_output_tokens=4000, timeout_seconds=heavy_timeout,
                 sensitive_fields=frozenset({"transcript"}),
-                provider_id="openrouter", model=OPENROUTER_COMPACTION_MODEL,
+                # No provider override any more. This task ran on DeepSeek V4
+                # Flash via OpenRouter because the serving model was Gemma and
+                # compaction wanted something cheaper per input token. The
+                # serving model IS DeepSeek V4 Flash now — same weights, better
+                # host (see config.SERVING_HOST) — so the override would only
+                # buy a slower endpoint and a second credential.
                 repair_hint="Return a single JSON object with exactly these keys: "
                 "original_ask, agents, terminals, decisions, blockers, next_actions, "
                 "preserved_ids. Each entry of agents is an object with agent_id, "
@@ -863,7 +865,7 @@ class TaskRunner:
         server down for it would be the wrong trade, while returning an empty
         compaction would be a lie about work that never happened.
         """
-        if profile.provider_id == "cerebras":
+        if profile.provider_id == "serving":
             return self.provider
         if self.openrouter_provider is None:
             raise provider_not_configured("OpenRouter")
@@ -1021,7 +1023,7 @@ class TaskRunner:
             # CEREBRAS_API_KEY and the utility-task benchmarks thread it into
             # `TaskRunner.run`, so an unscoped forward would put the Cerebras key
             # in an Authorization header bound for OpenRouter.
-            api_key=api_key if profile.provider_id == "cerebras" else None,
+            api_key=api_key if profile.provider_id == "serving" else None,
             # Cache affinity, keyed by TASK rather than by caller. A task's system
             # prompt is server-owned and identical for everyone who runs it, so the
             # calls that share a prefix are the ones that share a task id — not the
@@ -1057,7 +1059,7 @@ class TaskRunner:
                 # here would silently swap the caller's key for the provider's
                 # configured default midway through a task, and a blind forward
                 # would misdirect it to another vendor.
-                api_key=api_key if profile.provider_id == "cerebras" else None,
+                api_key=api_key if profile.provider_id == "serving" else None,
                 # ...and the same affinity key: the repair replays the whole first
                 # attempt plus one instruction, so it is the same prefix and should
                 # say so.

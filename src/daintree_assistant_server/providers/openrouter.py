@@ -53,7 +53,8 @@ import itertools
 import json
 import os
 import time
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, ClassVar
 
 import httpx
 from pydantic import SecretStr
@@ -574,12 +575,23 @@ class OpenRouterProvider:
     simply has no instance of this class at all.
     """
 
+    #: Overridable seams for a sibling OpenAI-shape host (see ``together.py``).
+    #: The wire body is identical — same ``max_tokens``, same unified ``reasoning``
+    #: object, same tool-call chunks — so a second vendor differs only in where it
+    #: lives, how a key is probed, and which attribution headers mean anything.
+    default_base_url: ClassVar[str] = DEFAULT_BASE_URL
+    key_probe_path: ClassVar[str] = _KEY_PATH
+    attribution_headers: ClassVar[Mapping[str, str]] = {
+        "HTTP-Referer": _REFERER,
+        "X-Title": _APP_TITLE,
+    }
+
     def __init__(
         self,
         client: httpx.AsyncClient,
         *,
         api_key: SecretStr | None = None,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: str | None = None,
         default_timeout: float = 60.0,
         dump_dir: str | None = None,
     ) -> None:
@@ -591,7 +603,7 @@ class OpenRouterProvider:
         # solely where a header or a redaction pattern is built, never stored as
         # plaintext on the instance.
         self._default_api_key = api_key
-        self._base_url = base_url.rstrip("/")
+        self._base_url = (base_url or self.default_base_url).rstrip("/")
         self._default_timeout = default_timeout
         # Dev-only diagnostic (Settings.dump_upstream_dir, gated out of production
         # by readiness): when set, every upstream request body is written there as
@@ -673,15 +685,14 @@ class OpenRouterProvider:
         is a verdict to act on, the second means we simply do not know.
         """
         key = self._resolve_key(api_key)
-        url = f"{self._base_url}{_KEY_PATH}"
+        url = f"{self._base_url}{self.key_probe_path}"
         try:
             response = await self._client.get(
                 url,
                 headers={
                     "Authorization": f"Bearer {key.get_secret_value()}",
                     "Accept": "application/json",
-                    "HTTP-Referer": _REFERER,
-                    "X-Title": _APP_TITLE,
+                    **self.attribution_headers,
                 },
                 timeout=self._verify_timeout(),
             )
@@ -707,6 +718,17 @@ class OpenRouterProvider:
             raise upstream_protocol_error(
                 "The provider returned an unreadable key record."
             ) from exc
+        return self._decode_key_record(payload)
+
+    def _decode_key_record(self, payload: Any) -> dict[str, Any]:
+        """Turn a 200 from ``key_probe_path`` into a diagnostic record.
+
+        An overridable seam because the probe PATH is already one: a sibling host
+        with no ``/key`` route answers a different shape entirely, and a decoder
+        hardcoded to OpenRouter's would reject that host's valid keys as a
+        protocol error — reporting "we could not tell" for a credential that just
+        proved itself.
+        """
         if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
             # A 200 whose body is not a key record answers nothing. Degrading it to
             # an empty record would surface as `valid: true` — the exact false
@@ -762,9 +784,9 @@ class OpenRouterProvider:
             "Content-Type": "application/json",
             "Accept": "text/event-stream" if stream else "application/json",
             # Attribution only — OpenRouter uses these for its public model/app
-            # rankings. They carry no auth weight.
-            "HTTP-Referer": _REFERER,
-            "X-Title": _APP_TITLE,
+            # rankings. They carry no auth weight, and a sibling host that has no
+            # such ranking overrides them away entirely.
+            **self.attribution_headers,
         }
 
     def _build_body(self, request: ProviderChatRequest, *, stream: bool) -> dict[str, Any]:
@@ -816,6 +838,17 @@ class OpenRouterProvider:
             body["stream"] = True
             if request.include_usage:
                 body["stream_options"] = {"include_usage": True}
+        return body
+
+    def _prepared_body(self, request: ProviderChatRequest, *, stream: bool) -> dict[str, Any]:
+        """``_build_body`` plus the dev-only dump, in that order.
+
+        The dump lives HERE rather than at the end of ``_build_body`` so it
+        records what actually goes on the wire: a subclass that adjusts the body
+        (``TogetherProvider`` swaps the thinking switch) would otherwise be
+        invisible to the one tool built for answering "what did we send?".
+        """
+        body = self._build_body(request, stream=stream)
         self._maybe_dump_body(body)
         return body
 
@@ -874,7 +907,7 @@ class OpenRouterProvider:
     # ---- ChatProvider ---------------------------------------------------
 
     async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:
-        body = self._build_body(request, stream=False)
+        body = self._prepared_body(request, stream=False)
         api_key = self._resolve_key(request.api_key)
         try:
             resp = await self._client.post(
@@ -964,7 +997,7 @@ class OpenRouterProvider:
         )
 
     async def open_stream(self, request: ProviderChatRequest) -> ProviderStream:
-        body = self._build_body(request, stream=True)
+        body = self._prepared_body(request, stream=True)
         api_key = self._resolve_key(request.api_key)
         ctx = self._client.stream(
             "POST",

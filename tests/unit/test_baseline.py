@@ -67,15 +67,18 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     captured: ``compare()`` only checks the BANDED numeric metrics, so an
     identity string nobody asserts drifts in silence.
     """
-    from daintree_assistant_server.config import CEREBRAS_MODEL
+    from daintree_assistant_server.config import SERVING_HOST, SERVING_MODEL
 
     identity = _baseline()["identity"]
-    assert identity["model"] == CEREBRAS_MODEL  # type: ignore[index]
-    # The upstream itself. There is no endpoint-selection posture to record any
-    # more — Cerebras hosts one endpoint per model, so privacy mode, sort axis
-    # and denylist have no subject. Naming the provider is what remains, and it
-    # is the field that would have to change for any of that to come back.
-    assert identity["provider"] == "cerebras"  # type: ignore[index]
+    assert identity["model"] == SERVING_MODEL  # type: ignore[index]
+    # The upstream itself, and it is a REAL posture field now rather than a
+    # constant: the host moved to Together and the same weights measured 3.1x
+    # faster than through OpenRouter's default routing, so which host serves is
+    # exactly the kind of change this block exists to make explicit in a diff.
+    # There is still no endpoint-selection posture to record — a model host
+    # serves one endpoint per model, so privacy mode, sort axis and denylist
+    # have no subject.
+    assert identity["provider"] == SERVING_HOST  # type: ignore[index]
     # There is likewise no first-byte endpoint sort: the call that sat on the
     # first-byte path (the upstream skill selector) was replaced by the LOCAL
     # two-stage selector, whose release facts are asserted below instead.

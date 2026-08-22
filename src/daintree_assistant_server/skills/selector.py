@@ -23,7 +23,7 @@ from typing import Any
 
 from pydantic import SecretStr
 
-from ..config import CEREBRAS_MODEL, Settings
+from ..config import SERVING_MODEL, Settings
 from ..contracts.openai import ChatMessage
 from ..errors import DaintreeError
 from ..prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader, RenderCache
@@ -689,7 +689,7 @@ class Selector:
         # first-byte latency specifically and holds regardless of the main posture.
         # json_object output, never a forced tool_choice.
         return ProviderChatRequest(
-            model=CEREBRAS_MODEL,
+            model=SERVING_MODEL,
             messages=messages,
             temperature=0.0,
             max_tokens=self.settings.selector_max_output_tokens,

@@ -507,7 +507,7 @@ def test_oversized_body_413(client, auth) -> None:
 
 
 def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
-    """CEREBRAS_API_KEY gates READINESS, and that placement is the whole point.
+    """The SERVING credential gates READINESS, and that placement is the point.
 
     Without it nothing can be answered at all. Discovering that on the first turn
     surfaces as an upstream 401 that reads like the caller's fault — an operator
@@ -517,13 +517,13 @@ def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
     """
     from fastapi.testclient import TestClient
 
-    from daintree_assistant_server.config import Settings
+    from daintree_assistant_server.config import SERVING_KEY_ENV, Settings
     from daintree_assistant_server.main import create_app
 
-    settings = Settings(
-        ENVIRONMENT="development", CEREBRAS_API_KEY="",
-        STATE_SIGNING_KEY_CURRENT="sk", STATE_SALT="x",
-    )
+    settings = Settings(**{
+        "ENVIRONMENT": "development", SERVING_KEY_ENV: "",
+        "STATE_SIGNING_KEY_CURRENT": "sk", "STATE_SALT": "x",
+    })
     app = create_app(settings=settings)  # real lifespan (no injected provider)
     with TestClient(app) as client:
         assert app.state.ready is False
@@ -541,7 +541,7 @@ def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
     from daintree_assistant_server.main import create_app
 
     settings = Settings(
-        ENVIRONMENT="production", CEREBRAS_API_KEY="csk-server-owned",
+        ENVIRONMENT="production", TOGETHER_API_KEY="sk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48, STATE_SALT="a-real-salt-value",
     )
     app = create_app(settings=settings)
@@ -568,7 +568,7 @@ def test_prod_not_ready_when_prompt_dumping_is_enabled(fake_provider) -> None:
 
     settings = Settings(
         ENVIRONMENT="production",
-        CEREBRAS_API_KEY="csk-server-owned",
+        TOGETHER_API_KEY="sk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",
         DAINTREE_DUMP_UPSTREAM_DIR="/tmp/daintree-dump",

@@ -5,7 +5,7 @@ boundary off the local CLI: the server owns the permanent system prompt, the
 skill catalog and bodies, automatic skill selection, prompt assembly, and the
 small-model utility prompts. The CLI keeps local state and local tool execution.
 
-**The server holds the upstream credential** (`CEREBRAS_API_KEY`) and funds every
+**The server holds the upstream credential** (`TOGETHER_API_KEY`) and funds every
 turn from it, so a request needs no API key of its own. That is a stage, not a
 destination: account authentication and sign-in are next, and `auth.py` is the
 seam they land in.
@@ -16,7 +16,7 @@ as their own response block, and streaming uses named SSE events (`meta`/`status
 `compaction`/`done`/`error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** Cerebras Inference (OpenAI-format API spoken *internally*, behind a provider abstraction) — `gemma-4-31b` for the main completion and every utility task; skill selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Cerebras is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference. Requests are not collected for training ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, deliberately *not* a zero-retention claim <!-- privacy-copy-ok -->)
+- **Upstream:** Together AI (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-ai/DeepSeek-V4-Flash-0731` for the main completion and every utility task; skill selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Together is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference — and pinning the host is what makes it fast, since the same weights via OpenRouter's default routing measured 3.1x slower (p50 3414ms against 1100ms). `config.SERVING_HOST` is the switch back to Cerebras/`gemma-4-31b`. Requests are not collected for training ([`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) — a no-training guarantee, deliberately *not* a zero-retention claim <!-- privacy-copy-ok -->)
 - **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
 
 ## Authoritative documents
@@ -80,7 +80,7 @@ proof that the whole corpus is accurate.
 src/daintree_assistant_server/
   api/            # FastAPI routers (chat, models, capabilities, skills, tasks, health)
   contracts/      # Pydantic wire models (OpenAI subset, extension, tasks, errors)
-  providers/      # ChatProvider protocol + Cerebras adapter + SSE parser
+  providers/      # ChatProvider protocol + Together/OpenRouter/Cerebras adapters + SSE parser
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader
   skills/         # Skill models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed skill-state token codec
@@ -120,7 +120,7 @@ Set this (see `.env.example` for the full list):
 
 ```bash
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
-export CEREBRAS_API_KEY=...               # the upstream credential; funds every turn
+export TOGETHER_API_KEY=...               # the upstream credential; funds every turn
 ```
 
 Those two are the whole list, and both are the **server's own**. There is no
@@ -128,10 +128,10 @@ inbound API key to configure, and the `Authorization` header is **ignored
 entirely** — not parsed, not validated, not rejected. That is deliberate and
 temporary, until account authentication lands, and it is stronger than "a key is
 optional": a CLI still sending the OpenRouter key it used to authenticate with
-would otherwise have that key forwarded to Cerebras and rejected as *theirs*.
+would otherwise have that key forwarded upstream and rejected as *theirs*.
 
 Missing required secrets do not crash the process — they fail **readiness**
-(`/readyz` returns 503) so liveness stays green. `CEREBRAS_API_KEY` is gated
+(`/readyz` returns 503) so liveness stays green. `TOGETHER_API_KEY` is gated
 there precisely so its absence surfaces as "this deployment is not ready" rather
 than as a first-turn upstream 401 that reads like the caller's fault.
 
@@ -139,7 +139,7 @@ than as a first-turn upstream 401 that reads like the caller's fault.
 
 ```bash
 # Copy the env scaffold; it binds HOST/PORT from .env (default 127.0.0.1:8473).
-cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT and CEREBRAS_API_KEY
+cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT and TOGETHER_API_KEY
 ./dev                  # exports .env, then runs the server
 ```
 
@@ -243,10 +243,10 @@ applied while leaving the service unhealthy is the worst outcome: the operator
 believes they have recovered and stops looking.
 
 The deployment mounts state-signing material (`STATE_SIGNING_KEY_CURRENT`,
-`STATE_SALT`) and the upstream credential (`CEREBRAS_API_KEY`), which funds every
+`STATE_SALT`) and the upstream credential (`TOGETHER_API_KEY`), which funds every
 turn. In production (`ENVIRONMENT=production`) the service fails readiness if a
 secret is weak or default (the packaged `STATE_SALT`, a signing key under 32
-characters), or if `CEREBRAS_BASE_URL` is not the real `https://api.cerebras.ai`
+characters), or if `TOGETHER_BASE_URL` is not the real `https://api.together.xyz`
 origin — the server key rides every request to that origin, so a typo'd or
 plain-http host would leak the one credential all of Daintree runs on.
 

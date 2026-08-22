@@ -84,7 +84,10 @@ async def verify(
         models = record.get("models")
         if isinstance(models, list):
             out["models"] = [m for m in models if isinstance(m, str)]
-        label = _safe_label(record.get("label"), settings.cerebras_api_key.get_secret_value())
+        # The credential ACTUALLY probed, not a vendor-named field: `verify_key`
+        # runs against the serving adapter, so redacting against a host we are not
+        # talking to would let the live key through in a label that echoed it.
+        label = _safe_label(record.get("label"), settings.serving_api_key.get_secret_value())
         if label:
             out["label"] = label
         for field in ("limit", "usage", "limit_remaining"):

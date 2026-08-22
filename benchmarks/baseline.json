@@ -5,8 +5,8 @@
     "skills": 39
   },
   "identity": {
-    "model": "gemma-4-31b",
-    "provider": "cerebras",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "provider": "together",
     "public_model": "daintree-assistant"
   },
   "prompt": {

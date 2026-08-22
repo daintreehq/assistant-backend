@@ -16,6 +16,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from daintree_assistant_server.config import SERVING_HOST
 from daintree_assistant_server.errors import invalid_api_key, upstream_error
 
 URL = "/v1/daintree/doctor"
@@ -188,7 +189,7 @@ def test_the_bundle_states_who_holds_the_credential(client, auth) -> None:
     What the bundle reports instead is who is paying.
     """
     body = client.post(URL, headers=auth).json()
-    assert body["provider"]["name"] == "cerebras"
+    assert body["provider"]["name"] == SERVING_HOST
     assert body["provider"]["server_holds_credential"] is True
     assert "privacy_mode" not in body["provider"]
 

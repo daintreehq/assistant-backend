@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from fakes import FakeProvider, make_result
 from pydantic import SecretStr, ValidationError
 
-from daintree_assistant_server.config import CEREBRAS_MODEL
+from daintree_assistant_server.config import SERVING_MODEL
 from daintree_assistant_server.contracts.tasks import (
     CompactedAgentOut,
     ContextCompactOutput,
@@ -19,6 +20,7 @@ from daintree_assistant_server.contracts.tasks import (
 from daintree_assistant_server.errors import DaintreeError, upstream_error, upstream_timeout
 from daintree_assistant_server.providers.base import ProviderUsage
 from daintree_assistant_server.services.task_runner import (
+    TaskProfile,
     TaskRunner,
     _affinity_key,
     build_profiles,
@@ -518,7 +520,7 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
     result = await task_runner.run(TaskRequest(task="terminal_summarize", input={"tail": "x"}), api_key=TEST_API_KEY)
     assert result.prompt_version == "terminal_summarize"
     assert result.usage.total_tokens >= 0
-    assert result.model == "gemma-4-31b"
+    assert result.model == SERVING_MODEL
 
 
 # The task ids are a FROZEN WIRE CONTRACT shared with the Go CLI, which hardcodes
@@ -714,7 +716,34 @@ def dual_runner(
         prompt_loader=prompt_loader,
         catalog_manager=catalog_manager,
         openrouter_provider=openrouter_provider,
+        profiles=_profiles_with_a_second_provider(),
     )
+
+
+#: The model the synthetic second-provider profile claims. Deliberately not a
+#: real id: the point is that it is NOT SERVING_MODEL, so a request landing on
+#: the wrong adapter is visible in one assertion.
+SECOND_PROVIDER_MODEL = "vendor-b/second-model"
+
+
+def _profiles_with_a_second_provider() -> dict[str, TaskProfile]:
+    """The shipped registry, with ONE profile moved onto the second adapter.
+
+    Every shipped task runs on the serving provider now — `context_compact` came
+    back when the serving model BECAME DeepSeek V4 Flash, so the cheap-second-model
+    argument that sent it away no longer applies. The `_provider_for` machinery it
+    used is still there, still reachable, and still the thing that must not leak a
+    caller credential across vendors, so these tests exercise it through a profile
+    they construct rather than through whichever task happens to use it this month.
+    That is the more honest subject anyway: the invariant is about the mechanism.
+    """
+    profiles = dict(build_profiles())
+    profiles["context_compact"] = replace(
+        profiles["context_compact"],
+        provider_id="openrouter",
+        model=SECOND_PROVIDER_MODEL,
+    )
+    return profiles
 
 
 _COMPACT_OUTPUT = {
@@ -748,7 +777,7 @@ async def test_compaction_routes_to_openrouter_not_the_serving_provider(
     # The serving provider was never touched.
     assert fake_provider.requests == []
     assert len(openrouter_provider.requests) == 1
-    assert openrouter_provider.requests[0].model == "deepseek/deepseek-v4-flash"
+    assert openrouter_provider.requests[0].model == SECOND_PROVIDER_MODEL
 
 
 @pytest.mark.asyncio
@@ -788,21 +817,31 @@ async def test_the_json_repair_retry_stays_on_the_same_provider_and_model(
 
     assert fake_provider.requests == []
     assert len(openrouter_provider.requests) == 2
-    assert {r.model for r in openrouter_provider.requests} == {"deepseek/deepseek-v4-flash"}
+    assert {r.model for r in openrouter_provider.requests} == {SECOND_PROVIDER_MODEL}
 
 
 @pytest.mark.asyncio
 async def test_an_unconfigured_openrouter_key_fails_only_that_task(
-    task_runner: TaskRunner, fake_provider: FakeProvider
+    settings, fake_provider: FakeProvider, prompt_loader, catalog_manager
 ) -> None:
     """A missing optional credential is a 503 on ONE task, not a dead server.
 
-    The default ``task_runner`` fixture is built with no OpenRouter provider —
-    which is exactly what a deployment that never set OPENROUTER_API_KEY looks
-    like. It must still answer every other task normally.
+    Built with a profile that routes off the serving host and NO second provider
+    to route to — which is exactly what a deployment looks like when a task wants
+    an optional credential nobody configured. It must still answer every other
+    task normally. (No shipped profile is in that position today; the mechanism
+    is, which is why the profile is constructed here.)
     """
+    runner = TaskRunner(
+        settings=settings,
+        provider=fake_provider,
+        prompt_loader=prompt_loader,
+        catalog_manager=catalog_manager,
+        openrouter_provider=None,
+        profiles=_profiles_with_a_second_provider(),
+    )
     with pytest.raises(DaintreeError) as exc:
-        await _run(task_runner, "context_compact", {"transcript": "conversation"})
+        await _run(runner, "context_compact", {"transcript": "conversation"})
     assert exc.value.status_code == 503
     assert exc.value.code == "provider_not_configured"
     # Named, because the fix is to set that provider's key.
@@ -814,7 +853,7 @@ async def test_an_unconfigured_openrouter_key_fails_only_that_task(
 
     # The rest of the registry is unaffected.
     fake_provider.complete_result = make_result(content="Tests are green.")
-    out = await _run(task_runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
+    out = await _run(runner, "terminal_summarize", {"purpose": "p", "tail": "x"})
     assert out == {"text": "Tests are green."}
 
 
@@ -827,7 +866,7 @@ async def test_the_reported_model_is_the_one_actually_used(
     result = await dual_runner.run(
         TaskRequest(task="context_compact", input={"transcript": "x"}), api_key=TEST_API_KEY
     )
-    assert result.model == "deepseek/deepseek-v4-flash"
+    assert result.model == SECOND_PROVIDER_MODEL
 
 
 @pytest.mark.asyncio
@@ -853,20 +892,21 @@ async def test_a_reported_cost_survives_to_the_client(
     assert result.usage.cost == 0.00009
 
 
-def test_only_the_compaction_profile_leaves_the_serving_provider() -> None:
+def test_no_profile_leaves_the_serving_provider() -> None:
     """A guard on scope, not on behaviour.
 
     Provider selection is one field on a dataclass, which makes it cheap to add a
     second, then a third — and that is the road back to the endpoint-selection
-    policy this repo deliberately deleted. Moving another task off Cerebras
-    should require deleting this assertion, deliberately.
+    policy this repo deliberately deleted. It is at ZERO now: `context_compact`
+    was the one exception, and it came home when the serving model became the
+    cheap model it had been leaving for. Moving a task off the serving provider
+    again should require deleting this assertion, deliberately.
     """
     profiles = build_profiles()
-    off_default = {p.id for p in profiles.values() if p.provider_id != "cerebras"}
-    assert off_default == {"context_compact"}
+    off_default = {p.id for p in profiles.values() if p.provider_id != "serving"}
+    assert off_default == set()
     for profile in profiles.values():
-        if profile.id != "context_compact":
-            assert profile.model == CEREBRAS_MODEL, profile.id
+        assert profile.model == SERVING_MODEL, profile.id
 
 
 def test_the_compaction_budget_fits_a_busy_orchestration_session() -> None:

@@ -35,6 +35,40 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # PUBLIC_MODEL_ID is the alias returned to clients. Only the provider API key and
 # base URL come from the environment.
 CEREBRAS_MODEL = "gemma-4-31b"
+
+# The Together-hosted alternative, and THE serving model today. DeepSeek V4 Flash
+# is the same weights `context_compact` has always used; what changed is the host.
+# OpenRouter is a router and this server sends it no routing preferences (there is
+# no `provider` block and policy.py is gone), so its endpoint choice is whatever
+# the default is that minute. Replaying the 62 real utility-task payloads:
+# Together p50 1100ms / p90 1702ms against OpenRouter's 3414ms / 6013ms — same
+# model, same prompts, 3.1x. The host, not the model, was the latency.
+TOGETHER_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
+
+# ---- THE serving identity — one host, one model, both hardcoded ------------
+# Switching hosts is these two lines and nothing else: the adapters are picked
+# from SERVING_HOST in main.py, readiness gates the matching credential, and
+# every model call (main completion and all 13 utility tasks) uses SERVING_MODEL.
+# Set them back to ("cerebras", CEREBRAS_MODEL) to return to Gemma 4 31B, which
+# is the move to make when a Cerebras model worth having lands.
+SERVING_HOST: Literal["together", "cerebras"] = "together"
+SERVING_MODEL = TOGETHER_MODEL
+
+#: Per-host names for the serving credential, its base URL, and the origin that
+#: URL must resolve to in production. Keyed by SERVING_HOST so readiness reports
+#: the variable the operator actually has to set.
+_SERVING_KEY_ENV = {"together": "TOGETHER_API_KEY", "cerebras": "CEREBRAS_API_KEY"}
+_SERVING_URL_ENV = {"together": "TOGETHER_BASE_URL", "cerebras": "CEREBRAS_BASE_URL"}
+_SERVING_ORIGIN = {"together": "api.together.xyz", "cerebras": "api.cerebras.ai"}
+
+#: Resolved for the current host. Readiness messages and the tests that pin the
+#: credential model both read these rather than a vendor name, so switching
+#: SERVING_HOST moves the whole posture instead of leaving assertions behind
+#: that still describe the host we left.
+SERVING_KEY_ENV = _SERVING_KEY_ENV[SERVING_HOST]
+SERVING_URL_ENV = _SERVING_URL_ENV[SERVING_HOST]
+SERVING_ORIGIN = _SERVING_ORIGIN[SERVING_HOST]
+
 PUBLIC_MODEL_ID = "daintree-assistant"
 
 # The runbook loaded whenever a turn produces a `docs_query` — i.e. whenever the
@@ -144,6 +178,16 @@ class Settings(BaseSettings):
     # production. This provider is constructed against its module default and
     # nothing has asked to move it.
     openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
+
+    # ---- Together AI — the SERVING host today (see SERVING_HOST above) ----
+    # Same shape as the Cerebras pair above and for the same reason: this key
+    # funds every turn, so `missing_secrets` gates readiness on it whenever
+    # Together is the serving host, and `weak_secrets` pins the base URL back to
+    # the real origin in production because the key is sent there.
+    together_base_url: str = Field(
+        default="https://api.together.xyz/v1", alias="TOGETHER_BASE_URL"
+    )
+    together_api_key: SecretStr = Field(default=SecretStr(""), alias="TOGETHER_API_KEY")
 
     # ---- Thinking headroom -----------------------------------------------
     # The thinking POSTURE itself is hardcoded (see INTERACTIVE_THINKING_ENABLED at
@@ -444,6 +488,20 @@ class Settings(BaseSettings):
         """
         return self.environment in ("production", "staging")
 
+    @property
+    def serving_api_key(self) -> SecretStr:
+        """The credential that funds every turn, per SERVING_HOST."""
+        return (
+            self.together_api_key if SERVING_HOST == "together" else self.cerebras_api_key
+        )
+
+    @property
+    def serving_base_url(self) -> str:
+        """The origin the serving credential is sent to, per SERVING_HOST."""
+        return (
+            self.together_base_url if SERVING_HOST == "together" else self.cerebras_base_url
+        )
+
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty.
 
@@ -458,8 +516,8 @@ class Settings(BaseSettings):
         missing: list[str] = []
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
-        if not self.cerebras_api_key.get_secret_value():
-            missing.append("CEREBRAS_API_KEY")
+        if not self.serving_api_key.get_secret_value():
+            missing.append(SERVING_KEY_ENV)
         return missing
 
     def local_only_problems(self) -> list[str]:
@@ -505,10 +563,10 @@ class Settings(BaseSettings):
         # production pins the real Cerebras origin. Development stays free to
         # point at proxies/mocks.
         try:
-            parsed = urlsplit(self.cerebras_base_url)
+            parsed = urlsplit(self.serving_base_url)
             origin_ok = (
                 parsed.scheme == "https"
-                and parsed.hostname == "api.cerebras.ai"
+                and parsed.hostname == SERVING_ORIGIN
                 # Default port only: a non-443 port is a different origin, and a
                 # malformed one should fail readiness, not the first request.
                 and parsed.port in (None, 443)
@@ -520,7 +578,8 @@ class Settings(BaseSettings):
             origin_ok = False
         if not origin_ok:
             problems.append(
-                "CEREBRAS_BASE_URL must be the https://api.cerebras.ai origin in production "
+                f"{SERVING_URL_ENV} must be the "
+                f"https://{SERVING_ORIGIN} origin in production "
                 "(the server API key is sent to it)"
             )
         if len(self.state_signing_key_current.get_secret_value()) < 32:

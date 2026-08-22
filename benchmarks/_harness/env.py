@@ -14,9 +14,16 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import Settings
-from daintree_assistant_server.providers.base import ProviderChatRequest
+from daintree_assistant_server.config import SERVING_HOST, SERVING_KEY_ENV, Settings
+from daintree_assistant_server.providers.base import ChatProvider, ProviderChatRequest
 from daintree_assistant_server.providers.cerebras import CerebrasProvider
+from daintree_assistant_server.providers.together import TogetherProvider
+
+#: The adapter class ``config.SERVING_HOST`` selects. Benchmarks MUST build the
+#: same one production does: a suite that measured wire bytes or latency through
+#: a host the server does not use is reporting a number about nothing, and the
+#: failure is silent because both adapters answer the same calls.
+_SERVING_PROVIDER_CLASS = TogetherProvider if SERVING_HOST == "together" else CerebrasProvider
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -68,12 +75,14 @@ BENCH_CALLER_KEY = SecretStr("benchmark-caller-key-not-a-secret")
 def caller_api_key(settings: Settings) -> SecretStr:
     """The per-call credential for service-level benchmark calls.
 
-    The real ``CEREBRAS_API_KEY`` when the environment has one (live suites),
-    else the bench sentinel (deterministic suites, whose fake providers never
-    build a header from it).
+    The real SERVING credential when the environment has one (live suites), else
+    the bench sentinel (deterministic suites, whose fake providers never build a
+    header from it). Follows ``config.SERVING_HOST`` rather than naming a vendor:
+    a benchmark holding the wrong host's key does not fail, it silently measures
+    a model production does not serve.
     """
-    if settings.cerebras_api_key.get_secret_value():
-        return settings.cerebras_api_key
+    if settings.serving_api_key.get_secret_value():
+        return settings.serving_api_key
     return BENCH_CALLER_KEY
 
 
@@ -84,32 +93,32 @@ def require_api_key(settings: Settings) -> SecretStr:
     the provider unwraps it only to build a header or to scrub an echoed key out of
     upstream error text.
     """
-    if not settings.cerebras_api_key.get_secret_value():
+    if not settings.serving_api_key.get_secret_value():
         raise EnvError(
-            "CEREBRAS_API_KEY is not set — export it or point --env-file at a .env "
+            f"{SERVING_KEY_ENV} is not set — export it or point --env-file at a .env "
             "that has it (live suites make real calls)."
         )
-    return settings.cerebras_api_key
+    return settings.serving_api_key
 
 
 def build_provider_body(
     request: ProviderChatRequest, settings: Settings, *, stream: bool = False
 ) -> dict[str, Any]:
-    """The EXACT upstream body ``CerebrasProvider`` would POST — built through the
+    """The EXACT upstream body the SERVING adapter would POST — built through the
     real provider (no network, no key needed) so the deterministic cache metric is
     measured over production's wire bytes, not a hand-rebuilt dict."""
-    provider = CerebrasProvider(
+    provider = _SERVING_PROVIDER_CLASS(
         None,  # type: ignore[arg-type]  # _build_body never touches the client
         api_key=SecretStr(""),  # no network: _build_body never builds a header
-        base_url=settings.cerebras_base_url,
+        base_url=settings.serving_base_url,
     )
     return provider._build_body(request, stream=stream)
 
 
 def make_upstream_provider(
     settings: Settings, *, timeout: float | None = None
-) -> CerebrasProvider:
-    """A real Cerebras provider over a fresh httpx client — identical wiring to
+) -> ChatProvider:
+    """A real SERVING provider over a fresh httpx client — identical wiring to
     the production ``Container``/existing benches (never a bespoke client)."""
     key = require_api_key(settings)
     t = timeout or settings.utility_timeout_seconds
@@ -117,9 +126,9 @@ def make_upstream_provider(
         timeout=httpx.Timeout(t, connect=settings.upstream_connect_timeout_seconds),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    return CerebrasProvider(
+    return _SERVING_PROVIDER_CLASS(
         client,
         api_key=key,
-        base_url=settings.cerebras_base_url,
+        base_url=settings.serving_base_url,
         default_timeout=t,
     )

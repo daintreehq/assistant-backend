@@ -28,15 +28,22 @@ from daintree_assistant_server import PROTOCOL_MAX, PROTOCOL_MIN
 from daintree_assistant_server import main as main_module
 from daintree_assistant_server.auth import authenticate
 from daintree_assistant_server.config import (
-    CEREBRAS_MODEL,
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
     PUBLIC_MODEL_ID,
+    SERVING_HOST,
+    SERVING_KEY_ENV,
+    SERVING_MODEL,
     Settings,
 )
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.cerebras import CerebrasProvider
+from daintree_assistant_server.providers.together import TogetherProvider
 from daintree_assistant_server.services.task_runner import TaskRunner
+
+#: The adapter SERVING_HOST currently selects. The Cerebras one keeps its own
+#: wire-contract tests below either way — it is the host we switch back to.
+_SERVING_PROVIDER_CLASS = TogetherProvider if SERVING_HOST == "together" else CerebrasProvider
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src" / "daintree_assistant_server"
@@ -330,7 +337,7 @@ def test_task_runner_actually_sends_reasoning_disabled() -> None:
 
 def test_provider_policy_names_the_pinned_models() -> None:
     text = _read(DOC_PROVIDER)
-    for model in (CEREBRAS_MODEL, PUBLIC_MODEL_ID):
+    for model in (SERVING_MODEL, PUBLIC_MODEL_ID):
         assert model in text, (
             f"docs/PROVIDER_POLICY.md does not name {model!r}. The model table is "
             "the documented source of truth for what actually answers a call."
@@ -338,7 +345,7 @@ def test_provider_policy_names_the_pinned_models() -> None:
 
 
 def test_readme_names_the_pinned_main_model() -> None:
-    assert CEREBRAS_MODEL in _read(README)
+    assert SERVING_MODEL in _read(README)
 
 
 # ---------------------------------------------------------------------------
@@ -369,7 +376,7 @@ def test_no_document_claims_the_caller_funds_the_turn(path: Path) -> None:
             continue
         pytest.fail(
             f"{path.name}:{number} says {match.group(0)!r}. The server holds the "
-            "upstream credential (CEREBRAS_API_KEY) and funds every turn from it; "
+            f"upstream credential ({SERVING_KEY_ENV}) and funds every turn from it; "
             "callers supply no key. See docs/KEY_HANDLING.md."
         )
 
@@ -384,10 +391,11 @@ def test_serving_provider_is_built_with_the_server_credential() -> None:
     reordering and renaming of everything around it.
     """
     builder = inspect.getsource(main_module._build_provider)
-    assert "settings.cerebras_api_key" in builder, (
+    expected = f"settings.{SERVING_KEY_ENV.lower()}"
+    assert expected in builder, (
         "main._build_provider no longer passes the server credential. Readiness "
-        "gates on CEREBRAS_API_KEY precisely so this cannot be missing at runtime; "
-        "a provider built without it cannot answer anything."
+        f"gates on {SERVING_KEY_ENV} precisely so this cannot be missing at "
+        "runtime; a provider built without it cannot answer anything."
     )
 
 
@@ -397,14 +405,14 @@ def test_the_serving_provider_really_holds_the_credential() -> None:
     A request that arrives with no caller key must still be servable — that is the
     entire current credential model, and the thing an anonymous CLI depends on.
     """
-    settings = Settings(
-        STATE_SIGNING_KEY_CURRENT="x" * 32,
-        CEREBRAS_API_KEY="csk-server-owned",
-    )
+    settings = Settings(**{
+        "STATE_SIGNING_KEY_CURRENT": "x" * 32,
+        SERVING_KEY_ENV: "sk-server-owned",
+    })
     provider = main_module._build_provider(settings)
-    assert isinstance(provider, CerebrasProvider)
+    assert isinstance(provider, _SERVING_PROVIDER_CLASS)
     # No per-call key: the server's own is what gets resolved.
-    assert provider._resolve_key(None).get_secret_value() == "csk-server-owned"
+    assert provider._resolve_key(None).get_secret_value() == "sk-server-owned"
 
 
 def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
@@ -416,13 +424,13 @@ def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
     """
     from pydantic import SecretStr as _SecretStr
 
-    settings = Settings(
-        STATE_SIGNING_KEY_CURRENT="x" * 32,
-        CEREBRAS_API_KEY="csk-server-owned",
-    )
+    settings = Settings(**{
+        "STATE_SIGNING_KEY_CURRENT": "x" * 32,
+        SERVING_KEY_ENV: "sk-server-owned",
+    })
     provider = main_module._build_provider(settings)
-    resolved = provider._resolve_key(_SecretStr("csk-caller-supplied"))
-    assert resolved.get_secret_value() == "csk-caller-supplied"
+    resolved = provider._resolve_key(_SecretStr("sk-caller-supplied"))
+    assert resolved.get_secret_value() == "sk-caller-supplied"
 
 
 # THE DOOR IS OPEN, and the docs must say so plainly.

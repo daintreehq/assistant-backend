@@ -29,7 +29,7 @@ from .api import (
     health,
     root,
 )
-from .config import Settings, get_settings
+from .config import SERVING_HOST, Settings, get_settings
 from .errors import register_exception_handlers, request_too_large
 from .observability import (
     bind_request_context,
@@ -42,6 +42,7 @@ from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
 from .providers.cerebras import CerebrasProvider
 from .providers.openrouter import OpenRouterProvider
+from .providers.together import TogetherProvider
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.compaction import Compactor, NullCompactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
@@ -296,6 +297,18 @@ def _build_provider(settings: Settings) -> ChatProvider:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
+    if SERVING_HOST == "together":
+        # The OpenAI-shape adapter, pointed at Together. Same body, same SSE, same
+        # unified `reasoning` object (measured — Together honours `{"enabled":
+        # false}`), so the vendor difference is three class attributes rather than
+        # a third parsing implementation. See providers/together.py.
+        return TogetherProvider(
+            client,
+            api_key=settings.together_api_key,
+            base_url=settings.together_base_url,
+            default_timeout=settings.main_timeout_seconds,
+            dump_dir=settings.dump_upstream_dir,
+        )
     return CerebrasProvider(
         client,
         # THE server credential. Daintree funds every turn from this key: callers

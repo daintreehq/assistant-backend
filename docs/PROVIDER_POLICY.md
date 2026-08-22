@@ -33,9 +33,22 @@ data, how failures are retried, and what error the caller gets back.
 
 | Call | Model | Source of truth |
 |---|---|---|
-| Main completion | `gemma-4-31b` | `config.CEREBRAS_MODEL` |
-| Utility tasks | `gemma-4-31b` | `config.CEREBRAS_MODEL` |
+| Main completion | `deepseek-ai/DeepSeek-V4-Flash-0731` on Together | `config.SERVING_MODEL` |
+| Utility tasks | `deepseek-ai/DeepSeek-V4-Flash-0731` on Together | `config.SERVING_MODEL` |
 | Skill selection | — local two-stage ONNX selector, no upstream call | `skills/local/setwise.py` |
+
+**The host is the latency decision, not the model.** These are the same weights
+`context_compact` reached through OpenRouter for months. OpenRouter is a router
+and this server sends it no routing preferences (there is no `provider` block —
+see above), so its endpoint choice is whatever the default is that minute.
+Replaying the 62 real utility-task payloads against both: Together p50 1100ms /
+p90 1702ms, OpenRouter p50 3414ms / p90 6013ms. Nothing about the model changed.
+
+`config.SERVING_HOST` names the host and `config.SERVING_MODEL` the model;
+switching back to Cerebras and `gemma-4-31b` is those two lines. The adapters are
+selected from `SERVING_HOST` in `main._build_provider`, readiness gates the
+matching credential (`SERVING_KEY_ENV`), and `weak_secrets` pins the matching
+origin in production.
 
 **One model, singular.** The second one existed for skill learning — a background
 pass that read a completed workflow and wrote or rewrote a skill file from model
@@ -56,10 +69,11 @@ it does not reason (§2) and it is what the prompt budgets are sized against.
 > prompt-based selector survives only as the scripted test seam; where selector
 > latency or selector cost is discussed below, that is what is meant.
 
-**The credential is the server's.** `CEREBRAS_API_KEY` funds every turn, and
+**The credential is the server's.** `TOGETHER_API_KEY` funds every turn, and
 callers supply none of their own — see [`KEY_HANDLING.md`](KEY_HANDLING.md). This
-inverted with the move to Cerebras and it is the fact most likely to be
-misremembered from older copy.
+inverted with the move off caller-supplied keys and it is the fact most likely
+to be misremembered from older copy. The variable name follows `SERVING_HOST`;
+the ownership does not change with it.
 
 `/v1/daintree/respond` and `/v1/daintree/capabilities` report
 `config.PUBLIC_MODEL_ID` (`daintree-assistant`), never a real model id.
