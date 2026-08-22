@@ -1255,3 +1255,94 @@ def test_the_benchmark_readme_ci_claim_matches_the_workflow() -> None:
         "benchmarks/README.md no longer states that CI runs the deterministic "
         "dashboard — check it has not reverted to claiming benchmarks are outside CI"
     )
+
+
+# ---------------------------------------------------------------------------
+# Retired architecture, stated in the present tense.
+# ---------------------------------------------------------------------------
+
+#: Claims that were TRUE of an earlier Daintree and are now false. Each is a
+#: phrase specific enough that a false positive is unlikely and a real
+#: reintroduction is certain to trip it.
+#:
+#: These are not ordinary doc-quality nits. Repository prose is what a coding
+#: agent reads as context before changing anything, so a document that describes
+#: a deleted architecture in the present tense is an instruction to rebuild it.
+#: `docs/DAINTREE_API.md` was exactly that for a whole generation: it documented
+#: caller-supplied OpenRouter keys, a `provider` endpoint-selection block and a
+#: model-call skill selector, all removed, while calling itself the wire
+#: contract.
+_RETIRED_CLAIMS = (
+    "caller's own api key as the bearer",
+    "the key is their openrouter key",
+    "skill selection runs on a separate small model",
+    "endpoint-selection policy",
+    "throughput-sorted",
+    "caller owns the key and pays the bill",
+)
+
+#: A line may discuss a retired design when it says so. Kept deliberately small:
+#: the escape hatch is for labelled history, not for softening a live claim.
+_HISTORY_MARKERS = (
+    "historical",
+    "used to",
+    "no longer",
+    "previously",
+    "was deleted",
+    "were deleted",
+    "git history",
+    "retired",
+    "before the",
+)
+
+
+def test_no_document_states_a_retired_architecture_in_the_present_tense() -> None:
+    docs = [README, DOC_API, DOC_PROVIDER, DOC_BETA, DOC_KEYS, REPO_ROOT / "CLAUDE.md"]
+    problems: list[str] = []
+    for path in docs:
+        if not path.exists():
+            continue
+        lines = _read(path).splitlines()
+        for number, line in enumerate(lines, start=1):
+            # Prose here is hard-wrapped, so a negation regularly lands at the end
+            # of the previous line ("…so there is no\nendpoint-selection policy").
+            # Scanning one line at a time would read those as live claims.
+            previous = lines[number - 2] if number >= 2 else ""
+            # Only the previous line's TAIL, and only to complete a wrapped
+            # sentence — a history marker earlier in the paragraph must not
+            # license a live claim on this line.
+            wrapped = "" if not previous.rstrip() else previous.rstrip()[-40:]
+            lowered = (wrapped + " " + line).lower()
+            # A history marker excuses the line it appears ON, not its neighbour:
+            # a previous line ending "This was deleted previously." would
+            # otherwise wave through every claim on the line after it.
+            if any(marker in line.lower() for marker in _HISTORY_MARKERS):
+                continue
+            for claim in _RETIRED_CLAIMS:
+                index = lowered.find(claim)
+                if index < 0:
+                    continue
+                # A NEGATED mention is the correction, not the defect: "there is
+                # no endpoint-selection policy" is exactly the sentence this test
+                # wants the docs to contain. Look only at the words immediately
+                # before the claim so a distant "no" elsewhere in a long line
+                # cannot excuse a live assertion.
+                # The negation has to GOVERN the claim, so it must be adjacent:
+                # "there is no endpoint-selection policy" is the correction this
+                # test wants, while "There is no ambiguity: the caller owns the
+                # key" is a live assertion with an unrelated "no" nearby. Only a
+                # copula or a bare "no"/"never" immediately before the phrase
+                # counts.
+                preceding = lowered[max(0, index - 24) : index].rstrip()
+                if any(
+                    preceding.endswith(negation)
+                    for negation in ("no", "not", "never", "nor", "neither")
+                ):
+                    continue
+                problems.append(f"{path.name}:{number} states {claim!r}")
+    assert not problems, (
+        "Retired architecture described as current:\n  "
+        + "\n  ".join(problems)
+        + "\n\nEither correct the statement or mark the passage as history "
+        "(a nearby 'historical', 'no longer', 'used to' … makes the intent explicit)."
+    )

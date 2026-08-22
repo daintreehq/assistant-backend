@@ -2,7 +2,7 @@
 
 **The `Authorization` header is ignored entirely.** Not parsed, not validated,
 not rejected. Every request becomes the same anonymous principal, and the turn is
-funded by the server's own upstream credential (``CEREBRAS_API_KEY``).
+funded by the server's own upstream credential (``config.SERVING_KEY_ENV``).
 
 That is stronger than "a key is optional", and the difference is the whole point
 of this module. A CLI mid-migration may still be sending the OpenRouter key it

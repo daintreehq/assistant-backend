@@ -296,3 +296,42 @@ replacing with what production actually reports (`tools_full_bytes` vs
 projection measures 79.3 KiB → 22.2 KiB skill-less (72%) and → 46.8 KiB with a
 skill and its foundation (41%). The median depends entirely on the mix of those
 two shapes in real traffic, which is the thing only production can report.
+
+---
+
+## Turn-boundary checkpointing for `skill.step.advance`
+
+**Trigger: when the CLI's `upsertStep` learns to backfill.** Not scheduled.
+
+`loaded_skills.md.j2` used to tell the model to call `skill.step.advance` ONLY at a
+turn boundary — one checkpoint instead of one call per step, which is materially
+cheaper on a long runbook. It contradicted the CLI tool description, the
+`skill_step_consistency` task and that task's whole benchmark corpus, all three of
+which describe a per-step record, so the scaffold was the surface that moved
+(`tests/unit/test_policy_contradictions.py` now pins the agreement).
+
+The scaffold was the outlier, but it was not the worse idea. What blocks it is the
+data model: `internal/tools/skill/skill.go`'s `upsertStep` records ONLY the step
+named in the call. Be precise about what that breaks — `currentStep` DOES advance to
+`nextStep`, so a consumer that resumes from the frontier alone still resumes
+correctly. What goes wrong is the per-step ledger beside it: complete steps 1-5 in
+one turn, checkpoint at 5, and the `steps` array `skill.run.get` returns has 2-4
+missing entirely. Anything reading that array — a wake turn reconstructing what was
+done, and the consistency auditor, to which the same gap looks exactly like an
+illegitimate jump — is reading holes as "never done".
+
+Backfill is the cleanest migration, not the only possible one: `steps` could instead
+be redefined as deliberately sparse, with the auditor and every reader taught that a
+gap means "not individually recorded" rather than "not done". That contradicts the
+current tool contract, which is why backfill is the assumption below.
+
+Reviving it needs, in order:
+
+1. CLI: `upsertStep` marks the intervening steps (a `throughStep`, or backfill from
+   `prevCurrent + 1`), so the progress array has no holes.
+2. `skill_step_consistency`: a forward jump stops being evidence of a mistake, and
+   the corpus case `consistency-illegit-jump` needs a replacement signal.
+3. The scaffold, the CLI tool description and this repo's contradiction gate move
+   together, in one release pair.
+
+Doing (3) alone is what created the contradiction in the first place.

@@ -5,18 +5,20 @@ OpenAI-compatible. There is exactly one client (the Daintree Assistant CLI), whi
 the server fully controls, so the wire contract is purpose-built rather than
 shaped around a third-party schema.
 
-The upstream provider is OpenRouter — its OpenAI-compatible wire shape is spoken
+The upstream provider is Together AI — its OpenAI-compatible wire shape is spoken
 *internally*, behind a provider abstraction; the main model is
-`deepseek/deepseek-v4-flash-0731`, and OpenRouter selects which of the endpoints
-serving it answers (throughput-sorted, filtered to endpoints that do not collect
-or train on data). That is invisible to clients.
+`deepseek-ai/DeepSeek-V4-Flash-0731`, named once in `config.SERVING_MODEL`. Together
+is a model HOST, not a router: one endpoint serves each model, so there is no
+endpoint-selection policy, no fallback pool and no caller-facing routing preference.
+All of that is invisible to clients, which never see a real model id.
 
 ## Principles
 
-- **Skills are the core.** Skill selection runs on a separate small model and skill
-  bodies are injected server-side; the result is surfaced as a first-class `skills`
-  block (active set, the newly-loaded prelude, and selector telemetry). A small model
-  with the right runbook loaded is the source of the system's intelligence.
+- **Skills are the core.** Skill selection runs LOCALLY — an in-process two-stage ONNX
+  classifier, no upstream call — and skill bodies are injected server-side; the result is
+  surfaced as a first-class `skills` block (active set, the newly-loaded prelude, and
+  selector telemetry). A small model with the right runbook loaded is the source of the
+  system's intelligence.
 - **The server owns all system text.** Clients cannot send `system`/`developer`
   messages or a free-form system prompt; the request schema is strict (`extra="forbid"`).
   Typed startup/project-instruction fields are bounded, server-framed untrusted data.
@@ -30,34 +32,33 @@ or train on data). That is invisible to clients.
 
 ## Authentication
 
-Every request carries the caller's own API key as the bearer token; that same key is
-the upstream (OpenRouter) credential funding the turn's model calls. For early testers
-the key IS their OpenRouter key (`sk-or-v1-…`); later it becomes a subscription key the
-backend maps to a credential server-side, with no wire change.
+**The credential model is inverted from what an early tester will remember.** The
+SERVER holds the upstream credential (`TOGETHER_API_KEY`) and funds every turn from it.
+Callers supply no key of their own.
 
-```
-Authorization: Bearer <caller API key>
-```
+There is no inbound API key to configure, and the `Authorization` header is **ignored
+entirely** — not parsed, not validated, not rejected. That is stronger than "a key is
+optional", and the difference is the point: a client still sending the key it used to
+authenticate with would otherwise have that key threaded upstream and refused as
+*theirs*, so the caller would see their own credential blamed for a header they were
+right to still be sending. Refusing to look is what makes an old client work.
 
-The server holds no shared inbound secret and no upstream credential of its own, and
-performs only structural validation (present, header-safe ASCII) — a missing or
-malformed key is `401 invalid_api_key`, while a well-formed key the upstream then
-rejects surfaces as `401 provider_invalid_api_key`. Same status, deliberately
-different codes: ours means "fix your header", theirs means "the key travelled fine
-and OpenRouter refused it". An underfunded or permission-limited key is different
-again (`402 provider_insufficient_credits`, `403 provider_key_forbidden`) — see
-[Errors](#errors). There is no unauthenticated mode in any environment.
+This is a stage, not a destination — account authentication is next, and `auth.py` is
+the seam. Because no caller key travels, the `provider_invalid_api_key` /
+`provider_insufficient_credits` / `provider_key_forbidden` family now describes the
+SERVER's credential: they mean the deployment is misconfigured or unfunded, not that
+the caller did anything wrong. See [Errors](#errors).
 
 `/healthz`, `/readyz`, and `/version` are unauthenticated (Cloud Run probes them; they
 carry no user data).
 
 ### POST /v1/daintree/auth/verify
 
-Because validation is structural, a well-formed key that no provider ever issued
-authenticates fine and is only discovered on the caller's first real turn. This endpoint
-closes that gap at sign-in by asking the provider directly. It is a tokenless
-introspection call (not a model call), takes **no request body**, and requires the
-bearer header like every other authed route.
+A readiness probe for the SERVER's own upstream credential, not the caller's — no caller
+key exists to check. It asks the provider directly whether the credential this deployment
+holds is usable, which is otherwise only discovered on the first real turn. It is a
+tokenless introspection call (not a model call), takes **no request body**, and reads no
+bearer header (this route ignores `Authorization`, like every other route).
 
 `POST /v1/daintree/auth/verify` with no body →
 
@@ -104,53 +105,10 @@ prevent.
 Not knowing is never reported as a verdict. Anything other than a provider verdict
 propagates as the usual error envelope: `429 upstream_rate_limited` (with `Retry-After`),
 `504 upstream_timeout`, `503 upstream_unavailable` (unreachable), `502
-upstream_protocol_error` (a 200 whose body is not a key record), `401 invalid_api_key`
-for a missing/malformed bearer at our own door, and `503` before readiness. The probe carries a short 10s read budget rather than
+upstream_protocol_error` (a 200 whose body the adapter could not read as a credential
+answer), and `503` before readiness. The probe carries a short 10s read budget rather than
 the main-model timeout. Being a sign-in bootstrap call, it does not require or check
 `X-Daintree-Protocol`.
-
-## Endpoint routing (optional)
-
-`/v1/daintree/respond` accepts an optional top-level `routing` block. Omit it —
-almost every request does — and the server default applies.
-
-```jsonc
-"routing": {
-  "privacy": "no_training",        // "no_training" (default) | "zdr"
-  "sort": "throughput",            // "throughput" (default) | "price" | "latency"
-  "only":   ["deepinfra"],         // optional endpoint allowlist (≤24 slugs)
-  "ignore": ["some-endpoint"]      // ADDED TO the server denylist (≤24 slugs)
-}
-```
-
-The caller owns the key and pays the bill, so how strict the privacy filter is
-and whether speed or price ranks endpoints are legitimately theirs to choose.
-
-**This is a closed set, not a pass-through.** An arbitrary `provider` block is
-rejected: forwarding one would let a client drop the no-training floor, pin an
-endpoint that cannot do `response_format` (breaking every JSON call), or send a
-parameter this server has never tested — each failing as an inscrutable upstream
-error rather than a validation one. Unknown fields and unknown values are `400`.
-Slugs must be lowercase alphanumerics with `.`, `-` or `_`.
-
-Three things a caller cannot do:
-
-- **Weaken privacy.** `data_collection: "deny"` is sent unconditionally and is not
-  derived from any field here. `privacy: "zdr"` is *additive* — it adds the
-  stricter retention filter on top, it does not replace the no-training one.
-- **Re-enable a denied endpoint.** The server ships a small denylist of endpoints
-  excluded on measured output quality (see
-  [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) §3). Unlike every other field here,
-  `ignore` is **unioned onto** it rather than replacing it — otherwise sending any
-  `ignore` list at all would quietly re-admit those endpoints, which is routing
-  getting *looser* through the block that exists to make it stricter. Naming one
-  in `only` empties the pool instead of overriding the floor.
-- **Guarantee a route.** `zdr`, an `only` list, or an unusual parameter mix can
-  empty the eligible pool. That fails closed with `503
-  upstream_no_compliant_provider` rather than silently relaxing the policy.
-
-`/v1/daintree/capabilities` reports the active mode, its accurate description, and
-the values a client may select.
 
 ## Protocol negotiation
 
@@ -319,7 +277,7 @@ Notes:
   It appears in the response only when thinking is enabled; on a turn that performed tool calls it
   SHOULD be echoed back verbatim on later requests so the model can continue the reasoning that
   produced those calls (it is ignored on turns that did not). Omit it entirely when thinking is
-  off. The server renames it to OpenRouter's `reasoning` at the provider boundary; the Daintree
+  off. The server renames it to the upstream's `reasoning` at the provider boundary; the Daintree
   wire name never changes. See Prompt assembly & caching.
 - Tool definitions are bounded (total bytes, schema depth, property count, string sizes);
   `function.parameters` must be a JSON object whose root `type`, when present, is `object`.
@@ -506,7 +464,7 @@ round trip it sits inside.
 
 | field | meaning |
 |---|---|
-| `selection_ms` | the skill-selector call, including a parse-repair round trip if one ran |
+| `selection_ms` | the LOCAL two-stage classifier, end to end. No network, so `calls` is 0 |
 | `docs_ms` | the documentation lookup, when the selector asked for one |
 | `preparation_ms` | request in → upstream request built. Selection, docs, state, assembly |
 | `upstream_open_ms` | request in → the model's first event. Mostly prefill |
@@ -545,7 +503,7 @@ posture changed.
 
 Skill selection is removed from the main thread:
 
-1. **Selector cadence.** A separate non-thinking small-model call (returning a JSON object via
+1. **Selector cadence.** A local in-process classifier — no upstream call (historically a small-model call returning a JSON object via
    `response_format` json_object) runs when: there is no valid
    `state`; `selection.force` is set or
    `selection.policy == "always"`; the catalog revision changed; the `turn_id` changed; or
@@ -663,7 +621,7 @@ stateless and identical for every caller, so nothing about it needs to run on th
 machine — unlike the Daintree control plane, which drives local terminals and worktrees
 behind a per-session token.
 
-1. **Classification.** The selector call already on the turn's first-byte path returns a
+1. **Classification.** The local selector already on the turn's first-byte path returns a
    second answer alongside `skill_ids`: `docs_query`, a short search string, or `null`. It is
    independent of skill selection — a turn can need both, either, or neither — and `null` is
    the common case. A turn that skips selection (continuation round, no-task fast path) or
@@ -704,7 +662,7 @@ cover degraded lifecycle paths without logging request content.
 
 ## Prompt assembly & caching
 
-The DeepSeek chat template serializes the prompt as **[all system messages, in
+The serving model's chat template serializes the prompt as **[all system messages, in
 array order] → [tools] → [non-system conversation]** — a system message anywhere in the array
 lands in the leading system region, before the ~21.5k-token tool schemas
 (measured 2026-07-08: volatile system-role runtime context after the
@@ -741,28 +699,23 @@ worktrees) is treated as untrusted data. Prose fields collapse whitespace; multi
 blocks. Agent ids are the exception to prose normalization: the assembler preserves their
 exact value, JSON-quotes it, and admits or omits each complete row under the roster budget.
 
-No `prompt_cache_key` is sent: no endpoint for this model advertises the parameter, and the
-routing policy's `require_parameters` filter would find no eligible endpoint for a request
-carrying one. Prefix caching is implicit at whichever endpoint serves the request.
+No `prompt_cache_key` is sent, and no `provider` block: a model host serves one endpoint per
+model, so there is nothing to select between and no cache-affinity hint to place. Prefix
+caching is implicit at the endpoint that serves the request.
 
-Every request also carries a top-level `provider` block — OpenRouter's endpoint-selection
-policy. Its defaults sit beside the model ids and a caller may narrow or re-rank them via
-the request's [`routing`](#endpoint-routing-optional) block: `sort: "throughput"` (fastest tokens/sec wins, price
-second), `data_collection: "deny"` (only endpoints that do not collect prompt data or train on
-it — a no-training floor, **not** zero data retention <!-- privacy-copy-ok -->; see
-[`PROVIDER_POLICY.md`](PROVIDER_POLICY.md)), `require_parameters: true` (drop endpoints that would silently ignore something we
-sent — this is what routes a json_object call away from an otherwise-faster endpoint with no
-`response_format` support), `allow_fallbacks: true` (the next-fastest compliant endpoint
-covers an outage), and `ignore` (the output-quality denylist — endpoints excluded because they
-were measured producing degenerate output, the one axis none of the other filters watch; a
-caller's own `ignore` is unioned onto it, never substituted). A policy that matches nothing returns 404 **or** 503 depending on which
-filter emptied the pool; both surface as `upstream_no_compliant_provider` rather than a
-generic bad-request.
+**There is no endpoint-selection policy at all any more.** The privacy filter, throughput
+sort, fallback pool, output-quality denylist, sticky-affinity key and caller-facing `routing`
+block all existed to steer a router across many interchangeable endpoints serving one model.
+A host has no such pool, so every one of them was deleted rather than neutered, along with
+the `upstream_no_compliant_provider` branch of the error taxonomy. Git history has the
+previous revision if that shape is ever needed again.
 
-Reasoning is controlled by OpenRouter's unified `reasoning` object, sent explicitly on every
-call: `{"enabled": false}` turns thinking off, `{"effort": "<tier>"}` turns it on at a tier.
-A reasoning model thinks when the field is absent, so the explicit directive is what keeps
-non-thinking calls (above all the selector) actually non-thinking.
+Reasoning is controlled by the unified `reasoning` object, sent explicitly on every call:
+`{"enabled": false}` turns thinking off, `{"effort": "<tier>"}` turns it on at a tier.
+DeepSeek V4 Flash thinks when the field is ABSENT, so the explicit directive is what keeps a
+non-thinking call actually non-thinking — measured, `{"enabled": false}` drops
+`reasoning_tokens` out of the usage block entirely. Skill selection sends nothing at all: it
+is local and makes no upstream call.
 
 The thinking posture is **hardcoded — a product decision like the model ids, not
 configuration**. **The whole interactive surface is non-thinking**: the main `/respond` call,
@@ -772,20 +725,18 @@ calls, and the utility tasks are bounded extractions and classifications over te
 already gathered — while reasoning cost seconds of first-byte latency (a measured greeting
 turn spent 366 reasoning tokens and ~3.5s of an 11.5s wall-clock).
 
-There is **no middle tier to retreat to**. DeepSeek accepts only `high`/`max` and silently
-remaps `low`/`medium` up to `high`; measured over 5 samples each on a fixed prompt, `low` and
-`high` produced statistically identical chain-of-thought (mean 662 vs 656 reasoning tokens).
-So the only real step below `high` is off, which is the posture taken. The selector reached
-this position first, on its own first-byte argument, and its prompt asks for a reason-first
-JSON key order (`task_type`/`reason` written before `skill_ids`) as an inline reasoning step —
-benchmarked at equal selection quality and a fraction of the latency. (Because a forced
-`tool_choice` is incompatible with thinking on DeepSeek, the selector was also moved off its
-forced `select_skills` call onto `response_format` json_object.)
+There is **no middle tier to retreat to**: measured over 5 samples each on a fixed prompt,
+`low` and `high` produced statistically identical chain-of-thought (mean 662 vs 656 reasoning
+tokens), so the only real step below `high` is off — which is the posture taken. Skill
+selection is not part of this decision at all any more: it runs locally and makes no upstream
+call, so it has no thinking posture to set. (Historically it did, and it reached "off" first
+on its own first-byte argument.)
 
-**Nothing thinks any more, and on Cerebras that is the model's doing rather than a flag's.**
-`gemma-4-31b` has no reasoning mode, and the wire has no field that could switch one off —
-Cerebras takes a bare `reasoning_effort` string with no "off" value. Skill learning used to be
-the one surface that did think; it has been removed.
+**Nothing thinks, and on Together that is a flag genuinely held down.** DeepSeek V4 Flash
+reasons whenever the field is absent, so every call sends `reasoning: {"enabled": false}` —
+measured, that drops `reasoning_tokens` out of the usage block entirely. (On Cerebras it was
+the model's doing instead: `gemma-4-31b` has no reasoning mode, and that wire had no field
+that could switch one off. Noted because `SERVING_HOST` can switch back.)
 
 `/respond` advertises the posture as `respond.thinking_enabled` on `/v1/daintree/capabilities`
 (currently `false`), which is what a client should gate any thinking UI on. Because
@@ -797,8 +748,7 @@ ceiling above the cap its profile set. The main `/respond` call instead runs on 
 budget (`MAIN_DEFAULT_MAX_TOKENS` == `MAIN_MAX_TOKENS_CEILING`).
 
 Thinking is independently forced off for any request that pins a `tool_choice` (thinking + a
-forced tool choice is rejected by the model; which endpoint enforces it is not worth betting a
-turn on) — that guard is enforced separately from the posture, so it holds if the posture ever
+forced tool choice is rejected by the model) — that guard is enforced separately from the posture, so it holds if the posture ever
 flips back. When thinking is enabled, the model returns its chain-of-thought as
 `reasoning_content`; the client stores it on the assistant turn and replays it verbatim on any
 turn that performed tool calls, so the model can continue that reasoning. That round-trip stays
@@ -830,14 +780,15 @@ the problem, because that is the whole reason these are separate codes.
 | 503  | *(not ready)* | `/readyz` is failing; the instance has not finished starting or is misconfigured. |
 | 500  | `internal_error` | Daintree bug. Report with the request id. |
 
-### The caller's provider account
+### The server's provider account
 
-The caller's own key rode the request, so these are settings on **their**
-OpenRouter account — and each one has a different fix. Never retried.
+No caller key rides the request, so these describe the DEPLOYMENT's own upstream
+credential — each one is an operator fix, never something the caller can act on.
+Never retried.
 
 | HTTP | Code | Action |
 |------|------|--------|
-| 401  | `provider_invalid_api_key` | OpenRouter rejected the key. Replace or rotate it. Distinct from `invalid_api_key`: the key travelled fine, the provider refused it. |
+| 401  | `provider_invalid_api_key` | The upstream rejected the server's key. Replace or rotate it. Distinct from `invalid_api_key`: the key travelled fine, the provider refused it. |
 | 402  | `provider_insufficient_credits` | The account cannot fund the call. Add credits or use another key. |
 | 403  | `provider_key_forbidden` | Key model-permissions, spend limit or a provider guardrail. |
 
@@ -845,8 +796,7 @@ OpenRouter account — and each one has a different fix. Never retried.
 
 | HTTP | Code | Action |
 |------|------|--------|
-| 429  | `upstream_rate_limited` | OpenRouter is rate limiting. Honour `Retry-After`. Retryable. |
-| 503  | `upstream_no_compliant_provider` | No endpoint matched the active routing policy (see [`PROVIDER_POLICY.md`](PROVIDER_POLICY.md)). **Not** retried — the policy is deterministic, so an immediate replay re-derives the same empty pool. Relax the request's `routing` block, or report a routing-policy problem. |
+| 429  | `upstream_rate_limited` | The upstream is rate limiting. Honour `Retry-After`. Retryable. |
 | 503  | `upstream_unavailable` | Provider outage or no capacity. Retryable. |
 | 503  | `provider_not_configured` | The task requires an optional second provider whose credential this deployment never set. **Not** retryable — no amount of waiting configures a key. Every other task and every turn is unaffected; set the named provider's key to enable it. |
 | 504  | `upstream_timeout` | Upstream inactivity/deadline. Retryable. |
@@ -855,7 +805,7 @@ OpenRouter account — and each one has a different fix. Never retried.
 
 | HTTP | Code | Action |
 |------|------|--------|
-| 502  | `upstream_request_rejected` | OpenRouter judged the body **Daintree generated** malformed. Almost always a server bug; report the request id. Carries the provider's own reason. |
+| 502  | `upstream_request_rejected` | The upstream judged the body **Daintree generated** malformed. Almost always a server bug; report the request id. Carries the provider's own reason. |
 | 502  | `upstream_protocol_error` | An unparseable response: bad JSON, a broken chunk, a stream that ended without `[DONE]`. Provider/compatibility problem. |
 | 502  | `upstream_runaway_output` | The upstream model degenerated: one round streamed more visible prose than the runaway ceiling (`MAIN_STREAM_RUNAWAY_CHARS`, default 16000 characters; tool-call arguments do not count) and the server hung up on it mid-stream rather than pay out the rest of the token budget. **Streaming only** — a buffered response has already been generated and billed by the time the server sees it, so there is nothing left to interrupt. Terminal on purpose rather than a truncated `done`: the text delivered so far is unusable, and committing it to history is what makes the NEXT turn degenerate too, so discard the round's assistant content and tool calls. **Not auto-retried, by design** — visible tokens have necessarily already reached the screen, and the CLI's retry boundary is the first content fragment (replaying would duplicate on-screen text). Re-asking is a fresh turn, which may route to a different endpoint. |
 | 502  | `upstream_error` | Residual/legacy catch-all. Still emitted for a missing or malformed upstream credential and for a non-verdict verification failure. |
@@ -879,7 +829,7 @@ changing the already-committed HTTP status. When an exhausted rate limit carried
 |---|---|---|---|
 | `POST` | `/v1/daintree/respond` | yes | Generation (native, + first-class skills) |
 | `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision + skill `{id, title}` listing |
-| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: does OpenRouter recognise the bearer? (no body; no inference). `valid` plus optional budget metadata; recognised is not the same as fundable |
+| `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: does the upstream recognise the server credential? (no body; no inference). `valid` plus optional budget metadata; recognised is not the same as fundable |
 | `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/skills/resolve` | yes | Manual `find` / `load` / `clear`; returns the same `skills` block + `state` |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks (server-owned prompts; no client task prompt) |

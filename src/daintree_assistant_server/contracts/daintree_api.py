@@ -136,9 +136,11 @@ class RespondUsage(BaseModel):
     completion_tokens: int = 0
     total_tokens: int = 0
     cached_tokens: int = 0
-    # What this turn's MAIN call charged the caller, in USD. The caller's own key
-    # funds every upstream call, so this is their bill, not ours — which is the
-    # whole reason it is surfaced rather than merely logged.
+    # What this turn's MAIN call cost, in USD, when the upstream reports it. The
+    # SERVER's key funds every upstream call now, so this is our bill rather than
+    # the caller's — surfaced anyway because a client that can see per-turn cost
+    # can show it, and because `None` ("unknown") must stay distinguishable from
+    # zero all the way out to the wire.
     #
     # It covers the main completion ONLY. The selector's cost is reported
     # separately under ``skills.selector.usage``; a client showing a turn total
@@ -210,14 +212,13 @@ class TurnTimings(BaseModel):
 
 
 class TurnCost(BaseModel):
-    """What this whole request charged the caller, in USD.
+    """What this whole request cost, in USD.
 
-    The caller's own key funds every upstream call a turn makes, so the number
-    that matters to them is the TOTAL — not what any one call cost. Skill
-    selection is local (in-process, unbilled), so an ordinary turn is ONE billed
-    call — the main completion — and a re-rolled round additionally pays for a
-    generation nobody ever saw; all of it lands on their card, so all of it is
-    counted here.
+    The SERVER's key funds every upstream call a turn makes, so this is our bill
+    rather than the caller's — but the number that matters is still the TOTAL, not
+    what any one call cost. Skill selection is local (in-process, unbilled), so an
+    ordinary turn is ONE billed call — the main completion — and a re-rolled round
+    additionally pays for a generation nobody ever saw; all of it is counted here.
 
     ``total`` is the headline. The breakdown is kept because it answers the
     follow-up question — "why was that turn expensive?". ``selector`` remains in

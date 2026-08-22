@@ -17,11 +17,11 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # THE model identity — singular, and a product decision rather than deployment
-# config. The main completion and every utility task run on CEREBRAS_MODEL:
-# Gemma 4 31B on Cerebras Inference, a model HOST rather than a router, so one
-# endpoint serves these weights and there is nothing to select between (see
-# providers/cerebras.py). Skill selection makes no upstream call at all — it is
-# the local ONNX classifier in skills/local/.
+# config. The main completion and every utility task run on SERVING_MODEL, at the
+# host SERVING_HOST names (both a few lines down). Either host is a model HOST
+# rather than a router, so one endpoint serves the weights and there is nothing to
+# select between. Skill selection makes no upstream call at all — it is the local
+# ONNX classifier in skills/local/.
 #
 # There is exactly ONE model now. The second one existed for skill learning,
 # which has been removed: a background pass that spent a large thinking budget
