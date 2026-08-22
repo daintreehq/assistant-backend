@@ -2,7 +2,7 @@
 id: daintree.orchestration.watch-outcome
 title: Watch an outcome unattended
 summary: Set up supervision that outlives the turn — a terminal watcher, an async verdict, a PR watch, or a timer — and pre-authorize with a narrow grant when the wake must act.
-whenToUse: Use when the user wants to be woken later, not waited on now — "run this overnight and wake me", "let me know when the build finishes", "ping me when the PR merges", "remind me in an hour", "keep an eye on it while I'm out" — or any request to leave something watching after this turn. Also when the ACTION itself is deferred rather than the report — "spawn it in five seconds", "start the build in ten minutes", "kick it off at midnight" — where the wait is the request and acting now would not satisfy it (the spawn mechanics stay daintree.edits.spawn-visible-agent; what belongs here is the timer that fires it). Also to pre-authorize an unattended action with a grant, and to list, cancel or revoke watchers, timers, async waits and grants you left. Do not use to cancel ONE named watcher (daintree.foundation), a one-off check of an agent that already finished (daintree.orchestration.verify-agent-work), triage of what is running now (daintree.orchestration.supervise-fleet), what happened while you were away (daintree.orchestration.status-and-resume), or wholesale teardown (daintree.orchestration.workspace-cleanup). `watcher.watchPR` sees only a PR's open/merged/draft/closed state, so a one-off read of CI, checks, reviews or an issue thread is not a watch at all (use daintree.workflow.follow-up-on-issue).
+whenToUse: Use when the user wants to be woken later, not waited on now — "run this overnight and wake me", "let me know when the build finishes", "ping me when the PR merges", "remind me in an hour", "keep an eye on it while I'm out" — or any request to leave something watching after this turn. Also to pre-authorize an unattended action with a grant, and to list, cancel or revoke watchers, timers, async waits and grants you left. Do not use to cancel ONE named watcher (daintree.foundation), a one-off check of an agent that already finished (daintree.orchestration.verify-agent-work), triage of what is running now (daintree.orchestration.supervise-fleet), what happened while you were away (daintree.orchestration.status-and-resume), or wholesale teardown (daintree.orchestration.workspace-cleanup). `watcher.watchPR` sees only a PR's open/merged/draft/closed state, so a one-off read of CI, checks, reviews or an issue thread is not a watch at all (use daintree.workflow.follow-up-on-issue).
 risk: system
 requiredTools:
   - context.snapshot
@@ -35,15 +35,14 @@ Procedure:
    - (b) A pass/fail verdict on a terminal → there is no fire-and-forget verdict call. If the work has ALREADY settled, `terminal.extract` reads and judges it once, this turn. If it has not, that is case (a): a `watcher.terminal.create` whose `alertWhen` is a `modelJudge` question ("did the suite pass with zero failures?") publishes the judged answer to the attention queue.
    - (c) A PR reaching a terminal state → `watcher.watchPR {"prNumber":123,"title":"…"}` (optional `cwd`, `stopAfterMs`) — read "What the PR watcher cannot watch" before promising anything about it.
    - (d) A nudge with no terminal to observe → `timer.schedule`, step 4.
-   - (e) The WORK itself starts later, so its terminal does not exist yet ("wait an hour, THEN run it") — unlike (d), where nothing is ever run and the user is only reminded → a one-shot `timer.schedule` whose payload IS the spawn, plus a grant scoped to it; read "Work that starts later" below for the exact pair. Do NOT spawn now just to have an id: that parks an agent idle on a worktree for the whole wait.
+   - (e) The WORK itself starts later, so its terminal does not exist yet ("wait an hour, THEN run it") — unlike (d), where nothing is ever run and the user is only reminded → read "Work that starts later" below before promising anything. Do NOT spawn now just to have an id: that parks an agent idle on a worktree for the whole wait.
    Spawning the agent right now? The cheapest supervisor is the spawn itself: `agentTask.spawnForEdits` with flat `watch:true` + `watchGoal:"…"` and an `acceptanceCriteria` contract. Its supervisor already confirms completion — add no second watcher.
 
 2. Create the watcher. `watcher.terminal.create` requires `terminalIds` (array of full ids), `title`, and `goal` — plain language for what you are observing, which drives the per-check classification. Optional: `stopWhen` (ends the watcher, status `condition_met`), `alertWhen` (alerts and KEEPS running), `cadenceMs` (default 120000), `modelTier` (`small` | `medium`), `startAfterMs`, `stopAfterMs` (defaults to 24 h — a watcher never runs forever, so set the horizon you mean). Write the conditions with the DSL below: prefer the free deterministic leaves, and set `cadenceMs` to the resolution you genuinely need.
 
 3. Grant BEFORE you leave, if the wake must mutate. An unattended turn has nobody to confirm: a confirm-required tool called by a watcher/timer/wake actor with no matching grant is blocked and lands as a pending-approval item — the overnight run stalls until morning, the exact failure the user asked you to prevent. Only the interactive main actor can mint a grant, so it happens now or never.
    `grant.create {"actorType":"wake","actorId":"wake","allowedToolNames":["terminal.sendCommand"],"ttlMs":28800000,"maxUses":3}`
-   - `actorType` is `watcher` | `timer` | `wake`. For `watcher`/`timer`, `actorId` is that supervisor's own `wch_…`/`tmr_…` id — create it first (a watcher in step 2, a timer in step 4), then grant against the id it returned. For `wake` (the supervisor daemon's autonomous turns while the user is away) `actorId` must be the literal `"wake"`.
-   - An auto-approve session does NOT cover any of them. Auto-approve silences the prompt for YOU, the interactive actor, and nothing else: a watcher, timer or wake turn has only the grant path, so a mutation you could fire yourself without a prompt is still blocked unattended. Never read "it did not ask me" as "it will not ask later".
+   - `actorType` is `watcher` | `timer` | `wake`. For `watcher`/`timer`, `actorId` is that supervisor's own `wch_…`/`tmr_…` id — create it first (a watcher in step 2, a timer in step 4), then grant against the id it returned. A one-shot timer is the exception — step 4 says why it can never consume one. For `wake` (the supervisor daemon's autonomous turns while the user is away) `actorId` must be the literal `"wake"`.
    - `ttlMs` and `maxUses` are required, and so is at least one of `allowedToolNames` / `allowedRiskClasses` — a grant with no scope authorizes nothing and is rejected.
    - Scope NARROW: an explicit `allowedToolNames` list, a `maxUses` equal to the actions you actually expect, a `ttlMs` covering only the window (8 h for overnight, not the 30-day ceiling). Never hand out a blanket `allowedRiskClasses` entry, and never mint a grant for read-only watching — reads need none.
    - `grant.create`, `grant.revoke` and `daintree.call` can NEVER be granted, so a wrapper-less capability cannot run unattended: do it yourself now, or say plainly that it waits for the user.
@@ -51,11 +50,11 @@ Procedure:
 4. For a time-based nudge: `timer.schedule {"title":"…","payload":{"type":"enqueue","message":"…"},"delayMs":3600000}`. Use `delayMs` (relative), never `fireAt` — you have no reliable clock, so an invented wall-clock time fires at the wrong hour or never. `payload.type` is `enqueue` (a reminder in the attention queue) or `call_safe_tool` with `payload.toolCall {"toolName":"…","args":{…}}`. A `repeat` requires `everyMs` and must be bounded by `maxRuns` or `until`, or it pings forever. Optional `target` ties it to a `terminalId` / `worktreeId` / `projectId` / `workflowRunId`.
    - `enqueue` posts that queue item and does NOTHING else — it runs no tool, and once the assistant is closed nothing reads it until the user next looks. It is a note to a human, never unattended work, so never schedule one to "handle" something.
    - To ACT at fire time the payload must be `call_safe_tool`, and it fires with nobody there to confirm. `toolName` may name any registered tool — the timer adds no allowlist of its own — but the usual tier and confirmation policy still decides what runs, so a tool that needs no confirmation simply runs and a read-only payload is unaffected.
-   - A confirm-required payload needs a live grant, and a timer CAN hold one — including a one-shot. Mint it AFTER `timer.schedule` returns, scoped to the `tmr_…` id it gave you (step 3). The fire spends one use; a TERMINAL fire (every one-shot, and the last fire of a bounded repeat) then revokes whatever is left, so the authority never outlives the timer that carried it. Give `ttlMs` room to OUTLAST the delay — an hour's wait needs more than an hour of authority, or the timer fires into an expired grant and the payload lands in the inbox instead.
+   - A confirm-required tool needs a live grant and cannot hold one: a timer REVOKES its own grants on its terminal fire (every one-shot, and the last fire of a bounded repeat) BEFORE the payload dispatches. So a one-shot timer cannot carry out a confirm-required mutation, however you grant it — do it yourself now, or say plainly that it waits for the user.
 
 5. Report the ids and END the turn — the setup IS the deliverable, so do not then wait on the same terminal in-turn. Every mechanism here outlives the turn, but they do not deliver the same thing once the assistant is CLOSED, so promise only what yours does:
    - WAKES YOU: a terminal watcher reaching its `stopWhen`/`alertWhen`, and a finished `terminal.await.async`. Only here is "I'll wake you when it finishes" a promise you can actually keep — and a `watch:true` spawn earns it only if it came back with a watcher id.
-   - ACTS, QUIETLY: a timer's `call_safe_tool` runs its one tool — no-confirmation, or confirm-required against a live grant — and leaves the result in the queue. It never starts a turn, so say "it will happen and a note will be waiting", never "I'll tell you when it does".
+   - ACTS, QUIETLY: a timer's `call_safe_tool` runs its one no-confirmation tool and leaves the result in the queue.
    - NEITHER: `watcher.watchPR` and a timer `enqueue` only leave an item that sits until the user looks. Promise a note waiting, never a wake.
 
 6. Clean up when the window closes. `watcher.list`, `timer.list`, `async.list` and `grant.list` (optional `actorId`) answer "what is still watching". Retire with `watcher.cancel` / `timer.cancel` / `grant.revoke` (each `{"id":"…"}`) or `async.cancel {"asyncId":"asy_…"}` — cancelling an async only stops tracking, nothing is killed or closed. Revoke a wake grant the moment the window is over; never leave standing authority behind.
@@ -98,28 +97,10 @@ THE KEY TRAP: to stop when an AGENT finishes its turn, do NOT use a bare `stopWh
 
 ## Work that starts later
 
-"Wait an hour, THEN spawn it" HAS an unattended path: a one-shot timer whose `call_safe_tool` payload is the spawn, plus a grant scoped to that timer. Two calls, and the order is forced — the grant needs the id the timer returns:
+"Wait an hour, THEN run it" has no unattended path today, so do not promise one. A `call_safe_tool` payload carrying a spawn is blocked by the revocation in step 4, and an `enqueue` payload only lands an inbox reminder — once the assistant is closed a timer never triggers an autonomous wake turn, since only a terminal watcher or an async completion does. Pick one of these and SAY which you did:
 
-```
-timer.schedule {
-  "title": "spawn the nightly build agent",
-  "delayMs": 3600000,
-  "payload": {"type": "call_safe_tool",
-              "toolCall": {"toolName": "agentTask.spawnForEdits",
-                           "args": {"title": "nightly build", "taskPrompt": "…",
-                                    "worktreeId": "/Users/…/app",
-                                    "watch": true, "watchGoal": "surface what the agent reported"}}}}
-grant.create {"actorId": "tmr_…", "actorType": "timer",
-              "allowedToolNames": ["agentTask.spawnForEdits"], "ttlMs": 4200000, "maxUses": 1}
-```
-
-Two things a normal spawn lets you skip. Pass `worktreeId` EXPLICITLY: omitted, it resolves to whatever is active at FIRE time, which is not the worktree you reasoned about an hour earlier. And put the supervision INSIDE the payload — the timer acts without waking you, so a deferred spawn with no `watch`/`watchGoal` leaves an agent working with nobody reading it.
-
-The delay itself is part of what the user asked for. Do not collapse it to "spawn now" because the spawn is the interesting half, and never schedule an `enqueue` timer to stand in for a wait you did not actually take — that runs nothing and reports nothing done. Pick deliberately and SAY which you did:
-
-- The delay was really about not blocking the user → start the work NOW and watch it: spawn with flat `watch:true` + `watchGoal` and an `acceptanceCriteria` contract, per step 1. The user is free the moment you hand back, and no grant is needed.
-- The delay is genuinely about the clock → schedule the spawn as above, and report the `tmr_…` and grant ids, when it fires, and that it will act without waking anyone.
-- The wait needs a HUMAN at the other end (a judgement call, a confirm-required step you cannot pre-authorize) → `timer.schedule` an `enqueue` reminder carrying the whole instruction, and say plainly that the work itself waits for them. That is the same honest answer step 3 requires for any capability you cannot pre-authorize.
+- The delay was really about not blocking the user → start the work NOW and watch it: spawn with flat `watch:true` + `watchGoal` and an `acceptanceCriteria` contract, per step 1. The user is still free the moment you hand back.
+- The delay is genuinely about the clock → `timer.schedule` an `enqueue` reminder carrying the whole instruction, and tell the user plainly that the spawn itself waits for them. That is the same honest answer step 3 requires for any capability you cannot pre-authorize.
 
 Never pre-spawn an agent now to reserve a terminal id for later. It holds a worktree and burns its context idling, and it is the exact failure branch (e) exists to prevent.
 
