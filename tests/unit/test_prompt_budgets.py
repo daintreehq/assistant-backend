@@ -114,7 +114,31 @@ BASE_PROMPT_CEILING = 25 * 1024
 # far more likely to be skill-local than one added to the hard rules.
 BASE_PARTIAL_CEILINGS = {
     "00-persona.md": 1024,
-    "10-hard-rules.md": 4 * 1024,
+    # RAISED 2026-08-22, 4096 -> 4224 B, to end the "an agent" collision.
+    #
+    #   What behaviour needs this?  This partial required `agentTask.spawnForEdits`
+    #   for an agent spawned "for ANY purpose — edits OR a read-only exploration the
+    #   user wants delegated", while `20-tool-discipline.md` instructs exactly that
+    #   read-only exploration to go to `subagent.run`. Both ship in every assistant
+    #   turn. A model resolving the pair toward the HARD rule (the stronger layer, and
+    #   the one whose scope word was "ANY") stops delegating searches — silently
+    #   losing the primitive the 2026-08-21 ratchet above was raised to buy, on the
+    #   turns where main-thread context is most expensive.
+    #
+    #   Why here rather than only in tool-discipline?  Naming the two categories in
+    #   the partial that DEFINES `subagent.run` is necessary but not sufficient: a
+    #   reader who acts on the hard rule has, by construction, not yet been persuaded
+    #   to read further. Rewriting every generic-agent sentence in this file to name a
+    #   category would also work and would cost fewer bytes; it was rejected because
+    #   the carve-out then exists only by implication, and an implication is what the
+    #   old wording already relied on.
+    #
+    #   What it cost: 113 B for the rewritten spawn rule, plus 11 B qualifying the
+    #   "spawning an AGENT is the only thing that brings a fresh terminal" bullet,
+    #   which the naming made newly ambiguous. 4184 B measured against a 4224 B
+    #   ceiling — the same ~40 B of slack the 4096 B ceiling carried, deliberately,
+    #   so this stays a ratchet rather than a raised roof.
+    "10-hard-rules.md": 4224,
     # The turn-finality control line (issue #61). CONDITIONAL now: the container
     # ships this partial only when a compaction producer exists, which today is
     # never, so it costs nothing on a real request — but it is still base by the
@@ -134,6 +158,19 @@ BASE_PARTIAL_CEILINGS = {
     "40-communication.md": 4 * 1024,
     "50-formatting.md": 3 * 1024,
 }
+# The SECOND static system message, and the other half of the permanent prompt.
+# It had no ratchet until 2026-08-22, which is how it grew 552 B in one change
+# while every base partial was individually guarded: the aggregate ceiling above
+# measures `main/base/*.md` ONLY, and its own docstring says so. Two permanent
+# regions and one ratchet is not a ratchet — a rule moved out of base and into
+# the contract lowers the guarded number without lowering a single byte the model
+# receives.
+#
+# Measured RENDERED (3251 B at introduction), not as the template file: the Jinja
+# tags never reach the model, and the file is ~130 B larger than the message. That
+# is also how the base prompt and the selector prompt are measured here.
+RESPONSE_CONTRACT_CEILING = 3456
+
 # The selector system prompt is the catalog rendered as a classification menu, so it
 # grows monotonically with every skill added — and it sits on the turn's FIRST-BYTE
 # path (the selector is hardcoded non-thinking precisely to keep that path fast). Left
@@ -342,3 +379,27 @@ def test_skills_have_no_pipe_tables() -> None:
 def test_skills_end_with_report_back() -> None:
     for skill in load_catalog().skills:
         assert "report back" in skill.body.lower(), f"{skill.id} has no Report-back template"
+
+
+def test_response_contract_under_ceiling() -> None:
+    """The other permanent system message, ratcheted like the first.
+
+    Rendered through the assembler rather than read off disk, so this measures
+    what is actually sent. Before raising it, ask the question the base ceiling
+    asks in reverse: output SHAPE is this file's job, so a rule arriving here
+    from `main/base/*.md` is a correct move and should show up as a matching
+    DROP in the base numbers above. Growth on both sides at once is new text,
+    not a relocation, and needs the same written argument a base raise does.
+    """
+    from daintree_assistant_server.config import Settings
+    from daintree_assistant_server.services.prompt_assembler import PromptAssembler
+
+    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32)
+    rendered = PromptAssembler(PromptLoader(), settings).render_response_contract()
+    size = len(rendered.encode("utf-8"))
+    assert size <= RESPONSE_CONTRACT_CEILING, (
+        f"the response contract renders to {size}B, over its {RESPONSE_CONTRACT_CEILING}B "
+        "ratchet. It is a system message on every request, ahead of ~21.5k tokens of tool "
+        "schemas in the serving model's serialization — these bytes are paid by every caller "
+        "on every turn."
+    )

@@ -261,3 +261,175 @@ def test_no_permanent_layer_restates_another() -> None:
         + "\n\nGive the rule ONE owner and have the other layer stop stating it. "
         "See this test's docstring for which layer owns what."
     )
+
+
+# ---------------------------------------------------------------------------
+# The two things called "an agent".
+# ---------------------------------------------------------------------------
+#
+# What these gates can and cannot do, stated before the code so nobody trusts
+# them further than they deserve. English semantics cannot be proved by
+# substring search: a partial rewritten to say "a private sub-agent IS a
+# workspace agent" collapses the very distinction below while satisfying every
+# presence assertion here. What these DO catch is the specific way the
+# contradiction existed and the specific ways it would come back — the retired
+# scope words, a category name being dropped, the carve-out being dropped, and
+# the positive delegation instruction being deleted (which would end the
+# contradiction by removing the feature, the cheapest wrong fix available).
+# A reader is still required.
+
+#: The wording that created the collision. `10-hard-rules.md` required
+#: `agentTask.spawnForEdits` for an agent spawned "for ANY purpose — edits OR a
+#: read-only exploration the user wants delegated", while
+#: `20-tool-discipline.md` told the model to delegate exactly that kind of
+#: read-only exploration to `subagent.run`. Both partials are in every assistant
+#: turn, and the delegation bullet is the one the repo measured as actually
+#: moving behaviour — so a model resolving the pair against `subagent.run` loses
+#: the feature silently, on the turns where context economy matters most.
+#:
+#: Listed as several phrasings because the collision is a SCOPE WORD, and the
+#: scope word is the part an editor reaches for first.
+_UNIVERSAL_AGENT_SCOPES = (
+    "for any purpose",
+    "for every purpose",
+    "to spawn an agent for",
+    "whenever you spawn an agent",
+)
+
+#: The unqualified claim that put a second contradiction in the same request.
+#: `20-tool-discipline.md` said "Every agent and terminal lives in exactly one
+#: worktree", one bullet before the new text describing a private sub-agent as
+#: holding no worktree. Naming the categories is what makes a generic claim
+#: about "every agent" newly false rather than merely vague.
+_UNQUALIFIED_WORKTREE_CLAIM = "every agent and terminal lives in exactly one worktree"
+
+
+def test_the_two_agent_categories_are_named_rather_than_collided() -> None:
+    """A rule about "an agent" must say WHICH of the two it governs."""
+    hard_rules = (BASE_DIR / "10-hard-rules.md").read_text(encoding="utf-8").lower()
+    discipline = (BASE_DIR / "20-tool-discipline.md").read_text(encoding="utf-8").lower()
+
+    for scope in _UNIVERSAL_AGENT_SCOPES:
+        assert scope not in hard_rules, (
+            f"10-hard-rules.md again routes agents through agentTask.spawnForEdits by an "
+            f"unqualified scope ({scope!r}). 20-tool-discipline.md tells the same turn to "
+            "delegate read-only search to subagent.run, so any universal scope makes the two "
+            "rules contradict."
+        )
+    assert "visible workspace agent" in hard_rules, (
+        "The hard rules no longer name the visible workspace agent category, so the "
+        "spawnForEdits requirement is once again a rule about the ambiguous word 'agent'."
+    )
+    assert "subagent.run" in hard_rules, (
+        "The hard rules no longer carve subagent.run out of the spawnForEdits requirement. "
+        "The carve-out has to be where the requirement is: a reader of the hard rule cannot "
+        "be relied on to reach the tool-discipline partial before acting on it."
+    )
+    assert "private sub-agent" in discipline and "workspace agent" in discipline, (
+        "20-tool-discipline.md no longer distinguishes the private sub-agent from the "
+        "visible workspace agent, which is the distinction the hard rule defers to."
+    )
+    # The cheapest wrong fix for a contradiction between two rules is to delete
+    # one of them. Deleting THIS one costs the delegation primitive the base
+    # prompt exists to bias toward, and would leave every assertion above green.
+    assert "subagent.run" in discipline, (
+        "20-tool-discipline.md no longer instructs subagent.run at all. Resolving the "
+        "collision by dropping the delegation bullet removes the behaviour the 2026-08-21 "
+        "byte ratchet was raised to buy — see tests/unit/test_prompt_budgets.py."
+    )
+    assert _UNQUALIFIED_WORKTREE_CLAIM not in discipline, (
+        "20-tool-discipline.md claims every agent lives in exactly one worktree, in the same "
+        "partial that describes the private sub-agent as holding none. Qualify the claim to "
+        "workspace agents."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Instruction precedence.
+# ---------------------------------------------------------------------------
+
+#: The five levels, in the order the prompt must state them. Matched as ORDERED
+#: positions rather than mere presence: a sentence naming all five in the
+#: reverse order describes the opposite policy and would satisfy any
+#: presence-only check. These are the substrings, not the full prose, so the
+#: sentence can be reworded around them.
+_PRECEDENCE_LEVELS = (
+    "hard rules",
+    "the user stated",
+    "workflow runbook",
+    "domain foundation",
+    "your own defaults",
+)
+
+#: Claims that put a runbook ABOVE the user. Both shipped in `30-skills.md`
+#: before the precedence order was written down, and both flatly contradict its
+#: second level — the runbook was "subordinate only to these hard rules", and a
+#: "request in the conversation" (which is where the user speaks) was never
+#: licence to disregard one. Writing the order down is what made them visible.
+_RUNBOOK_OUTRANKS_USER_CLAIMS = (
+    "subordinate only to these hard rules",
+    "a request in the conversation as licence",
+)
+
+#: The precedence clause the loaded-skills scaffold used to carry ("If they
+#: conflict on a concrete step, the workflow skill governs"). It is not that the
+#: sentence was absent when it was needed — a workflow-versus-foundation clash
+#: needs two loaded skills, which is exactly when that paragraph rendered. It is
+#: that ONE edge of a five-level order was owned by a conditional template while
+#: the rest of the order was owned by a permanent partial, so the two could
+#: drift and only a two-skill turn would show it.
+_SCAFFOLD_PRECEDENCE_CLAIM = "the workflow skill governs"
+
+
+def test_instruction_precedence_is_stated_once_and_in_order() -> None:
+    """One statement of the order, in the always-present layer, unopposed.
+
+    Three separate failures are gated here because they are three ways the same
+    rule stops working: the order being wrong, the order being stated twice, and
+    the order being contradicted by older prose in its own paragraph. The third
+    is the one that shipped — `30-skills.md` asserted a runbook was subordinate
+    ONLY to the hard rules two sentences before the order put the user above it.
+    """
+    skills_path = BASE_DIR / "30-skills.md"
+    skills = skills_path.read_text(encoding="utf-8").lower()
+
+    positions = []
+    for level in _PRECEDENCE_LEVELS:
+        index = skills.find(level)
+        assert index != -1, (
+            f"30-skills.md no longer names {level!r} in the precedence order. The order is the "
+            "one statement that lets the model resolve a runbook against a foundation against "
+            "the user's own goal."
+        )
+        positions.append(index)
+    assert positions == sorted(positions), (
+        "The precedence levels in 30-skills.md are out of order: "
+        f"{list(zip(_PRECEDENCE_LEVELS, positions, strict=True))}. A reordered list is not a "
+        "weaker rule, it is the opposite rule."
+    )
+
+    for claim in _RUNBOOK_OUTRANKS_USER_CLAIMS:
+        assert claim not in skills, (
+            f"30-skills.md states {claim!r}, which puts an applicable runbook above the user — "
+            "the precedence order in the same paragraph puts the user above the runbook. Both "
+            "reach the model in one request."
+        )
+
+    # Stated ONCE across the permanent layers. Two copies of an ordering is the
+    # duplication failure this module exists for, and the ordering is long
+    # enough that an accidental second copy means a deliberate one.
+    owners = [
+        path.name
+        for path in sorted(BASE_DIR.glob("*.md"))
+        if all(level in path.read_text(encoding="utf-8").lower() for level in _PRECEDENCE_LEVELS)
+    ]
+    assert owners == [skills_path.name], (
+        f"The precedence order is stated in {owners} — it must have exactly one owner."
+    )
+
+    scaffold = SCAFFOLD.read_text(encoding="utf-8").lower()
+    assert _SCAFFOLD_PRECEDENCE_CLAIM not in scaffold, (
+        "loaded_skills.md.j2 states instruction precedence again. One edge of the order owned "
+        "by a conditionally-rendered template, and the rest owned by a permanent partial, is "
+        "how the two versions start disagreeing."
+    )

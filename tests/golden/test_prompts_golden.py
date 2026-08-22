@@ -250,6 +250,23 @@ def test_loaded_skills_one(assembler: PromptAssembler) -> None:
     assert_golden("loaded_skills_alpha.md", assembler.render_loaded_skills([skill]))
 
 
+def test_loaded_skills_foundation_and_workflow(assembler: PromptAssembler) -> None:
+    """Two skills, which is the ONLY rendering that emits the layering paragraph.
+
+    That paragraph — how a domain foundation and a workflow skill combine, and
+    the rule against interleaving two procedures — is guarded by `{% if
+    loaded_skills | length > 1 %}` and so appears in neither the empty nor the
+    one-skill snapshot. It was edited (the instruction-precedence clause moved to
+    `main/base/30-skills.md`) with no golden covering a single byte of it, and
+    the only other test touching it asserts the literal string "Layering:" is
+    present. The fixture catalog already carries the right pair: alpha is
+    `foundation: true`, beta is an ordinary workflow skill.
+    """
+    catalog = _fixture_catalog()
+    pair = [catalog.get("daintree.example.alpha"), catalog.get("daintree.example.beta")]
+    assert_golden("loaded_skills_pair.md", assembler.render_loaded_skills(pair))
+
+
 def test_turn_footer(assembler: PromptAssembler) -> None:
     turn = TurnContext(
         goal="Prepare the branch for review",
