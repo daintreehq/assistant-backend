@@ -323,7 +323,7 @@ def test_an_authoritative_clear_actually_clears() -> None:
     """
     from daintree_assistant_server.services.chat_orchestrator import resolve_active_skills
     from daintree_assistant_server.skills.catalog import load_catalog
-    from daintree_assistant_server.skills.selector import SelectionDecision
+    from daintree_assistant_server.skills.decision import SelectionDecision
 
     catalog = load_catalog()
     prior = [sorted(catalog.known_ids)[0]]
@@ -338,7 +338,7 @@ def test_an_authoritative_clear_actually_clears() -> None:
 
 def test_a_cleared_decision_does_not_claim_a_selector_call() -> None:
     """Telemetry stays honest: no call ran, so `ran` must stay False."""
-    from daintree_assistant_server.skills.selector import SelectionDecision
+    from daintree_assistant_server.skills.decision import SelectionDecision
 
     decision = SelectionDecision.cleared()
     assert decision.ran is False

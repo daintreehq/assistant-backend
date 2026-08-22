@@ -82,8 +82,9 @@ quality — it does not reason (§2) and it is what Pro's budgets are sized agai
 
 > **Skill selection is not an upstream call.** It runs as a LOCAL in-process
 > two-stage selector (`skills/local/`, no credential, no endpoint, ~10ms). The
-> prompt-based selector survives only as the scripted test seam; where selector
-> latency or selector cost is discussed below, that is what is meant.
+> There is no other selector: the prompt-based one has been deleted, so
+> "selector latency" and "selector cost" below describe a path that no longer
+> exists on any route.
 
 **The credential is the server's.** `TOGETHER_API_KEY` funds every turn, and
 callers supply none of their own — see [`KEY_HANDLING.md`](KEY_HANDLING.md). This

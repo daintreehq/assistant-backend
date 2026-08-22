@@ -47,7 +47,6 @@ TEMPLATE_TURN_FOOTER = "main/turn_footer.md.j2"
 TEMPLATE_RESPONSE_CONTRACT = "main/response_contract.md.j2"
 TEMPLATE_DISPLAY_CONTEXT = "main/display_context.md.j2"
 TEMPLATE_DOCS_CONTEXT = "main/docs_context.md.j2"
-TEMPLATE_SELECTOR_SYSTEM = "selector/system.md.j2"
 
 _ALL_TEMPLATES = (
     TEMPLATE_STARTUP_CONTEXT,
@@ -58,7 +57,6 @@ _ALL_TEMPLATES = (
     TEMPLATE_RESPONSE_CONTRACT,
     TEMPLATE_DISPLAY_CONTEXT,
     TEMPLATE_DOCS_CONTEXT,
-    TEMPLATE_SELECTOR_SYSTEM,
 )
 
 
@@ -149,8 +147,8 @@ class PromptLoader:
 
         A directory that holds only SOME assets is an overlay, not a broken
         prompt set: the prompt-variant benchmarks ship a single alternative
-        ``selector/system.md.j2`` and expect everything else to come from the
-        package. Templates resolve overlay-first through a ``ChoiceLoader``, and
+        template and expect everything else to come from the package. Templates
+        resolve overlay-first through a ``ChoiceLoader``, and
         raw bodies fall back per directory — so a variant can override one file
         without vendoring forty.
         """

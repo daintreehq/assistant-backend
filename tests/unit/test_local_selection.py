@@ -1321,3 +1321,52 @@ def test_a_rejected_job_never_counts_as_a_queue_wait() -> None:
         pool.close()
 
     asyncio.run(go())
+
+
+# ---------------------------------------------------------------------------
+# The seam and the production selector must stay the same shape.
+# ---------------------------------------------------------------------------
+
+
+def test_the_scripted_seam_matches_the_production_selector_signature() -> None:
+    """`ScriptedSelector` lives in test code; nothing else stops it drifting.
+
+    Orchestration tests drive selection through the scripted seam, so every
+    assertion about cadence, active-set resolution, docs pinning and fail-open
+    behaviour is written against ITS signature rather than `LocalSelector`'s.
+    That was safe while the seam was a second SHIPPED implementation held to the
+    same protocol by mypy. It is not safe now: the seam is test scaffolding,
+    `mypy --strict` runs over `src` and `tools` only, and `SkillSelector` is a
+    plain `Protocol` — so a keyword added to the real `select()` would leave
+    ninety-odd tests passing against a seam that never learned about it.
+
+    Compared as SIGNATURES rather than by `isinstance`: `SkillSelector` is not
+    `runtime_checkable`, and even a runtime protocol check only verifies the
+    method NAME exists, which is the half of this that was never in doubt.
+    """
+    import inspect
+
+    from fakes import ScriptedSelector
+
+    from daintree_assistant_server.skills.local.selector import LocalSelector, SkillSelector
+
+    protocol = inspect.signature(SkillSelector.select)
+    production = inspect.signature(LocalSelector.select)
+    seam = inspect.signature(ScriptedSelector.select)
+
+    def shape(sig: inspect.Signature) -> list[tuple[str, str]]:
+        # Names and kinds, not annotations: the seam is duck-typed test code and
+        # annotating it against the real Catalog/ChatMessage types would import
+        # production types into a fake for no benefit. What must not drift is
+        # which arguments exist and how they may be passed.
+        return [(name, str(p.kind)) for name, p in sig.parameters.items() if name != "self"]
+
+    assert shape(seam) == shape(protocol), (
+        "ScriptedSelector.select no longer matches the SkillSelector protocol. Every "
+        "orchestration test drives selection through it, so a mismatch means those "
+        "tests are asserting against a selector the orchestrator cannot actually call."
+    )
+    assert shape(production) == shape(protocol), (
+        "LocalSelector.select no longer matches the SkillSelector protocol it is the "
+        "only production implementation of."
+    )

@@ -29,8 +29,8 @@ from pydantic import SecretStr
 from daintree_assistant_server.config import DOCS_SKILL_ID
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.skills.active_set import resolve_active_skills
+from daintree_assistant_server.skills.decision import SelectionDecision
 from daintree_assistant_server.skills.fast_path import can_skip_selection
-from daintree_assistant_server.skills.selector import SelectionDecision, parse_select_args
 from daintree_assistant_server.state.codec import StateCodec
 
 FOUNDATION = "daintree.foundation"
@@ -348,50 +348,17 @@ async def test_the_body_reaches_the_main_prompt(
     assert "## Docs" in sent, "the pinned runbook's body never reached the main prompt"
 
 
-@pytest.mark.asyncio
-async def test_the_selector_is_never_told_a_pinned_skill_is_active(
-    orchestrator: Any, fake_provider: Any
-) -> None:
-    """The prompt would otherwise contradict itself.
-
-    Its step 3 says re-list an active id or it is EVICTED; its closing checklist
-    says never invent an id and choose only from the catalog below. Naming a hidden
-    skill on the active line instructs the classifier to do both at once.
-
-    Driven through the ORCHESTRATOR, not `Catalog.selectable`, because the filter
-    existing is not the point — the real call site using it is. Reverting
-    `SkillSelector.select` to `filter_known` passes any assertion made against the
-    projection in isolation.
-    """
-    fake_provider.selection_result = selection_result([OPERATIONAL], docs_query=None)
-    fake_provider.complete_result = make_result(content="Renamed.")
-
-    first = RespondRequest.model_validate(
-        respond_body([{"role": "user", "content": "what is a watcher?"}])
-    )
-    fake_provider.selection_result = selection_result([], docs_query="what is a watcher")
-    outcome = await orchestrator.complete(
-        first, api_key=SecretStr("k"), request_id="req-1"
-    )
-    assert DOCS_SKILL_ID in [s["id"] for s in outcome.body["skills"]["active"]]
-
-    # A NEW instruction, carrying the prior set forward on the signed token. The
-    # selector reruns, and the active-skills line it is shown is built from that set.
-    fake_provider.selection_result = selection_result([OPERATIONAL], docs_query=None)
-    second = RespondRequest.model_validate(
-        respond_body(
-            [{"role": "user", "content": "rename my terminals"}],
-            turn_id="t2",
-            state=outcome.body["state"],
-        )
-    )
-    await orchestrator.complete(
-        second, api_key=SecretStr("k"), request_id="req-2"
-    )
-    prompt = _prompt_text(fake_provider.selection_requests[-1])
-    assert DOCS_SKILL_ID not in prompt, "the selector was shown a hidden skill id"
-
-
+# The pinned skill is withheld from the CLASSIFIER's active list too — a hidden
+# id on that line would tell it to re-list an id its menu does not contain. That
+# used to be asserted here, by reading the rendered selector prompt through a
+# whole orchestrator turn. It has moved to
+# `test_local_selection.py::test_local_selector_hides_pinned_actives_from_the_classifier`,
+# because the filter is `LocalSelector`'s own first step (`visible_active`) and
+# never the orchestrator's: a turn-level test cannot see it, and one written
+# here would have to assert on the scripted seam, which does not implement it.
+# The old test's argument — drive the real call site, not the projection in
+# isolation — is why it moved rather than being deleted: the real call site is
+# now that function.
 @pytest.mark.asyncio
 async def test_the_pin_survives_a_tool_continuation_round(
     orchestrator: Any, fake_provider: Any
@@ -454,25 +421,29 @@ def test_a_pinned_skill_still_round_trips_through_a_real_state_token(catalog: An
 # ---------------------------------------------------------------------------
 
 
-def test_the_parser_rejects_a_hidden_id(catalog: Any) -> None:
-    """The id is a public string. It appears in `/skills`, and it can appear in the
-    conversation the classifier is reading — so "absent from the catalog block" is
-    not a guarantee it never comes back. Naming it would load a pinned runbook,
+def test_a_pinned_skill_is_not_selectable(catalog: Any) -> None:
+    """The pin is hidden from selection, and `selectable_ids` is where that holds.
+
+    The id is a public string: it appears in `/skills`, and it can appear in the
+    conversation a classifier reads — so "the server never offered it" is not a
+    guarantee it never comes back out. Loading it would pull in a pinned runbook,
     auto-paired with its foundation, on a turn the server never pinned it for.
 
-    Returning it ALONE is treated as malformed (the model named skills and none
-    resolved) — the caller repairs once, then fails open to the prior set."""
-    raw = f'{{"skill_ids": ["{DOCS_SKILL_ID}"], "confidence": 0.9}}'
-    assert parse_select_args(raw, catalog, 3) is None
-
-
-def test_the_parser_keeps_the_valid_ids_beside_a_hidden_one(catalog: Any) -> None:
-    """A partially-hallucinated answer is still usable. Dropping the hidden id must
-    not cost the turn the real selection alongside it."""
-    raw = f'{{"skill_ids": ["{DOCS_SKILL_ID}", "{OPERATIONAL}"], "confidence": 0.9}}'
-    parsed = parse_select_args(raw, catalog, 3)
-    assert parsed is not None
-    assert parsed[0] == [OPERATIONAL]
+    Asserted against the CATALOG rather than against a parser. It used to be
+    checked through the prompt selector's argument parser, which dropped
+    unselectable ids on the way in; that selector is gone, and the property was
+    never really the parser's — every consumer, the local classifier included,
+    validates against this same set. Testing it here tests it once, for all of
+    them.
+    """
+    assert DOCS_SKILL_ID in catalog.known_ids, "the pinned skill must exist to be pinned"
+    assert DOCS_SKILL_ID not in catalog.selectable_ids, (
+        "the server-pinned docs runbook became selectable — a classifier can now "
+        "load it on a turn the server did not pin it for"
+    )
+    # And it is the ONLY thing hidden: a bug that emptied `selectable_ids` would
+    # satisfy the assertion above while making every skill unroutable.
+    assert catalog.selectable_ids == catalog.known_ids - {DOCS_SKILL_ID}
 
 
 # ---------------------------------------------------------------------------

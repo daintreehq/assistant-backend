@@ -96,18 +96,16 @@ def test_a_partial_directory_is_an_overlay_not_a_broken_prompt_set(tmp_path) -> 
     rest from the package. Requiring a full vendored copy would mean forty files
     to change one."""
     variant = tmp_path / "variant"
-    (variant / "selector").mkdir(parents=True)
-    (variant / "selector" / "system.md.j2").write_text(
-        "VARIANT SELECTOR {{ max_active }}", encoding="utf-8"
+    (variant / "main").mkdir(parents=True)
+    (variant / "main" / "integrations.md.j2").write_text(
+        "VARIANT INTEGRATIONS {{ mcp_servers | length }}", encoding="utf-8"
     )
 
     loader = PromptLoader(variant)
     loader.validate()
 
     # The overridden template wins...
-    assert "VARIANT SELECTOR" in loader.render(
-        "selector/system.md.j2", catalog=[], active_ids=[], max_active=3
-    )
+    assert "VARIANT INTEGRATIONS" in loader.render("main/integrations.md.j2", mcp_servers=[])
     # ...and everything it does not provide comes from the package.
     assert loader.base_prompt() == PromptLoader().base_prompt()
     assert loader.task_system_prompt("checkpoint")
@@ -121,15 +119,15 @@ def test_templates_do_not_auto_reload(tmp_path) -> None:  # type: ignore[no-unty
     up the new template — two different instruction sets in one process.
     """
     variant = tmp_path / "variant"
-    (variant / "selector").mkdir(parents=True)
-    template = variant / "selector" / "system.md.j2"
+    (variant / "main").mkdir(parents=True)
+    template = variant / "main" / "integrations.md.j2"
     template.write_text("FIRST", encoding="utf-8")
 
     loader = PromptLoader(variant)
-    assert loader.render("selector/system.md.j2") == "FIRST"
+    assert loader.render("main/integrations.md.j2") == "FIRST"
 
     template.write_text("SECOND", encoding="utf-8")
-    assert loader.render("selector/system.md.j2") == "FIRST"
+    assert loader.render("main/integrations.md.j2") == "FIRST"
 
 
 def test_content_hashes_distinguish_two_prompt_sets(tmp_path) -> None:  # type: ignore[no-untyped-def]
@@ -152,7 +150,7 @@ def test_content_hashes_distinguish_two_prompt_sets(tmp_path) -> None:  # type: 
 def test_content_hashes_cover_templates_too(tmp_path) -> None:  # type: ignore[no-untyped-def]
     """A template carries as much behaviour as a raw body.
 
-    Hashing only the raw bodies meant two builds whose selector INSTRUCTIONS
+    Hashing only the raw bodies meant two builds whose TEMPLATE instructions
     differed reported identical hashes — so a benchmark number could be
     attributed to the wrong prompt set.
     """
@@ -162,11 +160,12 @@ def test_content_hashes_cover_templates_too(tmp_path) -> None:  # type: ignore[n
     shutil.copytree(SRC_PROMPTS, staged)
     before = PromptLoader(staged).content_hashes()
 
-    selector = staged / "selector" / "system.md.j2"
-    selector.write_text(selector.read_text(encoding="utf-8") + "\nEXTRA", encoding="utf-8")
+    template = staged / "main" / "response_contract.md.j2"
+    template.write_text(template.read_text(encoding="utf-8") + "\nEXTRA", encoding="utf-8")
     after = PromptLoader(staged).content_hashes()
 
-    assert before["template:selector/system.md.j2"] != after["template:selector/system.md.j2"]
+    key = "template:main/response_contract.md.j2"
+    assert before[key] != after[key]
     assert before["base"] == after["base"]
 
 
@@ -297,56 +296,3 @@ def test_the_catalog_revision_moves_when_any_body_changes(catalog) -> None:  # t
     skills = list(catalog.skills)
     edited = [replace(skills[0], body=skills[0].body + "\n\nNEW STEP."), *skills[1:]]
     assert Catalog(edited).revision != catalog.revision
-
-
-# ---------------------------------------------------------------------------
-# The selector prompt — the largest render on the first-byte path.
-# ---------------------------------------------------------------------------
-
-
-def test_the_selector_prompt_is_memoised_per_catalog_and_active_set(
-    prompt_loader, catalog_manager, settings
-) -> None:  # type: ignore[no-untyped-def]
-    from daintree_assistant_server.skills.selector import Selector
-
-    sel = Selector(None, prompt_loader, catalog_manager, settings)  # type: ignore[arg-type]
-    cat = catalog_manager.catalog
-    active = sorted(cat.known_ids)[:1]
-
-    first = sel._render_system(cat, active)
-    second = sel._render_system(cat, active)
-    assert first == second
-    assert sel._system_cache.hits >= 1
-
-    # A different active set is a different prompt — the trailing active-set and
-    # reason-budget lines are the only part that varies between calls.
-    other = sel._render_system(cat, sorted(cat.known_ids)[1:2])
-    assert other != first
-
-
-def test_the_selector_cache_keys_on_the_catalog_revision(
-    prompt_loader, catalog_manager, settings
-) -> None:  # type: ignore[no-untyped-def]
-    """Skill learning can swap the catalog underneath at any time.
-
-    Keying on the revision means a stale entry simply never matches, rather than
-    serving a classification menu that no longer describes the skills that exist
-    — which would make the selector pick ids the catalog cannot resolve.
-    """
-    from daintree_assistant_server.skills.selector import Selector
-
-    sel = Selector(None, prompt_loader, catalog_manager, settings)  # type: ignore[arg-type]
-    cat = catalog_manager.catalog
-    rendered = sel._render_system(cat, [])
-
-    # Same skills, different revision => different key => a fresh render.
-    class _Shifted:
-        revision = "sha256:something-else"
-
-        def __getattr__(self, name: str) -> object:
-            return getattr(cat, name)
-
-    misses_before = sel._system_cache.misses
-    sel._render_system(_Shifted(), [])  # type: ignore[arg-type]
-    assert sel._system_cache.misses == misses_before + 1
-    assert rendered  # sanity

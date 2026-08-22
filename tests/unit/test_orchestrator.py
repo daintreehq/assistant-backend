@@ -16,7 +16,6 @@ from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.errors import upstream_error
 from daintree_assistant_server.modes import DEFAULT_MODE
 from daintree_assistant_server.providers.base import (
-    ProviderChatResult,
     ProviderStream,
     ProviderUsage,
 )
@@ -27,8 +26,8 @@ from daintree_assistant_server.services.chat_orchestrator import (
     resolve_active_skills,
 )
 from daintree_assistant_server.skills.catalog import Catalog
+from daintree_assistant_server.skills.decision import SelectionDecision
 from daintree_assistant_server.skills.loader import parse_skill
-from daintree_assistant_server.skills.selector import SelectionDecision
 
 TEST_API_KEY = SecretStr("test-caller-key")
 
@@ -1276,16 +1275,6 @@ def _nudged(request: object) -> bool:
     )
 
 
-def _priced_selection(cost: float = 0.0004) -> ProviderChatResult:
-    """A selector run that reported its cost.
-
-    The default fake selector fails open and reports no cost, which alone clears
-    `cost.complete`. Cost assertions about the MAIN slot need the selector out of
-    the way, or every one of them passes for the wrong reason.
-    """
-    return selection_result([], usage=ProviderUsage(prompt_tokens=3000, cost=cost))
-
-
 @pytest.mark.asyncio
 async def test_stream_reroll_that_half_reported_cost_is_not_labelled_complete(
     orchestrator: ChatOrchestrator,
@@ -1298,7 +1287,11 @@ async def test_stream_reroll_that_half_reported_cost_is_not_labelled_complete(
     charged, and `complete: true` would present that as an exact receipt — the
     one place the flag said "complete" over a number that was not.
     """
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_chunks = lambda request: (  # type: ignore[assignment]
         make_text_chunks("Tallied.")
         if _nudged(request)
@@ -1321,7 +1314,11 @@ async def test_stream_reroll_with_both_attempts_reported_stays_complete(
     fake_provider: FakeProvider,
 ) -> None:
     """The floor rule must not swallow an ordinary re-roll that reported twice."""
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_chunks = lambda request: (  # type: ignore[assignment]
         make_text_chunks("Tallied.", cost=0.003)
         if _nudged(request)
@@ -1349,7 +1346,11 @@ async def test_stream_single_attempt_cost_is_still_complete(
     would report `complete: false` — the fix would have traded a rare wrong
     "complete" for a universal wrong "floor".
     """
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_chunks = lambda _request: make_text_chunks(  # type: ignore[assignment]
         "Read five votes; here is the tally.", cost=0.004
     )
@@ -1393,7 +1394,11 @@ async def test_body_reroll_that_half_reported_cost_is_not_labelled_complete(
     plain `ProviderChatResult`, a different code path from the stream loop's
     accumulator — so the completeness bit has to survive that assignment too.
     """
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = [
         make_result(content=_DEAD_ROUND, usage=ProviderUsage(cost=0.002)),
         make_result(content="Read five votes; here is the tally."),
@@ -1414,7 +1419,11 @@ async def test_body_reroll_with_both_attempts_reported_stays_complete(
     fake_provider: FakeProvider,
 ) -> None:
     """Positive control for the path above: a fully-reported re-roll is exact."""
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = [
         make_result(content=_DEAD_ROUND, usage=ProviderUsage(cost=0.002)),
         make_result(
@@ -1449,19 +1458,18 @@ async def test_body_turn_usage_names_the_endpoint_that_served_it(
     orchestrator: ChatOrchestrator,
     fake_provider: FakeProvider,
 ) -> None:
-    """The main and selector ratios each carry their own host.
+    """The main and selector slots stay separate, and only one has a host.
 
-    They are different prompt prefixes on separately-routed calls, so they share
-    no cache and regress independently — one endpoint field could only ever be
-    right about one of them.
+    They were different prompt prefixes on separately-routed calls, sharing no
+    cache and regressing independently — which is why one endpoint field could
+    never be right about both. Selection is LOCAL now, so its half of that is
+    settled from the other direction: it has no host and no tokens at all. The
+    property still worth pinning is that the main call's figures do not leak
+    into the selector slot to fill the gap.
     """
     from structlog.testing import capture_logs
 
-    fake_provider.selection_result = selection_result(
-        [],
-        usage=ProviderUsage(prompt_tokens=3000, cached_tokens=2400, cost=0.0004),
-        endpoint="novita",
-    )
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = make_result(
         content="Read five votes; here is the tally.",
         usage=ProviderUsage(prompt_tokens=1000, completion_tokens=50, cached_tokens=750),
@@ -1475,8 +1483,13 @@ async def test_body_turn_usage_names_the_endpoint_that_served_it(
     entry = _turn_usage(logs)
     assert entry["endpoint"] == "deepinfra"
     assert entry["cache_ratio"] == 0.75
-    assert entry["selector_endpoint"] == "novita"
-    assert entry["selector_cache_ratio"] == 0.8
+    # In process, so it names itself rather than an upstream host...
+    assert entry["selector_endpoint"] == "local"
+    # ...and reports no tokens, so there is no ratio to state. `None`, never
+    # `0.0`: a zero would read as "the selector's cache did nothing" and drag
+    # down the very average this field exists to watch.
+    assert entry["selector_cache_ratio"] is None
+    assert entry["selector_prompt_tokens"] is None
     # The selector's host is NOT folded into the main count: it lands elsewhere
     # routinely under throughput sorting, and counting it would make a switch
     # look like it happened on every turn.
@@ -1502,7 +1515,11 @@ async def test_body_reroll_keeps_the_discarded_drafts_endpoint(
     """
     from structlog.testing import capture_logs
 
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = [
         make_result(
             content=_DEAD_ROUND,
@@ -1545,7 +1562,11 @@ async def test_body_reroll_onto_the_same_endpoint_is_not_a_switch(
     nothing, and must not read as a routing switch."""
     from structlog.testing import capture_logs
 
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = [
         make_result(content=_DEAD_ROUND, endpoint="deepinfra"),
         make_result(content="Read five votes; here is the tally.", endpoint="deepinfra"),
@@ -1568,9 +1589,7 @@ async def test_stream_turn_usage_names_the_endpoint_that_served_it(
     """The streaming half: the accepted stream's host reaches the log line."""
     from structlog.testing import capture_logs
 
-    fake_provider.selection_result = selection_result(
-        [], usage=ProviderUsage(prompt_tokens=3000, cost=0.0004), endpoint="novita"
-    )
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_factory = lambda _request: FakeStream(
         make_text_chunks("Read five votes; here is the tally."), endpoint="deepinfra"
     )
@@ -1585,7 +1604,8 @@ async def test_stream_turn_usage_names_the_endpoint_that_served_it(
     entry = _turn_usage(logs)
     assert entry["endpoint"] == "deepinfra"
     assert entry["distinct_endpoints"] == 1
-    assert entry["selector_endpoint"] == "novita"
+    # In process; it names itself, and is never counted as an upstream host.
+    assert entry["selector_endpoint"] == "local"
     assert entry["stream"] is True
 
 
@@ -1601,7 +1621,11 @@ async def test_stream_reroll_counts_both_endpoints(
     """
     from structlog.testing import capture_logs
 
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_factory = lambda request: FakeStream(
         make_text_chunks("Read five votes; here is the tally.")
         if _nudged(request)
@@ -1634,7 +1658,11 @@ async def test_a_provider_that_names_no_endpoint_reports_none_not_a_switch(
     """
     from structlog.testing import capture_logs
 
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
     with capture_logs() as logs:
         await orchestrator.complete(
@@ -1644,7 +1672,10 @@ async def test_a_provider_that_names_no_endpoint_reports_none_not_a_switch(
     entry = _turn_usage(logs)
     assert entry["endpoint"] is None
     assert entry["distinct_endpoints"] == 0
-    assert entry["selector_endpoint"] is None
+    # The local selector always names itself, which is exactly why it must not
+    # be counted: `distinct_endpoints` tracks UPSTREAM hosts, and folding a
+    # constant into it would report a routing switch on every silent turn.
+    assert entry["selector_endpoint"] == "local"
 
 
 @pytest.mark.asyncio
@@ -1661,7 +1692,11 @@ async def test_an_accepted_reroll_that_named_no_host_does_not_inherit_the_drafts
     """
     from structlog.testing import capture_logs
 
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_factory = lambda request: FakeStream(
         make_text_chunks("Read five votes; here is the tally.")
         if _nudged(request)
@@ -1704,7 +1739,11 @@ async def test_a_reroll_that_never_opened_keeps_the_drafts_endpoint(
             raise upstream_error("the re-roll never opened")
         return FakeStream(make_text_chunks(_DEAD_ROUND), endpoint="deepinfra")
 
-    fake_provider.selection_result = _priced_selection()
+    # No selector scaffolding: selection is LOCAL and costs nothing, so an
+    # unpriced selection already leaves the total complete. This used to need
+    # a priced fake, because a prompt selector that ran and reported nothing
+    # was an unobserved bill and cleared the flag on its own.
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_factory = factory  # type: ignore[assignment]
     with capture_logs() as logs:
         outcome = await orchestrator.complete(
@@ -1728,61 +1767,6 @@ async def test_a_reroll_that_never_opened_keeps_the_drafts_endpoint(
     entry = _turn_usage(logs)
     assert entry["endpoint"] == "deepinfra"
     assert entry["distinct_endpoints"] == 1
-
-
-@pytest.mark.asyncio
-async def test_a_repaired_selection_that_named_no_host_reports_none(
-    orchestrator: ChatOrchestrator,
-    fake_provider: FakeProvider,
-) -> None:
-    """The same stale-attribution rule, on the selector's own repair.
-
-    A malformed selection is re-asked once. If the repair names no host, the
-    answer's endpoint is unknown — labelling it with the discarded attempt's
-    host would put a node beside a selector cache ratio it did not produce.
-    """
-    from structlog.testing import capture_logs
-
-    fake_provider.selection_result = [
-        make_result(content="not json at all", endpoint="deepinfra"),
-        selection_result([], usage=ProviderUsage(prompt_tokens=3000, cost=0.0004)),
-    ]
-    fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
-    with capture_logs() as logs:
-        await orchestrator.complete(
-            _intent_body_request("bi-endpoint-sel-repair"),
-
-            api_key=TEST_API_KEY,
-        )
-    assert len(fake_provider.selection_requests) == 2, "the selection must have been repaired"
-    entry = _turn_usage(logs)
-    assert entry["selector_endpoint"] is None
-
-
-@pytest.mark.asyncio
-async def test_a_repaired_selection_reports_the_host_that_answered(
-    orchestrator: ChatOrchestrator,
-    fake_provider: FakeProvider,
-) -> None:
-    """Positive control: when the repair DOES name a host, that is the answer's
-    attribution — not the discarded first attempt's."""
-    from structlog.testing import capture_logs
-
-    fake_provider.selection_result = [
-        make_result(content="not json at all", endpoint="deepinfra"),
-        selection_result(
-            [], usage=ProviderUsage(prompt_tokens=3000, cost=0.0004), endpoint="novita"
-        ),
-    ]
-    fake_provider.complete_result = make_result(content="Read five votes; here is the tally.")
-    with capture_logs() as logs:
-        await orchestrator.complete(
-            _intent_body_request("bi-endpoint-sel-repair-ok"),
-
-            api_key=TEST_API_KEY,
-        )
-    entry = _turn_usage(logs)
-    assert entry["selector_endpoint"] == "novita"
 
 
 @pytest.mark.asyncio
@@ -1834,117 +1818,6 @@ async def test_the_turn_key_reaches_the_log_from_a_real_continuation_round(
 
 
 @pytest.mark.asyncio
-async def test_a_repaired_selection_that_half_reported_makes_the_turn_a_floor(
-    orchestrator: ChatOrchestrator,
-    fake_provider: FakeProvider,
-) -> None:
-    """The selector bills twice when its first JSON is malformed.
-
-    Its partial sum never reaches the wire as its own flag — `cost.complete` is
-    the single field a client is told to trust — so this proves the fact travels
-    the internal route (`_RespondMeta.selector_cost_complete`) all the way there.
-    """
-    fake_provider.selection_result = [
-        make_result(content="not json at all", usage=ProviderUsage(cost=0.0004)),
-        selection_result([], usage=ProviderUsage(prompt_tokens=3000)),
-    ]
-    fake_provider.complete_result = make_result(
-        content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
-    )
-    outcome = await orchestrator.complete(
-        _intent_body_request("sel-cost"),
-        api_key=TEST_API_KEY,
-    )
-    assert outcome.body is not None
-    assert len(fake_provider.selection_requests) == 2, "the selection must have been repaired"
-    assert outcome.body["cost"]["selector"] == pytest.approx(0.0004)
-    assert outcome.body["cost"]["complete"] is False
-
-
-@pytest.mark.asyncio
-async def test_a_repaired_selection_that_reported_twice_stays_complete(
-    orchestrator: ChatOrchestrator,
-    fake_provider: FakeProvider,
-) -> None:
-    """Positive control: a repair is not by itself a reason to report a floor."""
-    fake_provider.selection_result = [
-        make_result(content="not json at all", usage=ProviderUsage(cost=0.0004)),
-        selection_result([], usage=ProviderUsage(prompt_tokens=3000, cost=0.0005)),
-    ]
-    fake_provider.complete_result = make_result(
-        content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
-    )
-    outcome = await orchestrator.complete(
-        _intent_body_request("sel-cost-ok"),
-        api_key=TEST_API_KEY,
-    )
-    assert outcome.body is not None
-    assert outcome.body["cost"]["selector"] == pytest.approx(0.0009)
-    assert outcome.body["cost"]["complete"] is True
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("priced_first", [True, False])
-async def test_a_selector_that_never_parsed_still_reports_what_it_billed(
-    orchestrator: ChatOrchestrator,
-    fake_provider: FakeProvider,
-    priced_first: bool,
-) -> None:
-    """Both selector calls were billed; neither produced a usable selection.
-
-    `degraded_open` carries the summed usage out of a selection that failed —
-    the turn still owes the caller that money — and the summed figure is short
-    whichever of the two attempts went unreported, so the order is parameterized
-    rather than assumed.
-    """
-    priced, silent = ProviderUsage(cost=0.0004), ProviderUsage()
-    fake_provider.selection_result = [
-        make_result(content="not json at all", usage=priced if priced_first else silent),
-        make_result(content="still not json", usage=silent if priced_first else priced),
-    ]
-    fake_provider.complete_result = make_result(
-        content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
-    )
-    outcome = await orchestrator.complete(
-        _intent_body_request(f"sel-degraded-{priced_first}"),
-        api_key=TEST_API_KEY,
-    )
-    assert outcome.body is not None
-    assert len(fake_provider.selection_requests) == 2
-    assert outcome.body["skills"]["selector"]["degraded"] is True
-    assert outcome.body["cost"]["selector"] == pytest.approx(0.0004)
-    assert outcome.body["cost"]["total"] == pytest.approx(0.0024)
-    assert outcome.body["cost"]["complete"] is False
-
-
-@pytest.mark.asyncio
-async def test_a_degraded_selector_that_reported_both_calls_stays_complete(
-    orchestrator: ChatOrchestrator,
-    fake_provider: FakeProvider,
-) -> None:
-    """Failing to parse is not the same as failing to measure.
-
-    A selection that degraded still knows exactly what it spent when both calls
-    reported, and marking that turn a floor would be its own wrong answer.
-    """
-    fake_provider.selection_result = [
-        make_result(content="not json at all", usage=ProviderUsage(cost=0.0004)),
-        make_result(content="still not json", usage=ProviderUsage(cost=0.0005)),
-    ]
-    fake_provider.complete_result = make_result(
-        content="Read five votes; here is the tally.", usage=ProviderUsage(cost=0.002)
-    )
-    outcome = await orchestrator.complete(
-        _intent_body_request("sel-degraded-ok"),
-        api_key=TEST_API_KEY,
-    )
-    assert outcome.body is not None
-    assert outcome.body["skills"]["selector"]["degraded"] is True
-    assert outcome.body["cost"]["selector"] == pytest.approx(0.0009)
-    assert outcome.body["cost"]["complete"] is True
-
-
-@pytest.mark.asyncio
 async def test_a_reported_zero_survives_the_stream_as_an_exact_total(
     orchestrator: ChatOrchestrator,
     fake_provider: FakeProvider,
@@ -1955,7 +1828,7 @@ async def test_a_reported_zero_survives_the_stream_as_an_exact_total(
     check on the way to the wire would turn that measurement into "unreported"
     and put a floor on a turn we know exactly.
     """
-    fake_provider.selection_result = _priced_selection(0.0)
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_chunks = lambda _request: make_text_chunks(  # type: ignore[assignment]
         "Read five votes; here is the tally.", cost=0.0
     )
@@ -2085,38 +1958,6 @@ async def test_cache_session_key_is_stable_across_turns_and_unique_per_session(
     assert keys[0] is not None
     assert keys[0] == keys[1]
     assert keys[-1] != keys[0]
-
-
-@pytest.mark.asyncio
-async def test_selector_call_is_keyed_by_catalog_not_by_session(
-    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
-) -> None:
-    """The selector's affinity key must not carry the session — asserted from the
-    orchestrator's side, where the session key is in scope and the mistake is
-    therefore available to make.
-
-    Both halves matter. Keyed per session, the selector would splinter a prefix
-    whose entire value is that every caller shares it. Keyed with nothing, the
-    router hashes the user's own words and affinity never engages at all
-    (docs/PROVIDER_POLICY.md section 3a).
-    """
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
-    fake_provider.selection_result = selection_result([skill_id])
-    fake_provider.complete_result = make_result(content="done")
-
-    request = _affinity_request()
-    await orchestrator.complete(
-        request, api_key=TEST_API_KEY
-    )
-
-    session_key = orchestrator._cache_session_key(request, _standard_route(orchestrator))
-    assert session_key is not None
-    assert fake_provider.selection_requests
-    for req in fake_provider.selection_requests:
-        assert req.cache_session_id == "daintree-selector-" + (
-            orchestrator.catalog.revision.rpartition(":")[2][:16]
-        )
-        assert req.cache_session_id != session_key
 
 
 def test_json_mode_main_call_uses_its_own_affinity_namespace(

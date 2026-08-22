@@ -37,7 +37,7 @@ from pydantic import SecretStr
 from ...config import Settings
 from ...contracts.openai import ChatMessage
 from ..catalog import Catalog, CatalogManager
-from ..selector import SelectionDecision
+from ..decision import SelectionDecision
 from .documents import ACTIVE_PREFIX, fit_query, last_user_text
 from .runtime import InferencePool
 from .setwise import SetwiseClassifier
@@ -48,11 +48,18 @@ _log = logging.getLogger(__name__)
 class SkillSelector(Protocol):
     """What the orchestrator needs from a selector — nothing more.
 
-    Two implementations exist: ``LocalSelector`` (production — the in-process
-    two-stage selector) and the prompt-based ``skills.selector.Selector``, which survives
-    as the scriptable seam for orchestration tests and deterministic benchmarks
-    (its FakeProvider/ReplayProvider scripting is the interface dozens of
-    behavioural assertions are written against).
+    ONE production implementation: ``LocalSelector``, the in-process two-stage
+    selector. The prompt-based one that used to sit beside it is deleted — it
+    made a billed model call on the turn's first-byte path and had not served a
+    request in months.
+
+    The protocol survives that deletion because it still has two implementors,
+    and the second one is the reason it must stay honest: ``ScriptedSelector``
+    in ``tests/fakes.py`` drives orchestration tests and the deterministic trace
+    benchmark by returning a scripted answer instead of deciding. A seam living
+    in test code is the right home for it — it is not product — but it also
+    means nothing stops the two signatures drifting apart, so
+    ``tests/unit/test_local_selection.py`` pins them against each other.
     """
 
     async def select(

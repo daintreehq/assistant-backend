@@ -480,9 +480,11 @@ def test_no_caller_credential_reaches_any_provider_call(client, fake_provider) -
         json=respond_body([{"role": "user", "content": "prep my branch"}]),
     )
     assert r.status_code == 200
-    assert len(fake_provider.selection_requests) == 1, "selector call not recorded"
+    # A selection ran, and it made no upstream call — selection is local, so the
+    # header cannot reach a provider through that path at all.
+    assert len(fake_provider.selection_requests) == 1, "selection not recorded"
     assert fake_provider.requests, "main call not recorded"
-    for req in [*fake_provider.selection_requests, *fake_provider.requests]:
+    for req in fake_provider.requests:
         assert req.api_key is None
 
 

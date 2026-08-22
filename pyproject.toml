@@ -60,7 +60,6 @@ daintree_assistant_server = [
     # startup, that broke every request, not merely sub-agent ones.
     "prompts/main/subagent/*.md",
     "prompts/main/*.j2",
-    "prompts/selector/*.j2",
     "prompts/tasks/*.md",
     "skills/files/*.md",
     # The local two-stage skill selector — the SHIPPED selector. Both encoders

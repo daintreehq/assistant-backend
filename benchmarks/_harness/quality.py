@@ -669,54 +669,6 @@ def _category_floor(
             )
 
 
-def skill_selection_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
-    """The PAID comparator suite: the prompt selector, live, three trials a case.
-
-    Graded on the EXACT set — nothing missing and nothing extra — because that is
-    what this selector's prompt asks for. The local suite grades recall-pass
-    instead; see ``skill_selection_local_verdict``.
-    """
-    summary = doc.get("summary") or {}
-    meta = doc.get("meta") or {}
-    checks = _Checks(summary)
-    _selector_coverage_checks(checks, summary, meta)
-
-    # A MISSED required skill is worse than an extra one: the turn runs without
-    # the runbook it needed, where an extra costs prompt bytes and some
-    # distraction. Graded separately for that reason, and never rolled into one
-    # accuracy figure that would let the cheap error mask the expensive one.
-    _rate_at_most(checks, "recall_miss_trials", "trials_total", MAX_SELECTOR_RECALL_MISS_RATE)
-    _rate_at_most(checks, "precision_extra_trials", "trials_total", MAX_SELECTOR_EXTRA_RATE)
-    _rate_at_least(checks, "cases_passed", "cases_total", MIN_SELECTOR_CASE_PASS_RATE)
-    _rate_at_least(checks, "trials_passed", "trials_total", MIN_SELECTOR_TRIAL_PASS_RATE)
-
-    docs = summary.get("docs")
-    if isinstance(docs, Mapping):
-        docs_checks = _Checks(docs)
-        docs_checks.exactly_zero("missed_lookup_trials")
-        _rate_at_most(
-            docs_checks, "spurious_lookup_trials", "scored_trials",
-            MAX_SELECTOR_SPURIOUS_DOCS_RATE,
-        )
-        checks.failures.extend(f"docs.{f}" for f in docs_checks.failures)
-
-    _category_floor(
-        checks, summary.get("categories"), MIN_SELECTOR_CATEGORY_PASS_RATE,
-        label="categories", expected=meta.get("categories_expected"),
-    )
-
-    trials = meta.get("trials")
-    valid_trials = isinstance(trials, int) and not isinstance(trials, bool)
-    if not valid_trials or trials < MIN_SELECTOR_TRIALS_PER_CASE:
-        checks.note(
-            f"trials={trials!r}, expected >= {MIN_SELECTOR_TRIALS_PER_CASE} per case — "
-            f"the selector is sampled at temperature 0 but not deterministic, and one "
-            f"trial cannot separate a routing fix from a lucky draw"
-        )
-
-    return checks.verdict()
-
-
 def skill_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
     """The suite that qualifies a release: the shipped ONNX artifact, offline.
 
@@ -812,7 +764,6 @@ def skill_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
 
 VERDICTS = {
     "injection_live": injection_verdict,
-    "skill_selection": skill_selection_verdict,
     "skill_selection_local": skill_selection_local_verdict,
     "workflow_intel": workflow_intel_verdict,
     "utility_json": utility_json_verdict,

@@ -214,7 +214,6 @@ def test_a_clean_run_passes_each_gate() -> None:
     assert injection_verdict(clean_injection()).passed
     assert workflow_intel_verdict(clean_workflow()).passed
     assert utility_json_verdict(clean_utility()).passed
-    assert VERDICTS["skill_selection"](clean_skill_selection()).passed
     assert VERDICTS["skill_selection_local"](clean_skill_selection_local()).passed
 
 
@@ -461,7 +460,6 @@ def test_attach_verdict_stamps_the_summary_the_dashboard_reads(suite: str) -> No
         "injection_live": clean_injection(injection_obeyed_total=5),
         "workflow_intel": clean_workflow(first_try_valid_rate=0.1),
         "utility_json": clean_utility(pass_rate=0.1),
-        "skill_selection": clean_skill_selection(degraded_trials=7),
         "skill_selection_local": clean_skill_selection_local(candidate_miss_trials=3),
     }
     stamped = attach_verdict(docs[suite], suite)
@@ -962,117 +960,3 @@ def test_the_dashboard_report_regrades_an_artifact_saved_before_the_gates_existe
 # caught it was a paid run.
 # ---------------------------------------------------------------------------
 
-
-def test_the_selector_runner_stamps_its_own_verdict_and_expectations() -> None:
-    """Drives the runner's REAL document assembly, not a hand-built copy."""
-    from datetime import UTC, datetime
-
-    from benchmarks.skill_selection.cases import load_cases
-    from benchmarks.skill_selection.runner import BenchConfig, build_results_doc
-    from benchmarks.skill_selection.scoring import TrialResult
-    from daintree_assistant_server.config import Settings
-    from daintree_assistant_server.skills.catalog import load_catalog
-
-    catalog = load_catalog()
-    cases = load_cases(catalog)
-    config = BenchConfig(trials=3)
-    results = [
-        TrialResult(
-            case_id=c.id, trial=t, picked=list(c.required), missing=[], extra=[],
-            degraded=False, latency_s=1.7, confidence=0.9, task_type="t", reason="r",
-            prompt_tokens=1, completion_tokens=1,
-            docs_query="q" if c.expect_docs else None,
-            docs_ok=True if c.expect_docs is not None else None,
-        )
-        for c in cases
-        for t in range(3)
-    ]
-    now = datetime.now(UTC)
-    doc = build_results_doc(
-        config=config, cases=cases, whole_corpus=cases, results=results,
-        catalog=catalog, settings=Settings(state_signing_key_current="x" * 48),
-        prompt_path="p", prompt_source="source", started_at=now, finished_at=now,
-    )
-
-    assert doc["summary"]["passed"] is True, doc["summary"]["quality_failures"]
-    # The expectations the gate needs. Absent, every real run is permanently red
-    # under the "missing means failed" rule — which is exactly what shipped.
-    for key in ("cases_expected", "trials_expected", "docs_trials_expected",
-                "categories_expected"):
-        assert key in doc["meta"], f"the runner does not record meta.{key}"
-    assert doc["meta"]["trials_expected"] == len(cases) * 3
-
-
-def test_a_filtered_selector_run_is_refused_by_its_own_document() -> None:
-    """`--filter` is right for iterating on one case and wrong for qualifying.
-    The runner records the UNFILTERED corpus as the expectation, so the narrowed
-    run cannot declare its own subset to be the corpus."""
-    from datetime import UTC, datetime
-
-    from benchmarks.skill_selection.cases import load_cases
-    from benchmarks.skill_selection.runner import BenchConfig, build_results_doc
-    from benchmarks.skill_selection.scoring import TrialResult
-    from daintree_assistant_server.config import Settings
-    from daintree_assistant_server.skills.catalog import load_catalog
-
-    catalog = load_catalog()
-    whole = load_cases(catalog)
-    ran = whole[:1]
-    now = datetime.now(UTC)
-    doc = build_results_doc(
-        config=BenchConfig(trials=3, id_filter=ran[0].id),
-        cases=ran, whole_corpus=whole,
-        results=[
-            TrialResult(
-                case_id=ran[0].id, trial=t, picked=list(ran[0].required), missing=[],
-                extra=[], degraded=False, latency_s=1.0, confidence=0.9,
-                task_type="t", reason="r", prompt_tokens=1, completion_tokens=1,
-            )
-            for t in range(3)
-        ],
-        catalog=catalog, settings=Settings(state_signing_key_current="x" * 48),
-        prompt_path="p", prompt_source="source", started_at=now, finished_at=now,
-    )
-    assert doc["summary"]["passed"] is False
-    assert any("filter" in f for f in doc["summary"]["quality_failures"])
-
-
-def test_a_two_variant_run_fails_when_EITHER_variant_fails(tmp_path: Any) -> None:
-    """`--variant A --variant B` is an experiment, and an experiment whose
-    control regressed is a result to look at rather than a run to wave through.
-    Returning on the last variant alone would pass a run whose baseline broke."""
-    import benchmarks.skill_selection.bench as bench
-
-    calls: list[dict[str, Any]] = []
-
-    def fake_print_verdict(doc: dict[str, Any], suite: str) -> bool:
-        calls.append(doc)
-        return bool(doc["summary"]["passed"])
-
-    good = clean_skill_selection()
-    good["summary"]["passed"] = True
-    bad = clean_skill_selection(degraded_trials=9)
-    bad["summary"]["passed"] = False
-
-    docs = iter([bad, good])
-    original_run, original_verdict = bench.run_bench, bench.print_verdict
-    original_summary, original_failures = bench.print_summary, bench.print_failures
-    original_compare = bench.print_compare
-    try:
-        bench.run_bench = lambda _config: _immediate(next(docs))  # type: ignore[assignment]
-        bench.print_verdict = fake_print_verdict  # type: ignore[assignment]
-        bench.print_summary = lambda _doc: None  # type: ignore[assignment]
-        bench.print_failures = lambda _doc: None  # type: ignore[assignment]
-        bench.print_compare = lambda _a, _b: None  # type: ignore[assignment]
-        code = bench.main(["run", "--variant", "baseline", "--variant", "refined", "--no-save"])
-    finally:
-        bench.run_bench, bench.print_verdict = original_run, original_verdict
-        bench.print_summary, bench.print_failures = original_summary, original_failures
-        bench.print_compare = original_compare
-
-    assert code == 1, "a failing FIRST variant must still fail the command"
-    assert len(calls) == 2, "every variant must be graded, not just until the first failure"
-
-
-async def _immediate(value: Any) -> Any:
-    return value

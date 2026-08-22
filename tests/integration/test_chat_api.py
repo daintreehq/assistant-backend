@@ -11,7 +11,7 @@ from fakes import FakeProvider, make_result, make_text_chunks, selection_result
 
 from daintree_assistant_server.errors import upstream_error
 from daintree_assistant_server.services.chat_orchestrator import resolve_active_skills
-from daintree_assistant_server.skills.selector import SelectionDecision
+from daintree_assistant_server.skills.decision import SelectionDecision
 
 URL = "/v1/daintree/respond"
 SKILL_PREP = "daintree.workflow.prep-branch-for-review"
@@ -100,9 +100,29 @@ def test_structured_startup_reaches_main_model_but_not_selector(
     )
     assert response.status_code == 200
 
-    selector_wire = json.dumps(fake_provider.selection_requests[-1].messages)
-    assert visible in selector_wire
-    assert marker not in selector_wire
+    # The selector sees the sanitized CONVERSATION and nothing else. It used to
+    # be asserted against the rendered selector prompt; selection is local now,
+    # so there is no prompt — the evidence is the argument list, which is a
+    # stronger place to check it because every selector implementation takes it.
+    # EVERY argument selection was given, not just the conversation. Reading one
+    # of them would let a future leak through `turn_context` — the other free-text
+    # channel into selection — pass unnoticed, and that is the argument a bounded
+    # "hint" is most likely to be widened into.
+    recorded = fake_provider.selection_requests[-1]
+    selector_evidence = json.dumps(
+        {
+            "conversation": [
+                m.model_dump() if hasattr(m, "model_dump") else m for m in recorded.conversation
+            ],
+            "active_ids": recorded.active_ids,
+            "turn_context": recorded.turn_context,
+            "available_tools": recorded.available_tools,
+        }
+    )
+    assert visible in selector_evidence
+    assert marker not in selector_evidence, (
+        "startup context reached the selector — it is required to be blind to it"
+    )
 
     main = _main_request(fake_provider).messages
     startup_idx = next(
@@ -407,8 +427,11 @@ def test_a_stale_openrouter_bearer_is_ignored_not_forwarded(client, fake_provide
         json=respond_body([{"role": "user", "content": "x"}]),
     )
     assert r.status_code == 200
-    # And nothing carried the stale value upstream.
-    for req in [*fake_provider.selection_requests, *fake_provider.requests]:
+    # And nothing carried the stale value upstream. The selector is not in this
+    # list because it makes no upstream call at all any more — which is the
+    # strongest possible version of "it did not forward the header".
+    assert fake_provider.requests, "no upstream call was made, so nothing was proved"
+    for req in fake_provider.requests:
         assert req.api_key is None
 
 

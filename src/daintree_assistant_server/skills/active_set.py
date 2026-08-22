@@ -37,7 +37,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from .catalog import Catalog
-from .selector import SelectionDecision
+from .decision import SelectionDecision
 
 
 @dataclass(frozen=True)

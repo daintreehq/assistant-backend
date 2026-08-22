@@ -245,17 +245,21 @@ def test_nonstream_lint_does_not_discard_other_warnings(client, auth, fake_provi
 
 
 def test_a_request_reports_its_TOTAL_cost(client, auth, fake_provider) -> None:
-    """The headline number: what the whole request charged the caller.
+    """The headline number: what the whole request charged.
 
-    A turn is normally two billed upstream calls — the skill selector and the
-    main completion — and both land on the caller's own key. Reporting only the
-    main call understates their bill by the part they never see.
+    A turn used to be TWO billed upstream calls — the skill selector and the main
+    completion — and reporting only the second understated the bill by the part
+    nobody could see. Selection is in process now, so a turn is one billed call
+    and the total equals it. That makes this test look tautological and it is
+    not: `total` is still a SUM over components, the selector component is still
+    populated and reported when a decision carries usage, and a future second
+    billed call (compaction) reinstates the original hazard. What this pins is
+    that the sum reports the whole of what happened, and that a component which
+    genuinely cost nothing contributes nothing rather than being invented.
     """
     from daintree_assistant_server.providers.base import ProviderUsage
 
-    fake_provider.selection_result = selection_result(
-        [], usage=ProviderUsage(prompt_tokens=800, completion_tokens=15, cost=0.0004)
-    )
+    fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = make_result(
         content="done",
         usage=ProviderUsage(
@@ -269,20 +273,21 @@ def test_a_request_reports_its_TOTAL_cost(client, auth, fake_provider) -> None:
         json=respond_body([{"role": "user", "content": "hi"}], selection={"force": True}),
     ).json()
 
-    assert body["cost"]["total"] == 0.0021 + 0.0004
+    assert body["cost"]["total"] == 0.0021
     assert body["cost"]["main"] == 0.0021
-    assert body["cost"]["selector"] == 0.0004
+    # ABSENT, not 0.0. A zero would be a claim that a billed selector call
+    # happened and was free; nothing was billed at all.
+    assert "selector" not in body["cost"]
+    # And the total is still exact: a free component is not an unknown one.
+    assert body["cost"]["complete"] is True
     # The per-call usage blocks keep their own figures.
     assert body["usage"]["cost"] == 0.0021
     assert body["usage"]["cached_tokens"] == 900
 
 
 def test_the_streamed_total_matches_the_nonstreamed_one(client, auth, fake_provider) -> None:
-    from daintree_assistant_server.providers.base import ProviderUsage
 
-    fake_provider.selection_result = selection_result(
-        [], usage=ProviderUsage(prompt_tokens=800, cost=0.0004)
-    )
+    fake_provider.selection_result = selection_result([])
     fake_provider.stream_chunks = [
         {"choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]},
         {"choices": [{"index": 0, "delta": {"content": "done"}, "finish_reason": None}]},
@@ -298,8 +303,9 @@ def test_the_streamed_total_matches_the_nonstreamed_one(client, auth, fake_provi
         )
     )
 
-    assert done["cost"]["total"] == 0.0021 + 0.0004
-    assert done["cost"]["selector"] == 0.0004
+    assert done["cost"]["total"] == 0.0021
+    assert "selector" not in done["cost"]
+    assert done["cost"]["complete"] is True
 
 
 def test_an_unreported_cost_is_absent_never_zero(client, auth, fake_provider) -> None:

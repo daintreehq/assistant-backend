@@ -67,15 +67,26 @@ class ReplayProvider:
     """Serves the per-turn scripted selector/main responses set by the runner."""
 
     def __init__(self) -> None:
-        self.next_selector: list[str] = []
         self.next_main: ProviderChatResult | None = None
-        self.selector_calls = 0
         self.main_calls = 0
+        # The slots `ScriptedSelector` reads and records into. Selection makes no
+        # provider call any more, so a selector "call" is an entry in this list
+        # rather than a `complete()` that carried `response_format=json_object` —
+        # the discriminator this class used before, which now matches nothing.
+        self.selection_requests: list[Any] = []
+        self.selection_result: ProviderChatResult | None = None
+        self.selection_error: Exception | None = None
 
-    async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:
-        if request.response_format == {"type": "json_object"}:
-            self.selector_calls += 1
-            return selector_result(self.next_selector)
+    @property
+    def selector_calls(self) -> int:
+        return len(self.selection_requests)
+
+    def script_selection(self, skill_ids: list[str]) -> None:
+        self.selection_result = selector_result(skill_ids)
+
+    async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:  # noqa: ARG002
+        # `request` is unread now that every `complete` here is the MAIN call:
+        # it was only ever inspected to tell a selector call apart from one.
         self.main_calls += 1
         assert self.next_main is not None, "no scripted main response set for this turn"
         return self.next_main

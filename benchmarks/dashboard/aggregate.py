@@ -117,43 +117,6 @@ def _skill_selection_local(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]
         )
     return run_local(catalog=catalog, cases=cases)
 
-
-def _skill_selection(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
-    from daintree_assistant_server.skills.catalog import load_catalog
-
-    from ..skill_selection.cases import load_cases
-    from ..skill_selection.coverage import print_coverage
-    from ..skill_selection.runner import BenchConfig, run_bench
-
-    # FREE PREFLIGHT before spending ~438 model calls. `bench coverage` answers
-    # offline whether every skill has a case requiring it and every declared
-    # neighbour has a trap excluding it — and a skill with no cases is invisible
-    # to the live run by construction: it grades the cases that exist, so a skill
-    # nobody wrote a case for is one it cannot report on. Qualifying a release
-    # that way would mean paying to not test the newest skill.
-    catalog = load_catalog()
-    rows = print_coverage(catalog, load_cases(catalog))
-    if not rows or not all(r.gate_ok for r in rows):
-        gaps = [r.skill_id for r in rows if not r.gate_ok]
-        raise RuntimeError(
-            "skill-selection routing coverage has gaps, so a live run cannot "
-            f"qualify the catalog: {', '.join(gaps) or '<no skills>'}. "
-            "Run `python -m benchmarks.skill_selection.bench coverage`."
-        )
-
-    # Three trials minimum — the verdict rejects fewer, because the selector is
-    # stochastic even at temperature 0 and one sample cannot separate a routing
-    # fix from a lucky draw.
-    return asyncio.run(
-        run_bench(
-            BenchConfig(
-                trials=max(ctx.get("live_trials", 3), 3),
-                env_file=ctx.get("env_file"),
-            )
-        )
-    )
-
-
 DETERMINISTIC: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     ("prompt_cost", _prompt_cost_det),
     ("safety", _safety),
@@ -167,26 +130,18 @@ DETERMINISTIC: list[tuple[str, Callable[..., dict[str, Any]]]] = [
 ]
 #: Suites that are REPORTED but do not decide whether a run passed.
 #:
-#: One entry, and it earns the concept. The prompt-based selector is a
-#: comparator: it has not been on the serving path since selection moved local,
-#: and the row that decides routing quality is `skill_selection_local`. Leaving
-#: it in the pass roll-up would mean a regression in a component nobody runs
-#: could block a release — which is the same mistake as gating on it, wearing a
-#: different hat. Its verdict is still computed and still printed; it simply
-#: does not vote.
-INFORMATIONAL = frozenset({"skill_selection"})
+#: EMPTY, and kept as the concept rather than deleted with its one member. That
+#: member was the prompt-based selector comparator — reported but not voting,
+#: because a regression in a component nobody runs must not block a release. The
+#: comparator is gone with the selector it compared, and the distinction it
+#: needed is exactly the one a future paid or flaky suite will need again.
+INFORMATIONAL: frozenset[str] = frozenset()
 
 LIVE: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     ("prompt_cost_live", _prompt_cost_live),
     ("workflow_intel", _workflow_intel),
     ("injection_live", _injection_live),
     ("utility_json", _utility_json),
-    # UPSTREAM COMPARATOR, not the serving path: this drives the prompt-based
-    # selector live (~450 paid calls) to keep a baseline the local one is
-    # compared against. Do not read this row as "the selector's accuracy" — the
-    # classifier that actually serves is the `skill_selection_local` row above,
-    # which is free, deterministic, and where the release gate lives.
-    ("skill_selection", _skill_selection),
 ]
 
 
@@ -249,12 +204,6 @@ def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
             return {"injection_obey_rate": s.get("injection_obey_rate")}
         if name == "utility_json":
             return {"pass_rate": s.get("pass_rate"), "repair_rate": s.get("repair_rate")}
-        if name == "skill_selection":
-            return {
-                "cases": f"{s.get('cases_passed')}/{s.get('cases_total')}",
-                "recall_miss_trials": s.get("recall_miss_trials"),
-                "degraded_trials": s.get("degraded_trials"),
-            }
         if name == "skill_selection_scale":
             return {
                 "size": s.get("size"),

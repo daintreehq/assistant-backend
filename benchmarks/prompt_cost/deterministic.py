@@ -38,7 +38,6 @@ from daintree_assistant_server.config import Settings
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.modes import STANDARD_MODEL
 from daintree_assistant_server.prompts.loader import (
-    TEMPLATE_SELECTOR_SYSTEM,
     PromptLoader,
 )
 from daintree_assistant_server.services.compaction import default_compactor
@@ -50,7 +49,6 @@ from daintree_assistant_server.skills.tool_projection import (
     project_tools,
 )
 from daintree_assistant_server.state.codec import StateCodec
-from daintree_assistant_server.text_utils import estimate_tokens
 
 from .._harness.env import build_provider_body
 from .._harness.fixtures import build_respond_request, load_tool_inventory
@@ -418,27 +416,6 @@ def _layer_budget(
     }
 
 
-def _selector_prompt_cost(loader: PromptLoader) -> dict[str, Any]:
-    catalog = load_catalog()
-    rendered = loader.render(
-        TEMPLATE_SELECTOR_SYSTEM,
-        catalog=catalog.selector_metadata(),
-        active_ids=[],
-        max_active=3,
-    )
-    per_skill = [len(dumps(s.selector_view()).decode("utf-8")) for s in catalog.skills]
-    return {
-        "catalog_skills": len(catalog.skills),
-        "selector_prompt_bytes": len(rendered.encode("utf-8")),
-        "selector_prompt_token_est": estimate_tokens(rendered),
-        "mean_selector_view_bytes_per_skill": round(sum(per_skill) / len(per_skill), 1)
-        if per_skill
-        else 0.0,
-        "note": "token_est is a bytes/4 proxy; live selector prompt_tokens live in "
-        "the selector suite",
-    }
-
-
 def _state_token_size(settings: Settings) -> dict[str, Any]:
     codec = StateCodec(
         current_key=b"benchmark-key-not-a-secret",
@@ -558,6 +535,5 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         "summary": summary,
         "transitions": transitions,
         "layer_budget": _layer_budget(assembler, loader, settings, skills),
-        "selector_prompt_cost": _selector_prompt_cost(loader),
         "state_token_size": _state_token_size(settings),
     }

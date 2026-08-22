@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
-from fakes import FakeProvider
+from fakes import FakeProvider, ScriptedSelector
 from fastapi.testclient import TestClient
 
 from daintree_assistant_server.config import Settings
@@ -23,7 +23,6 @@ from daintree_assistant_server.skills.catalog import (
     default_skills_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.selector import Selector
 from daintree_assistant_server.state.codec import StateCodec
 
 API_KEY = "test-api-key"
@@ -111,11 +110,17 @@ def state_codec(settings: Settings) -> StateCodec:
 @pytest.fixture
 def selector(
     fake_provider: FakeProvider,
-    prompt_loader: PromptLoader,
     catalog_manager: CatalogManager,
     settings: Settings,
-) -> Selector:
-    return Selector(fake_provider, prompt_loader, catalog_manager, settings)
+) -> ScriptedSelector:
+    """The scriptable seam, over the test catalog fixture.
+
+    Distinct from ``scripted_selector`` below only in which catalog it reads:
+    this one takes the test's ``catalog_manager`` fixture, that one builds its
+    own from the packaged skills for the paths that go through
+    ``build_container``.
+    """
+    return ScriptedSelector(fake_provider, catalog_manager, settings)
 
 
 @pytest.fixture
@@ -127,7 +132,7 @@ def assembler(prompt_loader: PromptLoader, settings: Settings) -> PromptAssemble
 def orchestrator(
     settings: Settings,
     catalog_manager: CatalogManager,
-    selector: Selector,
+    selector: ScriptedSelector,
     state_codec: StateCodec,
     assembler: PromptAssembler,
     fake_provider: FakeProvider,
@@ -157,25 +162,30 @@ def task_runner(
     )
 
 
-def scripted_selector(fake_provider: FakeProvider, settings: Settings) -> Selector:
-    """The provider-scripted selector, injected at CONSTRUCTION time.
+def scripted_selector(fake_provider: FakeProvider, settings: Settings) -> ScriptedSelector:
+    """The scripted selection seam, injected at CONSTRUCTION time.
 
-    Production selection is a local two-stage ONNX selector now — it decides for
+    Production selection is a local two-stage ONNX selector — it decides for
     real, which is exactly wrong for orchestration tests that need to SCRIPT the
-    selection ("returns these ids", "fails upstream", "caps at three") to drive
-    a specific orchestrator branch. The prompt-based ``Selector`` class survives
-    as precisely that scriptable test seam: it reads ``FakeProvider``'s
-    ``selection_result``/``selection_error`` and records ``selection_requests``,
-    which is the interface ninety-odd assertions in this suite are written
-    against. Passed INTO build_container/create_app (never swapped in
-    afterwards) so the fixtures skip loading the ONNX graphs entirely — a fresh
-    clone without LFS content runs the suite, and only the explicitly
-    artifact-marked tests skip. The LocalSelector's own contract is tested in
-    tests/unit/test_local_selection.py.
+    selection ("returns these ids", "fails open", "caps at three") to drive a
+    specific orchestrator branch. `ScriptedSelector` (tests/fakes.py) reads
+    ``FakeProvider``'s ``selection_result``/``selection_error`` and records
+    ``selection_requests``, which is the interface ninety-odd assertions in this
+    suite are written against.
+
+    It used to be the prompt-based `Selector` from the shipped package, kept
+    alive there for this fixture alone. That class is gone — an LLM selector is
+    slower and more expensive than the local one on every axis measured, so
+    there was no product left for it to be a seam FOR, and a billed-model-call
+    implementation living in `src/` to serve a test fixture is the wrong trade.
+
+    Passed INTO build_container/create_app (never swapped in afterwards) so the
+    fixtures skip loading the ONNX graphs entirely — a fresh clone without LFS
+    content runs the suite, and only the explicitly artifact-marked tests skip.
+    The LocalSelector's own contract is tested in tests/unit/test_local_selection.py.
     """
-    return Selector(
+    return ScriptedSelector(
         fake_provider,
-        PromptLoader(),
         CatalogManager(load_catalog(default_skills_dir()), primary_dir=default_skills_dir()),
         settings,
     )

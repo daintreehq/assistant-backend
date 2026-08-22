@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from daintree_assistant_server.prompts.loader import TEMPLATE_SELECTOR_SYSTEM, PromptLoader
+from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.skills.catalog import load_catalog
 
 # The permanent base prompt is sent on EVERY request and is the second-largest
@@ -171,15 +171,6 @@ BASE_PARTIAL_CEILINGS = {
 # is also how the base prompt and the selector prompt are measured here.
 RESPONSE_CONTRACT_CEILING = 3456
 
-# The selector system prompt is the catalog rendered as a classification menu, so it
-# grows monotonically with every skill added — and it sits on the turn's FIRST-BYTE
-# path (the selector is hardcoded non-thinking precisely to keep that path fast). Left
-# unguarded, catalog growth silently taxes every turn's latency. This is a runaway
-# guard, not a style target: measured 28,110B over 23 skills (~1.2 KB/skill), so this
-# ceiling leaves room for roughly 30 more skills at today's density and trips only on a
-# rough doubling. Raise it deliberately (and re-measure per-skill cost) if the catalog
-# genuinely grows into it; do not raise it to paper over one bloated frontmatter.
-SELECTOR_PROMPT_CEILING = 64 * 1024
 # Per-skill selector-metadata ceilings. whenToUse is the PRIMARY routing signal and
 # summary is the secondary one; routing quality lives in them, so these are set
 # generously above the current maxima on purpose. A tight ceiling here would do real
@@ -290,24 +281,6 @@ def test_every_subagent_partial_has_a_ceiling() -> None:
     assert on_disk == set(SUBAGENT_PARTIAL_CEILINGS), (
         "sub-agent partials and SUBAGENT_PARTIAL_CEILINGS disagree: "
         f"{sorted(on_disk ^ set(SUBAGENT_PARTIAL_CEILINGS))}"
-    )
-
-
-def test_selector_prompt_under_ceiling() -> None:
-    # Rendered against the REAL catalog, the same way SkillSelector.select renders it,
-    # so the guard tracks what production actually sends.
-    catalog = load_catalog()
-    rendered = PromptLoader().render(
-        TEMPLATE_SELECTOR_SYSTEM,
-        catalog=catalog.selector_metadata(),
-        active_ids=[],
-        max_active=3,
-    )
-    size = len(rendered.encode("utf-8"))
-    assert size <= SELECTOR_PROMPT_CEILING, (
-        f"selector prompt {size}B over {len(catalog.skills)} skills exceeds the "
-        f"{SELECTOR_PROMPT_CEILING}B ceiling — this prompt gates the turn's first byte; "
-        "trim per-skill summary/whenToUse or drop a field from selector_view()"
     )
 
 

@@ -27,7 +27,6 @@ need no key, so they work with ``CEREBRAS_API_KEY=`` blanked.
 from __future__ import annotations
 
 import argparse
-import asyncio
 import sys
 from pathlib import Path
 
@@ -35,43 +34,6 @@ from .._harness.quality import print_verdict
 from .cases import CaseError, load_cases
 from .coverage import print_coverage
 from .reporting import load_doc, print_compare, print_failures, print_summary, save_doc
-from .runner import BenchConfig, BenchError, available_variants, run_bench
-
-
-def _cmd_run(args: argparse.Namespace) -> int:
-    variants = args.variant or ["baseline"]
-    docs = []
-    for variant in variants:
-        config = BenchConfig(
-            variant=variant,
-            trials=args.trials,
-            concurrency=args.concurrency,
-            id_filter=args.filter,
-            env_file=args.env_file,
-            model=args.model,
-        )
-        doc = asyncio.run(run_bench(config))
-        print_summary(doc)
-        print_failures(doc)
-        if not args.no_save:
-            path = save_doc(doc, Path(args.out) if args.out and len(variants) == 1 else None)
-            print(f"\nsaved: {path}")
-        docs.append(doc)
-    if len(docs) == 2:
-        print_compare(docs[0], docs[1])
-    # Every variant must pass, not just the last one. A --variant A --variant B
-    # compare is an experiment, and an experiment whose control regressed is a
-    # result to look at rather than a run to wave through.
-    #
-    # Graded into a list first: `all(...)` over a generator short-circuits, so a
-    # failing first variant would suppress the second's verdict — hiding half the
-    # output of a run that has already been paid for.
-    verdicts = [print_verdict(doc, "skill_selection") for doc in docs]
-    passed = all(verdicts)
-    # Non-zero on a QUALITY failure, not just an exception. Without this a
-    # release step could run the selector corpus, watch cases fail on screen, and
-    # still receive a successful process exit — which is what it did.
-    return 0 if passed else 1
 
 
 def _cmd_local(args: argparse.Namespace) -> int:
@@ -135,8 +97,6 @@ def _cmd_list(args: argparse.Namespace) -> int:
         exp = case.required or ["<empty>"]
         print(f"{case.id:<38} [{case.category}] -> {', '.join(exp)}")
     print(f"\n{len(cases)} cases")
-    variants = available_variants()
-    print(f"prompt variants: baseline (production){', ' if variants else ''}{', '.join(variants)}")
     return 0
 
 
@@ -202,29 +162,6 @@ def main(argv: list[str] | None = None) -> int:
     local.add_argument("--no-save", action="store_true", help="do not write a results file")
     local.set_defaults(func=_cmd_local)
 
-    run = sub.add_parser(
-        "run",
-        help="PAID comparator: the prompt-based selector against the live API. Not the "
-        "serving path — use `local` to qualify a release",
-    )
-    run.add_argument("--variant", action="append",
-                     help="prompt variant (repeatable; default: baseline)")
-    run.add_argument("--trials", type=int, default=3, help="trials per case (default 3)")
-    run.add_argument("--concurrency", type=int, default=6, help="parallel calls (default 6)")
-    run.add_argument("--filter", help="substring filter on case id/category")
-    run.add_argument("--env-file", help="path to a .env with CEREBRAS_API_KEY")
-    run.add_argument(
-        "--model",
-        help=(
-            "score a CANDIDATE model instead of the pinned one (paid). The pinned id "
-            "stays hardcoded in config.py; this only changes what this run sends, and "
-            "the result document records what it actually used. Run the same cases on "
-            "both and `compare` the two files."
-        ),
-    )
-    run.add_argument("--out", help="explicit output JSON path (single variant only)")
-    run.add_argument("--no-save", action="store_true", help="do not write a results file")
-    run.set_defaults(func=_cmd_run)
 
     scale = sub.add_parser(
         "scale",
@@ -270,7 +207,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except (BenchError, CaseError) as exc:
+    except CaseError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

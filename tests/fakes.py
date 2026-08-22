@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Callable
+from types import SimpleNamespace
 from typing import Any
 
 from daintree_assistant_server.providers.base import (
@@ -23,6 +24,7 @@ from daintree_assistant_server.services.compaction import (
     CompactionRequest,
     CompactionResult,
 )
+from daintree_assistant_server.skills.decision import SelectionDecision
 
 
 def make_result(
@@ -399,3 +401,179 @@ class FakeCompactor:
         if self.content is None:
             return None
         return CompactionResult(content=self.content)
+
+
+# ---------------------------------------------------------------------------
+# The scripted selection seam.
+# ---------------------------------------------------------------------------
+#
+# Production selection is the LOCAL two-stage ONNX classifier, which decides for
+# real — exactly wrong for orchestration tests that need to SCRIPT the outcome
+# ("returns these ids", "fails open", "carries this cost") to drive one specific
+# orchestrator branch.
+#
+# That seam used to be the prompt-based `Selector`, kept alive in `src/` purely
+# because the suite was written against it: ninety-odd assertions set
+# `FakeProvider.selection_result` and read `selection_requests`. Keeping a whole
+# billed-model-call implementation in the shipped package to serve a test fixture
+# is the wrong trade, and the class is gone. What survives is this — the same
+# interface, the same FakeProvider slots, and none of it in the product.
+#
+# The JSON parsing below is a deliberate SIMPLIFICATION of what the deleted
+# parser did, and the difference is worth stating: it validates ids against the
+# catalog, dedups, and clamps to the active-set cap, because tests depend on
+# those. It does not reproduce the malformed-output repair round-trip — that
+# behaviour belonged to a model that could return junk, and a test that hands
+# this fake junk is scripting a degraded selection, which it can say directly.
+
+_SELECTOR_FAILED_OPEN = "skill_selector_failed_open"
+
+
+class ScriptedSelector:
+    """A `SkillSelector` whose answer comes from `FakeProvider`, not a model.
+
+    Reads the same `selection_result` / `selection_error` slots the prompt-based
+    selector consumed and appends to the same `selection_requests` list, so the
+    assertions written against that seam keep meaning what they meant.
+    """
+
+    def __init__(self, provider: FakeProvider, catalog_manager: Any, settings: Any) -> None:
+        self.provider = provider
+        self.catalog_manager = catalog_manager
+        self.settings = settings
+
+    @property
+    def catalog(self) -> Any:
+        return self.catalog_manager.catalog
+
+    async def select(
+        self,
+        conversation: list[Any],
+        active_ids: list[str],
+        *,
+        api_key: Any = None,
+        turn_context: str | None = None,
+        available_tools: list[str] | None = None,
+        catalog: Any = None,
+    ) -> SelectionDecision:
+        catalog = catalog if catalog is not None else self.catalog
+        # Recorded so tests can assert a selection RAN and what it saw. The
+        # object is a stand-in for the upstream request the old seam built; only
+        # its presence and count are ever asserted.
+        self.provider.selection_requests.append(
+            SimpleNamespace(
+                conversation=list(conversation),
+                active_ids=list(active_ids),
+                turn_context=turn_context,
+                available_tools=list(available_tools or []),
+                # The catalog the selection actually consulted — a
+                # sub-agent narrows it, and the server-pinned skills are
+                # already filtered out of `selectable_ids`, so tests
+                # asserting what a selection could NAME assert on this.
+                catalog=catalog,
+                catalog_revision=catalog.revision,
+            )
+        )
+
+        if self.provider.selection_error is not None:
+            # Fail OPEN, like production: a selection that cannot be made must
+            # not take the turn down with it.
+            return SelectionDecision.degraded_open([_SELECTOR_FAILED_OPEN])
+
+        result = self.provider.selection_result
+        if result is None:
+            return SelectionDecision.degraded_open([_SELECTOR_FAILED_OPEN])
+        if isinstance(result, list):
+            result = result[0] if result else None
+            if result is None:
+                return SelectionDecision.degraded_open([_SELECTOR_FAILED_OPEN])
+
+        parsed = _parse_scripted_selection(
+            result.text, catalog, self.settings.max_active_skills
+        )
+        if parsed is None:
+            return SelectionDecision.degraded_open(
+                [_SELECTOR_FAILED_OPEN],
+                usage=result.usage,
+                endpoint=result.endpoint,
+                calls=1,
+            )
+        ids, confidence, task_type, reason, docs_query = parsed
+        return SelectionDecision(
+            skill_ids=ids,
+            ran=True,
+            degraded=False,
+            confidence=confidence,
+            task_type=task_type,
+            reason=reason,
+            # The PRODUCTION shape. `LocalSelector` runs in process: it reports
+            # no endpoint of its own beyond the literal "local", and zero calls,
+            # because it makes none. A seam that reported `calls=1` and a
+            # provider endpoint would let orchestration tests assert telemetry
+            # no real turn can produce — which is the whole hazard of a seam
+            # living in test code.
+            #
+            # ALWAYS None, exactly as `LocalSelector` reports. Forwarding the
+            # scripted result's usage meant "a billed call happened", which in
+            # `turn_cost` is what clears `cost.complete` — so a seam that did it
+            # would floor the reported total of every turn in the suite while
+            # production floored none, and no test could see the difference.
+            #
+            # A test that wants to model a selection which COST something is
+            # modelling a thing this product cannot do; it should build a
+            # `SelectionDecision` directly and say so, rather than reaching it
+            # through a seam that pretends otherwise.
+            usage=None,
+            endpoint="local",
+            calls=0,
+            warnings=[],
+            docs_query=docs_query,
+        )
+
+
+def _parse_scripted_selection(
+    raw_json: str, catalog: Any, max_active: int
+) -> tuple[list[str], float, str, str, str | None] | None:
+    """Read a scripted selection out of the JSON a test wrote."""
+    try:
+        data = json.loads(raw_json)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    raw_ids = data.get("skill_ids")
+    if not isinstance(raw_ids, list):
+        return None
+
+    clean: list[str] = []
+    seen: set[str] = set()
+    for item in raw_ids:
+        if len(clean) >= max_active:
+            break
+        if not isinstance(item, str):
+            continue
+        sid = item.strip()
+        if not sid or sid in seen or sid not in catalog.selectable_ids:
+            continue
+        seen.add(sid)
+        clean.append(sid)
+    if raw_ids and not clean and max_active > 0:
+        return None
+
+    try:
+        confidence = float(data.get("confidence", 0.0))
+    except (TypeError, ValueError):
+        confidence = 0.0
+    confidence = min(1.0, max(0.0, confidence))
+    docs_query = data.get("docs_query")
+    if not isinstance(docs_query, str) or not docs_query.strip():
+        docs_query = None
+    else:
+        docs_query = docs_query.strip()[:120]
+    return (
+        clean,
+        confidence,
+        str(data.get("task_type") or "")[:80],
+        str(data.get("reason") or "")[:300],
+        docs_query,
+    )

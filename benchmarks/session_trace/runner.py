@@ -94,7 +94,7 @@ async def _run_trace(orchestrator: Any, provider: R.ReplayProvider,
             pending_call = None
 
         main = turn["main"]
-        provider.next_selector = turn.get("selector_pick", []) or []
+        provider.script_selection(turn.get("selector_pick", []) or [])
         if "tool_calls" in main:
             name = main["tool_calls"][0]
             call_id = f"call_{trace['id']}_{idx}"
@@ -195,16 +195,26 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
     # (`selector_pick`) to drive specific cadence/active-set branches, so the
     # scriptable prompt-based selector is injected at CONSTRUCTION — the same
     # seam tests/conftest.py uses — and the ONNX artifact is never loaded here.
-    from daintree_assistant_server.prompts.loader import PromptLoader
+    import sys
+
     from daintree_assistant_server.skills.catalog import (
         CatalogManager,
         default_skills_dir,
     )
-    from daintree_assistant_server.skills.selector import Selector
 
-    seam = Selector(
+    # The SCRIPTED seam, from the test suite. Selection has to be driven, not
+    # decided, for a trace replay: each trace states which skills the turn should
+    # end up with, and running the real classifier would be measuring the
+    # classifier instead of the orchestration cadence this suite exists to pin.
+    # It lives in `tests/fakes.py` because that is what it is — the prompt-based
+    # selector that used to serve this purpose was a shipped billed-model-call
+    # implementation, and deleting it is what moved the seam here.
+    repo_root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(repo_root / "tests"))
+    from fakes import ScriptedSelector  # noqa: PLC0415
+
+    seam = ScriptedSelector(
         provider,
-        PromptLoader(),
         CatalogManager(load_catalog(default_skills_dir()), primary_dir=default_skills_dir()),
         settings,
     )

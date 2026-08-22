@@ -255,30 +255,37 @@ def test_a_partial_selector_sum_is_not_reported_as_a_complete_total() -> None:
     assert cost.complete is False
 
 
-def test_a_selector_repair_where_both_calls_reported_stays_complete() -> None:
-    """The fix must not make every repaired turn a floor — only the short ones."""
-    from daintree_assistant_server.skills.selector import _sum_usage
+def test_a_repair_where_both_calls_reported_stays_complete() -> None:
+    """The fix must not make every repaired turn a floor — only the short ones.
+
+    Read against the TASK runner's summation. This used to exercise the prompt
+    selector's copy of the same function; that selector is gone (selection is
+    local and makes no billed call, so it has no repair to bill), and the JSON
+    repair retry is now the only place in the server where two completions get
+    summed into one reported figure.
+    """
+    from daintree_assistant_server.services.task_runner import _sum_usage
 
     summed = _sum_usage(ProviderUsage(cost=0.0004), ProviderUsage(cost=0.0005))
     assert summed is not None
     assert summed.cost_complete is True
 
 
-def test_a_selector_repair_that_half_reported_is_marked_partial() -> None:
-    from daintree_assistant_server.skills.selector import _sum_usage
+def test_a_repair_that_half_reported_is_marked_partial() -> None:
+    from daintree_assistant_server.services.task_runner import _sum_usage
 
     summed = _sum_usage(ProviderUsage(cost=0.0004), ProviderUsage())
     assert summed is not None
     assert summed.cost_complete is False
 
 
-def test_a_selector_repair_call_is_billed_into_the_selector_cost() -> None:
-    """A malformed selector response costs TWICE — the attempt and the repair.
+def test_a_repair_call_is_billed_into_the_reported_cost() -> None:
+    """A malformed JSON response costs TWICE — the attempt and the repair.
 
-    The selector has its own `_sum_usage`; it summed tokens but dropped cost, so
-    a repaired selection reported less than the caller paid.
+    The bug this pins is a summation that added tokens and dropped cost, so a
+    repaired call reported less than was actually paid.
     """
-    from daintree_assistant_server.skills.selector import _sum_usage
+    from daintree_assistant_server.services.task_runner import _sum_usage
 
     summed = _sum_usage(ProviderUsage(cost=0.0004), ProviderUsage(cost=0.0005))
     assert summed is not None
@@ -355,3 +362,55 @@ def test_a_wire_zero_is_parsed_as_a_zero_not_as_absent() -> None:
     assert ProviderUsage.from_wire({"cost": 0}).cost == 0.0
 
 
+
+
+def test_a_free_local_selection_does_not_make_the_turn_incomplete() -> None:
+    """The case that used to be an edge and is now EVERY turn.
+
+    `LocalSelector` runs in process and reports `usage=None`. That is not "a
+    selector call whose cost we failed to observe" — the distinction the rule
+    above turns on — it is "no cost was incurred", and a turn whose only unknown
+    is a cost that does not exist must still report a complete total.
+
+    Untested until the prompt-based selector was deleted, because until then a
+    selection that reported nothing genuinely WAS a billed call we had lost
+    track of, and the suite's coverage of `selector_usage=None` was all about
+    the skipped-continuation case. Now every non-degraded turn takes this path,
+    so the assertion is load-bearing on the ordinary route rather than an edge.
+    """
+    cost = turn_cost(ProviderUsage(cost=0.002), _meta(None))
+    assert cost is not None
+    assert cost.complete is True, (
+        "a free in-process selection was treated as an unobserved cost, which floors "
+        "the reported total of every ordinary turn"
+    )
+    assert cost.total == pytest.approx(0.002)
+
+
+def test_a_degraded_local_selection_is_still_a_complete_total() -> None:
+    """Fail-open selection costs nothing either — degrading is not spending.
+
+    `SelectionDecision.degraded_open` is reachable on the local path (a
+    classifier error, or ids the catalog cannot resolve). It carries no usage,
+    so the same rule applies: nothing was billed, and nothing is unknown.
+    """
+    from daintree_assistant_server.skills.decision import SelectionDecision
+
+    decision = SelectionDecision.degraded_open(["local_skill_selector_failed_open"])
+    assert decision.usage is None
+    assert decision.calls == 0
+
+    # Built the way the orchestrator builds it from that decision, so the test
+    # distinguishes "ran locally and degraded" from "skipped selection" — the
+    # two states that both arrive here as `selector_usage=None` and that the
+    # deleted prompt-selector tests kept apart by the cost each one billed.
+    meta = _meta(None)
+    meta.skills.selector.ran = True
+    meta.skills.selector.degraded = True
+    cost = turn_cost(ProviderUsage(cost=0.002), meta)
+    assert cost is not None
+    assert cost.complete is True, (
+        "a degraded LOCAL selection floored the turn's total. Degrading costs "
+        "nothing in process; only an unobserved BILL is a gap."
+    )
+    assert cost.selector is None

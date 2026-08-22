@@ -61,10 +61,10 @@ from ..skills.active_set import (
     resolve_active_skills,
 )
 from ..skills.catalog import Catalog, CatalogManager
+from ..skills.decision import SelectionDecision
 from ..skills.fast_path import can_skip_selection
 from ..skills.load_events import SkillLoadExecution
 from ..skills.local.selector import SkillSelector
-from ..skills.selector import SelectionDecision
 from ..skills.tool_projection import (
     REASON_DISABLED,
     REASON_FILTER_ERROR,
