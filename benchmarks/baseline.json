@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:046cc0eecb32812abb4adac7724602f09609aca15b03c2f02bb611e12cd9a39a",
+    "revision": "sha256:b34f4ef5b13b6af1a480a8e92129d6af9697297fc95acdd25d7b1d5d7f127695",
     "skills": 39
   },
   "identity": {
@@ -10,8 +10,8 @@
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 25485,
-    "skill_body_bytes_total": 294682,
+    "base_prompt_bytes": 25301,
+    "skill_body_bytes_total": 290532,
     "subagent_prompt_bytes": 5375
   },
   "selector": {
