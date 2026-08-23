@@ -17,8 +17,28 @@ present tense.
 
 ## 1. Provider and model
 
-The **only** upstream is **Together AI** (`https://api.together.xyz/v1`,
-OpenAI-compatible wire format). It is a model **host**, not a router: one
+There are **two internal provider ROLES**, and exactly one public product.
+
+| Role | Host | Model | When it is called |
+|---|---|---|---|
+| **executor** | Together AI (`https://api.together.xyz/v1`) | `deepseek-ai/DeepSeek-V4-Flash-0731` | every turn, and every utility task |
+| **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gemma-4-31b` | eligible streaming turns only, and **off by default** |
+
+A caller cannot choose between them and is never told which answered. The public
+model id stays `daintree-assistant`; the backend composes the two calls behind it.
+
+**This is not the return of the `pro` tier.** That was a user-facing product mode
+with a registry, per-mode credentials and a per-turn route on the wire, and it was
+deleted when its pricing could not be made to work. What is here is a stage: an
+internal role with no caller-visible surface, whose entire failure mode is that a
+turn has no preamble.
+
+**Both hosts receive request-derived content on an eligible turn** — the user's
+message, the selected runbook bodies, a bounded slice of recent conversation.
+Cerebras is not a cache or an infrastructure service in this design; it reads
+prompt content, and section 4 applies to it exactly as it applies to Together.
+
+**The executor host is a model host, not a router**: one
 endpoint serves the model, and there is nothing to select between.
 
 That single fact is why this document is much shorter than it used to be. Under
@@ -65,11 +85,12 @@ this repository is calibrated against this exact model. Changing it is §9.
 > "selector latency" and "selector cost" below describe a path that no longer
 > exists on any route.
 
-**The credential is the server's.** `TOGETHER_API_KEY` funds every turn, and
-callers supply none of their own — see [`KEY_HANDLING.md`](KEY_HANDLING.md). This
-inverted with the move off caller-supplied keys and it is the fact most likely
-to be misremembered from older copy. The variable name follows `SERVING_HOST`;
-the ownership does not change with it.
+**Every credential is the server's.** `TOGETHER_API_KEY` funds every turn and
+`CEREBRAS_API_KEY` funds the preamble stage; callers supply none of their own —
+see [`KEY_HANDLING.md`](KEY_HANDLING.md). This inverted with the move off
+caller-supplied keys and it is the fact most likely to be misremembered from
+older copy. Variable names follow the ROLE (`EXECUTOR_*`, `FAST_RESPONSE_*`);
+the ownership does not change with them.
 
 `/v1/daintree/respond` and `/v1/daintree/capabilities` report
 `config.PUBLIC_MODEL_ID` (`daintree-assistant`), never a real model id.
@@ -200,18 +221,20 @@ handles both so that the answer is a log query rather than an outage.
 ## 4. Privacy — UNVERIFIED against the current host
 
 > ⚠️ **READ THIS BEFORE ANY LINE OF THIS SECTION.** Nothing here has been
-> verified against Together's terms, and Together is the only host this service
-> talks to. Every claim below — including the promise stated two paragraphs down
-> — was written when the upstream was Cerebras. **Do not repeat any of it,
-> anywhere, as a statement about the current deployment.** That includes the
-> summary in `README.md`, which currently makes the claim and should not until
-> this is closed.
+> verified against either host's terms for the account tiers actually in use.
+> **Do not repeat any of it, anywhere, as a statement about the current
+> deployment.** That includes the summary in `README.md`.
 >
-> Closing it means reading <https://www.together.ai/privacy> and
-> <https://www.together.ai/terms-of-service>, writing what Together actually
-> commits to, and then DELETING the Cerebras material rather than keeping both —
-> that host is gone (§1) and a second published position beside the real one is
-> just an opportunity to quote the wrong one. Tracked in `TODO.md`.
+> **There are TWO hosts to verify now, not one.** Together receives every turn;
+> Cerebras receives an eligible turn's prompt content when the fast-response
+> stage is enabled (§1). An earlier revision of this warning said Cerebras "is
+> gone" and told a reader to DELETE its policy material — that instruction is
+> withdrawn, and §4a is live rather than historical.
+>
+> Closing this means reading <https://www.together.ai/privacy>,
+> <https://www.together.ai/terms-of-service>, <https://trust.cerebras.ai> and
+> <https://cerebras.ai/privacy-policy>, and writing what each actually commits to
+> for the tier we run on. Tracked in `TODO.md`.
 
 **What the promise WAS, and why its basis moved.** Under OpenRouter the
 no-training floor was something this server *enforced* per request, by sending
@@ -226,10 +249,13 @@ exactly why a host change invalidates this section rather than merely dating it.
 
 ---
 
-### 4a. Historical — Cerebras's published position (NOT APPLICABLE)
+### 4a. Cerebras — the fast-response host
 
-Retained only as the shape a verified section should take. This host no longer
-serves any Daintree request.
+**This host serves Daintree requests again** (the fast-response role, section 1),
+so this section is live rather than historical. What has NOT changed is that the
+position below is published-and-unverified in exactly the way section 4 describes
+for Together: nothing here has been confirmed against the account tier actually in
+use, and this code cannot confirm it. Verify both hosts before external testing.
 
 **Cerebras publishes a stronger position than the copy below claims** — no
 training on inference inputs or outputs, and zero retention of them by default across all tiers <!-- privacy-copy-ok -->,
@@ -530,8 +556,10 @@ figure. Three things clear it:
 - **A stream cancelled before it reported.** A stream cut off mid-flight never
   sends the final chunk that carries usage, so its spend is real but
   unobservable — recovering it would mean a second `/generation?id=` call.
-  (This was common when speculative streaming existed; with one upstream call
-  per round it is now limited to a discarded bare-intent re-roll.)
+  (This was common when speculative streaming existed. It is now limited to a
+  discarded bare-intent re-roll and, on a turn that showed a preamble, a fast
+  call whose usage never arrived — which is exactly why `fast_response` is its
+  own cost component rather than being folded into `main`.)
 - **A component that is itself a partial sum.** `main` and `selector` are each
   one *number* but not always one *call*: a bare-intent re-roll bills the main
   slot twice, and a malformed selection bills the selector slot twice. If only

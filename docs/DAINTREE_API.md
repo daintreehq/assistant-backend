@@ -354,7 +354,13 @@ data: { "protocol_version":3, "request_id":"req_…", "model":"daintree-assistan
         "catalog_revision":"sha256:…", "prompt_version":"…", "warnings":[] }
 
 event: status
-data: { "phase": "thinking" }                    // once, when thinking-mode CoT begins (thinking on only)
+data: { "phase": "fast_response" }               // the preamble stage is running (eligible turns only)
+                                                 // "executor" once it hands over; "thinking" when CoT
+                                                 // begins. IGNORE AN UNKNOWN PHASE — the set grows.
+
+event: preamble                                  // at most once, before any executor output
+data: { "id":"pre_…", "content":"I'll trace the failing build and …",
+        "provisional": true, "commit_on": "done" }
 
 event: delta
 data: { "content": "Hel" }                      // repeated; may carry "reasoning_content" or "tool_calls" fragments
@@ -373,6 +379,35 @@ data: { "error": { "type":"…","code":"…","message":"…","param":"…" },
         "request_id":"req_…",                  // same id as the response header
         "retry_after":"5" }                    // optional raw Retry-After on rate limits
 ```
+
+#### The `preamble` event, and what a client owes it
+
+A short visible preview of the work, written before the main model answers. It
+exists to put honest text on the screen sooner; it is **not** a result, and the
+model that wrote it has inspected nothing.
+
+`meta` is still first, and `done` is still terminal. The rest is a contract:
+
+| Rule | Why it is a rule and not a preference |
+|---|---|
+| Render it immediately, in the assistant bubble | That is the whole point of it |
+| Hold it **provisional** until `done` | A turn can still fail after it; committing early puts a sentence into history for an answer that never arrived |
+| On `done`, commit **one** assistant message: preamble + `"\n\n"` + executor content | Two messages would make the model's next turn see a conversation it did not have |
+| On `error`, commit **nothing** | Same reason, in the case where it actually happens |
+| A preamble does **not** end the replay-safe window | It is server-generated, idempotent intent text. Only a visible executor delta makes a retry unsafe |
+| Ignore it if you do not implement it | It is additive; an unknown event name is safe to skip |
+
+For a tool-call round the committed message carries the preamble content **and**
+the tool calls — the preamble is part of that assistant turn, not a separate one.
+
+The backend appends the exact preamble to the main model's own input, followed by
+a server-owned continuation instruction, so the model knows it said those words
+and knows they were intent rather than evidence. That injected pair is internal:
+it is never shown, and a client must not echo it back.
+
+`/v1/daintree/capabilities` reports `respond.fast_response.enabled` for the
+instance you are talking to. It is **off by default**, so most deployments will
+never send this event.
 
 `request_id` is on the **error** event as well as `meta` because a stream can fail
 *before* `meta` is ever sent — a preparation failure does exactly that — and `meta` is
@@ -407,7 +442,10 @@ Guarantees:
 Long orchestration sessions resend their whole history every round at full input price.
 Most of that history is a stale snapshot of a mutable world, so the server may **propose**
 replacing a settled prefix of the conversation with one block of reconciled **current
-state**. The client owns its history and performs the replacement; the server stores nothing.
+state**. The client owns its history and performs the replacement; the compaction
+subsystem keeps no state of its own. (That is a statement about COMPACTION, not
+about the service: a deployment running full-content trace capture stores the
+turn like any other. See `docs/INTERNAL_BETA.md` §9.)
 
 When compaction is live, the model declares on the first line of its reply whether that
 reply ends the turn. **It is not live in any current deployment**: the rule that asks for
@@ -445,7 +483,10 @@ messages = messages.slice(0, replaces.start_index)
   recognises already-frozen history: compaction is append-only, and a block fed back through
   the compactor loses a little more each time with nothing in the output to say so. The name
   is stripped before the conversation reaches the model, so it costs nothing upstream.
-- Nothing about a block is stored server-side, and none of it rides the state token.
+- The compaction subsystem persists nothing about a block, and none of it rides
+  the state token — the span start is re-derived each turn from the reserved
+  message name the client splices back in. (Again: scoped to compaction. The
+  restricted trace plane, when enabled, captures the turn like any other.)
 
 `/v1/daintree/capabilities` carries a `context_compaction` block: `enabled` is whether THIS
 deployment can actually produce one, and `max_block_content_bytes` bounds `block.content`
@@ -571,9 +612,20 @@ Runbook selection is removed from the main thread:
      topology and the configured cap, none of which a request-shape validator can see.
    Gated by `runbooks.pinned_runbook_ids` in `/v1/daintree/capabilities` — `selection` is
    `extra="forbid"`, so sending the field to a deployment that predates it 422s the turn.
-3. **One upstream call.** Selection is local (an in-process classifier, ~10ms), so both
-   response paths are strictly sequential: select → assemble → one main completion. There
-   is no speculative or private pre-selection stream.
+3. **One upstream call on an ordinary turn; two whenever the fast-response stage
+   RUNS.**
+   Selection is local (an in-process classifier, ~10ms), so both response paths are
+   strictly sequential: select → assemble → one main completion. There is no
+   speculative or private pre-selection stream. When the stage is enabled and the
+   turn is eligible, a second internal call runs FIRST. Note that it runs — and is
+   billed — whether or not you ever see a `preamble`: in `shadow` mode it is
+   generated and withheld, and a reply the validator refuses is discarded. The two
+   calls are sequential, not concurrent: the main call cannot open until the
+   preamble exists, because its exact text is part of that call's input.
+
+   "Same connection" refers to the SSE response you are reading — one request in,
+   one stream out, with both internal calls behind it. Upstream, the two hosts use
+   separate HTTP clients and separate connection pools on purpose.
 4. **Injection.** Only the active runbook *bodies* are injected into the main prompt — never
    the full catalog — and they reach the model as **plain context** (the "Loaded runbooks"
    user-role block), not a tool call. The model is **not** shown a synthetic `runbook__load`

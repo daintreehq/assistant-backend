@@ -34,7 +34,7 @@ is not a description of today's build, so every line carries a status:
 
 | | Requirement | Status |
 |---|---|---|
-| 1 | ~~**OpenRouter is the sole provider.**~~ *(superseded — the serving host is `config.SERVING_HOST`)* | — |
+| 1 | ~~**OpenRouter is the sole provider.**~~ *(superseded twice — the executor is Together (`config.EXECUTOR_MODEL`), and an eligible turn ALSO reaches Cerebras for the preamble (`config.FAST_RESPONSE_MODEL`). Both receive prompt content; see `docs/PROVIDER_POLICY.md` §1.)* | — |
 | 2 | ~~**The tester supplies an OpenRouter key**, and it is theirs.~~ *(superseded — no caller key exists)* | — |
 | 3 | ~~**That key is the HTTP bearer** and funds every upstream call the turn makes.~~ *(superseded — the server's key funds every call)* | — |
 | 4 | **The serving backend holds no shared model credential** — not as a fallback, not as a default, not for "just the selector". | ✅ `main._build_provider(api_key=None)` |
@@ -58,7 +58,8 @@ Not blockers. Do not delay the beta for any of them:
 - tenant databases, team administration, admin console
 - model switching or provider switching in the client
 - user-created server-side runbooks
-- long-term server-side conversation storage
+- long-term server-side conversation storage for ORDINARY sessions (a restricted
+  training-trace store exists and is off by default — see section 9)
 - a public third-party developer API
 
 These belong *after* the OpenRouter-key-only beta has proved the assistant
@@ -109,18 +110,27 @@ Onboarding must state all of this, plainly, before the tester hands over a key:
   most important thing on this page to get right: onboarding copy written for the
   old model tells a tester they are paying for their own usage.)
 - **What is promised about their data, and what is not.** Requests go to Together
-  AI. Nobody has yet checked Together's published terms for the account tier we
-  actually run on, so make no data-handling promise at all — not retention, not
-  training, not deletion — until
+  AI, and — on an eligible turn where the fast-response stage is enabled — the
+  same turn's prompt content ALSO goes to Cerebras. Cerebras is not a cache or an
+  infrastructure service in this design; it reads the user's message and the
+  selected runbook bodies. Nobody has checked either host's published terms for
+  the account tiers we actually run on, so make no data-handling promise at all
+  — not retention, not training, not deletion — until
   [`PROVIDER_POLICY.md` §4](PROVIDER_POLICY.md#4-privacy--what-is-and-is-not-promised)
   stops declaring itself unverified. An unchecked assurance is worse than
   silence: silence a tester can weigh, and a promise they cannot. Never say
   "does not store". <!-- privacy-copy-ok -->
-- **A second outbound flow.** On a documentation question the server sends a
+- **A third outbound flow.** On a documentation question the server sends a
   cleaned version of the tester's question to Daintree's own public docs MCP
   (`daintree.org`). It is first-party and the query is not logged, but it is a
-  separate destination from Together and belongs in any honest data-flow
-  statement.
+  separate destination and belongs in any honest data-flow statement.
+- **Whether their session is being traced.** If the deployment they are on has
+  full-content trace capture enabled, exact content from their turns — messages,
+  tool arguments, terminal output, the assistant's reply — is written to a
+  restricted store for later model development. Tell them BEFORE the session, and
+  tell them what is captured, where it lives, how long it is kept, who can read
+  it, and that it is training-eligible. Full-content capture is off by default and refused outright in production
+  and staging, so on most deployments the honest answer is "no".
 - That the CLI stores **no key at all** — the sign-in flow and the credential
   file it wrote were removed, so there is nothing on disk to protect, rotate or
   delete. `DAINTREE_API_KEY` is the only way to set one, it is normally unset, and
@@ -214,8 +224,28 @@ State these to testers up front rather than letting them discover them:
 
 Every response carries `X-Request-Id`, and `/version` reports the build SHA. A
 useful report is: what you asked, what happened, the request ID, and the build
-SHA. Prompt and tool content is not logged server-side, so without the request ID
-there is very little to correlate against.
+SHA. Prompt and tool content is not written to the operational logs, so without
+the request ID there is very little to correlate against.
+
+**Say "operational logs", not "logging".** There are now two storage planes and
+the distinction is the whole of the honest answer:
+
+* **Operational logs** (structlog / Cloud Logging) carry metadata only — ids,
+  timings, byte counts, digests, usage, failure codes. No message text, no tool
+  arguments, no runbook bodies, no terminal output. That has not changed and is
+  gated by a test that drives a real turn and fails on a leak.
+* **The training-trace store** is a separate, restricted plane that CAN hold exact
+  content — the request, the runbook bodies, both model calls, the final assistant
+  message. It is **off by default**, refused outright in production and staging,
+  and turned on only for controlled internal sessions.
+
+**Telling the tester is an OPERATIONAL requirement, not something the code
+enforces.** Trace capture is deployment configuration: there is no per-session
+consent, no per-account flag, and nothing in a response that says "this turn was
+recorded". So "you would have been told" is a promise a person keeps, not one the
+server keeps — which is exactly why it is written down here as a duty rather than
+implied as a guarantee. (`TODO.md` carries the account-level eligibility gate that
+would make it machine-checkable.)
 
 Two details about that id:
 

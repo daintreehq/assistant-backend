@@ -710,7 +710,7 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 # Flash via OpenRouter because the serving model was Gemma and
                 # compaction wanted something cheaper per input token. The
                 # serving model IS DeepSeek V4 Flash now — same weights, better
-                # host (see config.SERVING_HOST) — so the override would only
+                # host (see config.EXECUTOR_ORIGIN) — so the override would only
                 # buy a slower endpoint and a second credential.
                 repair_hint="Return a single JSON object with exactly these keys: "
                 "original_ask, agents, terminals, decisions, blockers, next_actions, "

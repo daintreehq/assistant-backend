@@ -194,6 +194,44 @@ steps:
           exit 1
         fi
 
+        # cerebras-api-key is OPTIONAL, and mounted only when it exists.
+        #
+        # The opposite of together-api-key, deliberately: the fast-response stage
+        # is `off` by default, so a deployment without this secret is COMPLETE
+        # rather than degraded — it simply never opens a preamble. Mounting it
+        # unconditionally would make every deploy fail on a secret most
+        # deployments have no use for.
+        #
+        # Readiness is the other half of this: turning FAST_RESPONSE_MODE on
+        # WITHOUT the key fails /readyz (`Settings.fast_response_problems`), so
+        # the dangerous combination cannot take traffic.
+        # Tested on an ENABLED VERSION, not on the secret resource. `bootstrap.sh`
+        # deliberately creates this secret as an empty shell so that enabling the
+        # stage later is "add a version" rather than "re-run bootstrap" — so a
+        # resource-exists check would mount `:latest` on a secret that has no
+        # `latest`, and every deploy on a bootstrapped project would fail at the
+        # Cloud Run step. The shell existing means the feature is PREPARED; a
+        # version existing means it is CONFIGURED, and only the second is mountable.
+        CEREBRAS_STATUS=0
+        CEREBRAS_VERSION="$$(gcloud secrets versions list cerebras-api-key \
+          --project="$PROJECT_ID" --filter='state=ENABLED' \
+          --format='value(name)' --limit=1 2>/workspace/cerebras_err)" || CEREBRAS_STATUS=$$?
+        if [ "$$CEREBRAS_STATUS" -eq 0 ] && [ -n "$$CEREBRAS_VERSION" ]; then
+          SECRET_FLAGS="$$SECRET_FLAGS,CEREBRAS_API_KEY=cerebras-api-key:latest"
+          echo "Mounting cerebras-api-key (fast-response stage available)."
+        elif [ "$$CEREBRAS_STATUS" -eq 0 ]; then
+          echo "cerebras-api-key exists but has no enabled version —"
+          echo "  the fast-response stage stays unavailable. Add one to enable it."
+        elif grep -qi 'not found\|NOT_FOUND' /workspace/cerebras_err 2>/dev/null; then
+          echo "No cerebras-api-key — the fast-response stage stays unavailable."
+        else
+          # Same fail-closed posture as the signing key above: a permission error
+          # must not be read as "the secret is absent".
+          echo "ERROR: could not determine whether cerebras-api-key exists:"
+          cat /workspace/cerebras_err >&2
+          exit 1
+        fi
+
         # --set-* rather than --update-*: the deployed configuration is exactly
         # what this file says. A flag removed here is removed from the service
         # on the next release instead of lingering invisibly from an old one.

@@ -16,13 +16,17 @@ The public API is **Daintree-native** (`POST /v1/daintree/respond`), not OpenAI-
 
 The upstream is **Together AI** (OpenAI wire shape, spoken *internally* behind the `ChatProvider` abstraction in `providers/`): **one model, `deepseek-ai/DeepSeek-V4-Flash-0731`** (`config.EXECUTOR_MODEL`), for the main completion and every utility task. The public response says `daintree-assistant`.
 
-**A two-mode split briefly lived here** — a `pro` tier on Cerebras/`gemma-4-31b`, with a `modes.py` registry, per-mode credentials and per-turn route threading. It is gone: Cerebras's pricing structure could not be made to work for this product, so there was no second route to choose between, and a registry over one entry is a lie about the shape of the thing. Git history has the whole of it, and a genuine second tier lands there again rather than as a flag in `config.py`. Do not reintroduce mode plumbing speculatively.
+**There are TWO internal provider ROLES, and they are not a product tier.** `config.EXECUTOR_MODEL` on Together answers every turn; `config.FAST_RESPONSE_MODEL` (`gemma-4-31b`) on Cerebras writes a short visible preamble first, on eligible streaming turns, and is **off by default** (`FAST_RESPONSE_MODE=off`). A caller cannot choose between them, is never told which answered, and still targets one public model. **Both hosts receive prompt content on an eligible turn** — Cerebras is not a cache or an infrastructure service here, and `docs/PROVIDER_POLICY.md` section 1 says so.
+
+**A two-mode split also briefly lived here, and it is still gone** — a `pro` tier on Cerebras/`gemma-4-31b`, with a `modes.py` registry, per-mode credentials and per-turn route threading. Cerebras's pricing could not be made to work as a TIER: a second full-length answer per turn is a different cost shape from a 160-token preamble, which is why one came back and the other did not. Git history has the whole of it. The distinction that matters: a role is internal composition, a mode is a caller-visible choice. Do not reintroduce mode plumbing, a registry, or a `routing` field on the wire.
 
 **The host is the latency decision, not the model:** these are the weights `context_compact` reached through OpenRouter for months, and the same 62 utility-task payloads measured p50 1100ms on Together against 3414ms through OpenRouter's default routing. **Runbook selection is LOCAL** (an in-process ONNX classifier, `runbooks/local/`) and makes no upstream call.
 
 **Together is a model HOST rather than a router**, and almost everything that used to live in this paragraph followed from the opposite. One endpoint serves the model, so there is no endpoint-selection policy, no privacy filter to send, no fallback pool, no output-quality denylist, no sticky-affinity cohort, and no caller-facing `routing` preference — all of it was deleted rather than neutered, along with the `upstream_no_compliant_provider` taxonomy branch (`providers/policy.py` is gone; git history has it). Prefix caching is automatic, org-scoped and matched on the literal prompt prefix, so there is **no cache-affinity field on the wire either**: `cache_session_id` is still computed (it names which calls share a growing prefix, which nothing can recover after the fact) and `_build_body` drops it, under both vendors' spellings. `tests/unit/test_provider_openrouter.py::test_no_routing_or_affinity_field_is_ever_sent` asserts that, and literal prefix stability is therefore the only lever there is.
 
-The Together adapter is the OpenRouter one with three class attributes moved (`providers/together.py`) — same body, same SSE, and the unified `reasoning: {"enabled": false}` object is honoured, measured. **There is no live contract suite for it** (`tests/live/` is empty): the one that existed pinned the CEREBRAS wire and went with that adapter. What Together accepts, what it 400s, and whether it reports `cost` are therefore unpinned against the real API — `TODO.md` carries it.
+The Together adapter is the OpenRouter one with three class attributes moved (`providers/together.py`) — same body, same SSE, and the unified `reasoning: {"enabled": false}` object is honoured, measured. The Cerebras one (`providers/cerebras.py`) overrides `_build_body` instead, because its wire genuinely differs: `max_completion_tokens` rather than `max_tokens`, **no `reasoning` object at all** (the model does not reason, so omission IS the posture — the inverse of the parent, where an omitted field means "think"), and `prompt_cache_key` only where an account has it.
+
+**Neither adapter has a live contract suite** — `tests/live/` does not exist. What each host accepts, what it 400s, and whether it reports `cost` are unpinned against the real API; what IS pinned offline is the body each one builds (`tests/unit/test_provider_cerebras.py`). `TODO.md` carries both gaps.
 
 All model ids hardcoded. The full wire contract is `docs/DAINTREE_API.md`; code comments cite it as "section X.Y" — read it when changing wire shapes or task behavior.
 
@@ -163,7 +167,7 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    cost benchmark); the manifest is diagnostics, never payload, and never reaches a
    client.
 
-6. **Respond** — the runbooks/selection metadata is delivered first: as the response body's `runbooks` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential now — select → assemble → **one** upstream call; the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
+6. **Respond** — the runbooks/selection metadata is delivered first: as the response body's `runbooks` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential — select → assemble → upstream call (TWO calls when the fast-response stage runs: the preamble first, then the executor, never concurrently, because the executor's input contains the preamble); the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
 
 6b. **Turn-finality declaration and compaction** (`services/response_declaration.py`,
    `services/compaction.py`) — when compaction is live the model opens its reply with
@@ -262,7 +266,7 @@ Runbooks are Markdown procedures that become task-specific operating instruction
 **To add a runbook:**
 1. Create `runbooks/files/<id>.md` (it is auto-discovered, sorted by id — no registration).
 2. Run `pytest tests/unit` (~5s, no API calls). A new runbook trips more than the loader/catalog tests: `test_prompt_budgets.py` (body size ceilings, no pipe tables, a Report-back line), `test_runbook_catalog_hygiene.py` (every `requiredTools` name exists in the CLI tool-registry snapshot at `tests/fixtures/cli_tool_names.txt` — its header has the regeneration recipe against the pinned `cli/` submodule), and `test_prompt_budgets.py`'s house-style sweep over the packaged catalog. Do **not** try to narrow this with `pytest -k`: the obvious concern-named filter (`-k "catalog or budget or house"`) matches no loader test name or module and silently deselects all 14 of them. Run the directory, or list the files without a filter.
-3. **Run the golden tests** (`pytest tests/golden/`). The prompt snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/runbooks/`), not the live one, so adding or changing a real runbook no longer churns `selector_system.md` / `loaded_runbooks_*` — only editing a prompt template or the assembler does. A structural smoke test (`test_selector_prompt_renders_real_catalog`) still verifies the real catalog renders through the selector prompt.
+3. **Run the golden tests** (`pytest tests/golden/`). The prompt snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/runbooks/`), not the live one, so adding or changing a real runbook no longer churns `selector_system.md` / `loaded_runbooks_*` — only editing a prompt template or the assembler does. (An older revision of this file named a `test_selector_prompt_renders_real_catalog` smoke test here; it does not exist and has not for some time — the prompt-based selector it covered was deleted. The real-catalog checks that DO run live in `tests/unit/test_runbook_catalog_hygiene.py` and `tests/unit/test_prompt_budgets.py`.)
 4. **Check routing coverage** (`python -m benchmarks.runbook_selection.bench coverage`) — a per-runbook case-coverage matrix, offline and free (no API calls). It exits non-zero when a runbook has no benchmark case that requires it, so a new runbook does not land unrouted and untested. **Write carve-outs by fully-qualified ID** — "do not use for X, use `daintree.other.runbook`" — never as a bare leaf (`use competition`) or as prose (`use the competition runbook`). Coverage parses declared neighbours out of the `whenToUse` text, so an unqualified carve-out reads to it as a runbook claiming no confusion at all; `tests/unit/test_runbook_catalog_hygiene.py` holds the count at zero and also fails a dotted reference that resolves to no runbook, namespace or tool. `bench lint` ranks every runbook pair by how alike the retriever finds them and flags the ones with no id-level edge — which is how the 27 unqualified carve-outs were found: they were the catalog's most confusable pairs, invisible to its own tooling. Rewriting them left every one of the 177 benchmark cases returning a byte-identical answer. Note coverage gates per RUNBOOK, not per edge: naming a second neighbour makes the claim readable, not tested.
 
 ## Prompts / system messages
@@ -517,6 +521,92 @@ few runbooks survive `executable_with`, so most of their turns are runbook-less 
 exactly the shape where a core tuned for the ASSISTANT base prompt is the wrong
 core.
 
+## The fast-response stage (`FAST_RESPONSE_MODE`, default `off`)
+
+An eligible streaming turn can open with a short visible **preamble** — one or two
+sentences describing the work about to happen — written by `gemma-4-31b` on Cerebras
+while the executor request is still being assembled. `services/fast_response.py` owns
+it; `providers/cerebras.py` is the adapter.
+
+**Six things about it are load-bearing.**
+
+**It is an optimisation and it fails open.** A timeout, a provider error, output the
+validator refuses, runbooks that do not fit its budget — each resolves to a
+deterministic fallback (a generic preview that names no file, command or cause) or to
+no preamble at all. `generate()` does not raise, and there is **no retry**: one that
+succeeds at five seconds has already lost the argument the stage exists to win and has
+delayed the executor behind it.
+
+**The preamble is appended to the EXECUTOR's own input**, as an assistant row, followed
+by a server-owned continuation instruction (`prompts/fast_response/continuation.md`).
+That pair goes **after the volatile tail and nowhere else** — the system region and the
+~21.5k tokens of tool schemas stay byte-identical with and without it, which
+`benchmarks/prompt_cost`'s `fast_response_handoff` transition measures at 1.0 rather
+than assuming. The continuation row is not decoration: without it the executor reads the
+assistant turn above as evidence the work already happened. And this is why the design
+does NOT rely on an assistant-last request — DeepSeek's prefix completion is a separate
+beta behaviour behind its own flag and endpoint, and Together's compatibility surface
+establishes no such contract.
+
+**The visible bytes and the injected bytes are the same bytes.** If they diverge, the
+client's committed history and the model's view of its own last turn disagree, and every
+later round reasons about a conversation that did not happen. The one path that can break
+this is the context-budget fallback, which drops the handoff when the request only fails
+to fit with it on — so it drops the CONTENT too, because preparation runs before any byte
+is streamed.
+
+**Validation is strict because the output is authority-bearing.** These bytes become the
+executor's own prior assistant turn, so a claim that work already happened tells the
+MODEL the job is partly done, and an instruction ("ignore the next message…") carries an
+assistant's authority into a context that already contains user-controlled text.
+`validate_preamble` refuses completed-work claims in four grammatical shapes, text
+addressed to the model, structure, internal disclosure, control markers, and any finish
+reason that is not cleanly `stop`.
+
+**It never runs on a continuation round** (gated on `session.round`, not on whether the
+selector ran — selection reruns for reasons that are not a new instruction), on a
+sub-agent, on a background wake, on a non-streaming request, or with no runbook loaded.
+A bare-intent re-roll reuses the SAME preamble and handoff and adds only the existing
+nudge; it does not call Cerebras again.
+
+**`shadow` is a real mode, not a half-off one.** It generates, validates, bills and
+TRACES a preamble and shows nothing — which is the point: it produces evidence against
+real turns before any user sees one. Rollback at any stage is `FAST_RESPONSE_MODE=off`
+plus a config-only revision.
+
+## Training traces (`TRACE_CAPTURE_MODE`, default `off`)
+
+`tracing/` is a **second storage plane** and is emphatically not a log level.
+`observability.py` is metadata-only and stays that way; this one can hold exact content —
+the request, the runbook bodies, both model calls, the final assistant message — for
+replay and model training. Merging them would put user content in front of everyone who
+can read a log line.
+
+- **Off by default, and FULL-CONTENT capture is refused outright in
+  production/staging.** (`metadata` mode — the trace skeleton with no content —
+  is permitted anywhere, and is what a production deployment would run if it ran
+  anything.) There is no account
+  model yet, so there is nobody who could have consented; `Settings.trace_problems()`
+  fails readiness rather than capturing.
+- **Identity never reaches storage.** Session and turn ids are HMACed under a dedicated
+  `TRACE_IDENTITY_KEY` (never the state-signing key), and `tracing/scrub.py` strips the
+  raw ids and the signed state token from the captured request at the CAPTURE boundary.
+  A pseudonymous header is worthless if the blob beside it has the same ids in the clear.
+- **A trace failure cannot fail or alter a turn**, and its delay is BOUNDED rather
+  than zero. Every sink call is guarded and uploads run concurrently with
+  generation, but `start_trace` awaits the header write and termination awaits the
+  event/manifest/marker writes — so a slow store adds latency even though it can
+  never add an error. The terminal drain is capped by
+  `TRACE_FINAL_FLUSH_GRACE_SECONDS`; the opening write is not, and that is the one
+  place storage latency reaches preparation.
+- **The completion marker is the contract.** It is written LAST, and its presence means
+  every object the manifest names is stored. A trace without one is a prefix, and
+  `training/export_context_traces.py` refuses it — along with a failed hash, a missing
+  essential event, an outcome that is not `completed`, an orphaned tool result, or a
+  trace the header does not mark training-eligible.
+- **Redaction runs on the way OUT**, never in place: the raw trace is the record, and a
+  redactor that rewrote it would be destroying evidence.
+
 ## Deploying (Cloud Run)
 
 Nothing is ever built or pushed from a dev machine. **Pushing to `main` is the deploy** —
@@ -536,7 +626,7 @@ Run reserves `/healthz` — probe `/health` or `/readyz` externally.
 
 ## Golden tests
 
-`tests/golden/` snapshots rendered prompts and the fully-assembled upstream message array into `tests/golden/snapshots/`. Any intentional change to a **prompt template or the assembler** will fail these until you regenerate with `DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/` — treat the resulting snapshot diff as the human-reviewable record of what the model will actually see. The catalog-dependent snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/runbooks/`), deliberately decoupled from the live catalog so ordinary runbook edits never redden the suite; `test_selector_prompt_renders_real_catalog` keeps a structural check over the real catalog.
+`tests/golden/` snapshots rendered prompts and the fully-assembled upstream message array into `tests/golden/snapshots/`. Any intentional change to a **prompt template or the assembler** will fail these until you regenerate with `DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/` — treat the resulting snapshot diff as the human-reviewable record of what the model will actually see. The catalog-dependent snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/runbooks/`), deliberately decoupled from the live catalog so ordinary runbook edits never redden the suite. There is no `test_selector_prompt_renders_real_catalog` — it is named in older revisions of this file and does not exist; the real-catalog checks live in `tests/unit/test_runbook_catalog_hygiene.py`.
 
 ## Utility tasks (`POST /v1/daintree/tasks`)
 

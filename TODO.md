@@ -615,6 +615,99 @@ deliberately oversized live request settles what that host actually says.
 
 ---
 
+## Land the CLI half of protocol 3, the runbook rename, and the preamble
+
+**Trigger: before this branch can ship at all. Nothing here is optional — the
+backend on this branch cannot serve the CLI as it is pinned today.**
+
+The backend moved and the Go CLI has not. Concretely, the CLI must:
+
+- **speak protocol 3.** `PROTOCOL_VERSION` is 3 and `PROTOCOL_MIN` is 3, so a
+  protocol-2 client is refused with `426 unsupported_daintree_protocol`. This is
+  the one that makes the branch unshippable rather than merely incomplete.
+- **read `runbooks`, not `skills`** — the response block, `selection.pinned_runbook_ids`,
+  the `/v1/daintree/runbooks*` routes, and the `*_runbook_*` warning codes.
+- **rename its own run-tracking tools** to `runbook.step.advance` and
+  `runbook.run.get`. NOTE: `tests/fixtures/cli_tool_names.txt` and
+  `benchmarks/_harness/fixtures/cli_tool_inventory.json` ALREADY carry the new
+  spellings — they run ahead of the pinned submodule, which
+  `test_the_gate_above_retires_itself_when_the_cli_renames` documents and enforces.
+  That test FAILS the moment the Go side renames; that failure is the cue to
+  re-capture both fixtures and delete the pair of tests along with the header note.
+- **decode the `preamble` event** (it currently maps unknown event names to
+  `sseEventUnknown` and drops them, which is why shipping the backend half first is
+  safe): render it in the active assistant bubble, hold it PROVISIONAL, commit one
+  assistant message on `done` joining it to the executor content with `"\n\n"`,
+  commit NOTHING on `error`, keep the turn replay-safe until the first executor
+  delta, and never display the synthetic continuation row.
+
+Then move the submodule pin and re-capture both tool fixtures together.
+
+
+## Measure what the preamble actually costs and buys
+
+**Trigger: before `FAST_RESPONSE_MODE=visible` goes past a 1% cohort.**
+
+The stage is built, gated and off. What it does to real turns is unmeasured, and
+every number below needs paid calls, which is why none of it is in the offline
+dashboard (`CLAUDE.md`: "anything needing a paid call" is deliberately not gated
+there).
+
+Owed, in the order the risk runs:
+
+1. **Latency.** `p50/p90/p99 first visible preamble`, against the same turns'
+   time-to-first-executor-output. Report BOTH — the trade is a large improvement in
+   time-to-visible-text for a small regression in time-to-executor-output, and
+   quoting the first alone would misrepresent it. Proposed SLO: p50 <= 0.8s,
+   p90 <= 1.5s, p99 <= 3.0s.
+2. **Executor non-inferiority.** The same corpus with and without the handoff:
+   task success, tool-selection correctness, tool-call count, bare-intent re-roll
+   rate, invalid tool calls. The handoff must not degrade the executor to improve
+   perceived latency.
+3. **Repetition.** Normalised 5-gram overlap between the preamble and the first
+   200 executor words. Do NOT strip executor text post hoc because it resembles the
+   preamble — that removes substantive content. Fix the prompt or the model.
+4. **Overclaim rate on real traffic.** `validate_preamble` is measured against
+   hand-written phrasings today. Shadow mode exists to produce the real corpus.
+
+`shadow` is the mode that produces all four without showing anyone anything.
+
+
+## Capture the exact provider wire body in traces
+
+**Trigger: the next time a trace is used to replay a turn, or before the first
+training export is taken seriously.**
+
+`ModelInvocationTrace.wire_request_ref` is defined and always `None`.
+`request_ref` holds the NORMALIZED `ProviderChatRequest`, which is not what the
+provider saw: the adapter renames `max_tokens`, Together adds its `reasoning`
+object, Cerebras uses `max_completion_tokens`, and `cache_session_id` is dropped.
+A replay built from the normalized form is confidently wrong about the request.
+
+The fix is the observer hook the design already anticipates
+(`ProviderRequestObserver` in section 7.16 of the spec) — an optional callback on
+the provider boundary, NOT the orchestrator reaching into a private `_build_body`.
+It is left `None` rather than filled with the normalized bytes on purpose: a field
+that claims to be the wire body and is not would be worse than a visible gap.
+
+
+## Verify the GCS trace sink against a real bucket
+
+**Trigger: before `TRACE_SINK=gcs` is used for anything whose loss would matter.**
+
+`tracing/sinks/gcs.py` has never run against Cloud Storage. What IS pinned offline
+is the half that is ours — object paths, content types, the auth header, the
+token-refresh path, and that the completion marker is written LAST
+(`tests/unit/test_tracing_gcs.py`). What the API accepts, its error shapes, and
+whether the metadata-server token behaves as assumed are unpinned.
+
+Also owed on that first deployment, and not enforceable from code: a write-only
+IAM posture for the runtime identity (`storage.objects.create`, no list, no read,
+no delete), a separate offline identity for the export path, bucket lifecycle
+rules for `TRACE_RAW_RETENTION_DAYS`, and a bucket that is not shared with any
+public artifact.
+
+
 ## Write the live provider-contract suite that no longer exists
 
 **Trigger: before relying on any wire fact in `docs/PROVIDER_POLICY.md`, and

@@ -46,7 +46,7 @@ _ALLOWED_LINES: dict[str, tuple[str, ...]] = {
     "tests/unit/test_policy_contradictions.py": ("skill",),
     # Deferred-work entries that quote the retired vocabulary to describe the
     # rename itself, plus the Go path the CLI still uses.
-    "TODO.md": ("skill.go", "skill/skill.go", "skill__", "skill.", "skill\" ->", "skill ->", ".claude/skills"),
+    "TODO.md": ("skill.go", "skill/skill.go", "skill__", "skill.", "skill\" ->", "skill ->", ".claude/skills", "not `skills`"),
     "benchmarks/_harness/fixtures/README.md": ("skill",),
     # The self-retiring CLI-divergence gate must NAME the pre-rename tool ids;
     # that is how it detects the Go side catching up.

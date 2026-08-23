@@ -5,7 +5,7 @@ and everywhere it must never appear.
 
 ---
 
-## 1. There is one key, and the SERVER owns it
+## 1. Every key is the SERVER's, and callers hold none
 
 **This inverted when callers stopped supplying keys**, and it inverted in the direction
 that costs money if a reader remembers the old rule. It used to be that a
@@ -13,8 +13,24 @@ Daintree credential *was* the caller's own OpenRouter key, playing two roles at
 once: authenticating the request, and funding that turn's model calls. The caller
 paid.
 
-Now there is exactly one credential — `TOGETHER_API_KEY`, named by
-`config.EXECUTOR_KEY_ENV` — it belongs to the server, and **Daintree pays**. Consequences that follow directly, and that the
+Now every credential belongs to the SERVER and **Daintree pays**. Three of them
+concern providers and tracing, and the distinction between them is which failure
+they cause (the state-signing keys in §6 are a separate matter — they sign, they
+never spend):
+
+| Env var | Role | Missing means |
+|---|---|---|
+| `TOGETHER_API_KEY` (`config.EXECUTOR_KEY_ENV`) | funds every turn | `/readyz` fails — nothing can be answered |
+| `CEREBRAS_API_KEY` (`config.FAST_RESPONSE_KEY_ENV`) | funds the preamble stage | nothing, while `FAST_RESPONSE_MODE=off`; `/readyz` fails if the mode is on |
+| `TRACE_IDENTITY_KEY` | pseudonymises trace identity — spends nothing | nothing, while trace capture is off; `/readyz` fails if it is on |
+
+`TRACE_IDENTITY_KEY` is deliberately NOT the state-signing key and not the state
+salt. Sharing would make a compromise of either a compromise of both, and rotating
+one would silently re-pseudonymise every stored trace — splitting one subject into
+two identities in the middle of a corpus.
+
+Everything in sections 2-4 below applies to all three: none is ever logged,
+echoed, stored in a trace, or returned in an error body. Consequences that follow directly, and that the
 code enforces:
 
 - **The serving backend holds the model credential.** `main._build_provider`
@@ -57,12 +73,19 @@ code enforces:
 
 ## 2. Server-side handling
 
+> **The first three rows below are RETIRED and kept as history.** `auth.py` does
+> not read the `Authorization` header at all — not parsed, not validated, not
+> rejected — and `Principal` carries no credential. Refusing to look is what lets a
+> CLI still sending an old key work rather than fail confusingly (see §1 and
+> `CLAUDE.md`). What remains live is everything from **Propagation** down, which
+> now describes the SERVER's keys.
+
 | Stage | Behaviour | Code |
 |---|---|---|
-| Extraction | `Authorization: Bearer <token>`; raw header length-bounded *before* any scanning | `auth._extract_bearer` |
-| Structural validation | printable non-space ASCII (0x21–0x7E) only, ≤ 4096 bytes. **No prefix check** — the issuer is not our business, only that the value can ride an HTTP header safely | `auth._structurally_valid` |
-| In-process form | `pydantic.SecretStr` on a frozen `Principal`, `repr=False` | `auth.Principal` |
-| Propagation | threaded explicitly as `ProviderChatRequest.api_key` to every provider call | `providers/base.py` |
+| ~~Extraction~~ *(retired)* | ~~`Authorization: Bearer <token>`; raw header length-bounded *before* any scanning~~ — the header is ignored entirely | `auth.py` |
+| ~~Structural validation~~ *(retired)* | ~~printable non-space ASCII, ≤ 4096 bytes~~ — rejecting a malformed bearer only meant something while a bearer meant something | `auth.py` |
+| ~~In-process form~~ *(retired)* | ~~`SecretStr` on a frozen `Principal`~~ — `Principal` holds no credential | `auth.Principal` |
+| Propagation | the SERVER's key, threaded as `ProviderChatRequest.api_key` to every provider call. `ProviderChatRequest.api_key` stays live and tested as the field an account-mapped credential will occupy | `providers/base.py` |
 | Header construction | a fresh per-call header dict; the shared `httpx` client's own headers are never mutated, so concurrent calls carrying different keys cannot bleed into one another | `openrouter._headers` |
 | Malformed value | rejected in `_resolve_key` **before** httpx sees it — h11's `LocalProtocolError` embeds the offending header value verbatim and httpcore logs it at DEBUG, so the permissive path would leak the key into logs | `openrouter._resolve_key` |
 | Upstream error bodies | the credential is scrubbed out; if it is still recoverable after scrubbing (a doubly-encoded echo) the whole diagnostic is dropped | `openrouter._extract_upstream_error`, `_still_reveals` |

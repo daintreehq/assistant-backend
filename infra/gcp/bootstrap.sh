@@ -148,6 +148,17 @@ ensure_supplied_secret() {
 }
 ensure_supplied_secret together-api-key 'tgp_v1_...' gates
 
+# The FAST-RESPONSE credential, and deliberately NOT gating. The stage is `off` by
+# default, the deploy mounts this secret only when it exists, and a deployment
+# without it is complete rather than degraded — it simply never opens a preamble.
+# Creating the shell here means turning the feature on later is "add a version",
+# not "re-run bootstrap".
+#
+# The dangerous combination — the mode on, the key absent — is caught by readiness
+# (`Settings.fast_response_problems`), so a revision in that state never takes
+# traffic.
+ensure_supplied_secret cerebras-api-key 'csk-...' optional
+
 # ---------------------------------------------------------------------------
 say "Runtime service account (what the container runs as)"
 if gcloud iam service-accounts describe "$RUNTIME_SA_EMAIL" --project="$PROJECT" >/dev/null 2>&1; then
@@ -162,7 +173,12 @@ fi
 # together-api-key appears here because the deploy mounts it: without the grant,
 # the runtime identity cannot read the key that funds every turn, and the
 # revision fails at startup.
-RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key"
+# cerebras-api-key is granted whether or not it has a version yet: the binding is
+# on the secret, so granting it now means enabling the fast-response stage later
+# needs no IAM change — and a missing grant would present as a revision that
+# starts, passes readiness with the stage off, and then fails the moment somebody
+# turns it on.
+RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key cerebras-api-key"
 for s in $RUNTIME_SECRETS; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
