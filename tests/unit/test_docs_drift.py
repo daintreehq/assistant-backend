@@ -652,6 +652,10 @@ _ERROR_CODES = (
     "system_messages_not_allowed",
     "reserved_tool_name",
     "reserved_message_name",
+    "fork_plan_invalid",
+    "fork_call_not_alone",
+    "fork_call_not_offered",
+    "fork_target_unavailable",
     "unknown_task",
 )
 

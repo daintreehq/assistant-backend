@@ -122,6 +122,16 @@ class _Attempt:
     latency_ms: int = 0
     queue_ms: int = 0
     repaired: bool = False
+    #: Whether a request left for the provider and never came back with an
+    #: answer of any kind. A call cancelled by the deadline mid-generation
+    #: reports no usage, but the provider may still have billed what it produced
+    #: before the cancel — so "dispatched, outcome unknown" has to stay
+    #: distinguishable from "never dispatched". The first resolves to an empty
+    #: `ProviderUsage()`, which marks the turn's cost INCOMPLETE; the second
+    #: stays `None`, the identity. A provider that answers WITH A REJECTION
+    #: clears this: it generated nothing, and that is a known cost, not an
+    #: unknown one.
+    dispatched: bool = False
 
 
 @dataclass(frozen=True)
@@ -684,6 +694,11 @@ class ForkPromptExpansionService:
         except BranchUnusable as exc:
             return self._fallback(index, branch, plan, exc.kind, attempt)
         except DaintreeError as exc:
+            # The provider ANSWERED — with a rejection. A rejected call generated
+            # nothing, so its cost is known to be nothing rather than unknown,
+            # and marking the turn incomplete over it would degrade a number we
+            # actually have.
+            attempt.dispatched = False
             return self._fallback(index, branch, plan, f"upstream:{exc.code}", attempt)
         except TimeoutError:
             return self._fallback(index, branch, plan, "timeout", attempt)
@@ -722,7 +737,7 @@ class ForkPromptExpansionService:
             attempt.queue_ms = round((time.perf_counter() - queued_at) * 1000)
             started = time.perf_counter()
 
-            result = await self._complete(request, deadline=deadline)
+            result = await self._complete(request, attempt=attempt, deadline=deadline)
             attempt.usage = result.usage
             try:
                 args, mismatches = finalize_arguments(
@@ -753,7 +768,7 @@ class ForkPromptExpansionService:
                 # doomed repair is a call spent to learn nothing.
                 if exceeds_window(measure(repair_request)):
                     raise
-                retry = await self._complete(repair_request, deadline=deadline)
+                retry = await self._complete(repair_request, attempt=attempt, deadline=deadline)
                 attempt.usage = sum_usage(attempt.usage, retry.usage)
                 args, mismatches = finalize_arguments(
                     self._parse_arguments(retry),
@@ -779,7 +794,7 @@ class ForkPromptExpansionService:
         return expansion
 
     async def _complete(
-        self, request: ProviderChatRequest, *, deadline: float
+        self, request: ProviderChatRequest, *, attempt: _Attempt, deadline: float
     ) -> ProviderChatResult:
         """One upstream call, retried inside the SHARED fork clock.
 
@@ -790,6 +805,7 @@ class ForkPromptExpansionService:
         def remaining() -> float:
             return max(0.0, deadline - time.perf_counter())
 
+        attempt.dispatched = True
         if remaining() <= 0:
             # Checked before dispatch rather than left to the timeout. An
             # `asyncio.timeout(0)` only fires on the next loop iteration, so a
@@ -845,11 +861,19 @@ class ForkPromptExpansionService:
         quietly shorten the turn's total by exactly the calls that went wrong.
         """
         attempt = attempt or _Attempt()
+        usage = attempt.usage
+        if usage is None and attempt.dispatched:
+            # A request reached the provider and no usage came back — a call
+            # cancelled by the deadline, say. The provider may have billed what
+            # it generated before the cancel, so this is an OBSERVED-NOTHING
+            # call, not an absent one, and the difference is what keeps the
+            # turn's cost honestly marked incomplete.
+            usage = ProviderUsage()
         return BranchExpansion(
             index=index,
             branch_id=branch.id,
             call={**fallback_arguments(plan, branch), **effective_controls(plan, branch)},
-            usage=attempt.usage,
+            usage=usage,
             latency_ms=attempt.latency_ms,
             queue_ms=attempt.queue_ms,
             repaired=attempt.repaired,

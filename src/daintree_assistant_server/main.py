@@ -45,6 +45,8 @@ from .providers.together import TogetherProvider
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.compaction import Compactor, NullCompactor, default_compactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
+from .services.fork_prompt_expansion import ForkPromptExpansionService
+from .services.forked_tool_call_rewriter import ForkedToolCallRewriter
 from .services.prompt_assembler import PromptAssembler
 from .services.task_runner import TaskRunner
 from .skills.catalog import Catalog, CatalogManager, default_skills_dir, load_catalog
@@ -446,6 +448,14 @@ def build_container(
     assembler = PromptAssembler(
         prompt_loader, settings, response_declaration=chat_compactor.available
     )
+    # Built in dependency order — provider, expansion, rewriter, orchestrator —
+    # and NOT stored on the container: the expansion service borrows the shared
+    # provider rather than opening a client of its own, so it owns no resource
+    # lifespan teardown would have to close, and nothing outside the orchestrator
+    # has any business reaching it.
+    fork_rewriter = ForkedToolCallRewriter(
+        expansion=ForkPromptExpansionService(settings=settings, provider=chat_provider)
+    )
     orchestrator = ChatOrchestrator(
         settings=settings,
         catalog_manager=catalog_manager,
@@ -455,6 +465,7 @@ def build_container(
         provider=chat_provider,
         docs_client=docs_client,
         compactor=chat_compactor,
+        fork_rewriter=fork_rewriter,
     )
     task_runner = TaskRunner(
         settings=settings,

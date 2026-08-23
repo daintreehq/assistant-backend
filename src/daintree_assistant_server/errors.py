@@ -363,6 +363,84 @@ def upstream_context_window_exceeded(
     )
 
 
+def fork_plan_invalid(detail: str) -> DaintreeError:
+    """The model's internal fork plan is not one the backend can act on.
+
+    FAILS CLOSED, deliberately. Every field in a fork plan either names prose or
+    selects a mutation target — which worktree, which agent, whether a
+    supervisor watches — and the server has no standing to guess any of the
+    second kind on the user's behalf. A 502 rather than a 400 because the fault
+    is the model's, not the caller's: the request was well-formed and the reply
+    was not.
+    """
+    return DaintreeError(
+        status_code=502,
+        message=f"The model produced an unusable forked-spawn plan: {detail}.",
+        type=TYPE_API,
+        code="fork_plan_invalid",
+    )
+
+
+def fork_call_not_alone(call_count: int) -> DaintreeError:
+    """The internal fork call arrived alongside other tool calls.
+
+    A reply is ONE assistant decision. Some siblings of a fork call may be
+    prerequisites of it and others independent, and there is no way to tell
+    which from here — so running half the batch is not a safer outcome than
+    running none of it. Exposing the siblings while dropping the fork would be
+    the worst of the three: the model would continue believing it had spawned
+    four agents that do not exist.
+    """
+    return DaintreeError(
+        status_code=502,
+        message=(
+            f"The model mixed the internal forked-spawn call with {call_count - 1} other "
+            "tool call(s); it must be the only call in the reply."
+        ),
+        type=TYPE_API,
+        code="fork_call_not_alone",
+    )
+
+
+def fork_call_not_offered() -> DaintreeError:
+    """The model called the internal fork function on a turn that never offered it.
+
+    Low-probability and not theoretical: a user can quote the name in prose, and
+    model output is not a security boundary. What makes it worth failing over is
+    that the alternative is RELAYING a reserved name — which the client is
+    forbidden from replaying, so the turn after this one would 400 on Daintree's
+    own rule, stranding the session rather than one reply.
+
+    Whether to EXPAND a fork call depends on whether the tool was offered.
+    Whether to EMIT one never does.
+    """
+    return DaintreeError(
+        status_code=502,
+        message=(
+            "The model called an internal Daintree function that was not offered on "
+            "this request."
+        ),
+        type=TYPE_API,
+        code="fork_call_not_offered",
+    )
+
+
+def fork_target_unavailable() -> DaintreeError:
+    """The spawn tool the fork call expands into is not in the prepared request.
+
+    Unreachable through the normal gate, which refuses to offer the fork tool
+    without its target present. Reaching it means assembly and rewrite disagree
+    about what was offered, and the alternative to failing is fabricating four
+    calls the client has no way to execute.
+    """
+    return DaintreeError(
+        status_code=502,
+        message="The forked-spawn target tool is not available on this request.",
+        type=TYPE_API,
+        code="fork_target_unavailable",
+    )
+
+
 def upstream_protocol_error(
     message: str = "The upstream model provider returned a malformed response.",
 ) -> DaintreeError:

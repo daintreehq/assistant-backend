@@ -65,6 +65,17 @@ FLOORS: dict[str, int] = {
     # reservation back into the refusal, both leave every existing test passing.
     "src/daintree_assistant_server/services/context_budget.py": 100,
     "src/daintree_assistant_server/services/deadlines.py": 99,
+    # Added with the forked terminal-spawn feature (measured 2026-08-23 at 100,
+    # 100, 100 and 94.59; rounded down). These earn floors for the same reason
+    # `auth` and `validation` do — they are the code that decides whether an
+    # internal, server-only function call can reach a client, and whether a
+    # model that just read untrusted terminal output can move where an agent
+    # runs. A global percentage would absorb a regression in any of them without
+    # moving.
+    "src/daintree_assistant_server/contracts/forked_terminals.py": 100,
+    "src/daintree_assistant_server/services/forked_terminal_calls.py": 100,
+    "src/daintree_assistant_server/services/forked_tool_call_rewriter.py": 100,
+    "src/daintree_assistant_server/services/fork_prompt_expansion.py": 94,
     "src/daintree_assistant_server/services/result_schema.py": 83,
     # Ratcheted 2026-08-23 to 94 (measured 94.96, rounded down) with the transcript state
     # machine, the shape caps and the image data-URL policy.

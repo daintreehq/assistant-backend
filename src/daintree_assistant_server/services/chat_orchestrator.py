@@ -46,8 +46,10 @@ from ..contracts.extensions import (
 from ..contracts.openai import ChatMessage
 from ..errors import (
     DaintreeError,
+    fork_call_not_offered,
     internal_error,
     turn_deadline_exceeded,
+    upstream_protocol_error,
     upstream_runaway_output,
     upstream_timeout,
 )
@@ -93,6 +95,19 @@ from .docs_mcp import (
     DocsLookup,
     DocsLookupError,
     DocsMcpClient,
+)
+from .forked_terminal_calls import FORK_TOOL_DEFINITION
+from .forked_tool_call_rewriter import (
+    REASON_DISABLED as REASON_FORK_DISABLED,
+)
+from .forked_tool_call_rewriter import (
+    ForkedToolCallRewriter,
+    ForkFeatureDecision,
+    RewrittenToolCalls,
+    decide_fork_feature,
+    inject_fork_tool,
+    is_fork_call,
+    mentions_fork_tool,
 )
 from .output_policy import lint_output, repair_tables, resolve_content_width
 from .prompt_assembler import (
@@ -285,6 +300,11 @@ class _Timings:
     #: was subtly wrong: `thinking_signaled` is reset per attempt so a bare-intent
     #: re-roll can re-announce the phase, and held deltas flush after that reset.
     reasoning_at_ms: int | None = None
+    #: How long the four concurrent branch expansions took, when a forked spawn
+    #: was rewritten this turn. Logged rather than surfaced: the public wire
+    #: shape does not change for this feature, and this is the number that says
+    #: whether running the branches together bought anything.
+    fork_expansion_ms: int | None = None
 
     def to_wire(self, budget: RequestBudget | None) -> TurnTimings:
         """Render the wire shape, deriving what can only be known at the end."""
@@ -352,6 +372,13 @@ class _PreparedTurn:
     # it is worse than no evidence because this number's only job is to authorize
     # withholding tools.
     projection_computed: bool = False
+    # Whether the internal forked-spawn tool was offered this turn, and why not.
+    # Carried so both response paths know whether a rewrite is even possible —
+    # and so the streaming path knows to hold tool-call fragments that would
+    # otherwise be forwarded verbatim.
+    fork: ForkFeatureDecision = field(
+        default_factory=lambda: ForkFeatureDecision(enabled=False, reason=REASON_FORK_DISABLED)
+    )
     # This turn's context estimate, or ``None`` when measuring it failed. Carried
     # so the usage log can print it beside the upstream's own `prompt_tokens` —
     # the only place both numbers meet, and therefore the only place the
@@ -412,6 +439,11 @@ class ChatOrchestrator:
         # so every turn takes the path it took before this feature landed — the
         # declaration is stripped, nothing is started, and no event is emitted.
         compactor: Compactor | None = None,
+        # Rewrites an internal forked-spawn call into four ordinary spawn calls.
+        # Optional so a container is constructible without one; `None` means the
+        # feature cannot run at all, which is also what `disabled` produces, so
+        # the two collapse to the same turn.
+        fork_rewriter: ForkedToolCallRewriter | None = None,
     ) -> None:
         self.settings = settings
         self.catalog_manager = catalog_manager
@@ -421,6 +453,7 @@ class ChatOrchestrator:
         self.provider = provider
         self.docs_client = docs_client
         self.compactor = compactor
+        self.fork_rewriter = fork_rewriter
         # In-flight detached tasks — today, the streaming path's preparation task.
         # asyncio holds only a weak reference to a bare task, so we keep a strong
         # one here (discarded on done) to stop one being garbage-collected
@@ -747,11 +780,34 @@ class ChatOrchestrator:
         # then disagree about what the user is owed.
         if result is not drafted:
             self._strip_declaration(result, request_id=request_id)
+        # THE FORK REWRITE, ahead of everything that reads the round. An internal
+        # call must not be graded as a tool the client was offered, must not be
+        # counted as a tool call by the lint, and above all must not reach
+        # `_build_nonstream_body` — the client is forbidden from replaying
+        # anything in the reserved namespace, so a leaked call comes back as a
+        # 400 next round, after the user has watched four terminals not appear.
+        rewrite = await self._rewrite_fork_calls(
+            result.tool_calls,
+            base_request=prepared.provider_request,
+            fork=prepared.fork,
+            request_id=request_id,
+            budget=budget,
+        )
+        if rewrite.rewritten:
+            self._replace_tool_calls(result, rewrite.calls)
+            result.usage = sum_usage(result.usage, rewrite.added_usage)
+            prepared.timings.fork_expansion_ms = (
+                rewrite.fork.wall_ms if rewrite.fork else None
+            )
         # finish_reason is a second, independent signal: treat a continuation round as
         # such even if a malformed upstream drops the tool_calls payload.
         had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
         self._grade_projection(
             prepared.projection,
+            # The REWRITTEN names. Grading the raw ones would report the internal
+            # function as a call outside the projection on every forked turn —
+            # measuring the model's private decision instead of the capability
+            # the client actually had to execute.
             [c.get("function", {}).get("name", "") for c in result.tool_calls],
             request_id=request_id,
             profile=request.profile,
@@ -1307,6 +1363,35 @@ class ChatOrchestrator:
                 logger.warning("tool_projection_filter_failed", request_id=request_id)
                 enforcement = replace(enforcement, enforce=False, reason=REASON_FILTER_ERROR)
 
+        # THE SERVER-OWNED TOOL, injected here and nowhere else. After the
+        # projection swap, so the inventory-mismatch check above still compares
+        # the assembled tools against what the projection judged — a tool added
+        # before it would fail that check and silently disable enforcement. And
+        # only into the PROVIDER request: `request.input.tools` is the client's
+        # real callable surface, replayed back to us next round, where anything
+        # in the reserved namespace is refused at the door.
+        fork = ForkFeatureDecision(enabled=False, reason=REASON_FORK_DISABLED)
+        if self.fork_rewriter is not None:
+            fork = decide_fork_feature(
+                mode=self.settings.forked_terminal_calls_mode,
+                profile=request.profile,
+                tools=provider_request.tools,
+                max_tools=self.settings.max_tools,
+            )
+            if fork.enabled:
+                provider_request = replace(
+                    provider_request, tools=inject_fork_tool(provider_request.tools)
+                )
+        logger.info(
+            "fork_tool_injection",
+            request_id=request_id,
+            profile=request.profile,
+            enabled=fork.enabled,
+            reason=fork.reason,
+            client_tool_count=len(request.input.tools or ()),
+            provider_tool_count=len(provider_request.tools or ()),
+        )
+
         # Sizes are measured in their own guard: a serialization failure is a lost
         # metric, never a lost turn, and never a reason to widen the request that
         # was already validated above.
@@ -1454,6 +1539,7 @@ class ChatOrchestrator:
         return _PreparedTurn(
             projection=projection,
             enforcement=enforcement,
+            fork=fork,
             projection_computed=computed is not None,
             context=context,
             timings=timings,
@@ -2055,6 +2141,7 @@ class ChatOrchestrator:
             projection_computed=prepared.projection_computed,
             context=prepared.context,
             timings=prepared.timings,
+            fork=prepared.fork,
         )
         try:
             async for event in body:
@@ -2104,6 +2191,7 @@ class ChatOrchestrator:
         projection_computed: bool,
         context: ContextMeasurement | None,
         timings: _Timings,
+        fork: ForkFeatureDecision,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
@@ -2145,7 +2233,28 @@ class ChatOrchestrator:
         # holding everything tolerates providers that interleave call fragments.
         # Built once and reused: the re-roll rebuilds its buffer from the same index.
         param_index = build_parameter_index(request.input.tools)
+        if fork.enabled:
+            # The injected tool's own schema, so a near-miss in the fork plan's
+            # arguments is repaired like any other call's. It is not in
+            # `input.tools` — it never was a client tool — so the client-derived
+            # index alone would leave the one call this turn cares about
+            # unrepairable.
+            param_index = {
+                **param_index,
+                FORK_TOOL_DEFINITION["function"]["name"]: FORK_TOOL_DEFINITION["function"][
+                    "parameters"
+                ],
+            }
         tool_call_buffer = StreamToolCallBuffer(param_index)
+        # Whether an internal fork call could legitimately appear this round.
+        fork_live = fork.enabled and self.fork_rewriter is not None
+        # Raw fragments the buffer forwarded in passthrough mode, held rather
+        # than emitted while the fork tool is live. See the use site below.
+        passthrough: list[dict[str, Any]] = []
+        # The names to grade, when a rewrite replaced what the model called with
+        # what the client can see. `None` means no rewrite happened and the
+        # buffer's own record stands.
+        graded_names: list[str] | None = None
         stream: ProviderStream | None = None
         # THE COMMIT GATE (issue #25). A round that announces a tool call and emits
         # none must not reach the client as a finished turn — but on this path the
@@ -2408,8 +2517,19 @@ class ChatOrchestrator:
                                 ),
                             )
                         if ready:
-                            _mark_first_output(StreamDelta(tool_calls=ready))
-                            yield self._sse("delta", StreamDelta(tool_calls=ready))
+                            # `add` returns nothing on the normal path — calls are
+                            # consolidated at flush. A non-empty `ready` means the
+                            # buffer hit PASSTHROUGH (a fragment with no usable
+                            # index) and is now forwarding raw fragments verbatim,
+                            # which is the one route by which an internal call
+                            # could reach a client. While the fork tool is offered
+                            # these are held for the flush instead of forwarded, so
+                            # the rewrite still gets to inspect them.
+                            if fork_live:
+                                passthrough.extend(ready)
+                            else:
+                                _mark_first_output(StreamDelta(tool_calls=ready))
+                                yield self._sse("delta", StreamDelta(tool_calls=ready))
                         continue
                     if held is not None:
                         held.append(delta)
@@ -2483,6 +2603,7 @@ class ChatOrchestrator:
                     content_parts = []
                     content_chars = 0
                     tool_call_buffer = StreamToolCallBuffer(param_index)
+                    passthrough = []
                     held = None
                     if compaction_task is not None:
                         # Attempt 0's declaration described a draft being thrown
@@ -2527,10 +2648,72 @@ class ChatOrchestrator:
                 _mark_first_output(pending)
                 yield self._sse("delta", pending)
             held = None
-            remaining = tool_call_buffer.flush()
+            remaining = [*passthrough, *tool_call_buffer.flush()]
+            if remaining and not tool_call_buffer.names_complete and any(
+                mentions_fork_tool(fragment) for fragment in remaining
+            ):
+                # The buffer went to passthrough while something that could be an
+                # internal call was in flight, so its fragments were never
+                # consolidated: there is no whole call to expand and no safe way
+                # to forward the pieces. Failing costs this round; forwarding
+                # would put a reserved name in the transcript, which our own
+                # request boundary refuses on the NEXT turn — stranding the
+                # session rather than one reply.
+                raise upstream_protocol_error(
+                    "The upstream stream could not be read as tool calls."
+                )
+            # UNCONDITIONAL, not gated on the feature being enabled. Whether to
+            # EXPAND depends on whether the tool was offered; whether to EMIT a
+            # reserved name never does. A model that produces the name it was not
+            # offered — from a user quoting it, or from its own training — must
+            # not have it relayed, because the client is forbidden from replaying
+            # it and the turn after this one would 400.
+            if remaining and not fork_live and any(is_fork_call(c) for c in remaining):
+                logger.warning(
+                    "fork_call_not_offered", request_id=meta.request_id, reason=fork.reason
+                )
+                raise fork_call_not_offered()
+            if fork_live and remaining:
+                rewrite = await self._rewrite_fork_calls(
+                    remaining,
+                    base_request=provider_request,
+                    fork=fork,
+                    request_id=meta.request_id,
+                    budget=budget,
+                )
+                if rewrite.rewritten:
+                    remaining = rewrite.calls
+                    total_usage = sum_usage(total_usage, rewrite.added_usage)
+                    timings.fork_expansion_ms = (
+                        rewrite.fork.wall_ms if rewrite.fork else None
+                    )
+                    # The names the round is graded on are the visible ones. The
+                    # buffer recorded the internal function; grading that would
+                    # report a call outside the projection on every forked turn.
+                    graded_names = [
+                        call.get("function", {}).get("name", "") for call in remaining
+                    ]
             if remaining:
-                _mark_first_output(StreamDelta(tool_calls=remaining))
-                yield self._sse("delta", StreamDelta(tool_calls=remaining))
+                # ONE consolidated delta, and every call in it CARRIES ITS INDEX.
+                # That is not cosmetic: the client accumulates streamed fragments
+                # into a map keyed by index and defaults a missing one to zero,
+                # so four index-less calls land in the same slot — the ids
+                # overwrite each other and the four argument strings CONCATENATE
+                # into one unparseable blob. The user would get one broken spawn
+                # instead of four terminals, and nothing here would look wrong.
+                #
+                # The calls themselves stay index-free (`ToolCall` forbids the
+                # field, and the non-streaming body validates against it); the
+                # index is a property of the streamed FRAGMENT, so it is added
+                # here, at the wire.
+                indexed = [
+                    {**call, "index": position} for position, call in enumerate(remaining)
+                ]
+                # This is also the moment first output is stamped: the internal
+                # call was never yielded, so the turn's first visible output
+                # genuinely is the batch the client can execute.
+                _mark_first_output(StreamDelta(tool_calls=indexed))
+                yield self._sse("delta", StreamDelta(tool_calls=indexed))
             self._log_tool_call_repairs(tool_call_buffer.repairs, request_id=meta.request_id)
             # Compaction rides AHEAD of the terminal event, never behind it. SSE
             # itself has no notion of a terminal event, but a reader modelled on
@@ -2625,7 +2808,12 @@ class ChatOrchestrator:
         # yield above and never reaches here). A tool-continuation round is filtered
         # by had_tool_calls inside the trigger.
         if completed:
-            final_usage = carried_usage or ProviderUsage()
+            # `total_usage`, not `carried_usage`: the fork rewrite folds four
+            # hidden completions into the former, and the SSE `done` the client
+            # reads already reports them. Logging the latter would leave the
+            # durable record disagreeing with the response the user was handed,
+            # understating the turn by up to four completions.
+            final_usage = total_usage or carried_usage or ProviderUsage()
             log_turn_usage(
                 final_usage,
                 request_id=meta.request_id,
@@ -2646,9 +2834,15 @@ class ChatOrchestrator:
             # a re-rolled attempt got a fresh buffer, so its discarded calls are
             # not graded as if the model had made them. `names_complete` carries
             # whether that buffer could read every call at all.
+            #
+            # After a fork rewrite it is the VISIBLE names instead: the buffer
+            # recorded the internal function, which was never offered to the
+            # client and so would grade as a call outside the projection on every
+            # forked turn — measuring the model's private decision rather than
+            # the capability the client actually held.
             self._grade_projection(
                 projection,
-                tool_call_buffer.called_names,
+                graded_names if graded_names is not None else tool_call_buffer.called_names,
                 request_id=meta.request_id,
                 profile=request.profile,
                 enforcement=enforcement,
@@ -3100,6 +3294,55 @@ class ChatOrchestrator:
         return repaired
 
     # ---- retries (before any model output is emitted) -------------------
+
+    async def _rewrite_fork_calls(
+        self,
+        calls: list[dict[str, Any]],
+        *,
+        base_request: ProviderChatRequest,
+        fork: ForkFeatureDecision,
+        request_id: str,
+        budget: RequestBudget | None,
+    ) -> RewrittenToolCalls:
+        """Expand an internal forked-spawn call, or hand the calls straight back.
+
+        Guarded on the turn's own decision rather than only on the rewriter
+        existing: a turn that was never OFFERED the fork tool cannot legitimately
+        have called it, so there is nothing to expand and no reason to scan.
+        """
+        if self.fork_rewriter is None or not fork.enabled:
+            # UNCONDITIONAL outbound guard. Whether to EXPAND depends on whether
+            # the tool was offered; whether to EMIT a reserved name never does. A
+            # model that produced the internal name without being offered it —
+            # from a user quoting it, or from its own training — must not have it
+            # relayed: the client is forbidden from replaying anything in that
+            # namespace, so the turn after this one would 400 on our own rule.
+            if any(is_fork_call(call) for call in calls):
+                logger.warning(
+                    "fork_call_not_offered",
+                    request_id=request_id,
+                    reason=fork.reason,
+                )
+                raise fork_call_not_offered()
+            return RewrittenToolCalls(calls=calls)
+        return await self.fork_rewriter.rewrite(
+            calls,
+            base_request=base_request,
+            request_id=request_id,
+            budget=budget,
+        )
+
+    @staticmethod
+    def _replace_tool_calls(result: Any, calls: list[dict[str, Any]]) -> None:
+        """Swap the calls on a completion result in place.
+
+        `ProviderChatResult.tool_calls` reads through to `choices[0].message`,
+        so the replacement has to happen there or every later reader — the body
+        builder included — would still see the internal call.
+        """
+        message = result.message
+        if message:
+            message["tool_calls"] = calls
 
     async def _complete_with_retry(
         self, request: ProviderChatRequest, *, budget: RequestBudget | None = None
