@@ -69,6 +69,147 @@ def test_a_non_numeric_cost_does_not_break_the_response() -> None:
     assert ProviderUsage.from_wire({"cost": None}).cost is None
 
 
+def test_cached_tokens_are_read_from_the_nested_shape() -> None:
+    usage = ProviderUsage.from_wire(
+        {"prompt_tokens": 1000, "prompt_tokens_details": {"cached_tokens": 768}}
+    )
+    assert usage.cached_tokens == 768
+    assert usage.cached_tokens_source == "nested"
+
+
+def test_cached_tokens_are_read_from_the_flat_shape_too() -> None:
+    """Together documents both, model-dependent.
+
+    Reading only the nested one turns a host that uses the flat spelling into one
+    that appears to have no prefix cache — a wrong number that reads as a caching
+    problem rather than a parser bug, which is why it would survive review.
+    """
+    usage = ProviderUsage.from_wire({"prompt_tokens": 1000, "cached_tokens": 768})
+    assert usage.cached_tokens == 768
+    assert usage.cached_tokens_source == "flat"
+
+
+def test_the_flat_shape_is_a_fallback_and_never_a_supplement() -> None:
+    """Both present means one number reported twice, not two numbers to add."""
+    usage = ProviderUsage.from_wire(
+        {
+            "prompt_tokens": 1000,
+            "cached_tokens": 768,
+            "prompt_tokens_details": {"cached_tokens": 768},
+        }
+    )
+    assert usage.cached_tokens == 768
+
+
+def test_a_nested_skeleton_zero_does_not_mask_a_real_flat_count() -> None:
+    """An OpenAI-shaped host emits `prompt_tokens_details` as a fixed skeleton.
+
+    Preferring the nested value unconditionally would let a zero the host never
+    filled in hide a real flat count — the exact under-report the flat fallback
+    exists to fix, arriving through the fix itself. A report beats a zero.
+    """
+    usage = ProviderUsage.from_wire(
+        {
+            "prompt_tokens": 1000,
+            "cached_tokens": 900,
+            "prompt_tokens_details": {"cached_tokens": 0, "audio_tokens": 0},
+        }
+    )
+    assert usage.cached_tokens == 900
+    assert usage.cached_tokens_source == "flat"
+
+
+def test_a_flat_skeleton_zero_does_not_mask_a_real_nested_count() -> None:
+    """The mirror. Neither field is privileged; a report beats a zero either way."""
+    usage = ProviderUsage.from_wire(
+        {"prompt_tokens": 1000, "cached_tokens": 0, "prompt_tokens_details": {"cached_tokens": 900}}
+    )
+    assert usage.cached_tokens == 900
+    assert usage.cached_tokens_source == "nested"
+
+
+def test_a_genuine_zero_is_reported_as_zero_not_as_unreported() -> None:
+    """Both saying "no reuse" is a measurement, and must not decay to `None`."""
+    usage = ProviderUsage.from_wire(
+        {"prompt_tokens": 1000, "cached_tokens": 0, "prompt_tokens_details": {"cached_tokens": 0}}
+    )
+    assert usage.cached_tokens == 0
+    assert usage.cached_tokens_source == "nested"
+
+    lone = ProviderUsage.from_wire(
+        {"prompt_tokens": 1000, "prompt_tokens_details": {"cached_tokens": 0}}
+    )
+    assert lone.cached_tokens == 0
+    assert lone.cached_tokens_source == "nested"
+
+
+def test_an_unparseable_nested_count_falls_through_to_the_flat_one() -> None:
+    """`"768 tokens"` needs a judgement call, so it is not a count at all."""
+    usage = ProviderUsage.from_wire(
+        {"cached_tokens": 768, "prompt_tokens_details": {"cached_tokens": "768 tokens"}}
+    )
+    assert usage.cached_tokens == 768
+    assert usage.cached_tokens_source == "flat"
+
+
+def test_an_absent_cached_count_reports_no_source() -> None:
+    usage = ProviderUsage.from_wire({"prompt_tokens": 1000})
+    assert usage.cached_tokens is None
+    assert usage.cached_tokens_source is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        " 1024",  # whitespace needs a judgement call; a count does not
+        "+1024",
+        "1_024",
+        "1e3",
+        "\u00b9\u2070\u00b2\u2074",  # str.isdigit() says yes; int() says no
+        True,  # bool subclasses int, so this would otherwise land as 1
+        -5,  # a negative token count is not a token count
+        float("nan"),
+        float("inf"),
+        1024.5,
+        None,
+        [1024],
+        {"value": 1024},
+    ],
+)
+def test_a_malformed_token_count_is_unreported_rather_than_wrong(value: object) -> None:
+    """`turn_accounting.cache_ratio` divides by `prompt_tokens`, mid-turn.
+
+    A string there raised on the paid path. `None` means "not reported", which
+    every consumer already handles.
+    """
+    usage = ProviderUsage.from_wire(
+        {"prompt_tokens": value, "completion_tokens": value, "cached_tokens": value}
+    )
+    assert usage.prompt_tokens is None
+    assert usage.completion_tokens is None
+    assert usage.cached_tokens is None
+
+
+@pytest.mark.parametrize("value", [1024.0, "1024", 0, "0"])
+def test_an_unambiguous_count_is_read_rather_than_refused(value: object) -> None:
+    """Refusing here does not surface as "not reported" — it surfaces as zero.
+
+    Every consumer projects a `None` count with `or 0` on the way to the client,
+    so a form we could have read exactly one way and chose not to becomes a
+    confident zero. `1024.0` and `"1024"` each have one reading; take it.
+    """
+    assert ProviderUsage.from_wire({"prompt_tokens": value}).prompt_tokens == int(value)
+
+
+def test_a_summed_usage_claims_no_single_cached_token_source() -> None:
+    summed = sum_usage(
+        ProviderUsage(cached_tokens=10, cached_tokens_source="nested"),
+        ProviderUsage(cached_tokens=20, cached_tokens_source="nested"),
+    )
+    assert summed.cached_tokens == 30
+    assert summed.cached_tokens_source is None
+
+
 def test_a_discarded_attempt_is_still_billed_to_the_caller() -> None:
     """A re-rolled round charged the caller twice; reporting once under-bills.
 

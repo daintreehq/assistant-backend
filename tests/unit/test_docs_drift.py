@@ -1386,3 +1386,280 @@ def test_no_summary_repeats_a_privacy_claim_the_policy_has_not_verified() -> Non
         "stop stating the claim here. An external trust statement nobody has "
         "checked is the worst thing in this repository to be wrong about."
     )
+
+
+# ---------------------------------------------------------------------------
+# The wire contract: what the adapter sends, and what the prose says it sends.
+#
+# `docs/PROVIDER_POLICY.md` §8 is explicit that the code proves exactly one class
+# of fact — WHICH PARAMETERS WE SEND — and that this is what the drift tests pin.
+# These are that pin for the cache-affinity field. It is the claim most worth
+# holding: a reader who believes a cache key is sent optimizes the key, and the
+# only lever that exists is literal prefix stability.
+# ---------------------------------------------------------------------------
+
+#: EVERY maintained prose file, not just the seven a reader is pointed at.
+#: `PROSE_FILES` deliberately omits benchmark documentation and `TODO.md` — the
+#: first because most drift there is harmless, the second because it is future
+#: tense by construction. Neither exemption survives contact with THIS claim:
+#: the false sentence that motivated this scan had a twin in
+#: `benchmarks/prompt_cost/README.md` ("a stable `session_id` — what the server
+#: sends today"), describing a paid experiment built on it, and nothing would
+#: have looked there. A wire fact is not future tense wherever it is written.
+_VENDORED = ("cli", ".venv", "build", "node_modules", ".git")
+
+
+def _all_prose_files() -> list[Path]:
+    files = [
+        path
+        for path in REPO_ROOT.rglob("*.md")
+        if not any(part in _VENDORED for part in path.relative_to(REPO_ROOT).parts)
+        # Benchmark RESULTS are generated artifacts, not prose anyone maintains.
+        and "results" not in path.relative_to(REPO_ROOT).parts
+    ]
+    assert files, "no prose files found — the walk is broken, not the repository"
+    return sorted(files)
+
+
+def test_the_prose_walk_reaches_the_documents_this_scan_exists_for() -> None:
+    """A corpus that silently stopped including a file is a scan that passes.
+
+    Named explicitly rather than trusted to the glob: `PROVIDER_POLICY.md` is
+    where the fact lives, `CLAUDE.md` is where it was wrong, and the prompt-cost
+    README is the one `PROSE_FILES` would have missed.
+    """
+    found = {p.relative_to(REPO_ROOT).as_posix() for p in _all_prose_files()}
+    for required in (
+        "CLAUDE.md",
+        "README.md",
+        "TODO.md",
+        "docs/PROVIDER_POLICY.md",
+        "docs/DAINTREE_API.md",
+        "benchmarks/prompt_cost/README.md",
+        "benchmarks/latency/README.md",
+    ):
+        assert required in found, f"{required} is outside the affinity scan's corpus"
+    assert not any(f.startswith("cli/") for f in found), "vendored CLI must stay excluded"
+
+
+#: Both vendors' WIRE spellings, plus the NORMALIZED request's own field name.
+#: All three are absent from the body; `cache_session_id` is included because
+#: "`cache_session_id` is sent to Together" is exactly as wrong as the other two
+#: and a lookbehind excluding it wholesale let that sentence through.
+_AFFINITY_FIELDS = re.compile(r"prompt_cache_key|cache_session_id|(?<!cache_)session_id")
+
+#: A sentence may NAME a field it is telling you is not sent. What fails is a
+#: sentence asserting one is. These are the verbs that make it an assertion.
+_SENDS = re.compile(
+    r"\b(?:sends?|sending|sent|carries|carrying|carried|includes?|including|"
+    r"included|contains?|containing|passes|passing|passed|forwards?|forwarded|"
+    r"posts?|posted|adds?|added|appends?|appended|emits?|emitted|attaches?|"
+    r"attached|attaching|sets?|supplies|supplied|reaches|reaching|reached|"
+    r"puts?|transmits?|transmitted)\b"
+)
+
+#: ...unless the same CLAUSE is what negates it. Clause, not line: "no
+#: `provider` block is sent, and a `prompt_cache_key` is attached" negates the
+#: wrong half, and a line-wide search would read the whole sentence as safe.
+_NOT_SENT = re.compile(
+    r"\b(?:no|not|never|nothing|neither|nor|without|dropped?|drops|withheld|"
+    r"withholds?|omitted?|omits|unsent|stripped?|strips|would)\b"
+)
+
+#: A clause about a version that no longer exists is not a claim about what this
+#: one sends, and this repository's prose is full of them — "the retired Cerebras
+#: adapter's spelling", "an older revision sent". Kept SEPARATE from `_NOT_SENT`
+#: rather than folded in, because the two exemptions are different arguments and
+#: a single widening list is how a scan quietly stops scanning: negation says the
+#: sentence denies the claim, history says the sentence is not about today.
+_HISTORICAL = re.compile(
+    r"\b(?:used to|previously|formerly|historically|no longer|retired|deleted|"
+    r"older|earlier|prior|former|since removed|at the time)\b"
+)
+
+#: `cache_session_id` genuinely IS carried — on the normalized request, which
+#: `_build_body` then reads and discards. A clause saying so is true, and a scan
+#: that failed it would push the docs toward describing the field less clearly.
+_INTERNAL_CARRIER = re.compile(
+    r"normali[sz]ed request|providerchatrequest|normali[sz]ed "
+    r"``?providerchatrequest|on the request object"
+)
+
+#: Where one clause ends and the next begins. Markdown prose is one long
+#: sentence more often than it should be, and the conjunction is where a true
+#: half and a false half get joined.
+_CLAUSE_SPLIT = re.compile(r"[;.]|(?:,?\s+(?:and|but|while|whereas|though)\s+)|,")
+
+
+def _paragraphs(text: str) -> list[tuple[int, str]]:
+    """Blank-line-separated paragraphs, each with the line it starts on.
+
+    Scanning LINES misses a claim markdown soft-wrapped across two of them —
+    "Every request includes the affinity field" on one line and the field's name
+    on the next share no line, so a line-local scan sees a verb with no field
+    and a field with no verb, and passes both.
+    """
+    out: list[tuple[int, str]] = []
+    buffer: list[str] = []
+    start = 1
+    for number, line in enumerate(text.splitlines(), start=1):
+        if line.strip():
+            if not buffer:
+                start = number
+            buffer.append(line.strip())
+            continue
+        if buffer:
+            out.append((start, " ".join(buffer)))
+            buffer = []
+    if buffer:
+        out.append((start, " ".join(buffer)))
+    return out
+
+
+def _asserts_the_field_is_sent(paragraph: str) -> str | None:
+    """The offending clause, or ``None`` if the paragraph makes no such claim."""
+    for clause in _CLAUSE_SPLIT.split(paragraph.lower()):
+        if not clause or not _AFFINITY_FIELDS.search(clause):
+            continue
+        if not _SENDS.search(clause):
+            continue
+        if (
+            _NOT_SENT.search(clause)
+            or _HISTORICAL.search(clause)
+            or _INTERNAL_CARRIER.search(clause)
+        ):
+            continue
+        return clause.strip()
+    return None
+
+
+@pytest.mark.parametrize("path", _all_prose_files(), ids=lambda p: p.name)
+def test_no_document_claims_a_cache_affinity_field_is_sent(path: Path) -> None:
+    """CLAUDE.md said calls "still send a `prompt_cache_key`". They never did.
+
+    The adapter computes the key and `_build_body` drops it, because a host with
+    automatic prefix caching advertises no spelling to send it under and an
+    unadvertised parameter is a needless 400 risk. The prose disagreeing with
+    that is not a cosmetic error: it aims cache work at a field nobody reads, and
+    it did — a paid benchmark A/B'd a parameter that never left the process.
+    """
+    offenders: list[str] = []
+    for line_number, paragraph in _paragraphs(_read(path)):
+        clause = _asserts_the_field_is_sent(paragraph)
+        if clause is not None:
+            offenders.append(f"{path.relative_to(REPO_ROOT)}:{line_number}: {clause}")
+
+    assert not offenders, (
+        "prose claims a cache-affinity field reaches the wire:\n  "
+        + "\n  ".join(offenders)
+        + "\n\nThe adapter sends neither spelling (docs/PROVIDER_POLICY.md §3a). "
+        "Say what it does instead: the key is computed, and dropped."
+    )
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        # The sentence this test was written for, held as a fixture. A scan that
+        # no longer fires on what motivated it has silently stopped working.
+        "calls still send a `prompt_cache_key` naming their prefix, but as a "
+        "*hint* the upstream may ignore",
+        # Unrelated negation. A line-wide `_NOT_SENT` search reads the "No" and
+        # clears the whole sentence, including the false half after it.
+        "No `provider` block is sent, and a `prompt_cache_key` is attached to "
+        "every request.",
+        # Verbs the first draft of `_SENDS` did not know.
+        "The adapter forwards `prompt_cache_key` upstream.",
+        "Each body contains a `prompt_cache_key`.",
+        "We add a `session_id` to every completion request.",
+        # The internal spelling. Excluding it wholesale let this through.
+        "`cache_session_id` is sent to Together on every turn.",
+        # Markdown soft wrap: the verb and the field name never share a line.
+        "Every generation request includes the cache-affinity field\n"
+        "`prompt_cache_key`, so a stable session stays warm.",
+    ],
+)
+def test_the_affinity_scan_catches_a_claim_it_must_catch(prose: str) -> None:
+    paragraphs = _paragraphs(prose)
+    assert any(_asserts_the_field_is_sent(text) for _, text in paragraphs), prose
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        # The true statements have to survive, or the fix for a failure is
+        # deletion rather than correction.
+        "No `prompt_cache_key` is sent, and no `provider` block.",
+        "`session_id` is computed and never sent to the host.",
+        "It is dropped before the body is built, under both spellings "
+        "(`prompt_cache_key`, `session_id`).",
+        "`_build_body` strips the `prompt_cache_key` it was handed.",
+        "Every main conversation call and utility task carries a "
+        "`cache_session_id` on the normalized request.",
+        "An older revision sent a `prompt_cache_key`; this one does not.",
+        "`prompt_cache_key` was the retired Cerebras adapter's spelling.",
+    ],
+)
+def test_the_affinity_scan_permits_a_true_statement(prose: str) -> None:
+    paragraphs = _paragraphs(prose)
+    assert not any(_asserts_the_field_is_sent(text) for _, text in paragraphs), prose
+
+
+def test_the_historical_exemption_is_not_a_universal_escape_hatch() -> None:
+    """It clears a clause about an old revision, not a clause next to one.
+
+    `_HISTORICAL` is the widest of the three exemptions and the easiest to
+    over-apply. Clause scoping is what keeps it honest: a true history note and a
+    false present-tense claim in one sentence must still fail on the second half.
+    """
+    prose = (
+        "`session_id` was the retired OpenRouter spelling, and we now send "
+        "`prompt_cache_key` on every request."
+    )
+    assert any(_asserts_the_field_is_sent(text) for _, text in _paragraphs(prose))
+
+
+def test_both_cached_token_shapes_are_read() -> None:
+    """§3b of the provider policy describes a fallback. This is the fallback.
+
+    Pinned here rather than only in the provider tests because the doc is what a
+    reader consults before trusting a cache ratio, and a fallback that quietly
+    stopped existing would leave that section describing an adapter we no longer
+    ship.
+    """
+    from daintree_assistant_server.providers.base import ProviderUsage
+
+    nested = ProviderUsage.from_wire(
+        {"prompt_tokens": 100, "prompt_tokens_details": {"cached_tokens": 64}}
+    )
+    flat = ProviderUsage.from_wire({"prompt_tokens": 100, "cached_tokens": 64})
+    assert (nested.cached_tokens, nested.cached_tokens_source) == (64, "nested")
+    assert (flat.cached_tokens, flat.cached_tokens_source) == (64, "flat")
+
+    policy = _read(DOC_PROVIDER)
+    assert "prompt_tokens_details" in policy, (
+        "docs/PROVIDER_POLICY.md no longer documents where cached tokens arrive; "
+        "the parser reads two shapes and the doc is where that is explained"
+    )
+
+
+def test_no_document_claims_the_serving_path_spends_a_caller_key() -> None:
+    """`auth.py` ignores the Authorization header; the server funds every turn.
+
+    `ProviderChatRequest.api_key` still exists as the slot an account-mapped
+    credential will occupy, so its comment claiming the serving path "always"
+    fills it with the caller's own key was the credential model exactly
+    inverted — on the one field where being wrong routes a real secret.
+    """
+    principal = authenticate("Bearer sk-whatever-the-client-sent")
+    assert not hasattr(principal, "api_key"), (
+        "Principal now carries a credential — this test and every doc describing "
+        "the open door need rewriting together"
+    )
+
+    base = _read(SRC_ROOT / "providers" / "base.py")
+    assert "always the\n    # CALLER's own key" not in base
+    assert "CALLER's own key (their bearer token)" not in base, (
+        "providers/base.py claims the serving path threads the caller's key. "
+        "It threads None; the provider's own configured key pays."
+    )

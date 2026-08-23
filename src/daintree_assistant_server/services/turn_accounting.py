@@ -207,6 +207,15 @@ def log_turn_usage(
         # Raw values, not the `or 0` projections above: those cannot express
         # "unreported", and the ratio is the field that has to.
         cache_ratio=cache_ratio(usage.prompt_tokens, usage.cached_tokens),
+        # WHICH of the two documented shapes the count came out of — Together
+        # nests it for some models and puts it at the top level for others, and
+        # `providers/base.py` reads both. Logged because the two failure modes it
+        # separates look identical from `cached_tokens` alone: `None` here with a
+        # zero count says the host reported no reuse, while a shape that silently
+        # changed under us would show up as this field flipping. It is also the
+        # field the live contract suite will assert against once it exists
+        # (`TODO.md`), so the production answer is already on record when it does.
+        cached_tokens_source=usage.cached_tokens_source,
         # Which of the ~24 hosts produced the ratio above, and whether that
         # ratio is a single cache's or a blend of several.
         endpoint=endpoint,

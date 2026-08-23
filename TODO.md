@@ -19,7 +19,7 @@ The turn-finality declaration (#61) shipped as a PROBABILISTIC contract: the bas
 asks the model to open every reply with `[[DAINTREE:FINAL]]` or `[[DAINTREE:TOOLS]]`, and
 the backend strips it and acts on it. Nothing yet shows the serving model actually complies.
 The unit tests prove what happens WHEN a marker arrives; a fake emits it, so they cannot
-speak to whether `gemma-4-31b` does.
+speak to whether the serving model does.
 
 That gap is cheap today and expensive later. With `NullCompactor` a wrong or missing
 declaration costs only the prompt bytes. Once a producer exists, a false `FINAL` buys a
@@ -498,7 +498,10 @@ Nothing replaced it, so these are now remembered rather than checked:
   measurement);
 - whether Together reports a billed `cost`, which decides whether every
   cost field in a response is populated or absent (§5c);
-- that `prompt_cache_key` is accepted rather than rejected;
+- which of the two documented cached-token shapes the serving model reports
+  — nested under `prompt_tokens_details` or flat at the top level. The parser
+  reads both and stamps `cached_tokens_source` on every record, so the live
+  answer is one log query away the moment a suite can make the call;
 - the error-body shape the adapter parses;
 - streaming, tool calls, forced tool choice and JSON mode against the real API.
 

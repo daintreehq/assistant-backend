@@ -48,12 +48,11 @@ prompt prefill, and any reasoning emitted before the first visible token.
   not a slow endpoint.
 - **`endpoints`** — the endpoint that served each trial is recorded, because a
   bimodal latency distribution is usually two different endpoints rather than
-  noise. How much scatter to expect depends on the call: every call a user waits
-  on now carries an affinity key and sticks (`docs/PROVIDER_POLICY.md`
-  section 3a) — per session for a turn, per catalog revision for the selector,
-  per task id for a task — so a run's trials should mostly agree on an endpoint.
-  Scatter WITHIN a scenario is now itself a signal: sticky records expire after
-  10 minutes idle, and an error at the sticky endpoint re-routes the next call.
+  noise. Kept for a future router: nothing steers a trial toward a particular
+  endpoint, because the affinity key is computed and never sent
+  (`docs/PROVIDER_POLICY.md` section 3a) and the serving host is a single host
+  with automatic prefix caching. Expect `None` on most trials — that means "not
+  reported", not "one endpoint served them all".
 - **A discarded warmup trial** runs first: the very first call pays TLS + connection
   setup on a fresh httpx client.
 

@@ -46,7 +46,7 @@ async def _prompt_request(
     """Assemble a real provider request, then clamp completion to bound cost — the
     prompt (what we measure) is untouched.
 
-    ``skills`` selects the active set, which is what the affinity A/B varies: the
+    ``skills`` selects the active set, which is what the topic-shift sequence varies: the
     skill block is the first non-system message, so shifting it is what breaks the
     reusable prefix. Passing it through the assembler rather than editing the
     assembled array afterwards keeps the row identification the assembler's job —
@@ -74,12 +74,23 @@ async def _prompt_request(
 
 
 def _cache_ratio(usage: Any) -> dict[str, Any]:
-    pt = usage.prompt_tokens or 0
-    ct = usage.cached_tokens or 0
+    """Reuse for one call, with ``None`` wherever the host reported nothing.
+
+    The `or 0` this used to do turned "the host did not report cached tokens"
+    into a ratio of 0.0000 and printed it as a measurement — a cold cache that
+    was never observed to be cold. That is the same fabricated zero the usage
+    parser goes out of its way to avoid, and it is worse here: this benchmark
+    exists to decide whether the prefix layout pays off, so an invented zero
+    argues directly against the thing it is measuring.
+    """
+    pt = usage.prompt_tokens
+    ct = usage.cached_tokens
+    ratio = round(ct / pt, 4) if pt and ct is not None else None
     return {
         "prompt_tokens": pt,
         "cached_tokens": ct,
-        "cache_ratio": round(ct / pt, 4) if pt else 0.0,
+        "cache_ratio": ratio,
+        "cached_tokens_source": usage.cached_tokens_source,
     }
 
 
@@ -149,49 +160,33 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
     return {"trials": trials, "first_byte": latency_summary(first_byte)}
 
 
-#: Skills per turn, and turns per arm. Six consecutive skills per arm, so two arms
-#: can take disjoint slices of the catalog (see `_affinity_ab`).
-_AFFINITY_SKILLS_PER_TURN = 2
-_AFFINITY_TURNS = 3
-_AFFINITY_ARM_SPAN = _AFFINITY_SKILLS_PER_TURN * _AFFINITY_TURNS
+#: Skills per turn, and turns per sequence. Six consecutive skills, walked two at
+#: a time, so each turn presents a topic shift to the one before it.
+_SHIFT_SKILLS_PER_TURN = 2
+_SHIFT_TURNS = 3
+_SHIFT_SPAN = _SHIFT_SKILLS_PER_TURN * _SHIFT_TURNS
 
 
-async def _affinity_sequence(
-    provider: Any, settings: Settings, *, cache_session_id: str | None, offset: int
+async def _topic_shift_sequence(
+    provider: Any, settings: Settings, *, offset: int
 ) -> list[dict[str, Any]]:
-    """One session's worth of turns, run with or without an affinity key.
+    """One session's worth of turns, SHIFTING the active skill set between them.
 
-    The sequence deliberately SHIFTS the active skill set between turns. That is
-    the whole experiment: the skill block is the first non-system message, so a
-    shift invalidates everything below it while the invariant head above it (base
-    prompt, response contract, tool schemas) is still perfectly reusable. An arm
-    that sent the same request twice would measure nothing.
+    That shift is the whole experiment. The skill block is the first non-system
+    message, so changing it invalidates everything below while the invariant head
+    above it — base prompt, response contract, tool schemas — stays perfectly
+    reusable. What the sequence measures is how much of a request survives a
+    topic shift under the host's automatic prefix cache.
 
-    **What this A/B can still tell you has narrowed**, and it is worth saying so
-    rather than reading the old number off a new provider. Against a ROUTER the
-    key decided which of many endpoints answered, so the arms could differ by a
-    whole cold prefill. The serving host serves one endpoint and caches prefixes
-    automatically, org-scoped, with no sticky record to steer — so
-    ``prompt_cache_key`` is a hint it may ignore and the honest expectation is
-    that the two arms agree. A DIFFERENCE here is now the finding; parity is the
-    null result, not a regression.
-
-    ``cache_session_id=None`` is the NO-KEY baseline.
-
-    ``offset`` picks this arm's slice of the catalog, and it is the ONLY lever that
-    moves the default sticky key: that key hashes the first system message and the
-    first non-system message, which here are the invariant base prompt and the
-    skill block. Nothing further down — not the user message, not the tail — takes
-    part in it. So a per-arm, per-run offset is what stops the no-key arm from
-    inheriting the sticky record and warm prefix of the previous arm or the
-    previous run, which would read as an affinity effect that is really run order.
+    ``offset`` picks this run's slice of the catalog, so consecutive runs do not
+    simply re-read each other's warm prefixes.
     """
     from daintree_assistant_server.skills.catalog import load_catalog
 
     catalog = load_catalog()
     windows = [
-        list(catalog.skills[i : i + _AFFINITY_SKILLS_PER_TURN])
-        for i in range(offset, offset + _AFFINITY_ARM_SPAN, _AFFINITY_SKILLS_PER_TURN)
+        list(catalog.skills[i : i + _SHIFT_SKILLS_PER_TURN])
+        for i in range(offset, offset + _SHIFT_SPAN, _SHIFT_SKILLS_PER_TURN)
     ]
     calls: list[dict[str, Any]] = []
     for turn, skills in enumerate(windows):
@@ -201,7 +196,6 @@ async def _affinity_sequence(
             stream=False,
             skills=skills,
         )
-        pr.cache_session_id = cache_session_id
         result = await provider.complete(pr)
         calls.append({
             "turn": turn,
@@ -211,104 +205,94 @@ async def _affinity_sequence(
     return calls
 
 
-def _summarize_affinity(calls: list[dict[str, Any]]) -> dict[str, Any]:
+def _summarize_topic_shift(calls: list[dict[str, Any]]) -> dict[str, Any]:
     endpoints = [c["endpoint"] for c in calls]
     pairs = list(zip(endpoints, endpoints[1:], strict=False))
     # Only KNOWN→KNOWN transitions count. `endpoint` is None when the provider
     # reported none, and this repo treats that as "not reported", never as a host:
     # counting [A, None, A] as two switches would invent two cache misses that may
-    # not have happened, and counting it as zero would claim knowledge we lack.
+    # not have happened, and counting it as zero would claim knowledge we lack. A
+    # single-host provider reports nothing, so expect this to be entirely unknown.
     known = [(a, b) for a, b in pairs if a is not None and b is not None]
     # Switches, not distinct count: A→B→A is two switches and two cold prefixes,
     # which a distinct count of 2 would understate.
     switches = sum(1 for a, b in known if a != b)
-    # Turn 0 is excluded: it elects an endpoint rather than returning to one, so
-    # neither arm can differ there and averaging it in only dilutes the signal.
-    later = [c["cache_ratio"] for c in calls[1:]]
+    # Turn 0 is excluded: it has no preceding turn to have shifted away from, so
+    # its ratio measures whatever the org-wide cache already held, not reuse
+    # across a shift.
+    #
+    # Unreported calls are excluded from the mean rather than averaged in as
+    # zero, and `measured_calls` says how many went into it — an average over
+    # one observation and an average over three are different claims, and the
+    # number alone cannot tell them apart. `None` when nothing was measured.
+    later = [c["cache_ratio"] for c in calls[1:] if c["cache_ratio"] is not None]
     return {
         "endpoints": endpoints,
         "endpoint_switches": switches if len(known) == len(pairs) else None,
         "comparable_transitions": len(known),
         "unknown_transitions": len(pairs) - len(known),
-        "mean_cache_ratio_after_first": round(sum(later) / len(later), 4) if later else 0.0,
+        "mean_cache_ratio_after_first": round(sum(later) / len(later), 4) if later else None,
+        "measured_calls": len(later),
+        "unmeasured_calls": len(calls) - 1 - len(later),
         "calls": calls,
     }
 
 
-async def _affinity_ab(settings: Settings) -> dict[str, Any]:
-    """The issue #42 A/B: does naming the sticky key keep a session on one endpoint?
+async def _topic_shift_reuse(settings: Settings) -> dict[str, Any]:
+    """How much of a request survives a skill topic shift, live.
 
-    Both arms are one sequential session at concurrency one, well inside the
-    upstream's prefix-cache TTL (Together guarantees 5 minutes, often longer).
+    **This replaces the issue #42 cache-affinity A/B, which measured nothing.**
+    That experiment ran the sequence twice — once setting ``cache_session_id``,
+    once leaving it ``None`` — to ask whether naming a sticky key kept a session
+    on one endpoint. Against a ROUTER that was a real question. Against this host
+    it is not one: ``_build_body`` DROPS the key under both vendors' spellings
+    (docs/PROVIDER_POLICY.md section 3a), so the two arms sent byte-identical
+    bodies and any delta between them was run order. Keeping it would have burned
+    paid calls re-proving what a unit test already asserts, and — worse — printed
+    a delta a reader would have taken for an affinity effect.
 
-    The two arms take DISJOINT, run-randomized slices of the catalog. That is what
-    makes the comparison WITHIN a run fair rather than ordered: the arms share no
-    skill block, so neither can warm the other's prefix or leave behind a sticky
-    record the other inherits. Their skill CONTENT differs as a result, which is
-    noise — the metric is how much of each arm's own prefix survived its own topic
-    shifts — where sharing the slices would have been directional bias in the
-    second arm's favour.
+    What is left is the half that was always doing the work: one sequential
+    session at concurrency one, well inside the upstream's prefix-cache TTL
+    (Together guarantees 5 minutes, often longer), shifting skills every turn.
 
-    ACROSS runs it is weaker, and the limit is worth stating rather than papering
-    over. Together matches prefixes ORG-WIDE, so any traffic from this account —
-    another bench, a dev server, a real turn — can have warmed the same base
-    prompt and skill blocks already. The only freshness available is the offset,
-    and the catalog affords a couple of dozen positions, so two runs can draw
-    overlapping slices. A rerun is therefore not guaranteed cold. Space runs
-    beyond the cache TTL if independence matters.
+    The limit worth stating rather than papering over: Together matches prefixes
+    ORG-WIDE, so any traffic from this account — another bench, a dev server, a
+    real turn — can have warmed the same base prompt and skill blocks already.
+    The only freshness available is the offset, and the catalog affords a couple
+    of dozen positions, so a rerun is not guaranteed cold. Space runs beyond the
+    cache TTL if independence matters.
 
     What remains shared in every case is the invariant head above the skill block
     (base prompt, response contract, tool schemas). That is not a confound to
-    remove: it is shared by every Daintree request in existence, so both arms meet
-    it warm, which is exactly the condition the served fleet is in.
+    remove: it is shared by every Daintree request in existence, so the sequence
+    meets it warm, which is exactly the condition the served fleet is in.
     """
     from daintree_assistant_server.skills.catalog import load_catalog
 
     run = uuid.uuid4().hex[:12]
-    # Two disjoint arms have to fit inside the catalog. `positions` counts valid
-    # STARTS, so it is the slack plus one: a catalog of exactly 2 * span fits, at
-    # the single offset 0.
-    positions = len(load_catalog().skills) - 2 * _AFFINITY_ARM_SPAN + 1
+    # `positions` counts valid STARTS, so it is the slack plus one: a catalog of
+    # exactly one span fits, at the single offset 0.
+    positions = len(load_catalog().skills) - _SHIFT_SPAN + 1
     if positions < 1:
-        raise ValueError("catalog too small for two disjoint affinity arms")
+        raise ValueError("catalog too small for a topic-shift sequence")
     offset = int(run[:8], 16) % positions
     provider = make_upstream_provider(settings, timeout=settings.main_timeout_seconds)
     try:
-        control = await _affinity_sequence(
-            provider, settings, cache_session_id=None, offset=offset
-        )
-        treatment = await _affinity_sequence(
-            provider,
-            settings,
-            cache_session_id=f"daintree-main-bench-{run}",
-            offset=offset + _AFFINITY_ARM_SPAN,
-        )
+        calls = await _topic_shift_sequence(provider, settings, offset=offset)
     finally:
         await provider.aclose()
 
-    control_summary = _summarize_affinity(control)
-    treatment_summary = _summarize_affinity(treatment)
-
-    def delta(key: str) -> Any:
-        lhs, rhs = treatment_summary[key], control_summary[key]
-        return None if lhs is None or rhs is None else round(lhs - rhs, 4)
-
     return {
         "run": run,
-        "control": control_summary,
-        "treatment": treatment_summary,
-        "delta": {
-            "endpoint_switches": delta("endpoint_switches"),
-            "mean_cache_ratio_after_first": delta("mean_cache_ratio_after_first"),
-        },
-        "note": "one sequence per arm — indicative, not significant. Re-run before "
-                "drawing a conclusion; endpoint switch rate is diagnostic (an endpoint "
-                "is many GPU workers, so the same name is not the same cache).",
+        "offset": offset,
+        **_summarize_topic_shift(calls),
+        "note": "one sequence — indicative, not significant. Re-run before drawing a "
+                "conclusion; the org-wide cache means a 'cold' first turn may not be.",
     }
 
 
 async def run_live(
-    settings: Settings, *, trials: int = 3, affinity_ab: bool = False
+    settings: Settings, *, trials: int = 3, topic_shift: bool = False
 ) -> dict[str, Any]:
     from datetime import UTC, datetime
 
@@ -329,9 +313,13 @@ async def run_live(
         await provider.aclose()
 
     composed = await _composed_first_byte(settings, trials)
-    affinity = await _affinity_ab(settings) if affinity_ab else None
+    shift = await _topic_shift_reuse(settings) if topic_shift else None
 
-    warm_ratios = [c["warm_call"]["cache_ratio"] for c in warm_cases if not c["json_mode"]]
+    # Unreported ratios are dropped, not counted as zero — see `_cache_ratio`.
+    warm_ratios = [
+        r for c in warm_cases if not c["json_mode"]
+        if (r := c["warm_call"]["cache_ratio"]) is not None
+    ]
     doc: dict[str, Any] = {
         "meta": {
             "benchmark": "prompt_cost",
@@ -341,7 +329,7 @@ async def run_live(
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },
         "summary": {
-            "warm_tool_region_cache_ratio": max(warm_ratios) if warm_ratios else 0.0,
+            "warm_tool_region_cache_ratio": max(warm_ratios) if warm_ratios else None,
             "streaming_ttfb_p50_s": ttfb["p50_s"],
             "composed_first_byte_p50_s": composed["first_byte"]["p50_s"],
             "note": "shared server-side cache → first call is NOT cold; only the warm "
@@ -351,6 +339,6 @@ async def run_live(
         "streaming_ttfb": ttfb,
         "composed_first_byte": composed,
     }
-    if affinity is not None:
-        doc["affinity_ab"] = affinity
+    if shift is not None:
+        doc["topic_shift_reuse"] = shift
     return doc

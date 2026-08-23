@@ -2,12 +2,12 @@
 
 The deterministic scoreboard for the whole cost/latency story, plus a live
 cross-check. Drives the REAL `PromptAssembler.build_main_request` and the EXACT
-bytes `OpenRouterProvider` would POST.
+bytes the serving adapter would POST.
 
 ```bash
 python -m benchmarks.prompt_cost.bench run              # deterministic (free, CI-able)
 python -m benchmarks.prompt_cost.bench run --live        # + live cache/TTFB (paid)
-python -m benchmarks.prompt_cost.bench run --live --affinity-ab   # + cache-affinity A/B (paid)
+python -m benchmarks.prompt_cost.bench run --live --topic-shift   # + topic-shift reuse (paid)
 python -m benchmarks.prompt_cost.bench report results/<f>.json
 ```
 
@@ -44,30 +44,33 @@ python -m benchmarks.prompt_cost.bench report results/<f>.json
   (selector → assembly → main stream) — the latency a selector-firing turn actually
   costs the user.
 
-**Cache-affinity A/B (`--live --affinity-ab`, issue #42):** runs a three-turn
-session twice — once with **no** affinity key (the pre-change baseline, where
-OpenRouter falls back to hashing the first system and first non-system message) and
-once with a stable `session_id` (what the server sends today) — and reports endpoint
-switches plus mean cache ratio after the first turn. The sequence **shifts the
-active skill set between turns on purpose**: the skill block is the first non-system
-message, so a shift is exactly what invalidates the default key while leaving the
-invariant head above it reusable.
+**Topic-shift reuse (`--live --topic-shift`):** runs one three-turn session that
+**shifts the active skill set between turns on purpose**. The skill block is the
+first non-system message, so a shift invalidates everything below it while the
+invariant head above — base prompt, response contract, tool schemas — stays
+perfectly reusable. It reports mean cache ratio after the first turn, plus
+endpoint switches where the host reports an endpoint at all (this one does not,
+so expect `n/a`).
 
-The two arms take **disjoint, run-randomized slices of the catalog**, and the
-treatment key is fresh per run. That is what keeps arm order from deciding the
-result *within* a run: the skill block is the only thing below the invariant head
-that the default sticky key hashes, so disjoint slices mean neither arm can warm the
-other's prefix or leave a sticky record the other inherits.
+**This replaced a two-arm cache-affinity A/B (issue #42), which measured
+nothing.** That experiment ran the sequence twice — once setting the affinity
+key, once leaving it unset — and reported the delta. It made sense against a
+router, where the key decided which of many endpoints answered. It does not make
+sense here: the adapter **drops** the key under both vendors' spellings
+(`docs/PROVIDER_POLICY.md` section 3a), so both arms POSTed byte-identical bodies
+and the delta was run order wearing a measurement's clothes. Keeping it would
+have spent paid calls re-proving what
+`tests/unit/test_provider_openrouter.py::test_no_routing_or_affinity_field_is_ever_sent`
+asserts for free.
 
-Across runs it is weaker, and worth knowing before you read a delta. The no-key
-arm's key is OpenRouter's default — a hash of the base prompt and the skill block,
-both fixed content — so the offset is the only freshness available and the catalog
-affords only a couple of dozen positions; two runs can draw overlapping slices, and
-served traffic may have used those blocks anyway. **A rerun is not guaranteed
-cold**: space runs beyond the 10-minute sticky idle window if independence matters.
-The invariant head above the skill block stays shared in every case, deliberately —
-every Daintree request shares it, so both arms meeting it warm is the production
-condition, not a confound.
+Read the remaining number with one limit in mind. Together matches prefixes
+**org-wide**, so any traffic from this account — another bench, a dev server, a
+real turn — can have warmed the same base prompt and skill blocks already. The
+run-randomized catalog offset is the only freshness available and the catalog
+affords a couple of dozen positions, so **a rerun is not guaranteed cold**: space
+runs beyond the cache TTL if independence matters. The invariant head stays
+shared in every case, deliberately — every Daintree request shares it, so meeting
+it warm is the production condition, not a confound.
 
 One run is still indicative rather than significant — re-run before concluding.
 Endpoint switch rate is diagnostic only: an endpoint is many GPU workers, so the

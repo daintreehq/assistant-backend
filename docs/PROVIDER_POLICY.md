@@ -163,6 +163,40 @@ opaque local text we make no promises about. The salt is shared by every
 instance, so the key is stable across a stateless fleet without any instance
 storing it.
 
+### 3b. Cache reporting — two shapes, both read
+
+Nothing is sent to *ask* for prefix caching (§3a), so what a request carries says
+nothing about what it got. The only signal is the count the host reports back,
+and Together documents it in **two places**, saying which one appears depends on
+the model:
+
+| Shape | Where | Example |
+|---|---|---|
+| Nested | `usage.prompt_tokens_details.cached_tokens` | the OpenAI-standard spelling |
+| Flat | `usage.cached_tokens` | top level, beside `prompt_tokens` |
+
+`ProviderUsage.from_wire` reads the nested one first and falls back to the flat
+one, and records which arrived as `cached_tokens_source` (`"nested"`, `"flat"`,
+or `None`). Two properties are deliberate:
+
+- **The flat field is a fallback, never a supplement.** A host emitting both
+  would be reporting one number twice; summing them would inflate reuse on
+  precisely the requests where the cache is working hardest.
+- **`None` means "not reported", never zero.** Reading only the nested shape —
+  which is what this adapter did until the fallback landed — turns a host that
+  uses the flat spelling into one that appears to have no prefix cache at all.
+  That is the failure worth naming: it does not look like a parser bug, it looks
+  like a caching problem, and it invites work against the measurement instead of
+  the wire.
+
+Every token field goes through the same non-negative-integer coercion, for the
+reason `cost` already did: `usage` is untyped JSON, and a count arriving as
+`"1024"` or `true` used to land in an `int | None` field and raise in
+`turn_accounting.cache_ratio`, mid-turn, on the paid path.
+
+**Which shape this host actually uses is UNVERIFIED** — see §8. The parser
+handles both so that the answer is a log query rather than an outage.
+
 ## 4. Privacy — UNVERIFIED against the current host
 
 > ⚠️ **READ THIS BEFORE ANY LINE OF THIS SECTION.** Nothing here has been
@@ -612,7 +646,10 @@ recorded as a **dated observation** rather than a timeless truth. Specifically:
 
 - what the host retains and for how long (§4) — their published policy, not
   something this repository can assert or enforce;
-- that `prompt_cache_key` is accepted but not required;
+- which of the two documented cached-token shapes arrives — nested under
+  `prompt_tokens_details` or flat at the top level. The parser reads both
+  (`providers/base.py`) and records which one it saw, so this is unverified
+  rather than unhandled;
 - that the disable object actually suppresses reasoning (§2);
 - whether the host reports a billed cost (§5c);
 - every latency and token figure quoted above.

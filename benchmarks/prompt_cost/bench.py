@@ -59,30 +59,28 @@ def _print(doc: dict[str, Any]) -> None:
     if live:
         s = live["summary"]
         print("\n== prompt_cost (live) ==")
-        print(f"warm tool-region cache ratio : {s['warm_tool_region_cache_ratio']:.4f}")
+        # "n/a", never 0.0000: an unreported ratio is not an observed cold cache,
+        # and this is the headline number of a paid run.
+        warm = s["warm_tool_region_cache_ratio"]
+        print(f"warm tool-region cache ratio : {'n/a' if warm is None else format(warm, '.4f')}")
         print(f"streaming TTFB p50           : {s['streaming_ttfb_p50_s']:.3f}s")
         print(f"composed first-byte p50      : {s['composed_first_byte_p50_s']:.3f}s")
-        ab = live.get("affinity_ab")
-        if ab:
+        shift = live.get("topic_shift_reuse")
+        if shift:
             # "n/a" wherever an endpoint went unreported: a switch count over
-            # partially-unknown transitions would read as a measurement.
-            def _switches(value: Any, signed: bool = False) -> str:
-                if value is None:
-                    return "n/a"
-                return f"{value:+d}" if signed else str(value)
-
-            print(f"  cache affinity A/B (issue #42, run {ab['run']}):")
-            for arm in ("control (no key)", "treatment"):
-                a = ab[arm.split()[0]]
-                unknown = a["unknown_transitions"]
-                print(f"    {arm:16} switches={_switches(a['endpoint_switches'])} "
-                      f"cache_after_first={a['mean_cache_ratio_after_first']:.4f} "
-                      f"endpoints={a['endpoints']}"
-                      + (f" (unreported transitions: {unknown})" if unknown else ""))
-            d = ab["delta"]
-            cache_delta = d["mean_cache_ratio_after_first"]
-            print(f"    {'delta':16} switches={_switches(d['endpoint_switches'], signed=True)} "
-                  f"cache_after_first={cache_delta:+.4f}")
+            # partially-unknown transitions would read as a measurement. A
+            # single-host provider reports none, so this is usually "n/a".
+            switches = shift["endpoint_switches"]
+            unknown = shift["unknown_transitions"]
+            print(f"  topic-shift reuse (run {shift['run']}, offset {shift['offset']}):")
+            mean = shift["mean_cache_ratio_after_first"]
+            unmeasured = shift["unmeasured_calls"]
+            print(f"    {'sequence':16} switches={'n/a' if switches is None else switches} "
+                  f"cache_after_first={'n/a' if mean is None else format(mean, '.4f')}"
+                  f" (n={shift['measured_calls']}) "
+                  f"endpoints={shift['endpoints']}"
+                  + (f" (unreported transitions: {unknown})" if unknown else "")
+                  + (f" (unmeasured calls: {unmeasured})" if unmeasured else ""))
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
@@ -96,7 +94,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         from .live import run_live
 
         doc["live"] = asyncio.run(
-            run_live(settings, trials=args.trials, affinity_ab=args.affinity_ab)
+            run_live(settings, trials=args.trials, topic_shift=args.topic_shift)
         )
     _print(doc)
     if not args.no_save:
@@ -121,9 +119,9 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--live", action="store_true", help="add live cache/TTFB (paid)")
     run.add_argument("--trials", type=int, default=3, help="live latency trials (default 3)")
     run.add_argument(
-        "--affinity-ab",
+        "--topic-shift",
         action="store_true",
-        help="with --live: A/B the cache-affinity key against no key (paid)",
+        help="with --live: measure prefix reuse across a skill topic shift (paid)",
     )
     run.add_argument("--env-file", help="path to a .env with TOGETHER_API_KEY")
     run.add_argument("--out", help="explicit output JSON path")

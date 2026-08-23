@@ -38,14 +38,13 @@ trial, because the very first call pays TLS + connection setup on a fresh httpx
 client. Endpoint choice is recorded per trial, because a bimodal latency
 distribution is usually two different endpoints rather than noise.
 
-Do NOT read that recording as "each trial elects independently" — it no longer
-does. These scenarios drive the real ``Selector``, ``TaskRunner`` and orchestrator,
-and every one of those now attaches a cache-affinity ``session_id``: per session
-for a turn, per catalog revision for the selector, per task id for a task. Trials
-within a scenario should therefore mostly AGREE on an endpoint, and scatter is
-itself the signal — a sticky record expires after 10 minutes idle and an error at
-the sticky endpoint re-routes the next call. See docs/PROVIDER_POLICY.md
-section 3a.
+Do NOT read that recording as a sticky-session effect either way. The affinity
+key these scenarios' calls compute is never SENT (docs/PROVIDER_POLICY.md
+section 3a) — the serving host is one host with automatic prefix caching, so
+there is no endpoint pool to pin and nothing steers a trial toward the endpoint
+that served the last one. ``endpoint`` is reported by the provider or it is not;
+a single-host provider generally reports nothing at all, which is why most runs
+record ``None``. Scatter, when a name does arrive, is scatter.
 """
 
 from __future__ import annotations
