@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:b34f4ef5b13b6af1a480a8e92129d6af9697297fc95acdd25d7b1d5d7f127695",
+    "revision": "sha256:d3bd4bb099046cff77be3dfd26d0462981f47f7f542094ab5429d489009303e8",
     "skills": 39
   },
   "identity": {
@@ -11,7 +11,8 @@
   },
   "prompt": {
     "base_prompt_bytes": 24795,
-    "skill_body_bytes_total": 290532,
+    "base_prompt_forked_bytes": 27424,
+    "skill_body_bytes_total": 291665,
     "subagent_prompt_bytes": 5375
   },
   "selector": {

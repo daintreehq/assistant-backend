@@ -27,6 +27,7 @@ from daintree_assistant_server.services.forked_terminal_calls import (
 from daintree_assistant_server.services.forked_tool_call_rewriter import (
     ForkedToolCallRewriter,
 )
+from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from tests.fakes import FakeProvider, make_result
 
 #: `make_result`'s fixed per-call usage, so a total can be asserted exactly.
@@ -144,12 +145,22 @@ def fork_settings(settings: Settings) -> Settings:
 
 
 @pytest.fixture
+def fork_assembler(prompt_loader: Any, fork_settings: Settings) -> PromptAssembler:
+    # Built from the ENABLED settings. The shared `assembler` fixture carries the
+    # default (disabled) ones, so reusing it would run every test below against a
+    # base prompt with no forked-spawn rule in it — the tool offered and the rule
+    # explaining it absent, which is the one combination production cannot
+    # produce.
+    return PromptAssembler(prompt_loader, fork_settings)
+
+
+@pytest.fixture
 def fork_orchestrator(
     fork_settings: Settings,
     catalog_manager: Any,
     selector: Any,
     state_codec: Any,
-    assembler: Any,
+    fork_assembler: PromptAssembler,
     fake_provider: FakeProvider,
 ) -> ChatOrchestrator:
     fake_provider.complete_result = _spawn_answer
@@ -158,7 +169,7 @@ def fork_orchestrator(
         catalog_manager=catalog_manager,
         selector=selector,
         state_codec=state_codec,
-        assembler=assembler,
+        assembler=fork_assembler,
         provider=fake_provider,
         fork_rewriter=ForkedToolCallRewriter(
             expansion=ForkPromptExpansionService(
@@ -505,3 +516,33 @@ async def test_the_streaming_turn_reports_the_expansion_usage_it_billed(
     done = [payload for name, payload in events if name == "done"][0]
     assert done["usage"]["prompt_tokens"] == 4 * MAIN_PROMPT_TOKENS
     assert done["usage"]["completion_tokens"] == 4 * MAIN_COMPLETION_TOKENS
+
+
+async def test_the_rule_and_the_tool_ship_together(
+    fork_orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    # The one combination production cannot produce is a tool with no rule
+    # explaining it, or a rule naming a tool the turn was not offered. Both come
+    # from the same setting, and this is where that would break.
+    fake_provider.stream_chunks = _fork_chunks()
+    await _collect(fork_orchestrator, _request())
+    sent = fake_provider.stream_requests[-1]
+    system = "\n".join(
+        str(m.get("content", "")) for m in sent.messages if m.get("role") == "system"
+    )
+    assert "Branch expansion mode:" in system
+    assert FORK_TOOL_WIRE_NAME in system
+    assert FORK_TOOL_WIRE_NAME in [t["function"]["name"] for t in (sent.tools or [])]
+
+
+async def test_a_disabled_deployment_ships_neither(
+    orchestrator: ChatOrchestrator, fake_provider: FakeProvider
+) -> None:
+    fake_provider.stream_chunks = None
+    await _collect(orchestrator, _request())
+    sent = fake_provider.stream_requests[-1]
+    system = "\n".join(
+        str(m.get("content", "")) for m in sent.messages if m.get("role") == "system"
+    )
+    assert "Branch expansion mode:" not in system
+    assert FORK_TOOL_WIRE_NAME not in [t["function"]["name"] for t in (sent.tools or [])]

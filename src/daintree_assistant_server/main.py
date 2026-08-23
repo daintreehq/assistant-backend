@@ -445,6 +445,9 @@ def build_container(
     # flight anyway — a model can only declare what it was asked to declare. A
     # compactor whose availability genuinely varies at runtime therefore needs a
     # container rebuild to change the prompt, not just a property returning True.
+    # The forked-spawn rule is NOT passed here: the assembler reads it from the
+    # same `Settings` the injection gate reads, so the prompt and the tool list
+    # cannot disagree about whether the feature exists.
     assembler = PromptAssembler(
         prompt_loader, settings, response_declaration=chat_compactor.available
     )

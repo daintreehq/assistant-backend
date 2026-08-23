@@ -52,6 +52,7 @@ from ..contracts.forked_terminals import (
     ForkSpawnPlan,
     effective_controls,
     effective_mode,
+    effective_watch,
 )
 from ..errors import DaintreeError
 from ..observability import get_logger
@@ -490,6 +491,14 @@ def fallback_arguments(plan: ForkSpawnPlan, branch: ForkBranch) -> dict[str, Any
     )
 
     args: dict[str, Any] = {"title": title, "taskPrompt": task_prompt}
+    # The plan's watcher steer, when the plan asked for a watcher. Advertised on
+    # the branch and previously read only by an expansion — so the one path that
+    # exists BECAUSE the expansion failed was also the one that silently
+    # discarded it, leaving a supervisor with no completion criterion.
+    if effective_watch(plan, branch):
+        hint = sanitize_line(branch.watch_goal_hint, 1_000)
+        if hint:
+            args["watchGoal"] = hint
     if mode == "edit":
         args["acceptanceCriteria"] = sanitize_line(branch.acceptance_hint, 2_000) or (
             "- The objective stated in this branch's brief is satisfied.\n"

@@ -149,6 +149,21 @@ BASE_PARTIAL_CEILINGS = {
     # Raised with BASE_PROMPT_CEILING above (see the argument there) — the
     # delegation bullet lands in this partial.
     "20-tool-discipline.md": 10 * 1024,
+    # The internal forked-spawn call and its branch-expansion mode. CONDITIONAL
+    # like the declaration partial above: the container ships it only where
+    # FORKED_TERMINAL_CALLS_MODE is enabled, which is nowhere by default, so it
+    # costs a real request nothing today.
+    #
+    # It is base rather than skill text because the TOOL is offered on every
+    # assistant turn of an enabled deployment, deliberately — a tool list that
+    # appeared only once a particular runbook loaded would re-encode the largest
+    # region of the request on a topic shift. A rule governing an
+    # unconditionally-offered tool has to be unconditional too.
+    #
+    # Sized to the measured 2628 B, close rather than round: the enabled variant
+    # is already over the aggregate ceiling below, so this is the only ratchet
+    # actually holding this text.
+    "25-forked-terminal-calls.md": 2816,
     "30-skills.md": 3 * 1024,
     "35-daintree-docs.md": 2304,
     # Raised from 3 KiB with the base ceiling above, and for the same rule: the
@@ -375,4 +390,25 @@ def test_response_contract_under_ceiling() -> None:
         "ratchet. It is a system message on every request, ahead of ~21.5k tokens of tool "
         "schemas in the serving model's serialization — these bytes are paid by every caller "
         "on every turn."
+    )
+
+
+#: The base prompt an ENABLED forked-spawn deployment sends. Its own ratchet,
+#: because `BASE_PROMPT_CEILING` measures the default variant and would not
+#: notice this one growing at all — and 2.6 KiB of it is already text no other
+#: ceiling in this file covers.
+BASE_PROMPT_FORKED_CEILING = 28 * 1024
+
+
+def test_the_forked_variant_has_its_own_ratchet() -> None:
+    from daintree_assistant_server.prompts.loader import PromptLoader
+
+    size = len(
+        PromptLoader()
+        .base_prompt(response_declaration=False, forked_terminals=True)
+        .encode("utf-8")
+    )
+    assert size <= BASE_PROMPT_FORKED_CEILING, (
+        f"the enabled base prompt is {size}B, over its "
+        f"{BASE_PROMPT_FORKED_CEILING}B ratchet"
     )

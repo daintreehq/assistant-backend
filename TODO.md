@@ -10,6 +10,81 @@ claim about today's behaviour against the source before acting on it.
 
 ---
 
+## Measure forked-spawn latency against the serial baseline before enabling it
+
+**Trigger: before `FORKED_TERMINAL_CALLS_MODE=enabled` reaches production.**
+
+The feature is built and gated off. What is NOT measured is the thing it exists
+for: time from the user's submission to the client holding four executable spawn
+calls, candidate against baseline, on the same conversation and the same four
+branch objectives. Nothing offline can answer it — the arms differ only in how
+many upstream calls run and how they overlap, so a fake provider measures the
+harness rather than the feature.
+
+Measure at minimum: main completion time, fork-plan output tokens, expansion wall
+time against the sum of the four branch times (the concurrency claim, stated as a
+ratio), per-branch cached-token ratio (the prefix-reuse claim), the repair and
+fallback rates, and the total token and cost delta. The `fork_expansion_complete`
+event already carries all of it — this is a harness and a corpus, not new
+instrumentation.
+
+Two results would each stop the rollout on their own: a cached-token ratio that
+says the expansions are NOT reusing the main prefix (which would make the feature
+cost four full prompts to save some output tokens), and a fallback rate high
+enough that the normal path is no longer one main call plus four first-attempt
+expansions.
+
+Belongs in a nightly paid run beside the other live suites, not in the
+deterministic dashboard — CI gates nothing that costs money, deliberately.
+
+## A prompt-behaviour corpus for the fork trigger
+
+**Trigger: with the latency benchmark above, or the first time the model forks a
+turn it should not have.**
+
+The trigger rule lives in prose (`main/base/25-forked-terminal-calls.md`) and prose
+is graded by behaviour, not by a unit test. Cases worth grading: four disjoint edit
+branches; four read-only branches; per-branch overrides against shared defaults; a
+prompt-injection string inside the terminal history; a fake internal marker in
+ordinary user text; a branch owning a shared config file while the others avoid it;
+ambiguous worktree targets, where the model must ASK rather than fork; three
+branches, where the fixed-four call must not be used; and worktrees that do not
+exist yet, where the creation stage has to come first.
+
+Grade: correct trigger, valid compact plan, control-field accuracy, branch
+disjointness, first-try expansion validity, and whether the four generated prompts
+duplicate each other's scope.
+
+## Reconcile the declaration rule with branch-expansion mode
+
+**Trigger: before compaction's producer and forked spawns are enabled on the same
+deployment.**
+
+Unreachable today and cheap to fix later, which is why it is written down rather
+than solved now: `15-response-declaration.md` asks every reply to open with a
+`[[DAINTREE:FINAL]]`/`[[DAINTREE:TOOLS]]` control line, and
+`25-forked-terminal-calls.md` tells a branch expansion to emit exactly one tool
+call "with no prose and no other call". A model in expansion mode has two rules
+pointing opposite ways, and the one it picks decides whether the backend's
+scanner or its tool-call parser sees what it expects.
+
+The fourth golden snapshot (`base_prompt_declaring_and_forked.md`) is where both
+texts sit together, so the conflict is readable rather than theoretical. Deciding
+it is one sentence in whichever partial keeps its rule — most likely carving
+expansion mode out of the declaration, as the bare-JSON reply already is.
+
+## Variable branch counts for forked spawns
+
+**Trigger: once the fixed four is measured as a win AND a real workflow wants a
+different number.**
+
+Everything about the current design is written for exactly four: the plan contract,
+the tool description, the fallback templates and the latency argument. Widening it
+is a deliberate second decision, not a constant to relax — and the honest order is
+to prove the mechanism pays for itself at one size first. The same applies to
+expanding a target other than `agentTask.spawnForEdits`, and to starting expansion
+from a fork plan that is still streaming rather than one that has completed.
+
 ## Prove declaration compliance before compaction spends anything
 
 **Trigger: before #60's producer is switched on — i.e. before `context_compaction.enabled`

@@ -193,8 +193,26 @@ class PromptLoader:
         # Read once. See the module docstring: these are immutable packaged files
         # and the loader is a process-wide singleton, so the only thing per-request
         # reads bought was latency.
-        self._base_prompt = self._load_base()
-        self._base_prompt_no_declaration = self._load_base_without_declaration()
+        # One string per (declaration, forked-terminals) combination, built at
+        # LOAD rather than per call. Both choices are deployment-wide — a
+        # container holds one compactor and one fork mode for its lifetime — so
+        # the rendered prompt stays byte-identical across callers and the prefix
+        # cache does not split. Selecting per request would be the bug this
+        # avoids.
+        self._base_variants = {
+            (declaration, fork): self._load_parts(
+                "main/base", skip=self._omitted(declaration=declaration, fork=fork)
+            )
+            for declaration in (True, False)
+            for fork in (True, False)
+        }
+        # The MAXIMAL variant, and only `content_hashes`/`validate` read it.
+        # Those two ask "which prompt text does this BUILD ship", not "what did
+        # this deployment send" — so it covers every partial, and editing any one
+        # of them moves the hash even on a deployment that omits it. What a given
+        # deployment actually sends is a property of its flags, recorded beside
+        # them in `benchmarks/baseline.json`.
+        self._base_prompt = self._base_variants[(True, True)]
         self._subagent_prompt = self._load_parts("main/subagent")
         self._task_prompts = self._load_dir("tasks")
 
@@ -212,11 +230,18 @@ class PromptLoader:
     #: actually configured — see :meth:`base_prompt`.
     DECLARATION_PART = "15-response-declaration"
 
-    def _load_base(self) -> str:
-        return self._load_parts("main/base")
+    #: The partial that instructs the internal forked-spawn call and the branch
+    #: expansion mode. Dropped unless the feature is actually enabled — see
+    #: :meth:`base_prompt`.
+    FORK_PART = "25-forked-terminal-calls"
 
-    def _load_base_without_declaration(self) -> str:
-        return self._load_parts("main/base", skip={self.DECLARATION_PART})
+    def _omitted(self, *, declaration: bool, fork: bool) -> frozenset[str]:
+        skip: set[str] = set()
+        if not declaration:
+            skip.add(self.DECLARATION_PART)
+        if not fork:
+            skip.add(self.FORK_PART)
+        return frozenset(skip)
 
     def _load_parts(self, relative: str, *, skip: frozenset[str] | set[str] = frozenset()) -> str:
         # A persona prompt is authored as ordered section partials
@@ -260,24 +285,26 @@ class PromptLoader:
 
     # ---- raw bodies -----------------------------------------------------
 
-    def base_prompt(self, *, response_declaration: bool = True) -> str:
-        """The permanent assistant prompt, with the declaration rule optional.
+    def base_prompt(
+        self, *, response_declaration: bool = True, forked_terminals: bool = False
+    ) -> str:
+        """The permanent assistant prompt, with the optional rules optional.
 
-        The `[[DAINTREE:FINAL]]`/`[[DAINTREE:TOOLS]]` control line only pays for
-        itself when something CONSUMES it. Its consumer is compaction, and until a
-        producer ships every deployment holds ``NullCompactor`` — which is exactly
-        when this argument is False, so the rule is omitted rather than paid for.
-        Omitting it saves 646 bytes: the partial plus the blank line that joined
-        it to its neighbours.
+        Both flags follow the same principle: a rule that instructs a capability
+        the deployment does not have is prompt bytes spent to make the model
+        worse. The `[[DAINTREE:FINAL]]`/`[[DAINTREE:TOOLS]]` control line only
+        pays for itself when compaction CONSUMES it, and until a producer ships
+        every deployment holds ``NullCompactor``. The forked-spawn rule tells the
+        model to call a function that is only in the request when the feature is
+        enabled — and a rule naming an absent tool is exactly the contradiction
+        ``20-tool-discipline`` spends a bullet forbidding.
 
-        Both variants are built at load, not per call: the choice is
-        deployment-wide (a container holds one compactor for its lifetime), so the
-        rendered prompt stays byte-identical across callers and the prefix cache
-        does not split. Selecting per request would be the bug this avoids.
+        Every variant is built at load, not per call: both choices are
+        deployment-wide, so the rendered prompt stays byte-identical across
+        callers and the prefix cache does not split. Selecting per request would
+        be the bug this avoids.
         """
-        if response_declaration:
-            return self._base_prompt
-        return self._base_prompt_no_declaration
+        return self._base_variants[(response_declaration, forked_terminals)]
 
     def subagent_prompt(self) -> str:
         """The read-only sub-agent persona (``profile="subagent"``).

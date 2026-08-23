@@ -219,15 +219,18 @@ _FORK_TOOL_SCHEMA: Final[dict[str, Any]] = {
 }
 
 _FORK_TOOL_DESCRIPTION: Final = (
-    "Use ONLY when this reply must spawn exactly four fresh agent terminals. "
-    "Provide one shared goal and four compact branch briefs plus the exact "
-    "agentId, worktreeId, mode and watch policy for each branch (per branch or "
-    "in defaults; all four must resolve, watch included). Do NOT write the four "
-    "full task prompts; the backend expands them concurrently and replaces this "
-    "call with four normal agentTask.spawnForEdits calls. Every branch needs its "
-    "OWN already-resolved worktree id — never a branch name, never one worktree "
-    "twice. Call this function ALONE: no other tool call in the same reply. It "
-    "cannot fan out any other tool."
+    "Use ONLY when this reply must spawn four fresh agent terminals on four "
+    "INDEPENDENT units of work — separate scopes, separate worktrees, no shared "
+    "deliverable. Not for four agents on the SAME problem (rivals to be judged, "
+    "a panel to be polled, a cohort converging on one answer): each branch is "
+    "told the others own the rest of the work. Provide one shared goal and four "
+    "compact branch briefs. Every branch carries its own already-resolved "
+    "worktreeId — never a branch name, never one worktree twice, and never in "
+    "defaults. agentId, mode and watch may sit on the branch or in defaults and "
+    "must resolve for all four. Do NOT write the four full task prompts; the "
+    "backend expands them concurrently and replaces this call with four normal "
+    "agentTask.spawnForEdits calls. Call this function ALONE: no other tool call "
+    "in the same reply. It cannot fan out any other tool."
 )
 
 #: The wire definition, built once at import. A module-level constant rather

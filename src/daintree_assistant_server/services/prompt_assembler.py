@@ -274,6 +274,15 @@ class PromptAssembler:
         # Deployment-wide, never per request — a prompt that varied by caller would
         # split the prefix cache on its very first block.
         self.response_declaration = response_declaration
+        # Whether the base prompt carries the forked-spawn rule. Same principle
+        # as the declaration above — a rule that instructs a function the request
+        # does not carry is the contradiction `20-tool-discipline` spends a
+        # bullet forbidding — but READ FROM SETTINGS rather than passed in. The
+        # gate that injects the tool reads the same field, and a second parameter
+        # could disagree with it: a prompt telling the model to fork on a
+        # deployment that never offers the tool, or a tool offered with no rule
+        # explaining it. One source, no disagreement possible.
+        self.forked_terminals = settings.forked_terminal_calls_mode == "enabled"
         # Bounded: a runaway key space would be a slow memory leak in a process
         # that is meant to be stateless. Sized well above the number of distinct
         # active-skill sets a busy instance sees.
@@ -1117,7 +1126,10 @@ class PromptAssembler:
         add(
             "base",
             "system",
-            self.prompts.base_prompt(response_declaration=self.response_declaration),
+            self.prompts.base_prompt(
+                response_declaration=self.response_declaration,
+                forked_terminals=self.forked_terminals,
+            ),
         )
         # 2. response contract: static output-shape rules, and the LAST system row.
         #    Genuinely static — the per-request width it used to carry moved to the

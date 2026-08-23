@@ -43,6 +43,10 @@ BANDS: dict[str, float] = {
     # Every request carries this. 5% is roughly one new rule; more than that
     # should be a decision, not a drift.
     "base_prompt_bytes": 0.05,
+    # The variant an enabled forked-spawn deployment sends, banded on the same
+    # terms. Without its own entry the 2.6 KiB forked-spawn rule could grow
+    # without moving any number in this file.
+    "base_prompt_forked_bytes": 0.05,
     # The second persona, on the same terms. It is smaller, so the same 5% is a
     # tighter absolute bound — which is right: this is the profile with the least
     # context to spare.
@@ -112,14 +116,27 @@ def capture() -> dict[str, Any]:
             ),
         },
         "prompt": {
-            # What the container ACTUALLY builds. `default_compactor()` is the
-            # same call `build_container` makes, so the declaration rule is in or
-            # out of this measurement exactly when it is in or out of production —
-            # calling `base_prompt()` bare would record the other variant and
-            # quietly misreport every request by 646 bytes.
+            # BOTH deterministic variants, neither read from ambient config.
+            # An earlier version resolved the forked-spawn flag from `Settings`,
+            # which made a standalone capture depend on whoever's `.env` ran it —
+            # and recorded only the resulting number, so the same committed
+            # baseline meant 24.8 KiB on one machine and 27.4 KiB on another with
+            # no way to tell from the file. Recording both means the 5% band
+            # actually guards the enabled prompt too, which is otherwise invisible
+            # to every ratchet here.
+            #
+            # `default_compactor()` stays as-is: it is the same call
+            # `build_container` makes and does not vary by environment.
             "base_prompt_bytes": len(
                 loader.base_prompt(
-                    response_declaration=default_compactor().available
+                    response_declaration=default_compactor().available,
+                    forked_terminals=False,
+                ).encode("utf-8")
+            ),
+            "base_prompt_forked_bytes": len(
+                loader.base_prompt(
+                    response_declaration=default_compactor().available,
+                    forked_terminals=True,
                 ).encode("utf-8")
             ),
             "subagent_prompt_bytes": len(loader.subagent_prompt().encode("utf-8")),

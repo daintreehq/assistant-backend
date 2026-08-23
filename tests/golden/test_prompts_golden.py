@@ -128,7 +128,44 @@ def loader() -> PromptLoader:
 
 
 def test_base_prompt(loader: PromptLoader) -> None:
+    # The default call: the declaration rule present, forked spawns absent.
+    # Unchanged by the fork feature, which is the point — an optional partial
+    # must not move the snapshot every other prompt edit is reviewed against.
+    # What deployments actually send is pinned separately below.
     assert_golden("base_prompt.md", loader.base_prompt())
+
+
+def test_base_prompt_as_shipped_today(loader: PromptLoader) -> None:
+    # What a default deployment actually sends: no compaction producer exists,
+    # so the declaration rule is omitted, and forked spawns are off by default.
+    # Kept as its own snapshot because this is the string the prefix cache and
+    # every latency measurement are actually about.
+    assert_golden(
+        "base_prompt_shipped.md",
+        loader.base_prompt(response_declaration=False, forked_terminals=False),
+    )
+
+
+def test_base_prompt_with_forked_terminals(loader: PromptLoader) -> None:
+    # The variant an enabled deployment sends. Prompt bytes are behavior, and
+    # this rule instructs a function no other snapshot covers.
+    assert_golden(
+        "base_prompt_forked.md",
+        loader.base_prompt(response_declaration=False, forked_terminals=True),
+    )
+
+
+def test_base_prompt_with_both_optional_rules(loader: PromptLoader) -> None:
+    # Unreachable today — no deployment has a compaction producer — but the
+    # fourth corner of the matrix is buildable, so it is snapshotted rather than
+    # left as the one variant nobody has read. It carries a live tension worth
+    # seeing before compaction ships: the declaration rule wants a control line
+    # opening EVERY reply, and branch expansion wants exactly one tool call with
+    # nothing else. See TODO.md.
+    assert_golden(
+        "base_prompt_declaring_and_forked.md",
+        loader.base_prompt(response_declaration=True, forked_terminals=True),
+    )
 
 
 def test_subagent_prompt(loader: PromptLoader) -> None:

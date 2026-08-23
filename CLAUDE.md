@@ -517,6 +517,89 @@ few skills survive `executable_with`, so most of their turns are skill-less —
 exactly the shape where a core tuned for the ASSISTANT base prompt is the wrong
 core.
 
+## Forked terminal-spawn calls
+
+A fan-out of four agent terminals is expensive in exactly one place — the four
+detailed `taskPrompt` values, which the main model writes one after another on the
+turn's critical path. `daintree_internal__fork_spawn_terminals` is a **server-owned
+tool** that lets it write a compact plan instead: one shared goal, four short
+branch briefs, and the exact `agentId`/`worktreeId`/`mode`/`watch` per branch. The
+backend intercepts that call, expands each brief into a full
+`agentTask__spawnForEdits` call with **four concurrent completions**, and replaces
+the internal call with those four. The turn pays the SLOWEST branch rather than the
+sum of four, and the CLI receives an ordinary four-call batch through the path it
+already has.
+
+**`FORKED_TERMINAL_CALLS_MODE` is `disabled` | `enabled` and defaults to
+`disabled`** — no tool in the request and no rule in the base prompt, so nothing
+can be expanded. The rewriter is still constructed and its emit guard still runs:
+see below.
+There is deliberately no rollout percentage beside it, unlike tool projection: that
+one withholds capability from live sessions, while this adds a capability and fails
+closed. A per-session cohort would also split BOTH the base prompt and the tools
+array within one deployment, which is precisely the prefix-cache split
+`PromptLoader.base_prompt` builds its variants at load time to avoid.
+
+**The internal call never crosses the PUBLIC wire, in either direction.** The
+provider necessarily receives the tool definition and returns the call — that is
+the whole mechanism; it is the CLIENT that must never see either. The request
+boundary already refuses the whole `daintree_internal__` namespace from clients (an
+offered tool, a replayed assistant call, a named `tool_choice`), so a leaked call
+would come back as a 400 on the continuation round — after the user had watched four
+terminals fail to appear. Both response paths therefore rewrite BEFORE anything
+grades, lints, accounts for or emits the round, and the emit guard is
+**unconditional**: whether to EXPAND a fork call depends on the feature being on;
+whether to EMIT a reserved name never does, because model output is not a security
+boundary.
+
+**Five things about the design are load-bearing and easy to undo.**
+
+**Each expansion request is the prepared main request plus two rows** — the literal
+messages and the literal *complete* tools array, with a shared manifest and a
+one-line branch assignment appended. The main call has just processed that exact
+prefix, and all four branches differ only in their FINAL message. This is why
+`ChatProvider.structured_tool_call` is NOT used even though it exists for exactly
+this shape of call: it rebuilds the request with a single-tool array, and the chat
+template serializes tools before the conversation, so narrowing them moves the first
+divergent byte ahead of every message. `tests/unit/test_fork_cache_prefix.py` pins
+the divergence offset.
+
+**The allowlist is the authority, not the tool schema.** An expander may write
+`title`, `taskPrompt`, `acceptanceCriteria` and `watchGoal`; everything else is
+imposed from the validated plan. Keeping every property the tool *declares* looks
+equivalent and is not — the real spawn schema also declares `watchCadenceMs`, a
+`context` object and the legacy nested `watcher`, all control plane. An expander that
+has just read untrusted terminal output could set a supervisor's poll cadence to an
+hour, and the control merge would not notice, because it only re-imposes the four
+keys it owns.
+
+**Streamed replacement calls carry an `index`.** The CLI accumulates streamed
+fragments into a map keyed by index and defaults a missing one to zero
+(`cli/internal/backend/sse.go`), so four index-less calls land in one slot: the ids
+overwrite each other and the four argument strings CONCATENATE into unparseable
+JSON. The user gets one broken spawn instead of four terminals and nothing on this
+side looks wrong. The index is stamped at the SSE boundary, never on the call
+objects — `ToolCall` forbids the field and the non-streaming body validates against
+it.
+
+**A branch that cannot be expanded is still spawned**, from a prompt synthesized out
+of the plan alone. That is not only resilience: it bounds the worst case, because one
+bad branch would otherwise drag the whole fan-out through repeated model calls. The
+plan is required to carry an outcome, an owned scope and a done signal per branch
+precisely so this is possible.
+
+**An invalid control plan fails CLOSED.** There is no repair path and no default for
+the plan itself: every field either names prose or selects a mutation target, and the
+server has no standing to guess a worktree, an agent or a supervision decision on the
+user's behalf. `watch` in particular gets no safe default — inventing `False` would
+mean the backend, not the model, chose an unsupervised fleet. One worktree per branch
+is required across all four with no carve-out for read-only branches, because
+`mode: "explore"` is a line in the agent's prompt, not filesystem isolation.
+
+Not built, deliberately: variable branch counts, other target tools, and starting
+expansion from a partially-streamed plan (`TODO.md`). The fan-out runbook keeps its
+direct per-unit path for every case the fixed four does not cover.
+
 ## Deploying (Cloud Run)
 
 Nothing is ever built or pushed from a dev machine. **Pushing to `main` is the deploy** —
