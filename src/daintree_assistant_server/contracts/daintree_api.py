@@ -203,9 +203,21 @@ class TurnTimings(BaseModel):
     #: posture for every interactive call (docs/PROVIDER_POLICY.md section 2), so
     #: a non-null value here on a normal turn means that posture changed.
     thinking_ms: int | None = None
+    #: The fast preamble call, when the stage ran. ``None`` when it did not — a
+    #: skipped stage and a stage that answered instantly are different facts.
+    fast_response_ms: int | None = None
     #: Request in until the first visible token reaches the client. The headline
     #: number, and the one a user calls "it started answering".
+    #:
+    #: With a preamble this is the PREAMBLE's arrival, because that is when the
+    #: user sees text. ``executor_first_output_ms`` is the other half, and both
+    #: must be read together: the trade this feature makes is a large improvement
+    #: here in exchange for a small regression there, and quoting only the first
+    #: would misrepresent it.
     first_output_ms: int | None = None
+    #: Request in until the EXECUTOR's first visible output. Absent when no
+    #: preamble was shown, because it would then equal ``first_output_ms``.
+    executor_first_output_ms: int | None = None
     #: First visible token until the turn completes. Pure generation.
     generation_ms: int | None = None
     #: Request in until the response is complete. The whole wait.
@@ -235,7 +247,14 @@ class TurnCost(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     total: float
+    # The executor's completion — the call that produced the answer. Named `main`
+    # for the whole life of the single-call design; kept under that name because
+    # it is a WIRE field and renaming it buys a client nothing.
     main: float | None = None
+    # The fast preamble stage, when it ran and reported a cost. `None` covers both
+    # "did not run" and "ran but the provider said nothing", which the `complete`
+    # flag below is what disambiguates — a zero here would claim it was free.
+    fast_response: float | None = None
     selector: float | None = None
     # False when a call this turn MADE did not report its cost, so ``total`` is
     # the sum of what we could observe and nothing more.
@@ -315,12 +334,69 @@ class StreamDelta(BaseModel):
 
 
 class StreamStatus(BaseModel):
-    """A generation-phase marker streamed after ``meta``. Currently emitted once
-    with ``phase="thinking"`` the moment the model begins its thinking-mode
-    chain-of-thought — the ``reasoning_content`` deltas that follow are the CoT to
-    display. Absent entirely when thinking is off."""
+    """A generation-phase marker streamed after ``meta``.
+
+    Documented phases:
+
+    * ``fast_response`` — the preamble stage is running. Emitted only when that
+      stage is enabled AND eligible for the turn.
+    * ``executor`` — the main model is being opened.
+    * ``thinking`` — the model began its chain-of-thought; the
+      ``reasoning_content`` deltas that follow are the CoT to display. Absent
+      entirely under the shipped posture, which does not think.
+
+    **Clients must ignore an unknown phase.** The set grows, and a client that
+    treats an unrecognised value as an error would break on a server it is
+    otherwise perfectly compatible with.
+    """
 
     phase: str
+
+
+class StreamPreamble(BaseModel):
+    """A short visible preview, streamed BEFORE the executor produces anything.
+
+    It is deliberately its OWN event rather than an ordinary ``delta``, and each
+    reason is a thing that breaks if it is not:
+
+    * The client renders it in the same assistant bubble, but must not commit it
+      to conversation history yet — hence ``provisional`` and ``commit_on``.
+    * The backend's retry layer treats a visible executor delta as the point
+      after which replay is unsafe. A preamble is server-generated, idempotent
+      intent text; folding it into ``delta`` would make every turn that showed
+      one un-retryable for no reason.
+    * Bare-intent detection inspects executor output. The preamble deliberately
+      announces intended work and would be a guaranteed false positive.
+
+    The client joins it to the executor's content with a blank line and commits
+    ONE assistant message on ``done``. On ``error`` it commits nothing — which is
+    what keeps a failed turn out of canonical history.
+
+    Carries no provider or model identity: the product is Daintree.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    content: str
+    provisional: Literal[True] = True
+    commit_on: Literal["done"] = "done"
+
+
+class StageUsage(BaseModel):
+    """Per-stage token counts, when a turn made more than one model call.
+
+    The top-level ``usage`` stays EXECUTOR usage so a client showing "tokens in
+    this answer" keeps meaning what it always meant. This block is additive, for
+    a caller that wants the breakdown — and it names stages, never models.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    cached_tokens: int = 0
 
 
 class StreamDone(BaseModel):

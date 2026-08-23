@@ -34,7 +34,10 @@ from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
 from daintree_assistant_server.runbooks.load_events import RunbookLoadExecution
 from daintree_assistant_server.services.docs_mcp import DocsLookup, DocsSection
-from daintree_assistant_server.services.prompt_assembler import PromptAssembler
+from daintree_assistant_server.services.prompt_assembler import (
+    FastResponseHandoff,
+    PromptAssembler,
+)
 from daintree_assistant_server.services.task_runner import build_profiles
 
 SNAPSHOTS = Path(__file__).parent / "snapshots"
@@ -438,6 +441,44 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     )
     snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
     assert_golden("upstream_messages.json", snapshot)
+
+
+def test_full_upstream_messages_with_fast_response_handoff(
+    assembler: PromptAssembler,
+) -> None:
+    """The same turn, with the preamble pair — the reviewable record of what the
+    executor is actually told about its own previous turn.
+
+    Worth a snapshot of its own precisely because this is prose the MODEL reads
+    and nobody sees: the assistant row is text the user was already shown, and the
+    continuation row is the server arguing that it is intent rather than evidence.
+    A change to either belongs in a diff someone reads.
+    """
+    runbook = _fixture_catalog().get("daintree.example.alpha")
+    req = RespondRequest.model_validate(
+        {
+            "protocol_version": 3,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
+            "startup": _startup_payload(),
+            "turn": {"goal": "Prepare this branch for review."},
+        }
+    )
+    pr = assembler.build_main_request(
+        request=req,
+        runbooks=[runbook],
+        upstream_model="deepseek-v4-flash",
+        handoff=FastResponseHandoff(
+            content=(
+                "I'll review what changed on this branch, check it against the "
+                "project's conventions, and report what needs attention before it "
+                "goes up."
+            ),
+            continuation_message=PromptLoader().fast_response_continuation(),
+        ),
+    )
+    snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
+    assert_golden("upstream_messages_with_handoff.json", snapshot)
 
 
 def test_full_upstream_messages_subagent(assembler: PromptAssembler) -> None:

@@ -133,11 +133,26 @@ def test_capabilities(client, auth, app) -> None:
     assert body["respond"]["stream_events"] == [
         "meta",
         "status",
+        "preamble",
         "delta",
         "compaction",
         "done",
         "error",
     ]
+    # The preamble's commit semantics are the contract, not decoration: a client
+    # that renders it without holding it provisional commits a turn that may end
+    # in an error, and one that treats it as a visible executor delta would make
+    # every preamble turn un-retryable for no reason.
+    fast = body["respond"]["fast_response"]
+    assert fast["event"] == "preamble"
+    assert fast["provisional_until"] == "done"
+    assert fast["same_assistant_message"] is True
+    assert fast["join_separator"] == "\n\n"
+    assert fast["retry_safe_before_executor_delta"] is True
+    # ...and it never names the provider or the model behind it.
+    rendered = json.dumps(fast).lower()
+    for internal in ("cerebras", "gemma", "deepseek", "together"):
+        assert internal not in rendered
     # Hardcoded posture, not config. Asserted as a literal rather than against the
     # constant on purpose: this field is a wire contract the CLI gates its thinking UI
     # on, so the test must fail — and force the CLI to be updated in lockstep — when

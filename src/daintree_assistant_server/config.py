@@ -82,6 +82,9 @@ FAST_RESPONSE_MODEL = "gemma-4-31b"
 FAST_RESPONSE_KEY_ENV = "CEREBRAS_API_KEY"
 FAST_RESPONSE_URL_ENV = "CEREBRAS_BASE_URL"
 FAST_RESPONSE_ORIGIN = "api.cerebras.ai"
+#: The host name, for traces and metrics. Never reaches a client.
+FAST_RESPONSE_PROVIDER = "cerebras"
+EXECUTOR_PROVIDER = "together"
 
 #: The intended successor is a Qwen model in the 27B class. It is NOT pinned here
 #: and must not be guessed at: no such id is currently documented on the Cerebras

@@ -151,6 +151,49 @@ def _wire_bytes(value: Any) -> bytes:
 
 
 @dataclass(frozen=True)
+class FastResponseHandoff:
+    """The preamble the user already saw, on its way into the executor's input.
+
+    Two rows, appended AFTER the volatile tail and nowhere else:
+
+    * the exact visible preamble, as an ``assistant`` message, and
+    * a server-owned ``user`` message telling the executor to continue.
+
+    **Exactness is the contract.** ``content`` must be byte-for-byte what went out
+    on the ``preamble`` SSE event. If the two ever diverge, the client's committed
+    history and the model's view of its own last turn disagree, and every
+    subsequent round is reasoning about a conversation that did not happen.
+
+    **The continuation row is load-bearing, not decoration.** Without it the
+    executor reads the assistant turn above as evidence that the work already
+    occurred and answers accordingly. It is also why this does NOT rely on an
+    assistant-last request: DeepSeek's prefix-completion is a separate beta
+    behaviour behind its own flag and endpoint, and Together's standard
+    compatibility surface establishes no such contract.
+    """
+
+    content: str
+    continuation_message: str
+    invocation_id: str | None = None
+    content_sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        # Validated HERE rather than trusted from the caller. The orchestrator's
+        # `has_content` guard already refuses a blank preamble, but this type is
+        # what turns a string into an assistant turn, and a blank assistant row
+        # would hand the executor an empty prior turn to continue from. Two
+        # guards, because the failure is silent: the request assembles, the model
+        # answers, and only the reply is strange.
+        if not self.content.strip():
+            raise ValueError("a fast-response handoff needs a non-empty preamble")
+        if not self.continuation_message.strip():
+            raise ValueError(
+                "a fast-response handoff needs its continuation message; without it "
+                "the executor reads the preamble as evidence the work already happened"
+            )
+
+
+@dataclass(frozen=True)
 class PromptSegment:
     """One layer of the assembled prompt, described without carrying any of it.
 
@@ -1030,6 +1073,7 @@ class PromptAssembler:
         runbooks: list[Runbook],
         upstream_model: str,
         docs: DocsLookup | None = None,
+        handoff: FastResponseHandoff | None = None,
     ) -> ProviderChatRequest:
         """The request alone, for every caller that does not want the manifest.
 
@@ -1039,7 +1083,11 @@ class PromptAssembler:
         than payload. :meth:`build_main_request_with_segments` is the same work.
         """
         return self.build_main_request_with_segments(
-            request=request, runbooks=runbooks, upstream_model=upstream_model, docs=docs
+            request=request,
+            runbooks=runbooks,
+            upstream_model=upstream_model,
+            docs=docs,
+            handoff=handoff,
         )[0]
 
     def build_main_request_with_segments(
@@ -1049,6 +1097,7 @@ class PromptAssembler:
         runbooks: list[Runbook],
         upstream_model: str,
         docs: DocsLookup | None = None,
+        handoff: FastResponseHandoff | None = None,
     ) -> tuple[ProviderChatRequest, list[PromptSegment]]:
         """Assemble the upstream request so the upstream prefix cache covers the base
         prompt, the response contract, the tool schemas, and then as much of the
@@ -1097,6 +1146,17 @@ class PromptAssembler:
         gen = request.generation
 
         if request.profile == "subagent":
+            # A sub-agent never gets a preamble — it reports to the orchestrator,
+            # not to a person — so a handoff reaching here is a caller bug rather
+            # than a case to handle. Eligibility already refuses this profile;
+            # this is the second, structural guard, because SILENTLY dropping the
+            # pair would make the executor's view of its own last turn differ from
+            # what was shown, which is the one thing the handoff must never do.
+            if handoff is not None:
+                raise ValueError(
+                    "a fast-response handoff was passed for the sub-agent profile; "
+                    "sub-agents never receive a preamble"
+                )
             # Same layer vocabulary as below, minus the rows this profile drops:
             # a manifest naming rows that are not there would send a reader
             # chasing a missing segment rather than a changed one. `profile` is
@@ -1204,6 +1264,22 @@ class PromptAssembler:
                 + "\n\n".join(variable_parts)
             )
             add("tail", "user", framed)
+
+        # The fast-response handoff, LAST and only here.
+        #
+        # After the tail, so every cacheable row above it is untouched: the two
+        # static system blocks, the tool schemas, the runbook bodies, integrations
+        # and startup are byte-identical whether or not a preamble happened. The
+        # feature therefore costs its own bytes and nothing else, which is what
+        # makes `FAST_RESPONSE_MODE=off` a genuine no-op on the wire rather than a
+        # different-but-similar request.
+        #
+        # NOT spliced into `request.input.messages`: the client's transcript and
+        # server-generated control material stay structurally separate, so nothing
+        # downstream has to guess which is which.
+        if handoff is not None:
+            add("fast_response_handoff", "assistant", handoff.content)
+            add("continuation_control", "user", handoff.continuation_message)
 
         # "text" is the upstream default, so forwarding it is a no-op — except that
         # the model rejects ANY response_format alongside tools ("You cannot specify

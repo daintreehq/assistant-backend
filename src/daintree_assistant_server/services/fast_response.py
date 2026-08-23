@@ -197,7 +197,12 @@ class FastResponseResult:
         returning True for it is the shape of the bug that leaks it. Visibility is
         `FastResponsePolicyDecision.visible`, and it stays there.
         """
-        return bool(self.content)
+        # `.strip()`, not a bare truth test: whitespace-only content would
+        # otherwise count as a preamble, and the executor would be handed a blank
+        # assistant row to continue from while the client rendered nothing. The
+        # validator already rejects it on the model path; this closes the same
+        # hole for the fallback and any future caller.
+        return bool(self.content and self.content.strip())
 
 
 #: Used when the model could not be reached or its output was rejected, and the

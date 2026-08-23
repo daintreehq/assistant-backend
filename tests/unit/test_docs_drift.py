@@ -870,7 +870,16 @@ def test_every_documented_cost_field_exists_on_the_wire_model() -> None:
         TurnCost,
     )
 
-    assert set(TurnCost.model_fields) == {"total", "main", "selector", "complete"}
+    # `fast_response` joined when the preamble stage landed: a visible turn now
+    # makes TWO billed calls, and a total that hides one of them is the same
+    # "partial sum presented as complete" the `complete` flag exists to prevent.
+    assert set(TurnCost.model_fields) == {
+        "total",
+        "main",
+        "fast_response",
+        "selector",
+        "complete",
+    }
     assert "cost" in RespondResponse.model_fields
     assert "cost" in StreamDone.model_fields
 

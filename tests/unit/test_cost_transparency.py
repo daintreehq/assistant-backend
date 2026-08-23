@@ -555,3 +555,70 @@ def test_a_degraded_local_selection_is_still_a_complete_total() -> None:
         "nothing in process; only an unobserved BILL is a gap."
     )
     assert cost.selector is None
+
+
+# ---------------------------------------------------------------------------
+# The second billed call. A visible turn now pays for two.
+# ---------------------------------------------------------------------------
+
+
+def test_a_visible_preamble_turn_reports_both_calls() -> None:
+    """The executor and the fast stage both billed, so both are in the total.
+
+    Reporting only the executor would understate the bill by exactly the part
+    nobody would think to look for.
+    """
+    cost = turn_cost(
+        ProviderUsage(cost=0.002), _meta(None), fast_response=ProviderUsage(cost=0.0001)
+    )
+    assert cost is not None
+    assert cost.total == pytest.approx(0.0021)
+    assert cost.main == 0.002
+    assert cost.fast_response == 0.0001
+    assert cost.complete is True
+
+
+def test_a_fast_call_that_ran_without_reporting_makes_the_total_incomplete() -> None:
+    """Same rule the selector gets, for the same reason.
+
+    A stage that RAN and reported nothing would otherwise contribute 0.0 to a
+    field named `total` — a partial sum wearing a complete label.
+    """
+    cost = turn_cost(
+        ProviderUsage(cost=0.002), _meta(None), fast_response=ProviderUsage(cost=None)
+    )
+    assert cost is not None
+    assert cost.total == 0.002
+    assert cost.complete is False
+
+
+def test_a_turn_that_never_ran_the_fast_stage_is_still_complete() -> None:
+    """`None` means the stage did not run at all, which is a truthful zero rather
+    than a gap — the same distinction the selector's `selector_ran` draws."""
+    cost = turn_cost(ProviderUsage(cost=0.002), _meta(None), fast_response=None)
+    assert cost is not None
+    assert cost.complete is True
+    assert cost.fast_response is None
+
+
+def test_a_partial_fast_sum_clears_complete() -> None:
+    """`cost_complete=False` says the float itself is short — a retried or
+    multi-attempt call where only some attempts reported."""
+    cost = turn_cost(
+        ProviderUsage(cost=0.002),
+        _meta(None),
+        fast_response=ProviderUsage(cost=0.0001, cost_complete=False),
+    )
+    assert cost is not None
+    assert cost.complete is False
+
+
+def test_a_fast_only_cost_still_produces_a_block() -> None:
+    """The executor reporting nothing while the fast stage did is still knowledge
+    of a bill, and an absent block would claim the turn was free."""
+    cost = turn_cost(
+        ProviderUsage(cost=None), _meta(None), fast_response=ProviderUsage(cost=0.0001)
+    )
+    assert cost is not None
+    assert cost.total == pytest.approx(0.0001)
+    assert cost.complete is False, "the executor's own cost is unknown"

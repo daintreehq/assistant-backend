@@ -44,7 +44,40 @@ async def capabilities(
             # it is correct against every deployment, and one that does not would
             # break the day a producer is switched on. Read `context_compaction`
             # below for whether this instance can actually emit it.
-            "stream_events": ["meta", "status", "delta", "compaction", "done", "error"],
+            "stream_events": [
+                "meta",
+                "status",
+                "preamble",
+                "delta",
+                "compaction",
+                "done",
+                "error",
+            ],
+            # The fast-response stage. Advertised so a client knows the event
+            # exists and what its commit semantics are — NOT which provider or
+            # model writes it, which stays internal. `enabled` reports what THIS
+            # instance will actually do, because a client that renders a
+            # provisional bubble it never receives is worse off than one that
+            # never expected it.
+            "fast_response": {
+                "enabled": settings.fast_response_mode == "visible",
+                "streaming_only": True,
+                "event": "preamble",
+                # The client renders it immediately but must not commit it to
+                # conversation history until the stream terminates successfully.
+                # On `error` it commits nothing, which is what keeps a failed turn
+                # out of canonical history.
+                "provisional_until": "done",
+                # Preamble and executor output become ONE assistant message,
+                # joined by this separator. Fixed rather than negotiated so the
+                # committed text is identical everywhere.
+                "same_assistant_message": True,
+                "join_separator": "\n\n",
+                # A preamble is server-generated, idempotent intent text, so
+                # seeing one does NOT end the replay-safe window the way a visible
+                # executor delta does.
+                "retry_safe_before_executor_delta": True,
+            },
             # The main call's thinking posture is hardcoded OFF (a product decision,
             # like the model ids — see INTERACTIVE_THINKING_ENABLED in config.py), so
             # responses do not carry reasoning_content and the stream emits no
@@ -92,7 +125,7 @@ async def capabilities(
             "cost_reporting": {
                 "field": "cost",
                 "currency": "USD",
-                "components": ["total", "main", "selector", "complete"],
+                "components": ["total", "main", "fast_response", "selector", "complete"],
                 "stream_event": "done",
                 "absent_when_unknown": True,
                 # False on `cost.complete` means real spend happened that could

@@ -32,14 +32,19 @@ logger = get_logger("daintree.respond")
 
 
 def turn_cost(
-    main: ProviderUsage, meta: _RespondMeta, *, complete: bool = True
+    main: ProviderUsage,
+    meta: _RespondMeta,
+    *,
+    complete: bool = True,
+    fast_response: ProviderUsage | None = None,
 ) -> TurnCost | None:
     """Total USD this request charged the caller, across every upstream call.
 
-    A turn is normally TWO billed calls — the runbook selector and the main
-    completion — plus, on a re-rolled round, a generation the user never saw.
-    All of it is charged to the caller's own key, so reporting only the main
-    call would understate their bill by the part they cannot see.
+    Runbook selection is LOCAL and unbilled, so an ordinary turn is one billed
+    call. A turn that showed a preamble is TWO — the fast stage and the executor —
+    and a re-rolled round adds a generation nobody ever saw. All of it lands on
+    the server's key, so reporting only the executor would understate the bill by
+    the parts that are hardest to notice.
 
     Both figures are OpenRouter's own reported ``cost``, not a token-price
     estimate we compute: the router knows which of ~24 endpoints served the
@@ -67,23 +72,35 @@ def turn_cost(
     """
     selector_usage = meta.runbooks.selector.usage
     selector = selector_usage.cost if selector_usage is not None else None
+    # The preamble stage, on exactly the same terms as the selector: a call that
+    # RAN and did not report is unknown, not free. `fast_response is None` means
+    # the stage did not run at all, and its absent cost is a truthful zero.
+    fast_ran = fast_response is not None
+    fast_cost = fast_response.cost if fast_response is not None else None
     # "Ran" is what makes a missing cost UNKNOWN rather than genuinely zero.
     # A turn that skipped selection entirely (continuation round, no-task
     # fast path) has no selector usage at all, and its absent cost is a
     # truthful zero rather than a gap.
     selector_ran = selector_usage is not None
-    if main.cost is None and selector is None and not selector_ran:
-        return None
-    if main.cost is None and selector is None:
+    if main.cost is None and selector is None and fast_cost is None:
+        # NOTHING anywhere reported a cost, so there is nothing to report. The
+        # absence says "we do not know", which a zero would misreport as "free" —
+        # and that stays true whether or not a silent call happened, because a
+        # block of all-unknowns tells a reader less than no block at all.
         return None
     known_complete = complete and main.cost is not None and main.cost_complete
     if selector_ran and selector is None:
         known_complete = False
+    if fast_ran and fast_cost is None:
+        known_complete = False
+    if fast_response is not None and not fast_response.cost_complete:
+        known_complete = False
     if not meta.selector_cost_complete:
         known_complete = False
     return TurnCost(
-        total=(main.cost or 0.0) + (selector or 0.0),
+        total=(main.cost or 0.0) + (selector or 0.0) + (fast_cost or 0.0),
         main=main.cost,
+        fast_response=fast_cost,
         selector=selector,
         complete=known_complete,
     )
