@@ -21,10 +21,19 @@ the backend strips it and acts on it. Nothing yet shows the serving model actual
 The unit tests prove what happens WHEN a marker arrives; a fake emits it, so they cannot
 speak to whether the serving model does.
 
-That gap is cheap today and expensive later. With `NullCompactor` a wrong or missing
-declaration costs only the prompt bytes. Once a producer exists, a false `FINAL` buys a
-discarded upstream call, and a `FINAL` that is *believed* freezes a conversation prefix
-mid-task — and append-only means it does not unfreeze.
+**Read the settled-prefix entry below before starting this one.** They are two designs
+for one job and only one can govern #60: this entry gates a producer that BELIEVES the
+model's prediction, while the other proposes a producer that never asks for one. If the
+settled-prefix design is taken, this entry is superseded and the measurement below is not
+owed — there is nothing left to be right or wrong about. It survives because the
+predictive optimisation is still the cheaper design when the marker IS honoured, and
+nobody has measured whether it is.
+
+The gap is cheap today and expensive later. `NullCompactor` now omits the partial
+entirely, so a missing declaration currently costs nothing at all — not even the prompt
+bytes it used to. Once a producer exists, a false `FINAL` buys a discarded upstream call,
+and a `FINAL` that is *believed* freezes a conversation prefix mid-task — and append-only
+means it does not unfreeze.
 
 The `response_declaration` log line already emits the raw material, content-free: `declared`,
 `had_tool_calls`, `finish_reason`, and `contradicted`. What is owed is reading it — over real
@@ -455,6 +464,92 @@ turns are actually hitting the ceiling, and nothing does yet. The
 `turn_usage.estimated_prompt_tokens` field logged beside the upstream's own
 `prompt_tokens` is what will say so, and it also calibrates the characters/4
 estimate the refusal currently rests on.
+
+---
+
+## A behavioural benchmark for the main assistant
+
+**Trigger: before the first deliberate reduction of `main/base/*.md`,
+`main/response_contract.md.j2` or `daintree.foundation`. Not before, and not as
+a prerequisite for anything else.**
+
+The golden suite answers *what bytes changed*. It does not answer whether the
+model still chose the right tool, respected a permission boundary, converged,
+stopped, delegated, verified success, or reported clearly — and that gap is the
+reason "shrink the largest partial" keeps being deferred rather than done.
+`20-tool-discipline.md` is ~9.4 KiB and the foundation ~16 KiB, both plainly
+prunable and neither safely prunable, because a snapshot diff cannot tell a
+removed redundancy from a removed load-bearing rule.
+
+Shape: `benchmarks/main_behavior/`, cases in YAML, two modes. **Isolation** pins
+the intended skill set so a selector error cannot be mistaken for a prompt
+regression; **end-to-end** runs real selection, projection and assembly. A
+prompt edit that REDUCES a permanent layer must pass isolation, and a release
+that changes the assembly or selection architecture should pass both once the
+suite exists. Neither is a gate on work that does not touch those layers — the
+trigger above is the whole scope. Score
+deterministically wherever possible — first-correct-tool rate, forbidden-call
+rate, invalid-argument rate, rounds to completion, premature finish, failure to
+stop, exact-ID preservation, response-contract conformance, injection canary
+leakage — and reserve a judge for report usefulness and unsupported claims.
+
+The cases that matter first are the rules with no other guard: act in the same
+reply rather than promise later work, delegate expensive search early, preserve
+terminal ownership, do not close a resource nobody asked to close, distinguish
+working from blocked from failed from complete, verify before declaring
+completion, retain the active skill on continuation and replace it on a topic
+shift.
+
+**Why this is not in CI**: it needs paid completions, and a suite that costs
+money on every push either gets skipped or gets disabled. It belongs beside the
+live provider-contract suite on a low-spend key, run at qualification
+milestones, committing a content-free result artifact (build sha, prompt hash,
+catalog revision, tool-inventory hash, selector artifact revision, pass counts)
+so a dated claim is traceable — the gap `benchmarks/results/` being gitignored
+leaves today.
+
+---
+
+## Compact the settled prefix instead of predicting finality
+
+**Trigger: when #60's compaction producer is built. This is a design note for
+that work, not separate work — and if it is adopted it SUPERSEDES "Prove
+declaration compliance before compaction spends anything" above, which gates a
+producer that believes a prediction this one never asks for.**
+
+The shipped design asks the model to open a reply with `[[DAINTREE:FINAL]]` or
+`[[DAINTREE:TOOLS]]`, and the backend acts on the prediction. It is currently
+switched off entirely (`NullCompactor` omits the partial), because the serving
+model was measured emitting the marker on 0 of 20 tool-calling turns.
+
+There is a cleaner boundary available that needs no prediction at all. **At
+request time, everything before the latest user instruction is already
+settled.** Nothing the model is about to say can change it. So the producer can
+compact THAT prefix, concurrently with the main call, on any turn — including a
+tool-calling one, because the block replaces only history that was finished
+before the current instruction began.
+
+What it still owes:
+
+- the boundary stated and pinned, not scanned for heuristically — the last user
+  message in the validated transcript, or a bounded structural hint from the
+  client, which owns the history;
+- the existing safety rules unchanged: never compact an unresolved tool-call
+  batch, the current instruction, or anything after it;
+- a trigger that is economic rather than a fixed token count. Prefix caching
+  changes the arithmetic — replacing a long cached prefix with a short block is
+  a one-time miss against a saving taken on every later round — so the question
+  is expected remaining rounds times bytes saved against one compaction call
+  plus one cache miss. Capacity pressure overrides it;
+- a faithfulness gate before delivery, run in shadow first: exact ID/path/PR
+  preservation, user-constraint recall, completed-vs-pending distinction, no
+  invented completion, no captured injection, and an offline replay showing the
+  assistant can resume a scripted workflow from the block alone.
+
+The declaration machinery does not have to be deleted for this: the scanner and
+stripper cost a prefix probe and a model emitting the marker unprompted should
+still not show it to a user. What changes is that nothing DEPENDS on the
+prediction.
 
 ---
 

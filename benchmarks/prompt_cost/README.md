@@ -8,8 +8,57 @@ bytes the serving adapter would POST.
 python -m benchmarks.prompt_cost.bench run              # deterministic (free, CI-able)
 python -m benchmarks.prompt_cost.bench run --live        # + live cache/TTFB (paid)
 python -m benchmarks.prompt_cost.bench run --live --topic-shift   # + topic-shift reuse (paid)
+python -m benchmarks.prompt_cost.bench tools                 # per-tool schema cost (free)
 python -m benchmarks.prompt_cost.bench report results/<f>.json
 ```
+
+## Per-tool schema cost (`bench tools`)
+
+A **report, never a gate**. Offline and free — it reads the pinned CLI inventory
+fixture and the packaged catalog, and makes no network call.
+
+Every other measurement of the tool region is an AGGREGATE (`tools_bytes`, the
+`tools_*_bytes` log fields, the `system_tools_bytes` this benchmark gates). That
+answers "how big is the tool region" and refuses the only question an author can
+act on, which is *which tools*. This prints the array one row at a time: schema
+bytes, description bytes, parameter bytes, and who declares it.
+
+**Bytes are not the ranking.** A tool's cost is its size times how often it is
+offered, so each row carries a computed **reach** — how many of the catalog's
+skills would admit it — and rows sort by reach, then size. `tier` sits beside
+that as the *reason*, not the ranking, because the labels do not line up with
+exposure the way they look like they do:
+
+| Tier | Offered on | Why |
+|---|---|---|
+| `always` | every request | `ALWAYS_AVAILABLE` — the permanent base prompt instructs it, so withholding it is a contradiction the model cannot resolve |
+| `undeclared` | every request | projection argues from metadata and there is none about a tool the catalog has never heard of |
+| `scaffold` | every skill-bearing turn | `loaded_skills.md.j2` instructs it and no skill declares it |
+| `foundation` | every skill-bearing turn (today) | admission pairs each selected specific with its domain foundation, and 38 of 39 skills point at one |
+| `skill` | turns that loaded a declaring skill | reach varies from 1 to 20+ declarers, which a tier alone cannot express |
+
+Two labels can mean identical exposure by opposite arguments (`always` and
+`undeclared`; `scaffold` and `foundation`), and one tier spans an order of
+magnitude on its own — which is why an earlier tier-ordered version put a tool
+offered on *every* request below one that needs an active skill.
+
+**Reach is static, not observed.** It is the baseline projection over the
+packaged catalog — how widely a tool *could* be admitted — and knows nothing
+about which skills actually get selected. It also ignores the two per-request
+admission paths (a forced `tool_choice`, an unresolved tool call), which depend
+on a turn rather than on the catalog.
+
+**Prose bytes, not description bytes.** `function.description` is only the top
+of the editable surface; the inventory carries substantial prose under the
+parameter schema's own nested `description` keys — 49.1 KiB of prose against
+32.9 KiB of top-level descriptions. Ranking a prose audit on the top-level field
+alone would hide a third of what it can actually edit.
+
+The summary's **skill-less enforced floor** is the serialized `always` +
+`undeclared` subset — what an enforced assistant turn with no active skill
+proposes from this pinned inventory. Not a floor under literally every request:
+a caller can offer fewer tools, and a shadow, disabled or fail-open turn sends
+the whole inventory.
 
 ## What it measures
 

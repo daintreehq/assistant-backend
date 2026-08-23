@@ -108,7 +108,35 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
-    _print(load_doc(Path(args.path)))
+    doc = load_doc(Path(args.path))
+    # Dispatch on what the document SAYS it is. `_print` reads prompt-cost keys
+    # (`wire_encoder_matches_httpx` and friends) straight off the dict, so a
+    # saved tool report — a different shape entirely — came back as a KeyError
+    # from the one command documented for re-reading saved results.
+    if (doc.get("meta") or {}).get("benchmark") == "tool_schemas":
+        from .tool_schemas import print_report
+
+        print_report(doc)
+        return 0
+    _print(doc)
+    return 0
+
+
+def _cmd_tools(args: argparse.Namespace) -> int:
+    """Per-tool schema cost. A REPORT, never a gate.
+
+    Offline and free — it reads the pinned CLI inventory and the packaged
+    catalog — so it deliberately does not join the deterministic dashboard: a
+    ranking is not a pass/fail, and `benchmarks/baseline.json` already asserts
+    movement in the aggregate the dashboard cares about.
+    """
+    from .tool_schemas import print_report, run_report
+
+    doc = run_report()
+    print_report(doc, limit=args.limit)
+    if not args.no_save:
+        path = save_doc(doc, __file__, "tool_schemas", Path(args.out) if args.out else None)
+        print(f"\nsaved: {path}")
     return 0
 
 
@@ -130,6 +158,13 @@ def main(argv: list[str] | None = None) -> int:
     report = sub.add_parser("report", help="re-print a saved results file")
     report.add_argument("path")
     report.set_defaults(func=_cmd_report)
+    tools = sub.add_parser(
+        "tools", help="per-tool schema cost, in audit order (offline, free)"
+    )
+    tools.add_argument("--limit", type=int, default=20, help="rows to print (default 20)")
+    tools.add_argument("--out", help="explicit output JSON path")
+    tools.add_argument("--no-save", action="store_true")
+    tools.set_defaults(func=_cmd_tools)
     args = parser.parse_args(argv)
     try:
         return args.func(args)
