@@ -576,7 +576,7 @@ def _validate_generation(req: RespondRequest) -> None:
 def validate_respond_request(req: RespondRequest, settings: Settings) -> None:
     """Run all semantic validation.
 
-    Returns nothing. It used to return the one hardcoded ``SERVING_MODEL``, which
+    Returns nothing. It used to return the one hardcoded ``EXECUTOR_MODEL``, which
     made model resolution a side effect of validation — defensible while there
     was exactly one model, and wrong the moment a caller's MODE decides it.
     Resolution belongs at the route boundary, next to the entitlement check that

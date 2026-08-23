@@ -48,6 +48,14 @@ TEMPLATE_RESPONSE_CONTRACT = "main/response_contract.md.j2"
 TEMPLATE_DISPLAY_CONTEXT = "main/display_context.md.j2"
 TEMPLATE_DOCS_CONTEXT = "main/docs_context.md.j2"
 
+# Fast-response templates. A SEPARATE loaded-runbooks template from the main
+# one on purpose: the executor's version instructs `runbook.step.advance` and
+# `runbook.run.get`, tools the fast model has no way to call and must never be
+# told about. Reusing it would put two uncallable tool names in front of a model
+# whose only job is to describe intent.
+TEMPLATE_FAST_RESPONSE_RUNBOOKS = "fast_response/loaded_runbooks.md.j2"
+TEMPLATE_FAST_RESPONSE_CONTEXT = "fast_response/context.md.j2"
+
 _ALL_TEMPLATES = (
     TEMPLATE_STARTUP_CONTEXT,
     TEMPLATE_RUNTIME_CONTEXT,
@@ -57,6 +65,8 @@ _ALL_TEMPLATES = (
     TEMPLATE_RESPONSE_CONTRACT,
     TEMPLATE_DISPLAY_CONTEXT,
     TEMPLATE_DOCS_CONTEXT,
+    TEMPLATE_FAST_RESPONSE_RUNBOOKS,
+    TEMPLATE_FAST_RESPONSE_CONTEXT,
 )
 
 
@@ -197,6 +207,7 @@ class PromptLoader:
         self._base_prompt_no_declaration = self._load_base_without_declaration()
         self._subagent_prompt = self._load_parts("main/subagent")
         self._task_prompts = self._load_dir("tasks")
+        self._fast_response_prompts = self._load_dir("fast_response")
 
     def _resolve(self, relative: str) -> Path:
         """The overlay's copy of ``relative`` if it has one, else the package's."""
@@ -291,6 +302,26 @@ class PromptLoader:
         """
         return self._subagent_prompt
 
+    def fast_response_prompt(self) -> str:
+        """The static system prompt for the preamble stage."""
+        return self._read_fast("base")
+
+    def fast_response_continuation(self) -> str:
+        """The server-owned user message appended after the preamble.
+
+        Load-bearing rather than decorative: without it the executor reads the
+        preceding assistant turn as evidence that the work already happened, and
+        answers as though it had. It is also why the handoff does NOT rely on an
+        assistant-last request — see `docs/DAINTREE_API.md`.
+        """
+        return self._read_fast("continuation")
+
+    def _read_fast(self, stem: str) -> str:
+        try:
+            return self._fast_response_prompts[stem]
+        except KeyError:
+            raise PromptError(f"missing fast-response prompt: {stem}") from None
+
     def task_system_prompt(self, task_id: str) -> str:
         try:
             return self._task_prompts[task_id]
@@ -384,6 +415,14 @@ class PromptLoader:
             except TemplateError as exc:
                 raise PromptError(f"template {name} failed to load: {exc}") from exc
         self._validate_display_context()
+        # The fast-response stage's own prompts. Registered here so a missing or
+        # misnamed file fails READINESS with a name, rather than at the first turn
+        # that reaches the stage — which, with the feature defaulting to off,
+        # could be weeks after the file was lost.
+        if not self.fast_response_prompt().strip():
+            raise PromptError("fast-response base prompt is empty")
+        if not self.fast_response_continuation().strip():
+            raise PromptError("fast-response continuation prompt is empty")
         # Every REGISTERED task must have its prompt on disk. Without this a task
         # whose prompt file is missing or misnamed passes readiness and the whole
         # test suite, then 500s the first time a client calls it — PromptError has

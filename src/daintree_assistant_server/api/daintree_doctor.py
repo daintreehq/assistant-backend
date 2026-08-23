@@ -37,7 +37,7 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
-from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID, SERVING_MODEL
+from ..config import EXECUTOR_MODEL, INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
 from ..errors import DaintreeError
 from ..observability import get_logger
 from ..prompts.loader import MAIN_PROMPT_VERSION
@@ -106,7 +106,7 @@ async def _provider_section(
     section: dict[str, Any] = {
         "name": "together",
         "model": PUBLIC_MODEL_ID,
-        "upstream_model": SERVING_MODEL,
+        "upstream_model": EXECUTOR_MODEL,
         "thinking_enabled": INTERACTIVE_THINKING_ENABLED,
         # The server holds the upstream credential and funds every turn from it.
         # Stated here because it is the fact a tester most often needs confirmed,

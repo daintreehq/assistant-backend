@@ -58,7 +58,7 @@ BANDS: dict[str, float] = {
 
 def capture() -> dict[str, Any]:
     sys.path.insert(0, str(REPO_ROOT / "src"))
-    from daintree_assistant_server.config import PUBLIC_MODEL_ID, SERVING_MODEL
+    from daintree_assistant_server.config import EXECUTOR_MODEL, PUBLIC_MODEL_ID
     from daintree_assistant_server.prompts.loader import PromptLoader
     from daintree_assistant_server.runbooks.catalog import load_catalog
     from daintree_assistant_server.runbooks.local.documents import routing_revision
@@ -80,7 +80,7 @@ def capture() -> dict[str, Any]:
 
     return {
         "identity": {
-            "model": SERVING_MODEL,
+            "model": EXECUTOR_MODEL,
             "public_model": PUBLIC_MODEL_ID,
             # The upstream this server talks to. A release fact, and one that
             # must never move by accident. Together is a model host rather than

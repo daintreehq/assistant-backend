@@ -61,6 +61,11 @@ daintree_assistant_server = [
     "prompts/main/subagent/*.md",
     "prompts/main/*.j2",
     "prompts/tasks/*.md",
+    # The fast-response stage's own prompts. Eagerly loaded at startup like
+    # the task prompts, so a missing glob here is a container that fails
+    # readiness rather than a feature that quietly degrades.
+    "prompts/fast_response/*.md",
+    "prompts/fast_response/*.j2",
     "runbooks/files/*.md",
     # The local two-stage runbook selector — the SHIPPED selector. Both encoders
     # ship int8 only: fp32 is gitignored and exists locally so the export can

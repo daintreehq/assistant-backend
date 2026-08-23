@@ -178,9 +178,9 @@ def test_the_bundle_reports_the_public_model_alias(client, auth) -> None:
     body = client.post(URL, headers=auth).json()
     assert body["provider"]["model"] == "daintree-assistant"
     # And the operator-only field beside it names the real one.
-    from daintree_assistant_server.config import SERVING_MODEL
+    from daintree_assistant_server.config import EXECUTOR_MODEL
 
-    assert body["provider"]["upstream_model"] == SERVING_MODEL
+    assert body["provider"]["upstream_model"] == EXECUTOR_MODEL
 
 
 def test_the_bundle_states_who_holds_the_credential(client, auth) -> None:

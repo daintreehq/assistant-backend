@@ -11,7 +11,7 @@ import pytest
 from fakes import FakeProvider, make_result
 from pydantic import BaseModel, SecretStr, ValidationError
 
-from daintree_assistant_server.config import SERVING_MODEL
+from daintree_assistant_server.config import EXECUTOR_MODEL
 from daintree_assistant_server.contracts.tasks import (
     CompactedAgentOut,
     ContextCompactOutput,
@@ -669,7 +669,7 @@ async def test_prompt_version_and_usage(task_runner: TaskRunner, fake_provider: 
     result = await task_runner.run(TaskRequest(task="terminal_summarize", input={"tail": "x"}), api_key=TEST_API_KEY)
     assert result.prompt_version == "terminal_summarize"
     assert result.usage.total_tokens >= 0
-    assert result.model == SERVING_MODEL
+    assert result.model == EXECUTOR_MODEL
 
 
 # The task ids are a FROZEN WIRE CONTRACT shared with the Go CLI, which hardcodes
@@ -870,7 +870,7 @@ def dual_runner(
 
 
 #: The model the synthetic second-provider profile claims. Deliberately not a
-#: real id: the point is that it is NOT SERVING_MODEL, so a request landing on
+#: real id: the point is that it is NOT EXECUTOR_MODEL, so a request landing on
 #: the wrong adapter is visible in one assertion.
 SECOND_PROVIDER_MODEL = "vendor-b/second-model"
 
@@ -1055,7 +1055,7 @@ def test_no_profile_leaves_the_serving_provider() -> None:
     off_default = {p.id for p in profiles.values() if p.provider_id != "serving"}
     assert off_default == set()
     for profile in profiles.values():
-        assert profile.model == SERVING_MODEL, profile.id
+        assert profile.model == EXECUTOR_MODEL, profile.id
 
 
 def test_the_compaction_budget_fits_a_busy_orchestration_session() -> None:

@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from benchmarks._harness.env import make_upstream_provider
-from daintree_assistant_server.config import SERVING_KEY_ENV, SERVING_MODEL, Settings
+from daintree_assistant_server.config import EXECUTOR_KEY_ENV, EXECUTOR_MODEL, Settings
 from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.prompts.loader import PromptLoader
@@ -97,7 +97,7 @@ def _build_settings(config: BenchConfig) -> Settings:
     # for the right endpoint.
     if not settings.serving_api_key.get_secret_value():
         raise BenchError(
-            f"{SERVING_KEY_ENV} is not set — export it or point --env-file at a "
+            f"{EXECUTOR_KEY_ENV} is not set — export it or point --env-file at a "
             ".env that has it"
         )
     return settings
@@ -192,7 +192,7 @@ async def run_bench(config: BenchConfig) -> dict[str, Any]:
         "meta": {
             "benchmark": "utility_tasks",
             "variant": config.variant,
-            "model": SERVING_MODEL,
+            "model": EXECUTOR_MODEL,
             "trials": config.trials,
             "concurrency": config.concurrency,
             "filter": config.id_filter,

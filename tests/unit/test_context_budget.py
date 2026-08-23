@@ -9,7 +9,7 @@ upstream would have answered.
 
 from __future__ import annotations
 
-from daintree_assistant_server.config import SERVING_CONTEXT_TOKENS
+from daintree_assistant_server.config import EXECUTOR_CONTEXT_TOKENS
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.base import ProviderChatRequest
 from daintree_assistant_server.services.context_budget import (
@@ -202,7 +202,7 @@ def test_the_log_fields_carry_no_prompt_content() -> None:
         assert isinstance(value, (int, float, str))
     assert "secret" not in repr(fields)
     assert "private" not in repr(fields)
-    assert fields["context_window"] == SERVING_CONTEXT_TOKENS
+    assert fields["context_window"] == EXECUTOR_CONTEXT_TOKENS
 
 
 def test_the_error_is_a_413_naming_the_dimensions() -> None:

@@ -31,8 +31,8 @@ neutered** (git history has the previous revision).
 
 | Call | Model | Source of truth |
 |---|---|---|
-| Main completion | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.SERVING_MODEL` |
-| Utility tasks | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.SERVING_MODEL` |
+| Main completion | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.EXECUTOR_MODEL` |
+| Utility tasks | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.EXECUTOR_MODEL` |
 | Runbook selection | — local two-stage ONNX selector, no upstream call | `runbooks/local/setwise.py` |
 
 **A second product mode briefly lived here** — a `pro` tier on Cerebras serving
@@ -51,7 +51,7 @@ see above), so its endpoint choice is whatever the default is that minute.
 Replaying the 62 real utility-task payloads against both: Together p50 1100ms /
 p90 1702ms, OpenRouter p50 3414ms / p90 6013ms. Nothing about the model changed.
 
-`config.SERVING_MODEL` names the model and `config.SERVING_ORIGIN` the host the
+`config.EXECUTOR_MODEL` names the model and `config.EXECUTOR_ORIGIN` the host the
 credential is sent to; `main._build_provider` builds the adapter, readiness gates
 `TOGETHER_API_KEY`, and `weak_secrets` pins the origin in production.
 

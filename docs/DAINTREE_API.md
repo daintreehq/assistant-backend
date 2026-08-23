@@ -7,7 +7,7 @@ shaped around a third-party schema.
 
 The upstream provider is Together AI — its OpenAI-compatible wire shape is spoken
 *internally*, behind a provider abstraction; the main model is
-`deepseek-ai/DeepSeek-V4-Flash-0731`, named once in `config.SERVING_MODEL`. Together
+`deepseek-ai/DeepSeek-V4-Flash-0731`, named once in `config.EXECUTOR_MODEL`. Together
 is a model HOST, not a router: one endpoint serves each model, so there is no
 endpoint-selection policy, no fallback pool and no caller-facing routing preference.
 All of that is invisible to clients, which never see a real model id.

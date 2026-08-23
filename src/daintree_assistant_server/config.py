@@ -36,14 +36,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # and policy.py is gone), so its endpoint choice is whatever the default is that
 # minute. Replaying the 62 real utility-task payloads: Together p50 1100ms / p90
 # 1702ms against OpenRouter's 3414ms / 6013ms — same model, same prompts, 3.1x.
-SERVING_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
+EXECUTOR_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
 
 #: The credential, base URL and production origin for that one host. Named as
 #: constants rather than inlined so readiness messages, the doctor route and the
 #: tests that pin the credential model all read the same three strings.
-SERVING_KEY_ENV = "TOGETHER_API_KEY"
-SERVING_URL_ENV = "TOGETHER_BASE_URL"
-SERVING_ORIGIN = "api.together.xyz"
+EXECUTOR_KEY_ENV = "TOGETHER_API_KEY"
+EXECUTOR_URL_ENV = "TOGETHER_BASE_URL"
+EXECUTOR_ORIGIN = "api.together.xyz"
 
 #: The alias returned to clients. The product promise is Daintree, not a
 #: permanent contract with Together or DeepSeek.
@@ -61,12 +61,40 @@ PUBLIC_MODEL_ID = "daintree-assistant"
 #: an unverified ceiling may bound a paid turn, so it is allowed to bound only
 #: the ones no reading of it could rescue. Verify it with the live suite, then
 #: the budgeter can tighten.
-SERVING_CONTEXT_TOKENS = 131_072
+EXECUTOR_CONTEXT_TOKENS = 131_072
+
+# ---------------------------------------------------------------------------
+# The FAST-RESPONSE role. A second internal provider, NOT a second product.
+# ---------------------------------------------------------------------------
+#
+# A Cerebras/Gemma product TIER lived here once — `modes.py`, per-mode
+# credentials, a per-turn route on the wire — and it was deleted when its pricing
+# could not be made to work (CLAUDE.md). This is not that. There is no registry,
+# no caller-facing choice and no second public model: a request still targets
+# `daintree-assistant`, and the backend composes two internal calls behind it.
+#
+# Hardcoded for the same reason the executor model is: which model writes the
+# preamble is a product decision that has one right answer, not an operational
+# dial. What IS operational — whether the stage runs at all, and for how many
+# sessions — lives in `Settings` below, because the right value for that is
+# whatever production says this week.
+FAST_RESPONSE_MODEL = "gemma-4-31b"
+FAST_RESPONSE_KEY_ENV = "CEREBRAS_API_KEY"
+FAST_RESPONSE_URL_ENV = "CEREBRAS_BASE_URL"
+FAST_RESPONSE_ORIGIN = "api.cerebras.ai"
+
+#: The intended successor is a Qwen model in the 27B class. It is NOT pinned here
+#: and must not be guessed at: no such id is currently documented on the Cerebras
+#: public API (checked when this was written), and committing an unverified model
+#: string as a placeholder would produce a 404 at the first request of a rollout.
+#: Replacing this constant is gated on a verified id plus the live parameter,
+#: latency and overclaim checks in `TODO.md`.
 
 __all__ = [
+    "EXECUTOR_CONTEXT_TOKENS",
+    "EXECUTOR_MODEL",
+    "FAST_RESPONSE_MODEL",
     "PUBLIC_MODEL_ID",
-    "SERVING_CONTEXT_TOKENS",
-    "SERVING_MODEL",
     "Settings",
     "get_settings",
 ]
@@ -153,6 +181,16 @@ ToolProjectionMode = Literal["disabled", "shadow", "enforced"]
 TraceCaptureMode = Literal["off", "metadata", "full_internal"]
 TraceSinkKind = Literal["null", "filesystem", "gcs"]
 
+#: The fast-response stage. An operational KILL SWITCH, not a product choice —
+#: closed for the same reason the others are, so a typo cannot silently widen it.
+#:
+#: off      no Cerebras call at all; the executor request is byte-identical to
+#:          what it is today, which is what makes rollback a config-only revision
+#: shadow   generate, validate and trace the preamble — but do not emit it and do
+#:          not hand it to the executor. The turn the user sees is unchanged
+#: visible  emit the preamble and append it to the executor's input
+FastResponseMode = Literal["off", "shadow", "visible"]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -182,7 +220,7 @@ class Settings(BaseSettings):
     port: int = Field(default=8080, alias="PORT")
 
     # ---- Upstream provider (Together AI, OpenAI-compatible) --------------
-    # The model is hardcoded (see SERVING_MODEL above). Only the key and base URL
+    # The model is hardcoded (see EXECUTOR_MODEL above). Only the key and base URL
     # come from the environment.
     together_base_url: str = Field(
         default="https://api.together.xyz/v1", alias="TOGETHER_BASE_URL"
@@ -447,6 +485,33 @@ class Settings(BaseSettings):
     )
     trace_max_event_bytes: int = Field(default=8_388_608, ge=0, alias="TRACE_MAX_EVENT_BYTES")
 
+    # ---- Fast response (the Cerebras stage) ------------------------------
+    #
+    # `off` by default, so a deployment that sets nothing behaves exactly as it
+    # does today: one upstream call, the same bytes. That is deliberate — the
+    # rollback story for this feature is "set the mode back to off and roll a
+    # config-only revision", and a default of anything else would make the
+    # feature's failure mode the fleet's default state.
+    fast_response_mode: FastResponseMode = Field(default="off", alias="FAST_RESPONSE_MODE")
+    # Bucketed on the SESSION, never the request: a percentage re-rolled per
+    # request would show a preamble on one round of a conversation and not the
+    # next, producing exactly the inconsistent history the client cannot render.
+    fast_response_rollout_percent: int = Field(
+        default=0, ge=0, le=100, alias="FAST_RESPONSE_ROLLOUT_PERCENT"
+    )
+    # Short and absolute. The stage exists to make the system feel responsive; a
+    # retry that succeeds at five seconds has failed that purpose AND delayed the
+    # executor behind it, so there is no retry and the timeout is tight.
+    fast_response_timeout_seconds: float = Field(
+        default=3.0, gt=0.0, le=15.0, alias="FAST_RESPONSE_TIMEOUT_SECONDS"
+    )
+    cerebras_api_key: SecretStr = Field(default=SecretStr(""), alias="CEREBRAS_API_KEY")
+    cerebras_base_url: str = Field(default="", alias="CEREBRAS_BASE_URL")
+    # Account-gated at Cerebras, so off unless someone has confirmed it is enabled.
+    cerebras_prompt_cache_enabled: bool = Field(
+        default=False, alias="CEREBRAS_PROMPT_CACHE_ENABLED"
+    )
+
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")
@@ -605,7 +670,7 @@ class Settings(BaseSettings):
         if not self.state_signing_key_current.get_secret_value():
             missing.append("STATE_SIGNING_KEY_CURRENT")
         if not self.serving_api_key.get_secret_value():
-            missing.append(SERVING_KEY_ENV)
+            missing.append(EXECUTOR_KEY_ENV)
         return missing
 
     def local_only_problems(self) -> list[str]:
@@ -633,6 +698,44 @@ class Settings(BaseSettings):
                 "(the runbook overlay is development-only)"
             )
         problems.extend(self.trace_problems())
+        problems.extend(self.fast_response_problems())
+        return problems
+
+    def fast_response_problems(self) -> list[str]:
+        """Configuration that must fail readiness rather than degrade silently.
+
+        The fast stage is best-effort BY DESIGN — a Cerebras outage costs a
+        preamble, never a turn — and that is exactly why a misconfiguration has to
+        be loud here instead. A missing credential would otherwise present as
+        "the preamble never appears", which is indistinguishable from the feature
+        working and the model declining, and could sit unnoticed through a whole
+        rollout.
+
+        Nothing is checked when the mode is `off`: a deployment that is not
+        running the stage has no reason to hold its key.
+        """
+        if self.fast_response_mode == "off":
+            return []
+        problems: list[str] = []
+        if not self.cerebras_api_key.get_secret_value():
+            problems.append(
+                f"FAST_RESPONSE_MODE={self.fast_response_mode} requires "
+                f"{FAST_RESPONSE_KEY_ENV} (the stage would fail open on every turn "
+                "and look identical to a model that chose not to answer)"
+            )
+        # The SAME check the executor's origin gets, through the same helper —
+        # which exists for exactly this reason ("so both providers get the same
+        # check rather than a copy each"). A hostname comparison alone is not it:
+        # `http://api.cerebras.ai` and `https://api.cerebras.ai:8443` both pass a
+        # hostname test while sending the server's credential somewhere else.
+        if self.is_hardened and self.cerebras_base_url:
+            problem = _origin_problem(
+                value=self.cerebras_base_url,
+                expected_host=FAST_RESPONSE_ORIGIN,
+                env_name=FAST_RESPONSE_URL_ENV,
+            )
+            if problem:
+                problems.append(problem)
         return problems
 
     def trace_problems(self) -> list[str]:
@@ -692,8 +795,8 @@ class Settings(BaseSettings):
         # free to point at proxies and mocks.
         problem = _origin_problem(
             value=self.serving_base_url,
-            expected_host=SERVING_ORIGIN,
-            env_name=SERVING_URL_ENV,
+            expected_host=EXECUTOR_ORIGIN,
+            env_name=EXECUTOR_URL_ENV,
         )
         if problem is not None:
             problems.append(problem)

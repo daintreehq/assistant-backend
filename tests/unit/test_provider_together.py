@@ -21,7 +21,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import SERVING_MODEL, SERVING_ORIGIN, Settings
+from daintree_assistant_server.config import EXECUTOR_MODEL, EXECUTOR_ORIGIN, Settings
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.providers.together import TogetherProvider
 
@@ -132,7 +132,7 @@ def test_the_container_builds_this_adapter_at_this_origin_with_this_key() -> Non
     # EXACTLY the origin. `startswith` would accept
     # `https://api.together.xyz.evil.example`, which is precisely the shape a
     # misdirected credential takes.
-    assert provider._base_url == f"https://{SERVING_ORIGIN}/v1"  # noqa: SLF001
+    assert provider._base_url == f"https://{EXECUTOR_ORIGIN}/v1"  # noqa: SLF001
     assert provider._resolve_key(None).get_secret_value() == "tgp_v1_test"  # noqa: SLF001
     # And the model the container will ask it for is the pinned one.
-    assert SERVING_MODEL == "deepseek-ai/DeepSeek-V4-Flash-0731"
+    assert EXECUTOR_MODEL == "deepseek-ai/DeepSeek-V4-Flash-0731"

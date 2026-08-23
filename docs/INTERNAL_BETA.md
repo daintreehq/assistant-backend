@@ -38,7 +38,7 @@ is not a description of today's build, so every line carries a status:
 | 2 | ~~**The tester supplies an OpenRouter key**, and it is theirs.~~ *(superseded — no caller key exists)* | — |
 | 3 | ~~**That key is the HTTP bearer** and funds every upstream call the turn makes.~~ *(superseded — the server's key funds every call)* | — |
 | 4 | **The serving backend holds no shared model credential** — not as a fallback, not as a default, not for "just the selector". | ✅ `main._build_provider(api_key=None)` |
-| 5 | **The primary model stays pinned**, and is not a floating alias. | ✅ `config.SERVING_MODEL` |
+| 5 | **The primary model stays pinned**, and is not a floating alias. | ✅ `config.EXECUTOR_MODEL` |
 | 6 | **The backend owns** prompts, the runbook catalog and bodies, automatic runbook selection, prompt assembly, and the utility-task prompts. | ✅ |
 | 7 | **The CLI owns** the visible conversation, local state, permissions and tool execution. | ✅ |
 | 8 | **The backend is stateless across instances**, apart from process-local caches; runbook state travels in a signed, opaque token. | ✅ `state/codec.py` |
@@ -158,7 +158,7 @@ These are load-bearing. Breaking one is a release blocker, not a regression.
   selector never sees it. What it *does* see: sanitized `input.messages`, plus
   bounded turn/workflow hints and the available tool names.
 - The serving provider is built **with the server's own credential**
-  (the credential `config.SERVING_KEY_ENV` names), and `/readyz` gates on its presence.
+  (the credential `config.EXECUTOR_KEY_ENV` names), and `/readyz` gates on its presence.
 - Prompt order is cache-critical. The base prompt and the response contract are the
   **only** system messages; everything else the server injects sits below the tool
   schemas as a framed **user-role** row, ordered by how widely it can be shared,

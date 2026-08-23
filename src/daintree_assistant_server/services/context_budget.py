@@ -12,7 +12,7 @@ block and the injected tail — none of which the 8 MiB ceiling counts.
 
 **This module measures; it rarely refuses.** The estimate is characters/4, and
 against a window we have not verified on the live host (see
-``SERVING_CONTEXT_TOKENS``) that is not a number to fail a paid turn on. So the
+``EXECUTOR_CONTEXT_TOKENS``) that is not a number to fail a paid turn on. So the
 posture is deliberately lopsided:
 
 * every turn is measured and logged, which is what makes the constant
@@ -40,7 +40,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from ..config import SERVING_CONTEXT_TOKENS
+from ..config import EXECUTOR_CONTEXT_TOKENS
 from ..contracts.errors import TYPE_INVALID_REQUEST
 from ..errors import DaintreeError
 from ..providers.base import ProviderChatRequest
@@ -215,7 +215,7 @@ def measure(
     and the injected tail), which move together and are the part a long session
     grows.
     """
-    window = SERVING_CONTEXT_TOKENS if context_window is None else context_window
+    window = EXECUTOR_CONTEXT_TOKENS if context_window is None else context_window
     system = 0
     conversation = 0
     for message in request.messages:

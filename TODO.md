@@ -597,7 +597,7 @@ prediction.
 
 **Trigger: with the live provider-contract suite below.**
 
-`config.SERVING_CONTEXT_TOKENS` is 131,072 — the published figure for DeepSeek V4
+`config.EXECUTOR_CONTEXT_TOKENS` is 131,072 — the published figure for DeepSeek V4
 Flash, never asked of Together. That gap is why `exceeds_window` refuses only
 when the input alone clears the whole window rather than at the reservation
 boundary: an unverified ceiling is allowed to fail a paid turn only in the cases

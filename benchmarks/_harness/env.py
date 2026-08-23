@@ -14,7 +14,7 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import SERVING_KEY_ENV, Settings
+from daintree_assistant_server.config import EXECUTOR_KEY_ENV, Settings
 from daintree_assistant_server.providers.base import ChatProvider, ProviderChatRequest
 from daintree_assistant_server.providers.together import TogetherProvider
 
@@ -92,7 +92,7 @@ def require_api_key(settings: Settings) -> SecretStr:
     """
     if not settings.serving_api_key.get_secret_value():
         raise EnvError(
-            f"{SERVING_KEY_ENV} is not set — export it or point --env-file at a .env "
+            f"{EXECUTOR_KEY_ENV} is not set — export it or point --env-file at a .env "
             "that has it (live suites make real calls)."
         )
     return settings.serving_api_key

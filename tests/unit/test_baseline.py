@@ -67,10 +67,10 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     captured: ``compare()`` only checks the BANDED numeric metrics, so an
     identity string nobody asserts drifts in silence.
     """
-    from daintree_assistant_server.config import SERVING_MODEL
+    from daintree_assistant_server.config import EXECUTOR_MODEL
 
     identity = _baseline()["identity"]
-    assert identity["model"] == SERVING_MODEL  # type: ignore[index]
+    assert identity["model"] == EXECUTOR_MODEL  # type: ignore[index]
     # The upstream itself. Together is a model host rather than a router, so
     # there is no endpoint-selection posture to record beside it — privacy mode,
     # sort axis and denylist have no subject. Nor is there a first-byte endpoint

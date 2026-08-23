@@ -20,7 +20,7 @@ from typing import Any
 from pydantic import SecretStr
 
 from .. import PROTOCOL_VERSION, __version__
-from ..config import DOCS_RUNBOOK_ID, PUBLIC_MODEL_ID, SERVING_MODEL, Settings
+from ..config import DOCS_RUNBOOK_ID, EXECUTOR_MODEL, PUBLIC_MODEL_ID, Settings
 from ..contracts.daintree_api import (
     CompactionBlock,
     CompactionSpan,
@@ -105,6 +105,7 @@ from .docs_mcp import (
     DocsLookupError,
     DocsMcpClient,
 )
+from .fast_response import FastResponseService
 from .output_policy import lint_output, repair_tables, resolve_content_width
 from .prompt_assembler import (
     TOOLS_SEGMENT_ID,
@@ -435,6 +436,11 @@ class ChatOrchestrator:
         # each one carrying a flag check that only ever goes one way in
         # production and is therefore never exercised.
         trace_recorder: TraceRecorder | None = None,
+        # The fast-response stage. Optional, and disabled in every deployment
+        # today — `FastResponseService.available` is False unless an operator set
+        # a mode AND a Cerebras credential exists, so the turn takes exactly the
+        # path it takes now.
+        fast_response: FastResponseService | None = None,
     ) -> None:
         self.settings = settings
         self.catalog_manager = catalog_manager
@@ -445,6 +451,7 @@ class ChatOrchestrator:
         self.docs_client = docs_client
         self.compactor = compactor
         self.trace_recorder = trace_recorder or NullTraceRecorder()
+        self.fast_response = fast_response
         # In-flight detached tasks — today, the streaming path's preparation task.
         # asyncio holds only a weak reference to a bare task, so we keep a strong
         # one here (discarded on done) to stop one being garbage-collected
@@ -1442,7 +1449,7 @@ class ChatOrchestrator:
         assembled, segments = self.assembler.build_main_request_with_segments(
             request=request,
             runbooks=runbooks,
-            upstream_model=SERVING_MODEL,
+            upstream_model=EXECUTOR_MODEL,
             docs=docs,
         )
         provider_request = replace(

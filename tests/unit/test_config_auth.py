@@ -7,15 +7,15 @@ from pydantic import ValidationError
 
 from daintree_assistant_server.auth import authenticate
 from daintree_assistant_server.config import (
-    SERVING_KEY_ENV,
-    SERVING_ORIGIN,
-    SERVING_URL_ENV,
+    EXECUTOR_KEY_ENV,
+    EXECUTOR_ORIGIN,
+    EXECUTOR_URL_ENV,
     Settings,
 )
 
 
 def _settings(**overrides: object) -> Settings:
-    base: dict[str, object] = {"STATE_SIGNING_KEY_CURRENT": "sk", SERVING_KEY_ENV: "sk-test"}
+    base: dict[str, object] = {"STATE_SIGNING_KEY_CURRENT": "sk", EXECUTOR_KEY_ENV: "sk-test"}
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
 
@@ -26,13 +26,13 @@ def test_missing_secrets_reports_both_server_owned_secrets() -> None:
     # The SERVING key must fail READINESS — without it nothing can be answered,
     # and discovering that on the first turn surfaces as an upstream 401 that
     # reads like the caller's fault.
-    s = Settings(**{SERVING_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": ""})  # type: ignore[arg-type]
-    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT", SERVING_KEY_ENV]
+    s = Settings(**{EXECUTOR_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": ""})  # type: ignore[arg-type]
+    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT", EXECUTOR_KEY_ENV]
 
 
 def test_missing_upstream_key_alone_still_fails_readiness() -> None:
-    s = Settings(**{SERVING_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": "sk"})  # type: ignore[arg-type]
-    assert s.missing_secrets() == [SERVING_KEY_ENV]
+    s = Settings(**{EXECUTOR_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": "sk"})  # type: ignore[arg-type]
+    assert s.missing_secrets() == [EXECUTOR_KEY_ENV]
 
 
 def test_missing_secrets_empty_when_present() -> None:
@@ -59,7 +59,7 @@ def test_server_provider_is_built_with_the_configured_credential() -> None:
     # keyless would fail every request in `_resolve_key`.
     from daintree_assistant_server.main import _build_provider
 
-    s = _settings(**{SERVING_KEY_ENV: "sk-server-owned"})
+    s = _settings(**{EXECUTOR_KEY_ENV: "sk-server-owned"})
     provider = _build_provider(s)
     assert provider._resolve_key(None).get_secret_value() == "sk-server-owned"  # noqa: SLF001
 
@@ -73,12 +73,12 @@ def test_the_serving_identity_is_pinned_to_literals() -> None:
     matters: it is where the server's own upstream credential is sent on every
     request.
     """
-    from daintree_assistant_server.config import SERVING_MODEL
+    from daintree_assistant_server.config import EXECUTOR_MODEL
 
-    assert SERVING_KEY_ENV == "TOGETHER_API_KEY"
-    assert SERVING_URL_ENV == "TOGETHER_BASE_URL"
-    assert SERVING_ORIGIN == "api.together.xyz"
-    assert SERVING_MODEL == "deepseek-ai/DeepSeek-V4-Flash-0731"
+    assert EXECUTOR_KEY_ENV == "TOGETHER_API_KEY"
+    assert EXECUTOR_URL_ENV == "TOGETHER_BASE_URL"
+    assert EXECUTOR_ORIGIN == "api.together.xyz"
+    assert EXECUTOR_MODEL == "deepseek-ai/DeepSeek-V4-Flash-0731"
 
 
 def test_production_rejects_a_valid_https_origin_that_is_not_the_serving_host() -> None:
@@ -90,12 +90,12 @@ def test_production_rejects_a_valid_https_origin_that_is_not_the_serving_host() 
     simply somewhere else, which is what a misdirected key actually looks like.
     """
     s = _settings(
-        **{SERVING_URL_ENV: "https://api.openai.com/v1"},
+        **{EXECUTOR_URL_ENV: "https://api.openai.com/v1"},
         ENVIRONMENT="production",
         STATE_SIGNING_KEY_CURRENT="y" * 48,
         STATE_SALT="a-real-random-salt-value",
     )
-    assert any(SERVING_URL_ENV in p for p in s.weak_secrets())
+    assert any(EXECUTOR_URL_ENV in p for p in s.weak_secrets())
 
 
 def test_production_requires_the_real_serving_origin() -> None:
@@ -108,7 +108,7 @@ def test_production_requires_the_real_serving_origin() -> None:
         "STATE_SIGNING_KEY_CURRENT": "y" * 48,
         "STATE_SALT": "a-real-random-salt-value",
     }
-    host, env = SERVING_ORIGIN, SERVING_URL_ENV
+    host, env = EXECUTOR_ORIGIN, EXECUTOR_URL_ENV
     for bad in (
         f"http://{host}/v1",
         f"https://{host}.evil.example/v1",
@@ -166,7 +166,7 @@ def test_production_previous_key_must_pair_with_kid() -> None:
 
 
 def test_secret_not_in_repr() -> None:
-    s = _settings(**{SERVING_KEY_ENV: "sk-should-not-appear"})
+    s = _settings(**{EXECUTOR_KEY_ENV: "sk-should-not-appear"})
     assert "sk-should-not-appear" not in repr(s)
 
 

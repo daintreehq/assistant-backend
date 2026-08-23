@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from daintree_assistant_server.config import SERVING_KEY_ENV, SERVING_ORIGIN, Settings
+from daintree_assistant_server.config import EXECUTOR_KEY_ENV, EXECUTOR_ORIGIN, Settings
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INFRA = REPO_ROOT / "infra"
@@ -156,7 +156,7 @@ def test_no_infra_file_claims_a_caller_supplied_credential(path: Path) -> None:
         assert claim not in text, (
             f"{path.relative_to(REPO_ROOT)} still describes the caller-funded "
             f"credential model ({claim!r}). The server holds "
-            f"{SERVING_KEY_ENV} and funds every turn; see docs/KEY_HANDLING.md."
+            f"{EXECUTOR_KEY_ENV} and funds every turn; see docs/KEY_HANDLING.md."
         )
 
 
@@ -195,8 +195,8 @@ def test_the_origin_readiness_check_names_the_host_it_actually_pins() -> None:
     server's key is forwarded there. Naming a different vendor's origin makes the
     explanation false and the instruction unfollowable."""
     text = _read(TF_README)
-    assert SERVING_ORIGIN in text, (
-        f"the Terraform README should name {SERVING_ORIGIN}, the origin "
+    assert EXECUTOR_ORIGIN in text, (
+        f"the Terraform README should name {EXECUTOR_ORIGIN}, the origin "
         "Settings.weak_secrets actually pins in production"
     )
     assert "openrouter.ai` origin" not in text, (

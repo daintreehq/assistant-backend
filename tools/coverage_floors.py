@@ -50,6 +50,10 @@ FLOORS: dict[str, int] = {
     # that does not exist, which is how it was caught.)
     "src/daintree_assistant_server/providers/openrouter.py": 88,
     "src/daintree_assistant_server/providers/together.py": 90,
+    # The FAST-RESPONSE adapter. On this list because it holds the second server
+    # credential and because its whole job is a body that differs from the parent
+    # in three specific ways — a regression in any of them is silent on the wire.
+    "src/daintree_assistant_server/providers/cerebras.py": 97,
     # Added 2026-08-20 (measured 94.70%). The orchestrator earned a floor when the
     # streaming fold became a COST-CONTAINMENT surface as well as a correctness
     # one: the runaway guard is the only thing standing between a degenerating
@@ -70,6 +74,11 @@ FLOORS: dict[str, int] = {
     # machine, the shape caps and the image data-URL policy.
     "src/daintree_assistant_server/services/validation.py": 94,
     "src/daintree_assistant_server/services/turn_accounting.py": 99,
+    # The fast-response stage. A reliability surface rather than a security one:
+    # its contract is that it FAILS OPEN — every timeout, transport error and
+    # rejected output must resolve to "no preamble" and leave the turn alone. An
+    # uncovered branch here is a path that could raise into a real request.
+    "src/daintree_assistant_server/services/fast_response.py": 91,
     "src/daintree_assistant_server/state/codec.py": 93,
     # The TRAINING-TRACE plane. It belongs on this list for the same reason the
     # state codec does: it is the code that decides what user content is written

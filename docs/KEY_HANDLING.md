@@ -14,7 +14,7 @@ once: authenticating the request, and funding that turn's model calls. The calle
 paid.
 
 Now there is exactly one credential — `TOGETHER_API_KEY`, named by
-`config.SERVING_KEY_ENV` — it belongs to the server, and **Daintree pays**. Consequences that follow directly, and that the
+`config.EXECUTOR_KEY_ENV` — it belongs to the server, and **Daintree pays**. Consequences that follow directly, and that the
 code enforces:
 
 - **The serving backend holds the model credential.** `main._build_provider`

@@ -40,6 +40,7 @@ from .observability import (
 )
 from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
+from .providers.cerebras import CerebrasProvider
 from .providers.openrouter import OpenRouterProvider
 from .providers.together import TogetherProvider
 from .runbooks.catalog import Catalog, CatalogManager, default_runbooks_dir, load_catalog
@@ -50,6 +51,7 @@ from .runbooks.local.setwise import SetwiseClassifier
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.compaction import Compactor, NullCompactor, default_compactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
+from .services.fast_response import FastResponseService
 from .services.prompt_assembler import PromptAssembler
 from .services.task_runner import TaskRunner
 from .state.codec import StateCodec
@@ -239,6 +241,9 @@ class Container:
     # capture AND the configuration is valid — see `_build_trace_recorder`. Held
     # here so lifespan can drain its uploads before the clients they ride on close.
     trace_recorder: TraceRecorder = field(default_factory=NullTraceRecorder)
+    # The second internal provider ROLE — not a second product. `None` unless the
+    # fast stage is configured, which is every deployment today.
+    fast_response_provider: ChatProvider | None = None
     docs_http_client: httpx.AsyncClient | None = None
     # The local selector's worker pool — owned here so lifespan teardown joins
     # its threads. None when a selector override was injected (tests/benchmarks).
@@ -267,6 +272,9 @@ class Container:
             await self.trace_recorder.aclose()
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
             await self.provider.aclose()
+        if self.fast_response_provider is not None:
+            with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
+                await self.fast_response_provider.aclose()
         if self.openrouter_provider is not None:
             with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
                 await self.openrouter_provider.aclose()
@@ -304,6 +312,43 @@ def _build_docs_client() -> tuple[httpx.AsyncClient, DocsMcpClient]:
         limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
     )
     return client, DocsMcpClient(client)
+
+
+def _build_fast_response_provider(settings: Settings) -> ChatProvider | None:
+    """The Cerebras adapter, or None — which is every deployment today.
+
+    None when the stage is off or its credential is absent, and that is a NORMAL
+    configuration rather than a degraded one: the fast preamble is an
+    optimisation, and a server without it answers exactly as it does now.
+
+    Its own httpx client, not the executor's. The two hosts have opposite latency
+    profiles and opposite lifetimes — a three-second preamble call must never
+    queue behind a long-lived streaming completion holding a pooled connection,
+    which is the same reasoning that gives the docs MCP its own pool.
+    """
+    if settings.fast_response_mode == "off":
+        return None
+    if not settings.cerebras_api_key.get_secret_value():
+        # Readiness already refuses this (`Settings.fast_response_problems`), but
+        # `build_container` is also called directly by tests and benchmarks, which
+        # never probe readiness. Failing to None here keeps those paths honest.
+        return None
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            settings.fast_response_timeout_seconds,
+            connect=2.0,
+            write=_UPSTREAM_WRITE_TIMEOUT_SECONDS,
+            pool=_UPSTREAM_POOL_TIMEOUT_SECONDS,
+        ),
+        limits=httpx.Limits(max_connections=40, max_keepalive_connections=10),
+    )
+    return CerebrasProvider(
+        client,
+        api_key=settings.cerebras_api_key,
+        base_url=settings.cerebras_base_url or None,
+        default_timeout=settings.fast_response_timeout_seconds,
+        send_prompt_cache_key=settings.cerebras_prompt_cache_enabled,
+    )
 
 
 def _build_trace_recorder(
@@ -513,6 +558,12 @@ def build_container(
     # request to a different host on the same latency profile, and a pool per
     # concern costs connections nothing here is short of.
     trace_recorder = _build_trace_recorder(settings, docs_http_client)
+    fast_response_provider = _build_fast_response_provider(settings)
+    fast_response = FastResponseService(
+        settings=settings,
+        prompt_loader=prompt_loader,
+        provider=fast_response_provider,
+    )
     orchestrator = ChatOrchestrator(
         settings=settings,
         catalog_manager=catalog_manager,
@@ -523,6 +574,7 @@ def build_container(
         docs_client=docs_client,
         compactor=chat_compactor,
         trace_recorder=trace_recorder,
+        fast_response=fast_response,
     )
     task_runner = TaskRunner(
         settings=settings,
@@ -545,6 +597,7 @@ def build_container(
         task_runner=task_runner,
         compactor=chat_compactor,
         trace_recorder=trace_recorder,
+        fast_response_provider=fast_response_provider,
         docs_http_client=docs_http_client,
         inference_pool=inference_pool,
     )

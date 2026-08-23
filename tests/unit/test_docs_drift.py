@@ -28,11 +28,11 @@ from daintree_assistant_server import PROTOCOL_MAX, PROTOCOL_MIN
 from daintree_assistant_server import main as main_module
 from daintree_assistant_server.auth import authenticate
 from daintree_assistant_server.config import (
+    EXECUTOR_KEY_ENV,
+    EXECUTOR_MODEL,
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
     PUBLIC_MODEL_ID,
-    SERVING_KEY_ENV,
-    SERVING_MODEL,
     Settings,
 )
 from daintree_assistant_server.errors import DaintreeError
@@ -337,7 +337,7 @@ def test_task_runner_actually_sends_reasoning_disabled() -> None:
 
 def test_provider_policy_names_the_pinned_models() -> None:
     text = _read(DOC_PROVIDER)
-    for model in (SERVING_MODEL, PUBLIC_MODEL_ID):
+    for model in (EXECUTOR_MODEL, PUBLIC_MODEL_ID):
         assert model in text, (
             f"docs/PROVIDER_POLICY.md does not name {model!r}. The model table is "
             "the documented source of truth for what actually answers a call."
@@ -345,7 +345,7 @@ def test_provider_policy_names_the_pinned_models() -> None:
 
 
 def test_readme_names_the_pinned_main_model() -> None:
-    assert SERVING_MODEL in _read(README)
+    assert EXECUTOR_MODEL in _read(README)
 
 
 # ---------------------------------------------------------------------------
@@ -391,10 +391,10 @@ def test_serving_provider_is_built_with_the_server_credential() -> None:
     reordering and renaming of everything around it.
     """
     builder = inspect.getsource(main_module._build_provider)
-    expected = f"settings.{SERVING_KEY_ENV.lower()}"
+    expected = f"settings.{EXECUTOR_KEY_ENV.lower()}"
     assert expected in builder or "settings.serving_api_key" in builder, (
         "main._build_provider no longer passes the server credential. Readiness "
-        f"gates on {SERVING_KEY_ENV} precisely so this cannot be missing at "
+        f"gates on {EXECUTOR_KEY_ENV} precisely so this cannot be missing at "
         "runtime; a provider built without it cannot answer anything."
     )
 
@@ -407,7 +407,7 @@ def test_the_serving_provider_really_holds_the_credential() -> None:
     """
     settings = Settings(**{
         "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-        SERVING_KEY_ENV: "sk-server-owned",
+        EXECUTOR_KEY_ENV: "sk-server-owned",
     })
     provider = main_module._build_provider(settings)
     assert isinstance(provider, _SERVING_PROVIDER_CLASS)
@@ -426,7 +426,7 @@ def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
 
     settings = Settings(**{
         "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-        SERVING_KEY_ENV: "sk-server-owned",
+        EXECUTOR_KEY_ENV: "sk-server-owned",
     })
     provider = main_module._build_provider(settings)
     resolved = provider._resolve_key(_SecretStr("sk-caller-supplied"))

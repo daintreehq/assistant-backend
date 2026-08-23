@@ -17,9 +17,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, SecretStr, ValidationError
 
 from ..config import (
+    EXECUTOR_MODEL,
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
-    SERVING_MODEL,
     Settings,
 )
 from ..contracts.tasks import (
@@ -619,12 +619,12 @@ def _affinity_key(task_id: str) -> str:
 # exists so ONE task can reach a cheaper model, and the type is what stops it
 # growing into the endpoint-selection policy that was deliberately deleted in the
 # move off OpenRouter. Adding a third value should feel like a decision.
-#: "serving" is the one host this server talks to — Together, on SERVING_MODEL.
+#: "serving" is the one host this server talks to — Together, on EXECUTOR_MODEL.
 #: The profile does not care which vendor that is, only that it is the one
 #: funding ordinary turns.
 ProviderId = Literal["serving", "openrouter"]
 
-# No profile overrides the provider today: every task runs on SERVING_MODEL. The
+# No profile overrides the provider today: every task runs on EXECUTOR_MODEL. The
 # second-provider mechanism below (`ProviderId`, `_provider_for`) is kept because
 # it is the seam that made moving compaction off the serving model possible in
 # the first place — it just has no user while the serving model IS the cheap one.
@@ -649,7 +649,7 @@ class TaskProfile:
     # Defaulting both together keeps every profile on the one serving identity:
     # Together, on the one hardcoded model.
     provider_id: ProviderId = "serving"
-    model: str = SERVING_MODEL
+    model: str = EXECUTOR_MODEL
     # Appended to the generic repair instruction so the retry re-anchors on this
     # task's exact output shape (the selector does the same for select_runbooks).
     # Only used on the rare second attempt — no happy-path cost.
