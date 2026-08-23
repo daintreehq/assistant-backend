@@ -113,6 +113,12 @@ ignore = [
 # deliberately accepted and ignored. Same reasoning as the global ARG001 ignore
 # above, which already exempts the plain-function form of this.
 "src/daintree_assistant_server/runbooks/local/selector.py" = ["ARG002"]
+# Null objects: every argument is unused BY DESIGN — that is what makes them null.
+# Naming them anyway is what keeps the signature checkable against the Protocol,
+# and mypy --strict does check it, so the arguments are load-bearing even though
+# no body reads them.
+"src/daintree_assistant_server/tracing/sinks/null.py" = ["ARG002"]
+"src/daintree_assistant_server/tracing/recorder.py" = ["ARG002"]
 "tests/**/*.py" = [
     "ARG001",
     "ARG002",

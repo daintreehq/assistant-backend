@@ -19,7 +19,7 @@ from typing import Any
 
 from pydantic import SecretStr
 
-from .. import PROTOCOL_VERSION
+from .. import PROTOCOL_VERSION, __version__
 from ..config import DOCS_RUNBOOK_ID, PUBLIC_MODEL_ID, SERVING_MODEL, Settings
 from ..contracts.daintree_api import (
     CompactionBlock,
@@ -77,6 +77,17 @@ from ..runbooks.tool_projection import (
 )
 from ..state.codec import StateCodec
 from ..text_utils import sanitize_line, utf8_len
+from ..tracing import (
+    NULL_SCOPE,
+    InvocationUsage,
+    ModelInvocationTrace,
+    NullTraceRecorder,
+    NullTraceScope,
+    TraceOutcome,
+    TraceRecorder,
+    TraceScope,
+)
+from ..tracing.scrub import scrub_request
 from .bare_intent import could_still_be_bare_intent, is_bare_tool_intent
 from .compaction import (
     CompactionRequest,
@@ -360,6 +371,12 @@ class _PreparedTurn:
     # Wall-clock marks for the phases preparation owns. Continues to be filled in
     # by the response paths, which is why it is mutable and travels with the turn.
     timings: _Timings = field(default_factory=_Timings)
+    # This turn's training trace. `NULL_SCOPE` in every ordinary deployment, which
+    # is why the response paths call it unconditionally: the null scope is
+    # stateless and shared, so an untraced turn pays a method call that returns.
+    # It travels on the prepared turn because the terminal event is what completes
+    # a trace, and that happens in the response path rather than here.
+    trace: TraceScope | NullTraceScope = NULL_SCOPE
 
 
 def _carries_output(chunk: dict[str, Any] | None) -> bool:
@@ -412,6 +429,12 @@ class ChatOrchestrator:
         # so every turn takes the path it took before this feature landed — the
         # declaration is stripped, nothing is started, and no event is emitted.
         compactor: Compactor | None = None,
+        # The training-trace recorder. Optional, and `NullTraceRecorder` in every
+        # ordinary deployment — the null path allocates nothing and awaits
+        # nothing, which is what lets the calls below be unconditional instead of
+        # each one carrying a flag check that only ever goes one way in
+        # production and is therefore never exercised.
+        trace_recorder: TraceRecorder | None = None,
     ) -> None:
         self.settings = settings
         self.catalog_manager = catalog_manager
@@ -421,6 +444,7 @@ class ChatOrchestrator:
         self.provider = provider
         self.docs_client = docs_client
         self.compactor = compactor
+        self.trace_recorder = trace_recorder or NullTraceRecorder()
         # In-flight detached tasks — today, the streaming path's preparation task.
         # asyncio holds only a weak reference to a bare task, so we keep a strong
         # one here (discarded on done) to stop one being garbage-collected
@@ -714,12 +738,53 @@ class ChatOrchestrator:
         budget: RequestBudget,
         headers: dict[str, str],
     ) -> RespondOutcome:
+        """Terminate the trace on EVERY exit, not only the successful one.
+
+        Preparation owns its own failures (`_prepare_inner`), but everything after
+        it — an exhausted upstream retry, a total-budget cancellation, an
+        unexpected error — used to leave the scope open: pending uploads never
+        drained and no terminal marker, leaving the record indistinguishable from
+        an instance that was killed. Termination is idempotent (`_closed`), so the
+        success path completing it first is fine.
+        """
         prepared = await self._prepare(
             request,
             request_id=request_id,
             api_key=api_key,
             budget=budget,
         )
+        try:
+            return await self._complete_nonstream_traced(
+                request,
+                prepared=prepared,
+                request_id=request_id,
+                budget=budget,
+                headers=headers,
+            )
+        except asyncio.CancelledError:
+            # A distinct OUTCOME, not a failure. The client went away or the total
+            # budget expired; nothing was wrong with the turn, and an exporter
+            # filtering on status must be able to tell the two apart.
+            await prepared.trace.abort(TraceOutcome(status="cancelled"))
+            raise
+        except BaseException as exc:
+            await prepared.trace.abort(
+                TraceOutcome(
+                    status="failed",
+                    error_code=getattr(exc, "code", None) or type(exc).__name__,
+                )
+            )
+            raise
+
+    async def _complete_nonstream_traced(
+        self,
+        request: RespondRequest,
+        *,
+        prepared: _PreparedTurn,
+        request_id: str,
+        budget: RequestBudget,
+        headers: dict[str, str],
+    ) -> RespondOutcome:
         result = await self._complete_with_retry(
             prepared.provider_request, budget=budget
         )
@@ -800,6 +865,62 @@ class ChatOrchestrator:
             param_index=build_parameter_index(request.input.tools),
             cost=turn_cost,
             timings=prepared.timings.to_wire(budget),
+        )
+        # Both generations are recorded, including one that was thrown away: a
+        # bare-intent draft the user never saw was still produced, still billed,
+        # and is exactly the kind of example a future model needs to learn not to
+        # produce. `accepted` is what tells the two apart.
+        if result is not drafted:
+            await prepared.trace.record_model_invocation(
+                ModelInvocationTrace(
+                    invocation_id=f"inv_{request_id}_0",
+                    stage="executor",
+                    provider="together",
+                    model=prepared.provider_request.model,
+                    started_at="",
+                    finish_reason=drafted.finish_reason,
+                    attempt=0,
+                    accepted=False,
+                    discard_reason="bare_intent",
+                )
+            )
+        # The ACCEPTED call. Without this, `invocations` held only discarded
+        # drafts — so an ordinary turn recorded no model call at all, and a
+        # reader would conclude the answer arrived from nowhere.
+        await prepared.trace.record_model_invocation(
+            ModelInvocationTrace(
+                invocation_id=f"inv_{request_id}_final",
+                stage="executor",
+                provider="together",
+                model=prepared.provider_request.model,
+                started_at="",
+                finish_reason=result.finish_reason,
+                usage=InvocationUsage(
+                    prompt_tokens=result.usage.prompt_tokens,
+                    completion_tokens=result.usage.completion_tokens,
+                    total_tokens=result.usage.total_tokens,
+                    cached_tokens=result.usage.cached_tokens,
+                    cost=result.usage.cost,
+                ),
+                attempt=1 if result is not drafted else 0,
+                accepted=True,
+            )
+        )
+        await prepared.trace.record_event(
+            "turn.completed",
+            attributes={
+                "finish_reason": result.finish_reason,
+                "had_tool_calls": had_tool_calls,
+                "committed_to_history": True,
+            },
+            content={
+                "role": "assistant",
+                "content": result.text,
+                "tool_calls": result.tool_calls or [],
+            },
+        )
+        await prepared.trace.complete(
+            TraceOutcome(status="completed", finish_reason=result.finish_reason)
         )
         return RespondOutcome(headers=headers, streaming=False, body=body)
 
@@ -882,11 +1003,56 @@ class ChatOrchestrator:
         *,
         request_id: str,
         api_key: SecretStr | None,
+        budget: RequestBudget | None = None,
+    ) -> _PreparedTurn:
+        """Terminate the trace when preparation FAILS, then re-raise unchanged.
+
+        Preparation raises on a real turn: a deadline expires, the assembled
+        prompt exceeds the context window, the catalog reloads underneath a pin.
+        Without this the scope opened below is simply abandoned — its pending
+        uploads never drained, no terminal marker, and the record left looking
+        identical to an instance that was killed. A failed preparation is a turn
+        worth studying, and it should say so rather than merely go quiet.
+
+        The holder exists because the scope is created deep inside the body and
+        the failure has to be handled outside it; re-indenting five hundred lines
+        into a `try` to avoid one list would be the worse trade.
+        """
+        holder: list[TraceScope | NullTraceScope] = [NULL_SCOPE]
+        try:
+            return await self._prepare_traced(
+                request,
+                request_id=request_id,
+                api_key=api_key,
+                budget=budget,
+                trace_holder=holder,
+            )
+        except BaseException as exc:
+            # BaseException, not Exception: a preparation TIMEOUT arrives as
+            # asyncio.CancelledError, and that is the single most interesting
+            # failure this trace could record.
+            await holder[0].abort(
+                TraceOutcome(
+                    status="failed",
+                    error_code=getattr(exc, "code", None) or type(exc).__name__,
+                )
+            )
+            raise
+
+    async def _prepare_traced(
+        self,
+        request: RespondRequest,
+        *,
+        request_id: str,
+        api_key: SecretStr | None,
         # Only the docs lookup reads it: everything else in preparation is bounded
         # by the enclosing `asyncio.timeout`, but an outbound call to a third
         # server needs a slice of its own or a slow docs host silently spends the
         # whole preparation budget the selector also has to fit inside.
         budget: RequestBudget | None = None,
+        # Written as soon as the scope exists, so `_prepare_inner` can terminate it
+        # if anything below raises.
+        trace_holder: list[TraceScope | NullTraceScope] | None = None,
     ) -> _PreparedTurn:
         session_id = request.session.id
         cache_session_id = self._cache_session_key(request)
@@ -897,6 +1063,40 @@ class ChatOrchestrator:
 
         warnings: list[str] = []
         catalog_at_start = self.catalog
+        # Opened FIRST, so a turn that fails during preparation still leaves a
+        # record of having been attempted. Returns the shared null scope unless an
+        # operator configured capture, so this is free on every ordinary turn.
+        trace = await self.trace_recorder.start_trace(
+            request_id=request_id,
+            session_id=session_id,
+            turn_id=request.session.turn_id,
+            instruction_revision=request.session.instruction_revision,
+            round_index=request.session.round,
+            profile=request.profile,
+            environment=self.settings.environment,
+            build_sha=self.settings.build_sha,
+            server_version=__version__,
+            protocol_version=PROTOCOL_VERSION,
+            runbook_catalog_revision=catalog_at_start.revision,
+        )
+        if trace_holder is not None:
+            trace_holder[0] = trace
+        await trace.record_event(
+            "request.validated",
+            attributes={
+                "profile": request.profile,
+                "stream": request.generation.stream,
+                "message_count": len(request.input.messages),
+                "tool_count": len(request.input.tools or []),
+            },
+            # SCRUBBED, and lazily: `scrub_request` strips the raw session id, the
+            # raw turn id and the signed state token, none of which may ever be
+            # written down (section 7.29) — a pseudonymous header is worthless if
+            # the blob beside it carries the same ids in the clear. Passed as a
+            # thunk so an untraced deployment does not pay for a `model_dump` of a
+            # request that may be megabytes.
+            content=lambda: scrub_request(request.model_dump(mode="json", exclude_none=True)),
+        )
         verification = self.state_codec.verify(request.state, session_id=session_id)
         if request.state and not verification.valid and verification.reason:
             warnings.append(verification.reason)
@@ -1148,6 +1348,36 @@ class ChatOrchestrator:
         )
         active_ids = resolution.active
         newly_loaded_ids = resolution.newly_loaded
+
+        # Selection, recorded with the REJECTED candidates and the prior state, not
+        # just the winners. A future routing or context-selection model has to
+        # learn what was passed over as much as what was picked, and the ranked
+        # alternatives are the only place that signal exists — once the turn ends
+        # nothing can recover them.
+        await trace.record_event(
+            "runbook.active_set.resolved",
+            attributes={
+                "selector_ran": decision.ran,
+                "prior_active_ids": prior_active_ids,
+                "selected_before_pairing": list(decision.runbook_ids),
+                "active_ids": active_ids,
+                "newly_loaded_ids": newly_loaded_ids,
+                "dropped_over_cap": list(resolution.dropped_over_cap),
+                "client_pinned_ids": list(eligible_pins),
+                "docs_query_present": bool(docs_query),
+                "warnings": list(warnings),
+                "catalog_revision": catalog_at_start.revision,
+            },
+            content=[
+                {
+                    "id": runbook.id,
+                    "content_hash": runbook.content_hash,
+                    "body": runbook.body,
+                }
+                for runbook in (runbooks_catalog.get(sid) for sid in active_ids)
+                if runbook is not None
+            ],
+        )
         # `dropped_over_cap` is log-only for everything else, deliberately: nobody
         # ASKED for the runbooks the cap refused, so there is nothing to answer for.
         # A caller pin is the exception — it is a request, and a refused request
@@ -1448,7 +1678,47 @@ class ChatOrchestrator:
             # because the 64-entry bound was a guess and nothing has ever reported
             # whether it binds.
             **self.assembler.render_cache_stats(),
+            # Content-free by construction: counts and byte totals, never a blob
+            # hash. A stable content hash in Cloud Logging is a cross-session
+            # fingerprint — two turns sharing one is two turns sharing the text —
+            # which is precisely the inference the metadata-only contract exists
+            # to prevent. Hashes stay in the restricted trace manifest.
+            **trace.log_fields(),
             pre_upstream_ms=timings.preparation_ms,
+        )
+
+        # The NORMALIZED request, recorded after projection has settled what the
+        # tools array actually is.
+        #
+        # Normalized, not the provider's wire body — and the difference is real:
+        # the adapter renames `max_tokens`, adds Together's `reasoning` object and
+        # drops `cache_session_id` on the way out (`providers/openrouter.py`).
+        # Capturing the wire body needs an observer hook on the provider boundary
+        # (`ProviderRequestObserver`), which does not exist yet; `TODO.md` carries
+        # it. Until then `ModelInvocationTrace.wire_request_ref` stays None rather
+        # than being quietly filled with the normalized bytes, which would make a
+        # replay silently wrong about what the provider was actually sent.
+        await trace.record_event(
+            "executor.request",
+            attributes={
+                "model": provider_request.model,
+                "stream": provider_request.stream,
+                "message_count": len(provider_request.messages),
+                "tool_count": len(provider_request.tools or []),
+                "prompt_segments": [
+                    {"id": segment.id, "sha256": segment.sha256, "bytes": segment.bytes}
+                    for segment in segments
+                ],
+            },
+            content={
+                "messages": provider_request.messages,
+                "tools": provider_request.tools,
+                "tool_choice": provider_request.tool_choice,
+                "temperature": provider_request.temperature,
+                "max_tokens": provider_request.max_tokens,
+                "stream": provider_request.stream,
+                "model": provider_request.model,
+            },
         )
 
         return _PreparedTurn(
@@ -1461,6 +1731,7 @@ class ChatOrchestrator:
             meta=meta,
             active_ids=active_ids,
             api_key=api_key,
+            trace=trace,
         )
 
     # ---- server-side documentation lookup -------------------------------
@@ -2055,6 +2326,7 @@ class ChatOrchestrator:
             projection_computed=prepared.projection_computed,
             context=prepared.context,
             timings=prepared.timings,
+            trace=prepared.trace,
         )
         try:
             async for event in body:
@@ -2104,6 +2376,7 @@ class ChatOrchestrator:
         projection_computed: bool,
         context: ContextMeasurement | None,
         timings: _Timings,
+        trace: TraceScope | NullTraceScope = NULL_SCOPE,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
@@ -2619,6 +2892,40 @@ class ChatOrchestrator:
                 self._drop_compaction(compaction_task)
             if stream is not None:
                 await self._close_quietly(stream, request_id=meta.request_id)
+            # Terminated HERE rather than after the `done` yield, because this is
+            # the only point every exit reaches: a clean finish, a terminal error,
+            # and a client disconnect (which raises GeneratorExit at a yield and
+            # never returns to the code below). A trace completed on the success
+            # path alone would silently omit exactly the turns worth studying.
+            #
+            # The EXACT assistant content the client is expected to commit is
+            # recorded first: reconstructing it later from deltas is guesswork,
+            # and it is the training target.
+            await trace.record_event(
+                "turn.completed" if completed else "turn.failed",
+                attributes={
+                    "finish_reason": finish_reason,
+                    "had_tool_calls": saw_tool_calls,
+                    "committed_to_history": completed,
+                },
+                content={
+                    "role": "assistant",
+                    "content": "".join(content_parts),
+                    # Whether, not which. The accumulated calls live inside
+                    # `StreamToolCallBuffer`'s private state, and reaching in to
+                    # rebuild them would couple this record to the repair layer's
+                    # internals — for a payload the client already sends back on
+                    # the next round, where the trace picks it up as ordinary
+                    # request content.
+                    "had_tool_calls": saw_tool_calls,
+                },
+            )
+            await trace.complete(
+                TraceOutcome(
+                    status="completed" if completed else "failed",
+                    finish_reason=finish_reason,
+                )
+            )
 
         # Learn only from a stream that reached a clean ``done`` (not an error, and
         # not an aborted stream — a client disconnect raises GeneratorExit at a

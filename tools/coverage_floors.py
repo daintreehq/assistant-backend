@@ -71,6 +71,31 @@ FLOORS: dict[str, int] = {
     "src/daintree_assistant_server/services/validation.py": 94,
     "src/daintree_assistant_server/services/turn_accounting.py": 99,
     "src/daintree_assistant_server/state/codec.py": 93,
+    # The TRAINING-TRACE plane. It belongs on this list for the same reason the
+    # state codec does: it is the code that decides what user content is written
+    # down, under what pseudonym, and to where. A regression here is not a lost
+    # diagnostic — it is content stored that should not have been, or identity
+    # stored in the clear.
+    #
+    # Each floor is the measurement rounded DOWN, so it can only ratchet up.
+    # `scope.py` at 85 is the lowest and is honest rather than rounded: its
+    # uncovered lines are the nested `except` arms that exist so a storage failure
+    # can never reach a turn, and driving each one needs a sink that fails in a
+    # different specific place. The paths that MATTER — drop-on-oversize,
+    # backpressure, failed-blob honesty, the bounded flush — are covered.
+    "src/daintree_assistant_server/tracing/scope.py": 85,
+    "src/daintree_assistant_server/tracing/recorder.py": 93,
+    "src/daintree_assistant_server/tracing/eligibility.py": 93,
+    "src/daintree_assistant_server/tracing/models.py": 96,
+    # `scrub.py` and `redaction.py` are the two gates that decide what is written
+    # down and what leaves as training data. Redaction is held at 100 deliberately:
+    # for a boundary of that kind, every new executable branch should have been
+    # exercised before it ships.
+    "src/daintree_assistant_server/tracing/scrub.py": 93,
+    "src/daintree_assistant_server/tracing/redaction.py": 100,
+    "src/daintree_assistant_server/tracing/canonical.py": 84,
+    "src/daintree_assistant_server/tracing/sinks/filesystem.py": 94,
+    "src/daintree_assistant_server/tracing/sinks/gcs.py": 96,
     "src/daintree_assistant_server/text_utils.py": 90,
 }
 

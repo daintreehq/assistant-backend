@@ -146,6 +146,13 @@ def _origin_problem(*, value: str, expected_host: str, env_name: str) -> str | N
 #: catalog reads DOCS_RUNBOOK_ID from this module, so the arrow cannot reverse.
 ToolProjectionMode = Literal["disabled", "shadow", "enforced"]
 
+#: Training-trace capture. Closed for the same reason ``ToolProjectionMode`` is:
+#: every gate below keys on this value, so a typo in a free-form string ("full",
+#: "internal") would skip the content gate — failing OPEN, in the one direction
+#: that matters when the subject is recording people's content.
+TraceCaptureMode = Literal["off", "metadata", "full_internal"]
+TraceSinkKind = Literal["null", "filesystem", "gcs"]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -409,6 +416,37 @@ class Settings(BaseSettings):
         default=100, ge=0, le=100, alias="TOOL_PROJECTION_ROLLOUT_PERCENT"
     )
 
+    # ---- Training traces (a SEPARATE plane from operational logging) -----
+    #
+    # `observability.py` is metadata-only and stays that way. This is the other
+    # plane: exact content, restricted access, written for later replay and model
+    # training. They are not two verbosity levels of one system — combining them
+    # would put user content in front of everyone who can read a log line.
+    #
+    # `off` is the default, so a deployment that sets nothing records nothing.
+    # That is the correct default for a service with no account model and
+    # therefore nobody to ask for consent.
+    trace_capture_mode: TraceCaptureMode = Field(default="off", alias="TRACE_CAPTURE_MODE")
+    trace_sink: TraceSinkKind = Field(default="null", alias="TRACE_SINK")
+    trace_gcs_bucket: str = Field(default="", alias="TRACE_GCS_BUCKET")
+    trace_gcs_prefix: str = Field(default="raw/v1", alias="TRACE_GCS_PREFIX")
+    trace_filesystem_dir: str = Field(default="", alias="TRACE_FILESYSTEM_DIR")
+    # Its OWN key, never the state-signing key or the state salt. Sharing would
+    # make a compromise of either a compromise of both, and would silently
+    # re-pseudonymise every trace whenever the other was rotated — splitting one
+    # subject into two identities in the middle of a corpus.
+    trace_identity_key: SecretStr = Field(default=SecretStr(""), alias="TRACE_IDENTITY_KEY")
+    # The bounded wait before `done`. Uploads run concurrently with generation, so
+    # the normal path has nothing left to flush; this budget is for the abnormal
+    # one. A user does not hold a connection open for a training record.
+    trace_final_flush_grace_seconds: float = Field(
+        default=0.5, ge=0.0, le=5.0, alias="TRACE_FINAL_FLUSH_GRACE_SECONDS"
+    )
+    trace_max_pending_bytes: int = Field(
+        default=33_554_432, ge=0, alias="TRACE_MAX_PENDING_BYTES"
+    )
+    trace_max_event_bytes: int = Field(default=8_388_608, ge=0, alias="TRACE_MAX_EVENT_BYTES")
+
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")
@@ -594,6 +632,46 @@ class Settings(BaseSettings):
                 "DAINTREE_RUNBOOKS_OVERLAY_DIR must be unset in production "
                 "(the runbook overlay is development-only)"
             )
+        problems.extend(self.trace_problems())
+        return problems
+
+    def trace_problems(self) -> list[str]:
+        """Trace configuration that must fail readiness rather than run.
+
+        Every entry here fails CLOSED — a misconfigured trace plane records
+        nothing rather than recording the wrong thing to the wrong place. The
+        content gate is the one that matters most: there is no account model yet
+        and therefore no consent to rely on, so a hardened deployment asking for
+        full content capture is refused outright rather than trusted.
+        """
+        problems: list[str] = []
+        if self.trace_capture_mode == "full_internal" and self.is_hardened:
+            problems.append(
+                "TRACE_CAPTURE_MODE=full_internal is refused in production/staging "
+                "until account-level training eligibility exists (it would capture "
+                "user content with nobody having consented)"
+            )
+        if self.trace_capture_mode != "off":
+            # Required for EVERY enabled mode, not just full content capture.
+            # `metadata` still writes pseudonymous session and turn keys, and an
+            # empty key means HMAC-with-no-key — a value anyone holding the trace
+            # can recompute, which makes the pseudonym decorative.
+            if not self.trace_identity_key.get_secret_value():
+                problems.append(
+                    "TRACE_CAPTURE_MODE is enabled but TRACE_IDENTITY_KEY is empty "
+                    "(session and turn ids would be pseudonymised with an empty key, "
+                    "which anyone holding the trace could recompute)"
+                )
+            if self.trace_sink == "gcs" and not self.trace_gcs_bucket:
+                problems.append("TRACE_SINK=gcs requires TRACE_GCS_BUCKET")
+            if self.trace_sink == "filesystem":
+                if not self.trace_filesystem_dir:
+                    problems.append("TRACE_SINK=filesystem requires TRACE_FILESYSTEM_DIR")
+                if self.is_hardened:
+                    problems.append(
+                        "TRACE_SINK=filesystem is forbidden in production/staging "
+                        "(container-local storage for content-bearing traces)"
+                    )
         return problems
 
     def weak_secrets(self) -> list[str]:

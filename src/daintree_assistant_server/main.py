@@ -53,6 +53,16 @@ from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
 from .services.prompt_assembler import PromptAssembler
 from .services.task_runner import TaskRunner
 from .state.codec import StateCodec
+from .tracing import (
+    DefaultTraceRecorder,
+    FilesystemTraceSink,
+    NullTraceRecorder,
+    NullTraceSink,
+    TraceRecorder,
+    TraceSink,
+    decide,
+)
+from .tracing.sinks.gcs import GcsTraceSink
 
 logger = get_logger("daintree.main")
 
@@ -225,6 +235,10 @@ class Container:
     # the reconciliation task) has not landed. Held here so `/capabilities` can
     # report honestly whether the feature can actually do anything.
     compactor: Compactor = field(default_factory=NullCompactor)
+    # The training-trace plane. `NullTraceRecorder` unless an operator configured
+    # capture AND the configuration is valid — see `_build_trace_recorder`. Held
+    # here so lifespan can drain its uploads before the clients they ride on close.
+    trace_recorder: TraceRecorder = field(default_factory=NullTraceRecorder)
     docs_http_client: httpx.AsyncClient | None = None
     # The local selector's worker pool — owned here so lifespan teardown joins
     # its threads. None when a selector override was injected (tests/benchmarks).
@@ -245,6 +259,12 @@ class Container:
             # Detached tasks own live upstream calls; drain them (bounded) before
             # the provider they are calling through is torn down.
             await self.orchestrator.drain_background_tasks()
+        # Trace uploads BEFORE the clients they ride on. The GCS sink borrows the
+        # shared httpx client, so closing that first would turn every in-flight
+        # trace write into a failure at exactly the moment there is no longer any
+        # turn to protect.
+        with contextlib.suppress(Exception):  # pragma: no cover - best-effort drain
+            await self.trace_recorder.aclose()
         with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
             await self.provider.aclose()
         if self.openrouter_provider is not None:
@@ -284,6 +304,49 @@ def _build_docs_client() -> tuple[httpx.AsyncClient, DocsMcpClient]:
         limits=httpx.Limits(max_connections=20, max_keepalive_connections=5),
     )
     return client, DocsMcpClient(client)
+
+
+def _build_trace_recorder(
+    settings: Settings, http_client: httpx.AsyncClient | None
+) -> TraceRecorder:
+    """The training-trace recorder, or the null one — which is every deployment.
+
+    Returns ``NullTraceRecorder`` unless an operator has deliberately set a
+    capture mode AND the configuration passes ``Settings.trace_problems()``. The
+    second half matters: readiness already refuses a bad trace configuration, but
+    ``build_container`` is also called directly by tests and benchmarks, and a
+    recorder that captured content because nobody happened to call ``/readyz``
+    would be the whole failure this gate exists to prevent.
+    """
+    if settings.trace_capture_mode == "off" or settings.trace_problems():
+        return NullTraceRecorder()
+
+    eligibility = decide(
+        mode=settings.trace_capture_mode, is_hardened=settings.is_hardened
+    )
+    if not eligibility.enabled:
+        return NullTraceRecorder()
+
+    sink: TraceSink
+    if settings.trace_sink == "filesystem":
+        sink = FilesystemTraceSink(Path(settings.trace_filesystem_dir))
+    elif settings.trace_sink == "gcs" and http_client is not None:
+        sink = GcsTraceSink(
+            bucket=settings.trace_gcs_bucket,
+            prefix=settings.trace_gcs_prefix,
+            client=http_client,
+        )
+    else:
+        sink = NullTraceSink()
+
+    return DefaultTraceRecorder(
+        sink=sink,
+        identity_key=settings.trace_identity_key.get_secret_value().encode("utf-8"),
+        eligibility=eligibility,
+        max_event_bytes=settings.trace_max_event_bytes,
+        max_pending_bytes=settings.trace_max_pending_bytes,
+        flush_grace_seconds=settings.trace_final_flush_grace_seconds,
+    )
 
 
 def _build_provider(settings: Settings) -> ChatProvider:
@@ -446,6 +509,10 @@ def build_container(
     assembler = PromptAssembler(
         prompt_loader, settings, response_declaration=chat_compactor.available
     )
+    # Shares the docs pool rather than opening a third: a trace upload is a small
+    # request to a different host on the same latency profile, and a pool per
+    # concern costs connections nothing here is short of.
+    trace_recorder = _build_trace_recorder(settings, docs_http_client)
     orchestrator = ChatOrchestrator(
         settings=settings,
         catalog_manager=catalog_manager,
@@ -455,6 +522,7 @@ def build_container(
         provider=chat_provider,
         docs_client=docs_client,
         compactor=chat_compactor,
+        trace_recorder=trace_recorder,
     )
     task_runner = TaskRunner(
         settings=settings,
@@ -476,6 +544,7 @@ def build_container(
         orchestrator=orchestrator,
         task_runner=task_runner,
         compactor=chat_compactor,
+        trace_recorder=trace_recorder,
         docs_http_client=docs_http_client,
         inference_pool=inference_pool,
     )

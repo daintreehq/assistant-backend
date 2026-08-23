@@ -115,3 +115,8 @@ src/daintree_assistant_server/runbooks/local/artifacts/index/
 src/daintree_assistant_server/runbooks/local/artifacts/bi_encoder/
 src/daintree_assistant_server/runbooks/local/artifacts/reranker/
 src/daintree_assistant_server/runbooks/local/artifacts/docs_head.npz
+
+# Local training traces (TRACE_SINK=filesystem). These may contain FULL user
+# content — messages, tool arguments, terminal output. Never commit them, and
+# never include them in a diagnostic bundle or a copytree.
+.tmp/traces/

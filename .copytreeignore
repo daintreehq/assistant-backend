@@ -125,3 +125,8 @@ benchmarks/**/*.json
 .env
 .env.*
 !.env.example
+
+# Local training traces. Content-bearing by design — a bundle that swept these up
+# would be shipping user messages, tool arguments and terminal output to whoever
+# receives it.
+.tmp/traces/
