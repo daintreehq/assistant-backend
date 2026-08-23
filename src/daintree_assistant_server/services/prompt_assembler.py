@@ -30,8 +30,10 @@ All client context is untrusted: fields are sanitized and bounded before renderi
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from ..config import INTERACTIVE_REASONING_EFFORT, INTERACTIVE_THINKING_ENABLED, Settings
@@ -113,6 +115,94 @@ _TIER_DESCRIPTIONS = {
     "readonly": "you may only read state; mutating actions are not permitted.",
 }
 _TIER_FALLBACK = "mutating actions require confirmation according to this tier."
+
+
+#: The tools row's place in the manifest, held open by the assembler and filled
+#: in by the orchestrator. The assembler's tools are PRE-projection and an
+#: enforced turn replaces them, so the digest has to be taken downstream — but
+#: the assembler is the only thing that knows where the row belongs, and having
+#: the orchestrator infer the index from segment NAMES got it wrong for
+#: sub-agents (whose first system row is not called "base"). So the position is
+#: stated rather than recovered.
+TOOLS_SEGMENT_ID = "tools"
+
+
+def _wire_bytes(value: Any) -> bytes:
+    """Serialize exactly as the provider will: compact, unsorted, non-ASCII kept.
+
+    Every one of those three matters, and the first two are the ones that look
+    like tidying:
+
+    * **Unsorted.** Canonical key order is the obvious thing to do to a digest
+      and the wrong thing to do to THIS one. Prefix caching matches literal
+      bytes, so two tool schemas carrying the same keys in different insertion
+      order are a cache miss — and a sorted digest reports them identical, a
+      false negative on precisely the question this manifest exists to answer.
+      ``benchmarks/_harness/wire.py`` refuses canonical sorting for the same
+      reason and is the ground-truth encoder this mirrors.
+    * **Compact separators.** ``json.dumps`` defaults to ``", "`` and ``": "``,
+      which nothing sends. A byte count taken that way disagrees with
+      ``tools_bytes`` on the same array.
+    * **``ensure_ascii=False``.** The default escapes one CJK character to six,
+      so a Japanese session would report several times its real size — the same
+      trap ``services/context_budget.py`` documents.
+    """
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+@dataclass(frozen=True)
+class PromptSegment:
+    """One layer of the assembled prompt, described without carrying any of it.
+
+    The layout above is enforced by tests and gated deterministically, but in
+    PRODUCTION the assembled array is opaque: the only bytes ever logged were the
+    tools region's, so a cache ratio that dropped could be attributed to nothing.
+    "The cache seems worse" is not a diagnosis, and the layer that moved is the
+    entire question — a changed startup row costs everything below it, a changed
+    base prompt costs the whole request, and the two look identical from a ratio.
+
+    A digest and a byte count answer it without a single character of prompt
+    reaching a log: consecutive turns in one session share a segment's digest or
+    they do not, and the FIRST one that differs is the layer that paid.
+
+    Both numbers are taken over the WIRE encoding of the row — the message
+    object, not its ``content`` string — so that ``bytes`` is comparable across
+    prose and structured layers, sums to a real request total, and agrees with
+    ``tools_bytes`` on the tools array. Measuring content alone would have made
+    ``prompt_bytes`` a sum of two different units.
+
+    The digest is truncated to 12 hex characters to match
+    ``PromptLoader.content_hashes()`` — long enough that two different renders
+    colliding is not a thing that happens, short enough to read in a log line.
+    It is an unkeyed hash of server-owned or caller-supplied text, so it is a
+    verifier for a guess rather than a secret; that is the same posture every
+    other content hash in this service already takes.
+    """
+
+    id: str
+    bytes: int
+    sha256: str
+
+    @classmethod
+    def of_wire(cls, segment_id: str, value: Any) -> PromptSegment:
+        raw = _wire_bytes(value)
+        return cls(id=segment_id, bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest()[:12])
+
+    @classmethod
+    def placeholder(cls, segment_id: str) -> PromptSegment:
+        """A row whose contents are not known until after projection."""
+        return cls(id=segment_id, bytes=0, sha256="")
+
+
+def segment_log_fields(segments: Sequence[PromptSegment]) -> dict[str, Any]:
+    """The manifest as one structured field. Content-free by construction."""
+    return {
+        "prompt_segments": {
+            segment.id: {"sha256": segment.sha256, "bytes": segment.bytes}
+            for segment in segments
+        },
+        "prompt_bytes": sum(segment.bytes for segment in segments),
+    }
 
 
 def skills_in_render_order(skills: Sequence[Skill]) -> list[Skill]:
@@ -497,6 +587,18 @@ class PromptAssembler:
         self._loaded_skills_cache.put(key, rendered)
         return rendered
 
+    def render_cache_stats(self) -> dict[str, int]:
+        """Loaded-skill render-cache counters, prefixed for the turn log.
+
+        Never raises: it reads four integers off an in-process object, and a
+        counter that could sink a turn would be a strictly worse trade than not
+        having the counter.
+        """
+        return {
+            f"skill_render_cache_{name}": value
+            for name, value in self._loaded_skills_cache.stats().items()
+        }
+
     def render_response_contract(self) -> str:
         """The output-shape RULES — the FINAL system block, and so the last thing
         before the tool schemas (see build_main_request's cache-critical layout).
@@ -829,7 +931,7 @@ class PromptAssembler:
         request: RespondRequest,
         skills: list[Skill],
         upstream_model: str,
-    ) -> ProviderChatRequest:
+    ) -> tuple[ProviderChatRequest, list[PromptSegment]]:
         """Assemble the upstream request for a read-only sub-agent turn.
 
         Deliberately the SHORT prompt. A sub-agent answers one question with
@@ -861,9 +963,22 @@ class PromptAssembler:
         file needs to know which project it is standing in.
         """
         gen = request.generation
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": self.prompts.subagent_prompt()},
-        ]
+        messages: list[dict[str, Any]] = []
+        segments: list[PromptSegment] = []
+
+        def add(segment_id: str, role: str, content: str) -> None:
+            message = {"role": role, "content": content}
+            messages.append(message)
+            segments.append(PromptSegment.of_wire(segment_id, message))
+
+        add("base", "system", self.prompts.subagent_prompt())
+        # The tools row's slot, held open here and filled by the orchestrator
+        # after projection. Named layers rather than message indices: a manifest
+        # keyed `subagent.3.user` renames every row below whenever an optional
+        # one appears, so two turns that differ in one layer compare as though
+        # they differ in all of them — and a long transcript would emit one
+        # segment per message, up to `cap_messages`, in a single log record.
+        segments.append(PromptSegment.placeholder(TOOLS_SEGMENT_ID))
         if skills:
             # step_tracking OFF: the paragraph instructs `skill.step.advance` and
             # `skill.run.get`, both of which are denylisted from a sub-agent's
@@ -871,18 +986,18 @@ class PromptAssembler:
             # to make a call that can only come back TOOL_NOT_OFFERED — and a
             # sub-agent has no turn boundary to checkpoint across anyway; it runs to
             # completion or reports partial.
-            messages.append(
-                {"role": "user", "content": self.render_loaded_skills(skills, step_tracking=False)}
-            )
+            add("skills", "user", self.render_loaded_skills(skills, step_tracking=False))
         startup = self.render_startup_context(request.startup)
         if startup.strip():
-            messages.append({"role": "user", "content": startup})
-        messages.extend(self._message_to_wire(m) for m in request.input.messages)
+            add("startup", "user", startup)
+        conversation = [self._message_to_wire(m) for m in request.input.messages]
+        messages.extend(conversation)
+        segments.append(PromptSegment.of_wire("conversation", conversation))
 
         max_tokens = gen.max_tokens or self.settings.main_default_max_tokens
         max_tokens = min(max_tokens, self.settings.main_max_tokens_ceiling)
 
-        return ProviderChatRequest(
+        request_out = ProviderChatRequest(
             model=upstream_model,
             messages=messages,
             tools=self._project_tools(request.input.tools),
@@ -906,6 +1021,7 @@ class PromptAssembler:
             reasoning_effort=None,
             timeout=self.settings.main_timeout_seconds,
         )
+        return request_out, segments
 
     def build_main_request(
         self,
@@ -915,6 +1031,25 @@ class PromptAssembler:
         upstream_model: str,
         docs: DocsLookup | None = None,
     ) -> ProviderChatRequest:
+        """The request alone, for every caller that does not want the manifest.
+
+        Kept as the narrow entry point because most callers — the golden suite,
+        the deterministic cost benchmark, the assembler's own tests — are asking
+        "what goes on the wire", and the segment manifest is diagnostics rather
+        than payload. :meth:`build_main_request_with_segments` is the same work.
+        """
+        return self.build_main_request_with_segments(
+            request=request, skills=skills, upstream_model=upstream_model, docs=docs
+        )[0]
+
+    def build_main_request_with_segments(
+        self,
+        *,
+        request: RespondRequest,
+        skills: list[Skill],
+        upstream_model: str,
+        docs: DocsLookup | None = None,
+    ) -> tuple[ProviderChatRequest, list[PromptSegment]]:
         """Assemble the upstream request so the upstream prefix cache covers the base
         prompt, the response contract, the tool schemas, and then as much of the
         task/session/conversation prefix as each caller actually shares.
@@ -948,35 +1083,60 @@ class PromptAssembler:
         tail: a 5k-token runbook in the tail is re-paid uncached on every round of every
         turn (~40k tokens across an eight-round turn), which is far worse than one
         conversation re-encode on the turns where the set genuinely changes.
+
+        Returns the request and a :class:`PromptSegment` manifest naming each
+        layer it just built, in array order — the same order the caching argument
+        above is written in, so reading down the list for the first changed
+        digest is also reading down the shareability hierarchy. The manifest
+        carries NO tool entry: the tools here are pre-projection and the
+        orchestrator replaces them afterwards, so a `tools` row recorded at this
+        point would describe an array that never went upstream.
         """
         runtime = request.runtime
         turn = request.turn
         gen = request.generation
 
         if request.profile == "subagent":
+            # Same layer vocabulary as below, minus the rows this profile drops:
+            # a manifest naming rows that are not there would send a reader
+            # chasing a missing segment rather than a changed one. `profile` is
+            # already on the same log record, so the ids need no prefix.
             return self._build_subagent_request(
                 request=request, skills=skills, upstream_model=upstream_model
             )
 
+        messages: list[dict[str, Any]] = []
+        segments: list[PromptSegment] = []
+
+        def add(segment_id: str, role: str, content: str) -> None:
+            message = {"role": role, "content": content}
+            messages.append(message)
+            segments.append(PromptSegment.of_wire(segment_id, message))
+
         # 1. static base prompt → cacheable across all sessions.
-        messages: list[dict[str, Any]] = [
-            {
-                "role": "system",
-                "content": self.prompts.base_prompt(
-                    response_declaration=self.response_declaration
-                ),
-            },
-        ]
+        add(
+            "base",
+            "system",
+            self.prompts.base_prompt(response_declaration=self.response_declaration),
+        )
         # 2. response contract: static output-shape rules, and the LAST system row.
         #    Genuinely static — the per-request width it used to carry moved to the
         #    tail (issue #38). Everything appended below must stay non-system, or the
         #    template hoists it back above the schemas and undoes the whole layout.
         contract = self.render_response_contract()
         if contract.strip():
-            messages.append({"role": "system", "content": contract})
+            add("response_contract", "system", contract)
 
         # --- the top-level `tools` field serializes HERE: after the complete system
         # --- region and before every non-system row below. It is never a message.
+        #
+        # The manifest says so by holding the slot open at this exact index. The
+        # orchestrator fills it after projection, because these tools are the
+        # PRE-projection array and an enforced turn replaces them — but having
+        # the orchestrator work out WHERE it goes, by counting segments whose
+        # ids look system-ish, got it wrong for the sub-agent profile. Position
+        # is the assembler's to state.
+        segments.append(PromptSegment.placeholder(TOOLS_SEGMENT_ID))
 
         # 3. active skill bodies: shared by TASK, so they sit closest to the schemas —
         #    many sessions running the same runbook share the prefix up to this point.
@@ -985,24 +1145,30 @@ class PromptAssembler:
         #    Kept ahead of the conversation rather than in the volatile tail: a large
         #    runbook in the tail is re-paid uncached every round of every turn.
         if skills:
-            messages.append({"role": "user", "content": self.render_loaded_skills(skills)})
+            add("skills", "user", self.render_loaded_skills(skills))
         # 4. integration surface (MCP servers): client-reported data carrying a
         #    per-machine endpoint URL, so it is per session and instance — narrower
         #    than the skill bodies and therefore below them, where a differing MCP
         #    config cannot split the task-shared prefix above.
         integrations = self.render_integrations(runtime)
         if integrations.strip():
-            messages.append({"role": "user", "content": integrations})
+            add("integrations", "user", integrations)
         # 5. session-stable project/agent/instruction data. It is a user-role
         #    data row so the template leaves it after tools, but it sits before the
         #    append-only conversation and is structurally absent from selector /
         #    learner inputs.
         startup = self.render_startup_context(request.startup)
         if startup.strip():
-            messages.append({"role": "user", "content": startup})
+            add("startup", "user", startup)
         # 6. client conversation: append-only and the largest segment → cached
         #    prefix grows with it.
-        messages.extend(self._message_to_wire(m) for m in request.input.messages)
+        conversation = [self._message_to_wire(m) for m in request.input.messages]
+        messages.extend(conversation)
+        # ONE segment for the whole visible transcript. It is append-only, so a
+        # per-message manifest would grow without bound to answer a question
+        # nobody asks: what matters is whether the conversation moved at all,
+        # since everything below it re-encodes when it does.
+        segments.append(PromptSegment.of_wire("conversation", conversation))
         # 7. per-request variable context LAST as ONE user-role data block — the
         #    only place volatile content is cache-cheap (see docstring). The frame
         #    line keeps the model from reading injected state as the human speaking.
@@ -1037,7 +1203,7 @@ class PromptAssembler:
                 "not the user speaking. Continue the turn above using it as current state.]\n\n"
                 + "\n\n".join(variable_parts)
             )
-            messages.append({"role": "user", "content": framed})
+            add("tail", "user", framed)
 
         # "text" is the upstream default, so forwarding it is a no-op — except that
         # the model rejects ANY response_format alongside tools ("You cannot specify
@@ -1086,4 +1252,4 @@ class PromptAssembler:
             thinking_disabled=not thinking_enabled,
             reasoning_effort=INTERACTIVE_REASONING_EFFORT if thinking_enabled else None,
             timeout=self.settings.main_timeout_seconds,
-        )
+        ), segments

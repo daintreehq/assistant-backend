@@ -95,7 +95,12 @@ from .docs_mcp import (
     DocsMcpClient,
 )
 from .output_policy import lint_output, repair_tables, resolve_content_width
-from .prompt_assembler import PromptAssembler
+from .prompt_assembler import (
+    TOOLS_SEGMENT_ID,
+    PromptAssembler,
+    PromptSegment,
+    segment_log_fields,
+)
 from .response_declaration import Declaration, DeclarationScanner, strip_declaration
 from .tool_call_repair import (
     ParameterIndex,
@@ -1204,13 +1209,14 @@ class ChatOrchestrator:
             docs_query=docs_query if docs is not None else None,
         )
 
+        assembled, segments = self.assembler.build_main_request_with_segments(
+            request=request,
+            skills=skills,
+            upstream_model=SERVING_MODEL,
+            docs=docs,
+        )
         provider_request = replace(
-            self.assembler.build_main_request(
-                request=request,
-                skills=skills,
-                upstream_model=SERVING_MODEL,
-                docs=docs,
-            ),
+            assembled,
             api_key=api_key,
             cache_session_id=cache_session_id,
         )
@@ -1319,6 +1325,34 @@ class ChatOrchestrator:
         except Exception:  # noqa: BLE001 — a metric must never break a turn
             logger.warning("tool_projection_metrics_failed", request_id=request_id)
 
+        # PROMPT SEGMENT MANIFEST. A digest and a byte count per layer, so a turn
+        # whose cache ratio dropped can be compared against the one before it and
+        # the FIRST differing segment names the layer that paid. Nothing else in
+        # this record can answer that: `tools_*_bytes` covers one region, and a
+        # cache ratio is a single number over all of them.
+        #
+        # The tools row is added HERE rather than in the assembler because the
+        # assembler's tools are pre-projection — an enforced turn replaces them a
+        # few lines above, and a row recorded upstream of that would describe an
+        # array nothing was asked to accept. Appended last so it sits where the
+        # chat template puts it: after the system rows, ahead of everything else.
+        #
+        # Guarded like the sizes above, and for the same reason. Hashing ~120 KiB
+        # is well under a millisecond, but a lost manifest is a lost diagnostic
+        # and never a lost turn.
+        segment_fields: dict[str, Any] = {}
+        try:
+            tools_row = PromptSegment.of_wire(TOOLS_SEGMENT_ID, provider_request.tools or [])
+            # Filled in PLACE, at the index the assembler chose. Recovering that
+            # index here — by counting segments whose ids look system-ish — put
+            # the row ahead of the persona on every sub-agent turn, reporting the
+            # opposite of the wire order the whole manifest is read against.
+            segment_fields = segment_log_fields(
+                [tools_row if seg.id == TOOLS_SEGMENT_ID else seg for seg in segments]
+            )
+        except Exception:  # noqa: BLE001 — a metric must never break a turn
+            logger.warning("prompt_segment_metrics_failed", request_id=request_id)
+
         # CONTEXT BUDGET. Measured LAST, after projection has settled what the
         # tools array actually is: an enforced turn sends a materially smaller
         # inventory, and measuring the pre-projection request would report a size
@@ -1404,6 +1438,16 @@ class ChatOrchestrator:
             tool_projection_cohort_selected=enforcement.cohort_selected,
             tool_projection_bucket=enforcement.cohort_bucket,
             **sizes,
+            **segment_fields,
+            # The layer split `measure_context` already computed. It ran on every
+            # turn and was read only on the refusal path, so the one request that
+            # never needs attributing was the only one that got it.
+            **(context.log_fields() if context is not None else {}),
+            # The in-process render cache for loaded-skill blocks. Cumulative per
+            # process, which is what a rate wants; `entries` and `chars` are here
+            # because the 64-entry bound was a guess and nothing has ever reported
+            # whether it binds.
+            **self.assembler.render_cache_stats(),
             pre_upstream_ms=timings.preparation_ms,
         )
 

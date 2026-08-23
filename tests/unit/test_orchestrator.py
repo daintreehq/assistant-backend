@@ -1082,7 +1082,10 @@ async def test_prep_failure_streams_terminal_error_event(
     def boom(**kwargs: object) -> object:
         raise upstream_error("assembly failed")
 
-    monkeypatch.setattr(orchestrator.assembler, "build_main_request", boom)
+    # The seam the orchestrator actually calls: it needs the segment manifest
+    # alongside the request, so patching the narrow `build_main_request`
+    # wrapper here would install a bomb nothing ever steps on.
+    monkeypatch.setattr(orchestrator.assembler, "build_main_request_with_segments", boom)
 
     outcome = await orchestrator.complete(
         _basic_stream_request(), api_key=TEST_API_KEY
@@ -1105,7 +1108,10 @@ async def test_unexpected_prep_exception_streams_internal_error(
     def boom(**kwargs: object) -> object:
         raise RuntimeError("bug")
 
-    monkeypatch.setattr(orchestrator.assembler, "build_main_request", boom)
+    # The seam the orchestrator actually calls: it needs the segment manifest
+    # alongside the request, so patching the narrow `build_main_request`
+    # wrapper here would install a bomb nothing ever steps on.
+    monkeypatch.setattr(orchestrator.assembler, "build_main_request_with_segments", boom)
 
     outcome = await orchestrator.complete(
         _basic_stream_request(), api_key=TEST_API_KEY

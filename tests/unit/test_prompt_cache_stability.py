@@ -25,13 +25,19 @@ rule is identical in both places — per-request state rides at the END.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from conftest import respond_body
 
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
-from daintree_assistant_server.services.prompt_assembler import PromptAssembler
+from daintree_assistant_server.services.prompt_assembler import (
+    PromptAssembler,
+    PromptSegment,
+    segment_log_fields,
+)
 from daintree_assistant_server.skills.models import Skill
+from daintree_assistant_server.skills.tool_projection import tools_bytes
 
 _MESSAGES = [{"role": "user", "content": "start the work"}]
 
@@ -206,3 +212,260 @@ def test_identical_inputs_are_byte_identical(assembler, catalog) -> None:
         "the same input rendered differently twice — an unstable iteration order or "
         "timestamp is in the prompt"
     )
+
+
+# ---------------------------------------------------------------------------
+# The prompt-segment manifest. The layout above is gated deterministically, but
+# in production the assembled array is opaque: only the tools region's bytes were
+# ever logged, so a cache ratio that dropped could be attributed to nothing. The
+# manifest is what turns "the cache seems worse" into a named layer.
+# ---------------------------------------------------------------------------
+
+_SEGMENT_IDS = frozenset(
+    {
+        "base",
+        "response_contract",
+        "tools",
+        "skills",
+        "integrations",
+        "startup",
+        "conversation",
+        "tail",
+    }
+)
+
+
+def _segments(assembler: PromptAssembler, request: RespondRequest, skills: list[Skill]) -> Any:
+    return assembler.build_main_request_with_segments(
+        request=request, skills=skills, upstream_model="deepseek-v4-flash"
+    )[1]
+
+
+def _digest(segments: Any, name: str) -> str:
+    return next(s.sha256 for s in segments if s.id == name)
+
+
+def test_the_manifest_emits_only_labels_counts_and_digests(assembler, catalog) -> None:
+    """The whole point of a digest is describing a prompt without carrying one.
+
+    Checked structurally rather than by searching the rendered text for each
+    field: the ids are ordinary words ("base", "skills") that occur in the prose
+    anyway, so a substring search would fail on a manifest that was perfectly
+    content-free. What has to hold is that every field is a fixed label, an int,
+    or a hex digest — nothing derived from the text except through a hash.
+    """
+    segments = _segments(assembler, _request(), [catalog.skills[0]])
+    fields = segment_log_fields(segments)
+
+    assert set(fields) == {"prompt_segments", "prompt_bytes"}
+    assert isinstance(fields["prompt_bytes"], int)
+    for segment_id, entry in fields["prompt_segments"].items():
+        assert segment_id in _SEGMENT_IDS
+        assert set(entry) == {"sha256", "bytes"}
+        assert isinstance(entry["bytes"], int)
+        assert re.fullmatch(r"[0-9a-f]{0,12}", entry["sha256"])
+
+
+def test_no_canary_from_any_layer_survives_into_the_log_fields(assembler, catalog) -> None:
+    """A distinctive string in every caller-supplied carrier, including the tools
+    array the ORCHESTRATOR contributes — which the assembler never sees, and
+    which nothing else here would cover."""
+    canaries = {
+        "startup": "CANARY-project-instructions-8f21",
+        "turn": "CANARY-turn-goal-4b7c",
+        "tools": "CANARY-tool-description-99ad",
+    }
+    request = RespondRequest.model_validate(
+        respond_body(
+            _MESSAGES,
+            startup={"project_instructions": canaries["startup"]},
+            turn={"goal": canaries["turn"]},
+        )
+    )
+    segments = list(_segments(assembler, request, [catalog.skills[0]]))
+    segments = [
+        PromptSegment.of_wire(
+            "tools",
+            [{"type": "function", "function": {"name": "t", "description": canaries["tools"]}}],
+        )
+        if s.id == "tools"
+        else s
+        for s in segments
+    ]
+
+    flattened = json.dumps(segment_log_fields(segments))
+    for name, canary in canaries.items():
+        assert canary not in flattened, f"{name} leaked into the manifest"
+
+
+def test_the_manifest_follows_the_assembled_array(assembler, catalog) -> None:
+    """Order is the diagnostic. Reading down the list for the first changed
+    digest is only meaningful if the list is in wire order, widest scope first —
+    and the tools row belongs after the system messages, where the chat template
+    serializes it."""
+    skills = [catalog.skills[0]]
+    built, segments = assembler.build_main_request_with_segments(
+        request=_request(), skills=skills, upstream_model="deepseek-v4-flash"
+    )
+    ids = [s.id for s in segments]
+    assert ids[:3] == ["base", "response_contract", "tools"]
+    assert ids.index("skills") < ids.index("startup") < ids.index("conversation")
+    assert ids[-1] == "tail"
+    # One entry per LAYER, not per message: the conversation collapses to one
+    # row, and `tools` is not a message at all.
+    assert len(segments) == len(built.messages) - len(_MESSAGES) + 2
+
+
+def test_the_tools_slot_is_left_empty_for_the_orchestrator(assembler, catalog) -> None:
+    """The assembler's tools are PRE-projection and an enforced turn replaces
+    them, so a digest taken here would describe an array nothing was asked to
+    accept. It states the POSITION and nothing else."""
+    segments = _segments(assembler, _request(), [])
+    tools = next(s for s in segments if s.id == "tools")
+    assert (tools.bytes, tools.sha256) == (0, "")
+
+
+def test_each_segment_is_measured_over_the_bytes_that_go_upstream(
+    assembler, catalog
+) -> None:
+    """Not over the `content` string.
+
+    Content-only bytes would make `prompt_bytes` a sum of two different units —
+    prose lengths plus JSON lengths — and would disagree with `tools_bytes` on
+    the same tools array. The encoding is the provider's: compact separators,
+    no key sorting, non-ASCII kept.
+    """
+    built, segments = assembler.build_main_request_with_segments(
+        request=_request(), skills=[], upstream_model="deepseek-v4-flash"
+    )
+    expected = json.dumps(
+        built.messages[0], ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    base = next(s for s in segments if s.id == "base")
+    assert base.bytes == len(expected)
+
+    tools = [{"type": "function", "function": {"name": "t"}}]
+    assert PromptSegment.of_wire("tools", tools).bytes == tools_bytes(tools)
+
+
+def test_a_digest_is_not_canonicalized_away(assembler, catalog) -> None:
+    """`sort_keys=True` is the obvious thing to do to a digest and the wrong
+    thing to do to this one: prefix caching matches literal bytes, so two tool
+    schemas with the same keys in different insertion order are a cache MISS,
+    and a sorted digest would call them identical."""
+    a = [{"type": "function", "function": {"name": "t", "description": "d"}}]
+    b = [{"function": {"description": "d", "name": "t"}, "type": "function"}]
+    assert PromptSegment.of_wire("tools", a).sha256 != PromptSegment.of_wire("tools", b).sha256
+
+
+def test_a_cjk_conversation_is_not_measured_as_escape_sequences(assembler, catalog) -> None:
+    """`json.dumps` defaults to `ensure_ascii=True`, which renders one CJK
+    character as six. Asserted as an exact length rather than a ceiling: a loose
+    bound passes on a short sample even with the escaping still in place."""
+    text = "作業を開始してください"
+    japanese = [{"role": "user", "content": text}]
+    request = RespondRequest.model_validate(respond_body(japanese))
+    segments = _segments(assembler, request, [])
+    conversation = next(s for s in segments if s.id == "conversation")
+
+    expected = json.dumps(
+        [{"role": "user", "content": text}], ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    assert conversation.bytes == len(expected)
+    escaped = json.dumps([{"role": "user", "content": text}], separators=(",", ":"))
+    assert conversation.bytes < len(escaped.encode("utf-8"))
+
+
+def test_only_the_changed_layer_changes_its_digest(assembler, catalog) -> None:
+    """The property the whole manifest exists for.
+
+    A volatile-state change must move the tail's digest and NOTHING above it —
+    the same claim `test_volatile_state_changes_only_the_trailing_tail` makes
+    about bytes, restated as the thing a production log can check across two
+    consecutive turns.
+    """
+    narrow = _segments(assembler, _request(runtime={"display": {"content_width": 40}}), [])
+    wide = _segments(assembler, _request(runtime={"display": {"content_width": 100}}), [])
+
+    assert [s.id for s in narrow] == [s.id for s in wide]
+    changed = [n.id for n, w in zip(narrow, wide, strict=True) if n.sha256 != w.sha256]
+    assert changed == ["tail"]
+
+
+def test_an_appended_turn_changes_only_the_conversation_and_the_tail(
+    assembler, catalog
+) -> None:
+    """The commonest transition there is, and the one a cache regression hides
+    behind: everything above the conversation must hold."""
+    longer = [*_MESSAGES, {"role": "assistant", "content": "on it"}]
+    before = _segments(assembler, _request(), [])
+    after = _segments(
+        assembler, RespondRequest.model_validate(respond_body(longer)), []
+    )
+    changed = [n.id for n, w in zip(before, after, strict=True) if n.sha256 != w.sha256]
+    assert changed == ["conversation"]
+
+
+def test_a_skill_topic_shift_leaves_the_system_layers_untouched(assembler, catalog) -> None:
+    """Issue #39's guarantee, expressed in the manifest a production log reads.
+
+    Everything from the skills row down re-encodes; base and the response
+    contract must not, because they sit above the ~21.5k tokens of schemas.
+    """
+    one = _segments(assembler, _request(), [catalog.skills[0]])
+    two = _segments(assembler, _request(), [catalog.skills[1]])
+
+    assert _digest(one, "base") == _digest(two, "base")
+    assert _digest(one, "response_contract") == _digest(two, "response_contract")
+    assert _digest(one, "skills") != _digest(two, "skills")
+
+
+def test_an_optional_layer_appearing_renames_nothing_below_it(assembler, catalog) -> None:
+    """The reason the ids are layer names and not message indices.
+
+    A manifest keyed by position renames every row beneath an optional one the
+    moment it appears, so two turns differing in ONE layer compare as though
+    they differ in all of them — which is the opposite of an attribution.
+    """
+    without = _segments(assembler, _request(), [])
+    with_skills = _segments(assembler, _request(), [catalog.skills[0]])
+
+    assert "skills" not in {s.id for s in without}
+    assert "skills" in {s.id for s in with_skills}
+    for name in ("base", "response_contract", "startup", "conversation"):
+        assert _digest(without, name) == _digest(with_skills, name)
+
+
+def _subagent_segments(assembler: PromptAssembler, skills: list[Skill]) -> Any:
+    body = respond_body(_MESSAGES)
+    body["profile"] = "subagent"
+    return assembler.build_main_request_with_segments(
+        request=RespondRequest.model_validate(body),
+        skills=skills,
+        upstream_model="deepseek-v4-flash",
+    )
+
+
+def test_the_subagent_manifest_uses_the_same_layer_names(assembler, catalog) -> None:
+    """It drops the integrations, runtime, footer, display and response-contract
+    rows entirely, so it names fewer layers — but the ones it names are the same
+    ones, in the same order. `profile` is already on the log record, so nothing
+    needs a prefix to stay distinguishable."""
+    built, segments = _subagent_segments(assembler, [])
+    ids = [s.id for s in segments]
+    assert ids[:2] == ["base", "tools"]
+    assert set(ids) <= _SEGMENT_IDS
+    assert not {"tail", "integrations", "response_contract"} & set(ids)
+    assert len(segments) == len(built.messages) - len(_MESSAGES) + 2
+
+
+def test_the_subagent_manifest_survives_a_shape_change(assembler, catalog) -> None:
+    """One segment per indexed MESSAGE would make this comparison useless, and
+    on a long transcript would emit one row per message — up to `cap_messages`
+    of them — inside a single log record."""
+    executable = list(catalog.skills[:1])
+    _, without = _subagent_segments(assembler, [])
+    _, with_skills = _subagent_segments(assembler, executable)
+
+    assert _digest(without, "base") == _digest(with_skills, "base")
+    assert _digest(without, "conversation") == _digest(with_skills, "conversation")

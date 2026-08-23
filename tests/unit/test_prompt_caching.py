@@ -296,3 +296,30 @@ def test_the_catalog_revision_moves_when_any_body_changes(catalog) -> None:  # t
     skills = list(catalog.skills)
     edited = [replace(skills[0], body=skills[0].body + "\n\nNEW STEP."), *skills[1:]]
     assert Catalog(edited).revision != catalog.revision
+
+
+def test_the_render_cache_reports_its_own_counters(assembler, catalog) -> None:
+    """`hits` and `misses` were incremented since this class was written and read
+    by nothing but this file — a measurement nobody had ever taken.
+
+    `entries` and `chars` come with them because both bounds (64 entries,
+    2M chars) were chosen rather than measured, and production cannot answer
+    whether they bind if nothing asks.
+    """
+    specifics = [s for s in catalog.skills if not s.meta.foundation][:2]
+    before = assembler.render_cache_stats()
+    assert set(before) == {
+        "skill_render_cache_hits",
+        "skill_render_cache_misses",
+        "skill_render_cache_entries",
+        "skill_render_cache_chars",
+    }
+
+    assembler.render_loaded_skills(specifics)  # miss
+    assembler.render_loaded_skills(specifics)  # hit
+    after = assembler.render_cache_stats()
+
+    assert after["skill_render_cache_misses"] == before["skill_render_cache_misses"] + 1
+    assert after["skill_render_cache_hits"] == before["skill_render_cache_hits"] + 1
+    assert after["skill_render_cache_entries"] == before["skill_render_cache_entries"] + 1
+    assert after["skill_render_cache_chars"] > before["skill_render_cache_chars"]

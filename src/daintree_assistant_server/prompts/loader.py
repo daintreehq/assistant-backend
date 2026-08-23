@@ -93,6 +93,23 @@ class RenderCache:
         self.hits = 0
         self.misses = 0
 
+    def stats(self) -> dict[str, int]:
+        """Counters, for a caller that wants to log them.
+
+        ``hits`` and ``misses`` have been incremented since this class was
+        written and read by nothing but a unit test, which makes them a
+        measurement nobody has ever taken. ``entries`` and ``chars`` come along
+        because the two bounds were chosen rather than measured: whether 64
+        entries is the right size is a question only production can answer, and
+        it cannot answer a question nobody asked it.
+        """
+        return {
+            "hits": self.hits,
+            "misses": self.misses,
+            "entries": len(self._entries),
+            "chars": self._chars,
+        }
+
     def get(self, key: tuple[str, ...]) -> str | None:
         value = self._entries.get(key)
         # `is None`, never truthiness: an empty render is a legitimate cached

@@ -128,6 +128,41 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    (`TODO.md`). `turn_usage.estimated_prompt_tokens` logs the estimate beside the
    upstream's real `prompt_tokens` — the pair that calibrates the constant.
 
+5c. **Per-layer attribution** (`PromptSegment` in `services/prompt_assembler.py`) —
+   `build_main_request_with_segments` returns, beside the request, a digest and a byte
+   count for every layer it built (`base`, `response_contract`, `skills`,
+   `integrations`, `startup`, `conversation`, `tail`). The assembler HOLDS THE `tools` SLOT
+   OPEN at the index the chat template puts it — after the system rows — and the
+   orchestrator fills that slot in place from the POST-projection request, then logs the
+   lot on `respond` as `prompt_segments`. Position is stated rather than recovered: an
+   orchestrator counting segments whose ids looked system-ish put the tools row ahead of
+   the persona on every sub-agent turn. Both profiles use the SAME layer names, so a
+   manifest is never keyed by message index — a positional id renames every row below an
+   optional one the moment it appears, and on a long sub-agent transcript would emit one
+   row per message, up to `cap_messages` of them, in a single log record. The layout above is gated deterministically, but in
+   production the assembled array was opaque — only `tools_*_bytes` was ever logged — so a
+   cache ratio that dropped could be attributed to nothing, and "the cache seems worse" is
+   not a diagnosis. Two consecutive turns in one session share a segment's digest or they
+   do not, and the FIRST one that differs is the layer that paid. Content-free by
+   construction: a 12-hex digest (matching `PromptLoader.content_hashes()`) and a byte
+   count, both taken over the WIRE encoding of the row rather than its `content` string —
+   compact separators, **no key sorting**, `ensure_ascii=False`. All three are
+   load-bearing. Canonical sorting is the obvious thing to do to a digest and the wrong
+   thing to do to this one: prefix caching matches literal bytes, so two tool schemas
+   carrying the same keys in a different insertion order are a cache MISS that a sorted
+   digest reports as identical — a false negative on the exact question the manifest
+   answers (`benchmarks/_harness/wire.py` refuses sorting for the same reason). Measuring
+   the row rather than its content is what makes `prompt_bytes` a real total instead of a
+   sum of two units, and makes the `tools` entry agree with `tools_sent_bytes`.
+   The same record now also carries `ContextMeasurement.log_fields()` on EVERY turn — it
+   was computed every turn and read only on the refusal path, so the one request that
+   never needed attributing was the only one that got it — and the loaded-skill render
+   cache's `hits`/`misses`/`entries`/`chars`, which had been incremented since the class
+   was written and read by nothing but a unit test. `build_main_request` stays as the
+   narrow entry point for callers that want only the wire bytes (the golden suite, the
+   cost benchmark); the manifest is diagnostics, never payload, and never reaches a
+   client.
+
 6. **Respond** — the skills/selection metadata is delivered first: as the response body's `skills` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential now — select → assemble → **one** upstream call; the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
 
 6b. **Turn-finality declaration and compaction** (`services/response_declaration.py`,
