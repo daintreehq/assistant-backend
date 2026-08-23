@@ -651,6 +651,7 @@ _ERROR_CODES = (
     "unsupported_daintree_protocol",
     "system_messages_not_allowed",
     "reserved_tool_name",
+    "reserved_message_name",
     "unknown_task",
 )
 

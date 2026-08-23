@@ -776,7 +776,7 @@ the problem, because that is the whole reason these are separate codes.
 
 | HTTP | Code | Meaning / action |
 |------|------|------------------|
-| 400  | `system_messages_not_allowed`, `reserved_tool_name`, `invalid_tool_schema`, `tool_choice_not_offered`, `invalid_request_error` | The request is malformed. Client bug. |
+| 400  | `system_messages_not_allowed`, `reserved_tool_name`, `reserved_message_name`, `invalid_tool_schema`, `tool_choice_not_offered`, `invalid_request_error` | The request is malformed. Client bug. `reserved_message_name` means a message arrived carrying a `name` in Daintree's own `daintree_internal_` namespace — those name server-authored rows and are refused, case-insensitively and untrimmed, whatever role claims them. |
 | 400  | `missing_tool_call_id`, `dangling_tool_message`, `duplicate_tool_call_id`, `unresolved_tool_calls`, `malformed_tool_call_id`, `tool_calls_on_non_assistant_message` | The tool-call transcript is not a valid exchange. An assistant turn opens a BATCH of calls, every call is answered exactly once, and only then may a user/assistant message follow; order *within* a batch is free. Ids are compared verbatim — surrounding whitespace is rejected rather than trimmed, because they travel upstream raw. A trailing unresolved batch is legal. Client bug in every case: report it with the request id rather than retrying. |
 | 400  | `invalid_image`, `remote_image_not_allowed` | An image part failed the data-URL policy: media type outside the allowlist (`image/png`, `image/jpeg`, `image/webp`, `image/gif`), not `;base64`, empty, or not valid base64. |
 | 401  | `invalid_api_key` | Bearer missing or malformed **at Daintree's door**. Send a valid header. |

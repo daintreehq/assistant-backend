@@ -118,6 +118,25 @@ def reserved_tool_name(name: str, param: str) -> DaintreeError:
     )
 
 
+def reserved_message_name(name: str, param: str) -> DaintreeError:
+    """A client message wearing a name the SERVER authors messages under.
+
+    The sibling of ``reserved_tool_name``, and reserved for the same reason: the
+    backend appends its own rows to a prepared request (the forked-spawn
+    manifest and branch assignment), and those rows carry authority the
+    conversation must not be able to claim for itself. A user typing the same
+    words into ordinary content is harmless; a message arriving already NAMED as
+    one of them is a client trying to address machinery it cannot see.
+    """
+    return DaintreeError(
+        status_code=400,
+        message=f"Message name {name!r} is reserved by Daintree and may not be supplied.",
+        type=TYPE_INVALID_REQUEST,
+        code="reserved_message_name",
+        param=param,
+    )
+
+
 def invalid_request(
     message: str, *, param: str | None = None, code: str | None = None
 ) -> DaintreeError:

@@ -16,6 +16,8 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .contracts.forked_terminals import FORK_BRANCH_COUNT
+
 # ---- THE serving identity — one host, one model, both hardcoded -----------
 #
 # Together AI serves `deepseek-ai/DeepSeek-V4-Flash-0731`, and it serves
@@ -145,6 +147,12 @@ def _origin_problem(*, value: str, expected_host: str, env_name: str) -> str | N
 #: projector because config sits below skills in the import graph — the
 #: catalog reads DOCS_SKILL_ID from this module, so the arrow cannot reverse.
 ToolProjectionMode = Literal["disabled", "shadow", "enforced"]
+
+#: Whether the server offers the internal forked-spawn tool at all. Two states,
+#: not three: unlike tool projection there is no useful shadow here — the feature
+#: only does anything once the model can CALL the function, and a mode that
+#: offered it without expanding it would leak an internal call to the client.
+ForkedTerminalCallsMode = Literal["disabled", "enabled"]
 
 
 class Settings(BaseSettings):
@@ -407,6 +415,45 @@ class Settings(BaseSettings):
     # is a worse default than one that needs a second variable set alongside it.
     tool_projection_rollout_percent: int = Field(
         default=100, ge=0, le=100, alias="TOOL_PROJECTION_ROLLOUT_PERCENT"
+    )
+
+    # ---- Forked terminal spawn calls ------------------------------------
+    # The second operational kill switch, and the same exception as the one
+    # above: not a product decision deferred to config, but the off-switch for a
+    # behaviour that REWRITES what the model asked for before the client sees
+    # it. If forked spawns ever produce a bad batch, the fix has to be a
+    # config-only Cloud Run revision rather than a deploy.
+    #
+    # `disabled` by default, so a deployment that sets nothing is byte-identical
+    # to the pre-feature server: no tool in the request, no rule in the base
+    # prompt, no rewrite stage on either response path.
+    #
+    # There is deliberately NO rollout percentage beside it. Tool projection has
+    # one because it withholds capability from live sessions and a bad call
+    # should reach few of them; this feature adds a capability and fails closed.
+    # A per-session cohort would also split BOTH the base prompt and the tools
+    # array within one deployment, which is precisely the prefix-cache split
+    # `PromptLoader.base_prompt` builds its variants at load time to avoid.
+    forked_terminal_calls_mode: ForkedTerminalCallsMode = Field(
+        default="disabled", alias="FORKED_TERMINAL_CALLS_MODE"
+    )
+    # A process-wide ceiling on concurrent branch expansions, NOT a per-fork one:
+    # one fork must still be able to take all four permits and run its branches
+    # at once, or the feature serializes exactly the work it exists to
+    # parallelize. It bounds what many simultaneous forks can do to provider
+    # concurrency on one Cloud Run instance. 16 is four concurrent forks; raise
+    # it only against a measured instance-concurrency number.
+    fork_expansion_max_inflight: int = Field(
+        default=16, ge=FORK_BRANCH_COUNT, le=256, alias="FORK_EXPANSION_MAX_INFLIGHT"
+    )
+    # One wall clock for the whole fan-out, clamped further by whatever the turn
+    # has left. The user waits for the slowest branch, never the sum, and four
+    # 60-second calls must not compose into a four-minute turn.
+    # Bounded at BOTH ends. `gt=0` alone admits positive infinity, which is a
+    # float a config file can express and which silently removes the wall clock
+    # this field exists to be.
+    fork_expansion_timeout_seconds: float = Field(
+        default=20.0, gt=0, le=120.0, alias="FORK_EXPANSION_TIMEOUT_SECONDS"
     )
 
     # ---- Policy ---------------------------------------------------------

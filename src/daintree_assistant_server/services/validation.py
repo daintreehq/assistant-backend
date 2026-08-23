@@ -25,10 +25,12 @@ from ..contracts.openai import (
 from ..errors import (
     invalid_request,
     request_too_large,
+    reserved_message_name,
     reserved_tool_name,
     system_messages_not_allowed,
 )
 from ..text_utils import has_lone_surrogate, utf8_len
+from .forked_terminal_calls import is_reserved_message_name
 
 ALLOWED_ROLES = frozenset({"user", "assistant", "tool"})
 FORBIDDEN_ROLES = frozenset({"system", "developer"})
@@ -91,6 +93,19 @@ def _validate_roles(messages: list[ChatMessage]) -> None:
                 param=f"input.messages[{i}].role",
                 code="unsupported_role",
             )
+        # Reserved MESSAGE names, for the same reason and one layer over: the
+        # backend appends server-authored rows to a prepared request (the
+        # forked-spawn manifest and its branch assignment), and those rows are
+        # what switch a completion into branch-expansion mode. A client that
+        # could name a message `daintree_internal_fork_branch` could address that
+        # machinery directly. Checked on EVERY role — an assistant or tool row
+        # carrying the name is exactly as much of a forgery as a user one — and
+        # against the whole reserved PREFIX case-insensitively, because the
+        # audience for these names is a language model rather than a byte
+        # comparison.
+        if is_reserved_message_name(msg.name):
+            assert msg.name is not None
+            raise reserved_message_name(msg.name, param=f"input.messages[{i}].name")
         # Reserved tool names must not be smuggled in via prior assistant tool
         # calls; the server-generated synthetic load events are added after
         # validation and never appear in client-supplied messages.
