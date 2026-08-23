@@ -7,7 +7,7 @@ complete serialized prompt, plus the output we reserved for it, fits the serving
 model's context window. A request can satisfy every cap in `config.py` and still
 be several times too large, because the caps bound the pieces the CLIENT sent
 and the prompt also carries the base prompt, the response contract, ~21.5k
-tokens of tool schemas, the active skill bodies, the integrations, the startup
+tokens of tool schemas, the active runbook bodies, the integrations, the startup
 block and the injected tail — none of which the 8 MiB ceiling counts.
 
 **This module measures; it rarely refuses.** The estimate is characters/4, and
@@ -211,7 +211,7 @@ def measure(
     Split by ROLE rather than by assembler layer, because by this point the
     layers have already been flattened into the wire array and role is what
     survives: the two static system blocks, the tool schemas, and everything
-    else (the user-role skill/integration/startup rows, the visible transcript
+    else (the user-role runbook/integration/startup rows, the visible transcript
     and the injected tail), which move together and are the part a long session
     grows.
     """

@@ -1,7 +1,7 @@
 """Structured logging and request identifiers.
 
 Logs carry *metadata*, never content: no message text, tool arguments,
-project instructions, memories, terminal tails, skill bodies, bearer keys, or
+project instructions, memories, terminal tails, runbook bodies, bearer keys, or
 state tokens. Helpers here make that the easy default.
 """
 

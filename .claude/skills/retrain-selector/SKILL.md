@@ -1,7 +1,7 @@
 ---
 name: retrain-selector
-description: "Retrain the local two-stage skill selector to make new or edited skills route COMPETITIVELY. Not required to make a skill selectable at all — the set-wise head has no per-skill weights, so a skill added to skills/files/ is embedded on load and reachable that turn — but a never-trained skill loses contested requests to established neighbours (measured 4/14 vs 13/14), so a skill sharing vocabulary with an existing one still needs data. Run when a new skill routes badly, when the benchmark regresses, or when the user says retrain the selector."
-argument-hint: "(optional) space-separated skill ids that are NEW, so data generation focuses there"
+description: "Retrain the local two-stage runbook selector to make new or edited runbooks route COMPETITIVELY. Not required to make a runbook selectable at all — the set-wise head has no per-runbook weights, so a runbook added to runbooks/files/ is embedded on load and reachable that turn — but a never-trained runbook loses contested requests to established neighbours (measured 4/14 vs 13/14), so a runbook sharing vocabulary with an existing one still needs data. Run when a new runbook routes badly, when the benchmark regresses, or when the user says retrain the selector."
+argument-hint: "(optional) space-separated runbook ids that are NEW, so data generation focuses there"
 allowed-tools:
   - Bash
   - Read
@@ -12,32 +12,32 @@ allowed-tools:
   - Workflow
 ---
 
-# Retrain the local skill selector
+# Retrain the local runbook selector
 
 ## Read this first: a retrain is a QUALITY step, not an unblocking step
 
-The selector is **two stages** (`skills/local/setwise.py`):
+The selector is **two stages** (`runbooks/local/setwise.py`):
 
 1. a small bi-encoder that embeds the conversation and takes the `k` nearest
-   skills by cosine from a table of embedded skill documents;
+   runbooks by cosine from a table of embedded runbook documents;
 2. a set-wise head that reads the conversation embedding and the `k` cached
-   skill embeddings together, and returns a logit per candidate plus the docs
+   runbook embeddings together, and returns a logit per candidate plus the docs
    and cardinality decisions.
 
-**Neither stage has per-skill parameters.** A skill added to `skills/files/` is
+**Neither stage has per-runbook parameters.** A runbook added to `runbooks/files/` is
 embedded by `SetwiseClassifier.sync()` the moment the catalog loads it, gets a
 row in the table, and can be selected that turn — no provenance gate, no
-degraded window. Under the fixed-head classifier that preceded it, a new skill
+degraded window. Under the fixed-head classifier that preceded it, a new runbook
 could never be selected at all AND the whole selector degraded open until
 someone ran this runbook.
 
 **But "reachable" is not "competitive", and the gap is measured.** Holding three
-skills out of both stages and scoring only their benchmark cases:
-**4/14 zero-shot against 13/14 trained** (`training/EXPERIMENTS.md`). A new skill
+runbooks out of both stages and scoring only their benchmark cases:
+**4/14 zero-shot against 13/14 trained** (`training/EXPERIMENTS.md`). A new runbook
 wins requests that only it plausibly answers, and loses contested ones to
 established neighbours — whose training data names them and not it.
 
-So: adding a skill is no longer *urgent*, because nothing breaks and the skill
+So: adding a runbook is no longer *urgent*, because nothing breaks and the runbook
 works on unambiguous requests. It is still *worth doing*, and the trigger below
 tells you when.
 
@@ -45,17 +45,17 @@ tells you when.
 
 - The benchmark (`training.eval_two_stage`) drops below its floor, or a
   category regresses.
-- **A skill was added and shares vocabulary with an existing one.** This is the
+- **A runbook was added and shares vocabulary with an existing one.** This is the
   common case and the measured weakness: `manage-issue` held out scored 0/4
   against `start-work-on-issue`, `debug-web-app` 0/3 against `diagnose-and-fix`,
   while `terminals.rename` — whose words nothing else claims — scored 4/7 with no
-  training at all. If a new skill sits in a crowded neighbourhood, assume it
+  training at all. If a new runbook sits in a crowded neighbourhood, assume it
   needs data. See the asymmetry lesson in `training/EXPERIMENTS.md`: fences are
-  only learned in the direction they are written, and a new skill's strongest
+  only learned in the direction they are written, and a new runbook's strongest
   words are stolen from its neighbours.
 - The corpus has grown enough that the encoders are meaningfully behind it.
 
-A **body-only** skill edit never warrants one: only `title`/`summary`/
+A **body-only** runbook edit never warrants one: only `title`/`summary`/
 `whenToUse` are embedded.
 
 ## Check where you actually stand, before training anything
@@ -68,41 +68,41 @@ $PY -m training.eval_two_stage --ablate
 
 That loads the shipped ONNX artifact, applies the production decision procedure,
 prints per-category recall-pass and every miss by name, and reports the
-shortlist-order ablation. If the skill you are worried about is not in the miss
+shortlist-order ablation. If the runbook you are worried about is not in the miss
 list, there is nothing to retrain for.
 
 ## The shipped recipe (do not improvise — measured in training/EXPERIMENTS.md)
 
-### 1. Generate data for the new skills
+### 1. Generate data for the new runbooks
 
-Refresh the digest, then run one Workflow agent per new skill. The agent prompts
+Refresh the digest, then run one Workflow agent per new runbook. The agent prompts
 and JSON schemas follow one pattern: read `training/data/catalog_digest.md` plus
-the skill's own file; return `positives` (situation-invented, NOT a whenToUse
+the runbook's own file; return `positives` (situation-invented, NOT a whenToUse
 paraphrase), `boundary_negatives` mined from the "do not use for X" clauses, and
 `followups`.
 
 ```bash
 $PY - <<'EOF'
 import sys, pathlib; sys.path.insert(0, 'src')
-from daintree_assistant_server.skills.catalog import load_catalog, default_skills_dir
-cat = load_catalog(default_skills_dir()); sel = set(cat.selectable_ids)
-out = ["# Daintree skill catalog — routing digest", ""]
-for s in cat.skills:
+from daintree_assistant_server.runbooks.catalog import load_catalog, default_runbooks_dir
+cat = load_catalog(default_runbooks_dir()); sel = set(cat.selectable_ids)
+out = ["# Daintree runbook catalog — routing digest", ""]
+for s in cat.runbooks:
     if s.meta.id not in sel: continue
     f = " [FOUNDATION]" if getattr(s.meta, "foundation", False) else ""
     out += [f"## {s.meta.id}{f}", f"title: {s.meta.title}",
             f"summary: {s.meta.summary}", f"whenToUse: {s.meta.when_to_use}", ""]
 pathlib.Path("training/data/catalog_digest.md").write_text("\n".join(out))
-print("digest refreshed:", len(sel), "skills")
+print("digest refreshed:", len(sel), "runbooks")
 EOF
 ```
 
 **Hard rules for generating agents:** never read `benchmarks/` or `tests/`; only
-real skill ids; label the specific skill alone (never "specific + foundation" —
+real runbook ids; label the specific runbook alone (never "specific + foundation" —
 the backend pairs the foundation downstream); `expect_ids: []` is a first-class
 answer. And generate **reverse-direction** boundary rows too: rows where an
-ESTABLISHED skill is correct and the new one is the hard negative. The new
-skill's whenToUse fences against its neighbours, but their whenToUse predates it
+ESTABLISHED runbook is correct and the new one is the hard negative. The new
+runbook's whenToUse fences against its neighbours, but their whenToUse predates it
 and names it nowhere, so without those rows every fence runs one way only.
 
 ### 2. Assemble (cumulative by default)
@@ -132,15 +132,15 @@ $PY -m training.train_setwise --epochs 10 --ordering equivariant
 ```
 
 Watch on stage 1: `r@32` (the shortlist must not be the thing that loses a
-skill) and `r@8` as the early warning that will matter at 200 skills. Watch on
-stage 2: `card` ~0.95 — this is what makes "zero skills" work — and
+runbook) and `r@8` as the early warning that will matter at 200 runbooks. Watch on
+stage 2: `card` ~0.95 — this is what makes "zero runbooks" work — and
 `val exact-match`.
 
 Keep `--ordering equivariant`. `positional` and `blind` exist so the choice stays
 measured rather than assumed, and both were scored (see `EXPERIMENTS.md`):
 `positional` is worse at matched precision (154 vs 158) and gives up
 permutation-equivariance — reversing its shortlist changes 151 of 165 answers,
-which is a slot prior that would penalise any newly added skill. `blind` ties,
+which is a slot prior that would penalise any newly added runbook. `blind` ties,
 and is the ablation showing the head does not depend on stage 1's scores.
 
 ### 4. Export
@@ -173,13 +173,13 @@ family's honest error bar is ±2 cases.
 report **0 cases changed** — that is the permutation-equivariance claim being
 checked against the real graph rather than trusted from the architecture.
 
-If the round was about a new skill, also re-measure what a retrain actually
-bought. Train a probe with the new skills held out of BOTH stages and score only
+If the round was about a new runbook, also re-measure what a retrain actually
+bought. Train a probe with the new runbooks held out of BOTH stages and score only
 their cases:
 
 ```bash
-$PY -m training.train_retriever --holdout-skills <ids> --out training/models/retriever_probe
-$PY -m training.train_setwise --epochs 10 --holdout-skills <ids> \
+$PY -m training.train_retriever --holdout-runbooks <ids> --out training/models/retriever_probe
+$PY -m training.train_setwise --epochs 10 --holdout-runbooks <ids> \
      --retriever training/models/retriever_probe --out training/models/sw_probe
 $PY -m training.export_two_stage --setwise training/models/sw_probe --out .tmp/art_probe
 $PY -m training.eval_zero_shot --artifact .tmp/art_probe
@@ -199,12 +199,12 @@ shipped encoders were trained on.
 
 ## Scaling
 
-Adding a skill costs **one row in the embedding table** (~4.5KB) and one
+Adding a runbook costs **one row in the embedding table** (~4.5KB) and one
 embedding pass at catalog load. It costs nothing at inference: the head sees `k`
-candidates whatever the catalog size, and the cosine search over 1,000 skills is
+candidates whatever the catalog size, and the cosine search over 1,000 runbooks is
 a single 1000x384 matrix-vector product — microseconds, and exact, which is why
 there is no ANN index here.
 
 What still costs a retrain is *quality*: the encoders only know the vocabulary
-they were trained on. The intended workflow is batched — let skills accumulate,
+they were trained on. The intended workflow is batched — let runbooks accumulate,
 generate their data (both directions), retrain once.

@@ -1,0 +1,351 @@
+# Neighbor-runbook routing traps: the whenToUse lines route between runbooks that share
+# keywords. Picking the trap runbook is a precision failure (extra).
+
+cases:
+  - id: close-idle-terminals-is-cleanup
+    category: routing-trap
+    note: >-
+      Re-pointed against the 23-runbook catalog. The rename bait is unchanged, but the
+      answer is no longer the foundation: workspace-cleanup's trigger list is the user's
+      own teardown words ("close these", "tidy up the terminals") and this is a PLURAL
+      close, while the foundation claims only "closing ONE the user named". The
+      keep-the-build exception is the classify-safe/unsafe step of cleanup's own runbook.
+    messages:
+      - role: user
+        content: Close all the idle terminals, but keep the one running the build.
+    expect:
+      required: [daintree.orchestration.workspace-cleanup]
+      optional: [daintree.foundation]
+
+  - id: resume-session-not-foundation
+    category: routing-trap
+    note: >-
+      Moved here from 60-foundation-only.yaml. "Resume the session I closed yesterday" is
+      status-and-resume's own trigger ("to pick up / resume something from an earlier
+      session"), and the foundation now hands it over by name ('"where were we" across
+      sessions is status-and-resume'). The trap is the auto-paired foundation winning by
+      default on a request shaped like a state read — so the failure measured here is a
+      MISS, not an extra.
+    messages:
+      - role: user
+        content: Can we resume the session I closed yesterday afternoon? The parser one.
+    expect:
+      required: [daintree.orchestration.status-and-resume]
+      optional: [daintree.foundation]
+
+  - id: independent-poll-not-multi-agent
+    category: routing-trap
+    note: Independent opinions with no cross-talk -> poll, not multi-agent relay.
+    messages:
+      - role: user
+        content: >-
+          Get independent takes from my pinned agents on this API design — no
+          discussion between them — then give me the consensus.
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: debate-is-multi-agent
+    category: routing-trap
+    note: Genuine back-and-forth relay -> multi-agent, not poll/competition.
+    messages:
+      - role: user
+        content: >-
+          Spawn three agents and have them debate the best approach to the cache
+          invalidation bug — relay the arguments between them until they converge.
+    expect:
+      required: [daintree.orchestration.multi-agent]
+      optional: [daintree.foundation]
+
+  - id: peer-vote-is-competition
+    category: routing-trap
+    note: Independent outputs + peer scoring -> competition, not interview.
+    messages:
+      - role: user
+        content: >-
+          Have four agents each write a release announcement, then have them
+          peer-review each other's drafts and vote for the best one.
+    expect:
+      required: [daintree.orchestration.competition]
+      optional: [daintree.foundation]
+
+  - id: judge-led-interview
+    category: routing-trap
+    note: >-
+      The LIGHT depth of the merged interview runbook — a judge questions candidates and
+      names a winner, with no codebase verification.
+    messages:
+      - role: user
+        content: >-
+          Spawn an interviewer agent to interview three candidate agents about
+          testing strategy and pick a winner.
+    expect:
+      required: [daintree.orchestration.interview]
+      optional: [daintree.foundation]
+
+  - id: interview-with-verification
+    category: routing-trap
+    note: >-
+      The DEEP depth of the same runbook: the old verified-interview folded into
+      daintree.orchestration.interview, whose whenToUse now claims both depths ("a deep
+      one where the judge verifies candidates' claims against the codebase ... and
+      narrows to a top 2"). Paired with judge-led-interview above, this checks the merge
+      did not strand the deep phrasing.
+    messages:
+      - role: user
+        content: >-
+          Run an interview where the judge actually checks the candidates' claims
+          against the codebase, asks challenging follow-ups, narrows to a top 2,
+          and then picks the winner.
+    expect:
+      required: [daintree.orchestration.interview]
+      optional: [daintree.foundation]
+
+  - id: tie-needs-runoff
+    category: routing-trap
+    note: A tie in an existing vote -> runoff tie-breaker, not a fresh competition.
+    messages:
+      - role: user
+        content: >-
+          Earlier the four agents voted on the two logo taglines and it ended 2-2.
+          Run a tie-breaker round with the same agents.
+    expect:
+      required: [daintree.orchestration.runoff-tiebreaker]
+      optional: [daintree.foundation]
+
+  - id: single-agent-not-poll
+    category: routing-trap
+    note: One named agent -> ask-and-relay, not a fleet poll.
+    messages:
+      - role: user
+        content: Ask nova — just nova — what she thinks about the new queue design.
+    expect:
+      required: [daintree.agents.ask-and-relay]
+      optional: [daintree.foundation]
+
+  - id: finished-issue-is-prep
+    category: routing-trap
+    note: Wrapping up finished work -> prep-branch-for-review, not start-work-on-issue.
+    messages:
+      - role: user
+        content: >-
+          The work on issue 88 is finished. Wrap it up and get it in front of
+          reviewers.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+
+  - id: worktree-with-recipe
+    category: routing-trap
+    note: Worktree + startup recipe -> recipe runbook, not start-work-on-issue.
+    messages:
+      - role: user
+        content: Create a new worktree with the standard dev recipe.
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.foundation]
+
+  - id: label-tabs-not-fleet-report
+    category: routing-trap
+    note: >-
+      Covers daintree.terminals.rename's carve-out against supervise-fleet, which had no
+      trap. The bait is real: inspecting what every agent is on is supervise-fleet's own
+      sweep ("how's everyone doing?", "catch me up on the agents"). The deciding clause is
+      rename's "The deliverable is new TITLES. Do not use when the user wants a report on
+      what the agents are doing rather than a retitle (use
+      daintree.orchestration.supervise-fleet)" — here the inspection is only the means and
+      the labels are the deliverable ("Not a rundown"). supervise-fleet agrees from its own
+      side ("or for retitling tabs (daintree.terminals.rename)"), so picking it is an extra.
+      Worded around "label" rather than rename/retitle/title so this measures routing, not
+      keyword overlap with the whenToUse.
+    messages:
+      - role: user
+        content: >-
+          Third time today I've typed into the wrong terminal. Can you go along the
+          row, work out what each one is on, and stick a short label on it? Not a
+          rundown — I just want to read it off the tabs.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.foundation]
+
+  - id: no-ticket-change-not-issue-workflow
+    category: routing-trap
+    note: >-
+      Covers daintree.edits.spawn-visible-agent's carve-outs, which had no trap at all. The
+      bait is forge-workflow shaped — a backlog grievance about a known defect, the kind of
+      thing that usually arrives as a ticket — but the deciding clause is
+      start-work-on-issue's own "Do not use ... for a change with no forge issue behind it
+      (use daintree.edits.spawn-visible-agent)", and the user says outright that nothing was
+      ever filed. One unit of work, so fan-out-work's "signal is PLURALITY plus
+      INDEPENDENCE" does not fire either; the deliverable is a code change landing, not an
+      answer relayed back. Every declared neighbour is left out of required AND optional, so
+      the case asserts the whole carve-out list rather than one clause of it.
+    messages:
+      - role: user
+        content: >-
+          This one never made it onto the board and I'm not going to file it now —
+          the uploader retries three times back to back and hammers the API when the
+          CDN blips. Put an agent on adding proper backoff.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: choose-next-ticket-is-not-starting-it
+    category: routing-trap
+    note: >-
+      Trap coverage for daintree.workflow.find-issue-work against its whole carve-out list.
+      Every surface signal points at start-work-on-issue ("pick up", a ticket, worktrees) and
+      the cross-check against in-flight work baits status-and-resume, while "a few" baits
+      fan-out-work's plurality signal. The deciding clause is find-issue-work's own boundary:
+      the deliverable is the choice, and the user forbids launching. start-work-on-issue,
+      fan-out-work, status-and-resume and follow-up-on-issue are all left out of required AND
+      optional, so the case asserts the carve-out list rather than one clause of it.
+    messages:
+      - role: user
+        content: >-
+          Before I pick up the next parser ticket, check a few candidates against the
+          worktrees and open PRs so I don't start something that's already underway.
+          Tell me which one is safe to take — don't spin anything up.
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: review-is-on-the-forge-not-in-a-terminal
+    category: routing-trap
+    note: >-
+      Trap coverage for daintree.workflow.follow-up-on-issue. The request is worded as a
+      relay to a running implementer, which is relay-review-feedback's exact trigger — but
+      that runbook's source is a reviewer AGENT's terminal, and here the user says the notes
+      are on the forge and nobody has fetched them. Getting them is follow-up-on-issue's
+      job — it owns the forge side of the loop: read the PR's review decision, then, since
+      no forge READ action returns the bodies of reviews left on a PR, escalate to an
+      explore agent for the text before relaying. "Don't leave a watcher" also excludes watch-outcome, and nothing
+      is being committed or pushed.
+    messages:
+      - role: user
+        content: >-
+          The reviewer left their comments on PR 412 itself — we never had an agent
+          look at it. Read what's actually blocking it and pass the concrete asks to
+          the agent still working in terminal 6. Don't leave a watcher on it.
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: wake-me-on-merge-is-not-a-status-read
+    category: routing-trap
+    note: >-
+      The reverse boundary, now that watch-outcome names follow-up-on-issue by id. A PR
+      number plus review/CI vocabulary baits the one-off forge read, but the user explicitly
+      does NOT want a reading now — they want to be woken on a later state transition, which
+      is watch-outcome's own trigger and exactly what watcher.watchPR can observe.
+      follow-up-on-issue is excluded from required and optional.
+    messages:
+      - role: user
+        content: >-
+          Don't go poking at PR 412's checks now — I'm heading out. Just keep an eye
+          on it and ping me if it merges or gets closed.
+    expect:
+      required: [daintree.orchestration.watch-outcome]
+      optional: [daintree.foundation]
+
+  - id: copytree-file-for-agents-not-fan-out
+    category: routing-trap
+    note: >-
+      Covers curate-copytree-bundle's carve-out against fan-out-work. The bait is the
+      mention of agents, fan-out-work's home turf — but nothing is being launched or
+      injected into a terminal; the deliverable is ONE curated context file for later.
+      The deciding clause is curate-copytree-bundle's "Do not use for injecting
+      workspace context into an agent's terminal during a fan-out — that is
+      daintree.orchestration.fan-out-work", and fan-out-work's own signal (PLURALITY
+      plus INDEPENDENCE of work units) does not fire on a file-packaging request, so
+      fan-out-work is left out of required AND optional.
+    messages:
+      - role: user
+        content: >-
+          I'm splitting the terrain renderer across three agents later. Before
+          that, make one code-context file containing the renderer, its
+          configuration, and its tests; stop after creating the file and leave
+          every agent untouched.
+    expect:
+      required: [daintree.context.curate-copytree-bundle]
+      optional: [daintree.foundation]
+
+  - id: worktree-with-recipe-not-plain
+    category: routing-trap
+    note: >-
+      The nearest neighbour, and the one the runbook's own whenToUse excludes first:
+      "Do not use for a worktree with a workspace recipe (use
+      daintree.recipe.run-or-create)". The bait is real — this IS a worktree
+      creation request, and the plain runbook owns most of those — but "saved …
+      layout" plus terminals coming up with it is a stored Daintree recipe, which
+      is recipe.run-or-create's whole trigger. The plain runbook must not be picked.
+    messages:
+      - role: user
+        content: >-
+          Make a worktree with our saved release-prep layout, so the usual terminals
+          come up with it.
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.foundation]
+
+  - id: worktree-for-issue-is-start-work
+    category: routing-trap
+    note: >-
+      The second exclusion in the same whenToUse: "for starting a forge issue with
+      an agent (use daintree.workflow.start-work-on-issue)". A worktree IS created
+      here, which is exactly why it baits — but the deliverable is work started on
+      a numbered issue, not a worktree handed back empty.
+    messages:
+      - role: user
+        content: Get someone going on issue 412 in its own worktree.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.foundation]
+
+  - id: plain-worktree-not-an-agent-spawn
+    category: routing-trap
+    note: >-
+      The runbook's own trap, in the direction the coverage gate reads: this runbook is
+      the answer and a declared neighbour must NOT come with it. The bait is the
+      word "work on" plus a named branch, which reads toward
+      daintree.edits.spawn-visible-agent — but the deliverable stops at a worktree
+      the user will open themselves, and that runbook's carve-out is explicit: it is
+      for spawning an agent into a worktree that ALREADY exists. Nothing is being
+      launched here, so an agent-spawn pick is wrong rather than merely extra.
+    messages:
+      - role: user
+        content: >-
+          Give the caching fix its own checkout beside this one, based on main —
+          I'll drive it myself from there.
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]
+
+  - id: search-closed-prs-is-find-work
+    category: routing-trap
+    note: >-
+      Added when forge.listPRs gained a `search` key. Finding a SET of past PRs by
+      topic is a search-and-shortlist job, so it belongs with the runbook that owns
+      the provider query dialect; follow-up-on-issue is the bait because it owns PRs
+      generally, but its scope is reading ONE known PR's state. Currently a MISS at
+      selection time: the artifact predates the PR-search vocabulary and answers
+      follow-up-on-issue. Scored, not asserted — the corpus fix is a retrain.
+    messages:
+      - role: user
+        content: Find the closed PRs about the theme work.
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: one-known-pr-state-is-follow-up
+    category: routing-trap
+    note: >-
+      The other direction of the same boundary, and the one that must not regress
+      now that find-issue-work advertises pull requests in its whenToUse. A single
+      named PR with a state question is a read, not a search.
+    messages:
+      - role: user
+        content: Is PR #11892 green? Did the reviewer sign it off?
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]

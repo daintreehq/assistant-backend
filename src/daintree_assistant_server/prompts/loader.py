@@ -42,7 +42,7 @@ MAIN_PROMPT_VERSION = "main"
 TEMPLATE_STARTUP_CONTEXT = "main/startup_context.md.j2"
 TEMPLATE_RUNTIME_CONTEXT = "main/runtime_context.md.j2"
 TEMPLATE_INTEGRATIONS = "main/integrations.md.j2"
-TEMPLATE_LOADED_SKILLS = "main/loaded_skills.md.j2"
+TEMPLATE_LOADED_RUNBOOKS = "main/loaded_runbooks.md.j2"
 TEMPLATE_TURN_FOOTER = "main/turn_footer.md.j2"
 TEMPLATE_RESPONSE_CONTRACT = "main/response_contract.md.j2"
 TEMPLATE_DISPLAY_CONTEXT = "main/display_context.md.j2"
@@ -52,7 +52,7 @@ _ALL_TEMPLATES = (
     TEMPLATE_STARTUP_CONTEXT,
     TEMPLATE_RUNTIME_CONTEXT,
     TEMPLATE_INTEGRATIONS,
-    TEMPLATE_LOADED_SKILLS,
+    TEMPLATE_LOADED_RUNBOOKS,
     TEMPLATE_TURN_FOOTER,
     TEMPLATE_RESPONSE_CONTRACT,
     TEMPLATE_DISPLAY_CONTEXT,
@@ -75,7 +75,7 @@ class RenderCache:
     ``self`` and keep every assembler alive for the life of the process.
 
     Not thread-safe, and that is checked rather than assumed. The service does use
-    ``asyncio.to_thread`` in two places — the catalog reload and skill-learning
+    ``asyncio.to_thread`` in two places — the catalog reload and runbook-learning
     file writes — but neither touches a render cache: they do disk I/O and hand
     back a new ``Catalog``. Every cache access happens on the event loop, so a
     lock on the request path would protect against nothing and cost every turn.
@@ -113,7 +113,7 @@ class RenderCache:
     def get(self, key: tuple[str, ...]) -> str | None:
         value = self._entries.get(key)
         # `is None`, never truthiness: an empty render is a legitimate cached
-        # value (no active skills renders to almost nothing), and treating it as
+        # value (no active runbooks renders to almost nothing), and treating it as
         # a miss would re-render it forever while reporting a misleading hit rate.
         if value is None:
             self.misses += 1
@@ -133,7 +133,7 @@ class RenderCache:
         self._entries.move_to_end(key)
         self._chars += len(value)
         # Evict until BOTH bounds hold. The entry count alone does not bound
-        # memory: a skill body may be up to 256 KiB, so 64 three-skill renders is
+        # memory: a runbook body may be up to 256 KiB, so 64 three-runbook renders is
         # ~96 MiB of text — and CPython stores a string with any non-ASCII
         # character at 2 or 4 bytes per character, so the real figure can be
         # several times the byte length of the same text on disk.
@@ -321,7 +321,7 @@ class PromptLoader:
         }
         for task_id, body in self._task_prompts.items():
             hashes[f"task:{task_id}"] = digest(body)
-        # Templates too. Without them, two builds whose selector or loaded-skills
+        # Templates too. Without them, two builds whose selector or loaded-runbooks
         # INSTRUCTIONS differ report identical hashes — and those templates carry
         # as much behaviour as the raw bodies do.
         for name in _ALL_TEMPLATES:

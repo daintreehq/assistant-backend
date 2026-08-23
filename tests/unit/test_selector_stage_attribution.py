@@ -1,4 +1,4 @@
-"""Which stage lost a required skill — the decomposition, tested without a model.
+"""Which stage lost a required runbook — the decomposition, tested without a model.
 
 Every case here runs the REAL ``admit_with_reasons`` over a hand-built ranking
 and hands its output to ``_attribute``. That is the whole point of the design:
@@ -16,9 +16,9 @@ blamed on a floor it never reached. Neither showed up in the end-to-end number.
 
 from __future__ import annotations
 
-from benchmarks.skill_selection.cases import BenchCase
-from benchmarks.skill_selection.local_runner import STAGES, _attribute
-from daintree_assistant_server.skills.local.setwise import (
+from benchmarks.runbook_selection.cases import BenchCase
+from benchmarks.runbook_selection.local_runner import STAGES, _attribute
+from daintree_assistant_server.runbooks.local.setwise import (
     SetwiseClassifier,
     admit,
     admit_with_reasons,
@@ -47,7 +47,7 @@ def _stage(
     """Run the real admission, then attribute the loss it produced."""
     active = active or set()
     picked, rejected = admit_with_reasons(ranked, active, count, max_active)
-    assert want not in picked, "fixture does not exercise a loss: the skill was admitted"
+    assert want not in picked, "fixture does not exercise a loss: the runbook was admitted"
     loss = _attribute(
         _case([want], sorted(active)), want, ranked=dict(ranked), rejected=rejected
     )
@@ -59,7 +59,7 @@ def _stage(
 # --------------------------------------------------------------------------
 
 
-def test_a_skill_absent_from_the_ballot_is_a_stage_one_loss() -> None:
+def test_a_runbook_absent_from_the_ballot_is_a_stage_one_loss() -> None:
     """The distinction the whole suite exists for.
 
     Absent is not "ranked low". No admission floor and no better head can
@@ -71,7 +71,7 @@ def test_a_skill_absent_from_the_ballot_is_a_stage_one_loss() -> None:
     assert loss.probability is None
 
 
-def test_a_scored_but_low_skill_is_a_stage_two_loss() -> None:
+def test_a_scored_but_low_runbook_is_a_stage_two_loss() -> None:
     assert _stage([("other", 0.9), ("want", 0.02)], want="want") == "rank_miss"
 
 
@@ -89,10 +89,10 @@ def test_a_newcomer_below_its_floor_is_a_calibration_loss() -> None:
     assert stage == "floor_reject"
 
 
-def test_an_active_skill_is_not_charged_the_newcomer_floor() -> None:
-    """The floor applies only to a skill the conversation is NOT already running.
+def test_an_active_runbook_is_not_charged_the_newcomer_floor() -> None:
+    """The floor applies only to a runbook the conversation is NOT already running.
 
-    Charging an active skill to ``floor_reject`` would point every continuation
+    Charging an active runbook to ``floor_reject`` would point every continuation
     failure at calibration when the head is what scored it down.
     """
     stage = _stage(
@@ -102,10 +102,10 @@ def test_an_active_skill_is_not_charged_the_newcomer_floor() -> None:
     assert stage == "rank_miss"
 
 
-def test_a_confident_skill_lost_to_a_zero_count_is_a_cardinality_loss() -> None:
+def test_a_confident_runbook_lost_to_a_zero_count_is_a_cardinality_loss() -> None:
     """The failure the shipped artifact produces on a reserved candidate.
 
-    The skill scores far above the bonus floor and still does not load, because
+    The runbook scores far above the bonus floor and still does not load, because
     the count head called the turn empty — and the bonus never fires on an empty
     answer. Reporting this as ``rank_miss`` would send someone to retrain the
     ranking head over a problem in the count head.
@@ -129,7 +129,7 @@ def test_a_confident_newcomer_lost_to_a_zero_count_is_NOT_a_floor_loss() -> None
     assert stage == "cardinality_short"
 
 
-def test_a_confident_skill_lost_to_a_full_answer_is_a_cap_loss() -> None:
+def test_a_confident_runbook_lost_to_a_full_answer_is_a_cap_loss() -> None:
     ranked = [("a", 0.99), ("b", 0.98), ("c", 0.97), ("want", 0.96)]
     assert _stage(ranked, want="want", count=3, max_active=3) == "cap_full"
 
@@ -143,8 +143,8 @@ def test_a_capped_out_newcomer_is_NOT_a_floor_loss() -> None:
     assert stage == "cap_full"
 
 
-def test_a_below_floor_skill_on_an_empty_answer_is_still_a_rank_miss() -> None:
-    """Cardinality is only to blame when the skill would otherwise have ridden.
+def test_a_below_floor_runbook_on_an_empty_answer_is_still_a_rank_miss() -> None:
+    """Cardinality is only to blame when the runbook would otherwise have ridden.
 
     Below the bonus floor the count head's answer is irrelevant — the bonus
     would not have admitted it at any count, so the score is the problem.

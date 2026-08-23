@@ -9,6 +9,7 @@ from conftest import detach_docs_client, respond_body
 from fakes import FakeProvider
 from fastapi.testclient import TestClient
 
+from daintree_assistant_server import PROTOCOL_MIN
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import build_container, create_app
 
@@ -54,7 +55,12 @@ def test_previous_protocol_version_rejected_with_upgrade_required(client, auth) 
     r = client.post(
         "/v1/daintree/respond",
         headers=auth,
-        json=respond_body([{"role": "user", "content": "rename my terminals"}], protocol_version=1),
+        json=respond_body(
+            [{"role": "user", "content": "rename my terminals"}],
+            # The ACTUAL predecessor, derived. Pinned at 1 this stayed green through
+            # the 2 -> 3 bump while saying nothing about whether 2 was still served.
+            protocol_version=PROTOCOL_MIN - 1,
+        ),
     )
     assert r.status_code == 426
     assert r.json()["error"]["code"] == "unsupported_daintree_protocol"
@@ -62,7 +68,7 @@ def test_previous_protocol_version_rejected_with_upgrade_required(client, auth) 
 
 def test_missing_session_rejected(client, auth) -> None:
     r = client.post(URL, headers=auth, json={
-        "protocol_version": 2, "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
+        "protocol_version": 3, "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
     })
     assert r.status_code == 400
 
@@ -108,7 +114,7 @@ def test_reserved_tool_call_smuggling_rejected(client, auth) -> None:
     r = client.post(URL, headers=auth, json=respond_body([
         {"role": "user", "content": "go"},
         {"role": "assistant", "content": None, "tool_calls": [
-            {"id": "c1", "type": "function", "function": {"name": "skill__load", "arguments": "{}"}}
+            {"id": "c1", "type": "function", "function": {"name": "runbook__load", "arguments": "{}"}}
         ]},
         {"role": "tool", "content": "loaded", "tool_call_id": "c1"},
     ]))
@@ -186,7 +192,7 @@ def test_oversized_body_with_content_length_rejected() -> None:
 
 def test_oversized_body_without_content_length_rejected() -> None:
     payload = (
-        b'{"protocol_version":2,"session":{"id":"s","turn_id":"t"},'
+        b'{"protocol_version":3,"session":{"id":"s","turn_id":"t"},'
         b'"input":{"messages":[{"role":"user","content":"' + b"x" * 5000 + b'"}]}}'
     )
 

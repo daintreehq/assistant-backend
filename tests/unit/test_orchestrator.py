@@ -18,21 +18,21 @@ from daintree_assistant_server.providers.base import (
     ProviderStream,
     ProviderUsage,
 )
+from daintree_assistant_server.runbooks.catalog import Catalog
+from daintree_assistant_server.runbooks.decision import SelectionDecision
+from daintree_assistant_server.runbooks.loader import parse_runbook
 from daintree_assistant_server.services import chat_orchestrator as orchestrator_module
 from daintree_assistant_server.services.chat_orchestrator import (
     ChatOrchestrator,
-    merge_active_skills,
-    resolve_active_skills,
+    merge_active_runbooks,
+    resolve_active_runbooks,
 )
-from daintree_assistant_server.skills.catalog import Catalog
-from daintree_assistant_server.skills.decision import SelectionDecision
-from daintree_assistant_server.skills.loader import parse_skill
 
 TEST_API_KEY = SecretStr("test-caller-key")
 
 
 def _assert_foundation_closed(catalog, active: list[str]) -> None:
-    """Every admitted skill's domain foundation is admitted too.
+    """Every admitted runbook's domain foundation is admitted too.
 
     The explicit-load path signs a state token, and the reuse/degraded paths replay
     that set verbatim — so an unclosed set minted here would propagate a
@@ -46,7 +46,7 @@ def _assert_foundation_closed(catalog, active: list[str]) -> None:
 
 def test_merge_additive_new_first(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    merged = merge_active_skills([ids[2]], [ids[0], ids[1]], catalog, 3)
+    merged = merge_active_runbooks([ids[2]], [ids[0], ids[1]], catalog, 3)
     # The explicitly loaded id leads; prior ids follow in their existing order.
     assert merged.active[0] == ids[2]
     assert merged.newly_loaded[0] == ids[2]
@@ -58,7 +58,7 @@ def test_merge_additive_new_first(catalog) -> None:
 
 def test_merge_caps_at_max_active(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    merged = merge_active_skills([ids[3]], [ids[0], ids[1], ids[2]], catalog, 3)
+    merged = merge_active_runbooks([ids[3]], [ids[0], ids[1], ids[2]], catalog, 3)
     assert len(merged.active) <= 3
     assert merged.active[0] == ids[3]  # the explicit load always wins its slot
     assert merged.dropped_over_cap  # the oldest prior ids yield
@@ -68,7 +68,7 @@ def test_merge_caps_at_max_active(catalog) -> None:
 
 def test_merge_empty_selection_keeps_prior(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    merged = merge_active_skills([], [ids[0]], catalog, 3)
+    merged = merge_active_runbooks([], [ids[0]], catalog, 3)
     assert ids[0] in merged.active
     # Closure may pull the foundation in, but nothing the caller already had is "new".
     assert ids[0] not in merged.newly_loaded
@@ -77,7 +77,7 @@ def test_merge_empty_selection_keeps_prior(catalog) -> None:
 
 def test_merge_drops_unknown(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    merged = merge_active_skills(["nope", ids[0]], [], catalog, 3)
+    merged = merge_active_runbooks(["nope", ids[0]], [], catalog, 3)
     assert "nope" not in merged.active
     assert ids[0] in merged.active
     # An unknown id is not a capacity signal.
@@ -87,7 +87,7 @@ def test_merge_drops_unknown(catalog) -> None:
 
 def test_merge_no_duplicate_load(catalog) -> None:
     ids = sorted(catalog.known_ids)
-    merged = merge_active_skills([ids[0]], [ids[0]], catalog, 3)
+    merged = merge_active_runbooks([ids[0]], [ids[0]], catalog, 3)
     assert merged.active.count(ids[0]) == 1
     assert merged.newly_loaded == [
         s for s in merged.active if s != ids[0]
@@ -95,20 +95,20 @@ def test_merge_no_duplicate_load(catalog) -> None:
     _assert_foundation_closed(catalog, merged.active)
 
 
-# ---- resolve_active_skills: per-turn authoritative selection ----------------
+# ---- resolve_active_runbooks: per-turn authoritative selection ----------------
 #
 # These run against the REAL catalog, whose foundation topology moves (ids are
-# reshaped; a foundation may resolve for every skill). They therefore assert the
+# reshaped; a foundation may resolve for every runbook). They therefore assert the
 # topology-independent half of the contract — what is evicted, what is newly
 # loaded, the cap — while the synthetic-catalog block below pins the exact
 # admission shape and the property test re-checks all of it over real ids.
 
 
 def test_resolve_successful_run_replaces_prior(catalog) -> None:
-    # A successful selector run is authoritative: prior skills not re-listed are evicted.
+    # A successful selector run is authoritative: prior runbooks not re-listed are evicted.
     ids = sorted(catalog.known_ids)
-    decision = SelectionDecision(skill_ids=[ids[1]], ran=True, degraded=False)
-    result = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    decision = SelectionDecision(runbook_ids=[ids[1]], ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, [ids[0]], catalog, 3)
     assert ids[1] in result.active
     assert ids[0] not in result.active
     assert ids[1] in result.newly_loaded
@@ -117,8 +117,8 @@ def test_resolve_successful_run_replaces_prior(catalog) -> None:
 def test_resolve_empty_successful_run_clears_prior(catalog) -> None:
     # An empty result on a real run CLEARS the active set (topic shift to no-task).
     ids = sorted(catalog.known_ids)
-    decision = SelectionDecision(skill_ids=[], ran=True, degraded=False)
-    result = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    decision = SelectionDecision(runbook_ids=[], ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, [ids[0]], catalog, 3)
     assert result.active == []
     assert result.newly_loaded == []
 
@@ -127,7 +127,7 @@ def test_resolve_degraded_keeps_prior(catalog) -> None:
     # A selector that failed open must NOT evict — reuse the prior set.
     ids = sorted(catalog.known_ids)
     decision = SelectionDecision.degraded_open(["selector_failed"])
-    result = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    result = resolve_active_runbooks(decision, [ids[0]], catalog, 3)
     assert result.active == [ids[0]]
     assert result.newly_loaded == []
 
@@ -136,16 +136,16 @@ def test_resolve_no_run_reuses_prior(catalog) -> None:
     # A tool-continuation round does not run the selector → reuse decision → keep prior.
     ids = sorted(catalog.known_ids)
     decision = SelectionDecision.reuse([ids[0], ids[1]])
-    result = resolve_active_skills(decision, [ids[0], ids[1]], catalog, 3)
+    result = resolve_active_runbooks(decision, [ids[0], ids[1]], catalog, 3)
     assert result.active == [ids[0], ids[1]]
     assert result.newly_loaded == []
 
 
 def test_resolve_keeps_active_when_relisted(catalog) -> None:
-    # Re-listing an active skill keeps it; a genuinely new one loads alongside.
+    # Re-listing an active runbook keeps it; a genuinely new one loads alongside.
     ids = sorted(catalog.known_ids)
-    decision = SelectionDecision(skill_ids=[ids[0], ids[1]], ran=True, degraded=False)
-    result = resolve_active_skills(decision, [ids[0]], catalog, 3)
+    decision = SelectionDecision(runbook_ids=[ids[0], ids[1]], ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, [ids[0]], catalog, 3)
     assert {ids[0], ids[1]} <= set(result.active)
     assert ids[1] in result.newly_loaded
     assert ids[0] not in result.newly_loaded
@@ -154,9 +154,9 @@ def test_resolve_keeps_active_when_relisted(catalog) -> None:
 def test_resolve_caps_and_drops_unknown(catalog) -> None:
     ids = sorted(catalog.known_ids)
     decision = SelectionDecision(
-        skill_ids=["nope", ids[0], ids[1], ids[2], ids[3]], ran=True, degraded=False
+        runbook_ids=["nope", ids[0], ids[1], ids[2], ids[3]], ran=True, degraded=False
     )
-    result = resolve_active_skills(decision, [], catalog, 3)
+    result = resolve_active_runbooks(decision, [], catalog, 3)
     assert len(result.active) == 3
     assert "nope" not in result.active
     assert result.active[0] == ids[0]  # rank order is preserved
@@ -164,7 +164,7 @@ def test_resolve_caps_and_drops_unknown(catalog) -> None:
     assert result.dropped_over_cap and "nope" not in result.dropped_over_cap
 
 
-# ---- resolve_active_skills: domain-foundation UNIT admission -----------------
+# ---- resolve_active_runbooks: domain-foundation UNIT admission -----------------
 #
 # A synthetic catalog, so the admission contract is pinned deterministically:
 # the real catalog's foundation topology is being reshaped (single root
@@ -179,11 +179,11 @@ _OTHER_BASE = "spec.other.base"
 _OTHER_ONE = "spec.other.one"
 
 
-def _skill_markdown(skill_id: str, *, foundation: bool) -> str:
+def _runbook_markdown(runbook_id: str, *, foundation: bool) -> str:
     return (
         "---\n"
-        f"id: {skill_id}\n"
-        f"title: {skill_id}\n"
+        f"id: {runbook_id}\n"
+        f"title: {runbook_id}\n"
         "summary: Synthetic admission fixture.\n"
         "whenToUse: Use only in the admission tests.\n"
         + ("foundation: true\n" if foundation else "")
@@ -204,7 +204,7 @@ def _synthetic_catalog() -> Catalog:
         (_OTHER_ONE, False),
     ]
     return Catalog(
-        parse_skill(_skill_markdown(sid, foundation=f), expected_id=sid)
+        parse_runbook(_runbook_markdown(sid, foundation=f), expected_id=sid)
         for sid, f in specs
     )
 
@@ -217,8 +217,8 @@ def paired_catalog() -> Catalog:
 def test_resolve_pairs_domain_foundation_on_first_selection(paired_catalog) -> None:
     # Round 1: selector returns only the specific. The foundation is admitted with it so
     # it loads on the SAME turn (front-loaded), not a turn late.
-    decision = SelectionDecision(skill_ids=[_ONE], ran=True, degraded=False)
-    result = resolve_active_skills(decision, [], paired_catalog, 3)
+    decision = SelectionDecision(runbook_ids=[_ONE], ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, [], paired_catalog, 3)
     assert result.active == [_ONE, _DOMAIN_BASE]
     assert set(result.newly_loaded) == {_ONE, _DOMAIN_BASE}
 
@@ -228,15 +228,15 @@ def test_resolve_stable_across_rounds_no_late_load(paired_catalog) -> None:
     # only the specific (forgetting the foundation), admission keeps the set stable — the
     # foundation is not re-loaded, and nothing new appears mid-conversation.
     prior = [_ONE, _DOMAIN_BASE]
-    decision = SelectionDecision(skill_ids=[_ONE], ran=True, degraded=False)
-    result = resolve_active_skills(decision, prior, paired_catalog, 3)
+    decision = SelectionDecision(runbook_ids=[_ONE], ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, prior, paired_catalog, 3)
     assert result.active == [_ONE, _DOMAIN_BASE]
     assert result.newly_loaded == []
 
 
 def test_resolve_foundation_selected_alone_not_duplicated(paired_catalog) -> None:
-    decision = SelectionDecision(skill_ids=[_DOMAIN_BASE], ran=True, degraded=False)
-    result = resolve_active_skills(decision, [], paired_catalog, 3)
+    decision = SelectionDecision(runbook_ids=[_DOMAIN_BASE], ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, [], paired_catalog, 3)
     assert result.active == [_DOMAIN_BASE]
 
 
@@ -246,8 +246,8 @@ def test_resolve_paired_foundation_is_never_displaced_by_the_cap(paired_catalog)
     # cut — pairing was dead code exactly when it mattered. Now the foundation rides in
     # with the top-ranked specific as one unit and the MARGINAL specific is what the cap
     # costs, matching the selector prompt's own tie-break order.
-    decision = SelectionDecision(skill_ids=[_ONE, _TWO, _THREE], ran=True, degraded=False)
-    result = resolve_active_skills(decision, [], paired_catalog, 3)
+    decision = SelectionDecision(runbook_ids=[_ONE, _TWO, _THREE], ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, [], paired_catalog, 3)
     assert result.active == [_ONE, _DOMAIN_BASE, _TWO]
     assert len(result.active) == 3  # the budget is fully used
     assert result.dropped_over_cap == [_THREE]
@@ -257,8 +257,8 @@ def test_resolve_never_evicts_an_active_foundation_mid_workflow(paired_catalog) 
     # A new full selection used to silently evict the already-loaded foundation (and, per
     # the assembler's cache rules, force a full tools+conversation re-encode).
     prior = [_ONE, _DOMAIN_BASE]
-    decision = SelectionDecision(skill_ids=[_ONE, _TWO, _THREE], ran=True, degraded=False)
-    result = resolve_active_skills(decision, prior, paired_catalog, 3)
+    decision = SelectionDecision(runbook_ids=[_ONE, _TWO, _THREE], ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, prior, paired_catalog, 3)
     assert _DOMAIN_BASE in result.active
     assert result.newly_loaded == [_TWO]
 
@@ -271,9 +271,9 @@ def test_resolve_skips_an_unaffordable_unit_and_admits_a_later_one(
     # the last slot. No slot is reserved for a foundation that is then discarded, and no
     # slot is left empty while a candidate could have filled it.
     decision = SelectionDecision(
-        skill_ids=[_ONE, _OTHER_ONE, _TWO], ran=True, degraded=False
+        runbook_ids=[_ONE, _OTHER_ONE, _TWO], ran=True, degraded=False
     )
-    result = resolve_active_skills(decision, [], paired_catalog, 3)
+    result = resolve_active_runbooks(decision, [], paired_catalog, 3)
     assert result.active == [_ONE, _DOMAIN_BASE, _TWO]
     assert result.dropped_over_cap == [_OTHER_ONE]
     assert _OTHER_BASE not in result.active  # never reserved, never orphaned
@@ -283,7 +283,7 @@ def test_resolve_reuse_path_does_not_inject_foundation(paired_catalog) -> None:
     # A continuation round (no selector run) reuses the prior set verbatim — admission
     # must not surface a surprise foundation load mid-workflow.
     decision = SelectionDecision.reuse([_ONE])
-    result = resolve_active_skills(decision, [_ONE], paired_catalog, 3)
+    result = resolve_active_runbooks(decision, [_ONE], paired_catalog, 3)
     assert result.active == [_ONE]
     assert result.newly_loaded == []
 
@@ -292,7 +292,7 @@ def test_resolve_reuse_path_does_not_inject_foundation(paired_catalog) -> None:
 
 # The exact cross-domain selection that broke a proposed "reserve a slot for the
 # foundation" fix: it evicted the third specific AND then dropped the reserved
-# foundation nobody claimed, returning two skills against a budget of three.
+# foundation nobody claimed, returning two runbooks against a budget of three.
 _CROSS_DOMAIN_SELECTION = (
     "daintree.workflow.start-work-on-issue",
     "daintree.agents.ask-and-relay",
@@ -301,7 +301,7 @@ _CROSS_DOMAIN_SELECTION = (
 
 
 def _closure_holds(active: Sequence[str], catalog: Catalog) -> bool:
-    """Every admitted skill's domain foundation is itself admitted."""
+    """Every admitted runbook's domain foundation is itself admitted."""
     return all(
         catalog.domain_foundation(sid) is None or catalog.domain_foundation(sid) in active
         for sid in active
@@ -336,20 +336,20 @@ def test_admission_properties_over_the_real_catalog(catalog, max_active: int) ->
         [],
         [ids[0]],
         [ids[0], ids[0]],
-        ["unknown.skill", *ids[:3]],
+        ["unknown.runbook", *ids[:3]],
         ids[:5],
         ids[-4:],
     ]
     for selection in selections:
-        decision = SelectionDecision(skill_ids=selection, ran=True, degraded=False)
-        active = resolve_active_skills(decision, [], catalog, max_active).active
+        decision = SelectionDecision(runbook_ids=selection, ran=True, degraded=False)
+        active = resolve_active_runbooks(decision, [], catalog, max_active).active
 
         # (a) never over the budget, never duplicated, never unknown.
         assert len(active) <= max_active
         assert len(set(active)) == len(active)
         assert all(sid in catalog for sid in active)
 
-        # (b) every admitted skill's domain foundation is admitted too.
+        # (b) every admitted runbook's domain foundation is admitted too.
         assert _closure_holds(active, catalog), (selection, max_active, active)
 
         # (c) never shorter than it needs to be: nothing that was skipped could
@@ -368,7 +368,7 @@ def test_admission_properties_over_the_real_catalog(catalog, max_active: int) ->
         # distinct foundation in play — what the real catalog does), the admitted
         # count equals the brute-forced optimum. With two or more foundations the
         # top-ranked pick is deliberately kept even when dropping it would fit one
-        # more skill; (c) above is the guarantee that holds in every topology.
+        # more runbook; (c) above is the guarantee that holds in every topology.
         foundations = {
             catalog.domain_foundation(sid)
             for sid in selection
@@ -388,20 +388,20 @@ def test_resolve_cross_domain_selection_never_returns_a_short_set(catalog) -> No
     selection = [sid for sid in _CROSS_DOMAIN_SELECTION if sid in catalog]
     if len(selection) != len(_CROSS_DOMAIN_SELECTION):
         pytest.skip("catalog no longer carries the cross-domain regression ids")
-    decision = SelectionDecision(skill_ids=selection, ran=True, degraded=False)
-    result = resolve_active_skills(decision, [], catalog, 3)
+    decision = SelectionDecision(runbook_ids=selection, ran=True, degraded=False)
+    result = resolve_active_runbooks(decision, [], catalog, 3)
     assert len(result.active) == 3
     assert _closure_holds(result.active, catalog)
     assert result.active[0] == selection[0]  # the top-ranked pick is never sacrificed
 
 
-# ---- resolve_active_skills: CALLER pins (selection.pinned_skill_ids) ----------
+# ---- resolve_active_runbooks: CALLER pins (selection.pinned_runbook_ids) ----------
 #
 # The inversion is the point. The server pin (the docs runbook) takes the LEFTOVER
 # slot because it is the server's own inference off a `docs_query` — a good guess
 # the turn survives losing. A caller pin is not a guess: the caller named the id,
 # so it is admitted FIRST and the selection budgets against what it leaves.
-# `tests/unit/test_pinned_docs_skill.py` holds the other tier and the cross-tier
+# `tests/unit/test_pinned_docs_runbook.py` holds the other tier and the cross-tier
 # regression; these run against the synthetic two-foundation catalog so the
 # admission contract is pinned under any topology.
 
@@ -413,8 +413,8 @@ def test_a_client_pin_is_admitted_before_the_selection(paired_catalog) -> None:
     few for either selector pick, both of which need their own foundation. Under
     the server pin's leftover-slot rule the same turn would resolve the other way
     round, and the pin would be the casualty."""
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[_ONE, _TWO], ran=True, degraded=False),
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[_ONE, _TWO], ran=True, degraded=False),
         [],
         paired_catalog,
         3,
@@ -430,8 +430,8 @@ def test_a_client_pin_is_paired_with_its_domain_foundation(paired_catalog) -> No
     """Paired, unlike the server pin. A runbook loaded without the foundation its
     steps assume is a prompt shape production never produces — which defeats the
     purpose of pinning it to test it."""
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[], ran=True, degraded=False),
         [],
         paired_catalog,
         3,
@@ -443,8 +443,8 @@ def test_a_client_pin_is_paired_with_its_domain_foundation(paired_catalog) -> No
 def test_two_client_pins_sharing_a_foundation_cost_one_slot_each(paired_catalog) -> None:
     """Unit admission already tracks what it admitted, so the second pin's
     foundation is free. Three slots hold two pinned specifics, not one."""
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[], ran=True, degraded=False),
         [],
         paired_catalog,
         3,
@@ -458,8 +458,8 @@ def test_a_client_pin_unit_that_does_not_fit_is_skipped_whole(paired_catalog) ->
     """Pins are atomic units like any other admission — never half a unit. The
     second pin needs a second foundation and there is no room for the pair, so it
     is refused ENTIRELY rather than admitted foundation-less."""
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[], ran=True, degraded=False),
         [],
         paired_catalog,
         3,
@@ -477,8 +477,8 @@ def test_a_pin_the_selector_also_chose_is_admitted_once_at_pin_priority(
 ) -> None:
     """Both tiers want the same id. It must appear once, at the pin's rank — the
     strip is what guarantees that, and without it the id would be admitted twice."""
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[_ONE, _TWO], ran=True, degraded=False),
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[_ONE, _TWO], ran=True, degraded=False),
         [],
         paired_catalog,
         3,
@@ -499,7 +499,7 @@ def test_a_pin_the_cap_refused_cannot_re_enter_via_the_reused_set(paired_catalog
     BARE — the exact unit tier one refused as unaffordable whole.
     """
     prior = [_OTHER_ONE, _OTHER_BASE]
-    result = resolve_active_skills(
+    result = resolve_active_runbooks(
         SelectionDecision.reuse(prior),
         prior,
         paired_catalog,
@@ -515,8 +515,8 @@ def test_a_pin_the_cap_refused_cannot_re_enter_via_the_reused_set(paired_catalog
 def test_a_pin_the_selector_also_chose_is_not_double_reported(paired_catalog) -> None:
     """The authoritative counterpart: an id both tiers want, refused by the cap, is
     recorded once rather than once per tier."""
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[_ONE, _OTHER_ONE], ran=True, degraded=False),
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[_ONE, _OTHER_ONE], ran=True, degraded=False),
         [],
         paired_catalog,
         1,
@@ -531,8 +531,8 @@ def test_pins_apply_on_a_degraded_round_too(paired_catalog) -> None:
     plain continuation, and one a caller pin must survive. The pin was an explicit
     instruction on this round; a classifier that fell over is no reason to drop it."""
     prior = [_ONE, _DOMAIN_BASE]
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[], ran=True, degraded=True),
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[], ran=True, degraded=True),
         prior,
         paired_catalog,
         4,
@@ -547,7 +547,7 @@ def test_pins_that_fill_the_cap_leave_the_reused_set_nothing(paired_catalog) -> 
     minimum cap of 2 a single paired pin consumes the whole budget. The prior set
     must then be dropped cleanly rather than have one more id squeezed in."""
     prior = [_ONE, _DOMAIN_BASE]
-    result = resolve_active_skills(
+    result = resolve_active_runbooks(
         SelectionDecision.reuse(prior),
         prior,
         paired_catalog,
@@ -563,7 +563,7 @@ def test_a_client_pin_applies_on_a_reuse_round_too(paired_catalog) -> None:
     an authoritative round a pin sent mid-turn would silently do nothing. The
     resolver runs on every round, and tier one runs with it."""
     prior = [_ONE, _DOMAIN_BASE]
-    result = resolve_active_skills(
+    result = resolve_active_runbooks(
         SelectionDecision.reuse(prior),
         prior,
         paired_catalog,
@@ -588,7 +588,7 @@ def test_a_reuse_remainder_is_truncated_verbatim_not_re_paired(paired_catalog) -
     The module's third rule ("reuse never re-pairs") stands, and this is what it
     costs."""
     prior = [_ONE, _DOMAIN_BASE]
-    result = resolve_active_skills(
+    result = resolve_active_runbooks(
         SelectionDecision.reuse(prior),
         prior,
         paired_catalog,
@@ -602,9 +602,9 @@ def test_a_reuse_remainder_is_truncated_verbatim_not_re_paired(paired_catalog) -
 def test_an_unknown_client_pin_never_costs_a_slot(paired_catalog) -> None:
     """Skipped silently HERE — the orchestrator owns the warning, because it holds
     the catalog the caller was actually offered. What must not happen is the
-    unknown id consuming budget a real skill could have used."""
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[_ONE], ran=True, degraded=False),
+    unknown id consuming budget a real runbook could have used."""
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[_ONE], ran=True, degraded=False),
         [],
         paired_catalog,
         3,
@@ -617,8 +617,8 @@ def test_duplicate_client_pins_are_collapsed(paired_catalog) -> None:
     """First mention wins, and a repeat is not an error. Asserted because the
     strip is set-based while the drop list is not: a duplicate reaching
     `dropped_over_cap` would be reported twice for one mistake."""
-    result = resolve_active_skills(
-        SelectionDecision(skill_ids=[], ran=True, degraded=False),
+    result = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[], ran=True, degraded=False),
         [],
         paired_catalog,
         3,
@@ -639,8 +639,8 @@ def test_no_pins_leaves_resolution_exactly_as_it_was(paired_catalog) -> None:
     `_OTHER_ONE`'s unit unaffordable and drops it; reuse truncates verbatim.
     """
     prior = [_ONE, _DOMAIN_BASE]
-    authoritative = resolve_active_skills(
-        SelectionDecision(skill_ids=[_TWO, _OTHER_ONE], ran=True, degraded=False),
+    authoritative = resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[_TWO, _OTHER_ONE], ran=True, degraded=False),
         prior,
         paired_catalog,
         3,
@@ -649,7 +649,7 @@ def test_no_pins_leaves_resolution_exactly_as_it_was(paired_catalog) -> None:
     assert authoritative.dropped_over_cap == [_OTHER_ONE]
     assert authoritative.newly_loaded == [_TWO]
 
-    reuse = resolve_active_skills(
+    reuse = resolve_active_runbooks(
         SelectionDecision.reuse([_ONE, _DOMAIN_BASE, _TWO]),
         [_ONE, _DOMAIN_BASE, _TWO],
         paired_catalog,
@@ -659,8 +659,8 @@ def test_no_pins_leaves_resolution_exactly_as_it_was(paired_catalog) -> None:
     assert reuse.dropped_over_cap == [_TWO]
 
     # And the default argument really is inert.
-    assert resolve_active_skills(
-        SelectionDecision(skill_ids=[_TWO, _OTHER_ONE], ran=True, degraded=False),
+    assert resolve_active_runbooks(
+        SelectionDecision(runbook_ids=[_TWO, _OTHER_ONE], ran=True, degraded=False),
         prior,
         paired_catalog,
         3,
@@ -699,11 +699,11 @@ def test_chunk_to_delta_empty_delta_is_none() -> None:
 async def test_stream_meta_is_yielded_before_upstream_open(
     orchestrator: ChatOrchestrator, fake_provider: FakeProvider
 ) -> None:
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
-    fake_provider.selection_result = selection_result([skill_id])
+    runbook_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([runbook_id])
     request = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "stream-session", "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},
@@ -719,8 +719,8 @@ async def test_stream_meta_is_yielded_before_upstream_open(
     assert first.startswith("event: meta\n")
     meta = json.loads(first.split("data: ", 1)[1])
     # The pick, plus whatever domain foundation the catalog pairs with it.
-    assert [skill["id"] for skill in meta["skills"]["newly_loaded"]] == _resolved(
-        orchestrator, [skill_id]
+    assert [runbook["id"] for runbook in meta["runbooks"]["newly_loaded"]] == _resolved(
+        orchestrator, [runbook_id]
     )
     # The generator suspends at the metadata yield. Opening and prefetching the
     # provider cannot begin until the client asks for the next SSE event.
@@ -743,11 +743,11 @@ def _resolved(orchestrator: ChatOrchestrator, selected_ids: list[str]) -> list[s
     moves. Hardcoding it would make the speculation match under test an artifact
     of the fixture rather than of the orchestrator.
     """
-    return resolve_active_skills(
-        SelectionDecision(skill_ids=selected_ids, ran=True, degraded=False),
+    return resolve_active_runbooks(
+        SelectionDecision(runbook_ids=selected_ids, ran=True, degraded=False),
         [],
         orchestrator.catalog,
-        orchestrator.settings.max_active_skills,
+        orchestrator.settings.max_active_runbooks,
     ).active
 
 
@@ -764,14 +764,14 @@ def _stream_request_with_state(
     if state is None:
         state = orchestrator.state_codec.issue(
             session_id=session_id,
-            active_skills=_resolved(orchestrator, active_ids),
+            active_runbooks=_resolved(orchestrator, active_ids),
             catalog_revision=catalog_revision or orchestrator.catalog.revision,
             turn_id=prior_turn_id,
             instruction_revision=0,
         )
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": session_id, "turn_id": turn_id},
             "input": {"messages": [{"role": "user", "content": "next instruction"}]},
             "startup": {},
@@ -831,9 +831,9 @@ def _streamed_content(events: list[str]) -> str:
 # pass by leaving the arithmetic correct over an empty record.
 
 
-def _priced_decision(skill_ids: list[str], cost: float = 0.0004) -> SelectionDecision:
+def _priced_decision(runbook_ids: list[str], cost: float = 0.0004) -> SelectionDecision:
     return SelectionDecision(
-        skill_ids=skill_ids,
+        runbook_ids=runbook_ids,
         ran=True,
         degraded=False,
         usage=ProviderUsage(prompt_tokens=3000, cost=cost),
@@ -858,7 +858,7 @@ async def test_respond_log_reports_the_ids_the_cap_dropped(
     ids = sorted(orchestrator.catalog.known_ids)[:6]
 
     async def select(*args: object, **kwargs: object) -> SelectionDecision:
-        return SelectionDecision(skill_ids=ids, ran=True, degraded=False)
+        return SelectionDecision(runbook_ids=ids, ran=True, degraded=False)
 
     monkeypatch.setattr(orchestrator.selector, "select", select)
     records: list[tuple[str, dict[str, Any]]] = []
@@ -883,7 +883,7 @@ async def test_respond_log_reports_the_ids_the_cap_dropped(
     respond = next(fields for event, fields in records if event == "respond")
     dropped = respond["dropped_over_cap"]
     assert dropped, "a 6-id selection against a cap of 3 must report drops"
-    assert set(dropped).isdisjoint(respond["active_skills"])
+    assert set(dropped).isdisjoint(respond["active_runbooks"])
     assert set(dropped) <= set(ids)
 
 
@@ -952,7 +952,7 @@ def test_cadence_same_turn_does_not_run(orchestrator: ChatOrchestrator) -> None:
 def _turn_request(turn: dict) -> RespondRequest:
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "go"}]},
             "startup": {},
@@ -1008,7 +1008,7 @@ def test_selector_turn_context_empty_digest_adds_nothing() -> None:
 def _basic_stream_request(session_id: str = "hb-session") -> RespondRequest:
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": session_id, "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},
@@ -1024,9 +1024,9 @@ async def test_streaming_complete_returns_before_selection_finishes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The response scaffold (headers) is available while the selector still runs."""
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    runbook_id = sorted(orchestrator.catalog.known_ids)[0]
     started, release = _gate_selector(
-        monkeypatch, orchestrator, SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False)
+        monkeypatch, orchestrator, SelectionDecision(runbook_ids=[runbook_id], ran=True, degraded=False)
     )
 
     outcome = await orchestrator.complete(
@@ -1051,9 +1051,9 @@ async def test_heartbeat_comments_flow_while_selection_is_quiet(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(orchestrator_module, "HEARTBEAT_INTERVAL_SECONDS", 0.02)
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
+    runbook_id = sorted(orchestrator.catalog.known_ids)[0]
     started, release = _gate_selector(
-        monkeypatch, orchestrator, SelectionDecision(skill_ids=[skill_id], ran=True, degraded=False)
+        monkeypatch, orchestrator, SelectionDecision(runbook_ids=[runbook_id], ran=True, degraded=False)
     )
 
     outcome = await orchestrator.complete(
@@ -1256,7 +1256,7 @@ def _intent_stream_request(session_id: str = "bi-session") -> RespondRequest:
     """A streaming turn that offers a tool — the only shape the gate arms for."""
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": session_id, "turn_id": "turn-1"},
             "input": {
                 "messages": [{"role": "user", "content": "read the votes"}],
@@ -1371,7 +1371,7 @@ def _intent_body_request(session_id: str = "bi-body") -> RespondRequest:
     reaches the response body instead of a `done` event."""
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": session_id, "turn_id": "turn-1"},
             "input": {
                 "messages": [{"role": "user", "content": "read the votes"}],
@@ -1787,14 +1787,14 @@ async def test_the_turn_key_reaches_the_log_from_a_real_continuation_round(
     # groupable with the round that did select.
     state = orchestrator.state_codec.issue(
         session_id="sess-cont",
-        active_skills=[],
+        active_runbooks=[],
         catalog_revision=orchestrator.catalog.revision,
         turn_id="turn-cont",
         instruction_revision=0,
     )
     request = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "sess-cont", "turn_id": "turn-cont", "round": 2},
             "input": {"messages": [{"role": "user", "content": "read the votes"}]},
             "startup": {},
@@ -1887,7 +1887,7 @@ def _affinity_request(
         generation["response_format"] = "json_object"
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": session_id, "turn_id": turn_id},
             "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},
@@ -1904,8 +1904,8 @@ async def test_main_call_carries_a_pseudonymous_cache_session_key(
     # it has to reach the wire at all — and it must NOT be the client's own session
     # id, which is opaque local text this server makes no promises about and has no
     # business handing to a third party.
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
-    fake_provider.selection_result = selection_result([skill_id])
+    runbook_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([runbook_id])
     fake_provider.complete_result = make_result(content="done")
 
     request = _affinity_request()
@@ -1933,8 +1933,8 @@ async def test_cache_session_key_is_stable_across_turns_and_unique_per_session(
     # Stability across turns IS the feature: a key that changed per turn would pin
     # nothing. And it must not be shared, or two conversations would be told they
     # are one — herding unrelated prefixes onto a single endpoint.
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
-    fake_provider.selection_result = selection_result([skill_id])
+    runbook_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([runbook_id])
     fake_provider.complete_result = make_result(content="done")
 
     for turn in ("turn-1", "turn-2"):
@@ -2026,7 +2026,7 @@ async def test_json_mode_main_request_reaches_the_wire_with_its_key(
 def _timing_request(*, stream: bool) -> RespondRequest:
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "timing-session", "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},
@@ -2046,8 +2046,8 @@ async def test_nonstreaming_timings_are_measured_not_merely_present(
     cannot be less than any phase it contains. Those orderings are what make the
     block diagnostic rather than decorative.
     """
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
-    fake_provider.selection_result = selection_result([skill_id])
+    runbook_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([runbook_id])
     fake_provider.complete_result = make_result(content="done")
 
     outcome = await orchestrator.complete(
@@ -2079,8 +2079,8 @@ async def test_streaming_timings_ride_the_terminal_event(
     useful and exactly why it cannot know how long generation took. A client
     logging a turn's phases reads the terminal event.
     """
-    skill_id = sorted(orchestrator.catalog.known_ids)[0]
-    fake_provider.selection_result = selection_result([skill_id])
+    runbook_id = sorted(orchestrator.catalog.known_ids)[0]
+    fake_provider.selection_result = selection_result([runbook_id])
     fake_provider.stream_result = FakeStream(make_text_chunks("hello there"))
 
     outcome = await orchestrator.complete(
@@ -2117,7 +2117,7 @@ async def test_a_skipped_selector_reports_no_selection_time(
 
     request = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "timing-session", "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "hey"}]},
             "startup": {},
@@ -2126,7 +2126,7 @@ async def test_a_skipped_selector_reports_no_selection_time(
     )
     outcome = await orchestrator.complete(request, api_key=TEST_API_KEY)
 
-    assert outcome.body["skills"]["selector"]["ran"] is False
+    assert outcome.body["runbooks"]["selector"]["ran"] is False
     assert "selection_ms" not in outcome.body["timings"]
     # ...while the phases that always happen are always reported.
     assert outcome.body["timings"]["total_ms"] >= 0
@@ -2184,7 +2184,7 @@ def _plain_stream_request(session_id: str = "runaway-session") -> RespondRequest
     """A streaming turn offering NO tools — the shape a runaway reply takes."""
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": session_id, "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "say something"}]},
             "startup": {},

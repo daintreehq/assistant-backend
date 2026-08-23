@@ -16,7 +16,7 @@ than failing the whole call.
 
 **It is safe to paste in public.** The bundle is assembled from an explicit
 allowlist of non-sensitive facts, never by serializing settings. It carries no
-prompt text, no skill bodies, no tool schemas, no conversation content, and
+prompt text, no runbook bodies, no tool schemas, no conversation content, and
 nothing derived from the caller's key — not even a prefix or a length. What it
 does carry about the key is a verdict (``valid``/``usable``) obtained by asking
 the provider, which costs no tokens.
@@ -180,21 +180,21 @@ def _catalog_section(container: Any, warnings: list[str]) -> dict[str, Any]:
     """
     if container is None:
         warnings.append("catalog_unavailable")
-        return {"revision": None, "skills": 0, "foundations": 0}
+        return {"revision": None, "runbooks": 0, "foundations": 0}
     try:
         # `container.catalog` reads through the CatalogManager, which the
-        # skill-learning harness can reload underneath us. A doctor must survive
+        # runbook-learning harness can reload underneath us. A doctor must survive
         # whatever it is diagnosing, so even this is not assumed to work.
         catalog = container.catalog
         return {
             "revision": catalog.revision,
-            "skills": len(catalog),
-            "foundations": sum(1 for skill in catalog.skills if skill.meta.foundation),
+            "runbooks": len(catalog),
+            "foundations": sum(1 for runbook in catalog.runbooks if runbook.meta.foundation),
         }
     except Exception:  # noqa: BLE001 — a broken catalog is a finding, not a 500
         logger.warning("doctor_catalog_failed", exc_info=True)
         warnings.append("catalog_unavailable")
-        return {"revision": None, "skills": 0, "foundations": 0}
+        return {"revision": None, "runbooks": 0, "foundations": 0}
 
 
 def _limits_section(settings: Any) -> dict[str, Any]:
@@ -208,7 +208,7 @@ def _limits_section(settings: Any) -> dict[str, Any]:
         return {}
     try:
         return {
-            "max_active_skills": settings.max_active_skills,
+            "max_active_runbooks": settings.max_active_runbooks,
             "max_request_bytes": settings.max_request_bytes,
             "main_timeout_seconds": settings.main_timeout_seconds,
             "selector_timeout_seconds": settings.selector_timeout_seconds,

@@ -1,13 +1,13 @@
-"""No skill may instruct a raw MCP action that has acquired a typed wrapper.
+"""No runbook may instruct a raw MCP action that has acquired a typed wrapper.
 
 The CLI keeps a DENYLIST: raw MCP action name -> the typed wrapper that replaced
 it. Calling a denied action through `daintree.call` does not degrade — it returns
-`USE_TYPED_WRAPPER` and does nothing. So a skill still naming one is a runbook
+`USE_TYPED_WRAPPER` and does nothing. So a runbook still naming one is a runbook
 that asks the user to approve a system-tier call which cannot execute.
 
 This has already happened. `forge.getChecks` was added to the CLI and
-`forge.getCIStatus` denied; four skills went on instructing the raw call across a
-submodule bump, and nothing noticed — `test_skill_catalog_hygiene` checks
+`forge.getCIStatus` denied; four runbooks went on instructing the raw call across a
+submodule bump, and nothing noticed — `test_runbook_catalog_hygiene` checks
 `requiredTools` against the tool-name snapshot, and these were never tools. They
 were MCP actions reached through the generic `daintree.call`, which is itself a
 perfectly valid tool. The gap was structural, not an oversight.
@@ -25,12 +25,12 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SKILLS_DIR = REPO_ROOT / "src" / "daintree_assistant_server" / "skills" / "files"
+RUNBOOKS_DIR = REPO_ROOT / "src" / "daintree_assistant_server" / "runbooks" / "files"
 DISCOVERY_GO = REPO_ROOT / "cli" / "internal" / "tools" / "mcpx" / "discovery.go"
 
-# Skills that NAME a denied action while telling the model not to call it. A
+# Runbooks that NAME a denied action while telling the model not to call it. A
 # warning is the opposite of an instruction and is worth keeping — the learned
-# worktree skill earns its place by explaining exactly which raw call breaks and
+# worktree runbook earns its place by explaining exactly which raw call breaks and
 # how. Listed explicitly so the exemption is a decision someone made, not a
 # pattern that quietly swallows real drift.
 REVIEWED_WARNINGS: set[tuple[str, str]] = set()
@@ -89,7 +89,7 @@ def _denied_actions() -> dict[str, str]:
         f"cannot find `{_MAP_DECL}` in the vendored "
         f"{DISCOVERY_GO.relative_to(REPO_ROOT)}. The CLI changed how it declares the "
         "typed-wrapper denylist, so this gate can no longer read it — which means "
-        "skills naming a superseded raw action would stop being caught."
+        "runbooks naming a superseded raw action would stop being caught."
     )
     block = _go_map_body(source, _MAP_DECL)
     # Keys only. The value is prose naming the replacement — one entry names four
@@ -99,8 +99,8 @@ def _denied_actions() -> dict[str, str]:
     return {name: replacement.strip().strip('"`') for name, replacement in pairs}
 
 
-def _skill_files() -> list[Path]:
-    return sorted(SKILLS_DIR.glob("*.md"))
+def _runbook_files() -> list[Path]:
+    return sorted(RUNBOOKS_DIR.glob("*.md"))
 
 
 # How far after a `daintree.call` the action name can sit and still belong to that
@@ -130,7 +130,7 @@ def _instructs(body: str, action: str) -> bool:
         daintree.call forge.getCIStatus({…})
 
     Bound to a SPAN after each `daintree.call`, not to the file. Searching the
-    whole body for the two halves independently flags a skill that mentions the
+    whole body for the two halves independently flags a runbook that mentions the
     escape hatch in one paragraph and quotes an unrelated `"name"` field in
     another — and a catalog full of false positives gets the gate deleted.
     """
@@ -170,17 +170,17 @@ def test_the_denylist_parses_and_names_the_known_case(denied: dict[str, str]) ->
     assert "forge.getChecks" in denied["forge.getCIStatus"]
 
 
-def test_no_skill_instructs_a_raw_action_that_has_a_typed_wrapper(
+def test_no_runbook_instructs_a_raw_action_that_has_a_typed_wrapper(
     denied: dict[str, str],
 ) -> None:
     """The gate.
 
     Matches the CALL SHAPE — a `"name": "<action>"` payload — rather than a bare
-    mention, because a skill saying "do NOT send this through daintree.call" is
+    mention, because a runbook saying "do NOT send this through daintree.call" is
     doing the right thing and must not be punished for naming what it forbids.
     """
     offenders: list[str] = []
-    for path in _skill_files():
+    for path in _runbook_files():
         body = path.read_text(encoding="utf-8")
         if "daintree.call" not in body:
             continue
@@ -192,7 +192,7 @@ def test_no_skill_instructs_a_raw_action_that_has_a_typed_wrapper(
             offenders.append(f"{path.stem} calls {action} — use {wrapper}")
 
     assert not offenders, (
-        "these skills instruct a raw MCP action the CLI has superseded with a typed "
+        "these runbooks instruct a raw MCP action the CLI has superseded with a typed "
         "wrapper. `daintree.call` returns USE_TYPED_WRAPPER for them and does "
         "nothing, so the runbook asks the user to approve a call that cannot run:\n  "
         + "\n  ".join(offenders)
@@ -200,7 +200,7 @@ def test_no_skill_instructs_a_raw_action_that_has_a_typed_wrapper(
 
 
 def test_the_gate_would_catch_the_drift_it_was_written_for(denied: dict[str, str]) -> None:
-    """A synthetic body in the exact shape four real skills carried, so the check
+    """A synthetic body in the exact shape four real runbooks carried, so the check
     is shown to fire rather than assumed to."""
     body = (
         "1. READ THE STATE. For a PR, CI comes through the raw escape hatch:\n"
@@ -212,7 +212,7 @@ def test_the_gate_would_catch_the_drift_it_was_written_for(denied: dict[str, str
 
 def test_a_warning_against_a_denied_action_is_not_flagged(denied: dict[str, str]) -> None:
     """The negative control, and the reason the check matches a call shape rather
-    than a mention: the skill that documents the trap is the most useful one in
+    than a mention: the runbook that documents the trap is the most useful one in
     the catalog on this subject."""
     body = (
         "Do NOT send this action through `daintree.call`, and do not improvise "

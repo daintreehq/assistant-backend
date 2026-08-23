@@ -87,7 +87,7 @@ def test_stream_open_persistent_error_is_terminal_sse_after_meta(
     fake_provider.selection_result = selection_result([])
     # Tiny Retry-After: the retry helper honors the header as a real wait.
     fake_provider.stream_error = upstream_rate_limited(retry_after="0.05")
-    # Skill metadata commits the stream before provider connection begins. An
+    # Runbook metadata commits the stream before provider connection begins. An
     # exhausted open retry therefore terminates honestly inside SSE.
     with client.stream("POST", URL, headers=auth, json=_stream_body()) as s:
         assert s.status_code == 200

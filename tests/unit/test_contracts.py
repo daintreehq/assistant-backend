@@ -5,10 +5,11 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from daintree_assistant_server import PROTOCOL_VERSION
 from daintree_assistant_server.contracts.daintree_api import (
     RespondRequest,
     RespondResponse,
-    SkillsBlock,
+    RunbooksBlock,
     StreamError,
 )
 from daintree_assistant_server.contracts.errors import ErrorDetail
@@ -26,7 +27,7 @@ from daintree_assistant_server.contracts.tasks import (
 
 def _req(**overrides) -> dict:
     base = {
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": "s", "turn_id": "t"},
         "input": {"messages": [{"role": "user", "content": "hi"}]},
         "startup": {},
@@ -64,7 +65,7 @@ def test_request_parses_multimodal_content() -> None:
 def test_request_requires_session() -> None:
     with pytest.raises(ValidationError):
         RespondRequest.model_validate({
-            "protocol_version": 2,
+            "protocol_version": 3,
             "input": {"messages": [{"role": "user", "content": "x"}]},
             "startup": {},
         })
@@ -227,19 +228,20 @@ def test_open_terminal_rejects_nested_unknown_field() -> None:
         )
 
 
-def test_response_and_skills_block_shape() -> None:
+def test_response_and_runbooks_block_shape() -> None:
     resp = RespondResponse(
         request_id="req_1",
         model="daintree-assistant",
         message={"role": "assistant", "content": "ok"},
         finish_reason="stop",
-        skills=SkillsBlock(),
+        runbooks=RunbooksBlock(),
         catalog_revision="sha256:x",
         prompt_version="main",
     )
     dumped = resp.model_dump(exclude_none=True)
-    assert dumped["protocol_version"] == 2
-    assert dumped["skills"]["active"] == []
+    assert dumped["protocol_version"] == 3
+    assert PROTOCOL_VERSION == 3, "protocol bumped; update this literal deliberately"
+    assert dumped["runbooks"]["active"] == []
     assert dumped["message"]["content"] == "ok"
 
 

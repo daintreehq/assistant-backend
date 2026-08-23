@@ -20,9 +20,9 @@ cases:
 
   - id: cold_work_request
     kind: turn
-    title: Cold work request (first turn, selector must pick skills)
+    title: Cold work request (first turn, selector must pick runbooks)
     # Same cold shape, but the selector has real routing work to do and the winning
-    # skills' bodies are injected into the main prompt. Separates "selector is slow"
+    # runbooks' bodies are injected into the main prompt. Separates "selector is slow"
     # from "selector had nothing to do".
     stream: true
     prime: false

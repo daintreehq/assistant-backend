@@ -19,11 +19,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from daintree_assistant_server.skills.local.candidates import assemble_candidates
+from daintree_assistant_server.runbooks.local.candidates import assemble_candidates
 
 
 def _ids(n: int = 50) -> list[str]:
-    return [f"skill.{i:03d}" for i in range(n)]
+    return [f"runbook.{i:03d}" for i in range(n)]
 
 
 def _sims(n: int = 50) -> np.ndarray:
@@ -74,7 +74,7 @@ def test_a_catalog_smaller_than_k_is_fully_ranked_not_merely_included() -> None:
 
     assert _picked(chosen, ids) == [ids[i] for i in _oracle(sims, 6)]
     # Nothing was displaced, so nothing is flagged reserved even if an active
-    # skill sits at the bottom of the ranking.
+    # runbook sits at the bottom of the ranking.
     assert not chosen.reserved.any()
 
 
@@ -94,10 +94,10 @@ def test_rank_norm_is_scaled_by_k_not_by_the_candidate_count() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_an_active_skill_below_the_shortlist_is_seated_anyway() -> None:
+def test_an_active_runbook_below_the_shortlist_is_seated_anyway() -> None:
     """The defect this module exists for: retrieval misses the open runbook.
 
-    The chosen skill is the catalog's WORST match — the shape of a vague
+    The chosen runbook is the catalog's WORST match — the shape of a vague
     follow-up ("how's that going?") whose words sit nowhere near the runbook
     driving it — and must still reach the head.
     """
@@ -115,7 +115,7 @@ def test_the_reserved_candidate_keeps_its_real_cosine_and_the_weakest_rank() -> 
     ids, sims = _ids(), _sims()
     order = _oracle(sims, len(ids))
     # Not the catalog's worst, and deliberately NOT zero: a bug that zero-fills a
-    # reserved candidate's cosine would pass against a skill whose true score
+    # reserved candidate's cosine would pass against a runbook whose true score
     # happened to be 0.0.
     row = order[40]
     seated = ids[row]
@@ -148,7 +148,7 @@ def test_reservation_displaces_the_weakest_retrieved_candidate() -> None:
     assert chosen - baseline == {seated}
 
 
-def test_an_active_skill_already_retrieved_is_not_flagged_reserved() -> None:
+def test_an_active_runbook_already_retrieved_is_not_flagged_reserved() -> None:
     ids, sims = _ids(), _sims()
     best = ids[_oracle(sims, 1)[0]]
     chosen = assemble_candidates(sims, ids, {best}, 32)
@@ -169,7 +169,7 @@ def test_several_absent_actives_are_all_seated() -> None:
     assert len(chosen) == 32
 
 
-def test_reservation_never_evicts_another_active_skill() -> None:
+def test_reservation_never_evicts_another_active_runbook() -> None:
     """Seating one open runbook must not unseat a different open runbook.
 
     The weakest RETRIEVED candidate is itself active here, so the displacement
@@ -207,7 +207,7 @@ def test_when_every_retrieved_slot_is_active_nothing_is_displaced() -> None:
 def test_when_slots_run_out_the_nearest_actives_win() -> None:
     """Contract, not a reachable state: totality when actives exceed the ballot.
 
-    ``max_active_skills`` has no hard upper bound in ``config.py``, so this is
+    ``max_active_runbooks`` has no hard upper bound in ``config.py``, so this is
     the documented behaviour if it were ever raised past ``k`` — the actives the
     query is nearest are seated, by cosine and not by iteration order.
     """
@@ -263,7 +263,7 @@ def test_a_non_positive_k_returns_an_empty_ballot(k: int) -> None:
 
 
 def test_a_similarity_row_that_does_not_match_the_catalog_raises() -> None:
-    """A wiring bug must not silently rank the wrong skills.
+    """A wiring bug must not silently rank the wrong runbooks.
 
     ``InferencePool.run`` turns this into a degrade-open reuse of the prior
     active set. Returning a ballot built from a mismatched row instead would come
@@ -323,8 +323,8 @@ def test_cosine_and_rank_norm_are_not_the_same_array() -> None:
     assert chosen.cosine is not chosen.rank_norm
 
 
-def test_the_ballot_never_repeats_a_skill() -> None:
-    """A duplicated row would give one skill two votes in the set-wise pass."""
+def test_the_ballot_never_repeats_a_runbook() -> None:
+    """A duplicated row would give one runbook two votes in the set-wise pass."""
     ids, sims = _ids(), _sims()
     order = _oracle(sims, len(ids))
     active = {ids[order[0]], ids[order[31]], ids[order[47]]}
@@ -338,7 +338,7 @@ def test_tied_scores_are_broken_by_table_position() -> None:
 
     numpy's default sort is unstable and may order equal keys differently
     between versions and architectures. The trainer and the server would then
-    hand the same two tied skills different ``rank_norm`` values — a train/serve
+    hand the same two tied runbooks different ``rank_norm`` values — a train/serve
     skew with no error attached. Table position is id order, so it is stable
     across processes; asserted against that rather than against "two calls in
     one process agreed", which unstable sorting also satisfies.

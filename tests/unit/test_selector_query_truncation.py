@@ -28,19 +28,19 @@ from pathlib import Path
 
 import pytest
 
-from benchmarks.skill_selection.cases import load_cases
-from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
-from daintree_assistant_server.skills.local.documents import (
+from benchmarks.runbook_selection.cases import load_cases
+from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+from daintree_assistant_server.runbooks.local.documents import (
     ACTIVE_PREFIX,
     QUERY_HISTORY_CHARS,
     fit_query,
     query_document,
 )
-from daintree_assistant_server.skills.local.setwise import MAX_TOKENS, SetwiseClassifier
+from daintree_assistant_server.runbooks.local.setwise import MAX_TOKENS, SetwiseClassifier
 
 ARTIFACT = (
     Path(__file__).resolve().parents[2]
-    / "src" / "daintree_assistant_server" / "skills" / "local" / "artifacts" / "selector"
+    / "src" / "daintree_assistant_server" / "runbooks" / "local" / "artifacts" / "selector"
 )
 
 pytestmark = pytest.mark.skipif(
@@ -72,7 +72,7 @@ def live():  # type: ignore[no-untyped-def]
     """The real classifier and catalog. Module-scoped — the tokenizers are the
     only expensive part and every test here wants the same ones."""
     clf = SetwiseClassifier(ARTIFACT)
-    return clf, load_catalog(default_skills_dir())
+    return clf, load_catalog(default_runbooks_dir())
 
 
 def _survives(clf: SetwiseClassifier, text: str, needle: str) -> bool:
@@ -183,7 +183,7 @@ def test_an_over_long_message_keeps_BOTH_of_its_ends(live) -> None:  # type: ign
 def test_the_loaded_prefix_is_counted_against_the_cap(live) -> None:  # type: ignore[no-untyped-def]
     """The prefix is prepended downstream, so the fitter has to count it itself.
 
-    Ignoring it would let a three-skill active set push the query back over the
+    Ignoring it would let a three-runbook active set push the query back over the
     cap after the fitter had declared it safe — and the prefix is the only place
     the active set enters the QUERY, so losing its tail is losing the state.
     """

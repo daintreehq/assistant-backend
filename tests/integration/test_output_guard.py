@@ -247,7 +247,7 @@ def test_nonstream_lint_does_not_discard_other_warnings(client, auth, fake_provi
 def test_a_request_reports_its_TOTAL_cost(client, auth, fake_provider) -> None:
     """The headline number: what the whole request charged.
 
-    A turn used to be TWO billed upstream calls — the skill selector and the main
+    A turn used to be TWO billed upstream calls — the runbook selector and the main
     completion — and reporting only the second understated the bill by the part
     nobody could see. Selection is in process now, so a turn is one billed call
     and the total equals it. That makes this test look tautological and it is

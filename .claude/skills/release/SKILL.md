@@ -175,7 +175,7 @@ URL=$(gcloud run services describe daintree-assistant --region=us-central1 \
   --project=daintree-research --format='value(status.url)')
 
 curl -fsS "$URL/health"     # {"status":"ok"}
-curl -fsS "$URL/readyz"     # {"status":"ready","catalog_revision":"...","skills":N}
+curl -fsS "$URL/readyz"     # {"status":"ready","catalog_revision":"...","runbooks":N}
 curl -fsS "$URL/version"    # build_sha must equal $RELEASE_SHA
 ```
 
@@ -199,7 +199,7 @@ gcloud run revisions list --service=daintree-assistant --region=us-central1 \
 ```
 
 A `/readyz` 503 is a configuration failure — a missing or weak secret, a
-malformed prompt template, an unparseable skill file. The response withholds the
+malformed prompt template, an unparseable runbook file. The response withholds the
 reason in production, so read the real error from the logs:
 
 ```bash

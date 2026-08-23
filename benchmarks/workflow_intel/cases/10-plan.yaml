@@ -17,7 +17,7 @@ cases:
         - {name: terminal__awaitAll}
         - {name: fs__read}
         - {name: fs__search}
-      active_skill_ids: [daintree.workflow.start-work-on-issue]
+      active_runbook_ids: [daintree.workflow.start-work-on-issue]
     expect:
       max_nodes: 20
       next_action_grounded: true
@@ -32,7 +32,7 @@ cases:
         - {name: agentTask__spawnForEdits}
         - {name: terminal__awaitAll}
         - {name: terminal__read}
-      active_skill_ids: [daintree.orchestration.competition, daintree.foundation]
+      active_runbook_ids: [daintree.orchestration.competition, daintree.foundation]
     expect:
       max_nodes: 20
       next_action_grounded: true

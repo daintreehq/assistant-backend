@@ -1,9 +1,9 @@
-"""The respond orchestrator: selection cadence, prompt assembly, skill metadata,
+"""The respond orchestrator: selection cadence, prompt assembly, runbook metadata,
 and immediate metadata streaming.
 
-It coordinates state verification, the skill selector, the prompt assembler, and
+It coordinates state verification, the runbook selector, the prompt assembler, and
 the provider, producing a native Daintree response (non-streaming body, or a
-named-event SSE stream) with skills as a first-class block. The protocol is
+named-event SSE stream) with runbooks as a first-class block. The protocol is
 Daintree-owned — not OpenAI-compatible — though DeepSeek is still spoken in the
 OpenAI wire shape *upstream*, behind the provider abstraction.
 """
@@ -20,14 +20,14 @@ from typing import Any
 from pydantic import SecretStr
 
 from .. import PROTOCOL_VERSION
-from ..config import DOCS_SKILL_ID, PUBLIC_MODEL_ID, SERVING_MODEL, Settings
+from ..config import DOCS_RUNBOOK_ID, PUBLIC_MODEL_ID, SERVING_MODEL, Settings
 from ..contracts.daintree_api import (
     CompactionBlock,
     CompactionSpan,
     RespondMessage,
     RespondRequest,
     RespondResponse,
-    SkillsBlock,
+    RunbooksBlock,
     StreamCompaction,
     StreamDelta,
     StreamDone,
@@ -39,9 +39,9 @@ from ..contracts.daintree_api import (
 )
 from ..contracts.extensions import (
     Prelude,
+    RunbookRef,
     SelectorMeta,
     SelectorUsage,
-    SkillRef,
 )
 from ..contracts.openai import ChatMessage
 from ..errors import (
@@ -55,16 +55,16 @@ from ..observability import get_logger, new_call_id, new_request_id
 from ..prompts.loader import MAIN_PROMPT_VERSION
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderStream, ProviderUsage
 from ..providers.retry import retry_upstream
-from ..skills.active_set import (
-    merge_active_skills,
-    resolve_active_skills,
+from ..runbooks.active_set import (
+    merge_active_runbooks,
+    resolve_active_runbooks,
 )
-from ..skills.catalog import Catalog, CatalogManager
-from ..skills.decision import SelectionDecision
-from ..skills.fast_path import can_skip_selection
-from ..skills.load_events import SkillLoadExecution
-from ..skills.local.selector import SkillSelector
-from ..skills.tool_projection import (
+from ..runbooks.catalog import Catalog, CatalogManager
+from ..runbooks.decision import SelectionDecision
+from ..runbooks.fast_path import can_skip_selection
+from ..runbooks.load_events import RunbookLoadExecution
+from ..runbooks.local.selector import RunbookSelector
+from ..runbooks.tool_projection import (
     REASON_DISABLED,
     REASON_FILTER_ERROR,
     REASON_INVENTORY_MISMATCH,
@@ -170,15 +170,15 @@ _BARE_INTENT_NUDGE: dict[str, Any] = {
 
 @dataclass
 class _RespondMeta:
-    """The computed skill/state outcome shared by streaming and non-streaming."""
+    """The computed runbook/state outcome shared by streaming and non-streaming."""
 
     request_id: str
     state: str
     catalog_revision: str
     prompt_version: str
-    skills: SkillsBlock
+    runbooks: RunbooksBlock
     warnings: list[str] = field(default_factory=list)
-    # Whether `skills.selector.usage.cost` accounts for every selector call this
+    # Whether `runbooks.selector.usage.cost` accounts for every selector call this
     # turn made. A malformed selection is repaired with a SECOND billed call, and
     # if only one of the two reported, the summed figure is short. Internal
     # rather than a wire field: `cost.complete` is the single flag a client is
@@ -196,7 +196,7 @@ class _RespondMeta:
     # `respond` line, same request_id) is what says the ratio blends two calls.
     selector_endpoint: str | None = None
     # The selector's usage as the PROVIDER reported it, kept beside the wire
-    # projection in `skills.selector.usage` rather than instead of it. The wire
+    # projection in `runbooks.selector.usage` rather than instead of it. The wire
     # model floors every count to 0 for the client, which cannot express "not
     # reported" — and a cache ratio computed off that floor would claim a
     # stone-cold prefix on a call that simply never counted its hits.
@@ -385,8 +385,8 @@ def _full_tool_names(request: RespondRequest) -> list[str]:
     """Every tool name the request carries, UNCAPPED.
 
     The complete inventory is what `Catalog.executable_with` has to see: it asks
-    "does the caller hold every tool this skill declares", and a truncated view
-    answers "no" for a skill whose last required tool happened to be listed late.
+    "does the caller hold every tool this runbook declares", and a truncated view
+    answers "no" for a runbook whose last required tool happened to be listed late.
     Tool ORDER would then decide the menu, which is neither intended nor stable.
     """
     return [tool.function.name for tool in (request.input.tools or [])]
@@ -398,7 +398,7 @@ class ChatOrchestrator:
         *,
         settings: Settings,
         catalog_manager: CatalogManager,
-        selector: SkillSelector,
+        selector: RunbookSelector,
         state_codec: StateCodec,
         assembler: PromptAssembler,
         provider: ChatProvider,
@@ -479,7 +479,7 @@ class ChatOrchestrator:
 
         `outside_proposed` names the calls the projection would have withheld. It
         is THE promotion gate, and the admission reasons say which rule should
-        have covered a miss — almost always a skill whose `requiredTools` is
+        have covered a miss — almost always a runbook whose `requiredTools` is
         incomplete, which is a metadata fix rather than a design flaw.
 
         **Read it from SHADOW traffic when deciding to promote.** Under
@@ -589,7 +589,7 @@ class ChatOrchestrator:
 
         The cap exists to keep the selector's user message small. Do NOT use this
         for anything that must be COMPLETE: a request may legally carry up to
-        `max_tools` (128) entries, so a skill whose last required tool sits at
+        `max_tools` (128) entries, so a runbook whose last required tool sits at
         position 101 would look unsatisfiable. Use `_full_tool_names` for filtering.
         """
         return _full_tool_names(request)[:cap]
@@ -764,7 +764,7 @@ class ChatOrchestrator:
         )
         if lint_warnings:
             # Appended to the turn's existing warnings rather than replacing
-            # them: a reply can be both over-wide AND have had an unknown skill
+            # them: a reply can be both over-wide AND have had an unknown runbook
             # id ignored, and dropping either loses a distinct diagnosis.
             prepared.meta.warnings.extend(lint_warnings)
         turn_cost = self._turn_cost_for(result.usage, prepared)
@@ -781,7 +781,7 @@ class ChatOrchestrator:
             # same value and the count is 1; with one they may differ, which is
             # the whole signal.
             observed_endpoints=(first_endpoint, result.endpoint),
-            selector_ran=prepared.meta.skills.selector.ran,
+            selector_ran=prepared.meta.runbooks.selector.ran,
             selector_usage=prepared.meta.selector_usage,
             selector_endpoint=prepared.meta.selector_endpoint,
             turn_cost=turn_cost,
@@ -811,7 +811,7 @@ class ChatOrchestrator:
         api_key: SecretStr | None,
         budget: RequestBudget | None = None,
     ) -> _PreparedTurn:
-        """Validate, decode state, select skills and assemble — under a deadline.
+        """Validate, decode state, select runbooks and assemble — under a deadline.
 
         Everything here happens BEFORE the user has seen anything, so a stall is
         pure dead air. Bounding it separately from the rest of the turn also
@@ -901,7 +901,7 @@ class ChatOrchestrator:
         if request.state and not verification.valid and verification.reason:
             warnings.append(verification.reason)
 
-        # Only a fully valid token carries prior active skills forward; an
+        # Only a fully valid token carries prior active runbooks forward; an
         # invalid/expired/wrong-session token is ignored (selection reruns).
         prior_active_ids: list[str] = []
         # The documentation query this TURN already ran, if the turn is still
@@ -928,20 +928,20 @@ class ChatOrchestrator:
         #
         # It CLEARS rather than reuses, which is what separates it from an
         # ordinary skipped-selector round: the turn has no task, so carrying a
-        # workflow skill into it would keep a finished workflow loaded. That is
+        # workflow runbook into it would keep a finished workflow loaded. That is
         # also exactly what the selector is instructed to return here.
         #
         # `selection.force` and `policy == "always"` still win — a client asking
         # for selection gets selection.
-        # A sub-agent selects skills too — that is the point of giving it a real
+        # A sub-agent selects runbooks too — that is the point of giving it a real
         # tool inventory — but it chooses from a NARROWED menu.
         #
         # Most of this catalog is orchestration: spawning agents, driving
         # worktrees, supervising terminals. Handing one of those to a read-only
         # worker is worse than handing it nothing, because it spends context and
         # then instructs the model toward calls that can only fail. So the menu is
-        # filtered to skills whose declared `requiredTools` the caller actually
-        # holds (Catalog.executable_with), which also means a research-shaped skill
+        # filtered to runbooks whose declared `requiredTools` the caller actually
+        # holds (Catalog.executable_with), which also means a research-shaped runbook
         # written tomorrow becomes available to sub-agents the day it lands, with
         # no second list to maintain.
         #
@@ -955,7 +955,7 @@ class ChatOrchestrator:
         selection_catalog = catalog_at_start
         if subagent:
             selection_catalog = catalog_at_start.executable_with(available_tools)
-            # `selectable`, not `filter_known`: a server-pinned skill is hidden from
+            # `selectable`, not `filter_known`: a server-pinned runbook is hidden from
             # selection but still "known", and the docs runbook declares no required
             # tools so it survives every narrowing. Without this, a caller replaying
             # an assistant turn's signed state under profile="subagent" would carry
@@ -966,8 +966,8 @@ class ChatOrchestrator:
             logger.info(
                 "subagent_selection_menu",
                 request_id=request_id,
-                offered_skills=len(selection_catalog),
-                catalog_skills=len(catalog_at_start),
+                offered_runbooks=len(selection_catalog),
+                catalog_runbooks=len(catalog_at_start),
             )
 
         no_task = not subagent and can_skip_selection(request, prior_active_ids=prior_active_ids)
@@ -1028,8 +1028,8 @@ class ChatOrchestrator:
             timings.selection_ms = selector_ms
         elif no_task:
             # CLEAR, not reuse. A greeting or acknowledgement has no task, so a
-            # workflow skill left loaded would follow a finished workflow into an
-            # unrelated conversation — and `resolve_active_skills` treats an
+            # workflow runbook left loaded would follow a finished workflow into an
+            # unrelated conversation — and `resolve_active_runbooks` treats an
             # authoritative empty result as "clear", which is exactly what the
             # selector itself is told to return for these turns.
             decision = SelectionDecision.cleared()
@@ -1041,10 +1041,10 @@ class ChatOrchestrator:
         # no-run continuation round or a degraded selector reuses the prior set.
         # Pin one post-selection catalog snapshot for active resolution, prompt,
         # state, and metadata. If the catalog were reloaded during selection,
-        # the prompt renders against the same skills the state token records.
+        # the prompt renders against the same runbooks the state token records.
         resolved_catalog = self.catalog
         # Resolution and body lookup follow the same NARROWING the decision was made
-        # under, so a sub-agent can never end up holding a skill that was not on its
+        # under, so a sub-agent can never end up holding a runbook that was not on its
         # menu.
         #
         # Derived from `resolved_catalog` (the post-selection snapshot), NOT from
@@ -1072,7 +1072,7 @@ class ChatOrchestrator:
         # future caller reuses one sub-agent session across differing inventories,
         # the fix is to fold the profile and a normalized menu digest into the
         # selection identity — not to stamp the derived revision.
-        skills_catalog = (
+        runbooks_catalog = (
             resolved_catalog.executable_with(available_tools) if subagent else resolved_catalog
         )
 
@@ -1101,7 +1101,7 @@ class ChatOrchestrator:
         # Caller pins (section 7.9). Partitioned against TWO catalogs, because
         # "unknown" and "not yours" are different mistakes and a developer chasing a
         # pin that did not load needs to know which one they made: `resolved_catalog`
-        # is every skill that exists, `skills_catalog` is the menu this profile may
+        # is every runbook that exists, `runbooks_catalog` is the menu this profile may
         # execute. A sub-agent pinning a real orchestration runbook it holds no tools
         # for is the second case, and it is refused rather than admitted — a pin
         # overrides the CLASSIFIER's judgement, not the capability boundary, and a
@@ -1112,20 +1112,20 @@ class ChatOrchestrator:
         # is quadratic work on an n the caller chooses — synchronous, on the request
         # path, where no timeout can interrupt it. Linear here means the request
         # body's own byte ceiling is the only bound the field needs.
-        requested_pins = list(dict.fromkeys(request.selection.pinned_skill_ids))
-        eligible_pins = [sid for sid in requested_pins if sid in skills_catalog]
+        requested_pins = list(dict.fromkeys(request.selection.pinned_runbook_ids))
+        eligible_pins = [sid for sid in requested_pins if sid in runbooks_catalog]
         if any(sid not in resolved_catalog for sid in requested_pins):
-            # Same code the explicit `/skills/resolve` load path emits — one typo'd
+            # Same code the explicit `/runbooks/resolve` load path emits — one typo'd
             # id, one meaning. Ids are deliberately NOT interpolated into the string:
             # every warning in this protocol is a stable code the CLI matches on.
-            warnings.append("unknown_skill_id_ignored")
-        if any(sid in resolved_catalog and sid not in skills_catalog for sid in requested_pins):
-            warnings.append("pinned_skill_not_executable")
+            warnings.append("unknown_runbook_id_ignored")
+        if any(sid in resolved_catalog and sid not in runbooks_catalog for sid in requested_pins):
+            warnings.append("pinned_runbook_not_executable")
 
-        resolution = resolve_active_skills(
+        resolution = resolve_active_runbooks(
             decision,
             prior_active_ids,
-            skills_catalog,
+            runbooks_catalog,
             # A tighter cap for a sub-agent. It works to a hard round budget in a
             # context it will exhaust on tool results, so two 5k-token runbooks
             # would cost it more than they buy — and a narrowed menu rarely has a
@@ -1133,35 +1133,35 @@ class ChatOrchestrator:
             # NOTE: this caps RESOLUTION only; the selectors still render and parse
             # against the global cap. The outcome is correct either way (resolution
             # drops the excess), and the cost is at most one over-broad
-            # classification against a menu that is currently 2 skills wide. If the
+            # classification against a menu that is currently 2 runbooks wide. If the
             # sub-agent menu ever grows enough for that to matter, thread a
             # max_active override alongside the catalog override into both selectors.
-            min(self.settings.max_active_skills, 2)
+            min(self.settings.max_active_runbooks, 2)
             if subagent
-            else self.settings.max_active_skills,
+            else self.settings.max_active_runbooks,
             # Pinned on the CLASSIFICATION, not on the lookup succeeding. The
             # runbook's job includes what to do when no pages arrive — say so
             # and answer unverified rather than fabricate — and that is exactly
             # the turn where a fabricated menu path is most likely.
-            pinned_id=DOCS_SKILL_ID if docs_query else None,
+            pinned_id=DOCS_RUNBOOK_ID if docs_query else None,
             client_pinned_ids=eligible_pins,
         )
         active_ids = resolution.active
         newly_loaded_ids = resolution.newly_loaded
         # `dropped_over_cap` is log-only for everything else, deliberately: nobody
-        # ASKED for the skills the cap refused, so there is nothing to answer for.
+        # ASKED for the runbooks the cap refused, so there is nothing to answer for.
         # A caller pin is the exception — it is a request, and a refused request
         # that returns a normal-looking turn is precisely the silent failure this
         # feature would otherwise be debugged into. Pins are admitted first, so
         # reaching here at all means the pins alone did not fit the cap.
         if any(sid in eligible_pins for sid in resolution.dropped_over_cap):
-            warnings.append("pinned_skill_over_cap")
+            warnings.append("pinned_runbook_over_cap")
 
-        skills = skills_catalog.get_many(active_ids)
-        executions: list[SkillLoadExecution | DocsSearchExecution] = [
-            SkillLoadExecution.from_skill(
+        runbooks = runbooks_catalog.get_many(active_ids)
+        executions: list[RunbookLoadExecution | DocsSearchExecution] = [
+            RunbookLoadExecution.from_runbook(
                 new_call_id(),
-                skills_catalog.get(sid),  # type: ignore[arg-type]
+                runbooks_catalog.get(sid),  # type: ignore[arg-type]
             )
             for sid in newly_loaded_ids
         ]
@@ -1196,7 +1196,7 @@ class ChatOrchestrator:
 
         new_state = self.state_codec.issue(
             session_id=session_id,
-            active_skills=[s.id for s in skills],
+            active_runbooks=[s.id for s in runbooks],
             catalog_revision=resolved_catalog.revision,
             turn_id=request.session.turn_id,
             instruction_revision=request.session.instruction_revision,
@@ -1211,7 +1211,7 @@ class ChatOrchestrator:
 
         assembled, segments = self.assembler.build_main_request_with_segments(
             request=request,
-            skills=skills,
+            runbooks=runbooks,
             upstream_model=SERVING_MODEL,
             docs=docs,
         )
@@ -1248,12 +1248,12 @@ class ChatOrchestrator:
             try:
                 computed = project_tools(
                     offered=request.input.tools,
-                    active_skills=skills,
+                    active_runbooks=runbooks,
                     # The catalog the caller actually selected from. With the full one, a
                     # foundation filtered OUT of a sub-agent's menu is rediscovered here
                     # and its tools counted as proposed — understating `outside_proposed`,
                     # which is the one metric this measurement exists to produce.
-                    catalog=skills_catalog,
+                    catalog=runbooks_catalog,
                     messages=request.input.messages,
                     forced_tool=forced_tool,
                 )
@@ -1379,14 +1379,14 @@ class ChatOrchestrator:
             stream=request.generation.stream,
             selector_ran=decision.ran,
             selector_degraded=decision.degraded,
-            active_skills=active_ids,
+            active_runbooks=active_ids,
             newly_loaded=newly_loaded_ids,
-            # Ids the ``max_active_skills`` budget refused. Log-only on purpose: it
-            # is the measurement we need (is the cap costing us skills, and which?)
+            # Ids the ``max_active_runbooks`` budget refused. Log-only on purpose: it
+            # is the measurement we need (is the cap costing us runbooks, and which?)
             # at zero wire cost, without teaching the CLI a new warning code.
             dropped_over_cap=resolution.dropped_over_cap,
-            # Which skills the CALLER demanded, after the unknown/not-executable
-            # partition. Logged separately from `active_skills` because it is the
+            # Which runbooks the CALLER demanded, after the unknown/not-executable
+            # partition. Logged separately from `active_runbooks` because it is the
             # only way to tell a turn the classifier routed from one a developer
             # steered by hand — and routing metrics should not count the latter.
             client_pinned=eligible_pins,
@@ -1443,7 +1443,7 @@ class ChatOrchestrator:
             # turn and was read only on the refusal path, so the one request that
             # never needs attributing was the only one that got it.
             **(context.log_fields() if context is not None else {}),
-            # The in-process render cache for loaded-skill blocks. Cumulative per
+            # The in-process render cache for loaded-runbook blocks. Cumulative per
             # process, which is what a rate wants; `entries` and `chars` are here
             # because the 64-entry bound was a guess and nothing has ever reported
             # whether it binds.
@@ -1554,7 +1554,7 @@ class ChatOrchestrator:
 
     # Output-contract findings, as stable codes the CLI can branch on. Prefixed so
     # they are distinguishable at a glance from the request-level warnings
-    # (``unknown_skill_id_ignored``) that share the same list on the non-streaming
+    # (``unknown_runbook_id_ignored``) that share the same list on the non-streaming
     # path.
     _LINT_WARNING_CODES = {
         "think_leak": "output_think_leak",
@@ -1735,7 +1735,7 @@ class ChatOrchestrator:
         turn_id: str | None = None,
         instruction_revision: int = 0,
         query: str | None = None,
-        skill_ids: list[str] | None = None,
+        runbook_ids: list[str] | None = None,
         request_id: str | None = None,
     ) -> dict[str, Any]:
         request_id = request_id or new_request_id()
@@ -1750,17 +1750,17 @@ class ChatOrchestrator:
 
         run_selector = False
         if action == "clear":
-            decision = SelectionDecision(skill_ids=[], ran=False, degraded=False)
+            decision = SelectionDecision(runbook_ids=[], ran=False, degraded=False)
             active_ids: list[str] = []
             newly_loaded_ids: list[str] = []
         elif action == "load":
-            requested = skill_ids or []
+            requested = runbook_ids or []
             valid = self.catalog.filter_known(requested)
             if len(valid) != len(requested):
-                warnings.append("unknown_skill_id_ignored")
-            decision = SelectionDecision(skill_ids=valid, ran=False, degraded=False)
-            merged = merge_active_skills(
-                valid, prior_active_ids, self.catalog, self.settings.max_active_skills
+                warnings.append("unknown_runbook_id_ignored")
+            decision = SelectionDecision(runbook_ids=valid, ran=False, degraded=False)
+            merged = merge_active_runbooks(
+                valid, prior_active_ids, self.catalog, self.settings.max_active_runbooks
             )
             active_ids, newly_loaded_ids = merged.active, merged.newly_loaded
         elif action == "find":
@@ -1769,8 +1769,8 @@ class ChatOrchestrator:
             decision = await self.selector.select(conversation, prior_active_ids, api_key=api_key)
             warnings.extend(decision.warnings)
             # A find re-selects: the selector result is authoritative, same as a turn.
-            found = resolve_active_skills(
-                decision, prior_active_ids, self.catalog, self.settings.max_active_skills
+            found = resolve_active_runbooks(
+                decision, prior_active_ids, self.catalog, self.settings.max_active_runbooks
             )
             active_ids, newly_loaded_ids = found.active, found.newly_loaded
         else:
@@ -1781,14 +1781,14 @@ class ChatOrchestrator:
                 param="action",
             )
 
-        skills = self.catalog.get_many(active_ids)
+        runbooks = self.catalog.get_many(active_ids)
         executions = [
-            SkillLoadExecution.from_skill(new_call_id(), self.catalog.get(sid))  # type: ignore[arg-type]
+            RunbookLoadExecution.from_runbook(new_call_id(), self.catalog.get(sid))  # type: ignore[arg-type]
             for sid in newly_loaded_ids
         ]
         new_state = self.state_codec.issue(
             session_id=session_id,
-            active_skills=[s.id for s in skills],
+            active_runbooks=[s.id for s in runbooks],
             catalog_revision=self.catalog.revision,
             turn_id=turn_id,
             instruction_revision=instruction_revision,
@@ -1808,7 +1808,7 @@ class ChatOrchestrator:
             "state": meta.state,
             "catalog_revision": meta.catalog_revision,
             "prompt_version": meta.prompt_version,
-            "skills": meta.skills.model_dump(exclude_none=True),
+            "runbooks": meta.runbooks.model_dump(exclude_none=True),
             "warnings": meta.warnings,
         }
 
@@ -1822,12 +1822,12 @@ class ChatOrchestrator:
         active_ids: list[str],
         newly_loaded_ids: list[str],
         # Both kinds of server-run "tool call" the CLI renders as a prelude: a
-        # skill that loaded, and a documentation search that answered a usage
+        # runbook that loaded, and a documentation search that answered a usage
         # question. They share the channel because they are the same thing from
         # the client's side — work the server did before the model spoke.
-        # Sequence, not list: a caller with only skill loads should not have to
+        # Sequence, not list: a caller with only runbook loads should not have to
         # widen its own list to hand it over.
-        executions: Sequence[SkillLoadExecution | DocsSearchExecution],
+        executions: Sequence[RunbookLoadExecution | DocsSearchExecution],
         decision: SelectionDecision,
         run_selector: bool,
         warnings: list[str],
@@ -1835,12 +1835,12 @@ class ChatOrchestrator:
     ) -> _RespondMeta:
         selected_catalog = catalog or self.catalog
 
-        def refs(ids: list[str]) -> list[SkillRef]:
-            out: list[SkillRef] = []
+        def refs(ids: list[str]) -> list[RunbookRef]:
+            out: list[RunbookRef] = []
             for sid in ids:
-                skill = selected_catalog.get(sid)
-                if skill is not None:
-                    out.append(SkillRef(**skill.ref()))
+                runbook = selected_catalog.get(sid)
+                if runbook is not None:
+                    out.append(RunbookRef(**runbook.ref()))
             return out
 
         selector_usage = None
@@ -1856,7 +1856,7 @@ class ChatOrchestrator:
 
         reason = decision.reason if self.settings.expose_debug_selector_reason else None
 
-        skills = SkillsBlock(
+        runbooks = RunbooksBlock(
             active=refs(active_ids),
             newly_loaded=refs(newly_loaded_ids),
             prelude=Prelude(tool_executions=[e.prelude_execution() for e in executions]),
@@ -1874,7 +1874,7 @@ class ChatOrchestrator:
             state=state,
             catalog_revision=selected_catalog.revision,
             prompt_version=MAIN_PROMPT_VERSION,
-            skills=skills,
+            runbooks=runbooks,
             warnings=warnings,
             selector_cost_complete=(
                 decision.usage.cost_complete if decision.usage is not None else True
@@ -1912,7 +1912,7 @@ class ChatOrchestrator:
             usage=response_usage(result.usage),
             cost=cost,
             timings=timings or TurnTimings(),
-            skills=meta.skills,
+            runbooks=meta.runbooks,
             state=meta.state,
             catalog_revision=meta.catalog_revision,
             prompt_version=meta.prompt_version,
@@ -2221,7 +2221,7 @@ class ChatOrchestrator:
         fallback: tuple[list[StreamDelta], str | None, str] | None = None
         try:
             # The metadata event is always first, before any token: the client gets
-            # the skill prelude, active set, refreshed state, and selector outcome
+            # the runbook prelude, active set, refreshed state, and selector outcome
             # as soon as selection finishes — local selection is ~10ms, so this
             # arrives effectively immediately, well before the upstream opens.
             yield self._sse(
@@ -2229,7 +2229,7 @@ class ChatOrchestrator:
                 StreamMeta(
                     request_id=meta.request_id,
                     model=PUBLIC_MODEL_ID,
-                    skills=meta.skills,
+                    runbooks=meta.runbooks,
                     state=meta.state,
                     catalog_revision=meta.catalog_revision,
                     prompt_version=meta.prompt_version,
@@ -2280,7 +2280,7 @@ class ChatOrchestrator:
                 # Phase timing for the round's remaining "dead air": upstream
                 # open-to-first-event. It dominates on cache misses (prefill) and on
                 # thinking-heavy rounds (reasoning precedes the event), but no longer
-                # delays the already-emitted skill metadata. Measured from t_open —
+                # delays the already-emitted runbook metadata. Measured from t_open —
                 # a PHASE duration, matching the wire contract — not from request
                 # start; preparation already owns everything before this point.
                 if timings.upstream_open_ms is None:
@@ -2636,7 +2636,7 @@ class ChatOrchestrator:
                 finish_reason=finish_reason,
                 endpoint=main_endpoint,
                 observed_endpoints=main_endpoints,
-                selector_ran=meta.skills.selector.ran,
+                selector_ran=meta.runbooks.selector.ran,
                 selector_usage=meta.selector_usage,
                 selector_endpoint=meta.selector_endpoint,
                 turn_cost=turn_cost(final_usage, meta, complete=abandoned_opens == 0),
@@ -3059,7 +3059,7 @@ class ChatOrchestrator:
     ) -> Any:
         """One re-roll of a non-streaming round that announced an action and took none.
 
-        Mirrors the selector's repair posture (``skills/selector.py`` ``_run``):
+        Mirrors the selector's repair posture (``runbooks/selector.py`` ``_run``):
         detect the bad shape, re-ask ONCE with a corrective message, then accept
         whatever comes back — there is never a third attempt, and an upstream
         failure fails open to the reply already in hand. Nothing has reached the

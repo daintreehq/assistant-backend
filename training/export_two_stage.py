@@ -12,7 +12,7 @@ Three graphs and a table come out of here:
     vectors.npz                    both encoders' vectors for the build catalog
 
 ``vectors.npz`` is a CACHE, not a contract. Serving re-derives it from the live
-catalog on load and re-embeds any skill whose document digest has moved, so a
+catalog on load and re-embeds any runbook whose document digest has moved, so a
 catalog that has drifted since the build costs a few milliseconds of embedding
 rather than the degrade-open window the old fixed head required. Shipping it
 means the common case — catalog unchanged since build — starts instantly.
@@ -45,7 +45,7 @@ from training.setwise_model import (  # noqa: E402
 
 MODELS = ROOT / "training" / "models"
 ARTIFACTS = (
-    ROOT / "src" / "daintree_assistant_server" / "skills" / "local" / "artifacts"
+    ROOT / "src" / "daintree_assistant_server" / "runbooks" / "local" / "artifacts"
 )
 
 
@@ -93,7 +93,7 @@ def _export_encoder(
     # ids, returned a materially different embedding on x86 than on arm64
     # (component 3 of the pooled vector: 0.066 vs 0.251), which collapsed the
     # head's calibration and drove the cardinality argmax to 0 — the selector
-    # returned NO skills for every request, while /health and /readyz stayed
+    # returned NO runbooks for every request, while /health and /readyz stayed
     # green. The parity gate below compares int8 against fp32 on whichever
     # machine exports, so it is structurally blind to this. Keep the flag.
     quantize_dynamic(
@@ -145,8 +145,8 @@ def main() -> int:
 
     print(f"stage 1: {r_meta['base_model']}  stage 2: {meta['base_model']}")
     # Serving applies ONE document cap to both encoders (they embed the same
-    # skill document), so the two stages must have been trained under the same
-    # one. Trained at 384 and served at 192, the skill vectors would silently
+    # runbook document), so the two stages must have been trained under the same
+    # one. Trained at 384 and served at 192, the runbook vectors would silently
     # lose the whenToUse exclusion clauses — which are the routing signal.
     assert r_meta["doc_max_length"] == meta["doc_max_length"], (
         f"stage 1 trained with doc_max_length={r_meta['doc_max_length']} but "
@@ -203,7 +203,7 @@ def main() -> int:
         sample,
         str(out / "head.onnx"),
         input_names=["query", "candidates", "features", "mask"],
-        output_names=["skill_logits", "docs_logit", "cardinality_logits"],
+        output_names=["runbook_logits", "docs_logit", "cardinality_logits"],
         opset_version=17,
         do_constant_folding=True,
         dynamo=False,
@@ -212,7 +212,7 @@ def main() -> int:
     import onnxruntime as ort
 
     with torch.no_grad():
-        ref_skill, ref_docs, ref_card = head(*sample)
+        ref_runbook, ref_docs, ref_card = head(*sample)
     got = ort.InferenceSession(
         str(out / "head.onnx"), providers=["CPUExecutionProvider"]
     ).run(
@@ -225,7 +225,7 @@ def main() -> int:
         },
     )
     head_delta = max(
-        float(np.abs(got[0] - ref_skill.numpy()).max()),
+        float(np.abs(got[0] - ref_runbook.numpy()).max()),
         float(np.abs(got[1] - ref_docs.numpy()).max()),
         float(np.abs(got[2] - ref_card.numpy()).max()),
     )
@@ -245,16 +245,16 @@ def main() -> int:
     )
 
     # ---- the vector table, built through the SHIPPED code path -------------
-    from daintree_assistant_server.skills.catalog import (
-        default_skills_dir,
+    from daintree_assistant_server.runbooks.catalog import (
+        default_runbooks_dir,
         load_catalog,
     )
-    from daintree_assistant_server.skills.local.setwise import (
+    from daintree_assistant_server.runbooks.local.setwise import (
         SetwiseClassifier,
         save_table,
     )
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     # Built by ``sync`` rather than by a private loop here, so the vectors that
     # ship are produced by exactly the function that will refresh them at
     # runtime. A separate build path is how a build-time index and a
@@ -262,11 +262,11 @@ def main() -> int:
     clf = SetwiseClassifier(out, quantized=True)
     table = clf.sync(catalog)
     save_table(out / "vectors.npz", table)
-    print(f"  embedded {len(table.ids)} skills into vectors.npz")
+    print(f"  embedded {len(table.ids)} runbooks into vectors.npz")
 
     # ---- parity: DECISIONS over the whole benchmark ------------------------
-    from benchmarks.skill_selection.cases import load_cases
-    from daintree_assistant_server.skills.local.documents import (
+    from benchmarks.runbook_selection.cases import load_cases
+    from daintree_assistant_server.runbooks.local.documents import (
         last_user_text,
         query_document,
     )
@@ -285,7 +285,7 @@ def main() -> int:
             # that on the bare last user message via a second pass; omitting it
             # here would compare two artifacts on a code path neither ships.
             sel = clf_local.select(q, active, docs_query=last_user_text(case.messages))
-            result.append((tuple(sel.skill_ids), sel.docs_wanted))
+            result.append((tuple(sel.runbook_ids), sel.docs_wanted))
         return result
 
     d_fp32 = decisions(False)
@@ -301,7 +301,7 @@ def main() -> int:
         return n
 
     # Two tiers, matching the old export's posture. CORE decisions — the
-    # top-ranked skill, whether the answer is empty, the docs verdict — must be
+    # top-ranked runbook, whether the answer is empty, the docs verdict — must be
     # near-identical: a quantisation that changes those changed the model.
     # Bonus-margin extras flipping around BONUS_FLOOR are expected int8 noise,
     # so the secondary gate is outcome parity.
@@ -334,7 +334,7 @@ def main() -> int:
     }
     print(f"\nexported to {final}")
     print(f"  sizes (MB): {sizes}")
-    print(f"  shortlist k={k}  ordering={meta['ordering']}  skills={len(labels)}")
+    print(f"  shortlist k={k}  ordering={meta['ordering']}  runbooks={len(labels)}")
     return 0
 
 

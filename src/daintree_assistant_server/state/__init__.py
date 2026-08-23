@@ -1,1 +1,1 @@
-"""Stateless, signed skill-state token codec."""
+"""Stateless, signed runbook-state token codec."""

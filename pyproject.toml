@@ -27,7 +27,7 @@ dependencies = [
     "jinja2>=3.1.0",
     "structlog>=24.1.0",
     "pyyaml>=6.0.0",
-    # Local skill selection. These three, and deliberately nothing else — no
+    # Local runbook selection. These three, and deliberately nothing else — no
     # torch, no transformers, no sentence-transformers. The training stack is
     # ~2GB and lives in .venv-train; what ships is an ONNX graph, a tokenizer
     # vocabulary and the numpy needed to take a dot product against the index.
@@ -61,22 +61,22 @@ daintree_assistant_server = [
     "prompts/main/subagent/*.md",
     "prompts/main/*.j2",
     "prompts/tasks/*.md",
-    "skills/files/*.md",
-    # The local two-stage skill selector — the SHIPPED selector. Both encoders
+    "runbooks/files/*.md",
+    # The local two-stage runbook selector — the SHIPPED selector. Both encoders
     # ship int8 only: fp32 is gitignored and exists locally so the export can
     # measure what quantisation costs. The head is fp32 (~10MB) because it is
     # 1% of the parameters and quantising it would trade numerical slack for
     # memory nobody is short of. vectors.npz is a build-time CACHE of the
     # catalog's embeddings — serving re-derives it from the live catalog, so a
     # stale copy costs milliseconds, not correctness.
-    "skills/local/artifacts/selector/meta.json",
-    "skills/local/artifacts/selector/labels.json",
-    "skills/local/artifacts/selector/head.onnx",
-    "skills/local/artifacts/selector/vectors.npz",
-    "skills/local/artifacts/selector/retriever/model_int8.onnx",
-    "skills/local/artifacts/selector/retriever/tokenizer*.json",
-    "skills/local/artifacts/selector/ranking/model_int8.onnx",
-    "skills/local/artifacts/selector/ranking/tokenizer*.json",
+    "runbooks/local/artifacts/selector/meta.json",
+    "runbooks/local/artifacts/selector/labels.json",
+    "runbooks/local/artifacts/selector/head.onnx",
+    "runbooks/local/artifacts/selector/vectors.npz",
+    "runbooks/local/artifacts/selector/retriever/model_int8.onnx",
+    "runbooks/local/artifacts/selector/retriever/tokenizer*.json",
+    "runbooks/local/artifacts/selector/ranking/model_int8.onnx",
+    "runbooks/local/artifacts/selector/ranking/tokenizer*.json",
 ]
 
 [tool.ruff]
@@ -112,7 +112,7 @@ ignore = [
 # model (there is no credential to spend and no endpoint to route to) and are
 # deliberately accepted and ignored. Same reasoning as the global ARG001 ignore
 # above, which already exempts the plain-function form of this.
-"src/daintree_assistant_server/skills/local/selector.py" = ["ARG002"]
+"src/daintree_assistant_server/runbooks/local/selector.py" = ["ARG002"]
 "tests/**/*.py" = [
     "ARG001",
     "ARG002",

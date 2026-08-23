@@ -163,7 +163,7 @@ def _build_request(case: dict[str, Any], payload: str, i: int) -> RespondRequest
     elif carrier == "async_operation":
         turn["async_operations"] = [payload]
     payload_dict: dict[str, Any] = {
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": f"inj-{case['id']}-{i}", "turn_id": f"t-{i}"},
         # Send the real tool inventory (production always does), so a tool-hijack
         # payload CAN formally call the forbidden tool — otherwise that grading

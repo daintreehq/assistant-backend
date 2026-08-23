@@ -3,17 +3,17 @@
 The server ran a documentation search on the user's behalf, before the model
 said a word. From the CLI's side that is indistinguishable from a tool call it
 would have executed itself — so it is rendered as one, using the same
-``daintree.prelude.tool_executions`` channel a skill load already rides.
+``daintree.prelude.tool_executions`` channel a runbook load already rides.
 
 This is presentation, not protocol: the CLI never executes the call, and the
 main model is never shown it as a tool call either (the retrieved pages reach it
-as plain context in the injected tail, the same way skill bodies reach it as a
+as plain context in the injected tail, the same way runbook bodies reach it as a
 framed user-role block).
 
 **And the presentation does not currently happen.** The intent was honesty in the
 transcript — the user seeing that their question was answered from the docs, and
 which query found them, rather than watching the assistant produce cited pages
-from nowhere. The CLI decodes `skills.prelude` and renders nothing:
+from nowhere. The CLI decodes `runbooks.prelude` and renders nothing:
 `internal/backend/contracts.go` calls the whole block "vestigial metadata the
 client neither replays nor renders", left in place pending a coordinated
 server-side drop. So today this costs a few hundred bytes on the wire and buys
@@ -48,7 +48,7 @@ from ..contracts.extensions import (
 # NOTE it is deliberately NOT in `validation.RESERVED_TOOL_NAMES`. A client
 # offering a real tool by this name would give the model two routes to the same
 # answer, which `/capabilities` tells clients not to do — but rejecting the
-# request outright is a stricter contract than the skill tools need, and no
+# request outright is a stricter contract than the runbook tools need, and no
 # current client sends it.
 DOCS_SEARCH_WIRE_NAME = "docs__search"
 DOCS_SEARCH_DISPLAY_NAME = "docs.search"

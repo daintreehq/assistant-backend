@@ -19,11 +19,11 @@ python -m benchmarks.microperf.bench report results/<run>.json
    (`.main` — FastAPI, providers, services, the module-level app) in a **fresh
    subprocess** per run, so import cost is real rather than module-cache-warm. Then,
    in-process, `build_container(settings)` — which validates every prompt and loads
-   the skill catalog during construction. Together these bound the instance-boot
+   the runbook catalog during construction. Together these bound the instance-boot
    part of a Cloud Run cold start.
 2. **Catalog build + determinism.** `load_catalog()` latency, and a check that two
    builds produce the identical `revision` hash — prompt-cache identity and
-   skill-state validation both ride that determinism.
+   runbook-state validation both ride that determinism.
 3. **State-codec throughput.** `StateCodec.issue()` / `verify()` ops/sec over a
    fixed key/salt. Every `/respond` verifies the inbound token and issues a fresh
    one, so this is a per-request floor component (HMAC + canonical JSON + pydantic).
@@ -51,7 +51,7 @@ python -m benchmarks.microperf.bench report results/<run>.json
   input-order- or environment-dependent and cache identity is broken.
 - `p99_inflation_ratio` grows roughly with K on a single event loop (CPU work
   serializes); a jump at fixed K is the regression signal, not the absolute value.
-- The suite forces `SKILL_LEARNING_MODE=off` and configures logging at WARNING so
+- The suite forces `RUNBOOK_LEARNING_MODE=off` and configures logging at WARNING so
   background learning passes and INFO log rendering never contaminate the probe.
 
 Results land in `results/` (gitignored); the JSON document (`meta` + `summary` +

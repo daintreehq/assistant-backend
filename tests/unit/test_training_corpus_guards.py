@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from benchmarks.skill_selection.cases import load_cases
-from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
+from benchmarks.runbook_selection.cases import load_cases
+from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS = REPO_ROOT / "training" / "data" / "selection.jsonl"
@@ -35,7 +35,7 @@ def _norm(text: str) -> str:
 
 def _benchmark_strings() -> set[str]:
     out: set[str] = set()
-    for case in load_cases(load_catalog(default_skills_dir())):
+    for case in load_cases(load_catalog(default_runbooks_dir())):
         for msg in case.messages:
             if isinstance(msg.content, str):
                 out.add(_norm(msg.content))
@@ -109,7 +109,7 @@ def test_a_benchmark_greeting_never_collides_with_a_corpus_greeting() -> None:
 # Shortcut cross-tabs.
 #
 # The docs head learned "is anything in the context?" instead of "is this a
-# documentation question?" — 5/120 recall on docs turns with a skill loaded —
+# documentation question?" — 5/120 recall on docs turns with a runbook loaded —
 # because the corpus made context a lossless negative signal and the benchmark
 # shared the assumption. It cost a live outage of documentation lookup and a
 # workaround that still runs today: a whole second pass over the bare question,
@@ -176,7 +176,7 @@ def test_the_active_set_remains_a_KNOWN_shortcut_and_does_not_worsen() -> None:
     """The half that was NOT repaired, ratcheted at its current size.
 
     Measured on today's corpus: a documentation positive is 17.58x rarer on a row
-    with an active skill (0.358%, 7 of 1,956) than without (6.293%, 492 of
+    with an active runbook (0.358%, 7 of 1,956) than without (6.293%, 492 of
     7,818). That is the same shape as the history shortcut on the other axis, and
     it is why the bare-question second pass in ``setwise.py`` is still
     load-bearing rather than a historical note — with only seven active-bearing
@@ -189,7 +189,7 @@ def test_the_active_set_remains_a_KNOWN_shortcut_and_does_not_worsen() -> None:
     regression.
 
     Closing it is corpus work — docs questions asked mid-workflow, with one and
-    two skills loaded (`training/EXPERIMENTS.md`). Until someone does it, this is
+    two runbooks loaded (`training/EXPERIMENTS.md`). Until someone does it, this is
     the record of how far there is to go.
     """
     rows = _corpus_rows()
@@ -211,14 +211,14 @@ def test_the_active_set_remains_a_KNOWN_shortcut_and_does_not_worsen() -> None:
 
 
 @pytest.mark.skipif(not CORPUS.is_file(), reason="training corpus not present")
-def test_the_active_set_does_not_predict_how_many_skills_a_turn_needs() -> None:
+def test_the_active_set_does_not_predict_how_many_runbooks_a_turn_needs() -> None:
     """The cardinality head reads the same rows; it must not learn the same trick.
 
     A corpus where "something is loaded" implied a particular count would give it
     a lossless shortcut of exactly the kind the docs head took — and cardinality
     is the more damaging place for one, because a wrong count of zero drops every
-    skill the turn scored, however confidently (see the reserved-candidate sweep
-    in ``skills/local/candidates.py``).
+    runbook the turn scored, however confidently (see the reserved-candidate sweep
+    in ``runbooks/local/candidates.py``).
 
     Compared as DISTRIBUTIONS. An earlier version put independent floors on each
     side and never compared them, which a corpus of 98% zero-count active rows
@@ -244,8 +244,8 @@ def test_the_active_set_does_not_predict_how_many_skills_a_turn_needs() -> None:
 
     # And class 3 is a KNOWN hole rather than a covered case: 14 rows without an
     # active set, 0 with. Left as a note rather than a failure because three
-    # skills is already at `max_active_skills` and the combination may simply not
+    # runbooks is already at `max_active_runbooks` and the combination may simply not
     # arise — but recorded, so it is a decision rather than an oversight.
     assert shares[True][3] == 0.0 and shares[False][3] > 0.0, (
-        "three-skill coverage has moved; decide whether active rows now need it"
+        "three-runbook coverage has moved; decide whether active rows now need it"
     )

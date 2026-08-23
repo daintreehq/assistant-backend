@@ -1,4 +1,4 @@
-"""Unit tests for local (in-process) skill selection.
+"""Unit tests for local (in-process) runbook selection.
 
 Deliberately split by what needs a model and what does not. The document
 rendering, the selector's decision rules and the worker pool are pure logic and
@@ -17,13 +17,13 @@ from typing import Any
 import numpy as np
 import pytest
 
-from daintree_assistant_server.skills.local.documents import (
+from daintree_assistant_server.runbooks.local.documents import (
     query_document,
-    skill_document,
+    runbook_document,
     split_when_to_use,
 )
-from daintree_assistant_server.skills.local.runtime import InferencePool
-from daintree_assistant_server.skills.local.setwise import SetwiseClassifier, admit
+from daintree_assistant_server.runbooks.local.runtime import InferencePool
+from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier, admit
 
 
 @dataclass
@@ -62,15 +62,15 @@ def test_split_when_to_use_without_exclusions_returns_empty_tail() -> None:
 
 def test_short_variant_excludes_the_exclusion_clause() -> None:
     """The compact renderings drop the routing clauses; `full` keeps them."""
-    meta = _Meta("x", "Title", "Summary.", "Use for A. Do not use for B — use the B skill.")
-    assert "Do not use" not in skill_document(meta, variant="short")
-    assert "Do not use" not in skill_document(meta, variant="trigger")
-    assert "Do not use" in skill_document(meta, variant="full")
+    meta = _Meta("x", "Title", "Summary.", "Use for A. Do not use for B — use the B runbook.")
+    assert "Do not use" not in runbook_document(meta, variant="short")
+    assert "Do not use" not in runbook_document(meta, variant="trigger")
+    assert "Do not use" in runbook_document(meta, variant="full")
 
 
 def test_unknown_document_variant_raises() -> None:
-    with pytest.raises(ValueError, match="unknown skill document variant"):
-        skill_document(_Meta("x", "T", "S", "W"), variant="nope")
+    with pytest.raises(ValueError, match="unknown runbook document variant"):
+        runbook_document(_Meta("x", "T", "S", "W"), variant="nope")
 
 
 def test_query_document_always_admits_the_newest_message() -> None:
@@ -115,7 +115,7 @@ def test_admit_takes_the_cardinality_count_in_rank_order() -> None:
 
 
 def test_admit_zero_count_returns_empty_and_no_bonus_fires() -> None:
-    """The bonus never turns an empty answer into a loaded skill —
+    """The bonus never turns an empty answer into a loaded runbook —
     polluting a no-task turn is how loading noise becomes the norm."""
     ranked = [("a", 0.9), ("b", 0.6)]
     assert admit(ranked, set(), 0, 3) == []
@@ -123,7 +123,7 @@ def test_admit_zero_count_returns_empty_and_no_bonus_fires() -> None:
 
 def test_admit_rejected_newcomer_does_not_consume_the_slot() -> None:
     """Cardinality says one; rank 1 is a filtered newcomer; rank 2 is the
-    active skill. The scan must continue to rank 2 instead of returning an
+    active runbook. The scan must continue to rank 2 instead of returning an
     authoritative empty set that evicts a live workflow."""
     ranked = [("newcomer", 0.60), ("running", 0.55)]
     assert admit(ranked, {"running"}, 1, 3) == ["running"]
@@ -168,14 +168,14 @@ def test_admit_bonus_stops_at_the_first_below_floor_score() -> None:
     assert admit(ranked, set(), 1, 3) == ["a"]
 
 
-def test_admit_bonus_does_not_readmit_an_active_skill_below_the_floor() -> None:
+def test_admit_bonus_does_not_readmit_an_active_runbook_below_the_floor() -> None:
     """The bonus floor applies to EVERY candidate, active ones included.
 
     The rule the code comment calls load-bearing: the bonus exists to rescue a
-    near-miss RANKING, not to re-admit a skill the model scored below a coin flip
+    near-miss RANKING, not to re-admit a runbook the model scored below a coin flip
     just because it used to be loaded. The sibling below-floor test drives this
     with nothing active, so it would still pass a refactor that exempted active
-    skills from the floor — which is exactly the drift this pins.
+    runbooks from the floor — which is exactly the drift this pins.
     """
     ranked = [("newcomer", 0.9), ("stale", SetwiseClassifier.BONUS_FLOOR - 0.01)]
     assert admit(ranked, {"stale"}, 1, 3) == ["newcomer"]
@@ -203,7 +203,7 @@ def test_admit_floors_are_inclusive_at_their_exact_boundary() -> None:
 
 def test_admit_bonus_newcomer_still_owes_the_higher_floor() -> None:
     """A score BETWEEN the two floors clears the bonus floor but not the
-    newcomer floor: a newcomer at it stays out, an ACTIVE skill at it rides."""
+    newcomer floor: a newcomer at it stays out, an ACTIVE runbook at it rides."""
     between = (
         SetwiseClassifier.BONUS_FLOOR + SetwiseClassifier.NEWCOMER_FLOOR_WHEN_ACTIVE
     ) / 2
@@ -227,9 +227,9 @@ def test_admit_respects_max_active_over_count() -> None:
 class _StubClassifier:
     """Duck-typed SetwiseClassifier: fixed answer, recorded inputs."""
 
-    def __init__(self, skill_ids: list[str] | None = None,
+    def __init__(self, runbook_ids: list[str] | None = None,
                  docs: bool = False, fail: bool = False) -> None:
-        self._ids = skill_ids if skill_ids is not None else ["daintree.terminals.rename"]
+        self._ids = runbook_ids if runbook_ids is not None else ["daintree.terminals.rename"]
         self._docs = docs
         self._fail = fail
         self.calls: list[tuple[str, list[str]]] = []
@@ -237,7 +237,7 @@ class _StubClassifier:
         #: passes the SNAPSHOT it validated against and not a re-read of live state.
         self.catalogs: list[object] = []
         #: Every docs_query handed to select(). The docs decision is taken on a
-        #: DIFFERENT string from the skill decision, and a test that cannot see
+        #: DIFFERENT string from the runbook decision, and a test that cannot see
         #: which string arrived cannot tell the two apart.
         self.docs_queries: list[str | None] = []
         #: What the stub should report as force-included, for the telemetry test.
@@ -258,15 +258,15 @@ class _StubClassifier:
         self.calls.append((query, list(active_ids)))
         self.catalogs.append(catalog)
         self.docs_queries.append(docs_query)
-        from daintree_assistant_server.skills.local.setwise import Selection
+        from daintree_assistant_server.runbooks.local.setwise import Selection
 
-        return Selection(skill_ids=list(self._ids), docs_wanted=self._docs,
+        return Selection(runbook_ids=list(self._ids), docs_wanted=self._docs,
                          cardinality=len(self._ids),
                          scores=dict.fromkeys(self._ids, 0.9),
                          reserved_ids=self.reserved)
 
 
-class _StubSkill:
+class _StubRunbook:
     def __init__(self, sid: str) -> None:
         self.meta = _Meta(sid, f"Title {sid}", "Summary.", "Use when X.")
 
@@ -274,7 +274,7 @@ class _StubSkill:
 class _StubCatalog:
     def __init__(self, selectable: set[str]) -> None:
         self.selectable_ids = selectable
-        self.skills = [_StubSkill(sid) for sid in sorted(selectable)]
+        self.runbooks = [_StubRunbook(sid) for sid in sorted(selectable)]
 
 
 class _StubManager:
@@ -283,11 +283,11 @@ class _StubManager:
 
 
 class _StubSettings:
-    max_active_skills = 3
+    max_active_runbooks = 3
 
 
 def _local_selector(classifier: _StubClassifier):
-    from daintree_assistant_server.skills.local.selector import LocalSelector
+    from daintree_assistant_server.runbooks.local.selector import LocalSelector
 
     catalog = _StubCatalog({"daintree.terminals.rename", "daintree.foundation"})
     pool = InferencePool(workers=1, queue_depth=2, timeout_seconds=5.0)
@@ -299,7 +299,7 @@ def test_local_selector_returns_the_classifier_answer() -> None:
         clf = _StubClassifier()
         sel, pool = _local_selector(clf)
         decision = await sel.select([_Msg("user", "rename my terminals")], [])
-        assert decision.skill_ids == ["daintree.terminals.rename"]
+        assert decision.runbook_ids == ["daintree.terminals.rename"]
         assert decision.ran and decision.authoritative and not decision.degraded
         assert decision.endpoint == "local"
         pool.close()
@@ -310,16 +310,16 @@ def test_local_selector_returns_the_classifier_answer() -> None:
 def test_local_selector_serves_a_catalog_the_artifact_never_saw() -> None:
     """A changed catalog is answered, not degraded — the architecture's point.
 
-    The previous selector owned one weight row per skill, so it had to compare a
+    The previous selector owned one weight row per runbook, so it had to compare a
     stamped routing revision and degrade every turn open until a human
-    retrained. This one reads skill EMBEDDINGS, so an unfamiliar catalog is just
+    retrained. This one reads runbook EMBEDDINGS, so an unfamiliar catalog is just
     unfamiliar vectors: it is passed through to the model and answered.
     """
 
     async def go() -> None:
         clf = _StubClassifier()
         sel, pool = _local_selector(clf)
-        decision = await sel.select([_Msg("user", "rename my terminals")], ["prior.skill"])
+        decision = await sel.select([_Msg("user", "rename my terminals")], ["prior.runbook"])
         assert not decision.degraded
         assert decision.ran and decision.authoritative
         assert clf.calls, "the model must be consulted for an unfamiliar catalog"
@@ -348,7 +348,7 @@ def test_local_selector_fails_open_when_the_model_raises() -> None:
         sel, pool = _local_selector(clf)
         decision = await sel.select([_Msg("user", "rename my terminals")], [])
         assert decision.degraded
-        assert decision.warnings == ["local_skill_selector_failed_open"]
+        assert decision.warnings == ["local_runbook_selector_failed_open"]
         pool.close()
 
     asyncio.run(go())
@@ -360,7 +360,7 @@ def test_local_selector_background_wake_keeps_the_active_set() -> None:
         sel, pool = _local_selector(clf)
         convo = [_Msg("user", "watch it"), _Msg("assistant", "watcher armed, ending turn")]
         decision = await sel.select(convo, ["daintree.foundation"])
-        assert decision.skill_ids == ["daintree.foundation"]
+        assert decision.runbook_ids == ["daintree.foundation"]
         assert decision.task_type == "background_wake"
         assert clf.calls == [], "a wake has no new instruction to classify"
         pool.close()
@@ -370,10 +370,10 @@ def test_local_selector_background_wake_keeps_the_active_set() -> None:
 
 def test_local_selector_filters_ids_the_live_catalog_does_not_have() -> None:
     async def go() -> None:
-        clf = _StubClassifier(skill_ids=["daintree.terminals.rename", "skill.ghost"])
+        clf = _StubClassifier(runbook_ids=["daintree.terminals.rename", "runbook.ghost"])
         sel, pool = _local_selector(clf)
         decision = await sel.select([_Msg("user", "rename")], [])
-        assert decision.skill_ids == ["daintree.terminals.rename"]
+        assert decision.runbook_ids == ["daintree.terminals.rename"]
         pool.close()
 
     asyncio.run(go())
@@ -383,11 +383,11 @@ def test_local_selector_degrades_when_no_named_id_resolves() -> None:
     """Named-but-unresolvable is a mismatch, not an authoritative clear."""
 
     async def go() -> None:
-        clf = _StubClassifier(skill_ids=["skill.ghost", "skill.phantom"])
+        clf = _StubClassifier(runbook_ids=["runbook.ghost", "runbook.phantom"])
         sel, pool = _local_selector(clf)
         decision = await sel.select([_Msg("user", "rename")], ["daintree.foundation"])
         assert decision.degraded
-        assert decision.warnings == ["local_skill_selector_unknown_ids"]
+        assert decision.warnings == ["local_runbook_selector_unknown_ids"]
         pool.close()
 
     asyncio.run(go())
@@ -417,7 +417,7 @@ def test_local_selector_logs_a_reservation_without_conversation_text(caplog) -> 
     """The one number worth watching as the catalog grows, and nothing else.
 
     Reservation firing is how often the pre-reservation ballot would have been
-    evicting a live workflow, so it is logged — but skill ids only. This
+    evicting a live workflow, so it is logged — but runbook ids only. This
     codebase never logs user text, and a selector log line is one of the easier
     places to leak it by accident.
     """
@@ -447,7 +447,7 @@ def test_local_selector_does_not_log_when_nothing_was_reserved() -> None:
 
         clf = _StubClassifier()
         sel, pool = _local_selector(clf)
-        logger = logging.getLogger("daintree_assistant_server.skills.local.selector")
+        logger = logging.getLogger("daintree_assistant_server.runbooks.local.selector")
         seen: list[str] = []
         handler = logging.Handler()
         handler.emit = lambda record: seen.append(record.getMessage())  # type: ignore[method-assign]
@@ -481,7 +481,7 @@ def test_local_selector_docs_query_is_the_cleaned_last_user_message() -> None:
 
 _ARTIFACT = (
     Path(__file__).resolve().parents[2]
-    / "src/daintree_assistant_server/skills/local/artifacts/selector"
+    / "src/daintree_assistant_server/runbooks/local/artifacts/selector"
 )
 
 
@@ -498,27 +498,27 @@ def _artifact_present() -> bool:
 
 
 def _live_selector():  # type: ignore[no-untyped-def]
-    from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
-    from daintree_assistant_server.skills.local.setwise import SetwiseClassifier
+    from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+    from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     clf = SetwiseClassifier(_ARTIFACT)
     clf.sync(catalog)
     return clf, catalog
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
-def test_shipped_classifier_selects_a_plausible_skill() -> None:
+def test_shipped_classifier_selects_a_plausible_runbook() -> None:
     clf, _ = _live_selector()
     sel = clf.select("rename my terminals so i can tell the agents apart", [])
-    assert "daintree.terminals.rename" in sel.skill_ids
+    assert "daintree.terminals.rename" in sel.runbook_ids
     assert 0 < sel.cardinality <= 3
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
 def test_shipped_classifier_returns_empty_on_chatter() -> None:
     clf, _ = _live_selector()
-    assert clf.select("thanks, that's perfect", []).skill_ids == []
+    assert clf.select("thanks, that's perfect", []).runbook_ids == []
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
@@ -527,7 +527,7 @@ def test_shipped_table_covers_exactly_the_selectable_catalog() -> None:
 
     Asserted anyway because the ids in it are what the selector may return, and
     a table built from a stale ``vectors.npz`` that ``sync`` failed to reconcile
-    would offer skills the catalog cannot load.
+    would offer runbooks the catalog cannot load.
     """
     clf, catalog = _live_selector()
     table = clf.table
@@ -536,26 +536,26 @@ def test_shipped_table_covers_exactly_the_selectable_catalog() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
-def test_a_skill_added_after_training_is_routable_without_retraining() -> None:
+def test_a_runbook_added_after_training_is_routable_without_retraining() -> None:
     """The property the whole two-stage design exists for.
 
-    A skill the artifact has never seen — no weight row, no training row, not in
+    A runbook the artifact has never seen — no weight row, no training row, not in
     ``vectors.npz`` — is embedded on ``sync`` and can win a turn. Under the
     previous fixed-head selector this was structurally impossible: there was no
     output for it, and the routing-revision gate degraded every turn open until
     someone retrained.
 
-    Note what this does and does not pin. The invented skill is deliberately
+    Note what this does and does not pin. The invented runbook is deliberately
     UNCONTESTED — nothing else in the catalog claims credential rotation — which
-    is the case zero-shot routing actually handles. Measured against skills that
+    is the case zero-shot routing actually handles. Measured against runbooks that
     share vocabulary with a trained neighbour it is much weaker (4/14 vs 13/14;
     training/EXPERIMENTS.md), so this asserts "reachable", never "as good as
     trained".
     """
-    from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
-    from daintree_assistant_server.skills.local.setwise import SetwiseClassifier
+    from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+    from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     clf = SetwiseClassifier(_ARTIFACT)
     before = clf.sync(catalog)
     invented = "daintree.secrets.rotate-credentials"
@@ -563,11 +563,11 @@ def test_a_skill_added_after_training_is_routable_without_retraining() -> None:
 
     # Deliberately IN-DOMAIN and unclaimed. An off-domain invention (the first
     # draft of this test used piano tuning) tests the wrong thing: the
-    # cardinality head would rightly answer "this turn needs no skill", and the
+    # cardinality head would rightly answer "this turn needs no runbook", and the
     # test would fail for a correct reason.
     grown = _CatalogPlusOne(
         catalog,
-        _StubSkill2(
+        _StubRunbook2(
             invented,
             "Rotate service credentials",
             "Rotate, revoke and reissue API keys and tokens for a service, then "
@@ -584,23 +584,23 @@ def test_a_skill_added_after_training_is_routable_without_retraining() -> None:
         [],
         catalog=grown,
     )
-    assert invented in sel.skill_ids
+    assert invented in sel.runbook_ids
     # And every other vector was REUSED rather than recomputed: the digest keys
-    # the row to the document it was built from, so a one-skill change costs one
+    # the row to the document it was built from, so a one-runbook change costs one
     # embedding, not a full rebuild.
     kept = [sid for sid in before.ids if sid in after.ids]
     for sid in kept:
         assert before.digests[sid] == after.digests[sid]
 
 
-class _StubSkill2:
+class _StubRunbook2:
     def __init__(self, sid: str, title: str, summary: str, when: str) -> None:
         self.id = sid
         self.meta = _Meta(sid, title, summary, when)
 
 
 class _CatalogPlusOne:
-    """The live catalog with one extra skill, as a catalog-shaped duck type."""
+    """The live catalog with one extra runbook, as a catalog-shaped duck type."""
 
     def __init__(self, base, extra) -> None:  # type: ignore[no-untyped-def]
         self._base = base
@@ -637,10 +637,10 @@ class _CatalogPlusOne:
         ),
     ],
 )
-def test_shipped_classifier_routes_each_new_mcp_skill(query: str, expected: str) -> None:
-    """Every shipped skill must be reachable from a representative request."""
+def test_shipped_classifier_routes_each_new_mcp_runbook(query: str, expected: str) -> None:
+    """Every shipped runbook must be reachable from a representative request."""
     clf, _ = _live_selector()
-    assert expected in clf.select(query, []).skill_ids
+    assert expected in clf.select(query, []).runbook_ids
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
@@ -661,10 +661,10 @@ def test_shipped_classifier_routes_each_new_mcp_skill(query: str, expected: str)
         ),
     ],
 )
-def test_shipped_classifier_respects_new_skill_boundaries(query: str, excluded: str) -> None:
+def test_shipped_classifier_respects_new_runbook_boundaries(query: str, excluded: str) -> None:
     """Broad MCP runbooks must not displace their common read-only/local neighbours."""
     clf, _ = _live_selector()
-    assert excluded not in clf.select(query, []).skill_ids
+    assert excluded not in clf.select(query, []).runbook_ids
 
 
 # --------------------------------------------------------------------------
@@ -738,11 +738,11 @@ def test_pool_rejects_when_every_admission_slot_is_taken() -> None:
 
 
 # --------------------------------------------------------------------------
-# The docs decision reads a different string from the skill decision
+# The docs decision reads a different string from the runbook decision
 # --------------------------------------------------------------------------
 #
 # Regression cover for a silent, near-total outage of documentation lookup. The
-# skill query carries an ACTIVE_PREFIX and a tail of prior turns; the docs head
+# runbook query carries an ACTIVE_PREFIX and a tail of prior turns; the docs head
 # was trained only on bare standalone questions, so either one drove its
 # probability to ~0 and a mid-conversation usage question never retrieved. The
 # fix classifies docs on the bare newest user message. See the note at the docs
@@ -807,7 +807,7 @@ def test_no_docs_query_is_returned_when_the_head_did_not_ask() -> None:
 def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
     """THE regression. The shape of session ses_aa9b63b4 turn 2.
 
-    A usage question asked after a loaded skill and a prior exchange. Before the
+    A usage question asked after a loaded runbook and a prior exchange. Before the
     fix this returned docs_wanted=False and the turn answered a product question
     with no product documentation.
 
@@ -820,7 +820,7 @@ def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
     boundary; the pronoun gap is a corpus problem, tracked in EXPERIMENTS.md and
     scored — not asserted — by the benchmark.
     """
-    from daintree_assistant_server.skills.local.documents import query_document
+    from daintree_assistant_server.runbooks.local.documents import query_document
 
     clf, catalog = _live_selector()
     convo = [
@@ -833,7 +833,7 @@ def test_a_usage_question_retrieves_docs_even_mid_conversation() -> None:
 
     assert clf.select(
         ranking_query, ["daintree.foundation"], catalog=catalog, docs_query=bare
-    ).docs_wanted, "a usage question must retrieve docs with a skill already loaded"
+    ).docs_wanted, "a usage question must retrieve docs with a runbook already loaded"
 
     # Deliberately NOT also asserting that docs_query=None still answers False.
     # That is characterisation of THIS artifact's defect, not a contract: a
@@ -853,7 +853,7 @@ def test_conversation_context_no_longer_suppresses_documentation() -> None:
         "how do recipes work in Daintree",
         "where do I change the keybinding for the terminal",
     ]
-    from daintree_assistant_server.skills.local.documents import query_document
+    from daintree_assistant_server.runbooks.local.documents import query_document
 
     for q in questions:
         cold = clf.select(q, [], catalog=catalog, docs_query=q)
@@ -889,13 +889,13 @@ def test_chatter_still_does_not_retrieve_documentation() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
-def test_the_docs_pass_does_not_disturb_skill_selection() -> None:
+def test_the_docs_pass_does_not_disturb_runbook_selection() -> None:
     """Only the docs logit is re-read; the ranking answer must be untouched."""
     clf, catalog = _live_selector()
     q = "rename my terminals so i can tell the agents apart"
     without = clf.select(q, [], catalog=catalog, docs_query=None)
     with_docs = clf.select(q, [], catalog=catalog, docs_query="what is a watcher")
-    assert without.skill_ids == with_docs.skill_ids
+    assert without.runbook_ids == with_docs.runbook_ids
     assert without.cardinality == with_docs.cardinality
 
 
@@ -954,16 +954,16 @@ def test_a_narrowed_catalog_does_not_evict_the_full_catalog_s_vectors() -> None:
     """A sub-agent turn must not make the NEXT orchestrator turn re-embed.
 
     `_cached` is one slot. The sub-agent profile syncs a catalog narrowed by
-    `Catalog.executable_with` (2 of 39 skills today), which replaces that slot —
+    `Catalog.executable_with` (2 of 39 runbooks today), which replaces that slot —
     and before the digest memo existed, the next full-catalog turn re-encoded
-    every evicted skill on the first-byte path. Measured at 5.3s for 37 skills,
+    every evicted runbook on the first-byte path. Measured at 5.3s for 37 runbooks,
     once per alternation, against a ~10ms selection budget. Fan-out is the
     designed usage, so this fired on every delegation.
 
     Asserted as encoder CALLS rather than wall-clock: the cost is the ONNX runs,
     and a timing assertion on a shared CI box is a flake waiting to happen.
     """
-    from daintree_assistant_server.skills.local import setwise as setwise_mod
+    from daintree_assistant_server.runbooks.local import setwise as setwise_mod
 
     clf, catalog = _live_selector()
     narrow = catalog.executable_with(["fs.read", "fs.list"])
@@ -998,16 +998,16 @@ def test_a_narrowed_catalog_does_not_evict_the_full_catalog_s_vectors() -> None:
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
-def test_an_active_skill_reaches_the_head_even_when_retrieval_ranks_it_last() -> None:
+def test_an_active_runbook_reaches_the_head_even_when_retrieval_ranks_it_last() -> None:
     """The reservation guarantee, measured against the real retriever.
 
     The evidence used here is a genuine turn, not a synthetic similarity row:
     three loaded runbooks and a long message about something else, which is the
     worst case the ``ACTIVE_PREFIX`` mitigation measures at (ranks 8/10/11 of 38;
     see ``candidates.py``). The shortlist is then narrowed to 4 so that a rank the
-    live catalog is too small to punish becomes the miss it will be at 200 skills.
+    live catalog is too small to punish becomes the miss it will be at 200 runbooks.
 
-    At the shipped ``k=32`` against 38 selectable skills this is unobservable —
+    At the shipped ``k=32`` against 38 selectable runbooks this is unobservable —
     84% of the catalog is on the ballot regardless — which is exactly why it
     needs pinning before the catalog grows into the regime where it bites.
     """
@@ -1026,9 +1026,9 @@ def test_an_active_skill_reaches_the_head_even_when_retrieval_ranks_it_last() ->
 
     table = clf.table
     assert table is not None
-    from daintree_assistant_server.skills.local.candidates import assemble_candidates
-    from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX
-    from daintree_assistant_server.skills.local.setwise import _run_encoder
+    from daintree_assistant_server.runbooks.local.candidates import assemble_candidates
+    from daintree_assistant_server.runbooks.local.documents import ACTIVE_PREFIX
+    from daintree_assistant_server.runbooks.local.setwise import _run_encoder
 
     text = ACTIVE_PREFIX.format(", ".join(sorted(active))) + query
     q = _run_encoder(clf._retriever, clf._retriever_tok, [text], normalize=True)[0]
@@ -1048,30 +1048,30 @@ def test_an_active_skill_reaches_the_head_even_when_retrieval_ranks_it_last() ->
     assert len(chosen) == 4
 
 
-def _table_hiding(clf: Any, skill_id: str, text: str):  # type: ignore[no-untyped-def]
-    """The live table with ``skill_id``'s RETRIEVAL vector pointed away from ``text``.
+def _table_hiding(clf: Any, runbook_id: str, text: str):  # type: ignore[no-untyped-def]
+    """The live table with ``runbook_id``'s RETRIEVAL vector pointed away from ``text``.
 
-    The only way to observe reservation end to end on a 38-skill catalog: at
-    ``k=32`` an active skill has to be beaten by 32 others to fall off the
+    The only way to observe reservation end to end on a 38-runbook catalog: at
+    ``k=32`` an active runbook has to be beaten by 32 others to fall off the
     ballot, and the ``ACTIVE_PREFIX`` naming its own id makes that essentially
     impossible for a real query. So retrieval is made to miss it by construction
     — cosine driven to the floor — while its RANKING vector, the one the head
     actually reads, stays exactly as the catalog built it.
 
-    That is the combination worth pinning: a real skill embedding arriving with
+    That is the combination worth pinning: a real runbook embedding arriving with
     ``active=1``, ``rank_norm=1.0`` and a true cosine at the bottom, which is
-    precisely what a 500-skill catalog will hand the head on an ordinary vague
+    precisely what a 500-runbook catalog will hand the head on an ordinary vague
     follow-up.
     """
-    from daintree_assistant_server.skills.local.setwise import SkillTable, _run_encoder
+    from daintree_assistant_server.runbooks.local.setwise import RunbookTable, _run_encoder
 
     table = clf.table
     assert table is not None
-    row = table.ids.index(skill_id)
+    row = table.ids.index(runbook_id)
     q = _run_encoder(clf._retriever, clf._retriever_tok, [text], normalize=True)[0]
     retrieval = table.retrieval.copy()
     retrieval[row] = -q
-    return SkillTable(
+    return RunbookTable(
         ids=table.ids,
         retrieval=retrieval,
         ranking=table.ranking,
@@ -1086,12 +1086,12 @@ def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None
 
     Everything else here checks the assembler in isolation or the classifier on
     a turn where retrieval happened to succeed anyway. This is the one that would
-    fail if ``_encode_pass`` were reverted to a plain top-k: the active skill is
+    fail if ``_encode_pass`` were reverted to a plain top-k: the active runbook is
     unreachable by cosine, so its presence in the feed can only come from
     reservation, and its feature row is asserted rather than assumed.
     """
-    from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX
-    from daintree_assistant_server.skills.local.setwise import FEATURE_NAMES
+    from daintree_assistant_server.runbooks.local.documents import ACTIVE_PREFIX
+    from daintree_assistant_server.runbooks.local.setwise import FEATURE_NAMES
 
     clf, _ = _live_selector()
     active = "daintree.terminals.rename"
@@ -1101,7 +1101,7 @@ def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None
     chosen, feed = clf._encode_pass(table, text, {active})
 
     ids = [table.ids[int(i)] for i in chosen.indices]
-    assert active in ids, "reservation did not seat an unreachable active skill"
+    assert active in ids, "reservation did not seat an unreachable active runbook"
     slot = ids.index(active)
     assert bool(chosen.reserved[slot])
 
@@ -1113,7 +1113,7 @@ def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None
     assert feats[slot][is_active] == 1.0
     assert feats[slot][rank_norm] == 1.0
     assert feed["mask"][0][slot] == 1.0
-    # And the embedding the head reads is the skill's own, not a zero pad.
+    # And the embedding the head reads is the runbook's own, not a zero pad.
     row = table.ids.index(active)
     assert np.allclose(feed["candidates"][0][slot], table.ranking[row])
 
@@ -1122,14 +1122,14 @@ def test_a_reserved_candidate_reaches_the_head_with_the_right_features() -> None
 def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
     """The promise reservation makes, end to end: a hearing.
 
-    The head returns a probability for the unreachable active skill instead of
+    The head returns a probability for the unreachable active runbook instead of
     never seeing it. What the head then DOES with that probability is a property
     of the weights, not of this policy — and on this artifact, which was trained
     before reservation existed, it scores it down (see the sweep recorded in
     ``candidates.py``). Asserting retention here would be asserting something
     the shipped weights do not yet do.
     """
-    from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX
+    from daintree_assistant_server.runbooks.local.documents import ACTIVE_PREFIX
 
     clf, _ = _live_selector()
     active = "daintree.terminals.rename"
@@ -1153,7 +1153,7 @@ def test_a_reserved_candidate_is_scored_rather_than_absent() -> None:
 def test_a_topic_shift_evicts_the_prior_runbook() -> None:
     """The same rule on the UNMODIFIED catalog, where retrieval works normally.
 
-    Not a reservation test — here the rename skill is retrieved on its own merits
+    Not a reservation test — here the rename runbook is retrieved on its own merits
     — but the eviction it checks is the property reservation must not break.
     """
     clf, _ = _live_selector()
@@ -1161,14 +1161,14 @@ def test_a_topic_shift_evicts_the_prior_runbook() -> None:
         "forget that — I need to create a git worktree for the new feature branch",
         ["daintree.terminals.rename"],
     )
-    assert "daintree.terminals.rename" not in sel.skill_ids
+    assert "daintree.terminals.rename" not in sel.runbook_ids
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
 def test_reservation_stays_dormant_on_ordinary_follow_ups_today() -> None:
-    """At 38 skills the change is inert in practice, and that is worth pinning.
+    """At 38 runbooks the change is inert in practice, and that is worth pinning.
 
-    Not because 38 < 32 — it is not, and six skills genuinely do sit off every
+    Not because 38 < 32 — it is not, and six runbooks genuinely do sit off every
     dense ballot — but because the ``ACTIVE_PREFIX`` names the active id in the
     query, which keeps a single loaded runbook at or near rank 0 (measured in
     ``candidates.py``). So reservation never fires on these turns, and the
@@ -1188,49 +1188,49 @@ def test_reservation_stays_dormant_on_ordinary_follow_ups_today() -> None:
     ):
         sel = clf.select(query, active)
         assert sel.reserved_ids == (), (
-            f"{query!r} reserved {sel.reserved_ids}; the loaded-skill prefix "
+            f"{query!r} reserved {sel.reserved_ids}; the loaded-runbook prefix "
             "should keep a single active runbook inside the shortlist at this "
             "catalog size"
         )
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
-def test_a_pinned_nonselectable_skill_is_never_seated_as_a_candidate() -> None:
+def test_a_pinned_nonselectable_runbook_is_never_seated_as_a_candidate() -> None:
     """The docs runbook is server-pinned and hidden from selection.
 
     It legitimately appears in a prior active set, so the reservation path has
     to treat it as an id with no table row — nothing to seat — rather than
-    forcing a skill the classifier was never trained to see. Injecting it as an
+    forcing a runbook the classifier was never trained to see. Injecting it as an
     active id was previously measured to change 49 of 124 benchmark answers.
     """
-    from daintree_assistant_server.config import DOCS_SKILL_ID
+    from daintree_assistant_server.config import DOCS_RUNBOOK_ID
 
     clf, catalog = _live_selector()
-    assert DOCS_SKILL_ID not in catalog.selectable_ids
+    assert DOCS_RUNBOOK_ID not in catalog.selectable_ids
 
     table = clf.table
     assert table is not None
-    from daintree_assistant_server.skills.local.candidates import assemble_candidates
+    from daintree_assistant_server.runbooks.local.candidates import assemble_candidates
 
     sims = np.zeros(len(table.ids), dtype=np.float32)
-    chosen = assemble_candidates(sims, table.ids, {DOCS_SKILL_ID}, 32)
+    chosen = assemble_candidates(sims, table.ids, {DOCS_RUNBOOK_ID}, 32)
     assert not chosen.reserved.any()
-    assert DOCS_SKILL_ID not in [table.ids[int(i)] for i in chosen.indices]
+    assert DOCS_RUNBOOK_ID not in [table.ids[int(i)] for i in chosen.indices]
 
 
 @pytest.mark.skipif(not _artifact_present(), reason="selector artifact not present (LFS)")
-def test_a_narrowed_profile_cannot_seat_a_skill_outside_its_menu() -> None:
+def test_a_narrowed_profile_cannot_seat_a_runbook_outside_its_menu() -> None:
     """Reservation reads the table, and the table is the profile's own catalog.
 
     A sub-agent carrying an orchestration runbook in its prior active set must
     not have that runbook forced onto a ballot drawn from its narrowed menu —
     the whole point of the narrowed menu is that it cannot execute it.
     """
-    from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
-    from daintree_assistant_server.skills.local.candidates import assemble_candidates
-    from daintree_assistant_server.skills.local.setwise import SetwiseClassifier
+    from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+    from daintree_assistant_server.runbooks.local.candidates import assemble_candidates
+    from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     clf = SetwiseClassifier(_ARTIFACT)
     narrow = catalog.executable_with(["fs.read", "fs.list"])
     table = clf.sync(narrow)
@@ -1336,11 +1336,11 @@ def test_the_scripted_seam_matches_the_production_selector_signature() -> None:
     behaviour is written against ITS signature rather than `LocalSelector`'s.
     That was safe while the seam was a second SHIPPED implementation held to the
     same protocol by mypy. It is not safe now: the seam is test scaffolding,
-    `mypy --strict` runs over `src` and `tools` only, and `SkillSelector` is a
+    `mypy --strict` runs over `src` and `tools` only, and `RunbookSelector` is a
     plain `Protocol` — so a keyword added to the real `select()` would leave
     ninety-odd tests passing against a seam that never learned about it.
 
-    Compared as SIGNATURES rather than by `isinstance`: `SkillSelector` is not
+    Compared as SIGNATURES rather than by `isinstance`: `RunbookSelector` is not
     `runtime_checkable`, and even a runtime protocol check only verifies the
     method NAME exists, which is the half of this that was never in doubt.
     """
@@ -1348,9 +1348,9 @@ def test_the_scripted_seam_matches_the_production_selector_signature() -> None:
 
     from fakes import ScriptedSelector
 
-    from daintree_assistant_server.skills.local.selector import LocalSelector, SkillSelector
+    from daintree_assistant_server.runbooks.local.selector import LocalSelector, RunbookSelector
 
-    protocol = inspect.signature(SkillSelector.select)
+    protocol = inspect.signature(RunbookSelector.select)
     production = inspect.signature(LocalSelector.select)
     seam = inspect.signature(ScriptedSelector.select)
 
@@ -1362,11 +1362,11 @@ def test_the_scripted_seam_matches_the_production_selector_signature() -> None:
         return [(name, str(p.kind)) for name, p in sig.parameters.items() if name != "self"]
 
     assert shape(seam) == shape(protocol), (
-        "ScriptedSelector.select no longer matches the SkillSelector protocol. Every "
+        "ScriptedSelector.select no longer matches the RunbookSelector protocol. Every "
         "orchestration test drives selection through it, so a mismatch means those "
         "tests are asserting against a selector the orchestrator cannot actually call."
     )
     assert shape(production) == shape(protocol), (
-        "LocalSelector.select no longer matches the SkillSelector protocol it is the "
+        "LocalSelector.select no longer matches the RunbookSelector protocol it is the "
         "only production implementation of."
     )

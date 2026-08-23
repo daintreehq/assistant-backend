@@ -2,7 +2,7 @@
 
 Business logic depends only on these types, never on a vendor's wire shapes. A
 later provider (another hosted API, or a self-hosted PyTorch model) implements
-the same protocol without touching request validation, skill selection, state,
+the same protocol without touching request validation, runbook selection, state,
 prompt construction, or the public endpoints. Swapping one OpenAI-shaped host for another
 touched only ``providers/`` and the config that names the models, which is the
 property this file exists to keep.

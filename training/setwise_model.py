@@ -3,7 +3,7 @@
 ## The shape of the computation
 
     conversation  ──► bge-base encoder ──► q          (768-d, per request)
-    skill i       ──► bge-base encoder ──► s_i        (768-d, CACHED at build)
+    runbook i       ──► bge-base encoder ──► s_i        (768-d, CACHED at build)
 
     token_0 = Wq(q)                                   ← the CLS slot
     token_i = Wc([ s_i ; q⊙s_i ; |q−s_i| ]) + Wf(feats_i)
@@ -11,7 +11,7 @@
     [token_0 … token_K] ──► 2 transformer layers ──► per-slot logits
                                                      + docs / cardinality from slot 0
 
-The encoder runs ONCE per turn, on the conversation only. Skill vectors are read
+The encoder runs ONCE per turn, on the conversation only. Runbook vectors are read
 from a table. So the request-time cost of a candidate is a 768-float lookup and
 one row of attention — not a forward pass, which is exactly what made the
 abandoned cross-encoder reranker (``EXPERIMENTS.md``, Architecture A) cost 309ms
@@ -19,7 +19,7 @@ of a 312ms pipeline.
 
 ## Why a transformer over the candidates rather than a dot product
 
-A dot product scores each skill in isolation, so it cannot express the one thing
+A dot product scores each runbook in isolation, so it cannot express the one thing
 the residual errors are actually about: comparison. "Both of these look like
 worktree work, but THAT one owns the case where agents are already running" is a
 statement about a *pair* of candidates, and cardinality ("does this turn need one
@@ -30,8 +30,8 @@ the query.
 
 ## Why there is no positional encoding by default
 
-The head must generalise to skills it never saw in training — that is the whole
-point of consuming a skill EMBEDDING rather than owning a per-skill weight row.
+The head must generalise to runbooks it never saw in training — that is the whole
+point of consuming a runbook EMBEDDING rather than owning a per-runbook weight row.
 With no positional term the module is permutation-equivariant: the answer for a
 candidate depends on its content and its features, never on which slot it landed
 in. That makes the shortlist's ordering irrelevant by construction, which is the
@@ -55,11 +55,11 @@ from torch import nn
 # would train one meaning and serve another, silently and with no error
 # anywhere. Same reason ``documents.py`` owns the text rendering: training
 # follows serving.
-from daintree_assistant_server.skills.local.setwise import FEATURE_NAMES
+from daintree_assistant_server.runbooks.local.setwise import FEATURE_NAMES
 
 __all__ = ["CARD_CLASSES", "FEATURE_NAMES", "RetrieverGraph", "SetwiseGraph", "SetwiseHead"]
 
-#: Cardinality classes: 0, 1, 2, 3-or-more skills.
+#: Cardinality classes: 0, 1, 2, 3-or-more runbooks.
 CARD_CLASSES = 4
 
 
@@ -101,7 +101,7 @@ class SetwiseHead(nn.Module):
         self.encoder = nn.TransformerEncoder(
             layer, num_layers=layers, enable_nested_tensor=False
         )
-        self.skill_out = nn.Linear(d_model, 1)
+        self.runbook_out = nn.Linear(d_model, 1)
         self.docs_out = nn.Linear(d_model, 1)
         self.card_out = nn.Linear(d_model, CARD_CLASSES)
 
@@ -115,11 +115,11 @@ class SetwiseHead(nn.Module):
         """Score one batch of candidate sets.
 
         ``q``     (B, H)     pooled conversation embedding
-        ``s``     (B, K, H)  pooled skill embeddings for the shortlist
+        ``s``     (B, K, H)  pooled runbook embeddings for the shortlist
         ``feats`` (B, K, F)  per-candidate scalars (see ``FEATURE_NAMES``)
         ``mask``  (B, K)     1 for a real candidate, 0 for padding
 
-        Returns per-candidate skill logits (B, K), docs logits (B,) and
+        Returns per-candidate runbook logits (B, K), docs logits (B,) and
         cardinality logits (B, CARD_CLASSES).
 
         ``K`` is FIXED at export time and serving always supplies exactly that
@@ -152,11 +152,11 @@ class SetwiseHead(nn.Module):
         )
         encoded = self.encoder(tokens, src_key_padding_mask=pad)
 
-        skill_logits = self.skill_out(encoded[:, 1:]).squeeze(-1)
+        runbook_logits = self.runbook_out(encoded[:, 1:]).squeeze(-1)
         # Padding slots must never win a slot in the ranking downstream.
-        skill_logits = skill_logits.masked_fill(mask == 0, -1e4)
+        runbook_logits = runbook_logits.masked_fill(mask == 0, -1e4)
         pooled = encoded[:, 0]
-        return skill_logits, self.docs_out(pooled).squeeze(-1), self.card_out(pooled)
+        return runbook_logits, self.docs_out(pooled).squeeze(-1), self.card_out(pooled)
 
 
 class SetwiseGraph(nn.Module):
@@ -165,8 +165,8 @@ class SetwiseGraph(nn.Module):
     Pooling lives inside the graph for the same reason it does in the shipped
     classifier's export: the serving code cannot pool differently from the
     trainer if it does not pool at all. This graph is run on TWO kinds of text —
-    conversations at request time, skill documents at build time — with the same
-    weights, which is what lets a skill added after the build be embedded into
+    conversations at request time, runbook documents at build time — with the same
+    weights, which is what lets a runbook added after the build be embedded into
     the same space without retraining anything.
     """
 

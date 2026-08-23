@@ -20,7 +20,7 @@ in each suite's `results/` (gitignored); the JSON document is the record.
 | `workflow_intel/` | live | first-try structural validity + tool grounding + resume ranking of the workflow tasks | `python -m benchmarks.workflow_intel.bench run` |
 | `injection_live/` | live | canary-graded injection obedience floor of the untrusted local-context carriers | `python -m benchmarks.injection_live.bench run` |
 | `utility_json/` | live | terminal_extract_json + memory_distill accuracy/repair (the JSON tasks `utility_tasks` skips) | `python -m benchmarks.utility_json.bench run` |
-| `skill_selection/` | live | accuracy + latency of the automatic skill selector | `python -m benchmarks.skill_selection.bench` |
+| `runbook_selection/` | live | accuracy + latency of the automatic runbook selector | `python -m benchmarks.runbook_selection.bench` |
 | `utility_tasks/` | live | accuracy + latency of the 4 classifier/judge tasks | `python -m benchmarks.utility_tasks.bench` |
 | `dashboard/` | roll-up | runs the portfolio and emits one JSON report (deterministic-only is CI-able) | `python -m benchmarks.dashboard.bench run` |
 
@@ -54,7 +54,7 @@ Three rules the thresholds rest on, and they matter more than the numbers:
   wants a reason in the commit message, like `tools/coverage_floors.py`.
 
 `qualify-release` costs roughly **520 model calls** at three trials, ~438 of them
-the 146-case skill-selection corpus — which is both the bulk of the bill and the
+the 146-case runbook-selection corpus — which is both the bulk of the bill and the
 suite measuring whether the classifier still routes correctly.
 
 It differs from `run --live` in one way that matters: a missing key
@@ -87,6 +87,6 @@ recipe in `_harness/fixtures/README.md`.
   quality suite needs a calibrated LLM judge (kappa ≥ 0.7 against human labels) before
   its numbers can be trusted. The judge-free slices (checkpoint id-preservation,
   injection canary) fit the `utility_json` pattern and can be added when wanted.
-- **skill-learning gate/closed-loop** — needs the OpenAI builder key + a labeled
+- **runbook-learning gate/closed-loop** — needs the OpenAI builder key + a labeled
   transcript corpus; the deterministic `_validate`/secret-scan half is already covered
   inside `safety/`.

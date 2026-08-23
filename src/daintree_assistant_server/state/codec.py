@@ -1,6 +1,6 @@
-"""Signed, opaque skill-state token codec.
+"""Signed, opaque runbook-state token codec.
 
-The token is portable across Cloud Run instances: it carries the active skill
+The token is portable across Cloud Run instances: it carries the active runbook
 set and selector cadence markers so request correctness never depends on
 instance memory. It is signed (HMAC-SHA256) with a dedicated key — not the
 public API key or the upstream key — and is *not* encrypted (it contains only
@@ -25,16 +25,24 @@ from ..errors import request_too_large
 from ..text_utils import utf8_len
 from .models import StatePayload, StateVerification
 
-TOKEN_VERSION = 1
+# The PAYLOAD schema version. 2 renames `active_skills` to `active_runbooks`, so a
+# v1 token describes a field this codec no longer reads — it is rejected by the
+# version check below and the turn falls through to a fresh selection, which is
+# the ordinary handling for any unusable token and needs no migration.
+TOKEN_VERSION = 2
+# The ENVELOPE marker, and deliberately still `dst1`: it is the MAC domain
+# separator (it is signed, see `_signature`), not the payload schema version. Bumping
+# it would reject a stale token at the prefix check as malformed, losing the more
+# accurate `unsupported_runbook_state_version` reason the version check gives.
 TOKEN_PREFIX = "dst1"
 # Defensive cap so a junk token never triggers expensive parsing.
 MAX_TOKEN_BYTES = 16 * 1024
 
 # Warning codes surfaced when a supplied token is unusable.
-REASON_INVALID = "invalid_skill_state"
-REASON_EXPIRED = "expired_skill_state"
-REASON_SESSION_MISMATCH = "skill_state_session_mismatch"
-REASON_UNSUPPORTED_VERSION = "unsupported_skill_state_version"
+REASON_INVALID = "invalid_runbook_state"
+REASON_EXPIRED = "expired_runbook_state"
+REASON_SESSION_MISMATCH = "runbook_state_session_mismatch"
+REASON_UNSUPPORTED_VERSION = "unsupported_runbook_state_version"
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -47,7 +55,7 @@ def _b64url_decode(value: str) -> bytes:
 
 
 class StateCodec:
-    """Issues and verifies skill-state tokens using a small key ring."""
+    """Issues and verifies runbook-state tokens using a small key ring."""
 
     def __init__(
         self,
@@ -100,7 +108,7 @@ class StateCodec:
         self,
         *,
         session_id: str | None,
-        active_skills: Iterable[str],
+        active_runbooks: Iterable[str],
         catalog_revision: str,
         turn_id: str | None,
         instruction_revision: int,
@@ -112,7 +120,7 @@ class StateCodec:
             "v": TOKEN_VERSION,
             "kid": self._current_kid,
             "session_hash": self.session_hash(session_id),
-            "active_skills": [{"id": sid} for sid in active_skills],
+            "active_runbooks": [{"id": sid} for sid in active_runbooks],
             "catalog_revision": catalog_revision,
             "last_turn_id": turn_id,
             "last_instruction_revision": instruction_revision,
@@ -142,7 +150,7 @@ class StateCodec:
             return StateVerification(valid=False, payload=None, reason=None)
         if utf8_len(token) > MAX_TOKEN_BYTES:
             raise request_too_large(
-                "Skill-state token exceeds the size limit.", param="daintree.state"
+                "Runbook-state token exceeds the size limit.", param="daintree.state"
             )
 
         parts = token.split(".")
@@ -194,7 +202,7 @@ class StateCodec:
         # Strict session binding: a token's recorded session hash must match the
         # hash for the supplied session_id. A session-bound token replayed with a
         # missing/different session (expected hash "") is a mismatch, so it cannot
-        # carry one session's active skills into another.
+        # carry one session's active runbooks into another.
         if payload.session_hash != self.session_hash(session_id):
             return StateVerification(valid=False, payload=payload, reason=REASON_SESSION_MISMATCH)
 

@@ -23,7 +23,7 @@ docs turn — "what actually is a watcher", "how do i change which coding agent
 daintree uses by default", "where does daintree put worktrees on disk". These are
 not merely missing positives; they are the same question labelled both ways, and
 they are why `EXPERIMENTS.md` measures 113/120 docs recall cold against 5/120
-with a skill loaded. The shipped mitigation (re-reading the docs logit from a
+with a runbook loaded. The shipped mitigation (re-reading the docs logit from a
 second pass over the bare question) works around exactly this, and stays.
 
 The additions here also cover the phrasing gaps `EXPERIMENTS.md` names as the
@@ -404,7 +404,7 @@ def main() -> int:
         if len(r["history"]) == 2 and r["source"] in ("topic_shift", "followup")
     })
     print(f"source: {len(docs_pos)} docs+, {len(docs_neg)} docs-, {len(task_rows)} tasks, "
-          f"{len(multi_rows)} multi-skill, {len(task_hist)} histories")
+          f"{len(multi_rows)} multi-runbook, {len(task_hist)} histories")
 
     def social() -> list[str]:
         u, a = rng.choice(SOCIAL)
@@ -415,15 +415,15 @@ def main() -> int:
 
     # ---- 2. The observed bug, exactly: a usage question after a greeting.
     #
-    # `skill_ids` is the SOURCE row's answer, never a hardcoded []. 21 of the 207
-    # docs positives legitimately require skills — a docs turn and an operational
+    # `runbook_ids` is the SOURCE row's answer, never a hardcoded []. 21 of the 207
+    # docs positives legitimately require runbooks — a docs turn and an operational
     # turn are not exclusive, which is the whole premise of the pinned docs
     # runbook arriving ALONGSIDE another one. An earlier draft wrote [] for all
     # of them and generated 25 rows training "answer with nothing" for requests
     # whose own source row demands diagnostics or watch-outcome.
     for r in rng.sample(docs_pos, min(70, len(docs_pos))):
         docs_items.append({"query": r["query"], "is_docs": True,
-                           "skill_ids": list(r["expect_ids"]),
+                           "runbook_ids": list(r["expect_ids"]),
                            "history": social(), "active_ids": []})
 
     # ---- 3. Docs positives carrying a REAL prior exchange.
@@ -441,13 +441,13 @@ def main() -> int:
     # the docs decision from a second pass with the active set EMPTIED, so those
     # rows could never reach the path they were meant to teach; and carrying an
     # active set with an empty answer trains eviction, because an authoritative
-    # empty result CLEARS the active set (skills/active_set.py). The corpus
+    # empty result CLEARS the active set (runbooks/active_set.py). The corpus
     # already holds 318 such rows under `no_task_stateful`; this round declines
     # to add 60 more to a convention it has not measured.
     grounded = [r for r in docs_pos if _NAMES_PRODUCT.search(r["query"])]
     for r in rng.sample(grounded, min(80, len(grounded))):
         docs_items.append({"query": r["query"], "is_docs": True,
-                           "skill_ids": list(r["expect_ids"]),
+                           "runbook_ids": list(r["expect_ids"]),
                            "history": list(rng.choice(task_hist)), "active_ids": []})
 
     # ---- 4. Phrasing. Each transform is applied cold AND with context, because
@@ -469,29 +469,29 @@ def main() -> int:
                 list(rng.choice(task_hist))
                 if grounded_q and rng.random() < 0.5 else [])
             docs_items.append({"query": q, "is_docs": True,
-                               "skill_ids": list(r["expect_ids"]),
+                               "runbook_ids": list(r["expect_ids"]),
                                "history": hist, "active_ids": []})
     for r in rng.sample(docs_pos, min(30, len(docs_pos))):
         q = _deixis(r["query"])
         second = _second_person(q or r["query"])
         if second:
             docs_items.append({"query": second, "is_docs": True,
-                               "skill_ids": list(r["expect_ids"]),
+                               "runbook_ids": list(r["expect_ids"]),
                                "history": [], "active_ids": []})
     for r in rng.sample(docs_pos, min(35, len(docs_pos))):
         docs_items.append({"query": rng.choice(LEAD_INS) + r["query"], "is_docs": True,
-                           "skill_ids": list(r["expect_ids"]),
+                           "runbook_ids": list(r["expect_ids"]),
                            "history": [], "active_ids": []})
 
     # ---- 5. Balance. Context must not BECOME the docs cue: operational requests
     #        get the same lead-ins and the same histories, and stay not-docs.
     for r in rng.sample(docs_neg, min(80, len(docs_neg))):
         docs_items.append({"query": r["query"], "is_docs": False,
-                           "skill_ids": list(r["expect_ids"]),
+                           "runbook_ids": list(r["expect_ids"]),
                            "history": social(), "active_ids": []})
     for r in rng.sample(docs_neg, min(60, len(docs_neg))):
         docs_items.append({"query": rng.choice(LEAD_INS) + r["query"], "is_docs": False,
-                           "skill_ids": list(r["expect_ids"]),
+                           "runbook_ids": list(r["expect_ids"]),
                            "history": list(rng.choice(task_hist)), "active_ids": []})
 
     # ---- 6. The routing half: a real instruction after a greeting still routes.
@@ -499,17 +499,17 @@ def main() -> int:
     # The COUNT here is load-bearing, and getting it wrong is measurable. A first
     # pass added 320 of these against ~570 zero-cardinality rows (the docs
     # families above, which genuinely load no runbook), which moved the corpus
-    # from 13.8% zero-answer to 17.5% and thinned the two-skill class from 3.3%
+    # from 13.8% zero-answer to 17.5% and thinned the two-runbook class from 3.3%
     # to 3.0%. The cardinality head followed the prior it was given: docs recall
-    # rose 14/19 -> 20/21 and multi-skill fell 4/5 -> 2/5 in the same export.
+    # rose 14/19 -> 20/21 and multi-runbook fell 4/5 -> 2/5 in the same export.
     # An augmentation is not free of the balance it lands in, so this family and
     # the one below are sized to hold the shape of the corpus they extend.
     for r in rng.sample(task_rows, min(600, len(task_rows))):
         shift_items.append({"query": r["query"], "expect_ids": list(r["expect_ids"]),
                             "history": social(), "active_ids": []})
-    # Two-skill answers are only 3.3% of the corpus and NONE of them carried a
+    # Two-runbook answers are only 3.3% of the corpus and NONE of them carried a
     # social lead-in, so without this the pleasantry lesson is taught in the
-    # one-skill class alone and the head learns "greeting implies at most one".
+    # one-runbook class alone and the head learns "greeting implies at most one".
     for r in rng.sample(multi_rows, min(95, len(multi_rows))):
         shift_items.append({"query": r["query"], "expect_ids": list(r["expect_ids"]),
                             "history": social() if rng.random() < 0.6

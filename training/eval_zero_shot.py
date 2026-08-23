@@ -1,14 +1,14 @@
-"""Does a skill neither stage ever trained on actually route?
+"""Does a runbook neither stage ever trained on actually route?
 
-The whole reason for the two-stage architecture is that a skill can be added
+The whole reason for the two-stage architecture is that a runbook can be added
 after the build and still be selected — no head row to grow, no retrain, no
 degraded window. That claim is cheap to assert and worth measuring, so this
-scores an artifact built with ``--holdout-skills`` on exactly the benchmark cases
-whose REQUIRED answer is one of the held-out skills, and compares it against the
+scores an artifact built with ``--holdout-runbooks`` on exactly the benchmark cases
+whose REQUIRED answer is one of the held-out runbooks, and compares it against the
 shipped artifact on the same cases.
 
-The holdout must be applied to BOTH stages (``train_retriever --holdout-skills``
-and ``train_setwise --holdout-skills``). Held out of stage 2 only, the skill was
+The holdout must be applied to BOTH stages (``train_retriever --holdout-runbooks``
+and ``train_setwise --holdout-runbooks``). Held out of stage 2 only, the runbook was
 still shortlisted by an encoder that had trained on it, and the probe would be
 measuring half the pipeline while reporting the whole one.
 """
@@ -24,16 +24,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from benchmarks.skill_selection.cases import load_cases  # noqa: E402
-from daintree_assistant_server.skills.catalog import (  # noqa: E402
-    default_skills_dir,
+from benchmarks.runbook_selection.cases import load_cases  # noqa: E402
+from daintree_assistant_server.runbooks.catalog import (  # noqa: E402
+    default_runbooks_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.local.documents import query_document  # noqa: E402
-from daintree_assistant_server.skills.local.setwise import SetwiseClassifier  # noqa: E402
+from daintree_assistant_server.runbooks.local.documents import query_document  # noqa: E402
+from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier  # noqa: E402
 
 SHIPPED = (
-    ROOT / "src" / "daintree_assistant_server" / "skills" / "local"
+    ROOT / "src" / "daintree_assistant_server" / "runbooks" / "local"
     / "artifacts" / "selector"
 )
 
@@ -44,24 +44,24 @@ def pick(clf: SetwiseClassifier, case, selectable) -> list[str]:  # type: ignore
         return list(case.active)
     query = query_document(case.messages, turn_context=case.turn_context)
     visible = [sid for sid in case.active if sid in selectable]
-    return [sid for sid in clf.select(query, visible).skill_ids if sid in selectable]
+    return [sid for sid in clf.select(query, visible).runbook_ids if sid in selectable]
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--artifact", required=True, help="artifact built with --holdout-skills")
+    ap.add_argument("--artifact", required=True, help="artifact built with --holdout-runbooks")
     ap.add_argument("--reference", default=str(SHIPPED))
     args = ap.parse_args()
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     cases = load_cases(catalog)
     selectable = catalog.selectable_ids
 
     meta = json.loads((Path(args.artifact) / "meta.json").read_text())
-    holdout = set(meta.get("holdout_skills") or [])
+    holdout = set(meta.get("holdout_runbooks") or [])
     if not holdout:
         raise SystemExit(
-            f"{args.artifact} records no holdout_skills — it is an ordinary "
+            f"{args.artifact} records no holdout_runbooks — it is an ordinary "
             "artifact, and scoring it here would prove nothing"
         )
     print(f"held out of BOTH stages: {', '.join(sorted(holdout))}")
@@ -71,11 +71,11 @@ def main() -> int:
     reference = SetwiseClassifier(Path(args.reference))
     reference.sync(catalog)
 
-    # Cases whose REQUIRED answer includes a held-out skill: the ones that can
-    # only pass if a never-trained skill was selected on the strength of its
+    # Cases whose REQUIRED answer includes a held-out runbook: the ones that can
+    # only pass if a never-trained runbook was selected on the strength of its
     # embedding alone.
     target = [c for c in cases if set(c.required) & holdout]
-    print(f"benchmark cases requiring a held-out skill: {len(target)}\n")
+    print(f"benchmark cases requiring a held-out runbook: {len(target)}\n")
 
     zero_shot_hits = 0
     reference_hits = 0
@@ -93,11 +93,11 @@ def main() -> int:
         )
 
     print(
-        f"\nzero-shot recall on held-out skills: {zero_shot_hits}/{len(target)}"
+        f"\nzero-shot recall on held-out runbooks: {zero_shot_hits}/{len(target)}"
         f"   (same artifact family WITH training: {reference_hits}/{len(target)})"
     )
 
-    # The other half of the question: does holding three skills out damage the
+    # The other half of the question: does holding three runbooks out damage the
     # rest of the catalog? It should not — nothing else lost any training data —
     # and if it does, the probe's headline number is not comparable.
     rest = [c for c in cases if c.required and not (set(c.required) & holdout)]

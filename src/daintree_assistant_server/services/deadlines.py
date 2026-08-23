@@ -26,7 +26,7 @@ raised something :func:`~..providers.retry.retry_upstream` does not catch.
 ===================  ===========================================================
 Phase                What it bounds
 ===================  ===========================================================
-``preparation``      Validation, state decode and skill selection — everything
+``preparation``      Validation, state decode and runbook selection — everything
                      before the upstream model is opened. Slow here means *our*
                      work is slow (or the selector is), and the user has seen
                      nothing at all. Absolute, from the start of the turn.

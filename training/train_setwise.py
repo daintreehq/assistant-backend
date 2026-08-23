@@ -1,17 +1,17 @@
 """Stage 2 of the two-stage selector: the set-wise head over a retrieved shortlist.
 
 Stage 1 (``train_retriever.py``) is frozen before this runs. It supplies, per
-training row, the ``k`` nearest skills by cosine and their scores; this stage
+training row, the ``k`` nearest runbooks by cosine and their scores; this stage
 learns to answer the real question over that shortlist — which of these, possibly
 none, possibly two — plus the docs and cardinality decisions.
 
 ## What is different from the classifier this replaces
 
-The shipped classifier owns a weight ROW per skill. This head owns none: it
-consumes a skill's *embedding*, produced by the same encoder that embeds the
+The shipped classifier owns a weight ROW per runbook. This head owns none: it
+consumes a runbook's *embedding*, produced by the same encoder that embeds the
 conversation. Two consequences, and they are the reason for the whole exercise:
 
-1. **A skill added after training can still be selected.** Embed its document
+1. **A runbook added after training can still be selected.** Embed its document
    with the shipped encoder, append the row to the table, and it is a candidate.
    No retrain to unblock it, no ``routing_revision`` staleness gate, no
    degrade-open window while a rebuild happens. It does NOT arrive on equal
@@ -19,16 +19,16 @@ conversation. Two consequences, and they are the reason for the whole exercise:
    benchmark cases against 13 of 14 trained, winning only requests no neighbour
    also claims. What a retrain buys is competitiveness, not possibility.
 2. **Catalog size stops driving head size.** The head always sees ``k``
-   candidates. At 39 skills and at 1,000 it is the same computation and the same
+   candidates. At 39 runbooks and at 1,000 it is the same computation and the same
    difficulty; only stage 1's job gets harder, and cosine search over 1,000
    vectors is microseconds.
 
-The cost is capacity: a text-derived skill vector cannot memorise as much as a
+The cost is capacity: a text-derived runbook vector cannot memorise as much as a
 freely-learned row (measured directly as B5 in ``EXPERIMENTS.md``, where merely
-INITIALISING the old head from skill embeddings hurt). The shared projection
+INITIALISING the old head from runbook embeddings hurt). The shared projection
 ``cand_proj`` is what buys some of it back — it is free to learn how to sharpen
-text embeddings into discriminative ones, and being shared across skills it
-applies to skills it has never seen.
+text embeddings into discriminative ones, and being shared across runbooks it
+applies to runbooks it has never seen.
 
 ## The ordering question
 
@@ -62,17 +62,17 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from daintree_assistant_server.skills.catalog import (  # noqa: E402
-    default_skills_dir,
+from daintree_assistant_server.runbooks.catalog import (  # noqa: E402
+    default_runbooks_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.local.candidates import (  # noqa: E402
+from daintree_assistant_server.runbooks.local.candidates import (  # noqa: E402
     assemble_candidates,
 )
-from daintree_assistant_server.skills.local.documents import (  # noqa: E402
+from daintree_assistant_server.runbooks.local.documents import (  # noqa: E402
     INDEX_DOC_VARIANT,
     routing_revision,
-    skill_document,
+    runbook_document,
 )
 from training.common import build_query, corpus_rows, device  # noqa: E402
 from training.setwise_model import CARD_CLASSES, SetwiseHead  # noqa: E402
@@ -104,14 +104,14 @@ def main() -> int:
         "--doc-refresh",
         type=int,
         default=20,
-        help="re-embed the skill documents every N steps, without gradients "
+        help="re-embed the runbook documents every N steps, without gradients "
         "(0 = re-embed every step WITH gradients, ~6x slower). See below.",
     )
     ap.add_argument(
-        "--holdout-skills",
+        "--holdout-runbooks",
         default="",
-        help="comma-separated skill ids to strip from TRAINING rows entirely — "
-        "the zero-shot probe: can the head route a skill it never trained on?",
+        help="comma-separated runbook ids to strip from TRAINING rows entirely — "
+        "the zero-shot probe: can the head route a runbook it never trained on?",
     )
     ap.add_argument("--out", default=str(MODELS / "setwise"))
     args = ap.parse_args()
@@ -121,15 +121,15 @@ def main() -> int:
     from transformers import AutoModel, AutoTokenizer
 
     dev = device()
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     labels = sorted(catalog.selectable_ids)
     index = {sid: i for i, sid in enumerate(labels)}
     docs = [
-        skill_document(catalog.get(sid).meta, variant=INDEX_DOC_VARIANT) for sid in labels
+        runbook_document(catalog.get(sid).meta, variant=INDEX_DOC_VARIANT) for sid in labels
     ]
-    n_skills = len(labels)
-    k = min(args.candidates, n_skills)
-    print(f"catalog: {n_skills} selectable skills, shortlist k={k}, device {dev}")
+    n_runbooks = len(labels)
+    k = min(args.candidates, n_runbooks)
+    print(f"catalog: {n_runbooks} selectable runbooks, shortlist k={k}, device {dev}")
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -140,17 +140,17 @@ def main() -> int:
     cut = int(len(rows) * (1 - args.val_fraction))
     train_rows, val_rows = rows[:cut], rows[cut:]
 
-    holdout = {s.strip() for s in args.holdout_skills.split(",") if s.strip()}
+    holdout = {s.strip() for s in args.holdout_runbooks.split(",") if s.strip()}
     if holdout:
         unknown = holdout - set(labels)
         if unknown:
-            raise SystemExit(f"--holdout-skills names unknown ids: {sorted(unknown)}")
+            raise SystemExit(f"--holdout-runbooks names unknown ids: {sorted(unknown)}")
         before = len(train_rows)
         train_rows = [
             r for r in train_rows if not (set(r["expect_ids"]) & holdout)
         ]
         print(
-            f"zero-shot probe: held {len(holdout)} skill(s) out of training — "
+            f"zero-shot probe: held {len(holdout)} runbook(s) out of training — "
             f"{before - len(train_rows)} rows dropped, {len(train_rows)} remain"
         )
 
@@ -199,7 +199,7 @@ def main() -> int:
             """Rows' candidate ballots, built by the SERVING assembler.
 
             Not a top-k slice. ``assemble_candidates`` is the shipped policy —
-            it seats an active skill the cosine shortlist missed — and if
+            it seats an active runbook the cosine shortlist missed — and if
             training slices instead, the head learns on a ballot the server
             never builds. Every row's active set is right here in the corpus, so
             there is no reason for the two to differ.
@@ -306,16 +306,16 @@ def main() -> int:
         docs, padding=True, truncation=True, max_length=args.doc_max_length,
         return_tensors="pt",
     ).to(dev)
-    print(f"skill documents: {doc_enc['input_ids'].shape[1]} tokens padded")
+    print(f"runbook documents: {doc_enc['input_ids'].shape[1]} tokens padded")
 
     def pool(model, ids, mask):  # type: ignore[no-untyped-def]
         hidden = model(input_ids=ids, attention_mask=mask)[0]
         m = mask.unsqueeze(-1).to(hidden.dtype)
         return (hidden * m).sum(1) / m.sum(1).clamp(min=1e-9)
 
-    # ---- the skill-side embedding cache -----------------------------------
+    # ---- the runbook-side embedding cache -----------------------------------
     #
-    # Skill documents are long (p50 262 tokens against a query's ~64) and there
+    # Runbook documents are long (p50 262 tokens against a query's ~64) and there
     # are ~38 of them in every batch's candidate union, so encoding them WITH
     # gradients on every step costs about six times what the queries do and
     # dominates training. They are also, unlike the queries, the same 38 strings
@@ -323,11 +323,11 @@ def main() -> int:
     #
     # So they are embedded under no_grad and refreshed every ``doc_refresh``
     # steps. The encoder is then trained as a QUERY encoder, with the shared
-    # ``cand_proj`` learning to read whatever it produces on the skill side.
+    # ``cand_proj`` learning to read whatever it produces on the runbook side.
     # This is the asymmetric setup dense retrieval has used for years
     # (periodic index refresh), and it suits this architecture specifically: a
-    # skill-side representation that stays near the pretrained space is one a
-    # brand-new skill's document also lands in, which is the zero-shot property
+    # runbook-side representation that stays near the pretrained space is one a
+    # brand-new runbook's document also lands in, which is the zero-shot property
     # the whole design is for. Set --doc-refresh 0 to restore full gradient flow.
     doc_cache: torch.Tensor | None = None
 
@@ -364,7 +364,7 @@ def main() -> int:
         visible as a miss, which is what makes the reported number honest.
 
         The two must not fight. A swap steps over any slot holding a positive
-        (as it always has) AND any slot holding an active skill, because evicting
+        (as it always has) AND any slot holding an active runbook, because evicting
         a reserved candidate to seat a positive would train the head on a ballot
         the server cannot produce.
         """
@@ -397,7 +397,7 @@ def main() -> int:
                     # similarity row. This used to be `cos[i].min()` — the
                     # ballot's weakest score — which was a fair stand-in only
                     # while the ballot was a pure top-k, where an off-ballot
-                    # skill is below the minimum by definition. Reservation
+                    # runbook is below the minimum by definition. Reservation
                     # broke that: a deeply-ranked active seated on this ballot
                     # can BE the minimum, and a positive ranked just outside k
                     # would then be handed a cosine far below its own, teaching
@@ -469,8 +469,8 @@ def main() -> int:
         if doc_cache is not None:
             s = doc_cache[torch.tensor(idx_p, device=dev)]
         else:
-            # --doc-refresh 0: encode WITH gradients, but only the skills this
-            # batch actually shortlisted. At 38 skills that is the whole catalog;
+            # --doc-refresh 0: encode WITH gradients, but only the runbooks this
+            # batch actually shortlisted. At 38 runbooks that is the whole catalog;
             # at 1,000 it is the handful in play, which is what keeps this path's
             # cost independent of catalog size.
             union = np.unique(idx_p)
@@ -491,8 +491,8 @@ def main() -> int:
         # changes, train with ragged shortlists rather than trusting an
         # untrained mask.
         mask = torch.ones(len(subset), k, device=dev)
-        skill_logits, docs_logit, card_logits = head(q, s, feats_t, mask)
-        return skill_logits, docs_logit, card_logits, torch.tensor(y_p, device=dev), idx_p
+        runbook_logits, docs_logit, card_logits = head(q, s, feats_t, mask)
+        return runbook_logits, docs_logit, card_logits, torch.tensor(y_p, device=dev), idx_p
 
     # A positive is ~1 slot in k, so unweighted BCE answers "never".
     pos_rate = max(float(np.mean([len(r["expect_ids"]) for r in train_rows])), 0.1)
@@ -548,7 +548,7 @@ def main() -> int:
     def evaluate() -> tuple[float, float, float]:
         backbone.eval()
         head.eval()
-        # Evaluate against FRESH skill vectors, never a cache that is up to
+        # Evaluate against FRESH runbook vectors, never a cache that is up to
         # doc_refresh steps behind: serving embeds the catalog with the final
         # encoder, so a validation number computed against stale vectors is
         # measuring a model that will never run.
@@ -637,12 +637,12 @@ def main() -> int:
                 "doc_variant": INDEX_DOC_VARIANT,
                 "doc_refresh": args.doc_refresh,
                 "retriever": str(args.retriever),
-                # Recorded, NOT enforced. The head has no per-skill weights, so a
+                # Recorded, NOT enforced. The head has no per-runbook weights, so a
                 # catalog change does not invalidate it — this is provenance for
                 # a human reading the artifact, not a serving gate. Dropping that
                 # gate is the point of the architecture.
                 "routing_revision_at_train": routing_revision(catalog),
-                "holdout_skills": sorted(holdout),
+                "holdout_runbooks": sorted(holdout),
             },
             indent=2,
         )

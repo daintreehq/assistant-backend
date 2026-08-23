@@ -1,4 +1,4 @@
-"""Skill-state token payload models."""
+"""Runbook-state token payload models."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class ActiveSkillRef(BaseModel):
+class ActiveRunbookRef(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str
@@ -21,7 +21,7 @@ class StatePayload(BaseModel):
     v: int = 1
     kid: str
     session_hash: str = ""
-    active_skills: list[ActiveSkillRef] = Field(default_factory=list)
+    active_runbooks: list[ActiveRunbookRef] = Field(default_factory=list)
     catalog_revision: str = ""
     last_turn_id: str | None = None
     last_instruction_revision: int = 0
@@ -32,11 +32,11 @@ class StatePayload(BaseModel):
     # not agree about which sets are legal: a sub-agent's set can hold a specific
     # whose domain foundation was filtered out of its menu, and reuse deliberately
     # does not re-pair foundations, so an assistant round reusing that token would
-    # run a workflow skill with its base judgment layer silently missing.
+    # run a workflow runbook with its base judgment layer silently missing.
     #
     # Distinct session ids make the crossover unreachable for today's client, but
     # that is the CLIENT's property, not this server's. Everything else about the
-    # skill boundary is enforced here at the request boundary; this makes the
+    # runbook boundary is enforced here at the request boundary; this makes the
     # profile match the rest. Absent on assistant tokens so their bytes are
     # unchanged.
     profile: str = "assistant"
@@ -55,7 +55,7 @@ class StatePayload(BaseModel):
     docs_query: str | None = None
 
     def active_ids(self) -> list[str]:
-        return [s.id for s in self.active_skills]
+        return [s.id for s in self.active_runbooks]
 
 
 @dataclass(frozen=True)

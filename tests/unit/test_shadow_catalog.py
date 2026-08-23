@@ -2,7 +2,7 @@
 
 These distractors exist to make a recall number mean something, so the ways they
 can quietly stop doing that are what is pinned here: drifting from the real
-skill format, becoming trivially separable, colliding with real ids, or ceasing
+runbook format, becoming trivially separable, colliding with real ids, or ceasing
 to be reproducible. A weak distractor pool produces a confidently green scale
 result that means the opposite of what it appears to.
 
@@ -15,18 +15,18 @@ import re
 
 import pytest
 
-from benchmarks.skill_selection.shadow_catalog import (
+from benchmarks.runbook_selection.shadow_catalog import (
     SHAPES,
     Distractor,
     generate_distractors,
     shadow_catalog,
 )
-from daintree_assistant_server.skills.catalog import (
+from daintree_assistant_server.runbooks.catalog import (
     Catalog,
-    default_skills_dir,
+    default_runbooks_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.local.documents import skill_document
+from daintree_assistant_server.runbooks.local.documents import runbook_document
 
 
 def _words(text: str) -> set[str]:
@@ -37,7 +37,7 @@ def _words(text: str) -> set[str]:
 
 @pytest.fixture(scope="module")
 def real() -> Catalog:
-    return load_catalog(default_skills_dir())
+    return load_catalog(default_runbooks_dir())
 
 
 @pytest.fixture(scope="module")
@@ -47,8 +47,8 @@ def pool(real: Catalog) -> list[Distractor]:
 
 def test_generation_is_reproducible(real: Catalog) -> None:
     """A recall number is only comparable across runs if the catalog is."""
-    first = [d.skill.id for d in generate_distractors(120, real)]
-    second = [d.skill.id for d in generate_distractors(120, real)]
+    first = [d.runbook.id for d in generate_distractors(120, real)]
+    second = [d.runbook.id for d in generate_distractors(120, real)]
     assert first == second
 
 
@@ -60,29 +60,29 @@ def test_sizes_are_nested_so_a_sweep_can_reuse_its_vectors(real: Catalog) -> Non
     would silently turn a 220-second sweep into a four-hour one.
     """
     pool = generate_distractors(500, real)
-    small = [s.id for s in shadow_catalog(200, real, pool).skills]
-    large = [s.id for s in shadow_catalog(500, real, pool).skills]
+    small = [s.id for s in shadow_catalog(200, real, pool).runbooks]
+    large = [s.id for s in shadow_catalog(500, real, pool).runbooks]
     assert set(small) < set(large)
 
 
-def test_every_distractor_is_a_valid_skill(pool: list[Distractor]) -> None:
-    """They go through ``SkillMeta`` validation, so a generated document cannot
+def test_every_distractor_is_a_valid_runbook(pool: list[Distractor]) -> None:
+    """They go through ``RunbookMeta`` validation, so a generated document cannot
     be a shape the loader would reject on disk."""
     for d in pool:
-        assert d.skill.meta.id and d.skill.meta.title
-        assert d.skill.meta.summary and d.skill.meta.when_to_use
-        assert d.skill.content_hash.startswith("sha256:")
+        assert d.runbook.meta.id and d.runbook.meta.title
+        assert d.runbook.meta.summary and d.runbook.meta.when_to_use
+        assert d.runbook.content_hash.startswith("sha256:")
 
 
-def test_no_distractor_shadows_a_real_skill_id(real: Catalog, pool: list[Distractor]) -> None:
-    """A collision would silently REPLACE a real skill rather than crowd it,
+def test_no_distractor_shadows_a_real_runbook_id(real: Catalog, pool: list[Distractor]) -> None:
+    """A collision would silently REPLACE a real runbook rather than crowd it,
     which turns a recall measurement into a different experiment."""
-    ids = {d.skill.id for d in pool}
+    ids = {d.runbook.id for d in pool}
     assert not (ids & set(real.known_ids))
     assert len(ids) == len(pool)
 
 
-def test_a_shadow_catalog_keeps_every_real_skill(real: Catalog, pool: list[Distractor]) -> None:
+def test_a_shadow_catalog_keeps_every_real_runbook(real: Catalog, pool: list[Distractor]) -> None:
     catalog = shadow_catalog(300, real, pool)
     assert set(real.known_ids) <= set(catalog.known_ids)
     assert len(catalog) == 300
@@ -111,20 +111,20 @@ def test_the_pool_is_not_uniformly_adversarial(pool: list[Distractor]) -> None:
 def test_derived_distractors_overlap_their_source_vocabulary(
     real: Catalog, pool: list[Distractor]
 ) -> None:
-    """The whole point: a distractor has to look like the skill it crowds.
+    """The whole point: a distractor has to look like the runbook it crowds.
 
     Measured as token overlap against the source's own routing document, not as
     a substring of the id — an earlier version asserted the latter and failed on
     ``runoff-tiebreaker`` versus "tie-breaker", which is a hyphen, not a weak
     distractor. A generator that emitted generic text would leave retrieval an
-    easier job at 500 skills than it has at 38, and the sweep would report that
+    easier job at 500 runbooks than it has at 38, and the sweep would report that
     as safety.
     """
-    by_id = {s.id: s for s in real.skills}
+    by_id = {s.id: s for s in real.runbooks}
     overlaps = []
     for d in (x for x in pool if x.derived_from):
-        source = _words(skill_document(by_id[d.derived_from].meta))
-        derived = _words(skill_document(d.skill.meta))
+        source = _words(runbook_document(by_id[d.derived_from].meta))
+        derived = _words(runbook_document(d.runbook.meta))
         overlaps.append(len(source & derived) / max(len(source), 1))
 
     assert overlaps
@@ -145,12 +145,12 @@ def test_unrelated_distractors_do_NOT_overlap_the_real_catalog(
     catalog shape being modelled, and would make the recall numbers pessimistic
     rather than merely wrong.
     """
-    catalog_words = set().union(*(_words(skill_document(s.meta)) for s in real.skills))
+    catalog_words = set().union(*(_words(runbook_document(s.meta)) for s in real.runbooks))
     unrelated = [d for d in pool if d.shape == "unrelated"]
     assert unrelated
     shares = [
-        len(_words(skill_document(d.skill.meta)) - catalog_words)
-        / max(len(_words(skill_document(d.skill.meta))), 1)
+        len(_words(runbook_document(d.runbook.meta)) - catalog_words)
+        / max(len(_words(runbook_document(d.runbook.meta))), 1)
         for d in unrelated
     ]
     assert sorted(shares)[len(shares) // 2] > 0.2, "the easy shape is not actually foreign"
@@ -164,11 +164,11 @@ def test_the_hard_shapes_carry_an_exclusion_clause(pool: list[Distractor]) -> No
     dotted id" — see the id-reference test below for why most of them use the
     title instead.
     """
-    by_id = {s.id: s for s in load_catalog(default_skills_dir()).skills}
+    by_id = {s.id: s for s in load_catalog(default_runbooks_dir()).runbooks}
     for shape in ("scope_split", "sibling", "collision"):
         for sample in (d for d in pool if d.shape == shape):
             assert sample.derived_from is not None
-            when = sample.skill.meta.when_to_use
+            when = sample.runbook.meta.when_to_use
             assert "Do not use" in when
             source = by_id[sample.derived_from]
             assert source.id in when or source.title.lower() in when.lower()
@@ -180,19 +180,19 @@ def test_id_references_do_not_swamp_the_real_catalogs_fan_in(
     """A distractor naming its source by DOTTED ID is a measurement hazard.
 
     The query carries the active ids literally, through ``ACTIVE_PREFIX``, while
-    a skill's own routing document does not contain its id at all
-    (``skill_document`` renders title/summary/whenToUse). So a pool where every
-    exclusion names an id hands each real skill a crowd of synthetic competitors
+    a runbook's own routing document does not contain its id at all
+    (``runbook_document`` renders title/summary/whenToUse). So a pool where every
+    exclusion names an id hands each real runbook a crowd of synthetic competitors
     holding an exact token sequence the target itself lacks — and the
     dense-retrieval numbers would then be measuring the generator.
 
-    The real catalog averages 4.1 outgoing id references per skill. This keeps
+    The real catalog averages 4.1 outgoing id references per runbook. This keeps
     the synthetic fan-in within a small multiple of that rather than an order of
     magnitude above it.
     """
     ids = set(real.selectable_ids)
-    naming = sum(1 for d in pool if any(i in d.skill.meta.when_to_use for i in ids))
-    assert naming / len(pool) < 0.40, "too many distractors name a real skill id"
+    naming = sum(1 for d in pool if any(i in d.runbook.meta.when_to_use for i in ids))
+    assert naming / len(pool) < 0.40, "too many distractors name a real runbook id"
     assert naming > 0, "no distractor names an id — the real catalog does"
 
 
@@ -201,20 +201,20 @@ def test_every_rendered_document_is_distinct(real: Catalog, pool: list[Distracto
 
     The id is not part of a rendered document, so a template that varied only the
     id produced text-identical rows — measured, 961 distractors collapsed to 492
-    distinct documents with one repeated seven times. A "1,000-skill" catalog
+    distinct documents with one repeated seven times. A "1,000-runbook" catalog
     that is really 530 surfaces plus multiplicity does not measure catalog
-    growth; it measures duplication, and every conclusion past 200 skills rested
+    growth; it measures duplication, and every conclusion past 200 runbooks rested
     on it.
     """
-    documents = [skill_document(d.skill.meta) for d in pool]
+    documents = [runbook_document(d.runbook.meta) for d in pool]
     assert len(set(documents)) == len(documents)
     # ...and distinct from the real catalog's, or a distractor would BE a real
-    # skill's document and score as a retrieval hit for it.
-    assert not (set(documents) & {skill_document(s.meta) for s in real.skills})
+    # runbook's document and score as a retrieval hit for it.
+    assert not (set(documents) & {runbook_document(s.meta) for s in real.runbooks})
 
 
 def test_a_distractor_does_not_repeat_its_lead_in(pool: list[Distractor]) -> None:
-    """"Use when Use for a one-off..." is text no real skill carries.
+    """"Use when Use for a one-off..." is text no real runbook carries.
 
     A doubled lead appeared on a third of the first pool, from stripping only
     "Use when" while the catalog also uses "Use for", "Use ONLY" and
@@ -225,14 +225,14 @@ def test_a_distractor_does_not_repeat_its_lead_in(pool: list[Distractor]) -> Non
              "applies when", "pick this when", "choose this when", "follow this when",
              "the right runbook when")
     for d in pool:
-        when = " ".join(d.skill.meta.when_to_use.lower().split())
+        when = " ".join(d.runbook.meta.when_to_use.lower().split())
         for outer in leads:
             for inner in leads:
-                assert f"{outer} {inner} " not in when, f"{d.skill.id}: {when[:80]!r}"
+                assert f"{outer} {inner} " not in when, f"{d.runbook.id}: {when[:80]!r}"
 
 
 def test_asking_for_more_than_the_pool_holds_is_an_error(real: Catalog) -> None:
-    """Silently returning a smaller catalog would report a 500-skill recall
+    """Silently returning a smaller catalog would report a 500-runbook recall
     number taken at 200."""
     pool = generate_distractors(10, real)
     with pytest.raises(ValueError, match="pool holds"):

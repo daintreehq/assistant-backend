@@ -8,7 +8,7 @@
     python -m benchmarks.dashboard.bench compare results/a.json results/b.json
 
 The deterministic-only mode is the one worth wiring into CI: free, no key, and it
-gates every prompt/skill/assembler edit on the cache-stability, safety, micro-perf,
+gates every prompt/runbook/assembler edit on the cache-stability, safety, micro-perf,
 and orchestrator-correctness numbers.
 
 `qualify-release` is the paid counterpart, and differs from `run --live` in one
@@ -18,7 +18,7 @@ not reach the model has qualified nothing, and recording that as a green run is
 the failure mode this whole gate exists to prevent.
 
 WHAT IT COSTS, stated because nothing else on the way in says so: roughly 520
-model calls at three trials, of which ~438 are the skill-selection corpus (146
+model calls at three trials, of which ~438 are the runbook-selection corpus (146
 cases). That suite dominates the bill by an order of magnitude, and it is also
 the one measuring whether the classifier still routes correctly — the decision
 every other behaviour in the product hangs off. Small-model calls, so the money

@@ -9,13 +9,13 @@
 #                  must NOT run); bump it to model a new instruction (selector runs).
 #   user         — a new user message (a fresh instruction round)
 #   tool_result  — a tool result for the pending tool call (a continuation round)
-#   selector_pick— the skill ids the replayed selector returns THIS turn (ignored on
+#   selector_pick— the runbook ids the replayed selector returns THIS turn (ignored on
 #                  rounds where cadence skips the selector)
 #   main         — {tool_calls: [name]} (model asks for a tool → continuation) or
 #                  {final: "text"} (model gives the final answer → turn complete)
 #   expect       — {selector_ran, active: [ids]}
 cases:
-  - id: single-skill-two-rounds
+  - id: single-runbook-two-rounds
     session_id: s-rename
     turns:
       # An authoritative selection admits specific+foundation UNITS: the top-level

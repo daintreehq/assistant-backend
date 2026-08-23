@@ -35,11 +35,11 @@ def _result(message: dict[str, Any], finish_reason: str) -> ProviderChatResult:
     )
 
 
-def selector_result(skill_ids: list[str]) -> ProviderChatResult:
+def selector_result(runbook_ids: list[str]) -> ProviderChatResult:
     payload = {
         "task_type": "scripted",
         "reason": "replayed selection for the benchmark trace",
-        "skill_ids": list(skill_ids),
+        "runbook_ids": list(runbook_ids),
         "confidence": 0.9,
     }
     return _result({"role": "assistant", "content": json.dumps(payload)}, "stop")
@@ -81,8 +81,8 @@ class ReplayProvider:
     def selector_calls(self) -> int:
         return len(self.selection_requests)
 
-    def script_selection(self, skill_ids: list[str]) -> None:
-        self.selection_result = selector_result(skill_ids)
+    def script_selection(self, runbook_ids: list[str]) -> None:
+        self.selection_result = selector_result(runbook_ids)
 
     async def complete(self, request: ProviderChatRequest) -> ProviderChatResult:  # noqa: ARG002
         # `request` is unread now that every `complete` here is the MAIN call:

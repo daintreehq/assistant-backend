@@ -9,6 +9,17 @@ request (~77 KB of compact wire JSON — ~63% of the assembled prompt bytes; the
 assembler's whole cache layout exists to keep byte-stable, so the prompt-cost,
 injection, and session-trace suites load this rather than a toy stub.
 
+> **It is not a pure capture right now.** The skill -> runbook rename edited two
+> entries in place — `skill__run__get` -> `runbook__run__get` and
+> `skill__step__advance` -> `runbook__step__advance`, along with their `skillId`
+> argument key and their descriptions. The pinned CLI still registers the `skill.*`
+> ids, so those entries describe the CLI AFTER its rename rather than at the pinned
+> commit. Everything else is the capture verbatim. The divergence is bounded and
+> enforced by `test_the_fixtures_run_ahead_of_the_cli_only_where_we_said_they_do`,
+> and `test_the_gate_above_retires_itself_when_the_cli_renames` FAILS the moment the
+> Go side renames — that failure is the cue to re-capture per the recipe below and
+> delete both tests. Do not add further hand edits under this exception.
+
 **Shape:** a bare JSON array of `{"type": "function", "function": {...}}` dicts —
 exactly what `RespondRequest.input.tools` accepts, no envelope. Serialized with
 `json.dumps(tools, indent=1, ensure_ascii=True)` and **no trailing newline**.
@@ -69,9 +80,9 @@ each other.
    ```
 4. Refresh `tests/fixtures/cli_tool_names.txt` **in the same commit**. It must be
    exactly the sorted name projection of this file, and
-   `tests/unit/test_skill_catalog_hygiene.py` fails if the two disagree. Doing one
+   `tests/unit/test_runbook_catalog_hygiene.py` fails if the two disagree. Doing one
    and forgetting the other is the obvious mistake, and nothing else would notice:
-   both files still parse, and the damage only surfaces as a skill declaring a tool
+   both files still parse, and the damage only surfaces as a runbook declaring a tool
    the CLI no longer has.
 
    ```bash

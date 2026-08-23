@@ -56,7 +56,7 @@ async def test_a_stalled_preparation_becomes_an_attributable_error(
 
     body = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             # A substantive request: a bare greeting takes the no-task fast path
             # and never reaches the selector, so it could not exercise this deadline.
@@ -144,7 +144,7 @@ async def test_a_stalled_stream_ends_with_a_terminal_error_not_a_fabricated_done
 
     body = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             # A substantive request: a bare greeting takes the no-task fast path
             # and never reaches the selector, so it could not exercise this deadline.
@@ -235,7 +235,7 @@ async def test_an_upstream_that_never_sends_a_first_event_is_retried_not_fatal(
     assert "turn_deadline_exceeded" not in joined
     assert "upstream_timeout" not in joined, "a recovered stall leaked an error to the client"
     # Exactly one `meta`: the retry happens under a single public turn, and a second
-    # metadata event would tell the client its skill set had changed mid-turn.
+    # metadata event would tell the client its runbook set had changed mid-turn.
     assert joined.count("event: meta") == 1
     assert stalled[0].closed, "the stalled half-open stream leaked"
     await container.aclose()
@@ -571,7 +571,7 @@ async def _drain(container, *, request_id: str) -> str:  # type: ignore[no-untyp
 
     body = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},

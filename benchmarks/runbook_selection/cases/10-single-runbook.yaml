@@ -1,0 +1,187 @@
+# Clean single-runbook matches: one obviously-right specific runbook, no prior active set.
+# The foundation (daintree.foundation) is optional on these — pairing it in is
+# the documented default and is fine, but a lean pick of just the specific also passes.
+
+cases:
+  - id: rename-terminals-basic
+    category: single-runbook
+    note: The canonical rename request.
+    messages:
+      - role: user
+        content: Rename my terminals so I can tell the agents apart.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.foundation]
+
+  - id: rename-figure-out-titles
+    category: single-runbook
+    messages:
+      - role: user
+        content: >-
+          I've got six tabs all called "Claude". Figure out what each one is doing
+          and give them proper titles.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.foundation]
+
+  - id: start-issue-pickup
+    category: single-runbook
+    messages:
+      - role: user
+        content: Let's start on issue #142 — set up a worktree and get an agent going on it.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.foundation]
+
+  - id: prep-branch-open-pr
+    category: single-runbook
+    messages:
+      - role: user
+        content: >-
+          I think we're done here. Get this branch ready for review and open the PR.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+
+  - id: recipe-run-workspace
+    category: single-runbook
+    messages:
+      - role: user
+        content: Load the pr-review recipe in this workspace.
+    expect:
+      required: [daintree.recipe.run-or-create]
+      optional: [daintree.foundation]
+
+  - id: spawn-agent-fix-tests
+    category: single-runbook
+    messages:
+      - role: user
+        content: Spawn an agent to fix the failing auth tests in this repo.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: ask-single-agent-relay
+    category: single-runbook
+    messages:
+      - role: user
+        content: >-
+          Ask the claude agent whether the migration script handles rollbacks,
+          and tell me what it says.
+    expect:
+      required: [daintree.agents.ask-and-relay]
+      optional: [daintree.foundation]
+
+  - id: poll-pinned-fleet
+    category: single-runbook
+    messages:
+      - role: user
+        content: >-
+          Poll all my pinned agents: should we use Redis or in-process caching for
+          the session layer? Summarize the consensus.
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: status-overview
+    category: single-runbook
+    note: >-
+      Re-pointed against the 23-runbook catalog: "anything need attention?" is
+      supervise-fleet's own "anything need me?" trigger, and the deliverable is triage of
+      the running agents, not an inventory. The foundation's whenToUse now hands this
+      over by name ("triage of running agents is daintree.orchestration.supervise-fleet")
+      and forbids loading itself instead of a runbook that squarely matches; it stays in
+      optional because the backend pairs it downstream anyway.
+    messages:
+      - role: user
+        content: What's the current state of my terminals and agents? Anything need attention?
+    expect:
+      required: [daintree.orchestration.supervise-fleet]
+      optional: [daintree.foundation]
+
+  - id: explore-readonly-agent
+    category: single-runbook
+    note: Read-only investigation routes to spawn-visible-agent per its whenToUse.
+    messages:
+      - role: user
+        content: >-
+          Have an agent investigate why the dev server takes 8 seconds to boot —
+          read only, don't change anything yet.
+    expect:
+      required: [daintree.edits.spawn-visible-agent]
+      optional: [daintree.foundation]
+
+  - id: find-unclaimed-backlog-work
+    category: single-runbook
+    note: >-
+      Recall for daintree.workflow.find-issue-work. The deliverable is a SHORTLIST — the
+      user says outright not to start anything — which is the runbook's own boundary
+      ("The deliverable is a shortlist or one chosen issue, NOT a launched agent").
+    messages:
+      - role: user
+        content: >-
+          I've got a couple of hours. Dig through the tracker and find me two or three
+          open bugs nobody's assigned to and that aren't flagged for human review.
+          Just the list for now — don't set anything up yet.
+    expect:
+      required: [daintree.workflow.find-issue-work]
+      optional: [daintree.foundation]
+
+  - id: is-that-pr-green
+    category: single-runbook
+    note: >-
+      Recall for daintree.workflow.follow-up-on-issue — the plainest form of its trigger
+      ("is that PR green?", "what's blocking it?"). A one-off read now, no watcher.
+    messages:
+      - role: user
+        content: Did the checks pass on PR 412? And has anyone reviewed it yet?
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: comment-and-close-shipped-issue
+    category: single-runbook
+    note: >-
+      The write half of follow-up-on-issue: closeout comment plus close, which no other
+      runbook in the catalog teaches. Explicitly not branch prep — nothing to commit, push
+      or open.
+    messages:
+      - role: user
+        content: >-
+          Issue 284 shipped last week but the ticket's still open. Leave a note on it
+          saying what landed and then close it out.
+    expect:
+      required: [daintree.workflow.follow-up-on-issue]
+      optional: [daintree.foundation]
+
+  - id: copytree-curate-bundle-clipboard
+    category: single-runbook
+    note: The canonical natural-language curated-bundle request, clipboard-bound.
+    messages:
+      - role: user
+        content: >-
+          Create a bundle of everything relevant to landscape generation,
+          including its supporting files and tests, and put the finished file
+          on my clipboard.
+    expect:
+      required: [daintree.context.curate-copytree-bundle]
+      optional: [daintree.foundation]
+
+  - id: plain-worktree-new-branch
+    category: single-runbook
+    note: >-
+      The recall case for the runbook that runbook learning wrote after a session where the
+      assistant reached for raw git in the user's own terminal. The wording is a
+      user's, not the runbook's: no "plain", no "standalone", no "worktree", no "set
+      up" — all of those are the runbook's own trigger vocabulary, and echoing them
+      measures keyword overlap rather than routing. What decides it is that a
+      branch is named, a base is named, the isolation is the point, and nothing
+      asks for a recipe, an agent or an issue.
+    messages:
+      - role: user
+        content: >-
+          I want a separate checkout off develop for spike-auth-refactor, so I can
+          leave what I'm doing here alone.
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]

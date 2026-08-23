@@ -1,0 +1,133 @@
+"""The rename's own gate: "skill" must not come back as a Daintree runtime term.
+
+The 5,196-occurrence sweep that renamed the procedural catalog is the kind of change
+that reverses one file at a time — a merge that resurrects an old branch's wording, a
+comment written from memory, a fixture regenerated from a stale capture. Nothing else
+in the suite would notice: every test was renamed alongside the code, so the tests and
+the code agree with each other whichever word they are both using.
+
+This is deliberately a VOCABULARY check and not a spelling preference. The allowlist
+below is the whole design: each entry is a place where "skill" names something this
+repository does not own, and adding to it should feel like a decision.
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+#: Paths where "skill" is correct, with the reason it is correct.
+_ALLOWED_PATHS: dict[str, str] = {
+    # Claude Code's own skill directory. Anthropic's product term, not ours.
+    ".claude/": "Claude Code skills — an external product's term",
+    # The Go CLI, a separate repository on its own rename schedule.
+    "cli/": "the vendored CLI submodule, renamed on its own schedule",
+    # This file names the forbidden word in order to forbid it.
+    "tests/unit/test_legacy_vocabulary.py": "this gate",
+}
+
+#: Individual lines that legitimately say "skill", keyed by path. Each value is a
+#: substring that must appear in the offending line for it to be forgiven, so a
+#: blanket exemption cannot hide behind a file-level entry.
+_ALLOWED_LINES: dict[str, tuple[str, ...]] = {
+    "CLAUDE.md": (".claude/skills",),
+    "README.md": (".claude/skills",),
+    "cloudbuild.yaml": (".claude/skills",),
+    "pyproject.toml": (".claude skill",),
+    # The two CLI tool names that run AHEAD of the pinned submodule, plus the
+    # comment block explaining why. See the fixture header.
+    "tests/fixtures/cli_tool_names.txt": ("skill__step__advance", "skill__run__get", "skill"),
+    # Gates and sentinels that must keep quoting the retired vocabulary in order
+    # to detect its return. Renaming these is what makes them stop working.
+    "tests/unit/test_docs_drift.py": ("skill", "SKILL_LEARNING"),
+    "tests/unit/test_policy_contradictions.py": ("skill",),
+    # Deferred-work entries that quote the retired vocabulary to describe the
+    # rename itself, plus the Go path the CLI still uses.
+    "TODO.md": ("skill.go", "skill/skill.go", "skill__", "skill.", "skill\" ->", "skill ->", ".claude/skills"),
+    "benchmarks/_harness/fixtures/README.md": ("skill",),
+    # The self-retiring CLI-divergence gate must NAME the pre-rename tool ids;
+    # that is how it detects the Go side catching up.
+    "tests/unit/test_runbook_catalog_hygiene.py": ("skill.", "skill/skill.go", "`skill.*`"),
+    # Prose and comments that name the retired word IN ORDER to explain the break.
+    # Each is pinned to the phrase that does the explaining, so the exemption cannot
+    # drift into an ordinary present-tense use of the old term.
+    "docs/DAINTREE_API.md": ("rather than `skills`",),
+    "src/daintree_assistant_server/__init__.py": ('said "skill"',),
+    "src/daintree_assistant_server/state/codec.py": ("`active_skills`",),
+    # The v1 state-token test must build a payload carrying the RETIRED field name;
+    # that literal is the whole point of the fixture.
+    "tests/unit/test_state_codec.py": ("active_skills",),
+    # Claude Code's own skill directory, referenced by path from the training docs.
+    "training/EXPERIMENTS.md": (".claude/skills",),
+    "training/README.md": (".claude/skills",),
+}
+
+_SKILL = re.compile(r"\bskills?\b|skill_|_skill|Skill", re.IGNORECASE)
+
+_BINARY_SUFFIXES = {".onnx", ".npz", ".bin", ".safetensors", ".png", ".jpg", ".gz", ".pyc"}
+
+
+def _tracked_files() -> list[Path]:
+    out = subprocess.run(
+        ["git", "ls-files"], cwd=REPO_ROOT, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    return [Path(p) for p in out]
+
+
+def _is_allowed_path(rel: str) -> bool:
+    return any(rel == key or rel.startswith(key) for key in _ALLOWED_PATHS)
+
+
+def test_no_daintree_runtime_surface_still_says_skill() -> None:
+    """One assertion over every tracked file, with a reasoned allowlist."""
+    offenders: list[str] = []
+    for rel_path in _tracked_files():
+        rel = rel_path.as_posix()
+        if _is_allowed_path(rel) or rel_path.suffix in _BINARY_SUFFIXES:
+            continue
+        # The shipped selector artifacts are model weights and vocabularies; the
+        # tokenizer vocab genuinely contains the English word.
+        if "artifacts/" in rel:
+            continue
+        full = REPO_ROOT / rel_path
+        if not full.is_file():
+            continue
+        try:
+            text = full.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        permitted = _ALLOWED_LINES.get(rel, ())
+        for number, line in enumerate(text.splitlines(), start=1):
+            if not _SKILL.search(line):
+                continue
+            if any(token in line for token in permitted):
+                continue
+            offenders.append(f"{rel}:{number}: {line.strip()[:120]}")
+
+    assert not offenders, (
+        "these lines still use the retired Daintree runtime vocabulary:\n  "
+        + "\n  ".join(offenders)
+        + "\n\nDaintree's procedural catalog is called RUNBOOKS. If one of these names "
+        "something external — a Claude Code skill, the Go CLI, a provider feature — add "
+        "it to _ALLOWED_PATHS/_ALLOWED_LINES with the reason."
+    )
+
+
+def test_the_allowlist_does_not_rot() -> None:
+    """An allowlist entry for a file that no longer exists is a silent widening.
+
+    It is also how this gate would decay into a no-op: entries accumulate, nobody
+    removes them, and eventually the exemptions cover the surface being guarded.
+    """
+    missing = [
+        rel
+        for rel in list(_ALLOWED_PATHS) + list(_ALLOWED_LINES)
+        if not (REPO_ROOT / rel).exists()
+    ]
+    assert not missing, (
+        f"allowlist names paths that no longer exist: {missing}. Remove them — an "
+        "exemption for a deleted file only ever widens what the next one covers."
+    )

@@ -15,7 +15,7 @@
 # behind the `candidate` tag and smoke-tested on its own URL; only a revision
 # that answers /readyz gets promoted to 100%. Readiness covers failures that are
 # invisible at build time — a missing or weak secret, a malformed prompt
-# template, an unparseable skill file — so those turn into a red build instead
+# template, an unparseable runbook file — so those turn into a red build instead
 # of a broken production service.
 
 substitutions:
@@ -40,7 +40,7 @@ substitutions:
   #
   # _PREVIOUS_KID is EMPTY by default and the deploy fails closed if the previous
   # secret exists without one — a plausible-but-wrong placeholder would silently
-  # verify nothing, which presents as every session losing its skills at once.
+  # verify nothing, which presents as every session losing its runbooks at once.
   _CURRENT_KID: state-prod
   _PREVIOUS_KID: ''
 
@@ -67,7 +67,7 @@ timeout: 1800s
 
 steps:
   # ---- Materialise Git LFS content ----------------------------------------
-  # The skill selector (skills/local/artifacts/selector/**/*.onnx, tokenizer.json,
+  # The runbook selector (runbooks/local/artifacts/selector/**/*.onnx, tokenizer.json,
   # vectors.npz) is stored in Git LFS, and Cloud Build's repository fetch does
   # NOT bring LFS objects down — it leaves 130-byte pointer files where the
   # models should be. Without this step the image builds green, deploys green,
@@ -98,7 +98,7 @@ steps:
         # BOTH encoders are checked. Checking one would let a pointer ship as
         # the other: the two stages are separate graphs and LFS can fetch them
         # independently, so a per-file check is the only one that means anything.
-        ART=src/daintree_assistant_server/skills/local/artifacts/selector
+        ART=src/daintree_assistant_server/runbooks/local/artifacts/selector
         for MODEL in "$$ART/retriever/model_int8.onnx" "$$ART/ranking/model_int8.onnx"; do
           SIZE=$$(stat -c%s "$$MODEL")
           if [ "$$SIZE" -lt 1000000 ]; then
@@ -209,7 +209,7 @@ steps:
         # changed with the always-warm instance: idle memory is billed
         # continuously now, so this is a real recurring cost rather than the
         # rounding error it was under scale-to-zero. It is still the right
-        # trade — the process holds the prompt templates and every skill body
+        # trade — the process holds the prompt templates and every runbook body
         # resident, and an OOM restart costs more than the difference.
         #
         # timeout=960 is a CUSHION over the app's own 900s total turn deadline
@@ -251,7 +251,7 @@ steps:
           --port=8080
           # ONE vCPU, with concurrency halved to pay for it.
           #
-          # Local skill selection adds CPU-bound work this container never did:
+          # Local runbook selection adds CPU-bound work this container never did:
           # a bi-encoder plus a cross-encoder on onnxruntime, ~35ms of compute
           # per turn that fires the selector. The question was whether that needs
           # a second core, and it was measured rather than assumed
@@ -276,15 +276,15 @@ steps:
           # do not: a turn spends seconds streaming the main model's response and
           # ~35ms ranking, so the selector's duty cycle is low single-digit
           # percent and genuine collisions are rare. The pool bounds the rare
-          # case (skills/local/runtime.py) and, at worst, waits — which is still
+          # case (runbooks/local/runtime.py) and, at worst, waits — which is still
           # the fastest option available, since the alternative is the 2044ms
           # call this replaces.
           --cpu=1
           # 2Gi. Measured whole-process RSS with both selector encoders loaded
           # (int8; fp32 is neither shipped nor packaged) plus prompts, catalog
           # and the app: ~410MB idle on a dev machine. The catalog is DESIGNED to
-          # grow to 100-200 skills, and under the two-stage selector that growth
-          # is far cheaper than it was — a skill costs one row in the embedding
+          # grow to 100-200 runbooks, and under the two-stage selector that growth
+          # is far cheaper than it was — a runbook costs one row in the embedding
           # table (~4.5KB) instead of a wider head — but each one still costs
           # prompt bytes held resident, and 8 concurrent turns carry their own
           # buffers. An OOM kill mid-stream costs more than the ~$7/month the

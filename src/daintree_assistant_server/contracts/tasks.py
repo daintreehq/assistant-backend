@@ -165,10 +165,10 @@ class ExtractionVerdictInput(BaseModel):
     condition: str = Field(min_length=1, max_length=8192)
 
 
-class SkillStepConsistencyInput(BaseModel):
+class RunbookStepConsistencyInput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    skill_id: str = Field(min_length=1, max_length=256)
+    runbook_id: str = Field(min_length=1, max_length=256)
     completed_step: int = Field(ge=0)
     status: Literal["done", "skipped"] = "done"
     requested_next: str | None = Field(default=None, max_length=256)
@@ -546,7 +546,7 @@ class WorkflowPlanInput(BaseModel):
     scope: str | None = Field(default=None, max_length=4096)
     runtime_summary: dict[str, Any] = Field(default_factory=dict)
     tool_inventory: list[dict[str, Any]] = Field(default_factory=list, max_length=256)
-    active_skill_ids: list[str] = Field(default_factory=list, max_length=16)
+    active_runbook_ids: list[str] = Field(default_factory=list, max_length=16)
     existing_workflow: dict[str, Any] | None = None
     relevant_memories: list[str] = Field(default_factory=list, max_length=50)
     open_resources: list[dict[str, Any]] = Field(default_factory=list, max_length=100)

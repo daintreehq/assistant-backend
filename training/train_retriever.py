@@ -2,19 +2,19 @@
 
 ## What it is for
 
-The shipped multi-label classifier answers "which of these 39 skills" with one
-row per skill in a fixed head. That is optimal for 39 and structurally wrong for
-200: every skill needs its own training mass, a skill added after the build gets
-no row at all, and the head cannot say anything about a skill it never saw.
+The shipped multi-label classifier answers "which of these 39 runbooks" with one
+row per runbook in a fixed head. That is optimal for 39 and structurally wrong for
+200: every runbook needs its own training mass, a runbook added after the build gets
+no row at all, and the head cannot say anything about a runbook it never saw.
 
-This encoder replaces the "which skills are even in play" half of that question
-with a cosine search. Skills are embedded ONCE at build time; a turn embeds only
+This encoder replaces the "which runbooks are even in play" half of that question
+with a cosine search. Runbooks are embedded ONCE at build time; a turn embeds only
 the conversation and takes the nearest ``k``. The head that follows (stage 2,
 ``train_setwise.py``) then only ever reasons over ``k`` candidates, so its job is
-the same difficulty at 39 skills and at 1,000.
+the same difficulty at 39 runbooks and at 1,000.
 
 Nothing here is a reranker in the sense the abandoned Architecture A used the
-word (``EXPERIMENTS.md``): there is no cross-encoder, no per-(query, skill)
+word (``EXPERIMENTS.md``): there is no cross-encoder, no per-(query, runbook)
 forward pass. This stage produces an ordering and a shortlist, and stage 2 reads
 cached vectors, not text.
 
@@ -22,11 +22,11 @@ cached vectors, not text.
 
 InfoNCE over cosine similarity, with the corpus's mined ``hard_negatives`` as
 explicit negatives on top of the in-batch ones. Multi-positive rows (a turn that
-genuinely needs two skills) are handled by summing the positive mass rather than
-picking one arbitrarily, so a two-skill turn is not trained to rank one of its
+genuinely needs two runbooks) are handled by summing the positive mass rather than
+picking one arbitrarily, so a two-runbook turn is not trained to rank one of its
 own answers as a negative.
 
-Rows with no expected skill (the "no task" shapes) are dropped HERE and only
+Rows with no expected runbook (the "no task" shapes) are dropped HERE and only
 here: there is no positive to contrast against, and the question they answer —
 "this turn needs nothing" — belongs to stage 2's cardinality head, which sees
 them in full.
@@ -44,13 +44,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from daintree_assistant_server.skills.catalog import (  # noqa: E402
-    default_skills_dir,
+from daintree_assistant_server.runbooks.catalog import (  # noqa: E402
+    default_runbooks_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.local.documents import (  # noqa: E402
+from daintree_assistant_server.runbooks.local.documents import (  # noqa: E402
     INDEX_DOC_VARIANT,
-    skill_document,
+    runbook_document,
 )
 from training.common import build_query, corpus_rows, device  # noqa: E402
 
@@ -76,11 +76,11 @@ def main() -> int:
     # the whole selector below where it already is.
     ap.add_argument("--base-model", default="sentence-transformers/all-MiniLM-L6-v2")
     ap.add_argument(
-        "--holdout-skills",
+        "--holdout-runbooks",
         default="",
-        help="comma-separated skill ids to strip from TRAINING rows entirely. "
-        "Paired with train_setwise's flag of the same name, this makes a skill "
-        "invisible to BOTH stages — the honest zero-shot probe, since a skill "
+        help="comma-separated runbook ids to strip from TRAINING rows entirely. "
+        "Paired with train_setwise's flag of the same name, this makes a runbook "
+        "invisible to BOTH stages — the honest zero-shot probe, since a runbook "
         "held out of only stage 2 was still shortlisted by an encoder that knew it.",
     )
     ap.add_argument("--out", default=str(MODELS / "retriever"))
@@ -89,13 +89,13 @@ def main() -> int:
     import torch
     from transformers import AutoModel, AutoTokenizer
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     labels = sorted(catalog.selectable_ids)
     index = {sid: i for i, sid in enumerate(labels)}
     docs = [
-        skill_document(catalog.get(sid).meta, variant=INDEX_DOC_VARIANT) for sid in labels
+        runbook_document(catalog.get(sid).meta, variant=INDEX_DOC_VARIANT) for sid in labels
     ]
-    print(f"catalog: {len(labels)} selectable skills")
+    print(f"catalog: {len(labels)} selectable runbooks")
 
     rows = corpus_rows(DATA / "selection.jsonl")
     labelled = [r for r in rows if [s for s in r["expect_ids"] if s in index]]
@@ -107,15 +107,15 @@ def main() -> int:
     cut = int(len(labelled) * (1 - args.val_fraction))
     train_rows, val_rows = labelled[:cut], labelled[cut:]
 
-    holdout = {sid.strip() for sid in args.holdout_skills.split(",") if sid.strip()}
+    holdout = {sid.strip() for sid in args.holdout_runbooks.split(",") if sid.strip()}
     if holdout:
         unknown = holdout - set(labels)
         if unknown:
-            raise SystemExit(f"--holdout-skills names unknown ids: {sorted(unknown)}")
+            raise SystemExit(f"--holdout-runbooks names unknown ids: {sorted(unknown)}")
         before = len(train_rows)
         train_rows = [r for r in train_rows if not (set(r["expect_ids"]) & holdout)]
         print(
-            f"zero-shot probe: held {len(holdout)} skill(s) out of training — "
+            f"zero-shot probe: held {len(holdout)} runbook(s) out of training — "
             f"{before - len(train_rows)} rows dropped, {len(train_rows)} remain"
         )
 
@@ -141,7 +141,7 @@ def main() -> int:
         return torch.nn.functional.normalize(pooled, dim=-1)
 
     # The whole catalog is re-embedded every step. That is affordable because
-    # the catalog is small and it keeps the skill vectors exactly in step with
+    # the catalog is small and it keeps the runbook vectors exactly in step with
     # the encoder being trained — the alternative (a periodically refreshed
     # cache) trains the query side against stale documents, which is the same
     # class of silent train/serve drift ``documents.py`` exists to prevent.
@@ -156,9 +156,9 @@ def main() -> int:
     def targets(subset: list[dict]) -> torch.Tensor:
         """Multi-hot positives, plus -inf masking for mined hard negatives.
 
-        Returned as a (batch, n_skills) float matrix of 1.0 / 0.0. Hard
+        Returned as a (batch, n_runbooks) float matrix of 1.0 / 0.0. Hard
         negatives need no special treatment in the loss — every non-positive
-        skill is already a negative, and the corpus's mined ones simply carry
+        runbook is already a negative, and the corpus's mined ones simply carry
         more weight by being semantically close.
         """
         y = torch.zeros(len(subset), len(labels), device=dev)
@@ -183,7 +183,7 @@ def main() -> int:
             y = targets(batch)
             # Multi-positive InfoNCE: -log( sum_pos exp(s) / sum_all exp(s) ).
             # Summing the positive mass rather than looping one-positive-per-row
-            # means a two-skill turn is never asked to rank its own second answer
+            # means a two-runbook turn is never asked to rank its own second answer
             # as a negative, which is what a naive cross-entropy would do.
             logsumexp_all = torch.logsumexp(sim, dim=1)
             neg_inf = torch.finfo(sim.dtype).min
@@ -225,7 +225,7 @@ def main() -> int:
                 "doc_max_length": args.doc_max_length,
                 "hidden_size": model.config.hidden_size,
                 "doc_variant": INDEX_DOC_VARIANT,
-                "holdout_skills": sorted(holdout),
+                "holdout_runbooks": sorted(holdout),
             },
             indent=2,
         )

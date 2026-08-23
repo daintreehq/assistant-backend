@@ -12,7 +12,7 @@
 # WHY THIS EXISTS. `cloudbuild.yaml` promotes a candidate only after it answers
 # /readyz and reports the right build_sha, so a revision that fails to START never
 # takes traffic. What that cannot catch is a revision that comes up perfectly and
-# is WRONG — a prompt change that degrades answers, a skill that routes badly, a
+# is WRONG — a prompt change that degrades answers, a runbook that routes badly, a
 # latency regression. Those are found by a human minutes later, and the recovery
 # was previously "remember the gcloud incantation, under pressure, with a tester
 # waiting". This is that incantation, with the checks that make it safe.

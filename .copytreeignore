@@ -3,7 +3,7 @@
 # .gitignore.
 #
 # Goal: a PURE-CODE bundle. Everything needed to understand and change the
-# server — source, server-owned prompts, skill bodies, contracts, docs, deploy
+# server — source, server-owned prompts, runbook bodies, contracts, docs, deploy
 # and CI config — and nothing that is an environment, a cache, a build
 # artifact, a captured fixture, a model weight, or a second copy of a
 # different repository.
@@ -66,7 +66,7 @@ cli/
 # already; the wildcards below are what catches a stray export anywhere else.
 # ---------------------------------------------------------------------------
 training/data/
-src/daintree_assistant_server/skills/local/artifacts/
+src/daintree_assistant_server/runbooks/local/artifacts/
 *.npz
 *.onnx
 *.jsonl

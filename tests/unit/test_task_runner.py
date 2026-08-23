@@ -157,14 +157,14 @@ async def test_watcher_classify_clamps_confidence(task_runner: TaskRunner, fake_
 
 
 @pytest.mark.asyncio
-async def test_skill_step_consistency(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
+async def test_runbook_step_consistency(task_runner: TaskRunner, fake_provider: FakeProvider) -> None:
     fake_provider.complete_result = make_result(
         content=json.dumps({"reason": "normal", "confidence": 0.2, "matched": False})
     )
     out = await _run(
         task_runner,
-        "skill_step_consistency",
-        {"skill_id": "x", "completed_step": 1, "current_step_before": 1, "current_step_after": 2},
+        "runbook_step_consistency",
+        {"runbook_id": "x", "completed_step": 1, "current_step_before": 1, "current_step_after": 2},
     )
     assert out["matched"] is False
 
@@ -696,7 +696,7 @@ EXPECTED_TASK_IDS = frozenset(
         "terminal_extract_text",
         "terminal_extract_json",
         "extraction_verdict",
-        "skill_step_consistency",
+        "runbook_step_consistency",
         "workflow_plan",
         "workflow_reconcile",
         "workflow_resume_digest",

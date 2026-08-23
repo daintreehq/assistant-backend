@@ -77,7 +77,7 @@ where a key must never appear applies to it identically — it is *more* sensiti
 than a caller's was, since one leak exposes every turn Daintree runs rather than
 one tester's account.
 
-(There used to be a bounded exception here: skill learning ran fire-and-forget
+(There used to be a bounded exception here: runbook learning ran fire-and-forget
 after the response, so the orchestrator captured the caller's `SecretStr` by
 value into a detached task and it outlived the request. That feature has been
 removed.)
@@ -187,7 +187,7 @@ credential, sign in again. Nothing server-side needs to change: the backend keep
 no copy and no cache.
 
 **The server's state-signing key** (`STATE_SIGNING_KEY_CURRENT`) is unrelated
-material — it signs the opaque skill-state token, not any caller credential.
+material — it signs the opaque runbook-state token, not any caller credential.
 
 It rotates through a current/previous pair, and `cloudbuild.yaml` supports the
 overlap: it mounts `state-signing-key-previous` **when that secret exists**, and

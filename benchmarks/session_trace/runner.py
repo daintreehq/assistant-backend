@@ -21,7 +21,7 @@ from typing import Any
 
 from daintree_assistant_server.config import SERVING_MODEL
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
-from daintree_assistant_server.skills.catalog import load_catalog
+from daintree_assistant_server.runbooks.catalog import load_catalog
 
 from .._harness.cases import CaseError, load_yaml_cases
 from .._harness.env import BENCH_CALLER_KEY, build_settings
@@ -31,15 +31,15 @@ from . import replay as R
 CASES_DIR = Path(__file__).resolve().parent / "cases"
 
 
-def _validate_trace(trace: dict[str, Any], skill_ids: set[str], tools: set[str]) -> None:
+def _validate_trace(trace: dict[str, Any], runbook_ids: set[str], tools: set[str]) -> None:
     if not trace.get("turns"):
         raise CaseError(f"{trace['id']}: trace has no turns")
     for i, turn in enumerate(trace["turns"]):
         for sid in turn.get("selector_pick", []) or []:
-            if sid not in skill_ids:
-                raise CaseError(f"{trace['id']} turn {i}: unknown skill id {sid!r}")
+            if sid not in runbook_ids:
+                raise CaseError(f"{trace['id']} turn {i}: unknown runbook id {sid!r}")
         for sid in (turn.get("expect", {}).get("active") or []):
-            if sid not in skill_ids:
+            if sid not in runbook_ids:
                 raise CaseError(f"{trace['id']} turn {i}: unknown expect.active id {sid!r}")
         main = turn.get("main") or {}
         for name in main.get("tool_calls", []) or []:
@@ -51,11 +51,11 @@ def _validate_trace(trace: dict[str, Any], skill_ids: set[str], tools: set[str])
 
 def load_traces(id_filter: str | None = None) -> list[dict[str, Any]]:
     catalog = load_catalog()
-    skill_ids = {s.id for s in catalog.skills}
+    runbook_ids = {s.id for s in catalog.runbooks}
     tools = set(tool_names())
     traces = load_yaml_cases(CASES_DIR, id_filter)
     for t in traces:
-        _validate_trace(t, skill_ids, tools)
+        _validate_trace(t, runbook_ids, tools)
     return traces
 
 
@@ -63,7 +63,7 @@ def _request(
     messages: list[dict[str, Any]], state: str | None, session_id: str, turn_id: str
 ) -> RespondRequest:
     payload: dict[str, Any] = {
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": session_id, "turn_id": turn_id, "instruction_revision": 0},
         "input": {"messages": messages, "tools": load_tool_inventory()},
         "startup": {},
@@ -129,8 +129,8 @@ async def _run_trace(orchestrator: Any, provider: R.ReplayProvider,
         else:
             messages.append({"role": "assistant", "content": main["final"]})
 
-        got_active = [s["id"] for s in body.get("skills", {}).get("active", [])]
-        selector_ran = bool(body.get("skills", {}).get("selector", {}).get("ran"))
+        got_active = [s["id"] for s in body.get("runbooks", {}).get("active", [])]
+        selector_ran = bool(body.get("runbooks", {}).get("selector", {}).get("ran"))
         new_state = body.get("state")
         # The returned state token must actually verify (session-bound), and carry the
         # active set forward — a nonempty-but-forged/unverifiable token is not continuity.
@@ -197,13 +197,13 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
     # seam tests/conftest.py uses — and the ONNX artifact is never loaded here.
     import sys
 
-    from daintree_assistant_server.skills.catalog import (
+    from daintree_assistant_server.runbooks.catalog import (
         CatalogManager,
-        default_skills_dir,
+        default_runbooks_dir,
     )
 
     # The SCRIPTED seam, from the test suite. Selection has to be driven, not
-    # decided, for a trace replay: each trace states which skills the turn should
+    # decided, for a trace replay: each trace states which runbooks the turn should
     # end up with, and running the real classifier would be measuring the
     # classifier instead of the orchestration cadence this suite exists to pin.
     # It lives in `tests/fakes.py` because that is what it is — the prompt-based
@@ -215,7 +215,7 @@ async def run_bench(id_filter: str | None = None, env_file: str | None = None) -
 
     seam = ScriptedSelector(
         provider,
-        CatalogManager(load_catalog(default_skills_dir()), primary_dir=default_skills_dir()),
+        CatalogManager(load_catalog(default_runbooks_dir()), primary_dir=default_runbooks_dir()),
         settings,
     )
     container = build_container(settings, provider=provider, selector=seam)

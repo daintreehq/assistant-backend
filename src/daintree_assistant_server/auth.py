@@ -57,7 +57,7 @@ class Principal:
         return scope in self.scopes
 
 
-CALLER_SCOPES = frozenset({"chat", "tasks", "skills:read", "skills:write"})
+CALLER_SCOPES = frozenset({"chat", "tasks", "runbooks:read", "runbooks:write"})
 
 
 def authenticate(authorization: str | None) -> Principal:

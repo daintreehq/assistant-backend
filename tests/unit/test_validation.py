@@ -37,7 +37,7 @@ def _req(
     if tool_choice is not None:
         inp["tool_choice"] = tool_choice
     body: dict = {
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": "s", "turn_id": "t"},
         "input": inp,
         "startup": startup if startup is not None else {},
@@ -98,7 +98,7 @@ def test_unknown_role_rejected(settings: Settings) -> None:
     assert exc.value.code == "unsupported_role"
 
 
-@pytest.mark.parametrize("name", ["skill.find", "skill.load", "skill__find", "skill__load", "daintree_internal__x"])
+@pytest.mark.parametrize("name", ["runbook.find", "runbook.load", "runbook__find", "runbook__load", "daintree_internal__x"])
 def test_reserved_tools_rejected(settings: Settings, name: str) -> None:
     req = _req(tools=[{"type": "function", "function": {"name": name}}])
     with pytest.raises(DaintreeError) as exc:
@@ -108,8 +108,8 @@ def test_reserved_tools_rejected(settings: Settings, name: str) -> None:
 
 def test_allowed_wire_safe_tools(settings: Settings) -> None:
     req = _req(tools=[
-        {"type": "function", "function": {"name": "skill__run__get"}},
-        {"type": "function", "function": {"name": "skill__step__advance"}},
+        {"type": "function", "function": {"name": "runbook__run__get"}},
+        {"type": "function", "function": {"name": "runbook__step__advance"}},
     ])
     validate_respond_request(req, settings)
 
@@ -310,7 +310,7 @@ def test_text_response_format_with_tools_accepted(settings: Settings) -> None:
 # The old rule was a membership test: a tool result was accepted whenever its id
 # had appeared in ANY earlier assistant message. That let a transcript reuse an
 # id while the first call was still open, and
-# `skills/tool_projection._unresolved_tool_calls` keys a dict by exactly that id
+# `runbooks/tool_projection._unresolved_tool_calls` keys a dict by exactly that id
 # — so the second call OVERWROTE the first, and under enforcement the projection
 # withheld the tool the pending call needed. These tests pin the invariant that
 # makes that dict trustworthy: a call is open exactly once, and the batch closes

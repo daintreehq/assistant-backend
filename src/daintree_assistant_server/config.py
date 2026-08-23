@@ -21,8 +21,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Together AI serves `deepseek-ai/DeepSeek-V4-Flash-0731`, and it serves
 # everything: the main completion and every utility task. Together is a model
 # HOST rather than a router, so one endpoint serves the weights and there is
-# nothing to select between. Skill selection makes no upstream call at all — it
-# is the local ONNX classifier in `skills/local/`.
+# nothing to select between. Runbook selection makes no upstream call at all — it
+# is the local ONNX classifier in `runbooks/local/`.
 #
 # This was briefly a two-mode registry (`modes.py`), with a `pro` tier on
 # Cerebras. That is gone: Cerebras's pricing structure could not be made to work
@@ -79,14 +79,14 @@ __all__ = [
 # The same argument as foundation pairing, one step earlier.
 #
 # Because it is pinned, it is also HIDDEN FROM THE SELECTOR (`Catalog.selector_metadata`
-# omits it): a skill the server always supplies is one the classifier should never
+# omits it): a runbook the server always supplies is one the classifier should never
 # spend prompt bytes reading or risk mis-picking on an operational turn. That
 # hiding is what keeps the two decisions from disagreeing.
 #
-# An id the catalog does not contain is a silent no-op — `resolve_active_skills`
-# filters unknown ids — so deleting the skill file degrades to the previous
+# An id the catalog does not contain is a silent no-op — `resolve_active_runbooks`
+# filters unknown ids — so deleting the runbook file degrades to the previous
 # behaviour rather than breaking the turn.
-DOCS_SKILL_ID = "daintree.docs.answer-usage-question"
+DOCS_RUNBOOK_ID = "daintree.docs.answer-usage-question"
 
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
 # There is one optimum and the server ships it.
@@ -99,7 +99,7 @@ DOCS_SKILL_ID = "daintree.docs.answer-usage-question"
 # ~3.5s of an 11.5s wall-clock deciding how to answer "Hello!" (measured
 # 2026-08-08, turn_2c1bbc09, on the same weights).
 #
-# Skill learning used to be the one exception — it ran fire-and-forget after the
+# Runbook learning used to be the one exception — it ran fire-and-forget after the
 # response, so its latency never reached a user. It has been removed, so there is
 # no thinking surface left at all.
 INTERACTIVE_THINKING_ENABLED = False
@@ -142,8 +142,8 @@ def _origin_problem(*, value: str, expected_host: str, env_name: str) -> str | N
 
 
 #: The three tool-projection postures. Declared HERE rather than beside the
-#: projector because config sits below skills in the import graph — the
-#: catalog reads DOCS_SKILL_ID from this module, so the arrow cannot reverse.
+#: projector because config sits below runbooks in the import graph — the
+#: catalog reads DOCS_RUNBOOK_ID from this module, so the arrow cannot reverse.
 ToolProjectionMode = Literal["disabled", "shadow", "enforced"]
 
 
@@ -212,7 +212,7 @@ class Settings(BaseSettings):
     # ---- Thinking headroom -----------------------------------------------
     # The thinking POSTURE itself is hardcoded (see INTERACTIVE_THINKING_ENABLED at
     # the top of this module): main/utility/selector are non-thinking, only the
-    # skill-learning gate and builder/improver still think. reasoning_content
+    # runbook-learning gate and builder/improver still think. reasoning_content
     # round-trips through the wire contract so a tool-call turn can replay the
     # chain-of-thought that produced its calls (the provider adapter renames it to
     # the wire's `reasoning` on the way out), which the assembler preserves —
@@ -222,7 +222,7 @@ class Settings(BaseSettings):
     # Because max_tokens is SHARED by reasoning + visible output, a small-output
     # THINKING call adds this headroom to its tight output cap so the
     # chain-of-thought can't starve the answer into a finish_reason=length
-    # truncation. Under the current posture the skill-learning gate is the only
+    # truncation. Under the current posture the runbook-learning gate is the only
     # such call; utility tasks add it only if thinking is switched back on, since
     # a non-thinking task would otherwise be handed 4k tokens of slack it can
     # spend on VISIBLE output, silently overrunning its profile's cap. The main
@@ -310,12 +310,12 @@ class Settings(BaseSettings):
     max_result_schema_properties: int = Field(default=128, alias="MAX_RESULT_SCHEMA_PROPERTIES")
     max_result_schema_enum: int = Field(default=128, alias="MAX_RESULT_SCHEMA_ENUM")
     max_result_schema_string: int = Field(default=4096, alias="MAX_RESULT_SCHEMA_STRING")
-    # Floored at 2 deliberately: every skill resolves to a domain foundation, and the
+    # Floored at 2 deliberately: every runbook resolves to a domain foundation, and the
     # orchestrator admits a specific and its foundation as one atomic unit. A budget of 1
     # can never fit that unit, so a cap of 1 would silently load NOTHING rather than
     # loading less. This subsumes the earlier ge=0 guard against a cap of 0 admitting one
     # id anyway; max_meta_header_bytes was pruned on main as dead.
-    max_active_skills: int = Field(default=3, ge=2, alias="MAX_ACTIVE_SKILLS")
+    max_active_runbooks: int = Field(default=3, ge=2, alias="MAX_ACTIVE_RUNBOOKS")
 
     # ---- Timeouts (seconds) --------------------------------------------
     # The selector gates the turn's first byte, so this bound is a latency budget,
@@ -352,7 +352,7 @@ class Settings(BaseSettings):
     # flag — flipping the interactive posture back on must not silently drag the
     # selector with it.
     # Sized with wide margin over the observed 120-190-token completions: the
-    # reason-first key order puts skill_ids LAST in the JSON, so a length
+    # reason-first key order puts runbook_ids LAST in the JSON, so a length
     # truncation would now lose the critical key (parse fail -> repair -> possibly
     # degraded). The cap is runaway containment, not a spend target.
     selector_max_output_tokens: int = Field(default=800, alias="SELECTOR_MAX_OUTPUT_TOKENS")
@@ -387,7 +387,7 @@ class Settings(BaseSettings):
         default=0.25, ge=0.0, alias="RETRY_BACKOFF_BASE_SECONDS"
     )
 
-    # ---- Skill-aware tool projection ------------------------------------
+    # ---- Runbook-aware tool projection ------------------------------------
     # The one exception to "no env toggles, the server ships one optimum": this
     # is not a product decision being deferred to config, it is the kill switch
     # for a behaviour that withholds capability from the model. Model identity
@@ -421,17 +421,17 @@ class Settings(BaseSettings):
     # local_only_problems).
     dump_upstream_dir: str | None = Field(default=None, alias="DAINTREE_DUMP_UPSTREAM_DIR")
 
-    # ---- Skill overlay directory (LOCAL DEVELOPMENT ONLY) ----------------
-    # A second directory of skill files merged OVER the packaged catalog: a new
-    # id is added, a colliding id replaces the packaged skill. It exists so a
-    # skill can be authored in a scratch directory against a running server —
-    # POST /v1/daintree/skills/reload rebuilds the catalog without a restart.
+    # ---- Runbook overlay directory (LOCAL DEVELOPMENT ONLY) ----------------
+    # A second directory of runbook files merged OVER the packaged catalog: a new
+    # id is added, a colliding id replaces the packaged runbook. It exists so a
+    # runbook can be authored in a scratch directory against a running server —
+    # POST /v1/daintree/runbooks/reload rebuilds the catalog without a restart.
     # The path is read once, at startup; only its CONTENTS are re-read on
     # reload. A set value in production fails readiness (see
     # local_only_problems) and the reload route is not mounted there at all: a
     # deploy must serve the catalog its image shipped, not whatever happens to
     # be on the instance's disk.
-    skills_overlay_dir: str | None = Field(default=None, alias="DAINTREE_SKILLS_OVERLAY_DIR")
+    runbooks_overlay_dir: str | None = Field(default=None, alias="DAINTREE_RUNBOOKS_OVERLAY_DIR")
 
     # ---- Context field caps (bytes, unless noted) -----------------------
     # Session-stable agent registry rendered before the visible conversation.
@@ -470,14 +470,14 @@ class Settings(BaseSettings):
     # Every default is far above real traffic on purpose. These are not tuning
     # knobs: crossing one means something is malformed, so the right value is the
     # one a healthy client can never reach. (Real numbers to compare against: the
-    # CLI dispatches at most 6 tool calls in parallel, `max_active_skills` is 3,
+    # CLI dispatches at most 6 tool calls in parallel, `max_active_runbooks` is 3,
     # and the OpenAI wire allows 4 stop sequences.)
     cap_messages: int = Field(default=2000, alias="CAP_MESSAGES")
     cap_content_parts: int = Field(default=64, alias="CAP_CONTENT_PARTS")
     cap_tool_calls_per_message: int = Field(default=64, alias="CAP_TOOL_CALLS_PER_MESSAGE")
     cap_stop_sequences: int = Field(default=8, alias="CAP_STOP_SEQUENCES")
     cap_stop_sequence_bytes: int = Field(default=256, alias="CAP_STOP_SEQUENCE_BYTES")
-    cap_pinned_skill_ids: int = Field(default=16, alias="CAP_PINNED_SKILL_IDS")
+    cap_pinned_runbook_ids: int = Field(default=16, alias="CAP_PINNED_RUNBOOK_IDS")
 
     # ---- Images -----------------------------------------------------------
     # Nothing sends images today (`multimodal_images.data_urls` is advertised,
@@ -519,12 +519,12 @@ class Settings(BaseSettings):
         default=64 * 1024, ge=1, le=256 * 1024, alias="CAP_COMPACTION_BLOCK_BYTES"
     )
 
-    # ---- Skill learning (LOCAL DEVELOPMENT ONLY) ------------------------
+    # ---- Runbook learning (LOCAL DEVELOPMENT ONLY) ------------------------
     # A backend-internal harness that watches completed local workflows and, when
-    # warranted, writes or improves skill files so the catalog "learns". It is
+    # warranted, writes or improves runbook files so the catalog "learns". It is
     # entirely invisible to the CLI: no new wire fields, no feedback tool, and the
-    # main assistant model is never told it exists — a created skill simply appears
-    # as a normal dynamic skill load. It MUST be off in production: an enabled mode
+    # main assistant model is never told it exists — a created runbook simply appears
+    # as a normal dynamic runbook load. It MUST be off in production: an enabled mode
     # ---- Derived helpers ------------------------------------------------
 
     @property
@@ -575,13 +575,13 @@ class Settings(BaseSettings):
 
         These join ``missing_secrets()`` / ``weak_secrets()`` in readiness gating.
         Two entries: prompt dumping, which writes full prompts to disk, and the
-        skill overlay directory, which would let a production instance serve a
-        catalog its image never shipped. (Skill learning used to be here too,
+        runbook overlay directory, which would let a production instance serve a
+        catalog its image never shipped. (Runbook learning used to be here too,
         and was the reason this method exists — a production deploy that left it
-        on would have mutated the skill catalog from model output at runtime. It
+        on would have mutated the runbook catalog from model output at runtime. It
         has been removed entirely. The overlay is a much smaller thing: it only
         reads files a developer deliberately put there. Gated anyway, because
-        "which skills is production actually running?" must have one answer.)
+        "which runbooks is production actually running?" must have one answer.)
         """
         problems: list[str] = []
         if self.is_hardened and self.dump_upstream_dir:
@@ -589,10 +589,10 @@ class Settings(BaseSettings):
                 "DAINTREE_DUMP_UPSTREAM_DIR must be unset in production "
                 "(prompt dumping is development-only)"
             )
-        if self.is_hardened and self.skills_overlay_dir:
+        if self.is_hardened and self.runbooks_overlay_dir:
             problems.append(
-                "DAINTREE_SKILLS_OVERLAY_DIR must be unset in production "
-                "(the skill overlay is development-only)"
+                "DAINTREE_RUNBOOKS_OVERLAY_DIR must be unset in production "
+                "(the runbook overlay is development-only)"
             )
         return problems
 

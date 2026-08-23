@@ -143,7 +143,7 @@ async def test_a_stalled_open_still_heartbeats(
 
     body = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
             "startup": {},

@@ -20,19 +20,19 @@ python -m benchmarks.session_trace.bench report results/<f>.json
 - **selector_run_rate** — selector runs / total turns; the paid first-byte cost
   lever every avoided run saves ~1.75 s of.
 - **state_continuity_rate** — every turn returns a verifiable state token (the
-  portable, stateless-safe skill state that keeps the backend Cloud Run-safe).
+  portable, stateless-safe runbook state that keeps the backend Cloud Run-safe).
 
 ## Traces (`cases/*.yaml`)
 
 Each turn scripts what the replayed selector and main model return and asserts the
 orchestrator's behavior. Reuse a `turn_id` to model a continuation round (selector
 must not run); bump it for a new instruction. `main` is `{tool_calls: [name]}` (a
-continuation) or `{final: "text"}` (turn complete). Skill ids and tool names are
+continuation) or `{final: "text"}` (turn complete). Runbook ids and tool names are
 validated against the real catalog / tool inventory at load.
 
 ## Baseline (2026-08-08)
 
-A fourth metric, `learn_trigger_accuracy`, was removed when skill learning was
+A fourth metric, `learn_trigger_accuracy`, was removed when runbook learning was
 deleted from the server. It had already stopped measuring anything — the spy was
 being attached to an attribute the orchestrator no longer has — and sat at
 0.1667, which is what turned CI red on `develop`.

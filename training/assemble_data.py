@@ -1,15 +1,15 @@
 """Turn the generation workflow's raw agent output into validated training sets.
 
-Reads the workflow journal (one JSON result per agent), validates every skill id
+Reads the workflow journal (one JSON result per agent), validates every runbook id
 against the live catalog, deduplicates, and writes four JSONL corpora:
 
     selection.jsonl — one row per turn: query, history, prior active set,
-    expected skill ids, docs label, empty-answer kind. The classifier's whole
+    expected runbook ids, docs label, empty-answer kind. The classifier's whole
     diet; the docs and cardinality labels are derived from it at train time.
 
 ## The contamination gate
 
-The 150 cases in ``benchmarks/skill_selection/cases/`` are the held-out
+The 150 cases in ``benchmarks/runbook_selection/cases/`` are the held-out
 evaluation set and the only evidence that any of this works. Generating agents
 were told not to read them, but "was told not to" is not a control — the models
 share a domain, and a plausible query for "rename my terminals" is a short
@@ -34,9 +34,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from benchmarks.skill_selection.cases import load_cases  # noqa: E402
-from daintree_assistant_server.skills.catalog import (  # noqa: E402
-    default_skills_dir,
+from benchmarks.runbook_selection.cases import load_cases  # noqa: E402
+from daintree_assistant_server.runbooks.catalog import (  # noqa: E402
+    default_runbooks_dir,
     load_catalog,
 )
 from training.common import render_training_query  # noqa: E402
@@ -97,7 +97,7 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     valid_ids = set(catalog.selectable_ids)
     held_out = _benchmark_queries(catalog)
     print(f"catalog: {len(valid_ids)} selectable ids | held-out strings: {len(held_out)}")
@@ -107,9 +107,9 @@ def main() -> int:
         rows = _load_journal(Path(journal))
         print(f"  {journal}: {len(rows)} agent results")
         results.extend(rows)
-    per_skill = [r for r in results if "skill_id" in r]
+    per_runbook = [r for r in results if "runbook_id" in r]
     bundles = [r for r in results if "items" in r]
-    print(f"journal: {len(per_skill)} per-skill agents, {len(bundles)} cross-cutting bundles")
+    print(f"journal: {len(per_runbook)} per-runbook agents, {len(bundles)} cross-cutting bundles")
 
     stats: Counter[str] = Counter()
     seen_inputs: dict[str, tuple[str, ...]] = {}
@@ -143,7 +143,7 @@ def main() -> int:
         ):
             stats["dropped_contaminated"] += 1
             return
-        # A skill cannot be both the answer and a counter-example of itself.
+        # A runbook cannot be both the answer and a counter-example of itself.
         if hard_negatives and set(expect) & set(hard_negatives):
             hard_negatives = [h for h in hard_negatives if h not in expect]
             stats["hard_negative_overlap_stripped"] += 1
@@ -175,8 +175,8 @@ def main() -> int:
             else:
                 stats["dropped_duplicate"] += 1
             return
-        # The signature carries the DOCS label as well as the skills. Without
-        # it, two identical rendered inputs that agree on skills but disagree on
+        # The signature carries the DOCS label as well as the runbooks. Without
+        # it, two identical rendered inputs that agree on runbooks but disagree on
         # `is_docs` are counted as a duplicate — first admission silently wins —
         # and the contradiction this corpus was just repaired for could be
         # reintroduced without showing up in the stats.
@@ -197,10 +197,10 @@ def main() -> int:
             "empty_kind": empty_kind if not expect else None,
         })
 
-    for block in per_skill:
-        sid = block["skill_id"]
+    for block in per_runbook:
+        sid = block["runbook_id"]
         if sid not in valid_ids:
-            stats["skipped_agent_bad_skill"] += 1
+            stats["skipped_agent_bad_runbook"] += 1
             continue
         for p in block.get("positives", []):
             # Round two labels each positive with the SITUATION it was imagined
@@ -211,7 +211,7 @@ def main() -> int:
         for n in block.get("boundary_negatives", []):
             emit(
                 n["query"],
-                list(n["correct_skill_ids"]),
+                list(n["correct_runbook_ids"]),
                 source="boundary",
                 is_docs=False,
                 hard_negatives=[sid],
@@ -259,11 +259,11 @@ def main() -> int:
     for bundle in bundles:
         items = bundle["items"]
         shape = set(items[0].keys())
-        if "kind" in shape and "skill_ids" in shape:
+        if "kind" in shape and "runbook_ids" in shape:
             # Off-domain bundle: general-knowledge junk that must select nothing,
             # plus deliberately-included near misses that must still route.
             for it in items:
-                ids = list(it.get("skill_ids", []))
+                ids = list(it.get("runbook_ids", []))
                 emit(
                     it["query"],
                     ids,
@@ -277,20 +277,20 @@ def main() -> int:
                      source="no_task", is_docs=False, empty_kind="no_task")
         elif "is_docs" in shape:
             for it in items:
-                # A docs question with no skills is an empty answer reached by a
+                # A docs question with no runbooks is an empty answer reached by a
                 # different route than chatter: there IS a question, it just gets
                 # answered from retrieved pages rather than a runbook. It trains
                 # the no-task sentinel, not the off-domain one — an off-domain
                 # sentinel firing on a product question would suppress the
-                # documentation lookup along with the skill.
+                # documentation lookup along with the runbook.
                 # History and an active set ride through where the generator
                 # supplies them. Every one of the original 207 docs positives
                 # carried NEITHER, and the separation was perfect enough for the
                 # head to take it as a shortcut — "anything in the context means
                 # this is not a docs turn" — which measured 5/120 recall on docs
-                # turns with a skill loaded. A docs row that cannot express
+                # turns with a runbook loaded. A docs row that cannot express
                 # context cannot teach its way out of that.
-                emit(it["query"], list(it.get("skill_ids", [])),
+                emit(it["query"], list(it.get("runbook_ids", [])),
                      history=list(it.get("history", [])),
                      active=list(it.get("active_ids", [])),
                      source="docs", is_docs=bool(it["is_docs"]), empty_kind="no_task")
@@ -321,14 +321,14 @@ def main() -> int:
                      active=list(it.get("active_ids", [])), source=kind, is_docs=False)
         elif "expect_ids" in shape:
             for it in items:
-                emit(it["query"], list(it["expect_ids"]), source="multi_skill", is_docs=False)
-        elif "skill_ids" in shape:
+                emit(it["query"], list(it["expect_ids"]), source="multi_runbook", is_docs=False)
+        elif "runbook_ids" in shape:
             # Foundation gap-fill: single direct control-plane actions, plain
-            # state reads, and the specific-skill boundary. Labelled by target so
+            # state reads, and the specific-runbook boundary. Labelled by target so
             # per-source counts stay readable — the empty-answer rows here are
             # boundary cases, not chatter.
             for it in items:
-                ids = list(it.get("skill_ids", []))
+                ids = list(it.get("runbook_ids", []))
                 emit(
                     it["query"],
                     ids,

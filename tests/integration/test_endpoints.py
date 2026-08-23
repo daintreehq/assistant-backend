@@ -1,4 +1,4 @@
-"""Integration tests for health, models, capabilities, skills, and tasks endpoints."""
+"""Integration tests for health, models, capabilities, runbooks, and tasks endpoints."""
 
 from __future__ import annotations
 
@@ -10,9 +10,10 @@ from fakes import FakeCompactor, make_result, selection_result
 from fastapi.testclient import TestClient
 from unit.test_task_runner import EXPECTED_TASK_IDS
 
+from daintree_assistant_server import PROTOCOL_MAX, PROTOCOL_MIN
 from daintree_assistant_server.main import create_app
 
-SKILL_PREP = "daintree.workflow.prep-branch-for-review"
+RUNBOOK_PREP = "daintree.workflow.prep-branch-for-review"
 
 
 def test_healthz(client) -> None:
@@ -69,8 +70,8 @@ def test_readyz(client, app) -> None:
     body = r.json()
     assert body["status"] == "ready"
     # Assert the endpoint reports the app's ACTUAL catalog size, not a magic number:
-    # apply-mode skill learning grows the real catalog, and that must not redden this.
-    assert body["skills"] == len(app.state.container.catalog)
+    # apply-mode runbook learning grows the real catalog, and that must not redden this.
+    assert body["runbooks"] == len(app.state.container.catalog)
 
 
 def test_capabilities_reports_a_configured_compactor_as_enabled(
@@ -103,7 +104,14 @@ def test_version(client) -> None:
     r = client.get("/version")
     assert r.status_code == 200
     assert "server_version" in r.json()
-    assert r.json()["protocol"] == {"min": 2, "max": 2}
+    # Literal on purpose: reading the range out of the same constants the endpoint
+    # serves would pass through any bump, including an accidental one that widened
+    # support back to a protocol whose body shape this build cannot parse.
+    assert r.json()["protocol"] == {"min": 3, "max": 3}
+    assert (PROTOCOL_MIN, PROTOCOL_MAX) == (3, 3), (
+        "the supported protocol range moved; update this test and docs/DAINTREE_API.md "
+        "together, and check every fixture body that declares protocol_version"
+    )
 
 
 def test_capabilities(client, auth, app) -> None:
@@ -116,7 +124,7 @@ def test_capabilities(client, auth, app) -> None:
     # false here 422s the whole turn — asserted as a literal so dropping the
     # field cannot pass silently.
     assert body["respond"]["display_context"] is True
-    assert body["respond"]["max_active_skills"] == 3
+    assert body["respond"]["max_active_runbooks"] == 3
     # The full parser vocabulary, asserted as an exact list. `compaction` is
     # advertised even where no producer is configured (see `context_compaction`
     # below): the event is optional on every turn anyway, so a client that handles
@@ -142,24 +150,24 @@ def test_capabilities(client, auth, app) -> None:
     # renamed, every CLI task call 404'd. See EXPECTED_TASK_IDS in
     # tests/unit/test_task_runner.py.
     assert set(body["tasks"]) == EXPECTED_TASK_IDS
-    assert body["skills"]["manual_resolve"] is True
-    # Same gate as `display_context` above, for `selection.pinned_skill_ids`.
+    assert body["runbooks"]["manual_resolve"] is True
+    # Same gate as `display_context` above, for `selection.pinned_runbook_ids`.
     # `Selection` is extra="forbid", so a CLI that sends pins to a backend
     # advertising false here 422s the whole turn before the model runs — which is
     # why this is a literal the CLI can branch on rather than something inferred.
-    assert body["skills"]["pinned_skill_ids"] is True
-    # The id/title listing a client validates a skill name against before spending a
+    assert body["runbooks"]["pinned_runbook_ids"] is True
+    # The id/title listing a client validates a runbook name against before spending a
     # turn on it. Asserted as one exact equality rather than a count: that pins
-    # cardinality, the full-catalog scope (pinned skills included), the exact key set
+    # cardinality, the full-catalog scope (pinned runbooks included), the exact key set
     # (no body, no metadata leaking in), the titles and the id ordering at once, and
     # stays correct as the catalog grows. `catalog_revision` must come from the same
     # snapshot — it is what the list is keyed on.
     catalog = app.state.container.catalog
-    assert body["skills"]["catalog_revision"] == catalog.revision
-    listing = body["skills"]["catalog"]
-    assert listing == [{"id": s.id, "title": s.title} for s in catalog.skills]
+    assert body["runbooks"]["catalog_revision"] == catalog.revision
+    listing = body["runbooks"]["catalog"]
+    assert listing == [{"id": s.id, "title": s.title} for s in catalog.runbooks]
     # Sorted-by-id is a DOCUMENTED property of the wire shape, and the equality
-    # above cannot pin it: it compares against `Catalog.skills`, so if the catalog
+    # above cannot pin it: it compares against `Catalog.runbooks`, so if the catalog
     # stopped sorting, both sides would go unsorted together and still match.
     assert [e["id"] for e in listing] == sorted(e["id"] for e in listing)
     wf = body["workflow_intelligence"]
@@ -193,85 +201,85 @@ def test_capabilities(client, auth, app) -> None:
     assert body["context_compaction"]["stream_event"] in body["respond"]["stream_events"]
 
 
-def test_skills_list_and_etag(client, auth, app) -> None:
-    r = client.get("/v1/daintree/skills", headers=auth)
+def test_runbooks_list_and_etag(client, auth, app) -> None:
+    r = client.get("/v1/daintree/runbooks", headers=auth)
     assert r.status_code == 200
     body = r.json()
-    # The list reports every catalog skill (robust to the catalog growing via learning).
+    # The list reports every catalog runbook (robust to the catalog growing via learning).
     assert len(body["data"]) == len(app.state.container.catalog)
     assert all("body" not in s for s in body["data"])
     assert all("required_tools" in s for s in body["data"])
     etag = r.headers["etag"]
 
-    r304 = client.get("/v1/daintree/skills", headers={**auth, "If-None-Match": etag})
+    r304 = client.get("/v1/daintree/runbooks", headers={**auth, "If-None-Match": etag})
     assert r304.status_code == 304
 
 
-def test_capabilities_catalog_matches_skills_endpoint(client, auth) -> None:
+def test_capabilities_catalog_matches_runbooks_endpoint(client, auth) -> None:
     """The two public catalog views must not drift apart.
 
-    `skills.catalog` on capabilities and `data` on /v1/daintree/skills project the
+    `runbooks.catalog` on capabilities and `data` on /v1/daintree/runbooks project the
     SAME catalog at two widths, and the API doc now sends clients from one to the
     other for the full metadata. Nothing else would notice if they diverged — each
     endpoint has its own test and both would stay green while the pair silently
-    disagreed about which skills exist.
+    disagreed about which runbooks exist.
     """
     caps = client.get("/v1/daintree/capabilities", headers=auth).json()
-    skills = client.get("/v1/daintree/skills", headers=auth).json()
+    runbooks = client.get("/v1/daintree/runbooks", headers=auth).json()
 
-    assert caps["skills"]["catalog_revision"] == skills["catalog_revision"]
-    assert caps["skills"]["catalog"] == [
-        {"id": s["id"], "title": s["title"]} for s in skills["data"]
+    assert caps["runbooks"]["catalog_revision"] == runbooks["catalog_revision"]
+    assert caps["runbooks"]["catalog"] == [
+        {"id": s["id"], "title": s["title"]} for s in runbooks["data"]
     ]
 
 
-def test_skills_resolve_find(client, auth, fake_provider, app) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP])
-    r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 2, "session_id": "s", "action": "find", "query": "prep branch",
+def test_runbooks_resolve_find(client, auth, fake_provider, app) -> None:
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
+    r = client.post("/v1/daintree/runbooks/resolve", headers=auth, json={
+        "protocol_version": 3, "session_id": "s", "action": "find", "query": "prep branch",
     })
     assert r.status_code == 200
     body = r.json()
     # `find` runs the selector, so the pick is front-loaded with its domain foundation.
-    foundation = app.state.container.catalog.domain_foundation(SKILL_PREP)
-    assert [s["id"] for s in body["skills"]["active"]] == [SKILL_PREP, foundation]
-    assert len(body["skills"]["prelude"]["tool_executions"]) == len(body["skills"]["newly_loaded"])
+    foundation = app.state.container.catalog.domain_foundation(RUNBOOK_PREP)
+    assert [s["id"] for s in body["runbooks"]["active"]] == [RUNBOOK_PREP, foundation]
+    assert len(body["runbooks"]["prelude"]["tool_executions"]) == len(body["runbooks"]["newly_loaded"])
     assert body["state"].startswith("dst1.")
 
 
-def test_skills_resolve_load_and_clear(client, auth, app) -> None:
-    r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 2, "session_id": "s", "action": "load", "skill_ids": [SKILL_PREP],
+def test_runbooks_resolve_load_and_clear(client, auth, app) -> None:
+    r = client.post("/v1/daintree/runbooks/resolve", headers=auth, json={
+        "protocol_version": 3, "session_id": "s", "action": "load", "runbook_ids": [RUNBOOK_PREP],
     })
     body = r.json()
-    active = [s["id"] for s in body["skills"]["active"]]
+    active = [s["id"] for s in body["runbooks"]["active"]]
     # An explicit load is foundation-closed like the automatic path: this response signs
     # a state token that later rounds replay verbatim, so an unclosed set here would
     # strand every following turn without the domain's base judgment.
-    assert active[0] == SKILL_PREP
+    assert active[0] == RUNBOOK_PREP
     catalog = app.state.container.catalog
-    foundation_id = catalog.domain_foundation(SKILL_PREP)
+    foundation_id = catalog.domain_foundation(RUNBOOK_PREP)
     assert foundation_id is not None and foundation_id in active
     state = body["state"]
 
-    r2 = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 2, "session_id": "s", "action": "clear", "state": state,
+    r2 = client.post("/v1/daintree/runbooks/resolve", headers=auth, json={
+        "protocol_version": 3, "session_id": "s", "action": "clear", "state": state,
     })
     body2 = r2.json()
-    assert body2["skills"]["active"] == []
-    assert body2["skills"]["prelude"]["tool_executions"] == []
+    assert body2["runbooks"]["active"] == []
+    assert body2["runbooks"]["prelude"]["tool_executions"] == []
 
 
-def test_skills_resolve_find_requires_query(client, auth) -> None:
-    r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 2, "session_id": "s", "action": "find",
+def test_runbooks_resolve_find_requires_query(client, auth) -> None:
+    r = client.post("/v1/daintree/runbooks/resolve", headers=auth, json={
+        "protocol_version": 3, "session_id": "s", "action": "find",
     })
     assert r.status_code == 400
 
 
-def test_skills_resolve_load_requires_ids(client, auth) -> None:
-    r = client.post("/v1/daintree/skills/resolve", headers=auth, json={
-        "protocol_version": 2, "session_id": "s", "action": "load",
+def test_runbooks_resolve_load_requires_ids(client, auth) -> None:
+    r = client.post("/v1/daintree/runbooks/resolve", headers=auth, json={
+        "protocol_version": 3, "session_id": "s", "action": "load",
     })
     assert r.status_code == 400
 
@@ -435,7 +443,7 @@ def test_every_route_ignores_an_authorization_header_entirely(client, fake_provi
             json={"task": "terminal_judge", "input": {"question": "q"}},
         )
         assert r.status_code == 200, headers
-        assert client.get("/v1/daintree/skills", headers=headers).status_code == 200
+        assert client.get("/v1/daintree/runbooks", headers=headers).status_code == 200
         assert client.post("/v1/daintree/auth/verify", headers=headers).status_code == 200
     # Probes and version never require a key (Cloud Run probes them).
     assert client.get("/healthz").status_code == 200
@@ -453,9 +461,9 @@ def test_every_route_is_served_without_an_authorization_header(client) -> None:
     from conftest import respond_body
 
     assert client.get("/v1/daintree/capabilities").status_code == 200
-    assert client.get("/v1/daintree/skills").status_code == 200
+    assert client.get("/v1/daintree/runbooks").status_code == 200
     assert client.post(
-        "/v1/daintree/skills/resolve", json={"action": "clear", "session_id": "s"}
+        "/v1/daintree/runbooks/resolve", json={"action": "clear", "session_id": "s"}
     ).status_code == 200
     assert client.post(
         "/v1/daintree/respond",
@@ -472,7 +480,7 @@ def test_no_caller_credential_reaches_any_provider_call(client, fake_provider) -
     """
     from conftest import respond_body
 
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     fake_provider.complete_result = make_result(content="done")
     r = client.post(
         "/v1/daintree/respond",
@@ -504,7 +512,7 @@ def test_no_caller_credential_reaches_a_task_call(client, fake_provider) -> None
 
 def test_oversized_body_413(client, auth) -> None:
     headers = {**auth, "Content-Length": str(20 * 1024 * 1024)}
-    r = client.post("/v1/daintree/respond", headers=headers, content=b'{"protocol_version":2}')
+    r = client.post("/v1/daintree/respond", headers=headers, content=b'{"protocol_version":3}')
     assert r.status_code == 413
 
 
@@ -562,7 +570,7 @@ def test_prod_not_ready_when_prompt_dumping_is_enabled(fake_provider) -> None:
     even with an injected provider (the guard runs before the secret checks).
 
     It writes FULL prompts to disk — a forensics tool locally, a disclosure risk
-    anywhere else. This is the last entry in `local_only_problems`; skill
+    anywhere else. This is the last entry in `local_only_problems`; runbook
     learning, which used to be the other, has been removed entirely.
     """
     from fastapi.testclient import TestClient

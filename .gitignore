@@ -21,9 +21,9 @@ dist/
 # Temporary / scratch
 .tmp/
 
-# Local skill-learning harness: audit records, proposals, and (when configured to
-# a separate overlay dir) generated skill files. The default edit-in-place mode
-# writes to the tracked skills dir instead, so those show up in `git diff`.
+# Local runbook-learning harness: audit records, proposals, and (when configured to
+# a separate overlay dir) generated runbook files. The default edit-in-place mode
+# writes to the tracked runbooks dir instead, so those show up in `git diff`.
 .daintree/
 
 # Benchmark run outputs (local records, not source)
@@ -60,8 +60,8 @@ Thumbs.db
 # uv (not used by this project; pip + requirements.lock is the source of truth)
 uv.lock
 
-# Local skill selection (training side). The SERVING artifacts under
-# src/daintree_assistant_server/skills/local/artifacts/ are tracked via Git LFS —
+# Local runbook selection (training side). The SERVING artifacts under
+# src/daintree_assistant_server/runbooks/local/artifacts/ are tracked via Git LFS —
 # they ship in the image. Everything here is the machinery that produced them and
 # is reproducible from `training/`, so it stays out of the repo.
 # NOTE: git has no trailing-comment syntax — a "path  # why" line makes the
@@ -86,7 +86,7 @@ training/journals/
 # Generated synthetic corpora are NOT ignored: training/data/*.jsonl is checked in
 # as the record of what the shipped weights were trained on.
 
-# Local skill selection (serving side). Model GRAPHS are tracked via Git LFS
+# Local runbook selection (serving side). Model GRAPHS are tracked via Git LFS
 # (.gitattributes). fp32 graphs are NOT tracked: they exist only so the exporter
 # can measure what quantisation costs, and only the served precision ships.
 #
@@ -95,7 +95,7 @@ training/journals/
 # the document it was built from, so serving re-embeds exactly what moved and
 # reuses the rest; committing it just means the first turn after a deploy does
 # not pay for embedding a catalog that usually has not changed.
-src/daintree_assistant_server/skills/local/artifacts/**/model.onnx
+src/daintree_assistant_server/runbooks/local/artifacts/**/model.onnx
 # vocab.txt is a ~30k-line side-file the exporter emits beside tokenizer.json,
 # which is self-contained and is what `_tokenizer` actually loads
 # (Tokenizer.from_file). Verified by removing both from a checkout: the token ids
@@ -106,12 +106,12 @@ src/daintree_assistant_server/skills/local/artifacts/**/model.onnx
 # exporter wrote is a trap for whoever debugs it next. This glob was written for
 # the old classifier/ layout and silently swallowed the selector/ tokenizers when
 # that landed, which cost real time to rule out.
-src/daintree_assistant_server/skills/local/artifacts/**/vocab.txt
+src/daintree_assistant_server/runbooks/local/artifacts/**/vocab.txt
 # Superseded artifact layouts. The single fixed-head classifier is torn out (this
 # branch); the retrieve-then-rerank pipeline before it was measured and abandoned
 # (training/EXPERIMENTS.md). Kept as ignores so a stale local export cannot land.
-src/daintree_assistant_server/skills/local/artifacts/classifier/
-src/daintree_assistant_server/skills/local/artifacts/index/
-src/daintree_assistant_server/skills/local/artifacts/bi_encoder/
-src/daintree_assistant_server/skills/local/artifacts/reranker/
-src/daintree_assistant_server/skills/local/artifacts/docs_head.npz
+src/daintree_assistant_server/runbooks/local/artifacts/classifier/
+src/daintree_assistant_server/runbooks/local/artifacts/index/
+src/daintree_assistant_server/runbooks/local/artifacts/bi_encoder/
+src/daintree_assistant_server/runbooks/local/artifacts/reranker/
+src/daintree_assistant_server/runbooks/local/artifacts/docs_head.npz

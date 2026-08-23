@@ -3,9 +3,9 @@
 Two kinds of test here, and the second is the one that matters.
 
 The unit cases pin individual judgements. The **corpus** test replays every case
-in `benchmarks/skill_selection/cases/` — the same battery the live selector
+in `benchmarks/runbook_selection/cases/` — the same battery the live selector
 benchmark grades against — and asserts the fast path never fires on a case that
-declares a required skill. That is a real offline recall gate over ~100 realistic
+declares a required runbook. That is a real offline recall gate over ~100 realistic
 turns, not a hand-picked sample, so it catches a widened vocabulary that happens
 to swallow a genuine request.
 """
@@ -18,14 +18,14 @@ import pytest
 import yaml
 
 from daintree_assistant_server.contracts.openai import ChatMessage
-from daintree_assistant_server.skills.fast_path import (
+from daintree_assistant_server.runbooks.fast_path import (
     MAX_FAST_PATH_CHARS,
     can_skip_selection,
     is_no_task_utterance,
 )
 
 CASES_DIR = (
-    Path(__file__).resolve().parents[2] / "benchmarks" / "skill_selection" / "cases"
+    Path(__file__).resolve().parents[2] / "benchmarks" / "runbook_selection" / "cases"
 )
 
 
@@ -133,7 +133,7 @@ def test_refuses_a_long_utterance_even_in_vocabulary() -> None:
 
 def test_refuses_an_ack_that_answers_a_pending_question() -> None:
     """"ok" to "shall I close them?" is CONSENT to a workflow. Clearing that
-    workflow's skill is precisely backwards, so a preceding assistant question
+    workflow's runbook is precisely backwards, so a preceding assistant question
     disqualifies the whole path."""
     messages = [
         ChatMessage(role="user", content="tidy up please"),
@@ -185,7 +185,7 @@ def test_the_corpus_is_actually_loaded() -> None:
     assert len(cases) >= 100, f"only {len(cases)} cases found — is CASES_DIR right?"
     with_required = [c for _, c in cases if (c.get("expect") or {}).get("required")]
     assert len(with_required) >= 90, (
-        f"only {len(with_required)} cases declare a required skill; the gate has "
+        f"only {len(with_required)} cases declare a required runbook; the gate has "
         "little left to grade"
     )
 
@@ -195,14 +195,14 @@ def test_the_corpus_is_actually_loaded() -> None:
     [(src, case) for src, case in _corpus()],
     ids=[f"{src}:{case['id']}" for src, case in _corpus()],
 )
-def test_the_fast_path_never_skips_a_case_that_needs_a_skill(
+def test_the_fast_path_never_skips_a_case_that_needs_a_runbook(
     source: str, case: dict
 ) -> None:
     """The recall gate.
 
     A false skip is the expensive failure: the assistant runs the whole turn
     without the runbook it needed, and nothing in the response says so. Every
-    case here declares the skills it requires, so any hit on a case with a
+    case here declares the runbooks it requires, so any hit on a case with a
     non-empty `required` is a proven regression rather than a suspicion.
     """
     messages = [
@@ -240,7 +240,7 @@ def _request(text: str, **extra: object):  # type: ignore[no-untyped-def]
 
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": text}]},
             "startup": {},
@@ -258,7 +258,7 @@ def test_the_gate_fires_on_a_cold_greeting() -> None:
     assert can_skip_selection(_request("hey"), prior_active_ids=[]) is True
 
 
-def test_the_gate_refuses_when_a_skill_is_already_active() -> None:
+def test_the_gate_refuses_when_a_runbook_is_already_active() -> None:
     """An acknowledgement is no evidence the work is over — the user may be
     thanking the assistant while three agents keep running."""
     assert can_skip_selection(_request("thanks"), prior_active_ids=["daintree.foundation"]) is False
@@ -307,7 +307,7 @@ async def test_a_greeting_skips_the_selector_and_clears_the_active_set(
         request_id="req_fp",
     )
     assert outcome.body is not None
-    assert outcome.body["skills"]["active"] == []
+    assert outcome.body["runbooks"]["active"] == []
     # No selector call was made — only the main completion.
     assert fake_provider.selection_requests == []
     await container.aclose()
@@ -316,29 +316,29 @@ async def test_a_greeting_skips_the_selector_and_clears_the_active_set(
 def test_an_authoritative_clear_actually_clears() -> None:
     """The bug this disposition exists to fix.
 
-    `resolve_active_skills` treated a decision as authoritative only when
+    `resolve_active_runbooks` treated a decision as authoritative only when
     `ran` was true, so the fast path's empty result silently REUSED the prior
     set — the exact opposite of the clear it advertised, and invisible because
     the earlier wiring test supplied no prior set to reuse.
     """
-    from daintree_assistant_server.services.chat_orchestrator import resolve_active_skills
-    from daintree_assistant_server.skills.catalog import load_catalog
-    from daintree_assistant_server.skills.decision import SelectionDecision
+    from daintree_assistant_server.runbooks.catalog import load_catalog
+    from daintree_assistant_server.runbooks.decision import SelectionDecision
+    from daintree_assistant_server.services.chat_orchestrator import resolve_active_runbooks
 
     catalog = load_catalog()
     prior = [sorted(catalog.known_ids)[0]]
 
-    cleared = resolve_active_skills(SelectionDecision.cleared(), prior, catalog, 3)
+    cleared = resolve_active_runbooks(SelectionDecision.cleared(), prior, catalog, 3)
     assert cleared.active == [], "an authoritative clear reused the prior set"
 
     # A plain non-run decision still reuses — that is the continuation-round rule.
-    reused = resolve_active_skills(SelectionDecision.reuse(prior), prior, catalog, 3)
+    reused = resolve_active_runbooks(SelectionDecision.reuse(prior), prior, catalog, 3)
     assert reused.active == prior
 
 
 def test_a_cleared_decision_does_not_claim_a_selector_call() -> None:
     """Telemetry stays honest: no call ran, so `ran` must stay False."""
-    from daintree_assistant_server.skills.decision import SelectionDecision
+    from daintree_assistant_server.runbooks.decision import SelectionDecision
 
     decision = SelectionDecision.cleared()
     assert decision.ran is False
@@ -372,7 +372,7 @@ async def test_selection_force_still_runs_the_selector(settings, fake_provider) 
     container.orchestrator.selector.select = spying_select  # type: ignore[method-assign]
     body = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "thanks!"}]},
             "startup": {},

@@ -277,14 +277,20 @@ def test_no_document_claims_the_interactive_surface_thinks(path: Path) -> None:
 def test_nothing_is_documented_as_thinking() -> None:
     """There is no thinking surface left at all, and the doc has to say so.
 
-    Skill learning was the one exception — it ran after the response, so its
+    Runbook learning was the one exception — it ran after the response, so its
     latency never reached a user — and it has been removed. A doc that still
     carves out an exception sends a reader looking for a thinking budget that
     nothing spends.
     """
     text = _read(DOC_PROVIDER).lower()
     assert "nothing in this server thinks" in text
-    assert "skill learning is the one surface that still thinks" not in text
+    # BOTH spellings. The sentence this guards was written before the runbook rename,
+    # so forbidding only the new wording would let the original stale claim return.
+    for stale in (
+        "runbook learning is the one surface that still thinks",
+        "skill learning is the one surface that still thinks",
+    ):
+        assert stale not in text
 
 
 # The stale posture survived in *source comments* too — `config.py` justified the
@@ -595,7 +601,7 @@ def test_no_reasoning_effort_is_sent_by_anything() -> None:
     ``INTERACTIVE_REASONING_EFFORT`` is the value the interactive surface WOULD
     use if ``INTERACTIVE_THINKING_ENABLED`` were flipped back on, kept beside the
     flag so that decision does not also require choosing a tier. With the flag
-    off and skill learning gone, no call in the system sets ``reasoning_effort``
+    off and runbook learning gone, no call in the system sets ``reasoning_effort``
     at all — which is what the doc's thinking table now says.
 
     The doc assertion moved with the host. It used to check that §2 called the
@@ -787,8 +793,8 @@ def test_prompt_dumping_fails_readiness_in_every_hardened_environment(
 ) -> None:
     """The last local-only feature, and the reason that gate still exists.
 
-    Skill learning used to be the other entry — and the more dangerous one, since
-    it mutated the skill catalog from model output at runtime. It has been
+    Runbook learning used to be the other entry — and the more dangerous one, since
+    it mutated the runbook catalog from model output at runtime. It has been
     removed entirely, leaving prompt dumping: it writes FULL prompts to disk,
     which is a development forensics tool and a disclosure risk anywhere else.
 
@@ -818,23 +824,32 @@ def test_prompt_dumping_is_permitted_in_local_environments(environment: str) -> 
     assert local.local_only_problems() == []
 
 
-def test_no_document_still_describes_skill_learning() -> None:
+def test_no_document_still_describes_runbook_learning() -> None:
     """It is gone, and a document that still offers it is worse than silent.
 
     A reader following `.env.example` or the README would set
-    `SKILL_LEARNING_MODE`, see nothing happen (extra env vars are ignored), and
+    `RUNBOOK_LEARNING_MODE`, see nothing happen (extra env vars are ignored), and
     have no way to tell whether the feature was broken or absent.
     """
     offenders: list[str] = []
     for path in PROSE_FILES:
         for number, line in enumerate(_read(path).splitlines(), start=1):
-            if "SKILL_LEARNING" in line or "skill-learning" in line.lower():
+            lowered = line.lower()
+            # The feature was called "skill learning" when it existed and its env var was
+            # SKILL_LEARNING_*. Scanning only the renamed spelling would miss a document
+            # that still offers the setting a reader could actually type.
+            if (
+                "RUNBOOK_LEARNING" in line
+                or "SKILL_LEARNING" in line
+                or "runbook-learning" in lowered
+                or "skill-learning" in lowered
+            ):
                 # A line explaining the REMOVAL is the accurate copy.
                 if re.search(r"\b(?:removed|no longer|used to|gone|deleted)\b", line, re.I):
                     continue
                 offenders.append(f"{path.name}:{number}")
     assert not offenders, (
-        f"{offenders} still describe skill learning, which has been removed."
+        f"{offenders} still describe runbook learning, which has been removed."
     )
 
 
@@ -904,7 +919,7 @@ def test_the_documented_total_is_a_sum_of_both_calls() -> None:
     Asserted against the arithmetic rather than the prose, so a change that
     quietly reports only the main call fails here.
     """
-    from daintree_assistant_server.contracts.daintree_api import SkillsBlock
+    from daintree_assistant_server.contracts.daintree_api import RunbooksBlock
     from daintree_assistant_server.contracts.extensions import SelectorMeta, SelectorUsage
     from daintree_assistant_server.providers.base import ProviderUsage
     from daintree_assistant_server.services.chat_orchestrator import _RespondMeta
@@ -915,7 +930,7 @@ def test_the_documented_total_is_a_sum_of_both_calls() -> None:
         state=None,
         catalog_revision="c",
         prompt_version="p",
-        skills=SkillsBlock(
+        runbooks=RunbooksBlock(
             selector=SelectorMeta(usage=SelectorUsage(cost=0.0004)),
         ),
         warnings=[],
@@ -1115,9 +1130,9 @@ def test_no_document_tells_a_reader_the_cli_stores_a_key(doc: Path) -> None:
 # ---------------------------------------------------------------------------
 # Benchmark prose vs the committed baseline.
 #
-# The benchmark READMEs carried hand-copied absolute numbers — "16 skills",
+# The benchmark READMEs carried hand-copied absolute numbers — "16 runbooks",
 # "~20.3 KB selector prompt" — long enough that a reviewer quoted them back as
-# current against a 31-skill catalog. Hand-copied metrics decay silently; this
+# current against a 31-runbook catalog. Hand-copied metrics decay silently; this
 # pins the two that a reader is most likely to act on.
 # ---------------------------------------------------------------------------
 
@@ -1126,12 +1141,12 @@ DOC_PROMPT_COST = REPO_ROOT / "benchmarks" / "prompt_cost" / "README.md"
 
 
 _SNAPSHOT_HEADER = re.compile(r"Measured\s+\*{0,2}(\d{4}-\d{2}-\d{2})\*{0,2},?\s+"
-                              r"[^\n]*?(\d+)[- ]skills?[^\n]*?(\d+)[- ]tools?", re.I)
+                              r"[^\n]*?(\d+)[- ]runbooks?[^\n]*?(\d+)[- ]tools?", re.I)
 
 
 def test_the_prompt_cost_readme_declares_exactly_one_current_snapshot() -> None:
     """Two "Measured …" headers above the history section means the file
-    contradicts itself, which is how the stale 16-skill table survived beside a
+    contradicts itself, which is how the stale 16-runbook table survived beside a
     corrected one: a reader takes whichever they reach first."""
     current = _read(DOC_PROMPT_COST).split("### Snapshot history", 1)[0]
     headers = _SNAPSHOT_HEADER.findall(current)
@@ -1154,18 +1169,18 @@ def test_the_prompt_cost_readme_snapshot_matches_the_live_catalog() -> None:
     from tools.baseline import capture
 
     live = capture()
-    skills = live["catalog"]["skills"]
+    runbooks = live["catalog"]["runbooks"]
     tools = live["tools"]["count"]
     current = _read(DOC_PROMPT_COST).split("### Snapshot history", 1)[0]
     header = _SNAPSHOT_HEADER.search(current)
     assert header, (
-        "benchmarks/prompt_cost/README.md has no dated 'Measured <date>, N skills / "
+        "benchmarks/prompt_cost/README.md has no dated 'Measured <date>, N runbooks / "
         "M tools' line — the snapshot cannot be checked for staleness without one"
     )
-    assert (int(header.group(2)), int(header.group(3))) == (skills, tools), (
-        f"the prompt_cost README snapshot says {header.group(2)} skills / "
+    assert (int(header.group(2)), int(header.group(3))) == (runbooks, tools), (
+        f"the prompt_cost README snapshot says {header.group(2)} runbooks / "
         f"{header.group(3)} tools; the live catalog and tool fixture are "
-        f"{skills} / {tools}. Re-run `python -m benchmarks.prompt_cost.bench run` "
+        f"{runbooks} / {tools}. Re-run `python -m benchmarks.prompt_cost.bench run` "
         f"and refresh the table."
     )
 
@@ -1213,11 +1228,13 @@ def test_the_benchmark_readme_ci_claim_matches_the_workflow() -> None:
 #: a deleted architecture in the present tense is an instruction to rebuild it.
 #: `docs/DAINTREE_API.md` was exactly that for a whole generation: it documented
 #: caller-supplied OpenRouter keys, a `provider` endpoint-selection block and a
-#: model-call skill selector, all removed, while calling itself the wire
+#: model-call runbook selector, all removed, while calling itself the wire
 #: contract.
 _RETIRED_CLAIMS = (
     "caller's own api key as the bearer",
     "the key is their openrouter key",
+    "runbook selection runs on a separate small model",
+    # The pre-rename wording of the same retired claim.
     "skill selection runs on a separate small model",
     "endpoint-selection policy",
     "throughput-sorted",

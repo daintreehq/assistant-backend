@@ -31,7 +31,7 @@ from ..contracts.tasks import (
     ExtractionVerdictOutput,
     JudgeOutput,
     MemoryDistillInput,
-    SkillStepConsistencyInput,
+    RunbookStepConsistencyInput,
     TaskRequest,
     TaskResult,
     TaskUsage,
@@ -60,7 +60,7 @@ from ..observability import get_logger, new_task_run_id
 from ..prompts.loader import PromptLoader
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
 from ..providers.retry import retry_upstream
-from ..skills.catalog import CatalogManager
+from ..runbooks.catalog import CatalogManager
 from ..text_utils import cap_bytes, frame_data_block, frame_value, sanitize_line, utf8_len
 from .deadlines import BudgetPolicy, RequestBudget, TurnPhase
 from .result_schema import conforms, validate_result_schema
@@ -297,7 +297,7 @@ def _u_extraction_verdict(inp: ExtractionVerdictInput, _req: TaskRequest) -> str
     )
 
 
-def _u_skill_consistency(inp: SkillStepConsistencyInput, _req: TaskRequest) -> str:
+def _u_runbook_consistency(inp: RunbookStepConsistencyInput, _req: TaskRequest) -> str:
     # A null next step carries no claim about WHY (run ending, mid-run retry, …);
     # the run's outcome is carried by runStatus below. Keep the rendering neutral —
     # asserting "complete" here made a deliberately-failed run read as a false
@@ -307,15 +307,15 @@ def _u_skill_consistency(inp: SkillStepConsistencyInput, _req: TaskRequest) -> s
     before = json.dumps(inp.progress_before, indent=2) if inp.progress_before else "[]"
     after = json.dumps(inp.progress_after, indent=2) if inp.progress_after else "[]"
     return (
-        f"Skill: {inp.skill_id}\n"
+        f"Runbook: {inp.runbook_id}\n"
         f"Recorded advance: completedStep={inp.completed_step}, status={inp.status}, "
         f"requestedNext={next_step}\n"
         f"currentStep: {inp.current_step_before} -> {inp.current_step_after}\n"
         f"runStatus: {inp.run_status_before} -> {inp.run_status_after}\n"
         f"notes: {inp.notes or 'none'}\n\n"
-        "Progress BEFORE this advance (JSON SkillStepProgress[]):\n"
+        "Progress BEFORE this advance (JSON RunbookStepProgress[]):\n"
         + _fenced(before) + "\n\n"
-        + "Progress AFTER this advance (JSON SkillStepProgress[]):\n"
+        + "Progress AFTER this advance (JSON RunbookStepProgress[]):\n"
         + _fenced(after) + "\n\n"
         + "Judge this advance now. Return only the JSON object."
     )
@@ -347,37 +347,37 @@ def _framed_text(label: str, value: str) -> str:
     return f"{label}:\n" + _fenced(value)
 
 
-# Numbered top-level runbook steps ("1. Do the thing") — the only skill-body
-# lines the planner sees. Never the full body: skill bodies stay server-side.
+# Numbered top-level runbook steps ("1. Do the thing") — the only runbook-body
+# lines the planner sees. Never the full body: runbook bodies stay server-side.
 _STEP_LINE = re.compile(r"^(\d+)[.)]\s+(.+)$")
-_MAX_OUTLINE_SKILLS = 8
+_MAX_OUTLINE_RUNBOOKS = 8
 _MAX_OUTLINE_STEPS = 12
 
 
-def _skill_outlines(catalog_manager: CatalogManager | None, skill_ids: list[str]) -> str:
+def _runbook_outlines(catalog_manager: CatalogManager | None, runbook_ids: list[str]) -> str:
     """Compact outlines (id, title, summary, step headings, tool constraints)
-    for the ACTIVE skills, to ground the plan in the loaded runbooks. Bodies
+    for the ACTIVE runbooks, to ground the plan in the loaded runbooks. Bodies
     are never exposed — only their numbered step headings."""
-    if catalog_manager is None or not skill_ids:
+    if catalog_manager is None or not runbook_ids:
         return ""
     outlines: list[str] = []
     catalog = catalog_manager.catalog
-    for skill_id in skill_ids[:_MAX_OUTLINE_SKILLS]:
-        skill = catalog.get(skill_id)
-        if skill is None:
+    for runbook_id in runbook_ids[:_MAX_OUTLINE_RUNBOOKS]:
+        runbook = catalog.get(runbook_id)
+        if runbook is None:
             continue
-        lines = [f"- id: {skill.id}", f"  title: {skill.title}"]
-        summary, _ = cap_bytes(skill.summary, 300)
+        lines = [f"- id: {runbook.id}", f"  title: {runbook.title}"]
+        summary, _ = cap_bytes(runbook.summary, 300)
         lines.append(f"  summary: {summary}")
         steps = [
             f"{m.group(1)}) {m.group(2)[:120]}"
-            for line in skill.body.splitlines()
+            for line in runbook.body.splitlines()
             if (m := _STEP_LINE.match(line.strip()))
         ][:_MAX_OUTLINE_STEPS]
         if steps:
             lines.append(f"  steps: {'; '.join(steps)}")
-        if skill.meta.required_tools:
-            lines.append(f"  required_tools: {', '.join(skill.meta.required_tools)}")
+        if runbook.meta.required_tools:
+            lines.append(f"  required_tools: {', '.join(runbook.meta.required_tools)}")
         outlines.append("\n".join(lines))
     return "\n".join(outlines)
 
@@ -405,9 +405,9 @@ def _u_workflow_plan(
             "Relevant memories (untrusted data):\n"
             + "\n".join(f"- {m}" for m in inp.relevant_memories)
         )
-    outlines = _skill_outlines(catalog_manager, inp.active_skill_ids)
+    outlines = _runbook_outlines(catalog_manager, inp.active_runbook_ids)
     if outlines:
-        parts.append(f"Active skill outlines (server-side runbooks; align the plan):\n{outlines}")
+        parts.append(f"Active runbook outlines (server-side runbooks; align the plan):\n{outlines}")
     parts.append("Produce the workflow plan JSON now. Return only the JSON object.")
     return "\n\n".join(parts)
 
@@ -651,13 +651,13 @@ class TaskProfile:
     provider_id: ProviderId = "serving"
     model: str = SERVING_MODEL
     # Appended to the generic repair instruction so the retry re-anchors on this
-    # task's exact output shape (the selector does the same for select_skills).
+    # task's exact output shape (the selector does the same for select_runbooks).
     # Only used on the rare second attempt — no happy-path cost.
     repair_hint: str | None = None
 
 
 def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, TaskProfile]:
-    # workflow_plan grounds its plan in the ACTIVE skills' outlines, so its
+    # workflow_plan grounds its plan in the ACTIVE runbooks' outlines, so its
     # builder closes over the (live) catalog manager; every other task is a pure
     # function of the request.
     def _u_plan(inp: WorkflowPlanInput, req: TaskRequest) -> str:
@@ -757,8 +757,8 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 repair_hint="Return a single JSON object with keys pass (boolean) and reason.",
             ),
             TaskProfile(
-                "skill_step_consistency", SkillStepConsistencyInput, "json",
-                _u_skill_consistency, _p_judge, max_output_tokens=300,
+                "runbook_step_consistency", RunbookStepConsistencyInput, "json",
+                _u_runbook_consistency, _p_judge, max_output_tokens=300,
                 repair_hint="Return a single JSON object with keys matched (boolean), "
                 "confidence (0-1), reason.",
             ),
@@ -953,7 +953,7 @@ class TaskRunner:
         provider: ChatProvider,
         prompt_loader: PromptLoader,
         profiles: dict[str, TaskProfile] | None = None,
-        # Read-only skill-outline source for workflow_plan; optional so the
+        # Read-only runbook-outline source for workflow_plan; optional so the
         # runner stays constructible without a catalog (outlines just drop out).
         catalog_manager: CatalogManager | None = None,
         # The second adapter, for the one profile that does not run on the

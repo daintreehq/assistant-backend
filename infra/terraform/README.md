@@ -63,7 +63,7 @@ curl -s "$URL/readyz"                                    # {"status":"ready", ..
 curl -s -o /dev/null -w '%{http_code}' "$URL/v1/daintree/capabilities"   # 200 — the door is open
 curl -s -X POST "$URL/v1/daintree/respond" \
   -H 'content-type: application/json' \
-  -d '{"protocol_version":2,"session":{"id":"s","turn_id":"t"},"startup":{},
+  -d '{"protocol_version":3,"session":{"id":"s","turn_id":"t"},"startup":{},
        "input":{"messages":[{"role":"user","content":"hello"}]}}'
 # streaming: add "generation":{"stream":true} and watch for `event: meta` then `event: delta`/`event: done`.
 ```

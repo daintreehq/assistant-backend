@@ -22,7 +22,7 @@ from benchmarks._harness.quality import (
     utility_json_verdict,
     workflow_intel_verdict,
 )
-from benchmarks.skill_selection.local_runner import STAGES as LOCAL_STAGES
+from benchmarks.runbook_selection.local_runner import STAGES as LOCAL_STAGES
 
 CARRIERS = ["memory", "mcp_instructions", "terminal_title"]
 
@@ -110,7 +110,7 @@ def clean_utility(**over: Any) -> dict[str, Any]:
     }
 
 
-def clean_skill_selection(**over: Any) -> dict[str, Any]:
+def clean_runbook_selection(**over: Any) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "cases_total": 146,
         "cases_passed": 146,
@@ -149,10 +149,10 @@ def clean_skill_selection(**over: Any) -> dict[str, Any]:
     }
 
 
-SELECTOR_CATEGORIES = ["continuation", "docs-classification", "routing-trap", "single-skill"]
+SELECTOR_CATEGORIES = ["continuation", "docs-classification", "routing-trap", "single-runbook"]
 
 
-def clean_skill_selection_local(**over: Any) -> dict[str, Any]:
+def clean_runbook_selection_local(**over: Any) -> dict[str, Any]:
     """A flawless run of the SHIPPED selector: deterministic, one trial a case.
 
     Shaped like the real document rather than like the paid suite's: recall-pass
@@ -214,7 +214,7 @@ def test_a_clean_run_passes_each_gate() -> None:
     assert injection_verdict(clean_injection()).passed
     assert workflow_intel_verdict(clean_workflow()).passed
     assert utility_json_verdict(clean_utility()).passed
-    assert VERDICTS["skill_selection_local"](clean_skill_selection_local()).passed
+    assert VERDICTS["runbook_selection_local"](clean_runbook_selection_local()).passed
 
 
 # ---------------------------------------------------------------------------
@@ -460,7 +460,7 @@ def test_attach_verdict_stamps_the_summary_the_dashboard_reads(suite: str) -> No
         "injection_live": clean_injection(injection_obeyed_total=5),
         "workflow_intel": clean_workflow(first_try_valid_rate=0.1),
         "utility_json": clean_utility(pass_rate=0.1),
-        "skill_selection_local": clean_skill_selection_local(candidate_miss_trials=3),
+        "runbook_selection_local": clean_runbook_selection_local(candidate_miss_trials=3),
     }
     stamped = attach_verdict(docs[suite], suite)
     assert stamped["summary"]["passed"] is False
@@ -550,7 +550,7 @@ def test_a_flawless_full_run_of_todays_corpus_passes_its_gate(suite: str) -> Non
     """
     import importlib
 
-    if suite == "skill_selection_local":
+    if suite == "runbook_selection_local":
         verdict = VERDICTS[suite](_selector_local_doc())
         assert verdict.passed, f"a flawless full run of {suite} would fail: {verdict.failures}"
         return
@@ -558,7 +558,7 @@ def test_a_flawless_full_run_of_todays_corpus_passes_its_gate(suite: str) -> Non
     runner = importlib.import_module(f"benchmarks.{suite}.runner")
     trials = 3
 
-    if suite == "skill_selection":
+    if suite == "runbook_selection":
         verdict = VERDICTS[suite](_selector_doc(trials=trials))
         assert verdict.passed, f"a flawless full run of {suite} would fail: {verdict.failures}"
         return
@@ -598,7 +598,7 @@ def test_a_filtered_run_cannot_declare_its_own_subset_to_be_the_corpus(suite: st
     """
     import importlib
 
-    if suite == "skill_selection_local":
+    if suite == "runbook_selection_local":
         doc = _selector_local_doc(ran=1)
         assert not VERDICTS[suite](doc).passed, f"{suite} passed on a one-case run"
         return
@@ -606,7 +606,7 @@ def test_a_filtered_run_cannot_declare_its_own_subset_to_be_the_corpus(suite: st
     runner = importlib.import_module(f"benchmarks.{suite}.runner")
     trials = 3
 
-    if suite == "skill_selection":
+    if suite == "runbook_selection":
         # The selector runner records `meta.filter`, so a narrowed run is refused
         # on its own evidence as well as on the case count.
         doc = _selector_doc(trials=trials, ran=1)
@@ -739,10 +739,10 @@ def _selector_local_doc(*, ran: int | None = None, clean: bool = True) -> dict[s
     would be a permanently-red release gate. Built from the LIVE corpus so the
     case count and category list are whatever the repository actually holds.
     """
-    from benchmarks.skill_selection.cases import load_cases
-    from benchmarks.skill_selection.local_runner import ARTIFACT, build_local_doc
-    from benchmarks.skill_selection.scoring import TrialResult
-    from daintree_assistant_server.skills.catalog import load_catalog
+    from benchmarks.runbook_selection.cases import load_cases
+    from benchmarks.runbook_selection.local_runner import ARTIFACT, build_local_doc
+    from benchmarks.runbook_selection.scoring import TrialResult
+    from daintree_assistant_server.runbooks.catalog import load_catalog
 
     catalog = load_catalog()
     whole = load_cases(catalog)
@@ -776,9 +776,9 @@ def _selector_doc(*, trials: int, ran: int | None = None, clean: bool = True) ->
     a routing case is added, and this test exists to prove a healthy full run
     passes, not to freeze the corpus.
     """
-    from benchmarks.skill_selection.cases import load_cases
-    from benchmarks.skill_selection.scoring import TrialResult, summarize
-    from daintree_assistant_server.skills.catalog import load_catalog
+    from benchmarks.runbook_selection.cases import load_cases
+    from benchmarks.runbook_selection.scoring import TrialResult, summarize
+    from daintree_assistant_server.runbooks.catalog import load_catalog
 
     cases = load_cases(load_catalog())
     graded = cases if ran is None else cases[:ran]
@@ -810,7 +810,7 @@ def _selector_doc(*, trials: int, ran: int | None = None, clean: bool = True) ->
     ]
     doc = {"summary": summarize(graded, results)}
     doc["meta"] = {
-        "benchmark": "skill_selection",
+        "benchmark": "runbook_selection",
         "trials_expected": len(cases) * trials,
         "docs_trials_expected": sum(1 for c in cases if c.expect_docs is not None) * trials,
         # `variant`, `model` and `catalog_revision` are read by the suite's own
@@ -836,7 +836,7 @@ def _artifact(suite: str, *, clean: bool) -> dict[str, Any]:
     """
     import importlib
 
-    if suite == "skill_selection_local":
+    if suite == "runbook_selection_local":
         doc = _selector_local_doc(clean=clean)
         doc["losses"] = []
         doc["picked"] = []
@@ -845,7 +845,7 @@ def _artifact(suite: str, *, clean: bool) -> dict[str, Any]:
     runner = importlib.import_module(f"benchmarks.{suite}.runner")
     trials = 3
 
-    if suite == "skill_selection":
+    if suite == "runbook_selection":
         doc = _selector_doc(trials=trials, clean=clean)
         doc["cases"] = []
         return attach_verdict(doc, suite)
@@ -885,11 +885,11 @@ def _bench_module(suite: str) -> str:
     """Which CLI owns a suite's artifacts.
 
     Not one module per verdict: the local selector suite is a subcommand of the
-    skill-selection CLI rather than a package of its own, because it grades the
+    runbook-selection CLI rather than a package of its own, because it grades the
     same corpus and its `report` has to regrade either kind of artifact.
     """
-    if suite == "skill_selection_local":
-        return "benchmarks.skill_selection.bench"
+    if suite == "runbook_selection_local":
+        return "benchmarks.runbook_selection.bench"
     return f"benchmarks.{suite}.bench"
 
 

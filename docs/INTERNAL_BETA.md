@@ -14,7 +14,7 @@ A tester needs no key of their own — the server holds the upstream credential 
 funds every turn (this replaced the paste-your-own-OpenRouter-key contract; see the
 superseded rows below). The backend
 responds quickly and predictably, common Daintree workflows are covered by
-server-owned skills, failures say whose problem they are, and a bad revision can
+server-owned runbooks, failures say whose problem they are, and a bad revision can
 be rolled back.
 
 ## 2. What is in the beta
@@ -39,10 +39,10 @@ is not a description of today's build, so every line carries a status:
 | 3 | ~~**That key is the HTTP bearer** and funds every upstream call the turn makes.~~ *(superseded — the server's key funds every call)* | — |
 | 4 | **The serving backend holds no shared model credential** — not as a fallback, not as a default, not for "just the selector". | ✅ `main._build_provider(api_key=None)` |
 | 5 | **The primary model stays pinned**, and is not a floating alias. | ✅ `config.SERVING_MODEL` |
-| 6 | **The backend owns** prompts, the skill catalog and bodies, automatic skill selection, prompt assembly, and the utility-task prompts. | ✅ |
+| 6 | **The backend owns** prompts, the runbook catalog and bodies, automatic runbook selection, prompt assembly, and the utility-task prompts. | ✅ |
 | 7 | **The CLI owns** the visible conversation, local state, permissions and tool execution. | ✅ |
-| 8 | **The backend is stateless across instances**, apart from process-local caches; skill state travels in a signed, opaque token. | ✅ `state/codec.py` |
-| 9 | **Prompt dumping is off in staging and production** — it writes full prompts to disk, and an enabled dir fails `/readyz`. (Skill learning was the other entry here; it has been removed entirely.) | ✅ `Settings.local_only_problems` |
+| 8 | **The backend is stateless across instances**, apart from process-local caches; runbook state travels in a signed, opaque token. | ✅ `state/codec.py` |
+| 9 | **Prompt dumping is off in staging and production** — it writes full prompts to disk, and an enabled dir fails `/readyz`. (Runbook learning was the other entry here; it has been removed entirely.) | ✅ `Settings.local_only_problems` |
 | 10 | **Tester prompt and tool content is never logged.** | ✅ with one exception — see §5 |
 | 11 | **A caller can confirm the backend can actually serve before the first model call.** | ✅ `/auth/verify` probes the credential this request would spend — the caller's if they sent one, the SERVER's otherwise, which is every request today — with a tokenless model listing, and reports `usable` and a stable `reason` separately from `valid`. An inconclusive probe (provider unreachable) is reported as unknown, never as invalid |
 | 12 | **Failures identify their owner**: Daintree, the upstream provider, account credits, key permissions, rate limiting, or malformed input. | ✅ distinct codes — see [`DAINTREE_API.md`](DAINTREE_API.md#errors) |
@@ -57,7 +57,7 @@ Not blockers. Do not delay the beta for any of them:
 - billing metering, invoices, spend ledgers
 - tenant databases, team administration, admin console
 - model switching or provider switching in the client
-- user-created server-side skills
+- user-created server-side runbooks
 - long-term server-side conversation storage
 - a public third-party developer API
 
@@ -103,7 +103,7 @@ substitute for.
 
 Onboarding must state all of this, plainly, before the tester hands over a key:
 
-- Tokens are billed to **Daintree**, not to the tester — main completion, skill
+- Tokens are billed to **Daintree**, not to the tester — main completion, runbook
   selection and utility tasks alike. There is no key to hand over and none to
   protect. (This bullet used to say the opposite, and the reversal is the single
   most important thing on this page to get right: onboarding copy written for the
@@ -141,16 +141,16 @@ These are load-bearing. Breaking one is a release blocker, not a regression.
 
 - Client `system` / `developer` messages are **rejected**. The server owns all
   system text.
-- `skill.find` / `skill.load` are never *offered* to the main model. Selection is
+- `runbook.find` / `runbook.load` are never *offered* to the main model. Selection is
   automatic and server-side; the reserved-tool-names check enforces it at the
   request boundary.
-- Only **active skill bodies** are injected — never the full catalog.
+- Only **active runbook bodies** are injected — never the full catalog.
 - **Selector failure fails open** — a provider error or unparseable output
   degrades to the prior active set rather than blocking the user. This covers the
   failure modes that actually happen in production; an unexpected *programming*
   exception still fails the request, deliberately, because silently degrading a
   bug is how a bug survives.
-- Skill state is **portable** via the signed token. A well-sized but invalid,
+- Runbook state is **portable** via the signed token. A well-sized but invalid,
   expired, unknown-key or wrong-session token is **ignored** and selection simply
   re-runs — it is not an error. (An *oversized* token is different: it is rejected
   as invalid input, by contract validation or the codec's 16 KiB bound.)
@@ -162,9 +162,9 @@ These are load-bearing. Breaking one is a release blocker, not a regression.
 - Prompt order is cache-critical. The base prompt and the response contract are the
   **only** system messages; everything else the server injects sits below the tool
   schemas as a framed **user-role** row, ordered by how widely it can be shared,
-  widest first: skill bodies → integrations → the stable startup block → visible
+  widest first: runbook bodies → integrations → the stable startup block → visible
   conversation → one volatile runtime/display/turn tail. Keeping the integrations
-  row and the skill bodies out of the system region is what stops a per-machine MCP
+  row and the runbook bodies out of the system region is what stops a per-machine MCP
   endpoint URL, or a selector topic shift, from re-encoding all 21.5k tokens of tool
   schemas (#39). Never add a volatile system message — that includes the terminal's
   own width, which is why the geometry rides the tail and the response contract

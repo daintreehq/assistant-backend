@@ -20,8 +20,8 @@ from fakes import make_result, selection_result
 
 URL = "/v1/daintree/respond"
 
-# A skill-less turn proposes the always-on core plus anything the catalog has no
-# opinion about, so the withheld example has to be a tool some skill DECLARES:
+# A runbook-less turn proposes the always-on core plus anything the catalog has no
+# opinion about, so the withheld example has to be a tool some runbook DECLARES:
 # `forge__getPR` is one, and `context__snapshot` is one the core keeps.
 CORE_TOOL: dict[str, Any] = {
     "type": "function",

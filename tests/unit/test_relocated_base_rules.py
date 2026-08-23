@@ -2,14 +2,14 @@
 
 The base prompt shrank from ~30.6 KB to ~23.5 KB by relocating rules rather than
 deleting them: operational mechanics into ``daintree.foundation`` (measured active on
-153 of the 153 routing-benchmark cases that load any skill), and narrower rules into
+153 of the 153 routing-benchmark cases that load any runbook), and narrower rules into
 the runbook that owns them. Every relocated rule stopped being an always-on guarantee
 at that moment.
 
 Nothing else would notice if one went missing. The byte ceilings in
 ``test_prompt_budgets.py`` only get HAPPIER as text disappears; the golden snapshots
-render the base prompt and a pinned fixture catalog, not the live skills; and the
-routing benchmark scores which skill is picked, never what its body says. So a later
+render the base prompt and a pinned fixture catalog, not the live runbooks; and the
+routing benchmark scores which runbook is picked, never what its body says. So a later
 edit tidying the foundation could silently delete a rule that used to hold on every
 turn, and the whole suite would stay green.
 
@@ -27,9 +27,9 @@ from __future__ import annotations
 
 import pytest
 
-from daintree_assistant_server.skills.catalog import load_catalog
+from daintree_assistant_server.runbooks.catalog import load_catalog
 
-#: ``(claim, probe, owning skill id)``.
+#: ``(claim, probe, owning runbook id)``.
 RELOCATED_RULES: list[tuple[str, str, str]] = [
     # --- from 10-hard-rules.md, deleted outright ---
     ("spawn title is the action alone", "task-descriptive title", "daintree.foundation"),
@@ -73,16 +73,16 @@ RELOCATED_RULES: list[tuple[str, str, str]] = [
 
 
 @pytest.mark.parametrize(
-    ("claim", "probe", "skill_id"),
+    ("claim", "probe", "runbook_id"),
     RELOCATED_RULES,
     ids=[c for c, _, _ in RELOCATED_RULES],
 )
-def test_a_relocated_rule_still_has_a_home(claim: str, probe: str, skill_id: str) -> None:
+def test_a_relocated_rule_still_has_a_home(claim: str, probe: str, runbook_id: str) -> None:
     catalog = load_catalog()
-    skill = catalog.get(skill_id)
-    assert skill is not None, f"{skill_id} owns a relocated rule but is not in the catalog"
-    assert probe in skill.body, (
-        f"the base prompt no longer states {claim!r} and {skill_id} no longer carries it "
+    runbook = catalog.get(runbook_id)
+    assert runbook is not None, f"{runbook_id} owns a relocated rule but is not in the catalog"
+    assert probe in runbook.body, (
+        f"the base prompt no longer states {claim!r} and {runbook_id} no longer carries it "
         f"either (probe {probe!r}). Restore it, or relocate it and update RELOCATED_RULES."
     )
 

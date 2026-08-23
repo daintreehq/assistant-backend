@@ -20,11 +20,11 @@ from daintree_assistant_server.providers.base import (
     ProviderToolCallResult,
     ProviderUsage,
 )
+from daintree_assistant_server.runbooks.decision import SelectionDecision
 from daintree_assistant_server.services.compaction import (
     CompactionRequest,
     CompactionResult,
 )
-from daintree_assistant_server.skills.decision import SelectionDecision
 
 
 def make_result(
@@ -276,7 +276,7 @@ class FakeProvider:
         if result is None:
             return ProviderToolCallResult(
                 name=function_name,
-                arguments_json=json.dumps({"skill_ids": [], "confidence": 0.0, "task_type": ""}),
+                arguments_json=json.dumps({"runbook_ids": [], "confidence": 0.0, "task_type": ""}),
                 usage=ProviderUsage(prompt_tokens=100, completion_tokens=10, total_tokens=110),
             )
         if isinstance(result, list):
@@ -308,11 +308,11 @@ class FakeProvider:
         self.closed = True
 
 
-def tool_call_for(skill_ids: list[str], *, confidence: float = 0.9, task_type: str = "task") -> ProviderToolCallResult:
+def tool_call_for(runbook_ids: list[str], *, confidence: float = 0.9, task_type: str = "task") -> ProviderToolCallResult:
     return ProviderToolCallResult(
-        name="select_skills",
+        name="select_runbooks",
         arguments_json=json.dumps(
-            {"skill_ids": skill_ids, "confidence": confidence, "task_type": task_type}
+            {"runbook_ids": runbook_ids, "confidence": confidence, "task_type": task_type}
         ),
         usage=ProviderUsage(
             prompt_tokens=3000, completion_tokens=50, total_tokens=3050, cached_tokens=2800
@@ -321,7 +321,7 @@ def tool_call_for(skill_ids: list[str], *, confidence: float = 0.9, task_type: s
 
 
 def selection_result(
-    skill_ids: list[str],
+    runbook_ids: list[str],
     *,
     confidence: float = 0.9,
     task_type: str = "task",
@@ -333,7 +333,7 @@ def selection_result(
 
     The selector runs response_format json_object (not a forced tool call), so its
     output is parsed from ``message.content``. Keys mirror the prompt's reason-first
-    order (task_type/reason written before skill_ids — the non-thinking selector's
+    order (task_type/reason written before runbook_ids — the non-thinking selector's
     inline scratchpad); parsing itself is order-agnostic.
     """
     return make_result(
@@ -341,7 +341,7 @@ def selection_result(
             {
                 "task_type": task_type,
                 "reason": "matches the current task",
-                "skill_ids": skill_ids,
+                "runbook_ids": runbook_ids,
                 "confidence": confidence,
                 # Omitted rather than null when unset, matching a selector that
                 # simply did not answer the documentation question — the parser
@@ -426,11 +426,11 @@ class FakeCompactor:
 # behaviour belonged to a model that could return junk, and a test that hands
 # this fake junk is scripting a degraded selection, which it can say directly.
 
-_SELECTOR_FAILED_OPEN = "skill_selector_failed_open"
+_SELECTOR_FAILED_OPEN = "runbook_selector_failed_open"
 
 
 class ScriptedSelector:
-    """A `SkillSelector` whose answer comes from `FakeProvider`, not a model.
+    """A `RunbookSelector` whose answer comes from `FakeProvider`, not a model.
 
     Reads the same `selection_result` / `selection_error` slots the prompt-based
     selector consumed and appends to the same `selection_requests` list, so the
@@ -467,7 +467,7 @@ class ScriptedSelector:
                 turn_context=turn_context,
                 available_tools=list(available_tools or []),
                 # The catalog the selection actually consulted — a
-                # sub-agent narrows it, and the server-pinned skills are
+                # sub-agent narrows it, and the server-pinned runbooks are
                 # already filtered out of `selectable_ids`, so tests
                 # asserting what a selection could NAME assert on this.
                 catalog=catalog,
@@ -489,7 +489,7 @@ class ScriptedSelector:
                 return SelectionDecision.degraded_open([_SELECTOR_FAILED_OPEN])
 
         parsed = _parse_scripted_selection(
-            result.text, catalog, self.settings.max_active_skills
+            result.text, catalog, self.settings.max_active_runbooks
         )
         if parsed is None:
             return SelectionDecision.degraded_open(
@@ -500,7 +500,7 @@ class ScriptedSelector:
             )
         ids, confidence, task_type, reason, docs_query = parsed
         return SelectionDecision(
-            skill_ids=ids,
+            runbook_ids=ids,
             ran=True,
             degraded=False,
             confidence=confidence,
@@ -541,7 +541,7 @@ def _parse_scripted_selection(
         return None
     if not isinstance(data, dict):
         return None
-    raw_ids = data.get("skill_ids")
+    raw_ids = data.get("runbook_ids")
     if not isinstance(raw_ids, list):
         return None
 

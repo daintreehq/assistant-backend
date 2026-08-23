@@ -35,8 +35,8 @@ from daintree_assistant_server import PROTOCOL_MAX, PROTOCOL_MIN
 PROTOCOL_ROUTES: list[tuple[str, dict[str, object]]] = [
     ("/v1/daintree/respond", respond_body([{"role": "user", "content": "hi"}])),
     (
-        "/v1/daintree/skills/resolve",
-        {"protocol_version": 2, "session_id": "s-protocol", "action": "clear"},
+        "/v1/daintree/runbooks/resolve",
+        {"protocol_version": 3, "session_id": "s-protocol", "action": "clear"},
     ),
     (
         "/v1/daintree/tasks",
@@ -134,7 +134,7 @@ def test_an_omitted_protocol_header_stays_permitted(
 ID_ROUTES: list[tuple[str, str, dict[str, object] | None]] = [
     *[("POST", path, body) for path, body in PROTOCOL_ROUTES],
     ("GET", "/v1/daintree/capabilities", None),
-    ("GET", "/v1/daintree/skills", None),
+    ("GET", "/v1/daintree/runbooks", None),
 ]
 
 
@@ -218,9 +218,9 @@ def test_a_respond_body_reports_the_same_id_as_its_header(client, auth, ready_pr
 
 def test_a_resolve_body_reports_the_same_id_as_its_header(client, auth, ready_provider) -> None:
     r = client.post(
-        "/v1/daintree/skills/resolve",
+        "/v1/daintree/runbooks/resolve",
         headers={**auth, "X-Request-Id": "cli-resolve-match"},
-        json={"protocol_version": 2, "session_id": "s", "action": "clear"},
+        json={"protocol_version": 3, "session_id": "s", "action": "clear"},
     )
     assert r.status_code == 200, r.text
     assert r.json()["request_id"] == r.headers["X-Request-Id"] == "cli-resolve-match"

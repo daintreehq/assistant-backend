@@ -243,36 +243,36 @@ def test_dump_dir_empty_string_is_not_a_problem_in_production() -> None:
     assert s.local_only_problems() == []
 
 
-# ---- skill overlay directory (local-development-only guard) ---------------
+# ---- runbook overlay directory (local-development-only guard) ---------------
 
 
-def test_skills_overlay_dir_unset_by_default() -> None:
+def test_runbooks_overlay_dir_unset_by_default() -> None:
     s = _settings()
-    assert s.skills_overlay_dir is None
+    assert s.runbooks_overlay_dir is None
     assert s.local_only_problems() == []
 
 
-def test_skills_overlay_dir_allowed_in_development() -> None:
-    s = _settings(DAINTREE_SKILLS_OVERLAY_DIR="/tmp/skills")
-    assert s.skills_overlay_dir == "/tmp/skills"
+def test_runbooks_overlay_dir_allowed_in_development() -> None:
+    s = _settings(DAINTREE_RUNBOOKS_OVERLAY_DIR="/tmp/runbooks")
+    assert s.runbooks_overlay_dir == "/tmp/runbooks"
     assert s.local_only_problems() == []
 
 
-def test_skills_overlay_dir_fails_readiness_in_production() -> None:
-    s = _settings(ENVIRONMENT="production", DAINTREE_SKILLS_OVERLAY_DIR="/tmp/skills")
-    assert any("DAINTREE_SKILLS_OVERLAY_DIR" in p for p in s.local_only_problems())
+def test_runbooks_overlay_dir_fails_readiness_in_production() -> None:
+    s = _settings(ENVIRONMENT="production", DAINTREE_RUNBOOKS_OVERLAY_DIR="/tmp/runbooks")
+    assert any("DAINTREE_RUNBOOKS_OVERLAY_DIR" in p for p in s.local_only_problems())
 
 
-def test_skills_overlay_dir_fails_readiness_in_staging() -> None:
+def test_runbooks_overlay_dir_fails_readiness_in_staging() -> None:
     # Staging is hardened too: it is the rehearsal for production, so a catalog
     # it serves must be the one its image shipped.
-    s = _settings(ENVIRONMENT="staging", DAINTREE_SKILLS_OVERLAY_DIR="/tmp/skills")
-    assert any("DAINTREE_SKILLS_OVERLAY_DIR" in p for p in s.local_only_problems())
+    s = _settings(ENVIRONMENT="staging", DAINTREE_RUNBOOKS_OVERLAY_DIR="/tmp/runbooks")
+    assert any("DAINTREE_RUNBOOKS_OVERLAY_DIR" in p for p in s.local_only_problems())
 
 
-def test_skills_overlay_dir_empty_string_is_not_a_problem_in_production() -> None:
+def test_runbooks_overlay_dir_empty_string_is_not_a_problem_in_production() -> None:
     # An empty value means "unset" — it must not trip the production gate.
-    s = _settings(ENVIRONMENT="production", DAINTREE_SKILLS_OVERLAY_DIR="")
+    s = _settings(ENVIRONMENT="production", DAINTREE_RUNBOOKS_OVERLAY_DIR="")
     assert s.local_only_problems() == []
 
 
@@ -282,24 +282,24 @@ def test_both_local_only_features_are_reported_together() -> None:
     s = _settings(
         ENVIRONMENT="production",
         DAINTREE_DUMP_UPSTREAM_DIR="/tmp/dumps",
-        DAINTREE_SKILLS_OVERLAY_DIR="/tmp/skills",
+        DAINTREE_RUNBOOKS_OVERLAY_DIR="/tmp/runbooks",
     )
     problems = s.local_only_problems()
     assert len(problems) == 2
     assert any("DAINTREE_DUMP_UPSTREAM_DIR" in p for p in problems)
-    assert any("DAINTREE_SKILLS_OVERLAY_DIR" in p for p in problems)
+    assert any("DAINTREE_RUNBOOKS_OVERLAY_DIR" in p for p in problems)
 
 
-def test_max_active_skills_rejects_a_cap_below_two() -> None:
-    # Every skill resolves to a domain foundation and the orchestrator admits a
+def test_max_active_runbooks_rejects_a_cap_below_two() -> None:
+    # Every runbook resolves to a domain foundation and the orchestrator admits a
     # specific plus its foundation as one atomic unit, so a budget of 1 fits no unit
     # at all and would silently load NOTHING. The floor makes that unsettable.
     with pytest.raises(ValidationError):
-        _settings(MAX_ACTIVE_SKILLS=1)
+        _settings(MAX_ACTIVE_RUNBOOKS=1)
 
 
-def test_max_active_skills_accepts_the_floor() -> None:
-    assert _settings(MAX_ACTIVE_SKILLS=2).max_active_skills == 2
+def test_max_active_runbooks_accepts_the_floor() -> None:
+    assert _settings(MAX_ACTIVE_RUNBOOKS=2).max_active_runbooks == 2
 
 
 # ---------------------------------------------------------------------------
@@ -354,7 +354,7 @@ def test_the_rollout_controls_do_not_gate_readiness() -> None:
     """They are operational switches, not secrets or dev-only escape hatches.
 
     Neither belongs in the readiness gates, which exist for things that make the
-    server unable or unfit to ANSWER — a missing upstream key, a malformed skill.
+    server unable or unfit to ANSWER — a missing upstream key, a malformed runbook.
     A misconfigured rollout changes how many tools a turn is offered, which the
     fail-open paths already bound; it cannot stop the turn being served, and a
     server refused readiness over it would be down for a reason it could have

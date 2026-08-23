@@ -5,17 +5,17 @@ them. The model receives both in the same request, cannot tell which is
 authoritative, and resolves the conflict differently from turn to turn — so the
 failure is intermittent and reads like flakiness rather than a prompt bug.
 
-This file exists because exactly that shipped. `skill.step.advance` was
+This file exists because exactly that shipped. `runbook.step.advance` was
 described as a PER-STEP progress record by the CLI tool schema, the utility task
 that audits it, and that task's whole benchmark corpus — while
-`loaded_skills.md.j2` told the model the opposite: to call it ONLY at a turn
+`loaded_runbooks.md.j2` told the model the opposite: to call it ONLY at a turn
 boundary and explicitly "do NOT call it per step". Both were in every
-skill-loaded assistant turn.
+runbook-loaded assistant turn.
 
 The implementation settled it. `skill.go`'s `upsertStep` records ONLY the step
 named in the call and backfills nothing, so turn-boundary checkpointing leaves
 holes in the progress array the tool exists to produce: complete steps 1-5 in
-one turn, checkpoint at 5, and a later `skill.run.get` reads 2-4 as never done.
+one turn, checkpoint at 5, and a later `runbook.run.get` reads 2-4 as never done.
 The per-step contract is the one the data model supports, so the scaffold was
 the surface that moved. (Turn-boundary checkpointing is a defensible design and
 costs fewer calls — it just needs CLI-side backfill first. See TODO.md.)
@@ -28,16 +28,20 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROMPTS = REPO_ROOT / "src" / "daintree_assistant_server" / "prompts"
-SCAFFOLD = PROMPTS / "main" / "loaded_skills.md.j2"
-CONSISTENCY_TASK = PROMPTS / "tasks" / "skill_step_consistency.md"
+SCAFFOLD = PROMPTS / "main" / "loaded_runbooks.md.j2"
+CONSISTENCY_TASK = PROMPTS / "tasks" / "runbook_step_consistency.md"
 BASE_DIR = PROMPTS / "main" / "base"
 TOOL_INVENTORY = REPO_ROOT / "benchmarks" / "_harness" / "fixtures" / "cli_tool_inventory.json"
 
 #: Phrases that assert the RETIRED turn-boundary contract. Any of them appearing
 #: in a model-visible surface reopens the contradiction.
 _TURN_BOUNDARY_CLAIMS = (
+    "only when a runbook run may continue beyond this turn",
+    # The pre-rename wording of the same two claims. These are QUOTES of retired
+    # prompt text, so the strings to forbid are the ones that were actually written.
     "only when a skill run may continue beyond this turn",
     "do not call it per step",
+    "about to end the turn mid-runbook",
     "about to end the turn mid-skill",
     "only the last completed step",
     "record only the last",
@@ -51,7 +55,11 @@ _TURN_BOUNDARY_CLAIMS = (
 _PER_STEP_INSTRUCTION = "as you complete"
 
 CLI_SUBMODULE = REPO_ROOT / "cli"
-_CLI_SKILL_TOOL = CLI_SUBMODULE / "internal" / "tools" / "skill" / "skill.go"
+# The CLI's own path, and deliberately still `tools/skill/skill.go`: the Go side
+# has not been renamed yet, and a path spelled the way we WANT it does not read
+# the file — it just makes this gate skip, which is precisely the silent pass the
+# test below exists to prevent. Move it when the CLI rename is pinned here.
+_CLI_RUNBOOK_TOOL = CLI_SUBMODULE / "internal" / "tools" / "skill" / "skill.go"
 
 
 def _tool_description(name: str) -> str:
@@ -81,14 +89,14 @@ def test_the_scaffold_does_not_contradict_the_tool_it_instructs() -> None:
     """
     scaffold = SCAFFOLD.read_text(encoding="utf-8").lower()
     assert _PER_STEP_INSTRUCTION in scaffold, (
-        "loaded_skills.md.j2 no longer instructs a per-step record. Removing the "
+        "loaded_runbooks.md.j2 no longer instructs a per-step record. Removing the "
         "instruction is how the contradiction comes back without reusing any of its "
         "old wording."
     )
     for claim in _TURN_BOUNDARY_CLAIMS:
         assert claim not in scaffold, (
-            f"loaded_skills.md.j2 reasserts the turn-boundary contract ({claim!r}), which "
-            "the CLI tool description and the skill_step_consistency task both contradict. "
+            f"loaded_runbooks.md.j2 reasserts the turn-boundary contract ({claim!r}), which "
+            "the CLI tool description and the runbook_step_consistency task both contradict. "
             "Only the step named in a call is recorded — see this module's docstring."
         )
 
@@ -99,11 +107,11 @@ def test_the_cli_tool_still_describes_a_per_step_record() -> None:
     Without this, aligning the scaffold would look permanently correct while the
     authority it was aligned TO had moved underneath it.
     """
-    description = _tool_description("skill__step__advance").lower()
+    description = _tool_description("runbook__step__advance").lower()
     assert "as you complete each step" in description, (
-        "The CLI's skill.step.advance description no longer describes a per-step "
+        "The CLI's runbook.step.advance description no longer describes a per-step "
         "record. If the CLI moved to turn-boundary checkpointing (and taught "
-        "upsertStep to backfill), the scaffold and skill_step_consistency must move "
+        "upsertStep to backfill), the scaffold and runbook_step_consistency must move "
         "with it — and this test's expectation is what changes last, deliberately."
     )
 
@@ -133,14 +141,14 @@ def test_the_gate_reads_the_cli_source_when_the_submodule_is_present() -> None:
     and a developer who has not run `git submodule update --init` should not see
     a failure that says nothing about their change.
     """
-    if not _CLI_SKILL_TOOL.exists():
+    if not _CLI_RUNBOOK_TOOL.exists():
         import pytest
 
         pytest.skip("cli/ submodule not initialised — run `git submodule update --init cli`")
-    source = _CLI_SKILL_TOOL.read_text(encoding="utf-8").lower()
+    source = _CLI_RUNBOOK_TOOL.read_text(encoding="utf-8").lower()
     assert "as you complete each step" in source, (
-        "The CLI's skill.step.advance description changed. If it moved to "
-        "turn-boundary checkpointing, the scaffold, skill_step_consistency and this "
+        "The CLI's runbook.step.advance description changed. If it moved to "
+        "turn-boundary checkpointing, the scaffold, runbook_step_consistency and this "
         "gate move with it — see this module's docstring and TODO.md."
     )
 
@@ -361,7 +369,7 @@ _PRECEDENCE_LEVELS = (
     "your own defaults",
 )
 
-#: Claims that put a runbook ABOVE the user. Both shipped in `30-skills.md`
+#: Claims that put a runbook ABOVE the user. Both shipped in `30-runbooks.md`
 #: before the precedence order was written down, and both flatly contradict its
 #: second level — the runbook was "subordinate only to these hard rules", and a
 #: "request in the conversation" (which is where the user speaks) was never
@@ -371,14 +379,14 @@ _RUNBOOK_OUTRANKS_USER_CLAIMS = (
     "a request in the conversation as licence",
 )
 
-#: The precedence clause the loaded-skills scaffold used to carry ("If they
-#: conflict on a concrete step, the workflow skill governs"). It is not that the
+#: The precedence clause the loaded-runbooks scaffold used to carry ("If they
+#: conflict on a concrete step, the workflow runbook governs"). It is not that the
 #: sentence was absent when it was needed — a workflow-versus-foundation clash
-#: needs two loaded skills, which is exactly when that paragraph rendered. It is
+#: needs two loaded runbooks, which is exactly when that paragraph rendered. It is
 #: that ONE edge of a five-level order was owned by a conditional template while
 #: the rest of the order was owned by a permanent partial, so the two could
-#: drift and only a two-skill turn would show it.
-_SCAFFOLD_PRECEDENCE_CLAIM = "the workflow skill governs"
+#: drift and only a two-runbook turn would show it.
+_SCAFFOLD_PRECEDENCE_CLAIM = "the workflow runbook governs"
 
 
 def test_instruction_precedence_is_stated_once_and_in_order() -> None:
@@ -387,30 +395,30 @@ def test_instruction_precedence_is_stated_once_and_in_order() -> None:
     Three separate failures are gated here because they are three ways the same
     rule stops working: the order being wrong, the order being stated twice, and
     the order being contradicted by older prose in its own paragraph. The third
-    is the one that shipped — `30-skills.md` asserted a runbook was subordinate
+    is the one that shipped — `30-runbooks.md` asserted a runbook was subordinate
     ONLY to the hard rules two sentences before the order put the user above it.
     """
-    skills_path = BASE_DIR / "30-skills.md"
-    skills = skills_path.read_text(encoding="utf-8").lower()
+    runbooks_path = BASE_DIR / "30-runbooks.md"
+    runbooks = runbooks_path.read_text(encoding="utf-8").lower()
 
     positions = []
     for level in _PRECEDENCE_LEVELS:
-        index = skills.find(level)
+        index = runbooks.find(level)
         assert index != -1, (
-            f"30-skills.md no longer names {level!r} in the precedence order. The order is the "
+            f"30-runbooks.md no longer names {level!r} in the precedence order. The order is the "
             "one statement that lets the model resolve a runbook against a foundation against "
             "the user's own goal."
         )
         positions.append(index)
     assert positions == sorted(positions), (
-        "The precedence levels in 30-skills.md are out of order: "
+        "The precedence levels in 30-runbooks.md are out of order: "
         f"{list(zip(_PRECEDENCE_LEVELS, positions, strict=True))}. A reordered list is not a "
         "weaker rule, it is the opposite rule."
     )
 
     for claim in _RUNBOOK_OUTRANKS_USER_CLAIMS:
-        assert claim not in skills, (
-            f"30-skills.md states {claim!r}, which puts an applicable runbook above the user — "
+        assert claim not in runbooks, (
+            f"30-runbooks.md states {claim!r}, which puts an applicable runbook above the user — "
             "the precedence order in the same paragraph puts the user above the runbook. Both "
             "reach the model in one request."
         )
@@ -423,13 +431,13 @@ def test_instruction_precedence_is_stated_once_and_in_order() -> None:
         for path in sorted(BASE_DIR.glob("*.md"))
         if all(level in path.read_text(encoding="utf-8").lower() for level in _PRECEDENCE_LEVELS)
     ]
-    assert owners == [skills_path.name], (
+    assert owners == [runbooks_path.name], (
         f"The precedence order is stated in {owners} — it must have exactly one owner."
     )
 
     scaffold = SCAFFOLD.read_text(encoding="utf-8").lower()
     assert _SCAFFOLD_PRECEDENCE_CLAIM not in scaffold, (
-        "loaded_skills.md.j2 states instruction precedence again. One edge of the order owned "
+        "loaded_runbooks.md.j2 states instruction precedence again. One edge of the order owned "
         "by a conditionally-rendered template, and the rest owned by a permanent partial, is "
         "how the two versions start disagreeing."
     )

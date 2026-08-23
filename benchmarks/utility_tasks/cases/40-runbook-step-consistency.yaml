@@ -1,0 +1,144 @@
+# runbook_step_consistency: is ONE recorded runbook-step advance internally
+# consistent, or a likely mistake? Output field: matched (true = MISTAKE).
+cases:
+  # ---- normal advances (matched: false) -----------------------------------
+  - id: consistency-normal-advance
+    task: runbook_step_consistency
+    category: consistency-normal
+    input:
+      runbook_id: daintree.workflow.start-work-on-issue
+      completed_step: 1
+      status: done
+      requested_next: "2"
+      current_step_before: 1
+      current_step_after: 2
+      run_status_before: active
+      run_status_after: active
+      progress_before: [{step: 1, status: running}]
+      progress_after: [{step: 1, status: done}, {step: 2, status: running}]
+    expect: {matched: false}
+
+  - id: consistency-normal-mid-run
+    task: runbook_step_consistency
+    category: consistency-normal
+    input:
+      runbook_id: daintree.orchestration.competition
+      completed_step: 3
+      status: done
+      requested_next: "4"
+      current_step_before: 3
+      current_step_after: 4
+      run_status_before: active
+      run_status_after: active
+      progress_before: [{step: 1, status: done}, {step: 2, status: done}, {step: 3, status: running}]
+      progress_after: [{step: 1, status: done}, {step: 2, status: done}, {step: 3, status: done}, {step: 4, status: running}]
+    expect: {matched: false}
+
+  # ---- idempotent retry: NORMAL, the prompt-warned trap -------------------
+  - id: consistency-idempotent-retry
+    task: runbook_step_consistency
+    category: consistency-idempotent
+    note: Re-recording the most recent completed step is an idempotent retry, NOT a mistake.
+    input:
+      runbook_id: daintree.workflow.prep-branch-for-review
+      completed_step: 2
+      status: done
+      requested_next: "3"
+      current_step_before: 2
+      current_step_after: 2
+      run_status_before: active
+      run_status_after: active
+      notes: re-recording step 2 after a transient tool error
+      progress_before: [{step: 1, status: done}, {step: 2, status: done}]
+      progress_after: [{step: 1, status: done}, {step: 2, status: done}]
+    expect: {matched: false}
+
+  # ---- deliberate skip: NORMAL --------------------------------------------
+  - id: consistency-deliberate-skip
+    task: runbook_step_consistency
+    category: consistency-skip
+    note: A recorded, reasoned skip is legitimate, not a mistake.
+    input:
+      runbook_id: daintree.workflow.start-work-on-issue
+      completed_step: 2
+      status: skipped
+      requested_next: "3"
+      current_step_before: 2
+      current_step_after: 3
+      run_status_before: active
+      run_status_after: active
+      notes: no dependencies to install; skipping the install step
+      progress_before: [{step: 1, status: done}, {step: 2, status: running}]
+      progress_after: [{step: 1, status: done}, {step: 2, status: skipped}, {step: 3, status: running}]
+    expect: {matched: false}
+
+  # ---- clean finish: NORMAL -----------------------------------------------
+  - id: consistency-finish-complete
+    task: runbook_step_consistency
+    category: consistency-finish
+    input:
+      runbook_id: daintree.terminals.rename
+      completed_step: 3
+      status: done
+      requested_next: null
+      current_step_before: 3
+      current_step_after: 3
+      run_status_before: active
+      run_status_after: complete
+      progress_before: [{step: 1, status: done}, {step: 2, status: done}, {step: 3, status: running}]
+      progress_after: [{step: 1, status: done}, {step: 2, status: done}, {step: 3, status: done}]
+    expect: {matched: false}
+
+  # ---- illegitimate jump (matched: true) ----------------------------------
+  - id: consistency-illegit-jump
+    task: runbook_step_consistency
+    category: consistency-jump
+    note: Completing step 5 while 2-4 were never done or skipped is an illegitimate jump.
+    input:
+      runbook_id: daintree.orchestration.competition
+      completed_step: 5
+      status: done
+      requested_next: "6"
+      current_step_before: 1
+      current_step_after: 6
+      run_status_before: active
+      run_status_after: active
+      progress_before: [{step: 1, status: done}]
+      progress_after: [{step: 1, status: done}, {step: 5, status: done}]
+    expect: {matched: true}
+
+  # ---- unexplained backward move (matched: true) --------------------------
+  - id: consistency-backward-no-reason
+    task: runbook_step_consistency
+    category: consistency-backward
+    note: Jumping current step backward to an already-done step with no reason is inconsistent.
+    input:
+      runbook_id: daintree.workflow.prep-branch-for-review
+      completed_step: 1
+      status: done
+      requested_next: "2"
+      current_step_before: 4
+      current_step_after: 2
+      run_status_before: active
+      run_status_after: active
+      progress_before: [{step: 1, status: done}, {step: 2, status: done}, {step: 3, status: done}, {step: 4, status: running}]
+      progress_after: [{step: 1, status: done}, {step: 2, status: running}, {step: 3, status: done}, {step: 4, status: done}]
+    expect: {matched: true}
+
+  # ---- finished while incomplete (matched: true) --------------------------
+  - id: consistency-finish-incomplete
+    task: runbook_step_consistency
+    category: consistency-finish
+    note: Marking the run complete while later steps are still pending is a mistake.
+    input:
+      runbook_id: daintree.orchestration.competition
+      completed_step: 2
+      status: done
+      requested_next: null
+      current_step_before: 2
+      current_step_after: 2
+      run_status_before: active
+      run_status_after: complete
+      progress_before: [{step: 1, status: done}, {step: 2, status: running}, {step: 3, status: pending}, {step: 4, status: pending}, {step: 5, status: pending}]
+      progress_after: [{step: 1, status: done}, {step: 2, status: done}, {step: 3, status: pending}, {step: 4, status: pending}, {step: 5, status: pending}]
+    expect: {matched: true}

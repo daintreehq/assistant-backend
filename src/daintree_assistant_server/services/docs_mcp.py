@@ -68,7 +68,7 @@ DOCS_LOOKUP_TIMEOUT_SECONDS = 4.0
 
 # Per-section and whole-block byte ceilings. A single doc page can run to tens of
 # kilobytes and the search result repeats each chunk's text under `chunks`, so an
-# uncapped fold-in would dwarf the skill bodies it sits beside.
+# uncapped fold-in would dwarf the runbook bodies it sits beside.
 DOCS_SECTION_MAX_BYTES = 4 * 1024
 DOCS_BLOCK_MAX_BYTES = 12 * 1024
 

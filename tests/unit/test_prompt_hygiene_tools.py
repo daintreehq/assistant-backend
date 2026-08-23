@@ -1,9 +1,9 @@
 """The always-on core must cover what the ALWAYS-PRESENT prompt instructs.
 
-Skill-aware tool projection withholds tools no active skill declares. That is an
-argument from a skill's metadata, and it has no answer for a tool the SERVER'S
-OWN permanent prompt names: no skill is loaded to explain the absence, and on a
-skill-less turn there is no metadata in play at all. A projection that withholds
+Runbook-aware tool projection withholds tools no active runbook declares. That is an
+argument from a runbook's metadata, and it has no answer for a tool the SERVER'S
+OWN permanent prompt names: no runbook is loaded to explain the absence, and on a
+runbook-less turn there is no metadata in play at all. A projection that withholds
 `artifact.read` while `20-tool-discipline.md` tells the model to page every large
 result through it hands the model an instruction it cannot follow.
 
@@ -16,12 +16,12 @@ like `sha256:...` are not tools and must not be treated as gaps.
 half; `prompts/main/turn_footer.md.j2` is the other, and it went unscanned long
 enough to open a real hole (`async.cancel`, `watcher.cancel`). It is a
 server-owned layer that renders on every assistant turn carrying turn context,
-skill or no skill, so a tool it names has exactly the same claim on the core as
-one the base prompt names — and no skill's `requiredTools` can stand in for that,
+runbook or no runbook, so a tool it names has exactly the same claim on the core as
+one the base prompt names — and no runbook's `requiredTools` can stand in for that,
 because the footer renders when nothing is loaded.
 
 When this fails, the fix is usually to add the tool to `ALWAYS_AVAILABLE`. The
-other fix is to stop instructing it in the always-present prompt and let a skill
+other fix is to stop instructing it in the always-present prompt and let a runbook
 own it instead — but that is a prompt decision, not a projection one, and it has
 to be made deliberately rather than discovered as a withheld call in production.
 
@@ -45,10 +45,10 @@ from pathlib import Path
 import pytest
 
 from daintree_assistant_server.prompts.loader import PromptLoader
-from daintree_assistant_server.skills.catalog import load_catalog
-from daintree_assistant_server.skills.tool_projection import (
+from daintree_assistant_server.runbooks.catalog import load_catalog
+from daintree_assistant_server.runbooks.tool_projection import (
     ALWAYS_AVAILABLE,
-    SKILL_SCAFFOLD_TOOLS,
+    RUNBOOK_SCAFFOLD_TOOLS,
     wire_name,
 )
 
@@ -172,7 +172,7 @@ def test_every_tool_the_base_prompt_instructs_survives_projection() -> None:
     missing = sorted(_tools_named_in(PromptLoader().base_prompt()) - core)
     assert not missing, (
         "the always-present base prompt instructs these tools, but the projection "
-        f"would withhold them on a turn no skill covers: {missing}. Add them to "
+        f"would withhold them on a turn no runbook covers: {missing}. Add them to "
         "ALWAYS_AVAILABLE, or stop naming them in the permanent prompt."
     )
 
@@ -191,14 +191,14 @@ _NAMED_IN_TURN_FOOTER: frozenset[str] = frozenset(
 
 
 def test_every_tool_the_turn_footer_instructs_is_in_the_core() -> None:
-    """The footer is the other always-present layer, and it gets no skill.
+    """The footer is the other always-present layer, and it gets no runbook.
 
     `turn_footer.md.j2` renders on any assistant turn carrying turn context,
-    whatever the classifier selected — so "some skill declares it" is not an
-    answer here the way it is for the loaded-skills scaffold below. Both cancel
+    whatever the classifier selected — so "some runbook declares it" is not an
+    answer here the way it is for the loaded-runbooks scaffold below. Both cancel
     tools ARE declared by `daintree.foundation`, which is precisely the trap:
     that makes the catalog classify them, the unclassified pass-through skip
-    them, and an enforced skill-less turn render "async.cancel stops one" over a
+    them, and an enforced runbook-less turn render "async.cancel stops one" over a
     request that never offered it. Withholding is final, so `tool.search` cannot
     walk it back either.
     """
@@ -214,7 +214,7 @@ def test_every_tool_the_turn_footer_instructs_is_in_the_core() -> None:
     missing = sorted(named - core)
     assert not missing, (
         "the turn footer instructs these tools, but the projection would withhold "
-        f"them on a turn no skill covers: {missing}. Add them to ALWAYS_AVAILABLE, "
+        f"them on a turn no runbook covers: {missing}. Add them to ALWAYS_AVAILABLE, "
         "or stop naming them in the footer."
     )
 
@@ -234,7 +234,7 @@ _PROSE_INSTRUCTED: dict[str, str] = {
     "terminal.read": "20-tool-discipline: 'a bounded tail read per terminal'",
     # 20-tool-discipline: "Keep the main conversation clean: ... surface queue
     # items", alongside the backticked `queue.resolve`. Resolving presupposes
-    # reading, and 30-skills lists what the injected context carries — the queue
+    # reading, and 30-runbooks lists what the injected context carries — the queue
     # is not on it, so reading it is a call.
     "queue.digest": "20-tool-discipline: 'surface queue items'",
 }
@@ -242,7 +242,7 @@ _PROSE_INSTRUCTED: dict[str, str] = {
 # Four more were here and came out. `terminal.extract` rested on "read output only
 # when you need the content"; `terminal.awaitAll` on nothing in this prompt at
 # all; `memory.recall`/`memory.list` on the assumption that memory is searched,
-# when 30-skills says "pinned and recalled memories" ARRIVE in the injected
+# when 30-runbooks says "pinned and recalled memories" ARRIVE in the injected
 # context and to "read the answer straight out of whatever is present".
 #
 # They were added from the CLI's `coreToolNames`, which is a fine cross-check and
@@ -257,7 +257,7 @@ def test_the_prose_instructed_tools_are_in_the_core() -> None:
 
     Deleting an entry from `ALWAYS_AVAILABLE` that the prompt only describes would
     otherwise be invisible: the scanner finds no name, so the test above stays
-    green while an enforced skill-less turn loses the ability to confirm that a
+    green while an enforced runbook-less turn loses the ability to confirm that a
     terminal finished.
     """
     core = {wire_name(name) for name in ALWAYS_AVAILABLE}
@@ -294,17 +294,17 @@ def test_the_core_holds_nothing_the_prompt_does_not_reach() -> None:
     )
 
 
-def test_the_skill_scaffold_tools_are_admitted_when_a_skill_is_active() -> None:
-    """`loaded_skills.md.j2` instructs these and no skill declares them.
+def test_the_runbook_scaffold_tools_are_admitted_when_a_runbook_is_active() -> None:
+    """`loaded_runbooks.md.j2` instructs these and no runbook declares them.
 
-    They belong to the TEMPLATE, so no `requiredTools` audit over skill bodies
+    They belong to the TEMPLATE, so no `requiredTools` audit over runbook bodies
     could ever see the gap — which is exactly why it needs its own assertion.
 
     The template names one further tool, `terminal.await.async`, as the SCENARIO
     that makes a checkpoint worth recording rather than as a call to make. Any
-    skill that actually starts such a wait declares it, so the skill path covers
+    runbook that actually starts such a wait declares it, so the runbook path covers
     it — which is the general rule asserted below: a tool the scaffold mentions
-    is either scaffold, core, or something some skill owns.
+    is either scaffold, core, or something some runbook owns.
     """
     template = (
         Path(__file__).resolve().parents[2]
@@ -312,13 +312,13 @@ def test_the_skill_scaffold_tools_are_admitted_when_a_skill_is_active() -> None:
         / "daintree_assistant_server"
         / "prompts"
         / "main"
-        / "loaded_skills.md.j2"
+        / "loaded_runbooks.md.j2"
     )
     named = _tools_named_in(template.read_text(encoding="utf-8"))
-    scaffold = {wire_name(name) for name in SKILL_SCAFFOLD_TOOLS}
-    assert named, "the loaded-skills template names no tools — scanner drift?"
+    scaffold = {wire_name(name) for name in RUNBOOK_SCAFFOLD_TOOLS}
+    assert named, "the loaded-runbooks template names no tools — scanner drift?"
     assert scaffold <= named, (
-        "SKILL_SCAFFOLD_TOOLS claims to mirror what the template instructs, but "
+        "RUNBOOK_SCAFFOLD_TOOLS claims to mirror what the template instructs, but "
         f"the template no longer names {sorted(scaffold - named)}"
     )
 
@@ -327,6 +327,6 @@ def test_the_skill_scaffold_tools_are_admitted_when_a_skill_is_active() -> None:
         name for name in named - scaffold - core if name not in load_catalog().declared_tools
     )
     assert not unowned, (
-        "the loaded-skills scaffold names tools that neither the scaffold set, the "
-        f"core, nor any skill's requiredTools would admit: {unowned}"
+        "the loaded-runbooks scaffold names tools that neither the scaffold set, the "
+        f"core, nor any runbook's requiredTools would admit: {unowned}"
     )

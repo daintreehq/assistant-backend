@@ -25,7 +25,7 @@ bytes, description bytes, parameter bytes, and who declares it.
 
 **Bytes are not the ranking.** A tool's cost is its size times how often it is
 offered, so each row carries a computed **reach** — how many of the catalog's
-skills would admit it — and rows sort by reach, then size. `tier` sits beside
+runbooks would admit it — and rows sort by reach, then size. `tier` sits beside
 that as the *reason*, not the ranking, because the labels do not line up with
 exposure the way they look like they do:
 
@@ -33,18 +33,18 @@ exposure the way they look like they do:
 |---|---|---|
 | `always` | every request | `ALWAYS_AVAILABLE` — the permanent base prompt instructs it, so withholding it is a contradiction the model cannot resolve |
 | `undeclared` | every request | projection argues from metadata and there is none about a tool the catalog has never heard of |
-| `scaffold` | every skill-bearing turn | `loaded_skills.md.j2` instructs it and no skill declares it |
-| `foundation` | every skill-bearing turn (today) | admission pairs each selected specific with its domain foundation, and 38 of 39 skills point at one |
-| `skill` | turns that loaded a declaring skill | reach varies from 1 to 20+ declarers, which a tier alone cannot express |
+| `scaffold` | every runbook-bearing turn | `loaded_runbooks.md.j2` instructs it and no runbook declares it |
+| `foundation` | every runbook-bearing turn (today) | admission pairs each selected specific with its domain foundation, and 38 of 39 runbooks point at one |
+| `runbook` | turns that loaded a declaring runbook | reach varies from 1 to 20+ declarers, which a tier alone cannot express |
 
 Two labels can mean identical exposure by opposite arguments (`always` and
 `undeclared`; `scaffold` and `foundation`), and one tier spans an order of
 magnitude on its own — which is why an earlier tier-ordered version put a tool
-offered on *every* request below one that needs an active skill.
+offered on *every* request below one that needs an active runbook.
 
 **Reach is static, not observed.** It is the baseline projection over the
 packaged catalog — how widely a tool *could* be admitted — and knows nothing
-about which skills actually get selected. It also ignores the two per-request
+about which runbooks actually get selected. It also ignores the two per-request
 admission paths (a forced `tool_choice`, an unresolved tool call), which depend
 on a turn rather than on the catalog.
 
@@ -54,8 +54,8 @@ parameter schema's own nested `description` keys — 49.1 KiB of prose against
 32.9 KiB of top-level descriptions. Ranking a prose audit on the top-level field
 alone would hide a third of what it can actually edit.
 
-The summary's **skill-less enforced floor** is the serialized `always` +
-`undeclared` subset — what an enforced assistant turn with no active skill
+The summary's **runbook-less enforced floor** is the serialized `always` +
+`undeclared` subset — what an enforced assistant turn with no active runbook
 proposes from this pinned inventory. Not a floor under literally every request:
 a caller can offer fewer tools, and a shadow, disabled or fail-open turn sends
 the whole inventory.
@@ -65,14 +65,14 @@ the whole inventory.
 **Deterministic (no key, no network):**
 
 - **Cacheable-prefix stability per transition** — for `tool_continuation`,
-  `runtime_context_change`, `startup_context_change`, `skill_topic_shift`, and
+  `runtime_context_change`, `startup_context_change`, `runbook_topic_shift`, and
   `new_session`, the fraction
   of the `[system messages] + [tools]` region that stays a byte prefix of the next
   turn's. Target is **1.0** for all of them, topic-shift included (the layout's core
   promise — the ~21.5k-token tool region is fully reused). Since issue #39 the
-  loaded-skills block is a user-role row *below* the schemas, so changing the active
+  loaded-runbooks block is a user-role row *below* the schemas, so changing the active
   set cannot touch that region and the floor is gated rather than merely reported;
-  `full_prefix` still drops from the skill row down, which is inherent.
+  `full_prefix` still drops from the runbook row down, which is inherent.
   Computed over the exact httpx wire bytes — the suite asserts its compact
   encoder equals `httpx`'s (`wire_encoder_matches_httpx`), so it can never measure
   a body production doesn't send.
@@ -94,7 +94,7 @@ the whole inventory.
   costs the user.
 
 **Topic-shift reuse (`--live --topic-shift`):** runs one three-turn session that
-**shifts the active skill set between turns on purpose**. The skill block is the
+**shifts the active runbook set between turns on purpose**. The runbook block is the
 first non-system message, so a shift invalidates everything below it while the
 invariant head above — base prompt, response contract, tool schemas — stays
 perfectly reusable. It reports mean cache ratio after the first turn, plus
@@ -114,7 +114,7 @@ asserts for free.
 
 Read the remaining number with one limit in mind. Together matches prefixes
 **org-wide**, so any traffic from this account — another bench, a dev server, a
-real turn — can have warmed the same base prompt and skill blocks already. The
+real turn — can have warmed the same base prompt and runbook blocks already. The
 run-randomized catalog offset is the only freshness available and the catalog
 affords a couple of dozen positions, so **a rerun is not guaranteed cold**: space
 runs beyond the cache TTL if independence matters. The invariant head stays
@@ -136,7 +136,7 @@ invariants the suite enforces; the size rows are descriptive. Re-run
 reasoning from a stale figure.
 
 > **These are a dated snapshot, not a live reading.** Hand-copied numbers decay
-> silently — this table claimed a 16-skill catalog and a 20.3 KB selector prompt
+> silently — this table claimed a 16-runbook catalog and a 20.3 KB selector prompt
 > (against a real 43 KB one)
 > for long enough that a reviewer quoted it back as current. Regenerate with
 > `python -m benchmarks.prompt_cost.bench run` (free, no key) and update the date
@@ -145,7 +145,7 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-08-21, 39 skills / 79 tools (sizes are KiB). The catalog holds 39
+Measured 2026-08-21, 39 runbooks / 79 tools (sizes are KiB). The catalog holds 39
 but the selector prompt renders 38 — `daintree.docs.answer-usage-question` is
 server-pinned off the turn's `docs_query` and hidden from the selector, so it
 costs the selector nothing:
@@ -158,17 +158,17 @@ costs the selector nothing:
 | total request | ~120.7 KB, ~30.6k proxy tok |
 | tool schemas share of request | ~79.3 KB, **65.7%**, ~20.2k tok |
 | base prompt | ~24.1 KB, 20.0%, ~6.1k tok |
-| loaded skills (2 active) | ~11.8 KB, 9.7%, ~3.0k tok |
-| skill selection | **local two-stage selector — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
-| state token | 389–492 B (0–3 skills; 16 KiB cap) |
+| loaded runbooks (2 active) | ~11.8 KB, 9.7%, ~3.0k tok |
+| runbook selection | **local two-stage selector — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
+| state token | 389–492 B (0–3 runbooks; 16 KiB cap) |
 
 The tool region rose 73.5 → 79.3 KiB (~18.7k → ~20.2k proxy tokens) when the pin
 moved to `cb12688`, which added `subagent__run` and `terminal__moveToWorktree`
 and removed nothing. That reverses most of the ~10% fall recorded against the
 previous pin, when the CLI dropped its `docs__*` family because the backend
 retrieves documentation itself now. The region remains the largest single part of
-the request by a wide margin, and the largest remaining lever: skill-aware tool
-projection (`skills/tool_projection.py`, still in shadow mode) would cut it to a
+the request by a wide margin, and the largest remaining lever: runbook-aware tool
+projection (`runbooks/tool_projection.py`, still in shadow mode) would cut it to a
 median ~34.9 KiB.
 
 The base-prompt row is the one that moved most against the previous snapshot,
@@ -178,9 +178,9 @@ landed before that table was written and were never re-measured into it.
 
 Live rows below are **older and not re-measured here** (they cost money); treat
 them as an order-of-magnitude reference only. Measured 2026-07-10 against the
-then-current 18-skill catalog and 72-tool projection:
+then-current 18-runbook catalog and 72-tool projection:
 
-| metric (live, 2026-07-10, 18 skills / 72 tools) | value |
+| metric (live, 2026-07-10, 18 runbooks / 72 tools) | value |
 |---|---|
 | warm tool-region cache ratio | ~0.996 |
 | streaming TTFB p50 | ~0.63 s |
@@ -188,10 +188,10 @@ then-current 18-skill catalog and 72-tool projection:
 
 ### Snapshot history
 
-The 2026-07-10 deterministic figures (18-skill catalog, 72-tool projection) read
+The 2026-07-10 deterministic figures (18-runbook catalog, 72-tool projection) read
 `tool schemas ~72 KB / 54% / ~18k tok`, `selector prompt ~6033 tok`, and
 `topic-shift ~0.39`. Kept only as history — the catalog has since been
-consolidated to 16 skills and the selector prompt rewritten, so those numbers are
+consolidated to 16 runbooks and the selector prompt rewritten, so those numbers are
 **not** evidence about the current system. The deterministic half was also
 **broken from 2026-07-11 to 2026-07-28** (a `render_integrations` arity mismatch
 raised `TypeError` on every run and took the `dashboard/` roll-up down with it),

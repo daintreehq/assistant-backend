@@ -57,41 +57,41 @@ cases:
           - {role: function, content: "result"}
 
   # ---- reserved tool names (must reject) ------------------------------------
-  - id: wire-reject-reserved-tool-skill-find
+  - id: wire-reject-reserved-tool-runbook-find
     guard: wire_validation
     expect: reject
     request:
       input:
         messages: [{role: user, content: "hi"}]
         tools:
-          - {type: function, function: {name: skill.find}}
+          - {type: function, function: {name: runbook.find}}
 
-  - id: wire-reject-reserved-tool-skill-load
+  - id: wire-reject-reserved-tool-runbook-load
     guard: wire_validation
     expect: reject
     request:
       input:
         messages: [{role: user, content: "hi"}]
         tools:
-          - {type: function, function: {name: skill.load}}
+          - {type: function, function: {name: runbook.load}}
 
-  - id: wire-reject-reserved-tool-skill-find-underscore
+  - id: wire-reject-reserved-tool-runbook-find-underscore
     guard: wire_validation
     expect: reject
     request:
       input:
         messages: [{role: user, content: "hi"}]
         tools:
-          - {type: function, function: {name: skill__find}}
+          - {type: function, function: {name: runbook__find}}
 
-  - id: wire-reject-reserved-tool-skill-load-underscore
+  - id: wire-reject-reserved-tool-runbook-load-underscore
     guard: wire_validation
     expect: reject
     request:
       input:
         messages: [{role: user, content: "hi"}]
         tools:
-          - {type: function, function: {name: skill__load}}
+          - {type: function, function: {name: runbook__load}}
 
   - id: wire-reject-reserved-tool-internal-prefix
     guard: wire_validation
@@ -101,7 +101,7 @@ cases:
       input:
         messages: [{role: user, content: "hi"}]
         tools:
-          - {type: function, function: {name: daintree_internal__load_skill}}
+          - {type: function, function: {name: daintree_internal__load_runbook}}
 
   - id: wire-reject-reserved-tool-hidden-in-list
     guard: wire_validation
@@ -113,7 +113,7 @@ cases:
         tools:
           - {type: function, function: {name: fs__read}}
           - {type: function, function: {name: terminal__send}}
-          - {type: function, function: {name: skill__load}}
+          - {type: function, function: {name: runbook__load}}
 
   - id: wire-reject-reserved-tool-in-assistant-tool-call
     guard: wire_validation
@@ -126,7 +126,7 @@ cases:
           - role: assistant
             content: null
             tool_calls:
-              - {id: call_1, type: function, function: {name: skill__load, arguments: "{}"}}
+              - {id: call_1, type: function, function: {name: runbook__load, arguments: "{}"}}
           - {role: tool, tool_call_id: call_1, content: "loaded"}
 
   - id: wire-reject-reserved-tool-choice
@@ -136,7 +136,7 @@ cases:
     request:
       input:
         messages: [{role: user, content: "hi"}]
-        tool_choice: {name: skill__find}
+        tool_choice: {name: runbook__find}
 
   # ---- tool list integrity (must reject) -------------------------------------
   - id: wire-reject-duplicate-tool-name
@@ -392,10 +392,10 @@ cases:
   - id: wire-pass-tool-named-like-reserved-but-not
     guard: wire_validation
     expect: pass
-    note: near-miss names (skill_find, daintree_internal without __) are NOT reserved
+    note: near-miss names (runbook_find, daintree_internal without __) are NOT reserved
     request:
       input:
         messages: [{role: user, content: "hi"}]
         tools:
-          - {type: function, function: {name: skill_find}}
+          - {type: function, function: {name: runbook_find}}
           - {type: function, function: {name: daintree_internal}}

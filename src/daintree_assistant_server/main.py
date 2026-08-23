@@ -3,7 +3,7 @@
 Builds the immutable service container (settings, prompts, catalog, provider,
 state codec, selector, assembler, orchestrator, task runner), validates
 readiness on startup, and tears the provider down on shutdown. A malformed
-prompt or skill, or a missing required secret, prevents the app from becoming
+prompt or runbook, or a missing required secret, prevents the app from becoming
 ready (``/readyz`` returns 503) without crashing liveness.
 """
 
@@ -24,7 +24,7 @@ from .api import (
     daintree_capabilities,
     daintree_doctor,
     daintree_respond,
-    daintree_skills,
+    daintree_runbooks,
     daintree_tasks,
     health,
     root,
@@ -42,16 +42,16 @@ from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
 from .providers.openrouter import OpenRouterProvider
 from .providers.together import TogetherProvider
+from .runbooks.catalog import Catalog, CatalogManager, default_runbooks_dir, load_catalog
+from .runbooks.local.paths_local import selector_artifact_dir
+from .runbooks.local.runtime import InferencePool
+from .runbooks.local.selector import LocalSelector, RunbookSelector
+from .runbooks.local.setwise import SetwiseClassifier
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.compaction import Compactor, NullCompactor, default_compactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
 from .services.prompt_assembler import PromptAssembler
 from .services.task_runner import TaskRunner
-from .skills.catalog import Catalog, CatalogManager, default_skills_dir, load_catalog
-from .skills.local.paths_local import selector_artifact_dir
-from .skills.local.runtime import InferencePool
-from .skills.local.selector import LocalSelector, SkillSelector
-from .skills.local.setwise import SetwiseClassifier
 from .state.codec import StateCodec
 
 logger = get_logger("daintree.main")
@@ -207,7 +207,7 @@ class Container:
     catalog_manager: CatalogManager
     provider: ChatProvider
     state_codec: StateCodec
-    selector: SkillSelector
+    selector: RunbookSelector
     assembler: PromptAssembler
     orchestrator: ChatOrchestrator
     task_runner: TaskRunner
@@ -375,7 +375,7 @@ def _build_state_codec(settings: Settings) -> StateCodec:
 def build_container(
     settings: Settings,
     provider: ChatProvider | None = None,
-    selector: SkillSelector | None = None,
+    selector: RunbookSelector | None = None,
     compactor: Compactor | None = None,
 ) -> Container:
     """Construct and validate all service components.
@@ -388,13 +388,13 @@ def build_container(
     prompt_loader = PromptLoader()
     prompt_loader.validate()
 
-    # The packaged skills are the catalog. `DAINTREE_SKILLS_OVERLAY_DIR` (local
+    # The packaged runbooks are the catalog. `DAINTREE_RUNBOOKS_OVERLAY_DIR` (local
     # development only, refused in production by `local_only_problems`) merges a
-    # scratch directory on top, so a skill can be authored against a running
-    # server and picked up by POST /v1/daintree/skills/reload without a restart.
+    # scratch directory on top, so a runbook can be authored against a running
+    # server and picked up by POST /v1/daintree/runbooks/reload without a restart.
     # The path is fixed here for the process; only its contents are re-read.
-    primary_dir = default_skills_dir()
-    overlay_dir = Path(settings.skills_overlay_dir) if settings.skills_overlay_dir else None
+    primary_dir = default_runbooks_dir()
+    overlay_dir = Path(settings.runbooks_overlay_dir) if settings.runbooks_overlay_dir else None
     catalog = load_catalog(primary_dir, overlay_dir)
     catalog_manager = CatalogManager(catalog, primary_dir=primary_dir, overlay_dir=overlay_dir)
 
@@ -404,16 +404,16 @@ def build_container(
     # process that deliberately stays alive (unready, not dead).
     inference_pool: InferencePool | None = None
     if selector is None:
-        # Skill selection is LOCAL: a cosine shortlist plus one set-wise pass,
+        # Runbook selection is LOCAL: a cosine shortlist plus one set-wise pass,
         # in process, replacing the upstream model call that used to sit on the
         # turn's first-byte path (p50 2.0s). Constructed eagerly so a missing or
         # LFS-pointer artifact fails container validation — readiness, not a
-        # request — exactly like a malformed prompt or skill would.
+        # request — exactly like a malformed prompt or runbook would.
         classifier = SetwiseClassifier(selector_artifact_dir())
         # Embed the live catalog now rather than on the first turn: it validates
         # the artifact against a real catalog at startup, and it means the first
         # request does not pay for whatever drifted since the image was built.
-        # There is deliberately no staleness GATE — the head has no per-skill
+        # There is deliberately no staleness GATE — the head has no per-runbook
         # weights, so a catalog the artifact never saw is answered normally
         # instead of degrading every turn open until someone retrains.
         classifier.sync(catalog_manager.catalog)
@@ -485,10 +485,10 @@ def build_container(
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     settings: Settings = app.state.settings
     injected: ChatProvider | None = getattr(app.state, "injected_provider", None)
-    injected_selector: SkillSelector | None = getattr(app.state, "injected_selector", None)
+    injected_selector: RunbookSelector | None = getattr(app.state, "injected_selector", None)
     injected_compactor: Compactor | None = getattr(app.state, "injected_compactor", None)
     try:
-        # Local-development-only features (skill learning) must never be enabled in
+        # Local-development-only features (runbook learning) must never be enabled in
         # production; checked always, even with an injected provider.
         problems = list(settings.local_only_problems())
         if injected is None:
@@ -504,7 +504,7 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
             "startup_ready",
             environment=settings.environment,
             catalog_revision=container.catalog.revision,
-            skills=len(container.catalog),
+            runbooks=len(container.catalog),
             tasks=container.task_runner.task_ids(),
         )
     except Exception as exc:  # noqa: BLE001 - readiness must not crash liveness
@@ -524,7 +524,7 @@ def create_app(
     *,
     settings: Settings | None = None,
     provider: ChatProvider | None = None,
-    selector: SkillSelector | None = None,
+    selector: RunbookSelector | None = None,
     compactor: Compactor | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
@@ -582,15 +582,15 @@ def create_app(
     # Deliberately NOT behind require_ready: a doctor that goes down with the
     # patient cannot diagnose the outage a tester is calling about.
     app.include_router(daintree_doctor.router)
-    app.include_router(daintree_skills.router)
-    # The overlay reload trigger is mounted ONLY for local skill authoring. It
+    app.include_router(daintree_runbooks.router)
+    # The overlay reload trigger is mounted ONLY for local runbook authoring. It
     # mutates process state and `require_auth` gates nothing yet, so rather than
     # ship a route production has to be trusted not to call, production simply
     # does not have it — with no overlay configured, or in a hardened
     # environment, the URL 404s. (A hardened deploy that sets the variable at
     # all also fails readiness; this is the second lock on the same door.)
-    if settings.skills_overlay_dir and not settings.is_hardened:
-        app.include_router(daintree_skills.reload_router)
+    if settings.runbooks_overlay_dir and not settings.is_hardened:
+        app.include_router(daintree_runbooks.reload_router)
     app.include_router(daintree_tasks.router)
 
     return app

@@ -67,7 +67,7 @@ def test_visible_content_and_tool_calls_both_count(delta: dict[str, Any]) -> Non
 
 
 # ---------------------------------------------------------------------------
-# `resolve` — the manual skill endpoint's rejection path.
+# `resolve` — the manual runbook endpoint's rejection path.
 # ---------------------------------------------------------------------------
 
 
@@ -89,10 +89,10 @@ async def test_an_unknown_resolve_action_is_a_400_naming_the_field(
 
 
 @pytest.mark.asyncio
-async def test_loading_an_unknown_skill_id_warns_instead_of_failing(
+async def test_loading_an_unknown_runbook_id_warns_instead_of_failing(
     orchestrator: ChatOrchestrator,
 ) -> None:
-    """A stale client asking for a deleted skill gets the rest of its request.
+    """A stale client asking for a deleted runbook gets the rest of its request.
 
     Failing the call would make a catalog edit break every client still holding
     the old id, for a request the server can honour in part.
@@ -102,9 +102,9 @@ async def test_loading_an_unknown_skill_id_warns_instead_of_failing(
         session_id="s",
         state_token=None,
         api_key=None,
-        skill_ids=["daintree.does.not.exist"],
+        runbook_ids=["daintree.does.not.exist"],
     )
-    assert "unknown_skill_id_ignored" in result["warnings"]
+    assert "unknown_runbook_id_ignored" in result["warnings"]
 
 
 # ---------------------------------------------------------------------------

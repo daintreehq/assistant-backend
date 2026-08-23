@@ -7,7 +7,7 @@ after the fix). That invariant was covered only by ORDERING assertions, so a
 refactor that folded a per-turn value into a stable block kept every test green.
 
 Only the base prompt and the response contract are system-role now: "stable" means
-stable for EVERY caller, not merely within one session, so the skill bodies and the
+stable for EVERY caller, not merely within one session, so the runbook bodies and the
 integration surface ride user-role rows below the schemas (issue #39).
 
 These tests pin it directly: two requests differing ONLY in volatile runtime/turn
@@ -31,13 +31,13 @@ from typing import Any
 from conftest import respond_body
 
 from daintree_assistant_server.contracts.daintree_api import RespondRequest
+from daintree_assistant_server.runbooks.models import Runbook
+from daintree_assistant_server.runbooks.tool_projection import tools_bytes
 from daintree_assistant_server.services.prompt_assembler import (
     PromptAssembler,
     PromptSegment,
     segment_log_fields,
 )
-from daintree_assistant_server.skills.models import Skill
-from daintree_assistant_server.skills.tool_projection import tools_bytes
 
 _MESSAGES = [{"role": "user", "content": "start the work"}]
 
@@ -46,9 +46,9 @@ def _request(**kw: Any) -> RespondRequest:
     return RespondRequest.model_validate(respond_body(_MESSAGES, **kw))
 
 
-def _build(assembler: PromptAssembler, request: RespondRequest, skills: list[Skill]) -> Any:
+def _build(assembler: PromptAssembler, request: RespondRequest, runbooks: list[Runbook]) -> Any:
     return assembler.build_main_request(
-        request=request, skills=skills, upstream_model="deepseek-v4-flash"
+        request=request, runbooks=runbooks, upstream_model="deepseek-v4-flash"
     )
 
 
@@ -65,12 +65,12 @@ def test_volatile_state_changes_only_the_trailing_tail(assembler, catalog) -> No
     while the geometry lived in the response contract it re-encoded the whole
     system region, the 77 tool schemas behind it, and the conversation.
     """
-    skills = [catalog.skills[0]]
+    runbooks = [catalog.runbooks[0]]
     a = _messages(
         _build(
             assembler,
             _request(runtime={"permission_tier": "operator", "display": {"content_width": 40}}),
-            skills,
+            runbooks,
         )
     )
     b = _messages(
@@ -80,7 +80,7 @@ def test_volatile_state_changes_only_the_trailing_tail(assembler, catalog) -> No
                 runtime={"permission_tier": "operator", "display": {"content_width": 100}},
                 turn={"goal": "a completely different objective this turn"},
             ),
-            skills,
+            runbooks,
         )
     )
 
@@ -99,14 +99,14 @@ def test_volatile_state_changes_only_the_trailing_tail(assembler, catalog) -> No
 
 
 def test_no_system_message_follows_the_conversation(assembler, catalog) -> None:
-    built = _messages(_build(assembler, _request(), [catalog.skills[0]]))
+    built = _messages(_build(assembler, _request(), [catalog.runbooks[0]]))
     roles = [m["role"] for m in built]
     # Every system message must come first: one placed after the conversation would
     # still be serialized before the tools, silently busting their cache.
     last_system = max(i for i, r in enumerate(roles) if r == "system")
     assert roles[: last_system + 1] == ["system"] * (last_system + 1)
     # ...and the system region is EXACTLY the two fully-static blocks. The ordering
-    # check above passes just as happily with the skill or integrations block back in
+    # check above passes just as happily with the runbook or integrations block back in
     # the system region, since they precede the conversation either way — this is the
     # assertion that actually pins them below the schemas (issue #39).
     assert roles.count("system") == 2
@@ -123,7 +123,7 @@ def test_tool_downstream_blocks_follow_cache_scope_order(assembler, catalog) -> 
     """Issue #39: the rows below the schemas are ordered by how widely each is shared.
 
     The tool schemas serialize immediately after the system region, so everything
-    below them is ordered widest-shared first — skill bodies (shared by TASK, so any
+    below them is ordered widest-shared first — runbook bodies (shared by TASK, so any
     two sessions running the same runbook share the prefix through it), then
     integrations and startup (per session, instance and project). Reversing that pair
     still yields "user-role and before the conversation", so a naive layout test would
@@ -135,7 +135,7 @@ def test_tool_downstream_blocks_follow_cache_scope_order(assembler, catalog) -> 
             runtime={"permission_tier": "operator", "mcp_servers": [{"name": "daintree"}]},
             tools=[{"type": "function", "function": {"name": "git__status", "description": "d"}}],
         ),
-        [catalog.skills[0]],
+        [catalog.runbooks[0]],
     )
     msgs = _messages(built)
     # The schemas really are present, so "below the schemas" means something here.
@@ -152,14 +152,14 @@ def test_tool_downstream_blocks_follow_cache_scope_order(assembler, catalog) -> 
     contract = _find("# Response contract")
     # Match the injected HEADERS, not the body headings: "# Integrations" also
     # appears in base-prompt prose about not reciting these blocks.
-    skill = _find("[Injected skill context")
+    runbook = _find("[Injected runbook context")
     integrations = _find("[Injected integrations context")
     startup = _find("[Injected startup context")
     convo = next(i for i, m in enumerate(msgs) if m.get("content") == "start the work")
 
     assert [i for i, m in enumerate(msgs) if m["role"] == "system"] == [0, contract]
-    assert contract < skill < integrations < startup < convo
-    assert (msgs[skill]["role"], msgs[integrations]["role"], msgs[startup]["role"]) == (
+    assert contract < runbook < integrations < startup < convo
+    assert (msgs[runbook]["role"], msgs[integrations]["role"], msgs[startup]["role"]) == (
         "user",
         "user",
         "user",
@@ -174,9 +174,9 @@ def test_appending_a_turn_preserves_the_previous_prefix(assembler, catalog) -> N
     slicing off ``[-1]`` can no longer eat the last conversation message — but
     keeping runtime here holds this test on the realistic shape.
     """
-    skills = [catalog.skills[0]]
+    runbooks = [catalog.runbooks[0]]
     runtime = {"permission_tier": "operator"}
-    first = _messages(_build(assembler, _request(runtime=runtime), skills))
+    first = _messages(_build(assembler, _request(runtime=runtime), runbooks))
     longer = RespondRequest.model_validate(
         respond_body(
             [
@@ -187,7 +187,7 @@ def test_appending_a_turn_preserves_the_previous_prefix(assembler, catalog) -> N
             runtime=runtime,
         )
     )
-    second = _messages(_build(assembler, longer, skills))
+    second = _messages(_build(assembler, longer, runbooks))
 
     # Both tails are the injected-context block, so stripping one really does leave
     # the full conversation behind.
@@ -205,9 +205,9 @@ def test_appending_a_turn_preserves_the_previous_prefix(assembler, catalog) -> N
 
 
 def test_identical_inputs_are_byte_identical(assembler, catalog) -> None:
-    skills = [catalog.skills[0]]
-    a = _messages(_build(assembler, _request(), skills))
-    b = _messages(_build(assembler, _request(), skills))
+    runbooks = [catalog.runbooks[0]]
+    a = _messages(_build(assembler, _request(), runbooks))
+    b = _messages(_build(assembler, _request(), runbooks))
     assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True), (
         "the same input rendered differently twice — an unstable iteration order or "
         "timestamp is in the prompt"
@@ -226,7 +226,7 @@ _SEGMENT_IDS = frozenset(
         "base",
         "response_contract",
         "tools",
-        "skills",
+        "runbooks",
         "integrations",
         "startup",
         "conversation",
@@ -235,9 +235,9 @@ _SEGMENT_IDS = frozenset(
 )
 
 
-def _segments(assembler: PromptAssembler, request: RespondRequest, skills: list[Skill]) -> Any:
+def _segments(assembler: PromptAssembler, request: RespondRequest, runbooks: list[Runbook]) -> Any:
     return assembler.build_main_request_with_segments(
-        request=request, skills=skills, upstream_model="deepseek-v4-flash"
+        request=request, runbooks=runbooks, upstream_model="deepseek-v4-flash"
     )[1]
 
 
@@ -249,12 +249,12 @@ def test_the_manifest_emits_only_labels_counts_and_digests(assembler, catalog) -
     """The whole point of a digest is describing a prompt without carrying one.
 
     Checked structurally rather than by searching the rendered text for each
-    field: the ids are ordinary words ("base", "skills") that occur in the prose
+    field: the ids are ordinary words ("base", "runbooks") that occur in the prose
     anyway, so a substring search would fail on a manifest that was perfectly
     content-free. What has to hold is that every field is a fixed label, an int,
     or a hex digest — nothing derived from the text except through a hash.
     """
-    segments = _segments(assembler, _request(), [catalog.skills[0]])
+    segments = _segments(assembler, _request(), [catalog.runbooks[0]])
     fields = segment_log_fields(segments)
 
     assert set(fields) == {"prompt_segments", "prompt_bytes"}
@@ -282,7 +282,7 @@ def test_no_canary_from_any_layer_survives_into_the_log_fields(assembler, catalo
             turn={"goal": canaries["turn"]},
         )
     )
-    segments = list(_segments(assembler, request, [catalog.skills[0]]))
+    segments = list(_segments(assembler, request, [catalog.runbooks[0]]))
     segments = [
         PromptSegment.of_wire(
             "tools",
@@ -303,13 +303,13 @@ def test_the_manifest_follows_the_assembled_array(assembler, catalog) -> None:
     digest is only meaningful if the list is in wire order, widest scope first —
     and the tools row belongs after the system messages, where the chat template
     serializes it."""
-    skills = [catalog.skills[0]]
+    runbooks = [catalog.runbooks[0]]
     built, segments = assembler.build_main_request_with_segments(
-        request=_request(), skills=skills, upstream_model="deepseek-v4-flash"
+        request=_request(), runbooks=runbooks, upstream_model="deepseek-v4-flash"
     )
     ids = [s.id for s in segments]
     assert ids[:3] == ["base", "response_contract", "tools"]
-    assert ids.index("skills") < ids.index("startup") < ids.index("conversation")
+    assert ids.index("runbooks") < ids.index("startup") < ids.index("conversation")
     assert ids[-1] == "tail"
     # One entry per LAYER, not per message: the conversation collapses to one
     # row, and `tools` is not a message at all.
@@ -336,7 +336,7 @@ def test_each_segment_is_measured_over_the_bytes_that_go_upstream(
     no key sorting, non-ASCII kept.
     """
     built, segments = assembler.build_main_request_with_segments(
-        request=_request(), skills=[], upstream_model="deepseek-v4-flash"
+        request=_request(), runbooks=[], upstream_model="deepseek-v4-flash"
     )
     expected = json.dumps(
         built.messages[0], ensure_ascii=False, separators=(",", ":")
@@ -406,18 +406,18 @@ def test_an_appended_turn_changes_only_the_conversation_and_the_tail(
     assert changed == ["conversation"]
 
 
-def test_a_skill_topic_shift_leaves_the_system_layers_untouched(assembler, catalog) -> None:
+def test_a_runbook_topic_shift_leaves_the_system_layers_untouched(assembler, catalog) -> None:
     """Issue #39's guarantee, expressed in the manifest a production log reads.
 
-    Everything from the skills row down re-encodes; base and the response
+    Everything from the runbooks row down re-encodes; base and the response
     contract must not, because they sit above the ~21.5k tokens of schemas.
     """
-    one = _segments(assembler, _request(), [catalog.skills[0]])
-    two = _segments(assembler, _request(), [catalog.skills[1]])
+    one = _segments(assembler, _request(), [catalog.runbooks[0]])
+    two = _segments(assembler, _request(), [catalog.runbooks[1]])
 
     assert _digest(one, "base") == _digest(two, "base")
     assert _digest(one, "response_contract") == _digest(two, "response_contract")
-    assert _digest(one, "skills") != _digest(two, "skills")
+    assert _digest(one, "runbooks") != _digest(two, "runbooks")
 
 
 def test_an_optional_layer_appearing_renames_nothing_below_it(assembler, catalog) -> None:
@@ -428,20 +428,20 @@ def test_an_optional_layer_appearing_renames_nothing_below_it(assembler, catalog
     they differ in all of them — which is the opposite of an attribution.
     """
     without = _segments(assembler, _request(), [])
-    with_skills = _segments(assembler, _request(), [catalog.skills[0]])
+    with_runbooks = _segments(assembler, _request(), [catalog.runbooks[0]])
 
-    assert "skills" not in {s.id for s in without}
-    assert "skills" in {s.id for s in with_skills}
+    assert "runbooks" not in {s.id for s in without}
+    assert "runbooks" in {s.id for s in with_runbooks}
     for name in ("base", "response_contract", "startup", "conversation"):
-        assert _digest(without, name) == _digest(with_skills, name)
+        assert _digest(without, name) == _digest(with_runbooks, name)
 
 
-def _subagent_segments(assembler: PromptAssembler, skills: list[Skill]) -> Any:
+def _subagent_segments(assembler: PromptAssembler, runbooks: list[Runbook]) -> Any:
     body = respond_body(_MESSAGES)
     body["profile"] = "subagent"
     return assembler.build_main_request_with_segments(
         request=RespondRequest.model_validate(body),
-        skills=skills,
+        runbooks=runbooks,
         upstream_model="deepseek-v4-flash",
     )
 
@@ -463,9 +463,9 @@ def test_the_subagent_manifest_survives_a_shape_change(assembler, catalog) -> No
     """One segment per indexed MESSAGE would make this comparison useless, and
     on a long transcript would emit one row per message — up to `cap_messages`
     of them — inside a single log record."""
-    executable = list(catalog.skills[:1])
+    executable = list(catalog.runbooks[:1])
     _, without = _subagent_segments(assembler, [])
-    _, with_skills = _subagent_segments(assembler, executable)
+    _, with_runbooks = _subagent_segments(assembler, executable)
 
-    assert _digest(without, "base") == _digest(with_skills, "base")
-    assert _digest(without, "conversation") == _digest(with_skills, "conversation")
+    assert _digest(without, "base") == _digest(with_runbooks, "base")
+    assert _digest(without, "conversation") == _digest(with_runbooks, "conversation")

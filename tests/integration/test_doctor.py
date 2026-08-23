@@ -33,7 +33,7 @@ def test_doctor_reports_a_healthy_server(client, auth, fake_provider) -> None:
     assert body["provider"]["key_usable"] is True
     assert body["provider"]["server_holds_credential"] is True
     assert body["catalog"]["revision"]
-    assert body["catalog"]["skills"] > 0
+    assert body["catalog"]["runbooks"] > 0
     assert body["warnings"] == []
     assert body["request_id"]
 

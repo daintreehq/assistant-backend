@@ -1,0 +1,143 @@
+# Topic shifts: the previous task is done (or abandoned) and the user starts a
+# different workflow. The old active runbook must be evicted — returning it is a
+# precision failure — and the new workflow's runbook(s) selected.
+
+cases:
+  - id: shift-rename-to-issue
+    category: topic-shift
+    active: [daintree.terminals.rename]
+    messages:
+      - role: user
+        content: Rename my terminals so I can tell them apart.
+      - role: assistant
+        content: Done — all six terminals now have descriptive titles.
+      - role: user
+        content: Done with that. Now let's pick up issue 231 and get an agent on it.
+    expect:
+      required: [daintree.workflow.start-work-on-issue]
+      optional: [daintree.foundation]
+
+  - id: shift-issue-to-poll
+    category: topic-shift
+    active: [daintree.workflow.start-work-on-issue, daintree.foundation]
+    messages:
+      - role: user
+        content: Start work on issue 88.
+      - role: assistant
+        content: >-
+          Issue 88 is underway — the agent is working in terminal 3 with a
+          supervisor watcher attached.
+      - role: user
+        content: >-
+          Pause that for now. Poll the pinned agents on whether we should migrate
+          the build to uv, and give me the consensus.
+    expect:
+      required: [daintree.agents.poll-pinned-agents]
+      optional: [daintree.foundation]
+
+  - id: shift-experiment-to-prep
+    category: topic-shift
+    note: >-
+      The original final message also said "close those terminals", which is
+      workspace-cleanup's own trigger — a correct cleanup pick then scored as an extra
+      against a prep-only expectation. The eviction signal ("enough of that experiment")
+      is preserved without the second workflow, so exactly one runbook wins.
+    active: [daintree.orchestration.multi-agent, daintree.foundation]
+    messages:
+      - role: user
+        content: Have two agents debate the queue design and relay between them.
+      - role: assistant
+        content: >-
+          The debate wrapped up — both agents converged on the token-bucket
+          approach after three rounds.
+      - role: user
+        content: >-
+          Enough of that experiment — park it. Is my feature branch ready for a
+          PR? If so, prep it.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+
+  - id: shift-work-to-chitchat
+    category: topic-shift
+    note: New "topic" is not a task at all — everything must clear.
+    active: [daintree.edits.spawn-visible-agent]
+    messages:
+      - role: user
+        content: Spawn an agent to fix the linter errors.
+      - role: assistant
+        content: The agent finished — lint is clean and the changes are committed.
+      - role: user
+        content: nice. unrelated — what's a good name for a black cat?
+    expect:
+      required: []
+
+  - id: shift-poll-to-runoff
+    category: topic-shift
+    active: [daintree.agents.poll-pinned-agents]
+    messages:
+      - role: user
+        content: Poll the pinned agents — proposal A or proposal B for the schema split?
+      - role: assistant
+        content: 'Poll complete: 2 votes for A, 2 votes for B. A dead tie.'
+      - role: user
+        content: Run a runoff between the top two options with the same agents to break the tie.
+    expect:
+      required: [daintree.orchestration.runoff-tiebreaker]
+      optional: [daintree.foundation]
+
+  - id: shift-recipe-to-rename
+    category: topic-shift
+    active: [daintree.recipe.run-or-create, daintree.foundation]
+    messages:
+      - role: user
+        content: Run the fullstack dev recipe.
+      - role: assistant
+        content: >-
+          The recipe is up — five terminals opened: api server, web dev server,
+          worker, logs, and a scratch shell.
+      - role: user
+        content: The workspace looks good. Give all these terminals proper names.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.foundation]
+
+  - id: shift-from-greeting-to-real-task
+    category: topic-shift
+    note: >-
+      The shift every session opens with, and the only case in this file with
+      NOTHING loaded — there is no old runbook to evict because the preceding turn
+      was pleasantry. It is here rather than in 10-single-runbook because the
+      variable being scored is the exchange in front of the request, not the
+      request.
+
+      Reproduces the routing half of ses_3a3cd1e7. Measured on the shipped
+      artifact before the context retrain: this instruction ranks
+      create-plain-worktree at 1.000 asked cold, 0.248 behind this greeting, and
+      0.005 behind a shorter one — and the cardinality head answers zero, so the
+      turn loaded no runbook at all and the model fell back to guessing from the
+      tool schemas. It is not dilution by length: 105 characters of meaningless
+      padding in the same slot leaves the score at 0.998. It is the pleasantry —
+      a prior that 43 terse "hey" / "hi" rows (2.0% of the history-bearing
+      corpus, none of them answered at any length) were never going to move.
+
+      The greeting here is worded unlike any greeting in the training corpus, and
+      that is a REQUIREMENT, not a style choice. assemble_data's contamination
+      gate drops any training row whose query or HISTORY matches a held-out
+      benchmark string, and the social lead-in rows carry their greeting in the
+      history — so reusing a corpus greeting here would silently delete the rows
+      that teach the lesson this case checks, leaving it failing for a reason
+      invisible in the diff. tests/unit/test_training_corpus_guards.py asserts
+      the two vocabularies stay disjoint.
+    messages:
+      - role: user
+        content: afternoon — all well with you?
+      - role: assistant
+        content: >-
+          All well, thanks. Nothing running at the moment: one worktree on
+          develop and a single idle terminal. What would you like to do?
+      - role: user
+        content: Set up a worktree for feat/search-rewrite off develop.
+    expect:
+      required: [daintree.worktree.create-plain-worktree]
+      optional: [daintree.foundation]

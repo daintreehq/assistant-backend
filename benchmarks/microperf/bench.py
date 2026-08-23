@@ -46,7 +46,7 @@ def print_summary(doc: dict[str, Any]) -> None:
 
     cat = doc["catalog"]
     deterministic = "yes" if cat["revision_deterministic"] else "NO — INVESTIGATE"
-    print(f"\nskill catalog ({cat['skills']} skills):")
+    print(f"\nrunbook catalog ({cat['runbooks']} runbooks):")
     print(f"  load_catalog            {_fmt_ms(cat['catalog_build_ms'])}")
     print(f"  revision deterministic  {deterministic}")
 
@@ -75,7 +75,7 @@ def print_summary(doc: dict[str, Any]) -> None:
         print(
             f"\nreadiness: healthz={ready.get('healthz_status')} "
             f"readyz={ready.get('readyz_status')} "
-            f"(skills={ready.get('skills')})"
+            f"(runbooks={ready.get('runbooks')})"
         )
 
     s = doc["summary"]

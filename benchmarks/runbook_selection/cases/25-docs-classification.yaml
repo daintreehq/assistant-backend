@@ -1,0 +1,367 @@
+# The selector's SECOND answer: does this turn warrant a documentation lookup?
+#
+# Scored separately from runbook routing (`expect.docs`), because they are two
+# independent decisions over the same evidence and one number could not say
+# which of them moved. The two failure modes are opposites and both matter:
+#
+#   MISSED  — a product question answered from a half-remembered surface. This
+#             is the failure the feature exists to prevent, and the user acts on
+#             the wrong answer.
+#   SPURIOUS — a lookup on an operational turn. It buys a third-party round-trip
+#             on the first-byte path and puts irrelevant pages in front of the
+#             model, on turns that are the overwhelming majority.
+#
+# The hard cases are deliberate: every negative here NAMES a Daintree feature,
+# because keyword overlap is exactly what a classifier over-fires on. "Ask about
+# it" vs "do it with it" is the line, and the pairs below straddle it.
+
+cases:
+  # ---- should look up: questions ABOUT the product ------------------------
+  - id: docs-how-do-i-worktree
+    category: docs-classification
+    note: >-
+      The canonical usage question. Observed in the wild answering correctly from
+      the docs while ALSO loading a diagnostics runbook and dragging the domain
+      foundation in behind it — roughly 14 KB of procedure for a turn that used
+      none of it. The turn does load a runbook now, the documentation one, but the
+      SERVER pins that off the docs_query rather than the classifier choosing it;
+      from the selector's side the right answer is still nothing.
+    messages:
+      - role: user
+        content: How do I create a worktree from a pull request?
+    expect:
+      # No optional ids: any pick at all is an `extra` and fails the case. The
+      # documentation runbook IS loaded on this turn — but the SERVER pins it off
+      # the `docs_query` (config.DOCS_RUNBOOK_ID), and the selector cannot even see
+      # it, so it must not appear in the classifier's answer. What is asserted here
+      # is what the selector should say: nothing. (Asked
+      # mid-workflow it is a different turn; see docs-question-mid-workflow.)
+      required: []
+      docs: true
+
+  - id: docs-what-is-a-watcher
+    category: docs-classification
+    messages:
+      - role: user
+        content: What actually is a watcher, and when would I want one?
+    expect:
+      # No optional ids: any pick at all is an `extra` and fails the case. The
+      # documentation runbook IS loaded on this turn — but the SERVER pins it off
+      # the `docs_query` (config.DOCS_RUNBOOK_ID), and the selector cannot even see
+      # it, so it must not appear in the classifier's answer. What is asserted here
+      # is what the selector should say: nothing. (Asked
+      # mid-workflow it is a different turn; see docs-question-mid-workflow.)
+      required: []
+      docs: true
+
+  - id: docs-where-is-the-setting
+    category: docs-classification
+    note: Configuration questions are documentation, not an instruction to change it.
+    messages:
+      - role: user
+        content: Where do I change the keybinding for switching terminal tabs?
+    expect:
+      # No optional ids: any pick at all is an `extra` and fails the case. The
+      # documentation runbook IS loaded on this turn — but the SERVER pins it off
+      # the `docs_query` (config.DOCS_RUNBOOK_ID), and the selector cannot even see
+      # it, so it must not appear in the classifier's answer. What is asserted here
+      # is what the selector should say: nothing. (Asked
+      # mid-workflow it is a different turn; see docs-question-mid-workflow.)
+      required: []
+      docs: true
+
+  - id: docs-capability-question
+    category: docs-classification
+    note: A "does it support X" question is answerable only from the docs.
+    messages:
+      - role: user
+        content: Does Daintree support running agents against a remote host?
+    expect:
+      # No optional ids: any pick at all is an `extra` and fails the case. The
+      # documentation runbook IS loaded on this turn — but the SERVER pins it off
+      # the `docs_query` (config.DOCS_RUNBOOK_ID), and the selector cannot even see
+      # it, so it must not appear in the classifier's answer. What is asserted here
+      # is what the selector should say: nothing. (Asked
+      # mid-workflow it is a different turn; see docs-question-mid-workflow.)
+      required: []
+      docs: true
+
+  - id: docs-explain-then-do
+    category: docs-classification
+    note: >-
+      A compound turn. The explanation half is still a documentation question, so
+      the lookup is warranted even though work follows.
+    messages:
+      - role: user
+        content: >-
+          Before we start — remind me how Daintree's worktree cleanup works, then
+          go ahead and prep this branch for review.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+      docs: true
+
+  # ---- should NOT look up: work done WITH the product ---------------------
+  - id: docs-negative-do-the-thing
+    category: docs-classification
+    note: >-
+      Names the same feature as the first case and is the opposite request. This
+      is the pair the classifier most has to get right, and the DOCS half is what
+      it tests: an imperative is not a lookup, however much it reads like one.
+
+      The runbook half used to demand daintree.workflow.start-work-on-issue and
+      failed 3/3 both before and after this file was rewritten. That expectation
+      was wrong: start-work-on-issue owns ONE FORGE ISSUE by its own whenToUse,
+      and the catalog has no PR-checkout runbook at all — the docs describe that
+      as a Code Forge UI button. The classifier said so itself, every trial
+      ("closest is start-work-on-issue, but that's for issues, not PRs"), so
+      selector step 6 makes foundation-alone the correct answer, not a miss.
+      spawn-visible-agent is admitted because "get an agent started on it" is
+      genuinely its clause. Corrected rather than left red: a knowingly-wrong
+      expectation trains the next person to ignore the case.
+    messages:
+      - role: user
+        content: Create a worktree from PR #142 and get an agent started on it.
+    expect:
+      required: [daintree.foundation]
+      optional: [daintree.edits.spawn-visible-agent]
+      docs: false
+
+  - id: docs-negative-rename-terminals
+    category: docs-classification
+    messages:
+      - role: user
+        content: Rename my terminals so I can tell the agents apart.
+    expect:
+      required: [daintree.terminals.rename]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-negative-users-own-code
+    category: docs-classification
+    note: A "how does X work" question about the USER's project, not about Daintree.
+    messages:
+      - role: user
+        content: How does the retry logic in our upload client work? Walk me through it.
+    expect:
+      required: [daintree.explore.repository]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-negative-failing-test
+    category: docs-classification
+    messages:
+      - role: user
+        content: The watcher tests are failing on CI — figure out why and fix them.
+    expect:
+      required: [daintree.ci.diagnose-and-fix]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-negative-acknowledgement
+    category: docs-classification
+    note: No task at all, so nothing to look up either.
+    messages:
+      - role: user
+        content: thanks, that's exactly what I needed
+    expect:
+      required: []
+      docs: false
+
+  - id: docs-negative-continuation-work
+    category: docs-classification
+    note: >-
+      Mid-workflow. A turn that keeps a runbook going is operational however much
+      product vocabulary it contains.
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+    messages:
+      - role: user
+        content: Looks good — push it and open the PR.
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+      docs: false
+
+  - id: docs-question-mid-workflow
+    category: docs-classification
+    note: >-
+      The eviction trap, and the reason "a documentation question selects nothing"
+      is scoped to an idle turn. Pausing to ask about the product does not
+      abandon the workflow: clearing the active set here strands the assistant
+      mid-runbook AND pays a runbook-block+conversation re-encode when it reloads a
+      turn later. Both answers are needed — keep the runbooks, AND set the query.
+    active: [daintree.workflow.prep-branch-for-review, daintree.foundation]
+    messages:
+      - role: user
+        content: >-
+          Hang on, before you push — what does Daintree actually do with the
+          worktree once the PR is merged?
+    expect:
+      required: [daintree.workflow.prep-branch-for-review]
+      optional: [daintree.foundation]
+      docs: true
+
+  - id: docs-live-state-complaint
+    category: docs-classification
+    note: >-
+      A genuine hard case, expected TRUE — a docs turn that SHOULD also load a
+      runbook, as explain-then-do and docs-question-mid-workflow are in their own ways. "I did X and nothing happened" reads as an operational turn,
+      but diagnosing it means comparing what the docs say SHOULD happen against
+      what the live state shows, so the answer needs both halves. It is also the
+      shape that most needs the query carried: the docs comparison happens on the
+      round AFTER daintree.status returns, and a classifier that answers `null`
+      here leaves nothing to carry. Contrast docs-how-do-i-worktree, where the
+      documentation IS the answer and no runbook belongs.
+    messages:
+      - role: user
+        content: I shared a terminal with the fleet and nothing showed up on the other side.
+    expect:
+      required: [daintree.diagnostics]
+      optional: [daintree.foundation]
+      docs: true
+
+
+  # ---- context and phrasing must not suppress the lookup -------------------
+  #
+  # Every positive above is a single message on an idle turn. That is exactly the
+  # shape of the training corpus too — all 207 docs rows carry no history and no
+  # active set — so both the model and this suite shared one blind spot, and a
+  # near-total outage of documentation lookup sat behind it unmeasured: measured
+  # on 120 docs positives, recall was 113/120 asked cold and 5/120 asked with a
+  # runbook loaded.
+  #
+  # The three below are the standing guard, and they vary ONE thing each against
+  # a cold twin already in this file — history, then active set, then pronoun.
+  # The first two are the context guard; the third is a phrasing guard and is
+  # listed here because it has the same cause (a corpus that only ever saw one
+  # shape of docs question) and the same symptom (a confident 'no').
+
+  - id: docs-usage-question-after-unrelated-exchange
+    category: docs-classification
+    note: >-
+      Reproduces session ses_aa9b63b4. The same question that passes as
+      docs-how-do-i-worktree, asked as the second turn of a conversation. The
+      question is copied verbatim from that case so the ONLY difference is the
+      exchange in front of it — an inexact twin would leave a failure ambiguous
+      between "context suppressed it" and "this wording is harder".
+
+      This case currently records an EXTRA (the worktree runbook), and that is
+      deliberate — asking how to create a worktree is not asking to have one
+      created, which is the same position docs-how-do-i-worktree takes. Do not
+      quiet it by adding `optional`; the pick is the imperfection, not the case.
+    messages:
+      - role: user
+        content: Which MCP endpoint are you connected to?
+      - role: assistant
+        content: The Daintree MCP endpoint is http://127.0.0.1:45454/mcp (streamable-http).
+      - role: user
+        content: How do I create a worktree from a pull request?
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-usage-question-with-a-runbook-loaded
+    category: docs-classification
+    note: >-
+      A plain usage question on a turn that already has a runbook open. The
+      active set is evidence about the WORKFLOW, never about whether the user's
+      question needs the manual — and the docs runbook is designed to arrive
+      alongside an operational one rather than replace it.
+
+      The wording is deliberately the plainest in the file, and deliberately not
+      the richer phrasing docs-what-is-a-watcher uses. This case exists to vary
+      ONE thing — the active set — so it must not also carry a hard phrasing, or
+      a failure cannot be read.
+    active: [daintree.worktree.create-plain-worktree, daintree.foundation]
+    messages:
+      - role: user
+        content: what is a watcher
+    expect:
+      required: []
+      optional: [daintree.worktree.create-plain-worktree, daintree.foundation]
+      docs: true
+
+  - id: docs-second-person-phrasing
+    category: docs-classification
+    note: >-
+      "How do you <do X>" is a user asking how the PRODUCT does something, not a
+      question about the assistant's own procedure. The corpus has 66 first-person
+      docs rows against none of this shape, so these land mid-sigmoid rather than
+      in the top mode. This one varies PHRASING, not position: a cold
+      single-message turn, twinned against docs-how-do-i-worktree by pronoun
+      alone.
+
+      EXPECTED TO FAIL, and unstable when it does not. This query was measured at
+      0.4471 — above DOCS_THRESHOLD — and then found to disagree between fp32 and
+      int8 on one machine, and between arm64 and x86-64. It is decided by
+      quantisation noise, so do not "fix" it by moving the threshold: no
+      threshold owns a case that moves under the kernel. It is here to score the
+      pronoun gap and to show when corpus data finally closes it, which is the
+      only thing that will.
+    messages:
+      - role: user
+        content: How do you create a worktree in Daintree?
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-deictic-product-reference
+    category: docs-classification
+    note: >-
+      "in this app" instead of "in Daintree" — the user pointing at the product
+      they are already inside rather than naming it. Zero of the original 207
+      docs rows contained the phrase, and it cost the whole classification:
+      measured cold on the pre-retrain artifact, "How do I create a worktree?"
+      answered docs=true while this wording answered false, with nothing else
+      changed.
+
+      The wording is the user's own from ses_3a3cd1e7, typo repaired — the typo
+      is not the bug and a case that carried it would be scoring the tokenizer.
+
+      This is the COLD half of a twin: docs-usage-question-after-greeting is the
+      identical string behind a social exchange. Read the pair together and the
+      only variable between them is the history. It is deliberately NOT twinned
+      against docs-how-do-i-worktree — that one asks about a pull request and
+      this one does not, so the deixis comparison is a MEASUREMENT (recorded in
+      EXPERIMENTS.md), not something this file can claim by construction.
+    messages:
+      - role: user
+        content: How do I create worktrees in this app?
+    expect:
+      required: []
+      docs: true
+
+  - id: docs-usage-question-after-greeting
+    category: docs-classification
+    note: >-
+      Reproduces session ses_3a3cd1e7, and it is a DIFFERENT failure from
+      docs-usage-question-after-unrelated-exchange even though both put history
+      in front of the question. There the lead-in is a real exchange about a real
+      thing; here it is pure pleasantry carrying no task at all — the shape every
+      session starts with and the shape the corpus barely has. Of 2,116
+      history-bearing rows only 43 open on a greeting, all of them terse and
+      answered in one clause — 2.0%, and none at the length a real session
+      opens with.
+
+      The question is docs-deictic-product-reference's string verbatim, so the
+      ONLY variable is the pleasantry.
+
+      It must be a question the artifact can get WRONG cold, or the case proves
+      nothing: an earlier draft used the docs-how-do-i-worktree string, which the
+      broken artifact already answered docs=true on and already returned no
+      runbooks for — it passed on the old artifact and the new one alike, scoring
+      the mitigation rather than the bug. The greeting is worded differently from
+      every greeting in the corpus on purpose; see the contamination note in
+      50-topic-shift.yaml.
+    messages:
+      - role: user
+        content: afternoon — all well with you?
+      - role: assistant
+        content: >-
+          All well, thanks. Nothing running at the moment: one worktree on
+          develop and a single idle terminal. What would you like to do?
+      - role: user
+        content: How do I create worktrees in this app?
+    expect:
+      required: []
+      docs: true

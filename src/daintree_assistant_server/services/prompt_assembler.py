@@ -8,7 +8,7 @@ one never re-encodes anything above it. The effective order is:
 
 1. base prompt → response contract (the stable system region; fully static)
 2. tool schemas (the top-level ``tools`` field, ~21.5k tokens — the largest reusable run)
-3. active skill bodies (one framed user-role data row, omitted when empty) — shared by
+3. active runbook bodies (one framed user-role data row, omitted when empty) — shared by
    TASK, so every session running the same runbook shares this much of the prefix
 4. integrations → stable startup context (framed user-role data rows, omitted when empty)
    — per session, instance and project
@@ -18,7 +18,7 @@ one never re-encodes anything above it. The effective order is:
 
 Rows 3-5 are non-system precisely so they land AFTER the tool schemas: a selector topic
 shift or a per-machine MCP endpoint URL then costs its own bytes and the rows below it,
-never the 21.5k tokens of schemas above (issue #39). Skill bodies stay ahead of the
+never the 21.5k tokens of schemas above (issue #39). Runbook bodies stay ahead of the
 conversation rather than riding the volatile tail — a large runbook in the tail is re-paid
 uncached on every round of every turn, far worse than one conversation re-encode on the
 turns where the active set genuinely changes.
@@ -60,7 +60,7 @@ from ..prompts.loader import (
     TEMPLATE_DISPLAY_CONTEXT,
     TEMPLATE_DOCS_CONTEXT,
     TEMPLATE_INTEGRATIONS,
-    TEMPLATE_LOADED_SKILLS,
+    TEMPLATE_LOADED_RUNBOOKS,
     TEMPLATE_RESPONSE_CONTRACT,
     TEMPLATE_RUNTIME_CONTEXT,
     TEMPLATE_STARTUP_CONTEXT,
@@ -69,7 +69,7 @@ from ..prompts.loader import (
     RenderCache,
 )
 from ..providers.base import ProviderChatRequest
-from ..skills.models import Skill
+from ..runbooks.models import Runbook
 from ..text_utils import (
     cap_bytes,
     frame_data_block,
@@ -205,21 +205,21 @@ def segment_log_fields(segments: Sequence[PromptSegment]) -> dict[str, Any]:
     }
 
 
-def skills_in_render_order(skills: Sequence[Skill]) -> list[Skill]:
-    """THE canonical order the loaded-skills block is rendered in.
+def runbooks_in_render_order(runbooks: Sequence[Runbook]) -> list[Runbook]:
+    """THE canonical order the loaded-runbooks block is rendered in.
 
     Foundations first, so a domain's base judgment reads before the workflow
     steps that build on it; id order within each tier, so EVERY permutation of
     the same active set renders identical bytes. The tie-break is what makes
-    that true. Skills arrive in the selector's raw output order, and sorting on
+    that true. Runbooks arrive in the selector's raw output order, and sorting on
     the foundation flag alone is a stable sort on one boolean: it passed that
     order straight through, so the same set classified in a different order
-    re-encoded everything from the loaded-skills row down — the integrations,
+    re-encoded everything from the loaded-runbooks row down — the integrations,
     startup and conversation rows behind it — for zero semantic difference. (The
     tool schemas now sit ABOVE that row and survive it; before issue #39 moved the
     block below them, a bare permutation cost those too.)
 
-    Id order is also catalog order — ``Catalog`` stores its skills id-sorted —
+    Id order is also catalog order — ``Catalog`` stores its runbooks id-sorted —
     so this invents no new convention.
 
     Render order only — the active LIST keeps selector rank, which is load-
@@ -228,7 +228,7 @@ def skills_in_render_order(skills: Sequence[Skill]) -> list[Skill]:
     construction, and quietly repairing a duplicate would hide that break.
 
     """
-    return sorted(skills, key=lambda s: (not s.meta.foundation, s.id))
+    return sorted(runbooks, key=lambda s: (not s.meta.foundation, s.id))
 
 
 def _cap_list_combined(
@@ -276,8 +276,8 @@ class PromptAssembler:
         self.response_declaration = response_declaration
         # Bounded: a runaway key space would be a slow memory leak in a process
         # that is meant to be stateless. Sized well above the number of distinct
-        # active-skill sets a busy instance sees.
-        self._loaded_skills_cache = RenderCache(maxsize=64)
+        # active-runbook sets a busy instance sees.
+        self._loaded_runbooks_cache = RenderCache(maxsize=64)
 
     # ---- prompt fragment rendering --------------------------------------
 
@@ -520,7 +520,7 @@ class PromptAssembler:
         Rides a framed user-role row BELOW the tool schemas (issue #39). The CLI
         leads each server description with its MCP endpoint URL — a per-machine,
         per-instance value — so while this was system-role every distinct endpoint
-        re-encoded the ~21.5k tokens of schemas behind it. It sits after the skill
+        re-encoded the ~21.5k tokens of schemas behind it. It sits after the runbook
         bodies too: those are shared by task, this only by session and instance.
         """
         servers: list[dict[str, Any]] = []
@@ -549,54 +549,54 @@ class PromptAssembler:
         capped, _ = cap_bytes(rendered, self.settings.cap_mcp_block_bytes)
         return capped
 
-    def render_loaded_skills(self, skills: list[Skill], *, step_tracking: bool = True) -> str:
-        """The active skill bodies, rendered — memoised by content.
+    def render_loaded_runbooks(self, runbooks: list[Runbook], *, step_tracking: bool = True) -> str:
+        """The active runbook bodies, rendered — memoised by content.
 
-        This is the largest per-request render in the assembler (skill bodies run
-        to tens of kilobytes), and it is a pure function of WHICH skills are
-        active: `skills_in_render_order` canonicalizes first, so every
+        This is the largest per-request render in the assembler (runbook bodies run
+        to tens of kilobytes), and it is a pure function of WHICH runbooks are
+        active: `runbooks_in_render_order` canonicalizes first, so every
         permutation of one set produces the same bytes and shares one entry
         rather than paying for a duplicate. Sessions converge on a handful of
-        skill sets, so the hit rate is high.
+        runbook sets, so the hit rate is high.
 
-        Keyed on each skill's CONTENT hash, not its id. Ids are stable across a
-        skill-learning rewrite while the body changes underneath, so an id-keyed
+        Keyed on each runbook's CONTENT hash, not its id. Ids are stable across a
+        runbook-learning rewrite while the body changes underneath, so an id-keyed
         cache would serve the pre-rewrite body until the process restarted — the
         one failure mode a cache here could actually cause.
 
         Rides a framed user-role row placed directly below the tool schemas and
         above every other injected row (issue #39). This is the most widely shared
-        of the variable rows — sessions converge on a handful of skill sets, and any
+        of the variable rows — sessions converge on a handful of runbook sets, and any
         two running the same runbook share the prefix through it — so it earns the
         position nearest the schemas. Role and position are decided at the
         ``build_main_request`` call site; the cache key here is a pure function of
-        WHICH skills are active and is unaffected by either.
+        WHICH runbooks are active and is unaffected by either.
         """
-        ordered = skills_in_render_order(skills)
+        ordered = runbooks_in_render_order(runbooks)
         # Flat tuple of strings, which is what RenderCache is keyed on. The
         # step_tracking marker leads: it is part of the KEY, not just the render,
         # and a key that ignored it would serve whichever variant was rendered
         # first to both profiles.
         key = ("step" if step_tracking else "nostep", *(s.content_hash for s in ordered))
-        cached = self._loaded_skills_cache.get(key)
+        cached = self._loaded_runbooks_cache.get(key)
         if cached is not None:
             return cached
         rendered = self.prompts.render(
-            TEMPLATE_LOADED_SKILLS, loaded_skills=ordered, step_tracking=step_tracking
+            TEMPLATE_LOADED_RUNBOOKS, loaded_runbooks=ordered, step_tracking=step_tracking
         )
-        self._loaded_skills_cache.put(key, rendered)
+        self._loaded_runbooks_cache.put(key, rendered)
         return rendered
 
     def render_cache_stats(self) -> dict[str, int]:
-        """Loaded-skill render-cache counters, prefixed for the turn log.
+        """Loaded-runbook render-cache counters, prefixed for the turn log.
 
         Never raises: it reads four integers off an in-process object, and a
         counter that could sink a turn would be a strictly worse trade than not
         having the counter.
         """
         return {
-            f"skill_render_cache_{name}": value
-            for name, value in self._loaded_skills_cache.stats().items()
+            f"runbook_render_cache_{name}": value
+            for name, value in self._loaded_runbooks_cache.stats().items()
         }
 
     def render_response_contract(self) -> str:
@@ -929,7 +929,7 @@ class PromptAssembler:
         self,
         *,
         request: RespondRequest,
-        skills: list[Skill],
+        runbooks: list[Runbook],
         upstream_model: str,
     ) -> tuple[ProviderChatRequest, list[PromptSegment]]:
         """Assemble the upstream request for a read-only sub-agent turn.
@@ -947,7 +947,7 @@ class PromptAssembler:
           a human reading a cockpit; the sub-agent's report contract lives in its
           own persona prompt instead.
 
-        Skills DO reach a sub-agent, from a menu narrowed to the ones it can
+        Runbooks DO reach a sub-agent, from a menu narrowed to the ones it can
         actually execute (``Catalog.executable_with``). They are the reason the
         profile has a real tool inventory at all: a sub-agent sent to find one
         issue among thousands should get the runbook for searching issues, not
@@ -957,7 +957,7 @@ class PromptAssembler:
         the ordering below is the same one, minus the layers this profile drops:
         the ONLY system row is the static persona, so every sub-agent in the
         fleet shares a prefix of persona + its own narrow tool schemas, and the
-        skill bodies sit below the schemas (user-role) where a menu shift
+        runbook bodies sit below the schemas (user-role) where a menu shift
         re-encodes its own bytes instead of theirs. The startup block stays and
         sits last before the conversation, because a sub-agent sent to find a
         file needs to know which project it is standing in.
@@ -979,14 +979,14 @@ class PromptAssembler:
         # they differ in all of them — and a long transcript would emit one
         # segment per message, up to `cap_messages`, in a single log record.
         segments.append(PromptSegment.placeholder(TOOLS_SEGMENT_ID))
-        if skills:
-            # step_tracking OFF: the paragraph instructs `skill.step.advance` and
-            # `skill.run.get`, both of which are denylisted from a sub-agent's
+        if runbooks:
+            # step_tracking OFF: the paragraph instructs `runbook.step.advance` and
+            # `runbook.run.get`, both of which are denylisted from a sub-agent's
             # inventory. Shipping it would spend context telling a read-only worker
             # to make a call that can only come back TOOL_NOT_OFFERED — and a
             # sub-agent has no turn boundary to checkpoint across anyway; it runs to
             # completion or reports partial.
-            add("skills", "user", self.render_loaded_skills(skills, step_tracking=False))
+            add("runbooks", "user", self.render_loaded_runbooks(runbooks, step_tracking=False))
         startup = self.render_startup_context(request.startup)
         if startup.strip():
             add("startup", "user", startup)
@@ -1027,7 +1027,7 @@ class PromptAssembler:
         self,
         *,
         request: RespondRequest,
-        skills: list[Skill],
+        runbooks: list[Runbook],
         upstream_model: str,
         docs: DocsLookup | None = None,
     ) -> ProviderChatRequest:
@@ -1039,14 +1039,14 @@ class PromptAssembler:
         than payload. :meth:`build_main_request_with_segments` is the same work.
         """
         return self.build_main_request_with_segments(
-            request=request, skills=skills, upstream_model=upstream_model, docs=docs
+            request=request, runbooks=runbooks, upstream_model=upstream_model, docs=docs
         )[0]
 
     def build_main_request_with_segments(
         self,
         *,
         request: RespondRequest,
-        skills: list[Skill],
+        runbooks: list[Runbook],
         upstream_model: str,
         docs: DocsLookup | None = None,
     ) -> tuple[ProviderChatRequest, list[PromptSegment]]:
@@ -1070,16 +1070,16 @@ class PromptAssembler:
 
         The corollary the system region is now held to (issue #39): "stable" means
         stable for EVERY caller, not merely for one session. The integration surface
-        carries a per-machine MCP endpoint URL and the skill bodies change on every
+        carries a per-machine MCP endpoint URL and the runbook bodies change on every
         selector topic shift, so while both were system-role each of those changes
         re-encoded all 21.5k tokens of schemas behind them. Both are data the model
         reads, exactly like the startup block, so both now ride framed user-role rows
-        BELOW the schemas — ordered by shareability, widest first: skill bodies (shared
+        BELOW the schemas — ordered by shareability, widest first: runbook bodies (shared
         by task) before integrations and startup (per session, instance and project).
         That grows the invariant prefix from the base prompt alone to base + contract +
-        schemas, and makes a skill load cost its own bytes instead of the tool region.
+        schemas, and makes a runbook load cost its own bytes instead of the tool region.
 
-        Skill bodies stay ahead of the conversation rather than joining the volatile
+        Runbook bodies stay ahead of the conversation rather than joining the volatile
         tail: a 5k-token runbook in the tail is re-paid uncached on every round of every
         turn (~40k tokens across an eight-round turn), which is far worse than one
         conversation re-encode on the turns where the set genuinely changes.
@@ -1102,7 +1102,7 @@ class PromptAssembler:
             # chasing a missing segment rather than a changed one. `profile` is
             # already on the same log record, so the ids need no prefix.
             return self._build_subagent_request(
-                request=request, skills=skills, upstream_model=upstream_model
+                request=request, runbooks=runbooks, upstream_model=upstream_model
             )
 
         messages: list[dict[str, Any]] = []
@@ -1138,17 +1138,17 @@ class PromptAssembler:
         # is the assembler's to state.
         segments.append(PromptSegment.placeholder(TOOLS_SEGMENT_ID))
 
-        # 3. active skill bodies: shared by TASK, so they sit closest to the schemas —
+        # 3. active runbook bodies: shared by TASK, so they sit closest to the schemas —
         #    many sessions running the same runbook share the prefix up to this point.
         #    User-role (issue #39), so a selector topic shift re-encodes this row and
         #    what follows, and leaves the ~21.5k tokens of schemas above it cached.
         #    Kept ahead of the conversation rather than in the volatile tail: a large
         #    runbook in the tail is re-paid uncached every round of every turn.
-        if skills:
-            add("skills", "user", self.render_loaded_skills(skills))
+        if runbooks:
+            add("runbooks", "user", self.render_loaded_runbooks(runbooks))
         # 4. integration surface (MCP servers): client-reported data carrying a
         #    per-machine endpoint URL, so it is per session and instance — narrower
-        #    than the skill bodies and therefore below them, where a differing MCP
+        #    than the runbook bodies and therefore below them, where a differing MCP
         #    config cannot split the task-shared prefix above.
         integrations = self.render_integrations(runtime)
         if integrations.strip():
@@ -1214,7 +1214,7 @@ class PromptAssembler:
             response_format = {"type": "json_object"}
 
         # Thinking is hardcoded OFF for the main call (posture lives with the model
-        # id in config.py — this workload routes requests onto skill runbooks and
+        # id in config.py — this workload routes requests onto runbooks and
         # emits tool calls, which reasoning did not measurably improve while costing
         # seconds of first-byte latency).
         #

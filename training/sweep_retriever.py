@@ -1,16 +1,16 @@
 """How small can stage 1 be? Train each candidate backbone and measure.
 
-Stage 1 only has to put the right skill somewhere in the top ``k``. That is a
+Stage 1 only has to put the right runbook somewhere in the top ``k``. That is a
 much easier job than stage 2's, and paying bge-base-class capacity for it would
 be waste sitting on the first-byte path of every turn.
 
 ## Reading the numbers, and why recall@32 is NOT the metric here
 
-With 38 selectable skills, ``k=32`` is 84% of the catalog: essentially anything
+With 38 selectable runbooks, ``k=32`` is 84% of the catalog: essentially anything
 scores 1.000 and the number discriminates nothing. The metric that predicts
 behaviour at the catalog size this architecture is FOR is recall at a small
 FRACTION of the catalog — ``r@8`` here is 21% of 38, the same fraction ``k=32``
-would be of a 150-skill catalog and ``k=210`` of a 1,000-skill one.
+would be of a 150-runbook catalog and ``k=210`` of a 1,000-runbook one.
 
 So the rule this sweep applies: ``r@32`` must be 1.000 (a shortlist that drops
 the answer caps the whole selector below where it already is), and among the

@@ -6,7 +6,7 @@ CPU floor — no API key, no network:
 1. **Cold start** — ``import daintree_assistant_server`` (plus the app module,
    which pulls FastAPI and the whole service graph) in a FRESH subprocess so
    import cost is real, then ``build_container`` in-process (validates every
-   prompt and loads the skill catalog during construction).
+   prompt and loads the runbook catalog during construction).
 2. **Catalog build** — ``load_catalog()`` latency plus a determinism check on
    the ``revision`` hash (prompt-cache identity and state validation ride it).
 3. **State-codec throughput** — ``StateCodec.issue``/``verify`` ops/sec (every
@@ -47,7 +47,7 @@ from daintree_assistant_server.providers.base import (
     ProviderToolCallResult,
     ProviderUsage,
 )
-from daintree_assistant_server.skills.catalog import load_catalog
+from daintree_assistant_server.runbooks.catalog import load_catalog
 from daintree_assistant_server.state.codec import StateCodec
 
 from .._harness.env import BENCH_CALLER_KEY, build_settings
@@ -117,13 +117,13 @@ class FakeChatProvider:
     any latency measured through the orchestrator is the server's own CPU work.
 
     A ``json_object`` request (the selector) gets a valid selection over
-    ``selector_skill_ids`` so the real selector path succeeds without a repair
+    ``selector_runbook_ids`` so the real selector path succeeds without a repair
     round; everything else gets a plain final answer (no tool calls, so the turn
     is a completed round and never a continuation).
     """
 
-    def __init__(self, selector_skill_ids: list[str] | None = None) -> None:
-        self.selector_skill_ids = list(selector_skill_ids or [])
+    def __init__(self, selector_runbook_ids: list[str] | None = None) -> None:
+        self.selector_runbook_ids = list(selector_runbook_ids or [])
         self.calls = 0
         self.selector_calls = 0
 
@@ -135,7 +135,7 @@ class FakeChatProvider:
                 {
                     "task_type": "general",
                     "reason": "deterministic benchmark selection",
-                    "skill_ids": self.selector_skill_ids,
+                    "runbook_ids": self.selector_runbook_ids,
                     "confidence": 0.9,
                 }
             )
@@ -245,18 +245,18 @@ async def measure_build_container(settings: Settings, repeats: int = 5) -> dict[
     from daintree_assistant_server.main import build_container
 
     runs_ms: list[float] = []
-    catalog_skills = 0
+    catalog_runbooks = 0
     for _ in range(repeats):
         t0 = time.perf_counter()
         container = build_container(settings)
         runs_ms.append((time.perf_counter() - t0) * 1000.0)
-        catalog_skills = len(container.catalog)
+        catalog_runbooks = len(container.catalog)
         await container.aclose()
     return {
         "repeats": repeats,
-        "catalog_skills": catalog_skills,
+        "catalog_runbooks": catalog_runbooks,
         "build_container_ms": _ms_stats(runs_ms),
-        "note": "validates every prompt and loads the skill catalog during construction",
+        "note": "validates every prompt and loads the runbook catalog during construction",
     }
 
 
@@ -276,7 +276,7 @@ def measure_catalog(repeats: int = 10) -> dict[str, Any]:
         "catalog_build_ms": _ms_stats(runs_ms),
         "revision_deterministic": catalog.revision == again.revision,
         "revision": catalog.revision,
-        "skills": len(catalog),
+        "runbooks": len(catalog),
     }
 
 
@@ -290,7 +290,7 @@ def measure_state_codec(iters: int = 20_000) -> dict[str, Any]:
         salt=b"microperf-salt",
         ttl_seconds=3600,
     )
-    active = ["daintree.skill.alpha", "daintree.skill.beta", "daintree.skill.gamma"]
+    active = ["daintree.runbook.alpha", "daintree.runbook.beta", "daintree.runbook.gamma"]
     revision = "sha256:" + "0" * 64
 
     token = ""
@@ -298,7 +298,7 @@ def measure_state_codec(iters: int = 20_000) -> dict[str, Any]:
     for _ in range(iters):
         token = codec.issue(
             session_id="bench-session",
-            active_skills=active,
+            active_runbooks=active,
             catalog_revision=revision,
             turn_id="turn-1",
             instruction_revision=0,
@@ -313,7 +313,7 @@ def measure_state_codec(iters: int = 20_000) -> dict[str, Any]:
 
     return {
         "iters": iters,
-        "active_skills": len(active),
+        "active_runbooks": len(active),
         "token_bytes": len(token.encode("utf-8")),
         "issue_ops_per_sec": round(iters / issue_s),
         "verify_ops_per_sec": round(iters / verify_s),
@@ -357,8 +357,8 @@ async def measure_concurrency(
     from daintree_assistant_server.main import build_container
 
     catalog = load_catalog()
-    selector_ids = [s.id for s in catalog.skills[:2]]
-    provider = FakeChatProvider(selector_skill_ids=selector_ids)
+    selector_ids = [s.id for s in catalog.runbooks[:2]]
+    provider = FakeChatProvider(selector_runbook_ids=selector_ids)
     container = build_container(settings, provider=provider)
     orchestrator = container.orchestrator
 
@@ -426,7 +426,7 @@ async def measure_concurrency(
         "sequential": {"calls": sequential_calls, **latency_summary(sequential)},
         "levels": level_docs,
         "requested_concurrency": concurrency,
-        "active_skill_ids": selector_ids,
+        "active_runbook_ids": selector_ids,
         "total_requests": total_requests,
         "provider_calls": provider.calls,
         "provider_calls_per_request": (
@@ -438,7 +438,7 @@ async def measure_concurrency(
         "note": (
             "stateless-server concurrency probe: the real ChatOrchestrator.complete "
             "(non-streaming) over an instant provider, so all latency is per-request CPU "
-            "(the LOCAL two-stage skill selector's ONNX forward passes, ~21.5k-token tool-schema "
+            "(the LOCAL two-stage runbook selector's ONNX forward passes, ~21.5k-token tool-schema "
             "normalization, response assembly). Selection shares a bounded worker pool "
             "sized to Cloud Run's --concurrency=8; above that, refusals degrade open by "
             "design and are excluded from the warning gate."
@@ -472,7 +472,7 @@ def measure_readiness(settings: Settings) -> dict[str, Any]:
             body = readyz.json()
             if readyz.status_code == 200:
                 doc["catalog_revision"] = body.get("catalog_revision")
-                doc["skills"] = body.get("skills")
+                doc["runbooks"] = body.get("runbooks")
             else:
                 doc["readyz_error"] = body.get("error")
         except ValueError:
@@ -492,10 +492,10 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         raise PerfError(f"--iters must be >= 1 (got {config.iters})")
 
     # Quiet + deterministic: keep per-request INFO log rendering off the measured
-    # path, and make sure the local .env can never fire skill-learning background
+    # path, and make sure the local .env can never fire runbook-learning background
     # passes into the probe.
     configure_logging("WARNING")
-    settings = build_settings(config.env_file, SKILL_LEARNING_MODE="off")
+    settings = build_settings(config.env_file, RUNBOOK_LEARNING_MODE="off")
 
     cold = measure_cold_start(repeats=config.cold_repeats)
     catalog = measure_catalog(repeats=config.catalog_repeats)
@@ -520,7 +520,7 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         "build_container_ms_median": build["build_container_ms"]["median_ms"],
         "catalog_build_ms_median": catalog["catalog_build_ms"]["median_ms"],
         "revision_deterministic": catalog["revision_deterministic"],
-        "catalog_skills": catalog["skills"],
+        "catalog_runbooks": catalog["runbooks"],
         "codec_issue_ops_per_sec": codec["issue_ops_per_sec"],
         "codec_verify_ops_per_sec": codec["verify_ops_per_sec"],
         "single_call_p50_ms": round(concurrency["sequential"]["p50_s"] * 1000, 2),
@@ -547,7 +547,7 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
         and summary["codec_verify_ops_per_sec"] > 0
         # Exactly ONE provider call per request — the main completion — gated
         # on EXACT integers, not a rounded ratio (one extra call across 336
-        # requests rounds to 1.00). Skill selection never touches the provider:
+        # requests rounds to 1.00). Runbook selection never touches the provider:
         # selector_calls must be exactly zero, or the upstream selector came
         # back without anyone deciding that.
         and summary["provider_calls_total"] == summary["requests_total"]
@@ -564,7 +564,7 @@ def run_bench(config: BenchConfig) -> dict[str, Any]:
             "python_version": platform.python_version(),
             "concurrency": config.concurrency,
             "codec_iters": config.iters,
-            "skill_learning_forced_off": True,
+            "runbook_learning_forced_off": True,
             "note": (
                 "fake 0-latency provider; no network, no API key — every number is the "
                 "server's own CPU/boot cost"

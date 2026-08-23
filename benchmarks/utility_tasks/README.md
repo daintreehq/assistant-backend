@@ -19,7 +19,7 @@ reference scorer and are out of scope here):
 | `terminal_judge` | `matched` (bool) | drives whether a watcher fires on a yes/no question |
 | `watcher_classify` | `classification` (enum) | the supervisor-queue label for a terminal |
 | `extraction_verdict` | `pass` (bool) | pass/fail gate over an extracted result |
-| `skill_step_consistency` | `matched` (bool) | flags a bad skill-run advance |
+| `runbook_step_consistency` | `matched` (bool) | flags a bad runbook-run advance |
 
 ## Quick start
 
@@ -118,7 +118,7 @@ Fix: a **most-specific-class-wins** rule naming those precedences + a
 rules dropped a clear `tests_passed` trial for no token saving — as with the
 selector, the thinking model uses the verbal room, so the fuller phrasing shipped.
 
-### Fix 2 — skill-step failed-run judgement (`skill_step_consistency` 90% → 100%)
+### Fix 2 — runbook-step failed-run judgement (`runbook_step_consistency` 90% → 100%)
 
 Exposed only by the hardened set: the checker flagged a run marked **`failed`
 while incomplete** as a mistake (2–4/5 trials), conflating a deliberate abort with
@@ -126,8 +126,8 @@ while incomplete** as a mistake (2–4/5 trials), conflating a deliberate abort 
 `failed`/`cancelled`/`aborted` runs (only *successful* completion-while-incomplete
 is the bug), and the user-message builder no longer renders a null `requestedNext`
 as `"finish (run marked complete)"` — a false statement for a failed run that was
-itself tripping the contradiction detector. (`tasks/skill_step_consistency.md`
-plus `_u_skill_consistency` in `services/task_runner.py`.)
+itself tripping the contradiction detector. (`tasks/runbook_step_consistency.md`
+plus `_u_runbook_consistency` in `services/task_runner.py`.)
 
 ### Fix 3 — watcher injection resistance (injection cases 87.5% → 100%)
 

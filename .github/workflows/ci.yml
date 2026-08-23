@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
-          # The local skill selector (two ONNX encoders + head + tokenizers) is Git LFS.
+          # The local runbook selector (two ONNX encoders + head + tokenizers) is Git LFS.
           # build_container loads it eagerly, so without real bytes every test
           # that builds a container feeds ONNX Runtime a 130-byte pointer file.
           lfs: true
@@ -74,11 +74,11 @@ jobs:
       - name: Benchmarks (deterministic only)
         run: python -m benchmarks.dashboard.bench run --deterministic-only
 
-      # Free, offline, non-zero on a routing gap. It asks whether every skill has
-      # a case that REQUIRES it, and whether every skill declaring confusable
-      # neighbours has a trap excluding one. A skill with no cases is invisible to
+      # Free, offline, non-zero on a routing gap. It asks whether every runbook has
+      # a case that REQUIRES it, and whether every runbook declaring confusable
+      # neighbours has a trap excluding one. A runbook with no cases is invisible to
       # the live corpus by construction — that run grades the cases that exist —
-      # so without this a skill can enter the catalog untested and stay that way.
+      # so without this a runbook can enter the catalog untested and stay that way.
       # Five did, for three weeks.
-      - name: Skill-selection routing coverage
-        run: python -m benchmarks.skill_selection.bench coverage
+      - name: Runbook-selection routing coverage
+        run: python -m benchmarks.runbook_selection.bench coverage

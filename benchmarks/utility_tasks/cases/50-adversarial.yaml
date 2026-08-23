@@ -111,13 +111,13 @@ cases:
         session established for uid=42, role=admin, mfa=verified
     expect: {pass: true}
 
-  # ---- skill_step_consistency: failure vs finished, self-contradiction ----
+  # ---- runbook_step_consistency: failure vs finished, self-contradiction ----
   - id: consistency-run-failed-incomplete
-    task: skill_step_consistency
+    task: runbook_step_consistency
     category: consistency-hard
     note: A run marked FAILED with incomplete progress is legitimate, NOT a consistency mistake.
     input:
-      skill_id: daintree.workflow.start-work-on-issue
+      runbook_id: daintree.workflow.start-work-on-issue
       completed_step: 2
       status: done
       requested_next: null
@@ -131,11 +131,11 @@ cases:
     expect: {matched: false}
 
   - id: consistency-progress-contradicts-completed
-    task: skill_step_consistency
+    task: runbook_step_consistency
     category: consistency-hard
     note: The recorded progress array marks the just-completed step as still pending — a self-contradiction.
     input:
-      skill_id: daintree.orchestration.competition
+      runbook_id: daintree.orchestration.competition
       completed_step: 3
       status: done
       requested_next: "4"

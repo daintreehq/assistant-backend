@@ -9,9 +9,9 @@ it, instead of leaving it to be remembered.
 
 The two numbers to read together:
 
-- **recall-pass** — every required skill present. A miss answers without its
+- **recall-pass** — every required runbook present. A miss answers without its
   runbook, the worst outcome available, so this is the product metric.
-- **extras** — skills loaded that the case neither required nor allowed. Each
+- **extras** — runbooks loaded that the case neither required nor allowed. Each
   costs its body in prompt bytes on every round of the turn, so this is the
   price being paid for the recall.
 
@@ -29,17 +29,17 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from benchmarks.skill_selection.cases import load_cases  # noqa: E402
-from daintree_assistant_server.skills.catalog import (  # noqa: E402
-    default_skills_dir,
+from benchmarks.runbook_selection.cases import load_cases  # noqa: E402
+from daintree_assistant_server.runbooks.catalog import (  # noqa: E402
+    default_runbooks_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.local import setwise  # noqa: E402
-from daintree_assistant_server.skills.local.documents import query_document  # noqa: E402
-from daintree_assistant_server.skills.local.setwise import SetwiseClassifier  # noqa: E402
+from daintree_assistant_server.runbooks.local import setwise  # noqa: E402
+from daintree_assistant_server.runbooks.local.documents import query_document  # noqa: E402
+from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier  # noqa: E402
 
 ARTIFACT = (
-    ROOT / "src" / "daintree_assistant_server" / "skills" / "local"
+    ROOT / "src" / "daintree_assistant_server" / "runbooks" / "local"
     / "artifacts" / "selector"
 )
 
@@ -57,7 +57,7 @@ def score(clf: SetwiseClassifier, catalog, cases) -> tuple[int, int, float]:  # 
             query = query_document(case.messages, turn_context=case.turn_context)
             visible = [sid for sid in case.active if sid in selectable]
             picked = [
-                sid for sid in clf.select(query, visible).skill_ids if sid in selectable
+                sid for sid in clf.select(query, visible).runbook_ids if sid in selectable
             ]
         got = set(picked)
         miss = set(case.required) - got
@@ -76,7 +76,7 @@ def main() -> int:
     ap.add_argument("--newcomer", nargs="*", type=float, default=[0.55, 0.65, 0.75])
     args = ap.parse_args()
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     cases = load_cases(catalog)
     clf = SetwiseClassifier(Path(args.artifact), quantized=True)
     clf.sync(catalog)

@@ -19,7 +19,7 @@ async def run_task(
     request: Request,
     principal: Principal = Depends(require_auth),
     _ready: None = Depends(require_ready),
-    # `_protocol` carries the same rule as /respond and /skills/resolve: a task
+    # `_protocol` carries the same rule as /respond and /runbooks/resolve: a task
     # sends the caller's content upstream and returns a typed result the client
     # parses, so an unsupported client must be told 426 rather than handed a body
     # whose shape it may not understand. There is no `protocol_version` body field

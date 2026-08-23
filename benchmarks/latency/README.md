@@ -66,6 +66,6 @@ does hold them. But treat the absolute `cold_*` numbers as a warm-endpoint floor
 the **baseline-vs-improved comparison** as the trustworthy output: both runs use the
 identical protocol, so the delta is real either way.
 
-Skill learning is forced `off` for a run — it fires after a final-answer turn and would
+Runbook learning is forced `off` for a run — it fires after a final-answer turn and would
 otherwise add a GPT-5.6 Sol call and a catalog reload mid-benchmark, mutating the very
 catalog later scenarios select against.

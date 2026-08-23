@@ -1,4 +1,4 @@
-"""Overlay loading and in-place reload for the skill catalog."""
+"""Overlay loading and in-place reload for the runbook catalog."""
 
 from __future__ import annotations
 
@@ -9,18 +9,18 @@ from pathlib import Path
 
 import pytest
 
-from daintree_assistant_server.skills import catalog as catalog_module
-from daintree_assistant_server.skills.catalog import CatalogManager, load_catalog
-from daintree_assistant_server.skills.loader import SkillLoadError
+from daintree_assistant_server.runbooks import catalog as catalog_module
+from daintree_assistant_server.runbooks.catalog import CatalogManager, load_catalog
+from daintree_assistant_server.runbooks.loader import RunbookLoadError
 
 
-def _skill(skill_id: str, summary: str) -> str:
+def _runbook(runbook_id: str, summary: str) -> str:
     return (
         f"---\n"
-        f"id: {skill_id}\n"
-        f"title: Title for {skill_id}\n"
+        f"id: {runbook_id}\n"
+        f"title: Title for {runbook_id}\n"
         f"summary: {summary}\n"
-        f"whenToUse: Use when testing {skill_id}.\n"
+        f"whenToUse: Use when testing {runbook_id}.\n"
         f"---\n"
         f"Use when: testing.\n\n"
         f"Procedure:\n1. Do the thing.\n\n"
@@ -28,9 +28,9 @@ def _skill(skill_id: str, summary: str) -> str:
     )
 
 
-def _write(directory: Path, skill_id: str, summary: str) -> None:
+def _write(directory: Path, runbook_id: str, summary: str) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / f"{skill_id}.md").write_text(_skill(skill_id, summary), encoding="utf-8")
+    (directory / f"{runbook_id}.md").write_text(_runbook(runbook_id, summary), encoding="utf-8")
 
 
 def test_load_primary_only(tmp_path: Path) -> None:
@@ -56,9 +56,9 @@ def test_overlay_overrides_primary_by_id(tmp_path: Path) -> None:
     _write(primary, "test.alpha", "Original summary.")
     _write(overlay, "test.alpha", "Overridden summary.")
     catalog = load_catalog(primary, overlay)
-    skill = catalog.get("test.alpha")
-    assert skill is not None
-    assert skill.summary == "Overridden summary."
+    runbook = catalog.get("test.alpha")
+    assert runbook is not None
+    assert runbook.summary == "Overridden summary."
 
 
 def test_overlay_equal_to_primary_is_ignored(tmp_path: Path) -> None:
@@ -142,7 +142,7 @@ async def test_reload_async_uses_the_overlay_dir(tmp_path: Path) -> None:
 
 
 def test_a_failed_reload_keeps_the_previous_catalog(tmp_path: Path) -> None:
-    """Fail SAFE: a half-written skill must not take the running catalog down.
+    """Fail SAFE: a half-written runbook must not take the running catalog down.
 
     The load happens in full before the rebind, so the identity check is the
     assertion that matters — not merely an equal revision, but the very same
@@ -158,7 +158,7 @@ def test_a_failed_reload_keeps_the_previous_catalog(tmp_path: Path) -> None:
     before = manager.catalog
 
     (overlay / "test.broken.md").write_text("no frontmatter here", encoding="utf-8")
-    with pytest.raises(SkillLoadError):
+    with pytest.raises(RunbookLoadError):
         manager.reload_sync()
 
     assert manager.catalog is before
@@ -176,7 +176,7 @@ async def test_a_failed_async_reload_keeps_the_previous_catalog(tmp_path: Path) 
     before = manager.catalog
 
     (overlay / "test.broken.md").write_text("no frontmatter here", encoding="utf-8")
-    with pytest.raises(SkillLoadError):
+    with pytest.raises(RunbookLoadError):
         await manager.reload()
 
     assert manager.catalog is before
@@ -194,7 +194,7 @@ def test_an_overlay_path_that_is_a_file_is_rejected(tmp_path: Path) -> None:
     not_a_directory = tmp_path / "overlay.md"
     not_a_directory.write_text("a file", encoding="utf-8")
 
-    with pytest.raises(SkillLoadError, match="not a directory"):
+    with pytest.raises(RunbookLoadError, match="not a directory"):
         load_catalog(primary, not_a_directory)
 
 

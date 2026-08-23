@@ -17,8 +17,7 @@ import pytest
 
 from daintree_assistant_server.contracts.daintree_api import RespondToolChoice
 from daintree_assistant_server.contracts.openai import ChatMessage, FunctionCall, ToolCall
-from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
-from daintree_assistant_server.skills.tool_projection import (
+from daintree_assistant_server.runbooks.tool_projection import (
     REASON_COHORT_EXCLUDED,
     REASON_DISABLED,
     REASON_EMPTY_PROJECTION,
@@ -37,6 +36,7 @@ from daintree_assistant_server.skills.tool_projection import (
     session_bucket,
     tools_bytes,
 )
+from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
 
 
 def _projection(proposed: set[str], offered: set[str]) -> ToolProjection:

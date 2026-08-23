@@ -1,14 +1,14 @@
-"""Skill catalog tests."""
+"""Runbook catalog tests."""
 
 from __future__ import annotations
 
 import pytest
 
-from daintree_assistant_server.skills.catalog import Catalog, default_skills_dir, load_catalog
-from daintree_assistant_server.skills.loader import SkillLoadError, parse_skill
-from daintree_assistant_server.skills.models import Skill
+from daintree_assistant_server.runbooks.catalog import Catalog, default_runbooks_dir, load_catalog
+from daintree_assistant_server.runbooks.loader import RunbookLoadError, parse_runbook
+from daintree_assistant_server.runbooks.models import Runbook
 
-SKILL_A = """---
+RUNBOOK_A = """---
 id: a.one
 title: One
 summary: first
@@ -18,7 +18,7 @@ risk: read
 body one
 """
 
-SKILL_B = """---
+RUNBOOK_B = """---
 id: b.two
 title: Two
 summary: second
@@ -30,25 +30,25 @@ body two
 
 
 def _catalog() -> Catalog:
-    return Catalog([parse_skill(SKILL_A, expected_id="a.one"), parse_skill(SKILL_B, expected_id="b.two")])
+    return Catalog([parse_runbook(RUNBOOK_A, expected_id="a.one"), parse_runbook(RUNBOOK_B, expected_id="b.two")])
 
 
-def _skill(skill_id: str, *, foundation: bool = False) -> Skill:
-    """A minimal purpose-built skill — used to test id-namespace behaviour without
+def _runbook(runbook_id: str, *, foundation: bool = False) -> Runbook:
+    """A minimal purpose-built runbook — used to test id-namespace behaviour without
     pinning tests to real catalog ids (the real catalog evolves)."""
-    lines = ["---", f"id: {skill_id}", "title: T", "summary: s", "whenToUse: w"]
+    lines = ["---", f"id: {runbook_id}", "title: T", "summary: s", "whenToUse: w"]
     if foundation:
         lines.append("foundation: true")
     lines += ["risk: read", "---", "body", ""]
-    return parse_skill("\n".join(lines), expected_id=skill_id)
+    return parse_runbook("\n".join(lines), expected_id=runbook_id)
 
 
 def test_real_catalog_loads_all_packaged_files() -> None:
     catalog = load_catalog()
-    # Every packaged skill file loads (no skill silently dropped), whatever the
-    # count — robust to the catalog growing as skill learning writes new skills.
-    packaged = list(default_skills_dir().glob("*.md"))
-    assert packaged, "no packaged skill files found"
+    # Every packaged runbook file loads (no runbook silently dropped), whatever the
+    # count — robust to the catalog growing as runbook learning writes new runbooks.
+    packaged = list(default_runbooks_dir().glob("*.md"))
+    assert packaged, "no packaged runbook files found"
     assert len(catalog) == len(packaged)
     assert catalog.revision.startswith("sha256:")
 
@@ -87,29 +87,29 @@ def test_selector_metadata_is_request_invariant_and_minimal() -> None:
 
 
 def test_foundation_flag_defaults_false_and_parses_true() -> None:
-    plain = parse_skill(SKILL_A, expected_id="a.one")
+    plain = parse_runbook(RUNBOOK_A, expected_id="a.one")
     assert plain.meta.foundation is False
-    marked = parse_skill(
-        SKILL_A.replace("risk: read", "foundation: true\nrisk: read"),
+    marked = parse_runbook(
+        RUNBOOK_A.replace("risk: read", "foundation: true\nrisk: read"),
         expected_id="a.one",
     )
     assert marked.meta.foundation is True
     assert marked.selector_view()["foundation"] is True
 
 
-def test_real_catalog_every_skill_resolves_to_a_foundation() -> None:
+def test_real_catalog_every_runbook_resolves_to_a_foundation() -> None:
     # Structural, not id-hardcoded (the real catalog evolves): the point of the
-    # namespace walk is that NO skill loads without a base judgment layer, so every
-    # skill must resolve to some foundation above it.
+    # namespace walk is that NO runbook loads without a base judgment layer, so every
+    # runbook must resolve to some foundation above it.
     catalog = load_catalog()
-    foundations = [s.id for s in catalog.skills if s.meta.foundation]
-    assert foundations, "the real catalog has no foundation skill"
-    unpaired = [s.id for s in catalog.skills if catalog.domain_foundation(s.id) is None]
+    foundations = [s.id for s in catalog.runbooks if s.meta.foundation]
+    assert foundations, "the real catalog has no foundation runbook"
+    unpaired = [s.id for s in catalog.runbooks if catalog.domain_foundation(s.id) is None]
     assert unpaired == []
 
 
 def test_domain_foundation_pairs_specific_with_its_domain_foundation() -> None:
-    catalog = Catalog([_skill("dom.area.base", foundation=True), _skill("dom.area.thing")])
+    catalog = Catalog([_runbook("dom.area.base", foundation=True), _runbook("dom.area.thing")])
     # A specific resolves to its domain foundation...
     assert catalog.domain_foundation("dom.area.thing") == "dom.area.base"
     # ...and the foundation resolves to itself (the caller dedups).
@@ -119,11 +119,11 @@ def test_domain_foundation_pairs_specific_with_its_domain_foundation() -> None:
 def test_domain_foundation_walk_is_nearest_first() -> None:
     catalog = Catalog(
         [
-            _skill("dom.base", foundation=True),  # domain key "dom"
-            _skill("dom.area.narrow", foundation=True),  # domain key "dom.area"
-            _skill("dom.area.thing"),
-            _skill("dom.other.thing"),
-            _skill("dom.deep.nested.thing"),
+            _runbook("dom.base", foundation=True),  # domain key "dom"
+            _runbook("dom.area.narrow", foundation=True),  # domain key "dom.area"
+            _runbook("dom.area.thing"),
+            _runbook("dom.other.thing"),
+            _runbook("dom.deep.nested.thing"),
         ]
     )
     # The nearest ancestor wins: dom.area.* takes the dom.area foundation, not dom's.
@@ -135,7 +135,7 @@ def test_domain_foundation_walk_is_nearest_first() -> None:
 
 
 def test_domain_foundation_none_when_no_ancestor_has_one() -> None:
-    catalog = Catalog([_skill("dom.area.base", foundation=True), _skill("other.thing")])
+    catalog = Catalog([_runbook("dom.area.base", foundation=True), _runbook("other.thing")])
     # The walk never crosses into an unrelated top-level namespace.
     assert catalog.domain_foundation("other.thing") is None
 
@@ -144,17 +144,17 @@ def test_two_foundations_in_one_domain_is_rejected() -> None:
     # There is no sensible tie-break. Picking the id-sorted first means the LOSER does
     # not even resolve to itself, so selecting it would admit BOTH foundations and burn
     # two slots of the active-set budget on one domain. Fail closed at load instead.
-    with pytest.raises(SkillLoadError, match="two foundation skills"):
-        Catalog([_skill("dom.zeta", foundation=True), _skill("dom.alpha", foundation=True)])
+    with pytest.raises(RunbookLoadError, match="two foundation runbooks"):
+        Catalog([_runbook("dom.zeta", foundation=True), _runbook("dom.alpha", foundation=True)])
 
 
 def test_one_foundation_per_domain_across_distinct_domains_is_fine() -> None:
     catalog = Catalog(
         [
-            _skill("dom.alpha", foundation=True),
-            _skill("other.base", foundation=True),
-            _skill("dom.thing"),
-            _skill("other.thing"),
+            _runbook("dom.alpha", foundation=True),
+            _runbook("other.base", foundation=True),
+            _runbook("dom.thing"),
+            _runbook("other.thing"),
         ]
     )
     assert catalog.domain_foundation("dom.thing") == "dom.alpha"
@@ -173,17 +173,17 @@ def test_public_list_includes_required_tools_no_body() -> None:
 
 
 def test_duplicate_id_rejected() -> None:
-    skill = parse_skill(SKILL_A, expected_id="a.one")
-    with pytest.raises(SkillLoadError, match="duplicate"):
-        Catalog([skill, skill])
+    runbook = parse_runbook(RUNBOOK_A, expected_id="a.one")
+    with pytest.raises(RunbookLoadError, match="duplicate"):
+        Catalog([runbook, runbook])
 
 
 def test_revision_changes_with_content() -> None:
     base = _catalog().revision
     changed = Catalog(
         [
-            parse_skill(SKILL_A.replace("body one", "body one, edited"), expected_id="a.one"),
-            parse_skill(SKILL_B, expected_id="b.two"),
+            parse_runbook(RUNBOOK_A.replace("body one", "body one, edited"), expected_id="a.one"),
+            parse_runbook(RUNBOOK_B, expected_id="b.two"),
         ]
     ).revision
     assert base != changed

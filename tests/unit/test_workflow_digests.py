@@ -40,7 +40,7 @@ def footer(assembler: PromptAssembler, digests: list[WorkflowDigest]) -> str:
 
 def test_respond_request_accepts_workflow_state() -> None:
     req = RespondRequest.model_validate({
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": "s", "turn_id": "t"},
         "input": {"messages": [{"role": "user", "content": "hi"}]},
         "startup": {},
@@ -151,7 +151,7 @@ def test_footer_total_byte_budget_drops_tail_digests(assembler: PromptAssembler)
 
 def test_workflow_state_reaches_assembled_request(assembler: PromptAssembler) -> None:
     req = RespondRequest.model_validate({
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": "s", "turn_id": "t"},
         "input": {"messages": [{"role": "user", "content": "hi"}]},
         "startup": {},
@@ -159,7 +159,7 @@ def test_workflow_state_reaches_assembled_request(assembler: PromptAssembler) ->
             "workflow_state": [{"id": "wf_9", "goal": "Ship it", "status": "blocked"}],
         },
     })
-    pr = assembler.build_main_request(request=req, skills=[], upstream_model="m")
+    pr = assembler.build_main_request(request=req, runbooks=[], upstream_model="m")
     # The turn footer now rides the trailing user-role injected-context block
     # (volatile content must stay out of the system role for cache stability).
     footers = [

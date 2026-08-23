@@ -60,6 +60,7 @@ from daintree_assistant_server.state.codec import (
     REASON_SESSION_MISMATCH,
     REASON_UNSUPPORTED_VERSION,
     TOKEN_PREFIX,
+    TOKEN_VERSION,
     StateCodec,
     _b64url_decode,
     _b64url_encode,
@@ -567,7 +568,7 @@ def run_state_token() -> dict[str, Any]:
     )
     genuine = codec.issue(
         session_id=_SESSION,
-        active_skills=["daintree.example.one", "daintree.example.two"],
+        active_runbooks=["daintree.example.one", "daintree.example.two"],
         catalog_revision="rev-abc123",
         turn_id="turn-1",
         instruction_revision=0,
@@ -582,9 +583,9 @@ def run_state_token() -> dict[str, Any]:
         return p
 
     flipped_sig = sig[:-1] + ("A" if sig[-1] != "A" else "B")
-    evil_skills = [{"id": "daintree.evil"}]
+    evil_runbooks = [{"id": "daintree.evil"}]
     evil_body = _b64url_encode(
-        json.dumps(mutated(active_skills=evil_skills),
+        json.dumps(mutated(active_runbooks=evil_runbooks),
                    separators=(",", ":"), sort_keys=True).encode("utf-8")
     )
 
@@ -596,7 +597,7 @@ def run_state_token() -> dict[str, Any]:
         ("token-payload-mutated-old-signature",
          f"{prefix}.{evil_body}.{sig}", _SESSION, REASON_INVALID, _CODEC_T0),
         ("token-resigned-with-attacker-key",
-         _token_from_payload(mutated(active_skills=evil_skills), attacker_key),
+         _token_from_payload(mutated(active_runbooks=evil_runbooks), attacker_key),
          _SESSION, REASON_INVALID, _CODEC_T0),
         ("token-unknown-kid",
          _token_from_payload(mutated(kid="evil"), attacker_key),
@@ -614,8 +615,17 @@ def run_state_token() -> dict[str, Any]:
          _CODEC_T0),
         ("token-validly-signed-non-dict",
          _raw_token(b"[]", _CODEC_KEY), _SESSION, REASON_INVALID, _CODEC_T0),
+        # DERIVED from the current version, never a literal. Pinned at 2 this case
+        # silently became "a valid current token" when TOKEN_VERSION was bumped to 2,
+        # and a zero-tolerance safety benchmark would have reported a forgery accepted.
         ("token-future-version",
-         _token_from_payload(mutated(v=2), _CODEC_KEY), _SESSION,
+         _token_from_payload(mutated(v=TOKEN_VERSION + 1), _CODEC_KEY), _SESSION,
+         REASON_UNSUPPORTED_VERSION, _CODEC_T0),
+        # The retired schema, on the same terms: a correctly SIGNED v1 token — the
+        # shape a client holds across the 2 -> 3 rename — must be refused for the
+        # version, not merely fail to parse.
+        ("token-superseded-version",
+         _token_from_payload(mutated(v=TOKEN_VERSION - 1), _CODEC_KEY), _SESSION,
          REASON_UNSUPPORTED_VERSION, _CODEC_T0),
     ]
 

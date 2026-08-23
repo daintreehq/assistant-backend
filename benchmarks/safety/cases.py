@@ -40,7 +40,7 @@ CONFORMS_EXPECTS = frozenset({"conform", "violate"})
 SYNTH_KINDS = frozenset({"over_depth", "over_size", "over_enum", "over_properties"})
 
 _DEFAULT_ENVELOPE: dict[str, Any] = {
-    "protocol_version": 2,
+    "protocol_version": 3,
     "session": {"id": "bench-session", "turn_id": "turn-1"},
     "startup": {},
 }

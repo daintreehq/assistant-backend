@@ -1,4 +1,4 @@
-# Local skill selection — experiment log
+# Local runbook selection — experiment log
 
 > ## ⭐ SHIPPED CONFIGURATION — two-stage set-wise selector
 > ```
@@ -30,27 +30,27 @@
 > | recall-pass (int8) | 158/169 | 158/169 |
 > | strict pass | 74/169 | **132/169** |
 > | precision extras | 94 | **32** |
-> | mean skills loaded/turn | 2.29 | **1.17** |
+> | mean runbooks loaded/turn | 2.29 | **1.17** |
 > | fp32 ↔ int8 decision diff | 32 cases | **5 cases** |
 > | p50 latency | 9.0 ms | 11.6 ms |
 >
 > Same routing accuracy reached by being right rather than by over-loading and
-> letting the recall bonus cover it. Half the skill bodies per turn is a direct
+> letting the recall bonus cover it. Half the runbook bodies per turn is a direct
 > saving in prompt bytes on every round of every turn.
 >
 > **The reason to switch is structural, not the accuracy.** Neither stage owns a
-> per-skill weight: stage 1 embeds skill documents, stage 2's head consumes those
+> per-runbook weight: stage 1 embeds runbook documents, stage 2's head consumes those
 > embeddings. So
 >
-> 1. **a skill added at runtime routes without a retrain** — embedded by
+> 1. **a runbook added at runtime routes without a retrain** — embedded by
 >    `SetwiseClassifier.sync()` on catalog load, competing on equal terms. Under
 >    Architecture B this was structurally impossible (no head row) *and* the
 >    `routing_revision` gate degraded every turn open until someone retrained,
->    which put the selector in direct conflict with skill learning;
+>    which put the selector in direct conflict with runbook learning;
 > 2. **there is no staleness gate at all** — the hash is still stamped, but as a
 >    drift signal for a human, gating nothing;
 > 3. **catalog growth costs one table row (~4.5KB), not a wider head.** The head
->    always sees `k` candidates, so its job is the same size at 38 skills and at
+>    always sees `k` candidates, so its job is the same size at 38 runbooks and at
 >    2,000; only the cosine search grows, and that is a matmul.
 >
 > Rebuild:
@@ -73,7 +73,7 @@ record the same ideas get re-tried.
 | DeepSeek selector, benchmark | **138/146 (94.5%)** |
 | DeepSeek selector, latency | **p50 2,044 ms / p90 2,806 ms** |
 
-Benchmark = `benchmarks/skill_selection`, 150 held-out cases, exact-match
+Benchmark = `benchmarks/runbook_selection`, 150 held-out cases, exact-match
 (all required ids present, no extras; the domain foundation is allowed-not-required).
 
 **Caveat that grows with this document:** the benchmark has now been inspected
@@ -99,7 +99,7 @@ The conventional design. Built in full, then abandoned.
 
 ### Why it was abandoned
 
-On an **identical shortlist**, over the 136 cases needing ≥1 skill:
+On an **identical shortlist**, over the 136 cases needing ≥1 runbook:
 
 | ordering | recall@1 | recall@3 |
 |---|---|---|
@@ -119,8 +119,8 @@ error is cardinality, not ranking.
 
 ## Architecture B — multi-label classifier (REPLACED by C)
 
-One encoder, one head: 32 skill logits + 1 docs logit + 4 cardinality logits.
-The head's weight matrix **is** the skill embeddings, so a bigger catalog costs
+One encoder, one head: 32 runbook logits + 1 docs logit + 4 cardinality logits.
+The head's weight matrix **is** the runbook embeddings, so a bigger catalog costs
 one row (384 floats), not a wider input.
 
 | # | configuration | benchmark | synthetic | note |
@@ -128,8 +128,8 @@ one row (384 floats), not a wider input.
 | B1 | MiniLM-L6, threshold rule, 8 epochs | 113/150 | 0.441 | undertrained; threshold-sensitive |
 | B2 | + 30 epochs | 113/150 | 0.816 | |
 | B3 | + fusion with bi-encoder (α=0.8) | 113/150 | 0.859 | |
-| B4 | + cardinality head, fusion α=0.4 | **115/150** | 0.871 | routing-trap 52/58, single-skill 31/33 |
-| B5 | + head init from skill embeddings | — | 0.804 | **worse**; constrains training. Kept opt-in |
+| B4 | + cardinality head, fusion α=0.4 | **115/150** | 0.871 | routing-trap 52/58, single-runbook 31/33 |
+| B5 | + head init from runbook embeddings | — | 0.804 | **worse**; constrains training. Kept opt-in |
 | B6 | + full inverse-frequency balancing | 114/150 | 0.816 | topic-shift up, routing-trap 52→46 |
 | B7 | classifier ALONE via ONNX fp32 | 114/150 | — | **2.05 ms p50**; beats fusion on topic-shift |
 | B8 | + rebalanced corpus (topic-shift 88→223) | 114/150 | 0.849 | topic-shift 2/9→6/9, docs flag 15/16 |
@@ -139,15 +139,15 @@ one row (384 floats), not a wider input.
 | B12 | + round-3 contrastive corpus (5,224) fp32 | 126/150 | 0.841 | |
 | **B13** | **same weights, int8** | **130/150** | — | **86.7%, p50 8.9ms** |
 | B15 | + wake corpus & hardened gates (6,399), review fixes | **130/150 int8** | 0.850 | canonical serving-path eval; topic-shift 8/9, foundation 5/6, adversarial 4/5. fp32 129, diff 7 cases |
-| B14 | + round-4 session corpus (6,285) | 129/150 | 0.852 | fp32 = int8 = 129: decisions stabilised. foundation-only 2/6→**5/6**, multi-skill 2/5→**4/5** (both now match DeepSeek), no-task 6/6 |
+| B14 | + round-4 session corpus (6,285) | 129/150 | 0.852 | fp32 = int8 = 129: decisions stabilised. foundation-only 2/6→**5/6**, multi-runbook 2/5→**4/5** (both now match DeepSeek), no-task 6/6 |
 
 ### The foundation-label bug (found by Codex)
 
-104 training rows labelled `daintree.foundation` ALONGSIDE a specific skill, and
+104 training rows labelled `daintree.foundation` ALONGSIDE a specific runbook, and
 96 of 171 cardinality-2 rows were really "specific + auto-paired foundation".
 But the backend pairs the foundation downstream and the benchmark puts it in
 `optional`, never `required`. So most of the cardinality head's evidence for
-"this turn needs TWO skills" meant something the classifier is never asked to
+"this turn needs TWO runbooks" meant something the classifier is never asked to
 produce. Stripping foundation from any multi-label target was worth several
 cases.
 
@@ -167,15 +167,15 @@ Capacity helps, modestly.
 
     conversation ─► MiniLM-L6 (fine-tuned) ─► cosine vs the embedded catalog ─► top-32
     conversation ─► bge-base  (fine-tuned) ─► q ──┐
-    skill table  ────────────────────────────► s_i ┴─► set-wise head ─► 32 logits
+    runbook table  ────────────────────────────► s_i ┴─► set-wise head ─► 32 logits
                                                                       + docs + cardinality
 
 The head is 2 transformer layers over `[CLS(q), cand_1 … cand_32]`, where
-`cand_i = W([s_i ; q⊙s_i ; |q−s_i|]) + W_f(features_i)`. It owns **no per-skill
+`cand_i = W([s_i ; q⊙s_i ; |q−s_i|]) + W_f(features_i)`. It owns **no per-runbook
 parameters**, which is the whole point — see the header for what that buys.
 
-This is **not** Architecture A. Nothing re-reads a skill's text at request time;
-skill vectors are computed once and looked up. A's cross-encoder cost 309ms of a
+This is **not** Architecture A. Nothing re-reads a runbook's text at request time;
+runbook vectors are computed once and looked up. A's cross-encoder cost 309ms of a
 312ms pipeline scoring (query, document) *pairs*; this head reads cached vectors
 and costs well under a millisecond.
 
@@ -184,7 +184,7 @@ and costs well under a millisecond.
 Stage 1 is a **filter**, not a scorer: its only job is to put the answer inside
 the top `k`. So `r@32` must be 1.000, and among backbones that clear it the
 choice is cost. `r@8` is reported as the scale proxy — 8 of 38 is the same
-*fraction* that `k=32` would be of a 150-skill catalog.
+*fraction* that `k=32` would be of a 150-runbook catalog.
 
 | backbone | params | int8 | p50 | r@3 | r@8 | r@32 |
 |---|---|---|---|---|---|---|
@@ -230,7 +230,7 @@ same shortlist, same corpus, each read at its own calibrated floor:
 outright (158 vs 154); positional only reaches 159 by loading roughly twice the
 extras. And the ablation shows what it learned to get there: reversing the
 shortlist changes **151 of 165** answers, i.e. it is leaning on "rank 0 usually
-wins" rather than on content. That prior is exactly wrong for the skill this
+wins" rather than on content. That prior is exactly wrong for the runbook this
 architecture exists to serve — one added after training, whose cosine rank the
 head never trained against.
 
@@ -242,22 +242,22 @@ stage 1's scores**. That is a property worth having rather than a defect: when
 the catalog reaches thousands and the filter's scores get noisier, only `r@k`
 degrades — accuracy does not ride on the scores. The features are kept because
 they cost 3 floats and the path stays trained, not because they are currently
-earning anything measurable at 38 skills.
+earning anything measurable at 38 runbooks.
 
 ### Zero-shot: what "no retrain needed" actually buys — MEASURED
 
-The architecture's headline claim is that a skill added after the build routes
+The architecture's headline claim is that a runbook added after the build routes
 without a retrain. It is true in the sense that matters operationally, and it is
-much weaker than it sounds. Measured by holding three skills out of **both**
+much weaker than it sounds. Measured by holding three runbooks out of **both**
 stages' training data and scoring only the benchmark cases that require them
 (`training/eval_zero_shot.py`):
 
 | | zero-shot | same recipe, trained |
 |---|---|---|
-| cases requiring a held-out skill | **4/14** | 13/14 |
+| cases requiring a held-out runbook | **4/14** | 13/14 |
 | the other 141 cases | 130 | 131 |
 
-Per skill, the pattern is the whole finding:
+Per runbook, the pattern is the whole finding:
 
 - `daintree.terminals.rename` — **4 of 7**. Distinctive vocabulary ("rename",
   "titles", "tabs") that no neighbour claims, so its document wins on content.
@@ -267,46 +267,46 @@ Per skill, the pattern is the whole finding:
   `diagnose-and-fix`.
 
 This is the asymmetry recorded at the top of this file, hit from the third
-direction: **a new skill's strongest words are stolen from its neighbours**, and
+direction: **a new runbook's strongest words are stolen from its neighbours**, and
 here the neighbours are trained while the newcomer is not, so the newcomer loses
 every *contested* turn and wins only the unambiguous ones.
 
 So state the property precisely, and do not let it drift in the docs:
 
-- Before (Architecture B): a new skill was **structurally unselectable** — no
+- Before (Architecture B): a new runbook was **structurally unselectable** — no
   head row — *and* it moved `routing_revision`, so the selector degraded EVERY
-  turn open until someone retrained. The catalog broke, not just the new skill.
-- Now: the catalog keeps working, and the new skill is reachable and wins
+  turn open until someone retrained. The catalog broke, not just the new runbook.
+- Now: the catalog keeps working, and the new runbook is reachable and wins
   requests only it plausibly answers. It will still lose to established
   neighbours until it has boundary data of its own.
 
-**A retrain is no longer what makes a skill possible; it is what makes it
+**A retrain is no longer what makes a runbook possible; it is what makes it
 competitive.** That is a large operational improvement and not a licence to stop
 retraining. `.claude/skills/retrain-selector` says the same thing.
 
 ### Cross-learning: what a shared head does and does not buy
 
-With no per-skill parameters, every training row teaches the SHARED reader —
+With no per-runbook parameters, every training row teaches the SHARED reader —
 "how does a request map onto a whenToUse fence" — rather than filling in one
-skill's row. So competence transfers across skills in a way it structurally
+runbook's row. So competence transfers across runbooks in a way it structurally
 could not before. Two claims come out of that, and only one of them is measured.
 
-**Proven.** A skill held out of both stages still takes 4 of 14 of its own
-benchmark cases (see the zero-shot section above). Under a per-skill head that
+**Proven.** A runbook held out of both stages still takes 4 of 14 of its own
+benchmark cases (see the zero-shot section above). Under a per-runbook head that
 number is **0 by construction** — there is no output to activate. Every one of
-those 4 is transfer from other skills' data, so the mechanism is real and
+those 4 is transfer from other runbooks' data, so the mechanism is real and
 demonstrated, not inferred.
 
-**Not yet measured: that it COMPOUNDS.** The appealing version — each skill
-added makes every other skill route better, so the catalog stabilises as it
+**Not yet measured: that it COMPOUNDS.** The appealing version — each runbook
+added makes every other runbook route better, so the catalog stabilises as it
 grows — does not follow from the above and is not established here. The one
 adjacent data point is mildly against a large effect: removing 411 rows (three
-skills, ~5% of the corpus) moved the remaining 141 cases by 130 vs 131, i.e.
+runbooks, ~5% of the corpus) moved the remaining 141 cases by 130 vs 131, i.e.
 nothing outside the noise band.
 
 The experiment that would settle it, when there is a reason to run it: train
-stage 2 on data for N of the catalog's skills for N in {10, 20, 30, all}, and
-each time score the SAME held-out skills. If cross-learning compounds, zero-shot
+stage 2 on data for N of the catalog's runbooks for N in {10, 20, 30, all}, and
+each time score the SAME held-out runbooks. If cross-learning compounds, zero-shot
 performance on the held-out set rises with N even though their own data is never
 present. That is a learning curve over *breadth*, not volume, and it is the only
 version of the question the benchmark can answer.
@@ -317,58 +317,58 @@ with no training, `manage-issue` 0/4 and `debug-web-app` 0/3. Distinctive
 vocabulary transfers; **discrimination between two subtly different neighbours
 does not**, because that distinction lives in the PAIR and not in either
 document alone. A shared reader can learn "read the fence"; it cannot learn a
-fence nobody wrote. As overlapping skills accumulate, boundary data — in both
+fence nobody wrote. As overlapping runbooks accumulate, boundary data — in both
 directions — is the thing cross-learning does not give you for free.
 
-### Skill TEXT is now the fast routing lever
+### Runbook TEXT is now the fast routing lever
 
 A corollary worth using. Editing a `whenToUse` used to move `routing_revision`
 and require a retrain before it took effect, so text tuning was a ~20-minute
-loop. Now the edited skill is re-embedded on catalog load — **one** skill, one
+loop. Now the edited runbook is re-embedded on catalog load — **one** runbook, one
 forward pass — and the change is live. Measured on the shipped artifact: adding
 one clause to `review.review-change`'s whenToUse (that "tell me what you'd push
 back on" is a request for FINDINGS even when framed as pre-push) took the
-benchmark 158 -> 159, one case fixed and none broken, with 1 of 38 skills
+benchmark 158 -> 159, one case fixed and none broken, with 1 of 38 runbooks
 re-embedded and nothing retrained.
 
-`training/try_skill_text.py` scores a proposed edit against the whole suite from
+`training/try_runbook_text.py` scores a proposed edit against the whole suite from
 an in-memory overlay, writing nothing. Use it, and read both columns: a
-locally-correct carve-out that fences on words two skills legitimately share is
+locally-correct carve-out that fences on words two runbooks legitimately share is
 a regression, and this file already records one that shipped and had to be
 reverted. Tuning text against a suite this heavily inspected also fits it — a +1
 inside a ±2 error bar is not evidence on its own, and the edit should be
-defensible as a statement about the skill before the number is consulted.
+defensible as a statement about the runbook before the number is consulted.
 
 ### Why brute-force cosine and not an ANN index
 
 The shortlist's whole contract is `r@k = 1.000`: a candidate that never reaches
 the head cannot be recovered downstream, so a shortlist miss caps the entire
 selector. Approximate search sells exactly the property this stage cannot spend
-— IVF scans only the `nprobe` nearest k-means buckets, so a skill in an unprobed
+— IVF scans only the `nprobe` nearest k-means buckets, so a runbook in an unprobed
 bucket is invisible; HNSW's recall is a tunable below 1.
 
 And the speed it buys is not needed. `M @ q` + `argpartition` over float32,
-measured (see the latency breakdown above): 0.015 ms at 2,000 skills, 1.22 ms at
+measured (see the latency breakdown above): 0.015 ms at 2,000 runbooks, 1.22 ms at
 100,000. Where the crossovers actually sit:
 
-| skills | tables | search | search as % of turn |
+| runbooks | tables | search | search as % of turn |
 |---|---|---|---|
 | 2,000 (the design target) | 9 MB | 0.02 ms | 0.2% |
 | 10,000 | 46 MB | 0.12 ms | 0.9% |
 | 100,000 | 461 MB | 1.22 ms | 8.2% |
 | 875,000 | 4 GB | 10.7 ms | 44% |
 
-- search reaches **10% of the turn** at ~111,000 skills
-- search reaches parity with the ranking encoder at ~862,000 skills
+- search reaches **10% of the turn** at ~111,000 runbooks
+- search reaches parity with the ranking encoder at ~862,000 runbooks
 
-At 2,000 skills IVF would be self-defeating anyway: with the usual
+At 2,000 runbooks IVF would be self-defeating anyway: with the usual
 `nlist ~ sqrt(N)` it compares ~45 centroids and then scans ~45 vectors — about 90
 comparisons against our 2,000, saving ~0.013 ms — while adding an index build, a
 large binary dependency, and approximate recall.
 
 **The axis that binds first is MEMORY, not latency.** The tables are 4.5 KB per
-skill (384-d retrieval + 768-d ranking, float32) and fill 1 GB at ~217,000
-skills, while search does not become meaningful until ~111,000. So if this
+runbook (384-d retrieval + 768-d ranking, float32) and fill 1 GB at ~217,000
+runbooks, while search does not become meaningful until ~111,000. So if this
 catalog ever reached that scale the lever is **compressing the vectors** —
 float16 halves the tables outright, Matryoshka truncation or PQ goes further —
 not bucketing them for speed. If a vector library ever earns its place here it
@@ -398,7 +398,7 @@ STATIC in k (see below), so changing it means re-exporting.
    graph that loads happily and throws at run time on any k but the traced one.
    The head is therefore exported FULLY STATIC and serving pads to k with
    `mask=0`. Caught only by running a k=12 input against a k=32 export.
-2. **Skill documents are longer than they look**: p50 262 tokens, max 368. A
+2. **Runbook documents are longer than they look**: p50 262 tokens, max 368. A
    192-token cap — a reasonable-looking number borrowed from the query side —
    truncates exactly the `whenToUse` exclusion clauses that carry the routing
    signal. `doc_max_length` is 384 and the exporter asserts both stages agree.
@@ -406,7 +406,7 @@ STATIC in k (see below), so changing it means re-exporting.
    `vectors.npz` was built with int8 encoders and reused by an fp32 session, so
    documents and queries came from two different functions. It moved the
    benchmark by 2 cases between otherwise identical exports and read as run
-   noise. `SkillTable` now carries a `precision` stamp and a mismatch re-embeds.
+   noise. `RunbookTable` now carries a `precision` stamp and a mismatch re-embeds.
 4. **Per-tensor int8 is not enough for two stacked encoders.** Per-tensor
    quantisation moved the CORE decision on 14/169 cases and cost 5 recall-pass;
    `per_channel=True` — same size, same speed — took that to 1/169.
@@ -455,12 +455,12 @@ peaked at 280ms on the *reranker* design. At 2ms the question is moot.
    (96% accurate) does it in one prediction.
 3. **Conversation history trades continuation against topic-shift.** With 320
    chars: continuation 9/9, topic-shift 1/9. With none: 4/9 and 6/9. No setting
-   wins both, because what separates them is *which skills are loaded* — state,
+   wins both, because what separates them is *which runbooks are loaded* — state,
    not words. Fixed by putting the active set into the input (`[loaded: …]`).
 4. **Corpus balance shows up directly as category failures.** 272 follow-ups vs
-   88 topic-shifts taught "loaded → keep", and the model ranked stale skills at
+   88 topic-shifts taught "loaded → keep", and the model ranked stale runbooks at
    0.98 confidence. Generating 135 more topic-shifts moved it 2/9 → 6/9.
-5. **int8 changes decisions on the classifier** (which skill ranks first).
+5. **int8 changes decisions on the classifier** (which runbook ranks first).
    *(MiniLM-era finding — bge-base int8 passes the tiered parity gate and IS
    the shipped precision; see header.)*
 6. **Synthetic val overstates generalisation by ~10pp** (0.85 vs 0.76). The
@@ -493,12 +493,12 @@ seeds — random init per seed — so averaging them is meaningless).
   Quantisation must be PER-CHANNEL — see Architecture C trap 4. Measured
   whole-process RSS with both encoders loaded: ~410MB.
 - **Cloud Run: --cpu=1 --memory=2Gi --concurrency=8.** 1Gi would run today at
-  ~55% but leaves no headroom for the 100-200 skill catalog target plus
+  ~55% but leaves no headroom for the 100-200 runbook catalog target plus
   concurrent turn buffers; the second GiB costs ~$7/mo at min-instances=1.
 - **Earn-your-place admission** (setwise.py NEWCOMER_FLOOR_WHEN_ACTIVE=0.65):
-  with skills already loaded, a skill NOT in the active set needs p>=0.65 to
-  join; active skills and fresh-turn picks ride on the model's ranking alone.
-  Encodes the asymmetric cost of adding mid-conversation (re-encodes the skill
+  with runbooks already loaded, a runbook NOT in the active set needs p>=0.65 to
+  join; active runbooks and fresh-turn picks ride on the model's ranking alone.
+  Encodes the asymmetric cost of adding mid-conversation (re-encodes the runbook
   block + dilutes running runbooks). Benchmark-neutral: 130/150 with and without.
 - **Integration design (deferred to tear-out phase)**: at ~9ms the selector
   completes before speculation is worth starting — select first, assemble once,
@@ -533,7 +533,7 @@ blind spot and reported the feature healthy throughout.
 **Symptom.** A plain usage question ("How do you create a worktree in
 Daintree?") asked as the second turn of a conversation retrieved no
 documentation, and the turn answered a product question with no product
-documentation. The selector ran clean: `ran=true`, `degraded=false`, zero skills,
+documentation. The selector ran clean: `ran=true`, `degraded=false`, zero runbooks,
 no docs query.
 
 **Cause — a lossless shortcut in the corpus, not the architecture.** Of 8,640
@@ -550,7 +550,7 @@ context channel triggers it independently:
 | one turn of ordinary history | 0.00017 |
 | a conversational lead-in inside the message | 0.001 |
 
-Measured over 120 docs positives: **113/120 asked cold, 5/120 with a skill
+Measured over 120 docs positives: **113/120 asked cold, 5/120 with a runbook
 loaded.** Since `query_document` always prepends a 320-char history tail, the
 practical reading is that documentation lookup worked on the FIRST message of a
 conversation and almost nowhere else.
@@ -562,8 +562,8 @@ when the docs string and the ranking query agree.
 
 A cheaper version reused the primary shortlist and swapped only the query
 vector, and the measurement that justified it (113/120 either way) was worthless:
-k is 32 against 38 skills, so any two shortlists must share ≥26 candidates and
-retrieval is nearly a no-op. At 64 skills two top-32 sets can be disjoint, and
+k is 32 against 38 runbooks, so any two shortlists must share ≥26 candidates and
+retrieval is nearly a no-op. At 64 runbooks two top-32 sets can be disjoint, and
 the seam would have opened silently on exactly the topic-shift turns this feature
 exists for. **A measurement taken where the mechanism cannot operate is not
 evidence about the mechanism.**
@@ -614,16 +614,16 @@ carried more than one message and only one carried an active set. The suite
 mirrored the corpus, so it could not see a failure the corpus had caused: it
 scored 11/16 on the docs flag while the feature was dead in the field. Three
 cases were added that put an ordinary usage question somewhere other than the
-opening message — after an unrelated exchange, with a skill loaded, and in the
+opening message — after an unrelated exchange, with a runbook loaded, and in the
 second person. All three fail their DOCS EXPECTATION before the mitigation and
 meet it after; the docs flag goes 11/19 → 14/19.
 
 Be precise about what that does and does not say. `recall_pass_flags` scores
-skill ids only and ignores `expect.docs` entirely, so the routing headline
+runbook ids only and ignores `expect.docs` entirely, so the routing headline
 (158/172) is not evidence for this fix and never could be — the docs score is
 the separate 14/19. Nor are the added cases free of routing content: `required:
 []` means the selector must come back empty, and
-`docs-usage-question-after-unrelated-exchange` deliberately records a skill
+`docs-usage-question-after-unrelated-exchange` deliberately records a runbook
 extra it should not pick.
 
 When a benchmark is generated from the same assumptions as the training data,
@@ -634,13 +634,13 @@ agreement between them is not evidence.
 # Context-bearing turns: a greeting erased the task (2026-08-20)
 
 Reported from session `ses_3a3cd1e7`. Two turns in — "How are you?", then "How do
-I create worktrees in this app?" — the server loaded **no skill and retrieved no
+I create worktrees in this app?" — the server loaded **no runbook and retrieved no
 documentation**, and the model answered from the tool schemas alone. Since the
 only worktree-creation tool the CLI exposes is `worktree__createWithRecipe`,
 whose description is entirely about recipes, the answer confidently explained
 that worktrees are made from recipes. The correcting sentence ("omit `recipeId`
 and it creates only the worktree") lives in `create-plain-worktree`'s body — the
-skill that did not load.
+runbook that did not load.
 
 The selector logged `ran=true, degraded=false, cardinality=0`. Nothing failed.
 It answered, and the answer was "no task, no docs".
@@ -664,7 +664,7 @@ false positives against a corpus it should have called pristine — a check writ
 for something else entirely. The measurement below was always right; the
 explanation attached to it was not. Measured on the pre-retrain artifact:
 
-| history in front of "How do I create worktrees in this app?" | top skill | cardinality |
+| history in front of "How do I create worktrees in this app?" | top runbook | cardinality |
 |---|---|---|
 | none | 1.000 | 1 |
 | `check on the fleet` / `Four running…` (task) | 1.000 | 1 |
@@ -717,9 +717,9 @@ Corpus 8,640 → 9,774. Docs positives 207 → 499. `"this app"` 0 → 38,
 are the transferable part of this round; the row counts are not.
 
 1. **Carry the source row's answer, never `[]`.** 21 of the 207 docs positives
-   legitimately require skills — a docs turn and an operational turn are not
+   legitimately require runbooks — a docs turn and an operational turn are not
    exclusive, which is the entire premise of the pinned docs runbook arriving
-   *alongside* another one. The first draft hardcoded `skill_ids: []` in every
+   *alongside* another one. The first draft hardcoded `runbook_ids: []` in every
    family and generated 25 rows training "answer with nothing" for requests whose
    own source row demands `diagnostics` or `watch-outcome`.
 2. **Never emit into a bundle that cannot express the label you need.** The
@@ -752,15 +752,15 @@ the docs flag on ordinary work.
 
 The first pass added 320 routing rows against ~570 zero-cardinality ones and was
 exported and scored before the skew was noticed. It moved the corpus from 13.8%
-zero-answer to 17.5% and thinned the two-skill class from 3.3% to 3.0%, and the
-cardinality head followed the prior it was given: **docs 20/21 with multi-skill
+zero-answer to 17.5% and thinned the two-runbook class from 3.3% to 3.0%, and the
+cardinality head followed the prior it was given: **docs 20/21 with multi-runbook
 at 2/5**, against 4/5 before. Pass 2 raised the routing families to 600
-single-skill rows and added 95 two-skill lead-in rows, landing the two-skill
-class at 3.8%, and took multi-skill back to 4/5 for one docs case.
+single-runbook rows and added 95 two-runbook lead-in rows, landing the two-runbook
+class at 3.8%, and took multi-runbook back to 4/5 for one docs case.
 
 **Adding rows to fix one head moves the prior of another.** The two are trained
 from one corpus, and nothing but the per-category table showed it — the headline
-recall-pass moved by one case while a fifth of the multi-skill category fell out.
+recall-pass moved by one case while a fifth of the multi-runbook category fell out.
 
 ## Result
 
@@ -776,7 +776,7 @@ than against its own smaller one:
 | this artifact | **164/177** | **19/21** |
 
 The two numbers measure different heads, and only one of them can see this
-round's point: `recall_pass_flags` scores skill ids and ignores `expect.docs`
+round's point: `recall_pass_flags` scores runbook ids and ignores `expect.docs`
 entirely, so the docs gain is invisible to the routing figure and vice versa.
 
 Seven cases fixed, four broken:
@@ -793,7 +793,7 @@ Seven cases fixed, four broken:
 
 `docs-usage-question-after-unrelated-exchange` is the case the PREVIOUS round
 added and could not pass. `search-closed-prs-is-find-work` is not a casualty of
-the augmentation: `find-issue-work` gained its pull-request vocabulary in a skill
+the augmentation: `find-issue-work` gained its pull-request vocabulary in a runbook
 edit that landed AFTER both stages had trained, so the encoders never saw the
 words the case is about and the corpus has no PR-search rows at all. Its own note
 asks for a retrain, which is the follow-up, not this round.
@@ -808,7 +808,7 @@ of it.
 Three cases were added, and one of them was worthless when first written. An
 early draft of `docs-usage-question-after-greeting` reused the canonical cold
 question, which the BROKEN artifact already answered docs=true on and already
-returned no skills for: it passed on both artifacts and scored the mitigation
+returned no runbooks for: it passed on both artifacts and scored the mitigation
 rather than the bug. A regression case has to be a question the old artifact gets
 WRONG, and checking that requires actually running the old artifact — which is
 why the old one was kept and re-scored rather than trusted from its recorded
@@ -832,8 +832,8 @@ invariant alongside it.
 
 **`routing_revision_matches_catalog` is now `false` in the baseline**, and that
 is the drift signal working rather than a fault. The stamp is taken at TRAIN
-time; two skills' `whenToUse` lines moved after stage 2 finished. Nothing gates
-on it — the head has no per-skill weights and `sync()` re-embeds the moved
+time; two runbooks' `whenToUse` lines moved after stage 2 finished. Nothing gates
+on it — the head has no per-runbook weights and `sync()` re-embeds the moved
 documents on load — but it is the honest record that the next retrain has
 PR-search vocabulary to pick up.
 
@@ -850,7 +850,7 @@ PR-search vocabulary to pick up.
    199/207 recall and 6 false positives were measured at 207 positives, and there
    are now 499. The sweep is owed; the stale figures in `setwise.py` are marked
    as historical rather than current.
-3. `docs-question-mid-workflow` still misses its skill: the mitigation strips
+3. `docs-question-mid-workflow` still misses its runbook: the mitigation strips
    context from OUTSIDE the message and cannot strip framing INSIDE one.
    `docs-negative-do-the-thing` remains.
 
@@ -858,16 +858,16 @@ PR-search vocabulary to pick up.
 
 # Catalog scale: what k costs, measured (2026-08-21)
 
-Everything above was measured on a 38-skill catalog against `k=32` — 84% of the
+Everything above was measured on a 38-runbook catalog against `k=32` — 84% of the
 catalog on every ballot. At that ratio retrieval is barely a filter, so no number
 in this log says what Stage 1 does when it has to be one. `bench scale` pads the
 catalog with derived distractors (`shadow_catalog.py`) and re-measures oracle
-recall — "did every required skill reach the head", the only Stage 1 contract
+recall — "did every required runbook reach the head", the only Stage 1 contract
 that matters, because Stage 2 re-decides the order and nothing recovers an absent
 candidate.
 
 Seed 20260821, shipped int8 retriever. **154 of 177 cases count toward recall**:
-19 require no skill at all (chatter, no-task, most docs questions) and would be
+19 require no runbook at all (chatter, no-task, most docs questions) and would be
 vacuous successes, and 4 are background wakes that production never sends to the
 model.
 
@@ -876,7 +876,7 @@ model.
 Counts, not rates. n is 154 and one case is 0.65 points, so a table of
 four-decimal rates invites distinctions the sample cannot support.
 
-| skills | k=16 | k=32 (ships) | k=48 | k=64 | k=96 |
+| runbooks | k=16 | k=32 (ships) | k=48 | k=64 | k=96 |
 |---:|---:|---:|---:|---:|---:|
 | 39 | 0 | **0** | 0 | 0 | 0 |
 | 100 | 0 | **0** | 0 | 0 | 0 |
@@ -897,7 +897,7 @@ against the real catalog of the day rather than trusting this table.
 ## What reservation actually buys — a correction
 
 The first version of this section claimed dense retrieval alone "loses the open
-runbook on 41% of turns that have one" by 200 skills. **That was the wrong
+runbook on 41% of turns that have one" by 200 runbooks. **That was the wrong
 denominator and the claim does not survive it.** It counted every visible active
 id on every active case — including topic shifts, where dropping the old runbook
 is the CORRECT answer, and optional foundations that active-set pairing restores
@@ -906,7 +906,7 @@ anyway.
 Scored properly — actives that are also REQUIRED, i.e. the ones the turn should
 keep:
 
-| skills | dense alone | with reservation | every-active coverage, dense |
+| runbooks | dense alone | with reservation | every-active coverage, dense |
 |---:|---:|---:|---:|
 | 39 | 13/13 | 13/13 | 1.0000 |
 | 100 | 13/13 | 13/13 | 0.8261 |
@@ -914,7 +914,7 @@ keep:
 | 500 | 13/13 | 13/13 | 0.5217 |
 | 1000 | 13/13 | 13/13 | 0.4348 |
 
-**Dense retrieval keeps every active-and-required skill at every size measured.**
+**Dense retrieval keeps every active-and-required runbook at every size measured.**
 The `[loaded: …]` prefix carries the active ids into the query and it holds up:
 on this corpus, reservation rescues nothing that was actually going to be lost.
 
@@ -922,7 +922,7 @@ So candidate reservation is **insurance, not a repair**. It is still worth havin
 — it costs nothing, it converts a failure mode that no downstream floor can fix
 into an impossibility, and the coverage column shows retrieval genuinely does
 start dropping actives as the catalog grows — but this benchmark has 13 cases
-where an active skill is also required, and none of them were at risk. Do not
+where an active runbook is also required, and none of them were at risk. Do not
 cite it as a measured save. The corpus work that would make this question
 answerable is more continuation rows with a workflow open, which is the same gap
 the docs head has.
@@ -935,15 +935,15 @@ At `k=32`: everything holds through 200. At 500, `foundation-only` (5/6) and
 the most generic document in the catalog, so it is what a crowd of near-neighbours
 buries. That is a concrete argument for domain foundations before the catalog
 gets there, and it is what the CI smoke's one-miss budget is sized around: at 200
-skills the foundation sits at rank 26 of 200 under int8 and rank **31** under
+runbooks the foundation sits at rank 26 of 200 under int8 and rank **31** under
 fp32, the last slot `k=32` has.
 
 ## Distractor quality is the measurement instrument
 
 The first pool was not one. Templates varied only the id, and the id is not
-rendered into a skill document — so 961 distractors produced **492 distinct
+rendered into a runbook document — so 961 distractors produced **492 distinct
 documents**, one repeated seven times. Identical vectors still occupy separate
-shortlist slots, so "1,000 skills" meant ~530 routing surfaces crowding each
+shortlist slots, so "1,000 runbooks" meant ~530 routing surfaces crowding each
 other by multiplicity, and every conclusion past 200 rested on it. Generation now
 enforces distinct rendered documents and fails loudly when a template's variation
 space is exhausted (`tests/unit/test_shadow_catalog.py`).
@@ -956,18 +956,18 @@ looking wrong:
   scored as a miss when retrieved. It rewords now.
 * Three of five shapes named their source by dotted id in an exclusion clause,
   so half the pool carried an exact token sequence that the target's own document
-  does not contain (a skill's document has no id in it) while the query does, via
+  does not contain (a runbook's document has no id in it) while the query does, via
   `ACTIVE_PREFIX`. That biased the dense numbers harsh. One exclusion in four
-  names an id now, against the real catalog's 4.1 outgoing references per skill.
+  names an id now, against the real catalog's 4.1 outgoing references per runbook.
 
 ## Cost
 
-Embedding 1,000 skill documents: **~250s**, once. Sizes are nested and the
+Embedding 1,000 runbook documents: **~250s**, once. Sizes are nested and the
 classifier's digest-keyed vector memo outlives each table, so every smaller size
 in a sweep is free (measured 0.00s). That figure is also the honest cold-start
-worst case for a 1,000-skill catalog with no packaged `vectors.npz`.
+worst case for a 1,000-runbook catalog with no packaged `vectors.npz`.
 
-CI runs a 200-skill, `k=32` smoke (~24s): a one-miss budget on candidate recall,
+CI runs a 200-runbook, `k=32` smoke (~24s): a one-miss budget on candidate recall,
 and an exact 1.0 on active coverage, which is a construction guarantee rather
 than a measurement.
 
@@ -976,23 +976,23 @@ than a measurement.
 # Selector confidence cannot gate reasoning (2026-08-22)
 
 **Question.** The serving model is non-thinking on every call. Should it reason on
-turns where skill routing looks WEAK — a runbook the classifier is unsure about
+turns where runbook routing looks WEAK — a runbook the classifier is unsure about
 means the model has to work the steps out for itself — and stay non-thinking when a
-skill matches cleanly? The proposal was a threshold on `SelectionDecision.confidence`
-(the first admitted skill's probability): ~1.0 → no reasoning, below ~0.65 → reason.
+runbook matches cleanly? The proposal was a threshold on `SelectionDecision.confidence`
+(the first admitted runbook's probability): ~1.0 → no reasoning, below ~0.65 → reason.
 
 **Answer: no. The signal does not exist.** Measured over the 177-case routing corpus
-with the shipped artifact, on the 154 turns that require a skill:
+with the shipped artifact, on the 154 turns that require a runbook:
 
 | population | n | min | p25 | median | max |
 |---|---:|---:|---:|---:|---:|
 | selection CORRECT | 142 | 0.82 | 1.00 | 1.00 | 1.00 |
-| selection MISSED a required skill | 12 | 0.00 | 0.99 | **1.00** | 1.00 |
-| turn needs no skill at all | 19 | 0.00 | 0.00 | 0.00 | 0.00 |
+| selection MISSED a required runbook | 12 | 0.00 | 0.99 | **1.00** | 1.00 |
+| turn needs no runbook at all | 19 | 0.00 | 0.00 | 0.00 | 0.00 |
 
 The head is confident when it is wrong. Eleven of the twelve misses scored ≥ 0.98 —
 `review-the-branch`, `sweep-now-plus-wake-later` and `search-closed-prs-is-find-work`
-all missed a required skill at exactly 1.00. A 0.65 threshold turns reasoning on for
+all missed a required runbook at exactly 1.00. A 0.65 threshold turns reasoning on for
 **1 of 154 turns** and catches **8%** of the misses. Every threshold from 0.50 to
 0.80 selects the same single turn.
 
@@ -1006,12 +1006,12 @@ Two other candidate signals were measured and fail the same way:
 The one cleanly separated population is "nothing was selected" — exactly 0.00,
 20 turns. But it is not the population the idea wanted: 11 are docs questions and 6
 are contentless greetings, both the cheapest turn shapes there are, and only 1 of
-the 20 actually needed a skill. After excluding docs and greetings it is 3 turns of
+the 20 actually needed a runbook. After excluding docs and greetings it is 3 turns of
 173, so there is nothing there to serve either.
 
 **Why this was predictable, and the general lesson.** A sigmoid output is not a
 probability until someone measures that it is. This head was trained to rank, and
-ranking is all it does well: it puts the right skill first far more often than its
+ranking is all it does well: it puts the right runbook first far more often than its
 score says anything about whether it did. Calibration is a separate property and it
 was never trained for, so reading the score as a confidence is reading a number that
 was never fitted to mean that.
@@ -1023,6 +1023,6 @@ The cheaper alternative is to stop asking the classifier: a discrete
 `clear | ambiguous | insufficient` output trained as its own target would at least
 be fitted to the question being asked of it. `TODO.md` carries the trigger.
 
-Reproduce: `benchmarks/skill_selection/local_runner.py` drives the same artifact;
+Reproduce: `benchmarks/runbook_selection/local_runner.py` drives the same artifact;
 the distribution above comes from `SetwiseClassifier.select(...).scores` for the
 first admitted id, scored against each case's `required` set.

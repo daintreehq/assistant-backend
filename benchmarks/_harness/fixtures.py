@@ -139,7 +139,7 @@ def build_respond_request(
 ) -> RespondRequest:
     """Build a strict, valid ``RespondRequest`` against the committed contract."""
     payload: dict[str, Any] = {
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {
             "id": session_id,
             "turn_id": turn_id,

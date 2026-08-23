@@ -7,7 +7,7 @@ the server actually sends, so a regression shows up as a failing test in the PR
 that caused it rather than as a surprise on a bill.
 
 **What is deliberately NOT here:** anything that needs a paid call. Live latency,
-skill-selection accuracy and injection results belong in the nightly gate; a
+runbook-selection accuracy and injection results belong in the nightly gate; a
 baseline that cannot be checked offline would either be skipped in CI or make CI
 cost money on every push.
 
@@ -17,7 +17,7 @@ has to look. They are chosen by how the number behaves, not by uniform taste:
 * the base prompt is the highest-leverage text in the system and ships on every
   request, so it gets a tight band;
 * the selector prompt grows with the catalog by design, so it gets a loose one;
-* skill bodies churn — the learning harness rewrites them — so they are recorded
+* runbook bodies churn — the learning harness rewrites them — so they are recorded
   and not banded at all;
 * zero-tolerance guards are not bands. Zero is the value.
 
@@ -60,10 +60,10 @@ def capture() -> dict[str, Any]:
     sys.path.insert(0, str(REPO_ROOT / "src"))
     from daintree_assistant_server.config import PUBLIC_MODEL_ID, SERVING_MODEL
     from daintree_assistant_server.prompts.loader import PromptLoader
+    from daintree_assistant_server.runbooks.catalog import load_catalog
+    from daintree_assistant_server.runbooks.local.documents import routing_revision
+    from daintree_assistant_server.runbooks.local.paths_local import selector_artifact_dir
     from daintree_assistant_server.services.compaction import default_compactor
-    from daintree_assistant_server.skills.catalog import load_catalog
-    from daintree_assistant_server.skills.local.documents import routing_revision
-    from daintree_assistant_server.skills.local.paths_local import selector_artifact_dir
 
     loader = PromptLoader()
     catalog = load_catalog()
@@ -96,9 +96,9 @@ def capture() -> dict[str, Any]:
             "selector_onnx_bytes": sum(g.stat().st_size for g in graphs),
             "candidates": selector_meta.get("candidates", 0),
             "ordering": selector_meta.get("ordering", ""),
-            "trained_skills": len(selector_labels),
+            "trained_runbooks": len(selector_labels),
             # RECORDED, NOT ENFORCED, and the difference is the architecture.
-            # The set-wise head has no per-skill weights, so a catalog that has
+            # The set-wise head has no per-runbook weights, so a catalog that has
             # moved since training is answered normally rather than degrading
             # open — this is a "how far has the corpus drifted from the live
             # catalog" quality signal for a human reading a release, not a
@@ -123,13 +123,13 @@ def capture() -> dict[str, Any]:
                 ).encode("utf-8")
             ),
             "subagent_prompt_bytes": len(loader.subagent_prompt().encode("utf-8")),
-            "skill_body_bytes_total": sum(
-                len(s.body.encode("utf-8")) for s in catalog.skills
+            "runbook_body_bytes_total": sum(
+                len(s.body.encode("utf-8")) for s in catalog.runbooks
             ),
         },
         "catalog": {
-            "skills": len(catalog.skills),
-            "foundations": sum(1 for s in catalog.skills if s.meta.foundation),
+            "runbooks": len(catalog.runbooks),
+            "foundations": sum(1 for s in catalog.runbooks if s.meta.foundation),
             "revision": catalog.revision,
         },
         "tools": {

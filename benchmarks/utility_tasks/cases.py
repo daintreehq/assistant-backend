@@ -13,7 +13,7 @@ Every case is validated at load time against the real production profile: the
 ``task`` must be a supported classifier, the ``input`` must validate against the
 task's real Pydantic input model, and each ``expect`` key must be a real output
 field of that task. A typo fails fast instead of silently scoring as a miss —
-the same posture as the skill-selection suite validating skill ids.
+the same posture as the runbook-selection suite validating runbook ids.
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ SUPPORTED_TASKS: dict[str, frozenset[str]] = {
     "terminal_judge": frozenset({"matched"}),
     "watcher_classify": frozenset({"classification", "recommendedAction"}),
     "extraction_verdict": frozenset({"pass"}),
-    "skill_step_consistency": frozenset({"matched"}),
+    "runbook_step_consistency": frozenset({"matched"}),
 }
 
 _PROFILES = build_profiles()

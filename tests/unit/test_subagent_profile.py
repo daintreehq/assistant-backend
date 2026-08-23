@@ -7,7 +7,7 @@ three ways that all have to hold together, and each of these tests pins one of
 them:
 
 * it gets its OWN system prompt, not the orchestrator's;
-* it selects skills from a menu NARROWED to the ones it can execute;
+* it selects runbooks from a menu NARROWED to the ones it can execute;
 * it gets none of the orchestration context blocks it cannot act on.
 
 The default profile has to stay byte-identical on the wire, because the whole
@@ -31,7 +31,7 @@ def _req(*, profile: str | None = None, messages=None, startup=None, runtime=Non
     if tools is not None:
         inp["tools"] = tools
     body: dict = {
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": "s", "turn_id": "t"},
         "input": inp,
         "startup": startup or {},
@@ -63,7 +63,7 @@ def test_profile_defaults_to_assistant() -> None:
 def test_profile_rejects_an_unknown_persona() -> None:
     # A typo'd or invented persona must 422 rather than fall back to "assistant" —
     # a silent fallback would hand a sub-agent the orchestrator's full prompt and
-    # its whole skill catalog.
+    # its whole runbook catalog.
     with pytest.raises(ValidationError):
         _req(profile="rogue")
 
@@ -75,7 +75,7 @@ def test_subagent_gets_its_own_persona_not_the_orchestrator_one(
     assembler: PromptAssembler, prompt_loader: PromptLoader
 ) -> None:
     out = assembler.build_main_request(
-        request=_req(profile="subagent"), skills=[], upstream_model="m"
+        request=_req(profile="subagent"), runbooks=[], upstream_model="m"
     )
     system = _system_text(out)
     assert system.strip() == prompt_loader.subagent_prompt().strip()
@@ -91,31 +91,31 @@ def test_subagent_persona_states_the_load_bearing_rules(prompt_loader: PromptLoa
     assert "nobody" in body or "no human" in body, "must state there is no one to ask"
 
 
-def test_subagent_receives_the_skills_it_was_given(assembler: PromptAssembler, catalog) -> None:
-    """Skills are the POINT of giving a sub-agent a real tool inventory: one sent
+def test_subagent_receives_the_runbooks_it_was_given(assembler: PromptAssembler, catalog) -> None:
+    """Runbooks are the POINT of giving a sub-agent a real tool inventory: one sent
     to find an issue among thousands should get the issue-searching runbook rather
     than rediscover it every run. The narrowing happens in the orchestrator (see
     the menu tests below); the assembler renders what it is handed."""
-    skill = catalog.skills[0]
+    runbook = catalog.runbooks[0]
     out = assembler.build_main_request(
-        request=_req(profile="subagent"), skills=[skill], upstream_model="m"
+        request=_req(profile="subagent"), runbooks=[runbook], upstream_model="m"
     )
     text = _all_text(out)
-    assert "# Loaded skills" in text
-    assert skill.title in text
+    assert "# Loaded runbooks" in text
+    assert runbook.title in text
 
 
-def test_subagent_skill_bodies_sit_below_the_tool_schemas(
+def test_subagent_runbook_bodies_sit_below_the_tool_schemas(
     assembler: PromptAssembler, catalog
 ) -> None:
-    """The cache rule: only the STATIC persona may be system-role. A skill body
+    """The cache rule: only the STATIC persona may be system-role. A runbook body
     that crept into the system region would re-encode the tool schemas behind it
     every time the menu shifted."""
     out = assembler.build_main_request(
-        request=_req(profile="subagent"), skills=[catalog.skills[0]], upstream_model="m"
+        request=_req(profile="subagent"), runbooks=[catalog.runbooks[0]], upstream_model="m"
     )
     assert [m["role"] for m in out.messages if m["role"] == "system"] == ["system"]
-    assert "# Loaded skills" not in _system_text(out)
+    assert "# Loaded runbooks" not in _system_text(out)
 
 
 def test_subagent_drops_the_orchestration_context_blocks(assembler: PromptAssembler) -> None:
@@ -131,7 +131,7 @@ def test_subagent_drops_the_orchestration_context_blocks(assembler: PromptAssemb
             turn={"goal": "the orchestrator's goal", "workflow_runs": ["wfr_1"]},
         ),
 
-        skills=[],
+        runbooks=[],
         upstream_model="m",
     )
     text = _all_text(out)
@@ -147,7 +147,7 @@ def test_subagent_keeps_the_startup_block(assembler: PromptAssembler) -> None:
             startup={"project": {"id": "p", "name": "Terrain", "path": "/repo/terrain"}},
         ),
 
-        skills=[],
+        runbooks=[],
         upstream_model="m",
     )
     assert "/repo/terrain" in _all_text(out)
@@ -161,7 +161,7 @@ def test_subagent_forwards_its_tool_inventory(assembler: PromptAssembler) -> Non
         }
     ]
     out = assembler.build_main_request(
-        request=_req(profile="subagent", tools=tools), skills=[], upstream_model="m"
+        request=_req(profile="subagent", tools=tools), runbooks=[], upstream_model="m"
     )
     assert [t["function"]["name"] for t in out.tools] == ["fs__search"]
 
@@ -172,8 +172,8 @@ def test_subagent_prompt_is_materially_shorter_than_the_orchestrator_one(
     # The saving is a real part of why delegation pays for itself. If the two ever
     # converge, the sub-agent has quietly grown orchestration instructions it
     # cannot act on.
-    sub = len(_all_text(assembler.build_main_request(request=_req(profile="subagent"), skills=[], upstream_model="m")))
-    main = len(_all_text(assembler.build_main_request(request=_req(), skills=[], upstream_model="m")))
+    sub = len(_all_text(assembler.build_main_request(request=_req(profile="subagent"), runbooks=[], upstream_model="m")))
+    main = len(_all_text(assembler.build_main_request(request=_req(), runbooks=[], upstream_model="m")))
     assert sub < main / 2, f"sub-agent prompt is {sub} chars vs the orchestrator's {main}"
 
 
@@ -189,13 +189,13 @@ def test_the_profile_field_itself_does_not_split_the_prompt_cache(
     intentional cache bust argued for at BASE_PROMPT_CEILING in
     tests/unit/test_prompt_budgets.py. The golden snapshots record that diff.
     """
-    explicit = assembler.build_main_request(request=_req(profile="assistant"), skills=[], upstream_model="m")
-    implicit = assembler.build_main_request(request=_req(), skills=[], upstream_model="m")
+    explicit = assembler.build_main_request(request=_req(profile="assistant"), runbooks=[], upstream_model="m")
+    implicit = assembler.build_main_request(request=_req(), runbooks=[], upstream_model="m")
     assert explicit.messages == implicit.messages
 
 
 def test_subagent_disables_thinking(assembler: PromptAssembler) -> None:
-    out = assembler.build_main_request(request=_req(profile="subagent"), skills=[], upstream_model="m")
+    out = assembler.build_main_request(request=_req(profile="subagent"), runbooks=[], upstream_model="m")
     assert out.thinking_disabled is True
     assert out.reasoning_effort is None
 
@@ -204,7 +204,7 @@ def test_subagent_disables_thinking(assembler: PromptAssembler) -> None:
 
 
 # The read-only inventory a real sub-agent is offered (internal/app.subagentToolNames),
-# in the wire form the client sends. Trimmed to the ones skills actually name — the
+# in the wire form the client sends. Trimmed to the ones runbooks actually name — the
 # filter only cares about tools some `requiredTools` mentions.
 _READ_ONLY_TOOL_NAMES = [
     "context__snapshot", "fs__read", "fs__list", "fs__search",
@@ -226,7 +226,7 @@ def _orchestrator_request(
     selection: dict | None = None,
 ):
     body: dict = {
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": "sub_1", "turn_id": "sub_1-r0"},
         "input": {"messages": [{"role": "user", "content": text}]},
         "startup": {},
@@ -242,7 +242,7 @@ def _orchestrator_request(
 
 @pytest.mark.asyncio
 async def test_subagent_selects_from_a_narrowed_menu(settings, fake_provider) -> None:  # type: ignore[no-untyped-def]
-    """A sub-agent DOES select — from the skills it could actually execute.
+    """A sub-agent DOES select — from the runbooks it could actually execute.
 
     The narrowing is the whole point. Most of this catalog drives spawning,
     worktrees and terminals; handing one of those to a read-only worker spends its
@@ -265,7 +265,7 @@ async def test_subagent_selects_from_a_narrowed_menu(settings, fake_provider) ->
         menu = catalog.executable_with([t["function"]["name"] for t in _READ_ONLY_TOOLS])
         assert 0 < len(menu) < len(catalog), "the menu must be narrowed, not empty and not the whole catalog"
         # Anything it loaded has to be on that menu — never an orchestration runbook.
-        active = [ref["id"] for ref in outcome.body["skills"]["active"]]
+        active = [ref["id"] for ref in outcome.body["runbooks"]["active"]]
         for sid in active:
             assert sid in menu, f"{sid} is not executable by a sub-agent"
         # And this brief — the motivating case — must actually pick up the
@@ -286,7 +286,7 @@ async def test_subagent_is_never_offered_an_orchestration_runbook(
     try:
         catalog = container.orchestrator.catalog
         menu = catalog.executable_with([t["function"]["name"] for t in _READ_ONLY_TOOLS])
-        offered = {s.id for s in menu._skills}
+        offered = {s.id for s in menu._runbooks}
         # These drive spawning and editing; a read-only worker cannot follow them.
         for sid in ("daintree.edits.spawn-visible-agent", "daintree.review.review-change"):
             if catalog.get(sid) is not None:
@@ -297,7 +297,7 @@ async def test_subagent_is_never_offered_an_orchestration_runbook(
 
 @pytest.mark.asyncio
 async def test_an_empty_menu_skips_the_selector_entirely(settings, fake_provider) -> None:  # type: ignore[no-untyped-def]
-    """With no executable skill there is nothing to decide, so the call is skipped
+    """With no executable runbook there is nothing to decide, so the call is skipped
     rather than paid for to hear "none"."""
     from pydantic import SecretStr
 
@@ -305,7 +305,7 @@ async def test_an_empty_menu_skips_the_selector_entirely(settings, fake_provider
 
     container = build_container(settings, fake_provider)
     try:
-        # A single tool no skill declares ⇒ only zero-requirement skills survive.
+        # A single tool no runbook declares ⇒ only zero-requirement runbooks survive.
         outcome = await container.orchestrator.complete(
             _orchestrator_request(
                 "subagent",
@@ -319,11 +319,11 @@ async def test_an_empty_menu_skips_the_selector_entirely(settings, fake_provider
             request_id="req_empty",
         )
         assert outcome.body is not None
-        # Not asserting selector.ran here — a menu of only zero-requirement skills
+        # Not asserting selector.ran here — a menu of only zero-requirement runbooks
         # is still a menu. What must hold is that nothing unexecutable loaded.
-        for ref in outcome.body["skills"]["active"]:
-            skill = container.orchestrator.catalog.get(ref["id"])
-            assert not (skill and skill.meta.required_tools), f"{ref['id']} needs tools that were not offered"
+        for ref in outcome.body["runbooks"]["active"]:
+            runbook = container.orchestrator.catalog.get(ref["id"])
+            assert not (runbook and runbook.meta.required_tools), f"{ref['id']} needs tools that were not offered"
     finally:
         await container.aclose()
 
@@ -346,11 +346,11 @@ async def test_the_same_text_DOES_run_the_selector_for_the_assistant(
             api_key=SecretStr("k"),
             request_id="req_main",
         )
-        skills = outcome.body["skills"]
-        assert skills["selector"]["ran"] is True, "the orchestrator profile must still select"
-        assert skills["active"], "the same text must load runbooks for the orchestrator"
+        runbooks = outcome.body["runbooks"]
+        assert runbooks["selector"]["ran"] is True, "the orchestrator profile must still select"
+        assert runbooks["active"], "the same text must load runbooks for the orchestrator"
         # The control that gives the narrowing test its meaning: the orchestrator
-        # chooses from the WHOLE catalog, so it can reach skills a sub-agent cannot.
+        # chooses from the WHOLE catalog, so it can reach runbooks a sub-agent cannot.
         full = len(container.orchestrator.catalog)
         menu = container.orchestrator.catalog.executable_with(
             [t["function"]["name"] for t in _READ_ONLY_TOOLS]
@@ -363,37 +363,37 @@ async def test_the_same_text_DOES_run_the_selector_for_the_assistant(
 # --- regressions found in review ------------------------------------------
 
 
-def test_subagent_skill_render_omits_step_tracking(
+def test_subagent_runbook_render_omits_step_tracking(
     assembler: PromptAssembler, catalog
 ) -> None:
-    """`skill.step.advance` / `skill.run.get` are denylisted from a sub-agent's
+    """`runbook.step.advance` / `runbook.run.get` are denylisted from a sub-agent's
     inventory, so instructing it to call them spends context to buy a guaranteed
     TOOL_NOT_OFFERED. It also has no turn boundary to checkpoint across."""
-    skill = catalog.skills[0]
+    runbook = catalog.runbooks[0]
     sub = assembler.build_main_request(
-        request=_req(profile="subagent"), skills=[skill], upstream_model="m"
+        request=_req(profile="subagent"), runbooks=[runbook], upstream_model="m"
     )
-    main = assembler.build_main_request(request=_req(), skills=[skill], upstream_model="m")
+    main = assembler.build_main_request(request=_req(), runbooks=[runbook], upstream_model="m")
 
-    assert "skill.step.advance" not in _all_text(sub)
-    assert "skill.run.get" not in _all_text(sub)
+    assert "runbook.step.advance" not in _all_text(sub)
+    assert "runbook.run.get" not in _all_text(sub)
     # The control: the orchestrator still gets it, so this is a profile switch and
     # not an accidental deletion.
-    assert "skill.step.advance" in _all_text(main)
+    assert "runbook.step.advance" in _all_text(main)
 
 
-def test_loaded_skills_cache_keys_on_the_step_tracking_variant(
+def test_loaded_runbooks_cache_keys_on_the_step_tracking_variant(
     assembler: PromptAssembler, catalog
 ) -> None:
     """Both variants differ by a paragraph; a key ignoring the flag would serve
     whichever was rendered first to both profiles."""
-    skills = [catalog.skills[0]]
-    with_tracking = assembler.render_loaded_skills(skills, step_tracking=True)
-    without = assembler.render_loaded_skills(skills, step_tracking=False)
+    runbooks = [catalog.runbooks[0]]
+    with_tracking = assembler.render_loaded_runbooks(runbooks, step_tracking=True)
+    without = assembler.render_loaded_runbooks(runbooks, step_tracking=False)
     assert with_tracking != without
     # Re-render in the reverse order: a mis-keyed cache returns the other variant.
-    assert assembler.render_loaded_skills(skills, step_tracking=False) == without
-    assert assembler.render_loaded_skills(skills, step_tracking=True) == with_tracking
+    assert assembler.render_loaded_runbooks(runbooks, step_tracking=False) == without
+    assert assembler.render_loaded_runbooks(runbooks, step_tracking=True) == with_tracking
 
 
 def test_subagent_forwards_json_response_format(assembler: PromptAssembler) -> None:
@@ -401,38 +401,38 @@ def test_subagent_forwards_json_response_format(assembler: PromptAssembler) -> N
     left a caller asking for JSON and getting prose."""
     req = _req(profile="subagent")
     req.generation.response_format = "json_object"
-    out = assembler.build_main_request(request=req, skills=[], upstream_model="m")
+    out = assembler.build_main_request(request=req, runbooks=[], upstream_model="m")
     assert out.response_format == {"type": "json_object"}
 
 
-def test_a_server_pinned_skill_cannot_ride_into_a_subagent_via_prior_state(
+def test_a_server_pinned_runbook_cannot_ride_into_a_subagent_via_prior_state(
     catalog,
 ) -> None:
     """The docs runbook is hidden from selection but declares no required tools, so
     it survives every narrowing. Carrying prior ids with `filter_known` would let a
     replayed assistant state inject it into a profile whose docs lookup is off."""
-    from daintree_assistant_server.config import DOCS_SKILL_ID
+    from daintree_assistant_server.config import DOCS_RUNBOOK_ID
 
     menu = catalog.executable_with([t["function"]["name"] for t in _READ_ONLY_TOOLS])
-    if catalog.get(DOCS_SKILL_ID) is None:
-        pytest.skip("no pinned docs skill in this catalog")
+    if catalog.get(DOCS_RUNBOOK_ID) is None:
+        pytest.skip("no pinned docs runbook in this catalog")
     # It IS known to the narrowed catalog...
-    assert DOCS_SKILL_ID in menu.filter_known([DOCS_SKILL_ID])
+    assert DOCS_RUNBOOK_ID in menu.filter_known([DOCS_RUNBOOK_ID])
     # ...and that is exactly why the carry must use `selectable`, which drops it.
-    assert menu.selectable([DOCS_SKILL_ID]) == []
+    assert menu.selectable([DOCS_RUNBOOK_ID]) == []
 
 
 def test_an_empty_menu_is_measured_over_selectable_ids(catalog) -> None:
-    """`len(catalog)` never reaches 0 while the zero-requirement docs skill exists,
+    """`len(catalog)` never reaches 0 while the zero-requirement docs runbook exists,
     so the skip-the-selector branch would never fire if it counted length."""
     menu = catalog.executable_with(["nothing__at__all"])
-    assert len(menu) >= 1, "the zero-requirement pinned skill should survive"
+    assert len(menu) >= 1, "the zero-requirement pinned runbook should survive"
     assert not menu.selectable_ids, "but nothing should be selectable from it"
 
 
 def test_executable_cache_is_bounded(catalog) -> None:
     """The key is caller-supplied, so an unbounded map is a request-driven leak."""
-    from daintree_assistant_server.skills.catalog import _EXECUTABLE_CACHE_MAX
+    from daintree_assistant_server.runbooks.catalog import _EXECUTABLE_CACHE_MAX
 
     for i in range(_EXECUTABLE_CACHE_MAX * 3):
         catalog.executable_with([f"junk__{i}"])
@@ -478,7 +478,7 @@ def test_a_state_token_records_the_profile_that_resolved_it() -> None:
     A sub-agent's set can hold a specific whose domain foundation was filtered
     out of its menu, and continuation reuse deliberately does not re-pair
     foundations — so an assistant round reusing that token would run a workflow
-    skill with its base judgment layer silently missing. Distinct session ids
+    runbook with its base judgment layer silently missing. Distinct session ids
     make the crossover unreachable for today's CLI, but that is the client's
     property; this asserts the server's.
     """
@@ -489,7 +489,7 @@ def test_a_state_token_records_the_profile_that_resolved_it() -> None:
     )
     token = codec.issue(
         session_id="s",
-        active_skills=["daintree.example.alpha"],
+        active_runbooks=["daintree.example.alpha"],
         catalog_revision="rev1",
         turn_id="t1",
         instruction_revision=0,
@@ -501,7 +501,7 @@ def test_a_state_token_records_the_profile_that_resolved_it() -> None:
 
     assistant_token = codec.issue(
         session_id="s",
-        active_skills=["daintree.example.alpha"],
+        active_runbooks=["daintree.example.alpha"],
         catalog_revision="rev1",
         turn_id="t1",
         instruction_revision=0,
@@ -538,8 +538,8 @@ def test_a_cross_profile_token_forces_a_fresh_selection(orchestrator) -> None:
 # ---------------------------------------------------------------------------
 # Caller pins meet the capability boundary (issue #54).
 #
-# `selection.pinned_skill_ids` overrides the CLASSIFIER. It must not override
-# `executable_with`: the two refusals look the same from outside (the skill did
+# `selection.pinned_runbook_ids` overrides the CLASSIFIER. It must not override
+# `executable_with`: the two refusals look the same from outside (the runbook did
 # not load) but mean opposite things, and only one of them is a bug. A pin is a
 # developer saying "I know better than the router"; a narrowed menu is the server
 # saying "you do not hold the tools these steps call", which no amount of knowing
@@ -563,7 +563,7 @@ async def test_a_subagent_pin_outside_its_menu_is_refused_and_warned(
         catalog = container.orchestrator.catalog
         menu = catalog.executable_with([t["function"]["name"] for t in _READ_ONLY_TOOLS])
         outside = next(
-            (s.id for s in catalog.skills if s.id not in menu),
+            (s.id for s in catalog.runbooks if s.id not in menu),
             None,
         )
         assert outside is not None, "precondition: the menu must exclude something"
@@ -571,21 +571,21 @@ async def test_a_subagent_pin_outside_its_menu_is_refused_and_warned(
             _orchestrator_request(
                 "subagent",
                 tools=_READ_ONLY_TOOLS,
-                selection={"pinned_skill_ids": [outside]},
+                selection={"pinned_runbook_ids": [outside]},
             ),
 
             api_key=SecretStr("k"),
             request_id="req_pin_denied",
         )
         assert outcome.body is not None
-        active = [ref["id"] for ref in outcome.body["skills"]["active"]]
+        active = [ref["id"] for ref in outcome.body["runbooks"]["active"]]
         assert outside not in active, "a pin bypassed the capability boundary"
-        assert "pinned_skill_not_executable" in outcome.body["warnings"], (
+        assert "pinned_runbook_not_executable" in outcome.body["warnings"], (
             "a refused pin that returns a normal-looking turn is the silent failure "
             "this warning exists for"
         )
-        assert "unknown_skill_id_ignored" not in outcome.body["warnings"], (
-            "a KNOWN skill must not be reported as a typo — the two mistakes need "
+        assert "unknown_runbook_id_ignored" not in outcome.body["warnings"], (
+            "a KNOWN runbook must not be reported as a typo — the two mistakes need "
             "different answers"
         )
     finally:
@@ -595,7 +595,7 @@ async def test_a_subagent_pin_outside_its_menu_is_refused_and_warned(
 @pytest.mark.asyncio
 async def test_a_subagent_pin_inside_its_menu_loads(settings, fake_provider) -> None:  # type: ignore[no-untyped-def]
     """The other half. Narrowing must not make pinning useless for the profile —
-    a skill the worker CAN execute is loaded on demand, under the tighter
+    a runbook the worker CAN execute is loaded on demand, under the tighter
     sub-agent cap of two."""
     from pydantic import SecretStr
 
@@ -605,12 +605,12 @@ async def test_a_subagent_pin_inside_its_menu_loads(settings, fake_provider) -> 
     try:
         catalog = container.orchestrator.catalog
         menu = catalog.executable_with([t["function"]["name"] for t in _READ_ONLY_TOOLS])
-        # Explicitly NOT `menu.skills[0]`: catalog order is incidental, and the first
+        # Explicitly NOT `menu.runbooks[0]`: catalog order is incidental, and the first
         # entry can be the selector-hidden docs runbook, which declares no required
         # tools and so survives every narrowing. Pinning that would exercise the
-        # hidden-skill path rather than the capability boundary this test is about.
+        # hidden-runbook path rather than the capability boundary this test is about.
         inside = next(
-            (s.id for s in menu.skills if s.id in menu.selectable_ids and not s.meta.foundation),
+            (s.id for s in menu.runbooks if s.id in menu.selectable_ids and not s.meta.foundation),
             None,
         )
         assert inside is not None, "precondition: the menu must offer a selectable specific"
@@ -618,16 +618,16 @@ async def test_a_subagent_pin_inside_its_menu_loads(settings, fake_provider) -> 
             _orchestrator_request(
                 "subagent",
                 tools=_READ_ONLY_TOOLS,
-                selection={"pinned_skill_ids": [inside]},
+                selection={"pinned_runbook_ids": [inside]},
             ),
 
             api_key=SecretStr("k"),
             request_id="req_pin_ok",
         )
         assert outcome.body is not None
-        active = [ref["id"] for ref in outcome.body["skills"]["active"]]
-        assert inside in active, f"the pinned skill did not load; active={active}"
+        active = [ref["id"] for ref in outcome.body["runbooks"]["active"]]
+        assert inside in active, f"the pinned runbook did not load; active={active}"
         assert len(active) <= 2, "the sub-agent cap still binds a pinned turn"
-        assert "pinned_skill_not_executable" not in outcome.body["warnings"]
+        assert "pinned_runbook_not_executable" not in outcome.body["warnings"]
     finally:
         await container.aclose()

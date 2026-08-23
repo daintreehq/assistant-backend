@@ -1,7 +1,7 @@
 """Shared helpers for the local-selector training scripts.
 
 Text rendering is NOT defined here. It lives in the shipped package
-(``daintree_assistant_server.skills.local.documents``) and is imported below,
+(``daintree_assistant_server.runbooks.local.documents``) and is imported below,
 because the server can never import ``training/`` and therefore cannot be the
 one to follow. Training follows serving, not the other way round: any drift
 between how a conversation is rendered at train time and at request time
@@ -14,7 +14,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from daintree_assistant_server.skills.local.documents import (
+from daintree_assistant_server.runbooks.local.documents import (
     ACTIVE_PREFIX,
     fit_query,
     query_document,

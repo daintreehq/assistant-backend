@@ -33,7 +33,7 @@ from ..text_utils import has_lone_surrogate, utf8_len
 ALLOWED_ROLES = frozenset({"user", "assistant", "tool"})
 FORBIDDEN_ROLES = frozenset({"system", "developer"})
 
-RESERVED_TOOL_NAMES = frozenset({"skill.find", "skill.load", "skill__find", "skill__load"})
+RESERVED_TOOL_NAMES = frozenset({"runbook.find", "runbook.load", "runbook__find", "runbook__load"})
 RESERVED_TOOL_PREFIX = "daintree_internal__"
 
 # OpenAI-wire function names are limited to 64 characters.
@@ -234,7 +234,7 @@ def _validate_message_sequence(messages: list[ChatMessage]) -> None:
     and one that this server, not just the upstream, is damaged by.
 
     That last part is why the check is a state machine rather than the membership
-    test it used to be. `skills/tool_projection._unresolved_tool_calls` builds
+    test it used to be. `runbooks/tool_projection._unresolved_tool_calls` builds
     `{call_id: tool_name}` to decide which tools a continuation round still needs
     offered. Under the old rule a later assistant message could reuse a call id
     that was still unanswered, and that dict silently OVERWRITES the first entry
@@ -391,11 +391,11 @@ def _validate_shape(req: RespondRequest, settings: Settings) -> None:
                 param=f"generation.stop[{i}]",
             )
 
-    pinned = req.selection.pinned_skill_ids
-    if len(pinned) > settings.cap_pinned_skill_ids:
+    pinned = req.selection.pinned_runbook_ids
+    if len(pinned) > settings.cap_pinned_runbook_ids:
         raise request_too_large(
-            f"More than {settings.cap_pinned_skill_ids} skill ids were pinned.",
-            param="selection.pinned_skill_ids",
+            f"More than {settings.cap_pinned_runbook_ids} runbook ids were pinned.",
+            param="selection.pinned_runbook_ids",
         )
 
 

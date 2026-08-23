@@ -41,32 +41,32 @@ async def _prompt_request(
     messages: list[dict[str, Any]],
     stream: bool,
     json_mode: bool = False,
-    skills: list[Any] | None = None,
+    runbooks: list[Any] | None = None,
 ) -> Any:
     """Assemble a real provider request, then clamp completion to bound cost — the
     prompt (what we measure) is untouched.
 
-    ``skills`` selects the active set, which is what the topic-shift sequence varies: the
-    skill block is the first non-system message, so shifting it is what breaks the
+    ``runbooks`` selects the active set, which is what the topic-shift sequence varies: the
+    runbook block is the first non-system message, so shifting it is what breaks the
     reusable prefix. Passing it through the assembler rather than editing the
     assembled array afterwards keeps the row identification the assembler's job —
     surgery on "the first non-system message" would silently target the
     integrations or startup row if the set were ever empty.
     """
     from daintree_assistant_server.prompts.loader import PromptLoader
+    from daintree_assistant_server.runbooks.catalog import load_catalog
     from daintree_assistant_server.services.prompt_assembler import PromptAssembler
-    from daintree_assistant_server.skills.catalog import load_catalog
 
     assembler = PromptAssembler(PromptLoader(), settings)
-    if skills is None:
-        skills = list(load_catalog().skills[:2])
-    if not skills:
-        raise ValueError("an empty skill set would move the first non-system row")
+    if runbooks is None:
+        runbooks = list(load_catalog().runbooks[:2])
+    if not runbooks:
+        raise ValueError("an empty runbook set would move the first non-system row")
     req = build_respond_request(messages=messages, with_tools=not json_mode, stream=stream)
     if json_mode:
         gen = req.generation.model_copy(update={"response_format": "json_object"})
         req = req.model_copy(update={"generation": gen})
-    pr = assembler.build_main_request(request=req, skills=skills, upstream_model=SERVING_MODEL)
+    pr = assembler.build_main_request(request=req, runbooks=runbooks, upstream_model=SERVING_MODEL)
     pr.max_tokens = 8  # bound completion cost; prompt tokens are the measurement
     pr.stream = stream
     pr.include_usage = stream
@@ -160,19 +160,19 @@ async def _composed_first_byte(settings: Settings, trials: int) -> dict[str, Any
     return {"trials": trials, "first_byte": latency_summary(first_byte)}
 
 
-#: Skills per turn, and turns per sequence. Six consecutive skills, walked two at
+#: Runbooks per turn, and turns per sequence. Six consecutive runbooks, walked two at
 #: a time, so each turn presents a topic shift to the one before it.
-_SHIFT_SKILLS_PER_TURN = 2
+_SHIFT_RUNBOOKS_PER_TURN = 2
 _SHIFT_TURNS = 3
-_SHIFT_SPAN = _SHIFT_SKILLS_PER_TURN * _SHIFT_TURNS
+_SHIFT_SPAN = _SHIFT_RUNBOOKS_PER_TURN * _SHIFT_TURNS
 
 
 async def _topic_shift_sequence(
     provider: Any, settings: Settings, *, offset: int
 ) -> list[dict[str, Any]]:
-    """One session's worth of turns, SHIFTING the active skill set between them.
+    """One session's worth of turns, SHIFTING the active runbook set between them.
 
-    That shift is the whole experiment. The skill block is the first non-system
+    That shift is the whole experiment. The runbook block is the first non-system
     message, so changing it invalidates everything below while the invariant head
     above it — base prompt, response contract, tool schemas — stays perfectly
     reusable. What the sequence measures is how much of a request survives a
@@ -181,20 +181,20 @@ async def _topic_shift_sequence(
     ``offset`` picks this run's slice of the catalog, so consecutive runs do not
     simply re-read each other's warm prefixes.
     """
-    from daintree_assistant_server.skills.catalog import load_catalog
+    from daintree_assistant_server.runbooks.catalog import load_catalog
 
     catalog = load_catalog()
     windows = [
-        list(catalog.skills[i : i + _SHIFT_SKILLS_PER_TURN])
-        for i in range(offset, offset + _SHIFT_SPAN, _SHIFT_SKILLS_PER_TURN)
+        list(catalog.runbooks[i : i + _SHIFT_RUNBOOKS_PER_TURN])
+        for i in range(offset, offset + _SHIFT_SPAN, _SHIFT_RUNBOOKS_PER_TURN)
     ]
     calls: list[dict[str, Any]] = []
-    for turn, skills in enumerate(windows):
+    for turn, runbooks in enumerate(windows):
         pr = await _prompt_request(
             settings,
             messages=[{"role": "user", "content": f"Prepare this branch for review ({turn})."}],
             stream=False,
-            skills=skills,
+            runbooks=runbooks,
         )
         result = await provider.complete(pr)
         calls.append({
@@ -239,7 +239,7 @@ def _summarize_topic_shift(calls: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 async def _topic_shift_reuse(settings: Settings) -> dict[str, Any]:
-    """How much of a request survives a skill topic shift, live.
+    """How much of a request survives a runbook topic shift, live.
 
     **This replaces the issue #42 cache-affinity A/B, which measured nothing.**
     That experiment ran the sequence twice — once setting ``cache_session_id``,
@@ -253,26 +253,26 @@ async def _topic_shift_reuse(settings: Settings) -> dict[str, Any]:
 
     What is left is the half that was always doing the work: one sequential
     session at concurrency one, well inside the upstream's prefix-cache TTL
-    (Together guarantees 5 minutes, often longer), shifting skills every turn.
+    (Together guarantees 5 minutes, often longer), shifting runbooks every turn.
 
     The limit worth stating rather than papering over: Together matches prefixes
     ORG-WIDE, so any traffic from this account — another bench, a dev server, a
-    real turn — can have warmed the same base prompt and skill blocks already.
+    real turn — can have warmed the same base prompt and runbook blocks already.
     The only freshness available is the offset, and the catalog affords a couple
     of dozen positions, so a rerun is not guaranteed cold. Space runs beyond the
     cache TTL if independence matters.
 
-    What remains shared in every case is the invariant head above the skill block
+    What remains shared in every case is the invariant head above the runbook block
     (base prompt, response contract, tool schemas). That is not a confound to
     remove: it is shared by every Daintree request in existence, so the sequence
     meets it warm, which is exactly the condition the served fleet is in.
     """
-    from daintree_assistant_server.skills.catalog import load_catalog
+    from daintree_assistant_server.runbooks.catalog import load_catalog
 
     run = uuid.uuid4().hex[:12]
     # `positions` counts valid STARTS, so it is the slack plus one: a catalog of
     # exactly one span fits, at the single offset 0.
-    positions = len(load_catalog().skills) - _SHIFT_SPAN + 1
+    positions = len(load_catalog().runbooks) - _SHIFT_SPAN + 1
     if positions < 1:
         raise ValueError("catalog too small for a topic-shift sequence")
     offset = int(run[:8], 16) % positions

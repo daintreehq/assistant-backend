@@ -69,7 +69,7 @@ async def capabilities(
             # geometry until it sees this flag. Which is why nothing breaks in
             # either rollout order.
             "display_context": True,
-            "max_active_skills": settings.max_active_skills,
+            "max_active_runbooks": settings.max_active_runbooks,
             "metadata_transport": "body+stream_meta_event",
             # What a request cost, when the upstream says. `total` sums every
             # upstream call the request made that we could observe — the main
@@ -101,42 +101,42 @@ async def capabilities(
                 "total_may_be_incomplete": True,
             },
         },
-        "skills": {
+        "runbooks": {
             "catalog_revision": catalog.revision,
             "manual_resolve": True,
-            # `selection.pinned_skill_ids` — skills the caller requires this turn,
+            # `selection.pinned_runbook_ids` — runbooks the caller requires this turn,
             # admitted ahead of the classifier's own picks. A GATE for the same
             # reason as `display_context` above: `Selection` is extra="forbid", so
             # sending the field to a deployment that predates it 422s the whole turn
             # before the model runs. The CLI withholds it until it sees this.
-            "pinned_skill_ids": True,
-            # Every skill the catalog holds, as the minimal {id, title} reference.
-            # A client naming a skill — a CLI flag, a manual `resolve` load — can
+            "pinned_runbook_ids": True,
+            # Every runbook the catalog holds, as the minimal {id, title} reference.
+            # A client naming a runbook — a CLI flag, a manual `resolve` load — can
             # now check the id BEFORE it spends a turn, and offer near misses. The
             # server is not silent about a bad id (`load` warns
-            # `unknown_skill_id_ignored`), but that arrives after the turn ran, in
+            # `unknown_runbook_id_ignored`), but that arrives after the turn ran, in
             # a response field, with no idea what the user meant; preflight is a
             # different thing from a post-hoc warning.
             #
             # Cache it against `catalog_revision` above — same snapshot. That is
-            # CONSERVATIVE rather than exact: the revision hashes every skill's
+            # CONSERVATIVE rather than exact: the revision hashes every runbook's
             # metadata AND body, so a body-only edit moves it while this list stays
             # byte-identical. Re-fetching more often than strictly needed is the
             # right side to err on for a ~3.5KB array, and a second revision
             # covering only ids and titles would be a version to maintain.
             #
-            # Minimal on purpose. `/v1/daintree/skills` already serves the full
+            # Minimal on purpose. `/v1/daintree/runbooks` already serves the full
             # metadata (summary, when_to_use, risk, required_tools) with an ETag;
             # repeating ~53KB of it here would make every capabilities call pay for
             # what validation does not read. Ordering is deterministic for free —
-            # `Catalog.skills` is sorted by id at construction.
+            # `Catalog.runbooks` is sorted by id at construction.
             #
             # The CANONICAL catalog, not a menu: capabilities carries neither a
             # profile nor a tool inventory, so it cannot honestly narrow to what a
-            # sub-agent could execute. Server-pinned skills are included because
+            # sub-agent could execute. Server-pinned runbooks are included because
             # manual `load` accepts them (`filter_known`, not `selectable_ids`) —
             # a listing that hid them would lie about what the client may name.
-            "catalog": [skill.ref() for skill in catalog.skills],
+            "catalog": [runbook.ref() for runbook in catalog.runbooks],
         },
         # Daintree usage questions are answered HERE now: the server classifies
         # them on the selector call it already makes, searches the public docs
@@ -146,11 +146,11 @@ async def capabilities(
         # two ways to answer the same question and use both.
         #
         # `prelude_tool` is what the search surfaces as: an ordinary entry in
-        # `skills.prelude.tool_executions`, the same channel a skill load rides.
+        # `runbooks.prelude.tool_executions`, the same channel a runbook load rides.
         #
         # NOT a claim that it is visible. The CLI decodes `prelude` and does not
-        # render it — a newly-active skill reaches the model as body text in the
-        # loaded-skills block rather than as a replayed tool call, which
+        # render it — a newly-active runbook reaches the model as body text in the
+        # loaded-runbooks block rather than as a replayed tool call, which
         # left the prelude vestigial on that side. So a server-side docs lookup is
         # currently INVISIBLE to the user; the field says where it would appear if
         # a client chose to show it, not that one does.

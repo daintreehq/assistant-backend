@@ -31,25 +31,25 @@ from daintree_assistant_server.contracts.extensions import (
     WorktreeSnapshot,
 )
 from daintree_assistant_server.prompts.loader import PromptLoader
+from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
+from daintree_assistant_server.runbooks.load_events import RunbookLoadExecution
 from daintree_assistant_server.services.docs_mcp import DocsLookup, DocsSection
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from daintree_assistant_server.services.task_runner import build_profiles
-from daintree_assistant_server.skills.catalog import Catalog, load_catalog
-from daintree_assistant_server.skills.load_events import SkillLoadExecution
 
 SNAPSHOTS = Path(__file__).parent / "snapshots"
 
 # The catalog-dependent snapshots render against a PINNED fixture catalog, not the
-# live one, so the self-evolving skill catalog (the local skill-learning harness
-# writing/improving real skill files) never reddens these goldens. What they still
+# live one, so the self-evolving runbook catalog (the local runbook-learning harness
+# writing/improving real runbook files) never reddens these goldens. What they still
 # protect is the prompt/assembler behavior: template wording, field layout, the
 # active marker, and message ordering. Real-catalog coverage lives in behavioral
 # tests plus the structural smoke test below.
-FIXTURE_SKILLS = Path(__file__).parent / "fixtures" / "skills"
+FIXTURE_RUNBOOKS = Path(__file__).parent / "fixtures" / "runbooks"
 
 
 def _fixture_catalog() -> Catalog:
-    return load_catalog(FIXTURE_SKILLS)
+    return load_catalog(FIXTURE_RUNBOOKS)
 
 
 def _settings() -> Settings:
@@ -241,30 +241,30 @@ def test_integrations_empty_when_nothing_supplied(assembler: PromptAssembler) ->
     assert assembler.render_integrations(RuntimeContext()) == ""
 
 
-def test_loaded_skills_empty(assembler: PromptAssembler) -> None:
-    assert_golden("loaded_skills_empty.md", assembler.render_loaded_skills([]))
+def test_loaded_runbooks_empty(assembler: PromptAssembler) -> None:
+    assert_golden("loaded_runbooks_empty.md", assembler.render_loaded_runbooks([]))
 
 
-def test_loaded_skills_one(assembler: PromptAssembler) -> None:
-    skill = _fixture_catalog().get("daintree.example.alpha")
-    assert_golden("loaded_skills_alpha.md", assembler.render_loaded_skills([skill]))
+def test_loaded_runbooks_one(assembler: PromptAssembler) -> None:
+    runbook = _fixture_catalog().get("daintree.example.alpha")
+    assert_golden("loaded_runbooks_alpha.md", assembler.render_loaded_runbooks([runbook]))
 
 
-def test_loaded_skills_foundation_and_workflow(assembler: PromptAssembler) -> None:
-    """Two skills, which is the ONLY rendering that emits the layering paragraph.
+def test_loaded_runbooks_foundation_and_workflow(assembler: PromptAssembler) -> None:
+    """Two runbooks, which is the ONLY rendering that emits the layering paragraph.
 
-    That paragraph — how a domain foundation and a workflow skill combine, and
+    That paragraph — how a domain foundation and a workflow runbook combine, and
     the rule against interleaving two procedures — is guarded by `{% if
-    loaded_skills | length > 1 %}` and so appears in neither the empty nor the
-    one-skill snapshot. It was edited (the instruction-precedence clause moved to
-    `main/base/30-skills.md`) with no golden covering a single byte of it, and
+    loaded_runbooks | length > 1 %}` and so appears in neither the empty nor the
+    one-runbook snapshot. It was edited (the instruction-precedence clause moved to
+    `main/base/30-runbooks.md`) with no golden covering a single byte of it, and
     the only other test touching it asserts the literal string "Layering:" is
     present. The fixture catalog already carries the right pair: alpha is
-    `foundation: true`, beta is an ordinary workflow skill.
+    `foundation: true`, beta is an ordinary workflow runbook.
     """
     catalog = _fixture_catalog()
     pair = [catalog.get("daintree.example.alpha"), catalog.get("daintree.example.beta")]
-    assert_golden("loaded_skills_pair.md", assembler.render_loaded_skills(pair))
+    assert_golden("loaded_runbooks_pair.md", assembler.render_loaded_runbooks(pair))
 
 
 def test_turn_footer(assembler: PromptAssembler) -> None:
@@ -364,7 +364,7 @@ def test_response_contract_is_final_system_message(
     # hoisted into DeepSeek's system region and busts the tools+conversation cache).
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "hi"}]},
             "startup": _startup_payload(),
@@ -374,12 +374,12 @@ def test_response_contract_is_final_system_message(
             },
         }
     )
-    # Skills AND integrations are supplied deliberately: with both absent the
+    # Runbooks AND integrations are supplied deliberately: with both absent the
     # count-of-two assertion below holds under the OLD layout too, and would prove
     # nothing. These are exactly the two blocks issue #39 moved out of the system
     # region, so the request has to contain them for the check to bite.
     pr = assembler.build_main_request(
-        request=req, skills=[catalog.skills[0]], upstream_model="m"
+        request=req, runbooks=[catalog.runbooks[0]], upstream_model="m"
     )
     system_msgs = [m for m in pr.messages if m["role"] == "system"]
     last_system = system_msgs[-1]
@@ -408,10 +408,10 @@ def test_task_prompts(loader: PromptLoader, task_id: str) -> None:
 
 
 def test_full_upstream_messages(assembler: PromptAssembler) -> None:
-    skill = _fixture_catalog().get("daintree.example.alpha")
+    runbook = _fixture_catalog().get("daintree.example.alpha")
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
             "startup": _startup_payload(),
@@ -433,7 +433,7 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     )
     pr = assembler.build_main_request(
         request=req,
-        skills=[skill],
+        runbooks=[runbook],
         upstream_model="deepseek-v4-flash",
     )
     snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
@@ -445,15 +445,15 @@ def test_full_upstream_messages_subagent(assembler: PromptAssembler) -> None:
 
     This is the assertion the unit tests cannot make: that the ONLY system row is
     the persona (anything else would hoist above the tool schemas and bust their
-    cache), that the skill body and startup rows sit below it in that order, and
+    cache), that the runbook body and startup rows sit below it in that order, and
     that the orchestrator's integrations, runtime, turn-footer and response-contract
     rows are absent rather than merely untested. Same request shape as the
     assistant snapshot above, so the two diff against each other by eye.
     """
-    skill = _fixture_catalog().get("daintree.example.alpha")
+    runbook = _fixture_catalog().get("daintree.example.alpha")
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "profile": "subagent",
             "session": {"id": "s", "turn_id": "t"},
             "input": {
@@ -480,7 +480,7 @@ def test_full_upstream_messages_subagent(assembler: PromptAssembler) -> None:
     )
     pr = assembler.build_main_request(
         request=req,
-        skills=[skill],
+        runbooks=[runbook],
         upstream_model="deepseek-v4-flash",
     )
     snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
@@ -490,10 +490,10 @@ def test_full_upstream_messages_subagent(assembler: PromptAssembler) -> None:
 def test_full_upstream_messages_with_open_terminals(assembler: PromptAssembler) -> None:
     # The open-terminal inventory must reach the assembled upstream request in the
     # volatile per-request tail (runtime context), not just render in isolation.
-    skill = _fixture_catalog().get("daintree.example.alpha")
+    runbook = _fixture_catalog().get("daintree.example.alpha")
     req = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
             "startup": _startup_payload(),
@@ -527,7 +527,7 @@ def test_full_upstream_messages_with_open_terminals(assembler: PromptAssembler) 
     )
     pr = assembler.build_main_request(
         request=req,
-        skills=[skill],
+        runbooks=[runbook],
         upstream_model="deepseek-v4-flash",
     )
     snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
@@ -535,8 +535,8 @@ def test_full_upstream_messages_with_open_terminals(assembler: PromptAssembler) 
 
 
 def test_synthetic_execution_shape() -> None:
-    skill = _fixture_catalog().get("daintree.example.alpha")
-    ex = SkillLoadExecution.from_skill("call_srv_GOLDEN", skill)
+    runbook = _fixture_catalog().get("daintree.example.alpha")
+    ex = RunbookLoadExecution.from_runbook("call_srv_GOLDEN", runbook)
     prelude = ex.prelude_execution().model_dump()
     snapshot = json.dumps(prelude, indent=2, ensure_ascii=False)
     assert_golden("prelude_execution.json", snapshot)

@@ -13,10 +13,10 @@ import json
 
 from benchmarks.prompt_cost.tool_schemas import _INVENTORY, run_report
 from daintree_assistant_server.contracts.openai import FunctionDef, ToolDef
-from daintree_assistant_server.skills.catalog import load_catalog
-from daintree_assistant_server.skills.tool_projection import (
+from daintree_assistant_server.runbooks.catalog import load_catalog
+from daintree_assistant_server.runbooks.tool_projection import (
     ALWAYS_AVAILABLE,
-    SKILL_SCAFFOLD_TOOLS,
+    RUNBOOK_SCAFFOLD_TOOLS,
     project_tools,
     tools_bytes,
     wire_name,
@@ -26,15 +26,15 @@ from daintree_assistant_server.skills.tool_projection import (
 #: the implementation's own `_TIERS` made every ordering assertion circular:
 #: reordering the constant and letting the sorter follow it passed unchanged,
 #: which is exactly the reclassification these tests exist to catch.
-EXPECTED_TIERS = ("always", "scaffold", "undeclared", "foundation", "skill")
+EXPECTED_TIERS = ("always", "scaffold", "undeclared", "foundation", "runbook")
 
 
 def test_every_core_tool_is_classified_as_core() -> None:
     """The spelling bug that motivated this test.
 
-    Both sets are written dotted (`fs.read`) because that is the form a skill's
+    Both sets are written dotted (`fs.read`) because that is the form a runbook's
     `requiredTools` uses; the CLI inventory carries the wire form (`fs__read`).
-    Compared raw, EVERY core tool fell through to the `skill` tier — which put
+    Compared raw, EVERY core tool fell through to the `runbook` tier — which put
     the one tier paid on every single request at the bottom of the audit order
     and reported the never-withholdable floor as 4.2% of the inventory instead
     of ~28%. Nothing failed; the report simply pointed the wrong way.
@@ -46,7 +46,7 @@ def test_every_core_tool_is_classified_as_core() -> None:
         name = wire_name(dotted)
         if name in tiers:  # a core tool the pinned inventory predates
             assert tiers[name] == "always", name
-    for dotted in SKILL_SCAFFOLD_TOOLS:
+    for dotted in RUNBOOK_SCAFFOLD_TOOLS:
         name = wire_name(dotted)
         if name in tiers:
             assert tiers[name] == "scaffold", name
@@ -62,39 +62,39 @@ def test_the_report_ranks_by_reach_before_size() -> None:
 
     Two labels can mean identical exposure — `always` and `undeclared` reach
     every request by opposite arguments, and `scaffold` and `foundation` both
-    reach every skill-bearing turn — while one tier (`skill`) spans everything
+    reach every runbook-bearing turn — while one tier (`runbook`) spans everything
     from one declarer to twenty. Ranking on the label put a tool offered on
-    every request below one that needs an active skill.
+    every request below one that needs an active runbook.
     """
     rows = run_report()["tools"]
     keys = [
-        (not row["offered_on_skill_less_turns"], -row["reach"], -row["schema_bytes"])
+        (not row["offered_on_runbook_less_turns"], -row["reach"], -row["schema_bytes"])
         for row in rows
     ]
     assert keys == sorted(keys), "rows are not in reach-then-size order"
 
-    universal = [r for r in rows if r["offered_on_skill_less_turns"]]
+    universal = [r for r in rows if r["offered_on_runbook_less_turns"]]
     assert {r["tier"] for r in universal} == {"always", "undeclared"}, (
         "the widest rank must be exactly the tiers projection can never withhold"
     )
     assert rows[: len(universal)] == universal, "a narrower tool outranks a universal one"
 
 
-def test_reach_counts_the_skills_that_would_actually_admit_a_tool() -> None:
+def test_reach_counts_the_runbooks_that_would_actually_admit_a_tool() -> None:
     """Derived from the admission rules, not assumed from a label.
 
     A foundation's tools are admitted alongside every specific in its namespace,
-    so their reach is the namespace, not the one skill that declares them.
+    so their reach is the namespace, not the one runbook that declares them.
     """
     rows = {row["name"]: row for row in run_report()["tools"]}
     catalog = load_catalog()
-    foundation = next((s for s in catalog.skills if s.meta.foundation), None)
+    foundation = next((s for s in catalog.runbooks if s.meta.foundation), None)
     assert foundation is not None, "no foundation — this test needs rewriting"
 
     paired = sum(
         1
-        for skill in catalog.skills
-        if catalog.domain_foundation(skill.id) == foundation.id and skill.id != foundation.id
+        for runbook in catalog.runbooks
+        if catalog.domain_foundation(runbook.id) == foundation.id and runbook.id != foundation.id
     )
     assert paired > 1, "the foundation pairs with nothing; reach cannot be checked"
 
@@ -103,13 +103,13 @@ def test_reach_counts_the_skills_that_would_actually_admit_a_tool() -> None:
         if row is None or row["tier"] != "foundation":
             continue  # core tools outrank the foundation label; see `_tier`
         assert row["reach"] >= paired, (
-            f"{row['name']} reaches {row['reach']} skills but its foundation pairs "
+            f"{row['name']} reaches {row['reach']} runbooks but its foundation pairs "
             f"with {paired}"
         )
-        assert row["reach"] > row["declaring_skills"]
+        assert row["reach"] > row["declaring_runbooks"]
 
 
-def test_the_universal_rows_are_exactly_what_a_skill_less_turn_proposes() -> None:
+def test_the_universal_rows_are_exactly_what_a_runbook_less_turn_proposes() -> None:
     """Cross-checked against `project_tools` itself rather than re-derived here.
 
     The report reimplements the admission rules to rank by them, and a
@@ -133,15 +133,15 @@ def test_the_universal_rows_are_exactly_what_a_skill_less_turn_proposes() -> Non
         for entry in inventory
     ]
     projected = project_tools(
-        active_skills=[], catalog=catalog, offered=offered, messages=[]
+        active_runbooks=[], catalog=catalog, offered=offered, messages=[]
     )
 
     doc = run_report()
-    universal = {r["name"] for r in doc["tools"] if r["offered_on_skill_less_turns"]}
+    universal = {r["name"] for r in doc["tools"] if r["offered_on_runbook_less_turns"]}
     assert universal == set(projected.proposed), (
-        "the report's skill-less set disagrees with project_tools"
+        "the report's runbook-less set disagrees with project_tools"
     )
-    assert doc["summary"]["skill_less_floor_bytes"] == tools_bytes(
+    assert doc["summary"]["runbook_less_floor_bytes"] == tools_bytes(
         [t for t in inventory if (t.get("function") or {}).get("name") in universal]
     )
 
@@ -164,15 +164,15 @@ def test_the_totals_agree_with_the_aggregate_everything_else_measures() -> None:
 
 def test_a_foundation_tool_outranks_a_single_runbook_tool() -> None:
     """Admission pairs every selected specific with its domain foundation, so a
-    foundation's declared tools ride nearly every skill-bearing turn — 38 of 39
-    skills point at one foundation today. Ranking them beside a tool one runbook
+    foundation's declared tools ride nearly every runbook-bearing turn — 38 of 39
+    runbooks point at one foundation today. Ranking them beside a tool one runbook
     declares understates them by an order of magnitude, which is exactly the
     mis-aim this report exists to prevent."""
     doc = run_report()
     tiers = [row["tier"] for row in doc["tools"]]
     assert "foundation" in tiers, "no foundation tools — the pairing rule changed"
     assert tiers.index("foundation") < (
-        tiers.index("skill") if "skill" in tiers else len(tiers)
+        tiers.index("runbook") if "runbook" in tiers else len(tiers)
     )
     assert doc["summary"]["by_tier"]["foundation"]["bytes"] > 0
 
@@ -186,11 +186,11 @@ def test_every_tier_is_accounted_for() -> None:
     assert {row["tier"] for row in doc["tools"]} <= set(EXPECTED_TIERS)
 
 
-def test_declaring_skills_is_the_count_of_declared_by() -> None:
+def test_declaring_runbooks_is_the_count_of_declared_by() -> None:
     """The count is what the table prints and the list is what a reader follows;
     they are two views of one fact and must not drift."""
     for row in run_report()["tools"]:
-        assert row["declaring_skills"] == len(row["declared_by"])
+        assert row["declaring_runbooks"] == len(row["declared_by"])
         assert row["declared_by"] == sorted(row["declared_by"])
         # An undeclared tool is undeclared by definition — that is the tier's
         # whole meaning, and projection never withholds one.

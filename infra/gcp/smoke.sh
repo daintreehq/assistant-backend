@@ -90,10 +90,10 @@ fi
 
 code="$(req "$URL/readyz")"; load_body
 if [ "$code" = "200" ] && [ "$(jq_field "$BODY" status)" = "ready" ]; then
-  pass "/readyz is ready ($(jq_field "$BODY" skills) skills, catalog $(jq_field "$BODY" catalog_revision))"
+  pass "/readyz is ready ($(jq_field "$BODY" runbooks) runbooks, catalog $(jq_field "$BODY" catalog_revision))"
 else
   # A 503 here is a configuration failure — a missing or weak secret, a
-  # malformed prompt template, an unparseable skill file. Production withholds
+  # malformed prompt template, an unparseable runbook file. Production withholds
   # the reason, so the detail is in the Cloud Run logs.
   fail "/readyz returned $code" "$BODY"
   echo "        gcloud run services logs read $SERVICE --region=$REGION --project=$PROJECT --limit=50"
@@ -146,13 +146,13 @@ if true; then
     fail "/v1/daintree/capabilities returned $code" "$BODY"
   fi
 
-  code="$(req "${AUTH[@]}" "$URL/v1/daintree/skills")"; load_body
+  code="$(req "${AUTH[@]}" "$URL/v1/daintree/runbooks")"; load_body
   if [ "$code" = "200" ]; then
     n="$(printf '%s' "$BODY" | python3 -c "import json,sys
 print(len(json.load(sys.stdin).get('data', [])))" 2>/dev/null)"
-    pass "/v1/daintree/skills lists ${n:-?} skills (catalog metadata only, never bodies)"
+    pass "/v1/daintree/runbooks lists ${n:-?} runbooks (catalog metadata only, never bodies)"
   else
-    fail "/v1/daintree/skills returned $code" "$BODY"
+    fail "/v1/daintree/runbooks returned $code" "$BODY"
   fi
 
   # The sign-in probe. Free — a tokenless key introspection against the provider,
@@ -197,7 +197,7 @@ else:
   # sends a body the current build parses so a 426 can only come from the header.
   for path in respond tasks; do
     case "$path" in
-      respond) payload='{"protocol_version":2,"session":{"id":"smoke-426","turn_id":"t"},"startup":{},"input":{"messages":[{"role":"user","content":"hi"}]}}' ;;
+      respond) payload='{"protocol_version":3,"session":{"id":"smoke-426","turn_id":"t"},"startup":{},"input":{"messages":[{"role":"user","content":"hi"}]}}' ;;
       tasks)   payload='{"task":"terminal_judge","input":{"question":"q","tail":"t"}}' ;;
     esac
     code="$(req "${AUTH[@]}" -X POST "$URL/v1/daintree/$path" \
@@ -242,7 +242,7 @@ print((json.load(sys.stdin).get('error') or {}).get('code',''))" 2>/dev/null)"
     head_ "Real model turns (these spend money on your key)"
 
     read -r -d '' PAYLOAD <<'JSON'
-{"protocol_version":2,
+{"protocol_version":3,
  "session":{"id":"smoke-test","turn_id":"turn-1"},
  "startup":{},
  "input":{"messages":[{"role":"user","content":"Reply with exactly: OK"}]}}
@@ -257,8 +257,8 @@ m=d.get('message') or {}
 print((m.get('content') or '')[:60].replace(chr(10),' '))" 2>/dev/null)"
       active="$(printf '%s' "$BODY" | python3 -c "import json,sys
 d=json.load(sys.stdin)
-print(','.join(s.get('id','') for s in (d.get('skills') or {}).get('active', [])) or 'none')" 2>/dev/null)"
-      pass "POST /v1/daintree/respond -> \"$reply\" (active skills: $active)"
+print(','.join(s.get('id','') for s in (d.get('runbooks') or {}).get('active', [])) or 'none')" 2>/dev/null)"
+      pass "POST /v1/daintree/respond -> \"$reply\" (active runbooks: $active)"
     else
       # A 502 here points at the SERVER's credential, not the caller's: an
       # invalid or unfunded TOGETHER_API_KEY surfaces as the upstream's rejection
@@ -267,13 +267,13 @@ print(','.join(s.get('id','') for s in (d.get('skills') or {}).get('active', [])
     fi
 
     # Streaming matters enough to check separately: the first event must be
-    # `meta` (the skills block), which the CLI relies on to show a skill loading
+    # `meta` (the runbooks block), which the CLI relies on to show a runbook loading
     # while the model is still generating.
     stream_out="$(mktemp)"
     TIMEOUT=180
     curl -sS --max-time 180 "${AUTH[@]}" -X POST "$URL/v1/daintree/respond" \
       -H 'content-type: application/json' \
-      -d '{"protocol_version":2,"session":{"id":"smoke-test","turn_id":"turn-2"},"startup":{},"generation":{"stream":true},"input":{"messages":[{"role":"user","content":"Reply with exactly: OK"}]}}' \
+      -d '{"protocol_version":3,"session":{"id":"smoke-test","turn_id":"turn-2"},"startup":{},"generation":{"stream":true},"input":{"messages":[{"role":"user","content":"Reply with exactly: OK"}]}}' \
       > "$stream_out" 2>/dev/null
     first_event="$(grep -m1 '^event:' "$stream_out" | sed 's/^event: *//')"
     if [ "$first_event" = "meta" ] && grep -q '^event: *done' "$stream_out"; then

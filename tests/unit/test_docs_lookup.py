@@ -59,7 +59,7 @@ def _serving(*hits: dict[str, Any]) -> DocsMcpClient:
 def _request(session_id: str = "docs-session") -> RespondRequest:
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": session_id, "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "how do I make a worktree?"}]},
             "startup": {},
@@ -75,7 +75,7 @@ def _asking(fake_provider: FakeProvider, query: str | None = "create worktree") 
             {
                 "task_type": "product question",
                 "reason": "asking how a feature works",
-                "skill_ids": [],
+                "runbook_ids": [],
                 "confidence": 0.9,
                 "docs_query": query,
             }
@@ -147,7 +147,7 @@ async def test_the_search_is_surfaced_to_the_cli_as_a_prelude(
     _asking(fake_provider)
     outcome = await _run(orchestrator)
 
-    executions = outcome.body["skills"]["prelude"]["tool_executions"]
+    executions = outcome.body["runbooks"]["prelude"]["tool_executions"]
     docs = [e for e in executions if e["display_name"] == "docs.search"]
     assert len(docs) == 1
     assert docs[0]["call"]["function"]["name"] == "docs__search"
@@ -200,7 +200,7 @@ async def test_an_ordinary_turn_makes_no_docs_call(
 
     assert called == []
     assert "daintree_docs" not in _sent_messages(fake_provider)[-1]["content"]
-    executions = outcome.body["skills"]["prelude"]["tool_executions"]
+    executions = outcome.body["runbooks"]["prelude"]["tool_executions"]
     assert [e for e in executions if e["display_name"] == "docs.search"] == []
 
 
@@ -244,7 +244,7 @@ async def test_a_failing_docs_server_costs_the_turn_its_docs_not_the_turn(
 
     assert outcome.body["message"]["content"] == "Use the Create Worktree button."
     assert "daintree_docs" not in _sent_messages(fake_provider)[-1]["content"]
-    executions = outcome.body["skills"]["prelude"]["tool_executions"]
+    executions = outcome.body["runbooks"]["prelude"]["tool_executions"]
     assert [e for e in executions if e["display_name"] == "docs.search"] == []
 
 
@@ -388,7 +388,7 @@ def _continuation(state: str, session_id: str = "docs-session") -> RespondReques
     """The tool-result round of the SAME turn: same turn_id, tool output appended."""
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": session_id, "turn_id": "turn-1"},
             "input": {
                 "messages": [
@@ -472,7 +472,7 @@ async def test_a_new_turn_does_not_inherit_the_previous_docs_query(
     _asking(fake_provider, None)
     follow_up = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "docs-session", "turn_id": "turn-2"},
             "input": {"messages": [{"role": "user", "content": "now run the tests"}]},
             "startup": {},
@@ -512,7 +512,7 @@ async def test_a_mid_turn_interjection_does_not_inherit_the_docs_query(
     _asking(fake_provider, None)  # re-run selector: not a docs question
     interjection = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {
                 "id": "docs-session",
                 "turn_id": "turn-1",  # SAME turn...
@@ -548,7 +548,7 @@ async def test_a_re_run_selector_can_turn_the_lookup_off_mid_turn(
     _asking(fake_provider, None)
     forced = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "docs-session", "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "how do I share a terminal?"}]},
             "startup": {},
@@ -583,7 +583,7 @@ async def test_a_degraded_selector_keeps_the_turns_documentation(
     fake_provider.complete_result = make_result(content="answering with the docs")
     forced = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "docs-session", "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "how do I share a terminal?"}]},
             "startup": {},
@@ -593,7 +593,7 @@ async def test_a_degraded_selector_keeps_the_turns_documentation(
         }
     )
     outcome = await _run(orchestrator, forced)
-    assert outcome.body["skills"]["selector"]["degraded"] is True
+    assert outcome.body["runbooks"]["selector"]["degraded"] is True
     assert "daintree_docs" in _sent_messages(fake_provider)[-1]["content"]
 
 

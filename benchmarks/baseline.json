@@ -1,8 +1,8 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:b34f4ef5b13b6af1a480a8e92129d6af9697297fc95acdd25d7b1d5d7f127695",
-    "skills": 39
+    "revision": "sha256:18679167537c58fc21812272c1b6ff87bbd6b8bcce28d7e6825a5a65aeb93631",
+    "runbooks": 39
   },
   "identity": {
     "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
@@ -10,8 +10,8 @@
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 24795,
-    "skill_body_bytes_total": 290532,
+    "base_prompt_bytes": 24813,
+    "runbook_body_bytes_total": 290592,
     "subagent_prompt_bytes": 5375
   },
   "selector": {
@@ -20,11 +20,11 @@
     "routing_revision_at_train": "routing:94a3c1a6da09478b843b9b1b57d48095",
     "routing_revision_matches_catalog": false,
     "selector_onnx_bytes": 142587320,
-    "trained_skills": 38
+    "trained_runbooks": 38
   },
   "tools": {
     "count": 79,
-    "names_sha256": "b7f9a91036470ed6b759ade83ae17bce39dc0d45b15b13df72f7b9eec0cb7f58",
+    "names_sha256": "76a1631117fa114b1529e2c964484997f37e6dccfe122e639ecabeea34cba00d",
     "tool_inventory_bytes": 99686
   }
 }

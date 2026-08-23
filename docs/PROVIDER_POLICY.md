@@ -33,7 +33,7 @@ neutered** (git history has the previous revision).
 |---|---|---|
 | Main completion | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.SERVING_MODEL` |
 | Utility tasks | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.SERVING_MODEL` |
-| Skill selection | — local two-stage ONNX selector, no upstream call | `skills/local/setwise.py` |
+| Runbook selection | — local two-stage ONNX selector, no upstream call | `runbooks/local/setwise.py` |
 
 **A second product mode briefly lived here** — a `pro` tier on Cerebras serving
 `gemma-4-31b`, faster on the same benchmark payloads (p50 486ms against 1100ms).
@@ -59,8 +59,8 @@ The id is **hardcoded** — a product decision, not deployment config. There is 
 environment override, and there must not be one: every prompt and benchmark in
 this repository is calibrated against this exact model. Changing it is §9.
 
-> **Skill selection is not an upstream call.** It runs as a LOCAL in-process
-> two-stage selector (`skills/local/`, no credential, no endpoint, ~10ms). The
+> **Runbook selection is not an upstream call.** It runs as a LOCAL in-process
+> two-stage selector (`runbooks/local/`, no credential, no endpoint, ~10ms). The
 > There is no other selector: the prompt-based one has been deleted, so
 > "selector latency" and "selector cost" below describe a path that no longer
 > exists on any route.
@@ -90,11 +90,11 @@ measured: `reasoning_tokens` drops out of the usage block entirely.
 |---|---|---|
 | Main completion | off | `reasoning: {"enabled": false}`; `INTERACTIVE_THINKING_ENABLED = False` |
 | Utility tasks | off | same |
-| Skill selector | n/a | local classifier, no model call |
+| Runbook selector | n/a | local classifier, no model call |
 
-Skill learning used to be the one exception — it ran fire-and-forget after the
+Runbook learning used to be the one exception — it ran fire-and-forget after the
 response, so its latency never reached a user, and "read a whole transcript and
-write a skill" was genuinely worth reasoning about. It has been removed, so no
+write a runbook" was genuinely worth reasoning about. It has been removed, so no
 call in this system sets `reasoning_effort` at all.
 
 `INTERACTIVE_THINKING_ENABLED` stays in the code as the decision record and the
@@ -352,7 +352,7 @@ Dead air is the failure.
 
 | Phase | Bounds | Scope | Default |
 |---|---|---|---:|
-| `preparation` | validation, state decode, skill selection — before the model is opened | absolute | 25 s |
+| `preparation` | validation, state decode, runbook selection — before the model is opened | absolute | 25 s |
 | `open_stall` | stream open → first upstream event | per attempt, **retryable** | 45 s |
 | `first_output` | successful open → first visible content or tool call | cumulative from the open | 120 s |
 | `stream_idle` | longest gap between chunks once the stream is live | per gap | 60 s |
@@ -423,7 +423,7 @@ disconnect until the response completes, so the handler waits for the client
 while the client waits for the handler. The total deadline bounds the waste.
 The streaming path has no such gap: `GeneratorExit` closes the upstream stream.
 
-## 5b. Skill selection — the no-task fast path, and why shortlisting waits
+## 5b. Runbook selection — the no-task fast path, and why shortlisting waits
 
 Selection itself is local now (~10ms), so the fast path below no longer buys
 first-byte latency — it survives because "a greeting clears the active set"
@@ -437,10 +437,10 @@ only `ok`) and `"right all this"` (every word allowed, the combination an
 imperative). It also refuses whenever anything is in flight: an existing active
 set, a background wake, a goal, a workflow digest or run, async operations, or a
 resumed watcher. `tests/unit/test_no_task_fast_path.py` replays the whole
-selector benchmark corpus and fails on any case that declares a required skill.
+selector benchmark corpus and fails on any case that declares a required runbook.
 
 **Not shipped: candidate shortlisting.** Sending 6–10 lexically-retrieved
-candidates instead of all 31 skills would cut the ~11k-token selector prompt
+candidates instead of all 31 runbooks would cut the ~11k-token selector prompt
 substantially. It is not implemented because the saving is not obviously a win:
 
 > The catalog block is deliberately request-INVARIANT (`Catalog.selector_metadata`)
@@ -500,7 +500,7 @@ A `/respond` request can bill **more calls than are obvious**:
 - the main completion;
 - a bare-intent semantic re-roll, whose output the user never saw.
 
-(Skill selection is local and bills nothing; `cost.selector` is null on
+(Runbook selection is local and bills nothing; `cost.selector` is null on
 production turns and populated only by the scripted test seam.)
 
 `cost.total` sums every one it can observe. It no longer lands on the caller's
@@ -619,7 +619,7 @@ upstream bodies are never echoed".
 
 ## 7. Readiness is *configuration* readiness, not provider readiness
 
-`/readyz` validates the server's own secrets, the prompt files, the skill catalog
+`/readyz` validates the server's own secrets, the prompt files, the runbook catalog
 and provider-object construction. `TOGETHER_API_KEY` being **present** is part of
 that (`missing_secrets`) — without it nothing can be answered at all, and
 discovering that on the first turn surfaces as an upstream 401 that reads like the
@@ -668,7 +668,7 @@ host's own documentation (with the date read) for provider semantics.
 ## 9. Changing the pinned model
 
 A model change requires, before merge: the full deterministic suite, a
-skill-selection comparison, an injection comparison, a latency comparison, a
+runbook-selection comparison, an injection comparison, a latency comparison, a
 tool-call correctness comparison, a refreshed `benchmarks/baseline.json`, and an
 explicit release note. Do not switch to a floating alias during internal testing.
 

@@ -1,13 +1,24 @@
 # Canonical Daintree CLI tool wire names — a snapshot of the CLI's tool registry.
 #
-# Consumed by tests/unit/test_skill_catalog_hygiene.py to check that every skill's
+# Consumed by tests/unit/test_runbook_catalog_hygiene.py to check that every runbook's
 # requiredTools entry names a tool that actually exists. It is a SNAPSHOT on purpose:
 # Regenerating it needs a Go build of the pinned cli/ submodule, which CI does not do
 # (it checks the submodule out, but builds nothing). Snapshot taken against cli/ @ cb12688 (origin/develop).
 #
+# TWO NAMES HERE RUN AHEAD OF THAT PIN. `runbook__step__advance` and
+# `runbook__run__get` are the post-rename spellings; the pinned CLI still ships
+# them as `skill__step__advance` / `skill__run__get`. They were rewritten with the
+# rest of the skill -> runbook rename rather than left behind, because protocol 3
+# already makes this branch unshippable until the CLI half lands, and a fixture
+# holding the OLD names would have made every runbook declaring the new ones fail
+# for a reason that is not the real one. Re-capture from the CLI (recipe in
+# benchmarks/_harness/fixtures/README.md) the moment its rename is pinned here;
+# until then this line is the record that these two are AHEAD of the submodule,
+# not a capture of it.
+#
 # Format: one wire name per line, sorted, "#" lines are comments. The registry maps
 # an internal dotted name to its OpenAI wire name by replacing EVERY "." with "__"
-# (cli/internal/tools/registry.go, toWireName): fs.read -> fs__read. Skill frontmatter
+# (cli/internal/tools/registry.go, toWireName): fs.read -> fs__read. Runbook frontmatter
 # writes requiredTools in the dotted form, so the test normalizes with the same
 # substitution before comparing.
 #
@@ -21,7 +32,7 @@
 #
 # Regenerate when the CLI adds, removes, or renames a tool. The hygiene test asserts
 # ONE direction only (every declared requiredTools name appears here); registry tools
-# that no skill declares are the normal, expected state.
+# that no runbook declares are the normal, expected state.
 agentTask__list
 agentTask__spawnForEdits
 agentTask__status
@@ -60,13 +71,13 @@ queue__publish
 queue__resolve
 recipe__list
 recipe__run
+runbook__run__get
+runbook__step__advance
 scratch__create
 scratch__delete
 scratch__drop
 scratch__get
 scratch__set
-skill__run__get
-skill__step__advance
 subagent__run
 terminal__arm
 terminal__awaitAll

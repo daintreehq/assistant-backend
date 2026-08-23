@@ -74,7 +74,7 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     # The upstream itself. Together is a model host rather than a router, so
     # there is no endpoint-selection posture to record beside it — privacy mode,
     # sort axis and denylist have no subject. Nor is there a first-byte endpoint
-    # sort: the call that sat on that path (the upstream skill selector) was
+    # sort: the call that sat on that path (the upstream runbook selector) was
     # replaced by the LOCAL two-stage selector, whose release facts are asserted
     # below instead.
     assert identity["provider"] == "together"  # type: ignore[index]
@@ -84,13 +84,13 @@ def test_the_selector_block_describes_the_shipped_artifact() -> None:
     """The baseline pins the LOCAL selector's shape.
 
     Deliberately NOT a provenance gate any more. The set-wise head has no
-    per-skill weights, so a catalog that moved since training is served rather
+    per-runbook weights, so a catalog that moved since training is served rather
     than degraded — ``routing_revision_matches_catalog`` is captured as a
     drift signal for a human, and asserting it would re-impose exactly the
     coupling this architecture removed. What IS asserted is the shape the
     serving code depends on.
     """
-    from daintree_assistant_server.skills.local.setwise import FEATURE_NAMES
+    from daintree_assistant_server.runbooks.local.setwise import FEATURE_NAMES
 
     sel = _baseline()["selector"]
     assert sel["selector_onnx_bytes"] > 1_000_000  # type: ignore[index]
@@ -100,19 +100,19 @@ def test_the_selector_block_describes_the_shipped_artifact() -> None:
 
 
 def test_the_shipped_table_covers_the_live_catalog() -> None:
-    """Every selectable skill must have a vector, or it can never be shortlisted.
+    """Every selectable runbook must have a vector, or it can never be shortlisted.
 
     This is the check that replaced the routing-revision gate: not "was the head
-    trained on this catalog" (it need not have been) but "can every skill in the
+    trained on this catalog" (it need not have been) but "can every runbook in the
     catalog be reached at all".
     """
-    from daintree_assistant_server.skills.catalog import default_skills_dir, load_catalog
-    from daintree_assistant_server.skills.local.paths_local import selector_artifact_dir
-    from daintree_assistant_server.skills.local.setwise import SetwiseClassifier
+    from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
+    from daintree_assistant_server.runbooks.local.paths_local import selector_artifact_dir
+    from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier
 
     artifact = selector_artifact_dir()
     if not (artifact / "head.onnx").is_file():
         pytest.skip("selector artifact not present (LFS)")
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     table = SetwiseClassifier(artifact).sync(catalog)
     assert set(table.ids) == set(catalog.selectable_ids)

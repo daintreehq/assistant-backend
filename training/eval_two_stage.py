@@ -12,7 +12,7 @@ change" is.
 
 ``--ablate`` re-runs the same artifact with the shortlist's evidence disturbed,
 which is the only honest way to answer two questions this architecture invites:
-does the head actually depend on the retrieval order, and does a skill that never
+does the head actually depend on the retrieval order, and does a runbook that never
 appeared in training still route?
 """
 
@@ -27,27 +27,27 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from benchmarks.skill_selection.cases import load_cases  # noqa: E402
-from benchmarks.skill_selection.local_runner import STAGES, run_local  # noqa: E402
-from daintree_assistant_server.skills.catalog import (  # noqa: E402
-    default_skills_dir,
+from benchmarks.runbook_selection.cases import load_cases  # noqa: E402
+from benchmarks.runbook_selection.local_runner import STAGES, run_local  # noqa: E402
+from daintree_assistant_server.runbooks.catalog import (  # noqa: E402
+    default_runbooks_dir,
     load_catalog,
 )
-from daintree_assistant_server.skills.local.documents import query_document  # noqa: E402
-from daintree_assistant_server.skills.local.setwise import SetwiseClassifier  # noqa: E402
+from daintree_assistant_server.runbooks.local.documents import query_document  # noqa: E402
+from daintree_assistant_server.runbooks.local.setwise import SetwiseClassifier  # noqa: E402
 
-#: Release floor for the product metric (every required skill present). The
+#: Release floor for the product metric (every required runbook present). The
 #: architecture this replaced measured 158/169; the family's error bar is ±2-3,
 #: so the floor sits at the bottom of that band rather than at the peak.
 RECALL_PASS_FLOOR = 152
 
 ARTIFACT = (
-    ROOT / "src" / "daintree_assistant_server" / "skills" / "local"
+    ROOT / "src" / "daintree_assistant_server" / "runbooks" / "local"
     / "artifacts" / "selector"
 )
 
 
-# The scoring loop lives in ``benchmarks/skill_selection/local_runner.py`` and is
+# The scoring loop lives in ``benchmarks/runbook_selection/local_runner.py`` and is
 # imported rather than reimplemented here. It was duplicated for a while, and the
 # duplicate is exactly the kind that rots: two loops applying "the serving
 # decision procedure" drift a rule at a time — a projection here, a docs string
@@ -70,7 +70,7 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    catalog = load_catalog(default_skills_dir())
+    catalog = load_catalog(default_runbooks_dir())
     cases = load_cases(catalog)
     artifact = Path(args.artifact)
     meta = json.loads((artifact / "meta.json").read_text())
@@ -78,8 +78,8 @@ def main() -> int:
         f"artifact: k={meta['candidates']}  ordering={meta['ordering']}  "
         f"stage1={meta['retriever_base_model']}  stage2={meta['base_model']}"
     )
-    if meta.get("holdout_skills"):
-        print(f"  ZERO-SHOT PROBE: {', '.join(meta['holdout_skills'])} never trained on")
+    if meta.get("holdout_runbooks"):
+        print(f"  ZERO-SHOT PROBE: {', '.join(meta['holdout_runbooks'])} never trained on")
 
     outputs = {}
     for quantized in (False, True):
@@ -127,7 +127,7 @@ def main() -> int:
     print("\nlosses (int8), by the stage that lost them:")
     for loss in int8["losses"]:
         p = "  —  " if loss["p"] is None else f"{loss['p']:.3f}"
-        print(f"  {loss['case']:42} {loss['stage']:18} p={p}  {loss['skill']}")
+        print(f"  {loss['case']:42} {loss['stage']:18} p={p}  {loss['runbook']}")
 
     if args.ablate:
         _ablate(artifact, catalog, cases, outputs["int8"]["picked"])
@@ -192,9 +192,9 @@ def _select_reversed(clf, query, active_ids, np):  # type: ignore[no-untyped-def
     plain top-k here instead would make the ablation measure a policy the server
     does not run, and would silently drop any reserved candidate from the probe.
     """
-    from daintree_assistant_server.skills.local.candidates import assemble_candidates
-    from daintree_assistant_server.skills.local.documents import ACTIVE_PREFIX
-    from daintree_assistant_server.skills.local.setwise import (
+    from daintree_assistant_server.runbooks.local.candidates import assemble_candidates
+    from daintree_assistant_server.runbooks.local.documents import ACTIVE_PREFIX
+    from daintree_assistant_server.runbooks.local.setwise import (
         FEATURE_NAMES,
         _run_encoder,
         admit,
@@ -215,7 +215,7 @@ def _select_reversed(clf, query, active_ids, np):  # type: ignore[no-untyped-def
     feats[0, :, 0] = chosen.cosine[::-1]
     feats[0, :, 1] = [1.0 if table.ids[i] in active else 0.0 for i in top]
     feats[0, :, 2] = chosen.rank_norm[::-1]
-    skill_logits, _docs, card_logits = clf._head.run(
+    runbook_logits, _docs, card_logits = clf._head.run(
         None,
         {
             "query": q_rank[None, :].astype(np.float32),
@@ -224,7 +224,7 @@ def _select_reversed(clf, query, active_ids, np):  # type: ignore[no-untyped-def
             "mask": np.ones((1, k), dtype=np.float32),
         },
     )
-    probs = 1.0 / (1.0 + np.exp(-skill_logits[0]))
+    probs = 1.0 / (1.0 + np.exp(-runbook_logits[0]))
     ranked = [
         (table.ids[int(top[int(j)])], float(probs[int(j)]))
         for j in np.argsort(-probs)

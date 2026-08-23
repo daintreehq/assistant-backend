@@ -1,9 +1,9 @@
 """The native Daintree Assistant API wire contract (``/v1/daintree/respond``).
 
-This is a Daintree-owned protocol — not OpenAI-compatible. The skill/session
+This is a Daintree-owned protocol — not OpenAI-compatible. The runbook/session
 envelope is first-class (not a bolted-on extension), the request is strict
-(``extra="forbid"`` everywhere), and skills are surfaced as their own top-level
-block in the response because dynamic skill loading is the system's core value.
+(``extra="forbid"`` everywhere), and runbooks are surfaced as their own top-level
+block in the response because dynamic runbook loading is the system's core value.
 
 Conversation messages and tool definitions reuse the internal canonical models
 (:mod:`.openai`) so the selector, assembler, and DeepSeek provider — which speak
@@ -17,14 +17,15 @@ from typing import Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .. import PROTOCOL_VERSION
 from .errors import ErrorDetail
 from .extensions import (
     ClientInfo,
     Prelude,
+    RunbookRef,
     RuntimeContext,
     Selection,
     SelectorMeta,
-    SkillRef,
     StartupContext,
     TurnContext,
 )
@@ -36,7 +37,7 @@ from .openai import ChatMessage, ToolCall, ToolDef
 
 
 class RespondSession(BaseModel):
-    """Identifies the conversation and turn so skill state and selector cadence
+    """Identifies the conversation and turn so runbook state and selector cadence
     have a stable key. Required whenever a request is made — the native API has
     no anonymous/stateless mode."""
 
@@ -93,7 +94,7 @@ class RespondRequest(BaseModel):
     # human talks to. "subagent" is a bounded, read-only worker the CLI runs in
     # its own isolated conversation to burn context the main thread must not
     # pay for — exploring a tree, finding one issue among thousands — and which
-    # reports back a compact answer. The two differ in prompt, in the MENU skill
+    # reports back a compact answer. The two differ in prompt, in the MENU runbook
     # selection chooses from (both profiles select; a sub-agent's catalog is
     # narrowed to what its tools can execute), and in what context blocks are
     # worth assembling, so the profile has to arrive with the request rather than
@@ -113,20 +114,20 @@ class RespondRequest(BaseModel):
 
 
 # --------------------------------------------------------------------------
-# Response (non-streaming) and the skills block.
+# Response (non-streaming) and the runbooks block.
 # --------------------------------------------------------------------------
 
 
-class SkillsBlock(BaseModel):
-    """The dynamic-skill outcome for this turn — the heart of the protocol.
+class RunbooksBlock(BaseModel):
+    """The dynamic-runbook outcome for this turn — the heart of the protocol.
 
-    ``prelude`` is the synthetic skill-load the client renders *before* the
-    assistant's reply, so the user sees the skill being loaded as if it happened
+    ``prelude`` is the synthetic runbook-load the client renders *before* the
+    assistant's reply, so the user sees the runbook being loaded as if it happened
     first.
     """
 
-    active: list[SkillRef] = Field(default_factory=list)
-    newly_loaded: list[SkillRef] = Field(default_factory=list)
+    active: list[RunbookRef] = Field(default_factory=list)
+    newly_loaded: list[RunbookRef] = Field(default_factory=list)
     prelude: Prelude = Field(default_factory=Prelude)
     selector: SelectorMeta = Field(default_factory=SelectorMeta)
 
@@ -143,7 +144,7 @@ class RespondUsage(BaseModel):
     # zero all the way out to the wire.
     #
     # It covers the main completion ONLY. The selector's cost is reported
-    # separately under ``skills.selector.usage``; a client showing a turn total
+    # separately under ``runbooks.selector.usage``; a client showing a turn total
     # adds the two. Kept split rather than summed because they answer different
     # questions — "what did the answer cost" and "what did routing cost" — and a
     # single number hides the one the prompt work is trying to move.
@@ -180,10 +181,10 @@ class TurnTimings(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    #: The skill-selector call. ``None`` when selection did not run — a
+    #: The runbook-selector call. ``None`` when selection did not run — a
     #: tool-continuation round, or the no-task fast path. Includes a parse-repair
     #: round trip when one happened, which is why a surprising value should be
-    #: read next to ``skills.selector`` rather than alone.
+    #: read next to ``runbooks.selector`` rather than alone.
     selection_ms: int | None = None
     #: The documentation lookup, when the selector asked for one. ``None`` when
     #: no query was issued.
@@ -216,7 +217,7 @@ class TurnCost(BaseModel):
 
     The SERVER's key funds every upstream call a turn makes, so this is our bill
     rather than the caller's — but the number that matters is still the TOTAL, not
-    what any one call cost. Skill selection is local (in-process, unbilled), so an
+    what any one call cost. Runbook selection is local (in-process, unbilled), so an
     ordinary turn is ONE billed call — the main completion — and a re-rolled round
     additionally pays for a generation nobody ever saw; all of it is counted here.
 
@@ -260,7 +261,7 @@ class RespondMessage(BaseModel):
 class RespondResponse(BaseModel):
     """Non-streaming response body."""
 
-    protocol_version: int = 2
+    protocol_version: int = PROTOCOL_VERSION
     request_id: str
     model: str
     message: RespondMessage
@@ -271,8 +272,8 @@ class RespondResponse(BaseModel):
     cost: TurnCost | None = None
     # Where the wall clock went, by phase. See TurnTimings.
     timings: TurnTimings = Field(default_factory=TurnTimings)
-    # First-class skill outcome.
-    skills: SkillsBlock = Field(default_factory=SkillsBlock)
+    # First-class runbook outcome.
+    runbooks: RunbooksBlock = Field(default_factory=RunbooksBlock)
     state: str | None = None
     catalog_revision: str
     prompt_version: str
@@ -289,14 +290,14 @@ class StreamMeta(BaseModel):
     """Immediate first streamed event, emitted before the upstream model opens.
 
     It carries everything the client needs to surface selection progress before
-    the first model token: the skill prelude/active set, refreshed state token,
+    the first model token: the runbook prelude/active set, refreshed state token,
     and selector outcome.
     """
 
-    protocol_version: int = 2
+    protocol_version: int = PROTOCOL_VERSION
     request_id: str
     model: str
-    skills: SkillsBlock = Field(default_factory=SkillsBlock)
+    runbooks: RunbooksBlock = Field(default_factory=RunbooksBlock)
     state: str | None = None
     catalog_revision: str
     prompt_version: str

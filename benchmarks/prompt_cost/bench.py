@@ -32,7 +32,7 @@ def _print(doc: dict[str, Any]) -> None:
         print(f"min system+tools stable    : {s['min_system_tools_stable_continuity']:.4f} "
               "(continuation/runtime/startup/new-session — target 1.0)")
         print(f"topic-shift system+tools   : {s['topic_shift_system_tools_stable']} "
-              "(target 1.0 — FULL-inventory track: the skill block sits below the "
+              "(target 1.0 — FULL-inventory track: the runbook block sits below the "
               "schemas)")
         if s.get("full_tool_bytes"):
             saved = 1 - s["projected_tool_bytes"] / s["full_tool_bytes"]
@@ -52,7 +52,7 @@ def _print(doc: dict[str, Any]) -> None:
                   f"~{L['token_est']} tok")
         sp = det["selector_prompt_cost"]
         print(f"  selector prompt ~{sp['selector_prompt_token_est']} tok / "
-              f"{sp['catalog_skills']} skills")
+              f"{sp['catalog_runbooks']} runbooks")
         print(f"  state token bytes: "
               f"{[s['token_bytes'] for s in det['state_token_size']['sizes']]}")
     live = doc.get("live")
@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument(
         "--topic-shift",
         action="store_true",
-        help="with --live: measure prefix reuse across a skill topic shift (paid)",
+        help="with --live: measure prefix reuse across a runbook topic shift (paid)",
     )
     run.add_argument("--env-file", help="path to a .env with TOGETHER_API_KEY")
     run.add_argument("--out", help="explicit output JSON path")

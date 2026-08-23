@@ -1,0 +1,73 @@
+# Turns with no real task: the selector must return an empty array (clearing any
+# loaded runbooks). Loading anything here is a precision failure.
+
+cases:
+  - id: thanks-after-rename
+    category: no-task
+    note: Work is done; an acknowledgement must clear the active set.
+    active: [daintree.terminals.rename]
+    messages:
+      - role: user
+        content: Rename my terminals so I can tell them apart.
+      - role: assistant
+        content: >-
+          Done — renamed all five terminals: "build: web", "agent: parser fix",
+          "agent: docs", "dev server", and "scratch".
+      - role: user
+        content: perfect, thanks!
+    expect:
+      required: []
+
+  - id: greeting-only
+    category: no-task
+    messages:
+      - role: user
+        content: hey, you there?
+    expect:
+      required: []
+
+  - id: model-smalltalk
+    category: no-task
+    messages:
+      - role: user
+        content: out of curiosity, what model are you running on?
+    expect:
+      required: []
+
+  - id: bare-ack
+    category: no-task
+    note: >-
+      Ambiguous by design: the ack itself is no task, but the prior turn arranged an
+      ongoing monitoring commitment — clearing OR carrying the live supervision both
+      pass. watch-outcome joins the foundation in optional because "keep an eye on it
+      while I'm out" is now its own trigger and it owns that commitment; widening is
+      right here (the documented ambiguity IS the case) and would be wrong on a
+      routing-trap case.
+    messages:
+      - role: user
+        content: Can you keep an eye on things while I grab lunch?
+      - role: assistant
+        content: Sure — I'll check the terminals periodically and flag anything unusual.
+      - role: user
+        content: ok cool
+    expect:
+      required: []
+      optional: [daintree.foundation, daintree.orchestration.watch-outcome]
+
+  - id: general-knowledge
+    category: no-task
+    note: A pure knowledge question is not a Daintree workflow.
+    messages:
+      - role: user
+        content: what does EBITDA stand for?
+    expect:
+      required: []
+
+  - id: trivial-one-off
+    category: no-task
+    note: Trivial one-off with no procedure; loading the foundation here is overhead.
+    messages:
+      - role: user
+        content: what timezone is this machine set to?
+    expect:
+      required: []

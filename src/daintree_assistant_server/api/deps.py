@@ -33,7 +33,7 @@ def check_protocol_value(version: int | None) -> None:
     """Reject an unsupported protocol version declared in the request body.
 
     Every caller passes a value pydantic already parsed as ``int`` (or ``None``,
-    which ``/skills/resolve`` allows), so the old string-coercion branch was
+    which ``/runbooks/resolve`` allows), so the old string-coercion branch was
     unreachable. Omitted stays permitted — only a present, out-of-range value fails.
     """
     if version is None:

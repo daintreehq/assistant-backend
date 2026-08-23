@@ -446,7 +446,7 @@ def _require_exact(
 
 
 # ---------------------------------------------------------------------------
-# Skill selection — routing accuracy of the classifier on the first-byte path.
+# Runbook selection — routing accuracy of the classifier on the first-byte path.
 # ---------------------------------------------------------------------------
 
 # These are a RATCHET from a real measurement, not aspirations, and the
@@ -471,7 +471,7 @@ def _require_exact(
 # tightening as the classifier improves is the point.
 #
 # STALE, and knowingly so: that measurement predates the selector-evidence change
-# and the catalog it was taken against had 31 skills. The first paid run after
+# and the catalog it was taken against had 31 runbooks. The first paid run after
 # this lands must re-baseline these numbers — they are last-known-good, not
 # current truth.
 SELECTOR_BASELINE_COMMIT = "dd8a17e"
@@ -487,7 +487,7 @@ MAX_SELECTOR_EXTRA_RATE = 0.060            # measured 18/438 = 0.0411
 MAX_SELECTOR_SPURIOUS_DOCS_RATE = 0.05     # measured 1/48   = 0.0208
 MIN_SELECTOR_TRIALS_PER_CASE = 3
 # Per-category floor, because a global rate lets a whole category collapse
-# unseen: the corpus is 55 routing traps and 32 single-skill matches against
+# unseen: the corpus is 55 routing traps and 32 single-runbook matches against
 # 5-case categories like background-wake and adversarial, so the big categories
 # carry the average. Measured on a losing prompt variant, background-wake fell to
 # 0.40 while the GLOBAL rate only moved to 0.897 — the collapse was the whole
@@ -548,7 +548,7 @@ MAX_LOCAL_EXTRA_RATE = 0.20           # measured  27/177 = 0.153
 # wrong — 3/21 = 0.143 cleared it and the fourth was the first to fail.
 MAX_LOCAL_MISSED_DOCS_RATE = 0.10     # measured   2/21  = 0.095
 # 0.55 rather than the paid suite's 0.6: on recall-pass the weakest category is
-# multi-skill at 3/5, and in a 5-case category one case is 20 points.
+# multi-runbook at 3/5, and in a 5-case category one case is 20 points.
 MIN_LOCAL_CATEGORY_PASS_RATE = 0.55
 
 
@@ -637,7 +637,7 @@ def _category_floor(
 ) -> None:
     """Every category clears ``floor``, so a small one cannot collapse unseen.
 
-    A global rate lets it: the corpus is 73 routing traps and 39 single-skill
+    A global rate lets it: the corpus is 73 routing traps and 39 single-runbook
     matches against 5-case categories like background-wake and adversarial, so
     the big categories carry the average. Measured on a losing prompt variant,
     background-wake fell to 0.40 while the GLOBAL rate only moved to 0.897.
@@ -669,12 +669,12 @@ def _category_floor(
             )
 
 
-def skill_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
+def runbook_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
     """The suite that qualifies a release: the shipped ONNX artifact, offline.
 
-    Graded on RECALL-PASS — every required skill present — rather than on the
+    Graded on RECALL-PASS — every required runbook present — rather than on the
     exact set. That is not a softer bar chosen to make the numbers work; it is
-    this selector's actual contract. ``BONUS_FLOOR`` admits a further skill above
+    this selector's actual contract. ``BONUS_FLOOR`` admits a further runbook above
     0.45 beyond the cardinality head's answer on purpose, because a turn that
     misses its runbook answers without it while a spare runbook costs prompt
     bytes. Extras are designed behaviour here and a defect in the prompt
@@ -684,10 +684,10 @@ def skill_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
 
     Two gates exist only here.
 
-    **Stage-1 candidate recall.** ``candidate_miss`` counts required skills that
+    **Stage-1 candidate recall.** ``candidate_miss`` counts required runbooks that
     never reached the head at all — not ranked low, absent. No admission floor
     and no better head can recover one, so the ceiling is zero rather than a
-    rate. It is trivially satisfied at 38 skills against ``k=32``, and that is
+    rate. It is trivially satisfied at 38 runbooks against ``k=32``, and that is
     the point of gating it now: it is the number that moves first as the catalog
     grows, and no other suite can currently see it.
 
@@ -731,7 +731,7 @@ def skill_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
 
     checks.exactly_zero("candidate_miss_trials")
 
-    # Every missing skill must be attributed to exactly one stage. Without this
+    # Every missing runbook must be attributed to exactly one stage. Without this
     # the histogram can quietly under-count — which it did: a background-wake
     # case never reaches the model, its losses were skipped, and the stages
     # summed to one less than the miss count with nothing to say so. A
@@ -747,7 +747,7 @@ def skill_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
         attributed = sum(v for v in stages.values() if isinstance(v, int))
         if attributed != misses:
             checks.note(
-                f"stages sum to {attributed} but {misses:g} required skills were "
+                f"stages sum to {attributed} but {misses:g} required runbooks were "
                 f"missed — the loss attribution does not account for every miss"
             )
 
@@ -764,7 +764,7 @@ def skill_selection_local_verdict(doc: Mapping[str, Any]) -> QualityVerdict:
 
 VERDICTS = {
     "injection_live": injection_verdict,
-    "skill_selection_local": skill_selection_local_verdict,
+    "runbook_selection_local": runbook_selection_local_verdict,
     "workflow_intel": workflow_intel_verdict,
     "utility_json": utility_json_verdict,
 }

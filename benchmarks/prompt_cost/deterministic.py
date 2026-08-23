@@ -7,23 +7,23 @@ the serving adapter would POST, the numbers the whole cost/latency story turns o
    prefix cache reuses the leading, byte-identical portion of a request. The
    assembler's whole layout exists to keep the expensive ``[system messages] →
    [tools]`` region byte-stable across turns (the documented 36%→99% fix). For
-   each transition (tool-continuation, runtime-context change, skill topic-shift,
+   each transition (tool-continuation, runtime-context change, runbook topic-shift,
    new session) we build the two consecutive requests and measure how much of the
    cacheable region survives byte-identical:
      - ``system_tools_stable`` — fraction of the [system+tools] region that is a
        byte prefix of the next turn's. **1.0 is the target for every transition**,
-       including a skill topic-shift: since issue #39 the loaded-skills block is a
+       including a runbook topic-shift: since issue #39 the loaded-runbooks block is a
        user-role row BELOW the schemas, so changing it cannot touch that region.
      - ``full_prefix`` — fraction of the whole [system+tools+conversation] region
        reused (the append-only conversation is the largest cached segment). A topic
-       shift still drops this from the loaded-skills row down — inherent, not a bug.
+       shift still drops this from the loaded-runbooks row down — inherent, not a bug.
 
 2. **Per-layer byte / token budget** — where the request's size lives (base, the
-   contract, the ~21.5k-token tool schemas, skills, integrations, startup,
+   contract, the ~21.5k-token tool schemas, runbooks, integrations, startup,
    conversation, the volatile tail). ``token_est`` is a bytes/4 PROXY (no tokenizer
    in the repo); the live cross-check (``live.py``) is what pins real magnitude.
 
-3. **State-token size** vs active-skill-set size — the portable, stateless-safe
+3. **State-token size** vs active-runbook-set size — the portable, stateless-safe
    token stays tiny (Cloud Run carries no server memory; correctness rides this).
 
 All deterministic: no API key, no network, safe in CI.
@@ -39,14 +39,14 @@ from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.prompts.loader import (
     PromptLoader,
 )
-from daintree_assistant_server.services.compaction import default_compactor
-from daintree_assistant_server.services.prompt_assembler import PromptAssembler
-from daintree_assistant_server.skills.catalog import load_catalog
-from daintree_assistant_server.skills.models import Skill
-from daintree_assistant_server.skills.tool_projection import (
+from daintree_assistant_server.runbooks.catalog import load_catalog
+from daintree_assistant_server.runbooks.models import Runbook
+from daintree_assistant_server.runbooks.tool_projection import (
     filter_provider_tools,
     project_tools,
 )
+from daintree_assistant_server.services.compaction import default_compactor
+from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from daintree_assistant_server.state.codec import StateCodec
 
 from .._harness.env import build_provider_body
@@ -90,18 +90,20 @@ def _body_for(
     assembler: PromptAssembler,
     settings: Settings,
     request: RespondRequest,
-    skills: list[Skill],
+    runbooks: list[Runbook],
     *,
     enforced: bool = False,
 ) -> dict[str, Any]:
-    pr = assembler.build_main_request(request=request, skills=skills, upstream_model=SERVING_MODEL)
+    pr = assembler.build_main_request(
+        request=request, runbooks=runbooks, upstream_model=SERVING_MODEL
+    )
     if enforced:
         # The PRODUCTION filter, not a re-implementation of it. A benchmark that
         # modelled enforcement separately would keep measuring its own model long
         # after the orchestrator stopped agreeing with it.
         projection = project_tools(
             offered=request.input.tools,
-            active_skills=skills,
+            active_runbooks=runbooks,
             catalog=load_catalog(),
             messages=request.input.messages,
         )
@@ -148,19 +150,19 @@ _TOOL_RESULT = {
 
 
 def _transitions(
-    assembler: PromptAssembler, settings: Settings, skills: list[Skill]
+    assembler: PromptAssembler, settings: Settings, runbooks: list[Runbook]
 ) -> list[dict[str, Any]]:
     inv_present = bool(load_tool_inventory())
-    a, b = (skills[:1], skills[1:2]) if len(skills) >= 2 else (skills[:1], [])
+    a, b = (runbooks[:1], runbooks[1:2]) if len(runbooks) >= 2 else (runbooks[:1], [])
 
     def req(messages: list[dict[str, Any]], **kw: Any) -> RespondRequest:
         return build_respond_request(messages=messages, **kw)
 
     out: list[dict[str, Any]] = []
 
-    # 1. tool-continuation: same skills/runtime; a tool call + result are appended.
-    before = _body_for(assembler, settings, req([_USER]), skills)
-    after = _body_for(assembler, settings, req([_USER, _ASSIST_TOOL, _TOOL_RESULT]), skills)
+    # 1. tool-continuation: same runbooks/runtime; a tool call + result are appended.
+    before = _body_for(assembler, settings, req([_USER]), runbooks)
+    after = _body_for(assembler, settings, req([_USER, _ASSIST_TOOL, _TOOL_RESULT]), runbooks)
     out.append(
         {
             "transition": "tool_continuation",
@@ -170,7 +172,7 @@ def _transitions(
         }
     )
 
-    # 2. runtime-context change: same conversation/skills; the volatile runtime rides
+    # 2. runtime-context change: same conversation/runbooks; the volatile runtime rides
     #    the trailing user-role block, so system+tools must stay byte-identical.
     #    The display widths straddle WIDE_TERMINAL_WIDTH on purpose (issue #38): a
     #    resize is the most frequent runtime change there is, and while the geometry
@@ -188,8 +190,8 @@ def _transitions(
         "display": {"columns": 180, "content_width": 100},
         "open_terminals": [{"id": "t1", "agent_state": "idle", "exit_code": 0}],
     }
-    before = _body_for(assembler, settings, req([_USER], runtime=rt1), skills)
-    after = _body_for(assembler, settings, req([_USER], runtime=rt2), skills)
+    before = _body_for(assembler, settings, req([_USER], runtime=rt1), runbooks)
+    after = _body_for(assembler, settings, req([_USER], runtime=rt2), runbooks)
     out.append(
         {
             "transition": "runtime_context_change",
@@ -220,8 +222,8 @@ def _transitions(
             "total_count": 1,
         },
     }
-    before = _body_for(assembler, settings, req([_USER], startup=startup1), skills)
-    after = _body_for(assembler, settings, req([_USER], startup=startup2), skills)
+    before = _body_for(assembler, settings, req([_USER], startup=startup1), runbooks)
+    after = _body_for(assembler, settings, req([_USER], startup=startup2), runbooks)
     out.append(
         {
             "transition": "startup_context_change",
@@ -231,9 +233,9 @@ def _transitions(
         }
     )
 
-    # 4. skill topic-shift: the active skill set changes → the loaded-skills block
+    # 4. runbook topic-shift: the active runbook set changes → the loaded-runbooks block
     #    changes. Since issue #39 that block is a USER-role row BELOW the schemas, so
-    #    the whole [system+tools] region survives byte-identical: a skill load costs
+    #    the whole [system+tools] region survives byte-identical: a runbook load costs
     #    its own bytes and the rows after it, never the ~21.5k tokens of schemas.
     #    This is the issue's headline claim, so it is GATED at 1.0 rather than
     #    reported as an expected drop — regressing either block back into the system
@@ -244,10 +246,10 @@ def _transitions(
         stab = _stability(before, after)
         out.append(
             {
-                "transition": "skill_topic_shift",
-                "expect": "system_tools_stable == 1.0 (the skill block sits below the schemas)",
+                "transition": "runbook_topic_shift",
+                "expect": "system_tools_stable == 1.0 (the runbook block sits below the schemas)",
                 "floor_system_tools_stable": 1.0,
-                "note": "full_prefix still drops from the loaded-skills row down — that part "
+                "note": "full_prefix still drops from the loaded-runbooks row down — that part "
                 "is inherent and expected",
                 **stab,
             }
@@ -255,10 +257,10 @@ def _transitions(
 
     # 4b. THE SAME SHIFT, ENFORCED. Transition 4 is measured against the full
     #    inventory, and it stays honest about the LAYOUT invariant issue #39 won:
-    #    the skill block is below the schemas, so moving it cannot touch them.
+    #    the runbook block is below the schemas, so moving it cannot touch them.
     #
     #    But under `TOOL_PROJECTION_MODE=enforced` the tools array is a FUNCTION of
-    #    the active skill set, so a topic shift changes the schemas themselves and
+    #    the active runbook set, so a topic shift changes the schemas themselves and
     #    transition 4's 1.0 stops describing production traffic. Measuring only
     #    the full-inventory track would leave CI reporting a guarantee that no
     #    longer holds for the requests users actually get.
@@ -290,7 +292,7 @@ def _transitions(
         stab = _stability(before, after)
         out.append(
             {
-                "transition": "projected_skill_topic_shift",
+                "transition": "projected_runbook_topic_shift",
                 "expect": "system messages identical; the tool region INTENTIONALLY differs "
                 "— this is the cost of enforcement, measured not assumed",
                 # Deliberately NOT floored at 1.0: under enforcement it cannot be, and
@@ -317,7 +319,7 @@ def _transitions(
             }
         )
 
-    # 5. new session: different conversation, identical tools/skills/runtime — the
+    # 5. new session: different conversation, identical tools/runbooks/runtime — the
     #    static system prefix + the whole tool region are still reused cross-session.
     before = _body_for(
         assembler,
@@ -327,7 +329,7 @@ def _transitions(
             session_id="sess-a",
             turn_id="turn-a",
         ),
-        skills,
+        runbooks,
     )
     after = _body_for(
         assembler,
@@ -337,7 +339,7 @@ def _transitions(
             session_id="sess-b",
             turn_id="turn-b",
         ),
-        skills,
+        runbooks,
     )
     out.append(
         {
@@ -351,7 +353,7 @@ def _transitions(
 
 
 def _layer_budget(
-    assembler: PromptAssembler, loader: PromptLoader, settings: Settings, skills: list[Skill]
+    assembler: PromptAssembler, loader: PromptLoader, settings: Settings, runbooks: list[Runbook]
 ) -> dict[str, Any]:
     """Per-layer byte/token budget of one representative full request."""
     request = build_respond_request(messages=[_USER, _ASSIST_TOOL, _TOOL_RESULT])
@@ -359,26 +361,26 @@ def _layer_budget(
 
     base = loader.base_prompt(response_declaration=default_compactor().available)
     integrations = assembler.render_integrations(request.runtime)
-    skills_block = assembler.render_loaded_skills(skills)
+    runbooks_block = assembler.render_loaded_runbooks(runbooks)
     contract = assembler.render_response_contract()
     startup_block = assembler.render_startup_context(request.startup)
     runtime_block = assembler.render_runtime_context(request.runtime)
     display_block = assembler.render_display_context(request.runtime)
     footer = assembler.render_turn_footer(request.turn)
     # Conversation bytes from the assembled wire body. EXCLUDE every server-injected
-    # user-role block: the skills, integrations and startup rows are each counted
+    # user-role block: the runbooks, integrations and startup rows are each counted
     # separately above, as is the volatile runtime/display/footer tail, keeping the
     # layer budget disjoint. Since issue #39 there are THREE injected rows ahead of
     # the conversation, not one — stripping only a leading startup row would fold the
-    # skill and integration bytes into "conversation" and silently misreport both.
-    body = _body_for(assembler, settings, request, skills)
+    # runbook and integration bytes into "conversation" and silently misreport both.
+    body = _body_for(assembler, settings, request, runbooks)
     conv_msgs = [m for m in body["messages"] if m.get("role") != "system"]
     # Strip each injected row by EXACT content equality against the block we just
     # rendered, at most one per block, in assembly order. Prefix-matching on
     # "[Injected …" would also eat a genuine first conversation message that happened
     # to open with that marker, and would MISS a block the byte cap truncated,
     # double-counting it into `conversation`.
-    for block in (skills_block, integrations, startup_block):
+    for block in (runbooks_block, integrations, startup_block):
         if block.strip() and conv_msgs and conv_msgs[0].get("content") == block:
             conv_msgs = conv_msgs[1:]
     if conv_msgs and str(conv_msgs[-1].get("content", "")).startswith("[Injected context"):
@@ -393,7 +395,7 @@ def _layer_budget(
             ("base_prompt", base),
             ("response_contract", contract),
             ("tool_schemas", tools_str),
-            ("loaded_skills (user block)", skills_block),
+            ("loaded_runbooks (user block)", runbooks_block),
             ("integrations (user block)", integrations),
             ("startup_context (stable user block)", startup_block),
             ("conversation", convo),
@@ -426,12 +428,12 @@ def _state_token_size(settings: Settings) -> dict[str, Any]:
     for n in (0, 1, 3):
         token = codec.issue(
             session_id="s",
-            active_skills=[f"daintree.skill.{i}" for i in range(n)],
+            active_runbooks=[f"daintree.runbook.{i}" for i in range(n)],
             catalog_revision="rev-abc123",
             turn_id="turn-1",
             instruction_revision=0,
         )
-        sizes.append({"active_skills": n, "token_bytes": len(token.encode("utf-8"))})
+        sizes.append({"active_runbooks": n, "token_bytes": len(token.encode("utf-8"))})
     return {"sizes": sizes, "cap_bytes": 16 * 1024}
 
 
@@ -445,19 +447,19 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
     loader = PromptLoader()
     assembler = PromptAssembler(loader, settings)
     catalog = load_catalog()
-    skills = list(catalog.skills[:2])
+    runbooks = list(catalog.runbooks[:2])
 
-    transitions = _transitions(assembler, settings, skills)
+    transitions = _transitions(assembler, settings, runbooks)
     # A byte-proxy self-check: our compact encoder must equal httpx's wire bytes,
     # or the whole cache metric is measured over a body production never sends.
-    probe = _body_for(assembler, settings, build_respond_request(messages=[_USER]), skills)
+    probe = _body_for(assembler, settings, build_respond_request(messages=[_USER]), runbooks)
     wire_matches = dumps(probe) == wire_bytes(probe)
 
     required = {
         "tool_continuation",
         "runtime_context_change",
         "startup_context_change",
-        "skill_topic_shift",
+        "runbook_topic_shift",
         # The enforced twin. Gated for the same reason its full-inventory sibling
         # is: under enforcement the tools array follows the ACTIVE SET, so a
         # continuation round changing it would mean the filter is re-cutting the
@@ -467,8 +469,8 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         "new_session",
     }
     continuity = [t for t in transitions if t["transition"] in required]
-    # Every gated transition must actually have RUN. `skill_topic_shift` is emitted
-    # only when two distinct skills are available, so a catalog that shrank below two
+    # Every gated transition must actually have RUN. `runbook_topic_shift` is emitted
+    # only when two distinct runbooks are available, so a catalog that shrank below two
     # would drop it from the list — and `all()` over the survivors would then pass
     # vacuously, reporting green for a check that never executed. Fail closed.
     present = {t["transition"] for t in continuity}
@@ -493,13 +495,13 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
     # the file asserting nothing, and a system message drifting below the schemas
     # would hide inside a tool-region change that reads as expected.
     projected_shift = next(
-        (t for t in transitions if t["transition"] == "projected_skill_topic_shift"), None
+        (t for t in transitions if t["transition"] == "projected_runbook_topic_shift"), None
     )
     # PRESENT and holding. `is None or ...` would have read a missing transition as
     # a pass, which is the same vacuous-green failure `all_present` exists to stop
     # one line above: a refactor that stopped emitting the enforced shift would
     # silently retire its only assertion. When the catalog has fewer than two
-    # skills neither shift is emitted and `all_present` already fails, so requiring
+    # runbooks neither shift is emitted and `all_present` already fails, so requiring
     # presence here adds no new way to red.
     layout_held = projected_shift is not None and bool(projected_shift["system_messages_identical"])
     projected_size = next((t for t in transitions if t["transition"] == "projected_size"), None)
@@ -510,7 +512,7 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
             (
                 t["system_tools_stable"]
                 for t in transitions
-                if t["transition"] == "skill_topic_shift"
+                if t["transition"] == "runbook_topic_shift"
             ),
             None,
         ),
@@ -533,6 +535,6 @@ def run_deterministic(settings: Settings | None = None) -> dict[str, Any]:
         },
         "summary": summary,
         "transitions": transitions,
-        "layer_budget": _layer_budget(assembler, loader, settings, skills),
+        "layer_budget": _layer_budget(assembler, loader, settings, runbooks),
         "state_token_size": _state_token_size(settings),
     }

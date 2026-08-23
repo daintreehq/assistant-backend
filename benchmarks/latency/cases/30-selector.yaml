@@ -1,4 +1,4 @@
-# The skill selector in isolation — the one call that sits directly on the turn's
+# The runbook selector in isolation — the one call that sits directly on the turn's
 # first-byte path, so its latency is added to EVERY cold turn before the main model
 # is even opened.
 #
@@ -9,14 +9,14 @@
 cases:
   - id: selector_greeting
     kind: selector
-    title: Selector on a greeting (correct answer is "no skills")
+    title: Selector on a greeting (correct answer is "no runbooks")
     messages:
       - role: user
         content: "Hello!"
 
   - id: selector_work_request
     kind: selector
-    title: Selector on a real work request (must route to skills)
+    title: Selector on a real work request (must route to runbooks)
     messages:
       - role: user
         content: "Start work on issue 412 — the checkout totals are wrong on multi-currency carts. Get a branch going."

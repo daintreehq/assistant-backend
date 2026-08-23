@@ -2,7 +2,7 @@
 
 These are first-class fields of ``POST /v1/daintree/respond`` (not an OpenAI add-on):
 the request carries stable ``startup`` data, fresh ``runtime``/``turn`` context, and the
-``selection`` policy. The response returns skill/selection metadata in the ``skills``
+``selection`` policy. The response returns runbook/selection metadata in the ``runbooks``
 block (non-streaming) or first SSE ``meta`` event (streaming). See
 ``docs/DAINTREE_API.md``.
 """
@@ -128,7 +128,7 @@ class StartupContext(BaseModel):
 
     This is deliberately separate from ``input.messages``: it reaches the main
     model as a framed data row but is never mistaken for a user utterance by the
-    skill selector or the skill-learning transcript.
+    runbook selector or the runbook-learning transcript.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -268,37 +268,37 @@ class Selection(BaseModel):
 
     policy: Literal["new_instruction", "always"] = "new_instruction"
     force: bool = False
-    # Skills the CALLER requires this turn, whatever the classifier thinks.
+    # Runbooks the CALLER requires this turn, whatever the classifier thinks.
     #
-    # `force` means "re-run the selector this round", never "select this skill",
+    # `force` means "re-run the selector this round", never "select this runbook",
     # so before this field there was no way to say the latter. The case it exists
-    # for is skill DEVELOPMENT: exercising a runbook you are rewriting against a
+    # for is runbook DEVELOPMENT: exercising a runbook you are rewriting against a
     # real turn, instead of reverse-engineering a prompt that talks the selector
     # into picking it.
     #
     # It rides ALONGSIDE selection rather than replacing it — the realistic test
     # is the runbook plus whatever else the turn genuinely needs — and it is
-    # admitted FIRST, foundation-paired, against `max_active_skills`. See
-    # `resolve_active_skills`, which owns every one of those rules.
+    # admitted FIRST, foundation-paired, against `max_active_runbooks`. See
+    # `resolve_active_runbooks`, which owns every one of those rules.
     #
     # Ids that are unknown, or not executable under this request's `profile`, are
     # dropped and REPORTED in `warnings`; they are never a 422. Whether a pin fits
     # depends on the live catalog, the foundation topology and the configured cap,
     # none of which a request-shape validator can see.
     #
-    # Gated by `skills.pinned_skill_ids` in /v1/daintree/capabilities: this model
+    # Gated by `runbooks.pinned_runbook_ids` in /v1/daintree/capabilities: this model
     # is extra="forbid", so sending the field to a deployment that predates it
     # would 422 the whole turn.
-    pinned_skill_ids: list[str] = Field(default_factory=list)
+    pinned_runbook_ids: list[str] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------
 # Shared response-metadata building blocks (reused by the native API's
-# first-class skills block in :mod:`.daintree_api`).
+# first-class runbooks block in :mod:`.daintree_api`).
 # --------------------------------------------------------------------------
 
 
-class SkillRef(BaseModel):
+class RunbookRef(BaseModel):
     id: str
     title: str
 

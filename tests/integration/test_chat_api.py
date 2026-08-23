@@ -1,4 +1,4 @@
-"""Integration tests for /v1/daintree/respond and the skill-orchestration
+"""Integration tests for /v1/daintree/respond and the runbook-orchestration
 scenarios from specification section 19.5 (native protocol)."""
 
 from __future__ import annotations
@@ -10,12 +10,12 @@ from conftest import meta_of, parse_sse, respond_body
 from fakes import FakeProvider, make_result, make_text_chunks, selection_result
 
 from daintree_assistant_server.errors import upstream_error
-from daintree_assistant_server.services.chat_orchestrator import resolve_active_skills
-from daintree_assistant_server.skills.decision import SelectionDecision
+from daintree_assistant_server.runbooks.decision import SelectionDecision
+from daintree_assistant_server.services.chat_orchestrator import resolve_active_runbooks
 
 URL = "/v1/daintree/respond"
-SKILL_PREP = "daintree.workflow.prep-branch-for-review"
-SKILL_RENAME = "daintree.terminals.rename"
+RUNBOOK_PREP = "daintree.workflow.prep-branch-for-review"
+RUNBOOK_RENAME = "daintree.terminals.rename"
 
 
 def _paired(app, *ids: str) -> list[str]:
@@ -27,11 +27,11 @@ def _paired(app, *ids: str) -> list[str]:
     from the admission order the orchestrator actually issues.
     """
     container = app.state.container
-    return resolve_active_skills(
-        SelectionDecision(skill_ids=list(ids), ran=True, degraded=False),
+    return resolve_active_runbooks(
+        SelectionDecision(runbook_ids=list(ids), ran=True, degraded=False),
         [],
         container.catalog,
-        container.settings.max_active_skills,
+        container.settings.max_active_runbooks,
     ).active
 
 
@@ -39,40 +39,40 @@ def _main_request(provider: FakeProvider):
     return provider.requests[-1]
 
 
-def _loaded_skills_message(provider: FakeProvider) -> str:
-    # Find by content, not a brittle fixed position: skill bodies lead the injected
+def _loaded_runbooks_message(provider: FakeProvider) -> str:
+    # Find by content, not a brittle fixed position: runbook bodies lead the injected
     # user-role rows, with optional integrations, the stable startup block and the
     # visible conversation following them (issue #39).
-    # Match "## Skill 1:" because the base prompt mentions "# Loaded skills" in prose.
+    # Match "## Runbook 1:" because the base prompt mentions "# Loaded runbooks" in prose.
     return next(
         m["content"]
         for m in _main_request(provider).messages
-        if "## Skill 1:" in (m.get("content") or "")
+        if "## Runbook 1:" in (m.get("content") or "")
     )
 
 
-def test_scenario1_new_session_skill_selected(client, auth, fake_provider, app) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+def test_scenario1_new_session_runbook_selected(client, auth, fake_provider, app) -> None:
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep this branch for review"}],
         session_id="s1", turn_id="t1",
     ))
     assert r.status_code == 200
     meta = meta_of(r.json())
-    assert [s["id"] for s in meta["active_skills"]] == _paired(app, SKILL_PREP)
-    assert [s["id"] for s in meta["newly_loaded_skills"]] == _paired(app, SKILL_PREP)
-    # One synthetic skill.load per newly-loaded skill (the pick + its foundation).
-    assert len(meta["prelude"]["tool_executions"]) == len(meta["newly_loaded_skills"])
-    assert all(t["display_name"] == "skill.load" for t in meta["prelude"]["tool_executions"])
+    assert [s["id"] for s in meta["active_runbooks"]] == _paired(app, RUNBOOK_PREP)
+    assert [s["id"] for s in meta["newly_loaded_runbooks"]] == _paired(app, RUNBOOK_PREP)
+    # One synthetic runbook.load per newly-loaded runbook (the pick + its foundation).
+    assert len(meta["prelude"]["tool_executions"]) == len(meta["newly_loaded_runbooks"])
+    assert all(t["display_name"] == "runbook.load" for t in meta["prelude"]["tool_executions"])
     upstream = _main_request(fake_provider)
-    # The CLI sees a skill.load prelude (above), but the model must NOT — skills
-    # reach it as plain context, with no synthetic skill__load call to imitate.
+    # The CLI sees a runbook.load prelude (above), but the model must NOT — runbooks
+    # reach it as plain context, with no synthetic runbook__load call to imitate.
     assert not any(
-        m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "skill__load"
+        m.get("tool_calls") and m["tool_calls"][0]["function"]["name"] == "runbook__load"
         for m in upstream.messages
     )
-    skill = app.state.container.catalog.get(SKILL_PREP)
-    assert skill.title in _loaded_skills_message(fake_provider)
+    runbook = app.state.container.catalog.get(RUNBOOK_PREP)
+    assert runbook.title in _loaded_runbooks_message(fake_provider)
 
 
 def test_structured_startup_reaches_main_model_but_not_selector(
@@ -136,18 +136,18 @@ def test_structured_startup_reaches_main_model_but_not_selector(
     assert startup_idx < visible_idx
 
 
-def test_scenario2_no_relevant_skill_no_prelude(client, auth, fake_provider) -> None:
+def test_scenario2_no_relevant_runbook_no_prelude(client, auth, fake_provider) -> None:
     fake_provider.selection_result = selection_result([])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "rename my terminals"}], session_id="s2", turn_id="t1",
     ))
     meta = meta_of(r.json())
-    assert meta["active_skills"] == []
+    assert meta["active_runbooks"] == []
     assert meta["prelude"]["tool_executions"] == []
 
 
 def test_scenario3_same_turn_round_does_not_rerun(client, auth, fake_provider, app) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep branch"}], session_id="s3", turn_id="t1", round=0,
     ))
@@ -167,18 +167,18 @@ def test_scenario3_same_turn_round_does_not_rerun(client, auth, fake_provider, a
     meta = meta_of(r2.json())
     assert len(fake_provider.selection_requests) == 0  # selector NOT rerun
     assert meta["selector"]["ran"] is False
-    assert [s["id"] for s in meta["active_skills"]] == _paired(app, SKILL_PREP)
-    assert meta["newly_loaded_skills"] == []
+    assert [s["id"] for s in meta["active_runbooks"]] == _paired(app, RUNBOOK_PREP)
+    assert meta["newly_loaded_runbooks"] == []
 
 
 def test_scenario4_new_turn_reruns(client, auth, fake_provider) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep branch"}], session_id="s4", turn_id="t1",
     ))
     state = r1.json()["state"]
     fake_provider.selection_requests.clear()
-    fake_provider.selection_result = selection_result([SKILL_RENAME])
+    fake_provider.selection_result = selection_result([RUNBOOK_RENAME])
 
     r2 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "rename terminals"}], session_id="s4", turn_id="t2", state=state,
@@ -186,11 +186,11 @@ def test_scenario4_new_turn_reruns(client, auth, fake_provider) -> None:
     meta = meta_of(r2.json())
     assert len(fake_provider.selection_requests) == 1
     assert meta["selector"]["ran"] is True
-    assert SKILL_RENAME in [s["id"] for s in meta["active_skills"]]
+    assert RUNBOOK_RENAME in [s["id"] for s in meta["active_runbooks"]]
 
 
 def test_scenario5_interjection_reruns_once(client, auth, fake_provider) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep branch"}], session_id="s5", turn_id="t1", instruction_revision=0,
     ))
@@ -206,7 +206,7 @@ def test_scenario5_interjection_reruns_once(client, auth, fake_provider) -> None
 
 
 def test_scenario6_selector_run_caps_at_three(client, auth, fake_provider, app) -> None:
-    # A single authoritative selector run is capped: 4 returned ids → 3 skills load.
+    # A single authoritative selector run is capped: 4 returned ids → 3 runbooks load.
     # What fills those 3 slots is unit admission — the top-ranked pick arrives with
     # its domain foundation, and the MARGINAL specific is what the cap costs.
     catalog = app.state.container.catalog
@@ -216,10 +216,10 @@ def test_scenario6_selector_run_caps_at_three(client, auth, fake_provider, app) 
         [{"role": "user", "content": "a big multi-workflow task"}], session_id="s6", turn_id="t1",
     ))
     meta = meta_of(r.json())
-    active = [s["id"] for s in meta["active_skills"]]
+    active = [s["id"] for s in meta["active_runbooks"]]
     assert len(active) == 3  # the budget is fully spent, never left short
     assert active[0] == ids[0]  # rank order leads
-    for sid in active:  # …and every loaded skill's domain foundation is loaded too
+    for sid in active:  # …and every loaded runbook's domain foundation is loaded too
         foundation = catalog.domain_foundation(sid)
         assert foundation is None or foundation in active
 
@@ -243,23 +243,23 @@ def test_scenario6b_new_instruction_replaces_prior(client, auth, fake_provider, 
         session_id="s6b", turn_id="t2", state=state,
     ))
     meta = meta_of(r2.json())
-    active = [s["id"] for s in meta["active_skills"]]
+    active = [s["id"] for s in meta["active_runbooks"]]
     assert active == _paired(app, ids[1])  # prior ids[0] evicted — authoritative replacement
     assert ids[0] not in active
-    assert [s["id"] for s in meta["newly_loaded_skills"]] == [ids[1]]
+    assert [s["id"] for s in meta["newly_loaded_runbooks"]] == [ids[1]]
 
 
 def test_scenario7_unknown_and_duplicate_ids(client, auth, fake_provider, app) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP, "nonexistent", SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP, "nonexistent", RUNBOOK_PREP])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="s7", turn_id="t1",
     ))
     meta = meta_of(r.json())
-    assert [s["id"] for s in meta["active_skills"]] == _paired(app, SKILL_PREP)
+    assert [s["id"] for s in meta["active_runbooks"]] == _paired(app, RUNBOOK_PREP)
 
 
 def test_scenario8_selector_fails_retains_prior(client, auth, fake_provider, app) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="s8", turn_id="t1",
     ))
@@ -272,17 +272,17 @@ def test_scenario8_selector_fails_retains_prior(client, auth, fake_provider, app
     assert r2.status_code == 200
     meta = meta_of(r2.json())
     assert meta["selector"]["degraded"] is True
-    assert "skill_selector_failed_open" in meta["warnings"]
-    assert [s["id"] for s in meta["active_skills"]] == _paired(app, SKILL_PREP)
+    assert "runbook_selector_failed_open" in meta["warnings"]
+    assert [s["id"] for s in meta["active_runbooks"]] == _paired(app, RUNBOOK_PREP)
 
 
 def test_scenario9_catalog_revision_change_reruns(client, auth, fake_provider, app) -> None:
     codec = app.state.container.state_codec
     stale = codec.issue(
-        session_id="s9", active_skills=[SKILL_PREP],
+        session_id="s9", active_runbooks=[RUNBOOK_PREP],
         catalog_revision="sha256:stale", turn_id="t1", instruction_revision=0,
     )
-    fake_provider.selection_result = selection_result([SKILL_RENAME])
+    fake_provider.selection_result = selection_result([RUNBOOK_RENAME])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "rename"}], session_id="s9", turn_id="t1", state=stale,
     ))
@@ -292,7 +292,7 @@ def test_scenario9_catalog_revision_change_reruns(client, auth, fake_provider, a
 
 
 def test_scenario10_replayed_state_other_session(client, auth, fake_provider) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     r1 = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep"}], session_id="sessionA", turn_id="t1",
     ))
@@ -302,13 +302,13 @@ def test_scenario10_replayed_state_other_session(client, auth, fake_provider) ->
         [{"role": "user", "content": "prep"}], session_id="sessionB", turn_id="t1", state=state,
     ))
     meta = meta_of(r2.json())
-    assert "skill_state_session_mismatch" in meta["warnings"]
+    assert "runbook_state_session_mismatch" in meta["warnings"]
     assert meta["selector"]["ran"] is True
-    assert meta["active_skills"] == []
+    assert meta["active_runbooks"] == []
 
 
 def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider, app) -> None:
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     fake_provider.stream_chunks = make_text_chunks("hello there")
     body = respond_body(
         [{"role": "user", "content": "prep"}], session_id="ss", turn_id="t1",
@@ -324,7 +324,7 @@ def test_streaming_meta_event_first_then_deltas(client, auth, fake_provider, app
     assert "delta" in kinds
     assert "status" not in kinds  # no thinking-phase status event: the fake stream emits no reasoning_content
     meta = meta_of(events[0][1])
-    assert [sk["id"] for sk in meta["active_skills"]] == _paired(app, SKILL_PREP)
+    assert [sk["id"] for sk in meta["active_runbooks"]] == _paired(app, RUNBOOK_PREP)
     streamed = "".join(d.get("content", "") for e, d in events if e == "delta")
     assert "hello" in streamed
 
@@ -383,7 +383,7 @@ def test_stream_surfaces_reasoning_content(client, auth, fake_provider) -> None:
 def test_missing_session_rejected_422(client, auth) -> None:
     # The native protocol has no stateless mode: session is required by schema.
     r = client.post(URL, headers=auth, json={
-        "protocol_version": 2, "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
+        "protocol_version": 3, "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
     })
     assert r.status_code == 400  # RequestValidationError -> invalid_request_error
 
@@ -392,7 +392,7 @@ def test_missing_session_rejected_422(client, auth) -> None:
     "messages,tools,code",
     [
         ([{"role": "system", "content": "x"}, {"role": "user", "content": "y"}], None, "system_messages_not_allowed"),
-        ([{"role": "user", "content": "x"}], [{"type": "function", "function": {"name": "skill__load"}}], "reserved_tool_name"),
+        ([{"role": "user", "content": "x"}], [{"type": "function", "function": {"name": "runbook__load"}}], "reserved_tool_name"),
     ],
 )
 def test_error_envelopes(client, auth, messages, tools, code) -> None:
@@ -1074,7 +1074,7 @@ def test_request_id_is_unified_across_header_and_meta(client, auth, fake_provide
 
 
 # ---------------------------------------------------------------------------
-# selection.pinned_skill_ids — the caller's own pin (issue #54).
+# selection.pinned_runbook_ids — the caller's own pin (issue #54).
 #
 # End-to-end rather than resolver-level: the unit tests in
 # tests/unit/test_orchestrator.py own the admission algebra, so what these assert
@@ -1086,36 +1086,36 @@ def test_request_id_is_unified_across_header_and_meta(client, auth, fake_provide
 
 def _non_foundation_ids(app, count: int) -> list[str]:
     catalog = app.state.container.catalog
-    return [s.id for s in catalog.skills if not s.meta.foundation][:count]
+    return [s.id for s in catalog.runbooks if not s.meta.foundation][:count]
 
 
-def test_a_pinned_skill_loads_even_when_the_selector_wanted_something_else(
+def test_a_pinned_runbook_loads_even_when_the_selector_wanted_something_else(
     client, auth, fake_provider, app
 ) -> None:
     """The headline. The classifier picks the rename runbook; the caller pinned the
     prep-branch one, and the pinned body is what the model is handed."""
-    fake_provider.selection_result = selection_result([SKILL_RENAME])
+    fake_provider.selection_result = selection_result([RUNBOOK_RENAME])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "rename my terminals"}],
         session_id="pin1", turn_id="t1",
-        selection={"pinned_skill_ids": [SKILL_PREP]},
+        selection={"pinned_runbook_ids": [RUNBOOK_PREP]},
     ))
     assert r.status_code == 200, r.text
     body = r.json()
-    active = [s["id"] for s in body["skills"]["active"]]
-    assert active[0] == SKILL_PREP, f"the pin did not outrank the selection; {active}"
-    # Against the real body text, not the id. The loaded-skills template prints
-    # "Skill id: …" for every entry, so asserting the id would pass even if the
+    active = [s["id"] for s in body["runbooks"]["active"]]
+    assert active[0] == RUNBOOK_PREP, f"the pin did not outrank the selection; {active}"
+    # Against the real body text, not the id. The loaded-runbooks template prints
+    # "Runbook id: …" for every entry, so asserting the id would pass even if the
     # runbook itself were rendered empty — which is the failure that matters.
-    loaded = _loaded_skills_message(fake_provider)
-    prep_body = app.state.container.catalog.get(SKILL_PREP).body
+    loaded = _loaded_runbooks_message(fake_provider)
+    prep_body = app.state.container.catalog.get(RUNBOOK_PREP).body
     assert prep_body.strip().splitlines()[0] in loaded, (
         "the pinned runbook's BODY never reached the model"
     )
     assert body["warnings"] == []
 
 
-def test_a_pinned_skill_survives_a_continuation_round_without_reselection(
+def test_a_pinned_runbook_survives_a_continuation_round_without_reselection(
     client, auth, fake_provider, app
 ) -> None:
     """The selector does not run on a tool-continuation round, so if pins only
@@ -1125,23 +1125,23 @@ def test_a_pinned_skill_survives_a_continuation_round_without_reselection(
     first = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hello"}],
         session_id="pin2", turn_id="t1",
-        selection={"pinned_skill_ids": [SKILL_PREP]},
+        selection={"pinned_runbook_ids": [RUNBOOK_PREP]},
     ))
     assert first.status_code == 200, first.text
     state = first.json()["state"]
-    assert SKILL_PREP in [s["id"] for s in first.json()["skills"]["active"]]
+    assert RUNBOOK_PREP in [s["id"] for s in first.json()["runbooks"]["active"]]
 
     second = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hello"}, {"role": "assistant", "content": "hi"},
          {"role": "user", "content": "and now?"}],
         session_id="pin2", turn_id="t1", round=1, state=state,
-        selection={"pinned_skill_ids": [SKILL_PREP]},
+        selection={"pinned_runbook_ids": [RUNBOOK_PREP]},
     ))
     assert second.status_code == 200, second.text
-    active = [s["id"] for s in second.json()["skills"]["active"]]
-    assert SKILL_PREP in active, f"the pin was lost on continuation; {active}"
-    assert second.json()["skills"]["newly_loaded"] == [], (
-        "a skill already active must not be announced as a fresh load a second time"
+    active = [s["id"] for s in second.json()["runbooks"]["active"]]
+    assert RUNBOOK_PREP in active, f"the pin was lost on continuation; {active}"
+    assert second.json()["runbooks"]["newly_loaded"] == [], (
+        "a runbook already active must not be announced as a fresh load a second time"
     )
 
 
@@ -1154,12 +1154,12 @@ def test_an_unknown_pinned_id_warns_instead_of_silently_doing_nothing(
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hello"}],
         session_id="pin3", turn_id="t1",
-        selection={"pinned_skill_ids": ["daintree.does.not-exist"]},
+        selection={"pinned_runbook_ids": ["daintree.does.not-exist"]},
     ))
     assert r.status_code == 200, "an unknown pin degrades the turn, it never fails it"
     body = r.json()
-    assert "unknown_skill_id_ignored" in body["warnings"]
-    assert body["skills"]["active"] == []
+    assert "unknown_runbook_id_ignored" in body["warnings"]
+    assert body["runbooks"]["active"] == []
 
 
 def test_the_unknown_pin_warning_reaches_the_stream_meta_event(
@@ -1173,12 +1173,12 @@ def test_the_unknown_pin_warning_reaches_the_stream_meta_event(
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hello"}],
         session_id="pin4", turn_id="t1",
-        selection={"pinned_skill_ids": ["daintree.does.not-exist"]},
+        selection={"pinned_runbook_ids": ["daintree.does.not-exist"]},
         generation={"stream": True},
     ))
     assert r.status_code == 200
     events = {e: d for e, d in parse_sse(r.text) if e == "meta"}
-    assert "unknown_skill_id_ignored" in events["meta"]["warnings"]
+    assert "unknown_runbook_id_ignored" in events["meta"]["warnings"]
 
 
 def test_pins_that_overflow_the_cap_are_reported(client, auth, fake_provider, app) -> None:
@@ -1192,24 +1192,24 @@ def test_pins_that_overflow_the_cap_are_reported(client, auth, fake_provider, ap
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hello"}],
         session_id="pin5", turn_id="t1",
-        selection={"pinned_skill_ids": pins},
+        selection={"pinned_runbook_ids": pins},
     ))
     assert r.status_code == 200, r.text
     body = r.json()
-    assert "pinned_skill_over_cap" in body["warnings"]
-    assert len(body["skills"]["active"]) <= app.state.container.settings.max_active_skills
+    assert "pinned_runbook_over_cap" in body["warnings"]
+    assert len(body["runbooks"]["active"]) <= app.state.container.settings.max_active_runbooks
 
 
 def test_an_ordinary_turn_sends_no_pins_and_is_unchanged(client, auth, fake_provider, app) -> None:
     """The field is opt-in and inert. An ordinary turn must resolve exactly as it
     did before the tier existed — the prompt cache depends on it."""
-    fake_provider.selection_result = selection_result([SKILL_PREP])
+    fake_provider.selection_result = selection_result([RUNBOOK_PREP])
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "prep this branch for review"}],
         session_id="pin6", turn_id="t1",
     ))
     assert r.status_code == 200
-    assert [s["id"] for s in r.json()["skills"]["active"]] == _paired(app, SKILL_PREP)
+    assert [s["id"] for s in r.json()["runbooks"]["active"]] == _paired(app, RUNBOOK_PREP)
     assert r.json()["warnings"] == []
 
 
@@ -1220,23 +1220,23 @@ def test_a_large_pin_list_is_refused_at_the_boundary(client, auth, fake_provider
     no timeout could interrupt it.
 
     The de-duplication is still linear, but the n is no longer the caller's to
-    choose: `cap_pinned_skill_ids` refuses the list before any of that code runs.
+    choose: `cap_pinned_runbook_ids` refuses the list before any of that code runs.
     The test asserts the CAP now, because that is what makes the quadratic path
     structurally unreachable — a fix at the boundary rather than one downstream of
     it. Below the cap the resolver is exercised by the two tests that follow."""
     fake_provider.selection_result = selection_result([])
-    pins = [f"daintree.bogus.skill-{i}" for i in range(20_000)]
+    pins = [f"daintree.bogus.runbook-{i}" for i in range(20_000)]
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hello"}],
         session_id="pin7", turn_id="t1",
-        selection={"pinned_skill_ids": pins},
+        selection={"pinned_runbook_ids": pins},
     ))
     assert r.status_code == 413, r.text
     error = r.json()["error"]
     assert error["code"] == "request_too_large"
     # Names the field, so a client author is not left guessing which list was
     # the oversized one.
-    assert error["param"] == "selection.pinned_skill_ids"
+    assert error["param"] == "selection.pinned_runbook_ids"
     # Refused at the boundary means the turn never ran.
     assert not fake_provider.requests
 
@@ -1250,15 +1250,15 @@ def test_duplicate_and_unknown_pins_report_one_warning_each(
     r = client.post(URL, headers=auth, json=respond_body(
         [{"role": "user", "content": "hello"}],
         session_id="pin8", turn_id="t1",
-        selection={"pinned_skill_ids": [
-            SKILL_PREP, "daintree.nope.one", SKILL_PREP, "daintree.nope.two", "",
+        selection={"pinned_runbook_ids": [
+            RUNBOOK_PREP, "daintree.nope.one", RUNBOOK_PREP, "daintree.nope.two", "",
         ]},
     ))
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body["warnings"].count("unknown_skill_id_ignored") == 1
-    active = [s["id"] for s in body["skills"]["active"]]
-    assert active.count(SKILL_PREP) == 1, f"a repeated pin loaded twice; {active}"
+    assert body["warnings"].count("unknown_runbook_id_ignored") == 1
+    active = [s["id"] for s in body["runbooks"]["active"]]
+    assert active.count(RUNBOOK_PREP) == 1, f"a repeated pin loaded twice; {active}"
 
 
 # --------------------------------------------------------------------------

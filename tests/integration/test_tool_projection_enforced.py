@@ -23,12 +23,12 @@ from fakes import FakeProvider, make_result, selection_result
 
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import create_app
-from daintree_assistant_server.skills import tool_projection
+from daintree_assistant_server.runbooks import tool_projection
 
 URL = "/v1/daintree/respond"
 
-# `forge__getPR` is DECLARED by skills in the real catalog but needed by none of
-# them on a skill-less turn, so it is genuinely withheld. A name no skill declares
+# `forge__getPR` is DECLARED by runbooks in the real catalog but needed by none of
+# them on a runbook-less turn, so it is genuinely withheld. A name no runbook declares
 # would pass through as unclassified and prove nothing.
 CORE_TOOL: dict[str, Any] = {
     "type": "function",
@@ -378,7 +378,7 @@ def test_an_unanswered_call_keeps_its_tool_on_the_wire(enforced_client, fake_pro
     assert "recipe__run" not in sent, "nothing was filtered, so this proves nothing"
 
 
-def test_a_tool_no_skill_declares_survives_enforcement(enforced_client, fake_provider) -> None:  # type: ignore[no-untyped-def]
+def test_a_tool_no_runbook_declares_survives_enforcement(enforced_client, fake_provider) -> None:  # type: ignore[no-untyped-def]
     """The catalog cannot judge what it has never heard of.
 
     A client-side or integration-contributed tool has no `requiredTools` entry
@@ -404,8 +404,8 @@ def test_a_tool_no_skill_declares_survives_enforcement(enforced_client, fake_pro
 
 
 def test_a_sub_agent_turn_is_held_out(enforced_client, fake_provider) -> None:  # type: ignore[no-untyped-def]
-    """Sub-agents choose from a narrowed menu that few skills survive, so most of
-    their turns are skill-less — the shape where a core tuned for the ASSISTANT
+    """Sub-agents choose from a narrowed menu that few runbooks survive, so most of
+    their turns are runbook-less — the shape where a core tuned for the ASSISTANT
     base prompt is the wrong core."""
     fake_provider.selection_result = selection_result([])
     fake_provider.complete_result = make_result(content="ok")
@@ -427,7 +427,7 @@ def test_a_sub_agent_turn_is_held_out(enforced_client, fake_provider) -> None:  
 
 
 # ---------------------------------------------------------------------------
-# The skill path, which none of the above reaches.
+# The runbook path, which none of the above reaches.
 # ---------------------------------------------------------------------------
 
 
@@ -442,10 +442,10 @@ def _named(name: str) -> dict[str, Any]:
     }
 
 
-def test_an_active_skill_puts_its_declared_tools_on_the_wire(
+def test_an_active_runbook_puts_its_declared_tools_on_the_wire(
     enforced_client, fake_provider
 ) -> None:  # type: ignore[no-untyped-def]
-    """The whole skill-admission path, end to end — and nothing else covers it.
+    """The whole runbook-admission path, end to end — and nothing else covers it.
 
     Every other enforced test here scripts `selection_result([])`, so a wiring
     regression that passed `[]` into `project_tools` instead of the resolved
@@ -457,25 +457,25 @@ def test_an_active_skill_puts_its_declared_tools_on_the_wire(
     fake_provider.complete_result = make_result(content="renamed")
     tools = [
         CORE_TOOL,  # core
-        _named("terminal__rename"),  # the skill's own reason for existing
-        _named("terminal__extract__json"),  # also declared by the skill
+        _named("terminal__rename"),  # the runbook's own reason for existing
+        _named("terminal__extract__json"),  # also declared by the runbook
         _named("git__getProjectPulse"),  # ONLY via the paired domain foundation
-        _named("skill__step__advance"),  # the scaffold, because a skill is active
+        _named("runbook__step__advance"),  # the scaffold, because a runbook is active
         WITHHELD_TOOL,  # declared elsewhere, needed by nothing here
     ]
     with structlog.testing.capture_logs() as logs:
-        response = _post(enforced_client(), **_turn(session_id="enf-skill", tools=tools))
+        response = _post(enforced_client(), **_turn(session_id="enf-runbook", tools=tools))
     assert response.status_code == 200
     sent = set(_sent_tool_names(fake_provider))
     assert {"terminal__rename", "terminal__extract__json"} <= sent, (
-        "the selected skill's own tools were withheld"
+        "the selected runbook's own tools were withheld"
     )
     # `git__getProjectPulse` is declared by the foundation and by nothing in the
     # core, so this is the only assertion here that can fail if pairing breaks.
     # An earlier version asserted `daintree__call`, which is core — it would have
     # passed with foundation pairing removed entirely.
     assert "git__getProjectPulse" in sent, "the paired domain foundation's tools were withheld"
-    assert "skill__step__advance" in sent, "the scaffold was withheld with a skill active"
+    assert "runbook__step__advance" in sent, "the scaffold was withheld with a runbook active"
     assert "context__snapshot" in sent
     # And the point of the exercise: something was actually dropped.
     assert "forge__getPR" not in sent
@@ -670,7 +670,7 @@ def test_a_continuation_round_keeps_enforcing_against_the_reused_set(
         _named("terminal__rename"),
         _named("terminal__extract__json"),
         _named("daintree__call"),
-        _named("skill__step__advance"),
+        _named("runbook__step__advance"),
         WITHHELD_TOOL,
     ]
     fake_provider.selection_result = selection_result(["daintree.terminals.rename"])

@@ -36,7 +36,7 @@ def turn_cost(
 ) -> TurnCost | None:
     """Total USD this request charged the caller, across every upstream call.
 
-    A turn is normally TWO billed calls — the skill selector and the main
+    A turn is normally TWO billed calls — the runbook selector and the main
     completion — plus, on a re-rolled round, a generation the user never saw.
     All of it is charged to the caller's own key, so reporting only the main
     call would understate their bill by the part they cannot see.
@@ -65,7 +65,7 @@ def turn_cost(
     (and ``meta.selector_cost_complete``) carry that fact out of the summing
     helpers, because by the time the float arrives here it is unrecoverable.
     """
-    selector_usage = meta.skills.selector.usage
+    selector_usage = meta.runbooks.selector.usage
     selector = selector_usage.cost if selector_usage is not None else None
     # "Ran" is what makes a missing cost UNKNOWN rather than genuinely zero.
     # A turn that skipped selection entirely (continuation round, no-task
@@ -227,7 +227,7 @@ def log_turn_usage(
         # the wrong number.
         #
         # Read from the PROVIDER's record, not the wire projection in the
-        # `skills` block: that one floors every count to 0 for the client, which
+        # `runbooks` block: that one floors every count to 0 for the client, which
         # would resurrect the fabricated cold-cache 0.0 on this side too.
         # `selector_ran` is what keeps a silent call distinguishable from no call
         # once those counts are allowed to be `None`.

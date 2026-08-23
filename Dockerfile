@@ -12,7 +12,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy sources and install against the pinned lock for reproducible builds.
-# Prompt/skill files ship as package data. requirements.lock is a constraints
+# Prompt/runbook files ship as package data. requirements.lock is a constraints
 # file: it pins versions but only the runtime deps from pyproject get installed.
 COPY pyproject.toml README.md requirements.lock ./
 COPY src ./src

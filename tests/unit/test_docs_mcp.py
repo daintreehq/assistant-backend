@@ -421,7 +421,7 @@ def test_rendering_carries_the_path_for_citation() -> None:
 def test_a_huge_result_set_is_capped_before_it_reaches_the_prompt() -> None:
     """Docs pages run to tens of kilobytes; this block rides the volatile tail.
 
-    Uncapped it would dwarf the skill bodies beside it and be re-encoded on the
+    Uncapped it would dwarf the runbook bodies beside it and be re-encoded on the
     next turn for a question that will not be asked again.
     """
     huge = [

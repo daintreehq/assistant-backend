@@ -842,7 +842,7 @@
   "type": "function",
   "function": {
    "name": "daintree__listTools",
-   "description": "List the Daintree MCP tools, with their names and descriptions. Each entry carries a `callable` flag: tools marked `callable: false` are known to exist but are not offered in this turn's tool spec (e.g. an active skill narrowed the toolset), so calling them would do nothing.",
+   "description": "List the Daintree MCP tools, with their names and descriptions. Each entry carries a `callable` flag: tools marked `callable: false` are known to exist but are not offered in this turn's tool spec (e.g. an active runbook narrowed the toolset), so calling them would do nothing.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -2057,18 +2057,18 @@
  {
   "type": "function",
   "function": {
-   "name": "skill__run__get",
-   "description": "Read your stepwise progress through a loaded skill's runbook in THIS session: currentStep, per-step status (done|skipped) with notes and timestamps, and the run status. Absence is a NORMAL ok answer ({state: null}) \u2014 it means no step has been advanced yet, not an error. Use it after a compaction or a wake turn to find where you left off. Requires a live session.",
+   "name": "runbook__run__get",
+   "description": "Read your stepwise progress through a loaded runbook in THIS session: currentStep, per-step status (done|skipped) with notes and timestamps, and the run status. Absence is a NORMAL ok answer ({state: null}) \u2014 it means no step has been advanced yet, not an error. Use it after a compaction or a wake turn to find where you left off. Requires a live session.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
-     "skillId": {
+     "runbookId": {
       "minLength": 1,
       "type": "string"
      }
     },
     "required": [
-     "skillId"
+     "runbookId"
     ],
     "type": "object"
    }
@@ -2077,8 +2077,8 @@
  {
   "type": "function",
   "function": {
-   "name": "skill__step__advance",
-   "description": "Record that step N of a loaded skill's runbook is done (or skipped) and move to nextStep; OMIT nextStep to finish the run. Call it as you complete each step, not in one batch at the end \u2014 this is the progress record a compaction or a wake turn reads back through skill.run.get. currentStep never regresses. notes is an optional one-liner about what the step produced. Requires a live session.",
+   "name": "runbook__step__advance",
+   "description": "Record that step N of a loaded runbook is done (or skipped) and move to nextStep; OMIT nextStep to finish the run. Call it as you complete each step, not in one batch at the end \u2014 this is the progress record a compaction or a wake turn reads back through runbook.run.get. currentStep never regresses. notes is an optional one-liner about what the step produced. Requires a live session.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -2093,7 +2093,7 @@
      "notes": {
       "type": "string"
      },
-     "skillId": {
+     "runbookId": {
       "minLength": 1,
       "type": "string"
      },
@@ -2106,7 +2106,7 @@
      }
     },
     "required": [
-     "skillId",
+     "runbookId",
      "completedStep"
     ],
     "type": "object"

@@ -47,7 +47,7 @@ async def readyz(request: Request) -> JSONResponse:
         return JSONResponse(status_code=503, content=body)
     container = request.app.state.container
     body["catalog_revision"] = container.catalog.revision
-    body["skills"] = len(container.catalog)
+    body["runbooks"] = len(container.catalog)
     return JSONResponse(status_code=200, content=body)
 
 

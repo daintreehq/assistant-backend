@@ -310,7 +310,7 @@ def test_the_response_usage_carries_cost_through() -> None:
 
 
 def _meta(selector_usage=None, *, selector_cost_complete=True):  # type: ignore[no-untyped-def]
-    from daintree_assistant_server.contracts.daintree_api import SkillsBlock
+    from daintree_assistant_server.contracts.daintree_api import RunbooksBlock
     from daintree_assistant_server.contracts.extensions import SelectorMeta
     from daintree_assistant_server.services.chat_orchestrator import _RespondMeta
 
@@ -319,7 +319,7 @@ def _meta(selector_usage=None, *, selector_cost_complete=True):  # type: ignore[
         state=None,
         catalog_revision="c",
         prompt_version="p",
-        skills=SkillsBlock(selector=SelectorMeta(usage=selector_usage)),
+        runbooks=RunbooksBlock(selector=SelectorMeta(usage=selector_usage)),
         warnings=[],
         selector_cost_complete=selector_cost_complete,
     )
@@ -535,9 +535,9 @@ def test_a_degraded_local_selection_is_still_a_complete_total() -> None:
     classifier error, or ids the catalog cannot resolve). It carries no usage,
     so the same rule applies: nothing was billed, and nothing is unknown.
     """
-    from daintree_assistant_server.skills.decision import SelectionDecision
+    from daintree_assistant_server.runbooks.decision import SelectionDecision
 
-    decision = SelectionDecision.degraded_open(["local_skill_selector_failed_open"])
+    decision = SelectionDecision.degraded_open(["local_runbook_selector_failed_open"])
     assert decision.usage is None
     assert decision.calls == 0
 
@@ -546,8 +546,8 @@ def test_a_degraded_local_selection_is_still_a_complete_total() -> None:
     # two states that both arrive here as `selector_usage=None` and that the
     # deleted prompt-selector tests kept apart by the cost each one billed.
     meta = _meta(None)
-    meta.skills.selector.ran = True
-    meta.skills.selector.degraded = True
+    meta.runbooks.selector.ran = True
+    meta.runbooks.selector.degraded = True
     cost = turn_cost(ProviderUsage(cost=0.002), meta)
     assert cost is not None
     assert cost.complete is True, (

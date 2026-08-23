@@ -52,7 +52,7 @@ def _request(
 ) -> RespondRequest:
     """A streaming turn with enough settled history to have a span."""
     payload: dict[str, Any] = {
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": session_id, "turn_id": "turn-1"},
         "input": {
             "messages": [
@@ -337,7 +337,7 @@ async def test_a_short_conversation_has_nothing_to_compact(
     compactor = FakeCompactor()
     request = RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "short", "turn_id": "turn-1"},
             "input": {"messages": [{"role": "user", "content": "hi"}]},
             "startup": {},

@@ -18,7 +18,7 @@ from daintree_assistant_server.contracts.tasks import TaskRequest
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.task_runner import TaskRunner
 
-SKILL_PREP = "daintree.workflow.prep-branch-for-review"
+RUNBOOK_PREP = "daintree.workflow.prep-branch-for-review"
 
 TOOLS = [
     {"name": "context.snapshot", "risk": "read"},
@@ -238,33 +238,33 @@ async def test_plan_confidence_clamped(
 
 
 @pytest.mark.asyncio
-async def test_plan_prompt_includes_skill_outline_not_body(
+async def test_plan_prompt_includes_runbook_outline_not_body(
     task_runner: TaskRunner, fake_provider: FakeProvider, catalog
 ) -> None:
     fake_provider.complete_result = make_result(content=json.dumps(plan_payload()))
     await _run(
         task_runner,
         "workflow_plan",
-        {"goal": "g", "tool_inventory": TOOLS, "active_skill_ids": [SKILL_PREP]},
+        {"goal": "g", "tool_inventory": TOOLS, "active_runbook_ids": [RUNBOOK_PREP]},
     )
     user_msg = fake_provider.requests[0].messages[-1]["content"]
-    assert "Active skill outlines" in user_msg
-    assert f"- id: {SKILL_PREP}" in user_msg
+    assert "Active runbook outlines" in user_msg
+    assert f"- id: {RUNBOOK_PREP}" in user_msg
     # Outline only — the raw runbook body must never reach the task prompt.
-    body = catalog.get(SKILL_PREP).body
+    body = catalog.get(RUNBOOK_PREP).body
     assert body not in user_msg
 
 
 @pytest.mark.asyncio
-async def test_plan_unknown_skill_id_ignored(
+async def test_plan_unknown_runbook_id_ignored(
     task_runner: TaskRunner, fake_provider: FakeProvider
 ) -> None:
     fake_provider.complete_result = make_result(content=json.dumps(plan_payload()))
     await _run(
-        task_runner, "workflow_plan", {"goal": "g", "active_skill_ids": ["nope.missing"]}
+        task_runner, "workflow_plan", {"goal": "g", "active_runbook_ids": ["nope.missing"]}
     )
     user_msg = fake_provider.requests[0].messages[-1]["content"]
-    assert "Active skill outlines" not in user_msg
+    assert "Active runbook outlines" not in user_msg
 
 
 @pytest.mark.asyncio

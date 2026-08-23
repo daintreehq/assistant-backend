@@ -1,6 +1,6 @@
-"""Skill-aware tool projection — what a turn WOULD send.
+"""Runbook-aware tool projection — what a turn WOULD send.
 
-Tool schemas are ~61% of a request, and filtering them to the active skills'
+Tool schemas are ~61% of a request, and filtering them to the active runbooks'
 declared needs is the largest prompt saving available. These tests cover the
 projector: which tools survive, and why each one did.
 
@@ -16,9 +16,9 @@ log: how often the model calls a tool the projection would have withheld. Read i
 from SHADOW traffic — an enforced turn cannot call a tool it was never offered,
 so enforced evidence grades itself clean by construction.
 
-`test_declared_tools_cover_what_skill_bodies_actually_use` is the offline half of
+`test_declared_tools_cover_what_runbook_bodies_actually_use` is the offline half of
 that measurement. Read what it proves narrowly: it finds backticked registry
-names in skill bodies and checks them against the frontmatter. It cannot see a
+names in runbook bodies and checks them against the frontmatter. It cannot see a
 tool the model reaches for on its own, and it cannot tell an instruction from a
 prohibition — which is why its exceptions are a hand-classified set rather than a
 count.
@@ -27,7 +27,7 @@ Two failures shaped this file, and both were invisible to a green suite:
 
 * the projection compared dotted names to wire names and matched NOTHING, while
   every test passed because the helpers built dotted names on both sides;
-* the "20 of 26 skills have undeclared tools" figure it was built to defend was
+* the "20 of 26 runbooks have undeclared tools" figure it was built to defend was
   never real — the detector derived its vocabulary from the declarations it was
   auditing, so removing a declaration also removed the evidence against it.
 
@@ -48,10 +48,10 @@ from daintree_assistant_server.contracts.openai import (
     ToolCall,
     ToolDef,
 )
-from daintree_assistant_server.skills.catalog import load_catalog
-from daintree_assistant_server.skills.tool_projection import (
+from daintree_assistant_server.runbooks.catalog import load_catalog
+from daintree_assistant_server.runbooks.tool_projection import (
     ALWAYS_AVAILABLE,
-    SKILL_SCAFFOLD_TOOLS,
+    RUNBOOK_SCAFFOLD_TOOLS,
     project_tools,
     wire_name,
 )
@@ -88,12 +88,12 @@ def _user(text: str = "do the thing") -> list[ChatMessage]:
 
 
 def test_the_core_is_always_admitted(catalog) -> None:  # type: ignore[no-untyped-def]
-    """A turn with NO skill loaded must still be able to orient, find a
+    """A turn with NO runbook loaded must still be able to orient, find a
     capability it was not given, and ask the user a question — the base prompt
     instructs it to do all three."""
     projection = project_tools(
         offered=_tools(*ALWAYS_AVAILABLE, "forge.getPR"),
-        active_skills=[],
+        active_runbooks=[],
         catalog=catalog,
         messages=_user(),
     )
@@ -101,15 +101,15 @@ def test_the_core_is_always_admitted(catalog) -> None:  # type: ignore[no-untype
     assert wire_name("forge.getPR") in projection.withheld
 
 
-def test_an_active_skills_declared_tools_are_admitted(catalog) -> None:  # type: ignore[no-untyped-def]
-    skill = catalog.get("daintree.terminals.rename")
-    assert skill is not None
-    declared = list(skill.meta.required_tools or [])
-    assert declared, "fixture skill declares no tools"
+def test_an_active_runbooks_declared_tools_are_admitted(catalog) -> None:  # type: ignore[no-untyped-def]
+    runbook = catalog.get("daintree.terminals.rename")
+    assert runbook is not None
+    declared = list(runbook.meta.required_tools or [])
+    assert declared, "fixture runbook declares no tools"
 
     projection = project_tools(
         offered=_tools(*declared, "forge.getPR"),
-        active_skills=[skill],
+        active_runbooks=[runbook],
         catalog=catalog,
         messages=_user(),
     )
@@ -137,7 +137,7 @@ def test_the_domain_foundations_tools_come_with_a_specific(catalog) -> None:  # 
 
     projection = project_tools(
         offered=_tools(*foundation_only),
-        active_skills=[specific],
+        active_runbooks=[specific],
         catalog=catalog,
         messages=_user(),
     )
@@ -152,7 +152,7 @@ def test_a_pinned_tool_choice_is_never_withheld(catalog) -> None:  # type: ignor
     provider, not a degraded turn."""
     projection = project_tools(
         offered=_tools("forge.getPR"),
-        active_skills=[],
+        active_runbooks=[],
         catalog=catalog,
         messages=_user(),
         forced_tool="forge.getPR",
@@ -179,7 +179,7 @@ def test_an_unresolved_call_keeps_its_tool_available(catalog) -> None:  # type: 
     ]
     projection = project_tools(
         offered=_tools("forge.getPR"),
-        active_skills=[],
+        active_runbooks=[],
         catalog=catalog,
         messages=messages,
     )
@@ -204,7 +204,7 @@ def test_a_resolved_call_does_not_keep_its_tool(catalog) -> None:  # type: ignor
     ]
     projection = project_tools(
         offered=_tools("forge.getPR"),
-        active_skills=[],
+        active_runbooks=[],
         catalog=catalog,
         messages=messages,
     )
@@ -232,7 +232,7 @@ def test_two_calls_to_one_tool_need_both_answered(catalog) -> None:  # type: ign
     ]
     projection = project_tools(
         offered=_tools("forge.getPR"),
-        active_skills=[],
+        active_runbooks=[],
         catalog=catalog,
         messages=messages,
     )
@@ -240,7 +240,7 @@ def test_two_calls_to_one_tool_need_both_answered(catalog) -> None:  # type: ign
 
 
 def test_a_turn_with_no_tools_projects_nothing(catalog) -> None:  # type: ignore[no-untyped-def]
-    projection = project_tools(offered=None, active_skills=[], catalog=catalog, messages=_user())
+    projection = project_tools(offered=None, active_runbooks=[], catalog=catalog, messages=_user())
     assert projection.proposed == frozenset()
     assert projection.withheld == frozenset()
 
@@ -248,11 +248,11 @@ def test_a_turn_with_no_tools_projects_nothing(catalog) -> None:  # type: ignore
 def test_the_projection_never_invents_a_tool(catalog) -> None:  # type: ignore[no-untyped-def]
     """It can only ever admit from what the client offered — a proposal naming a
     tool that was not offered would be unfulfillable."""
-    skill = catalog.get("daintree.terminals.rename")
-    assert skill is not None
+    runbook = catalog.get("daintree.terminals.rename")
+    assert runbook is not None
     projection = project_tools(
         offered=_tools("context.snapshot"),
-        active_skills=[skill],
+        active_runbooks=[runbook],
         catalog=catalog,
         messages=_user(),
         forced_tool="something.notOffered",
@@ -271,7 +271,7 @@ def test_outside_reports_exactly_the_withheld_calls(catalog) -> None:  # type: i
     # opinion about passes through as unclassified and is never outside anything.
     projection = project_tools(
         offered=_tools("context.snapshot", "recipe.run", "forge.getPR"),
-        active_skills=[],
+        active_runbooks=[],
         catalog=catalog,
         messages=_user(),
     )
@@ -293,7 +293,7 @@ def test_outside_reports_exactly_the_withheld_calls(catalog) -> None:  # type: i
 
 
 # Every dotted name in the CLI registry, from the captured inventory. This is the
-# AUTHORITY on what a tool is. An earlier version derived it from the skills' own
+# AUTHORITY on what a tool is. An earlier version derived it from the runbooks' own
 # declarations, which is circular: deleting the last declaration of a real tool
 # made every body reference to it invisible, so the check certified the very
 # regression it existed to catch.
@@ -328,7 +328,7 @@ _TICKED = re.compile(r"`([a-zA-Z][a-zA-Z0-9.]*)")
 #
 # So each pair is classified by hand. Adding or removing one fails this test and
 # demands the same review. A genuine undeclared USE does not belong here — declare
-# it in the skill's frontmatter instead.
+# it in the runbook's frontmatter instead.
 _REVIEWED_UNDECLARED = {
     # PROHIBITIONS — the body names the tool to forbid it. Declaring these would
     # be actively wrong: it would offer the model exactly what the runbook is
@@ -350,11 +350,11 @@ _REVIEWED_UNDECLARED = {
     # comes from (daintree.workflow.follow-up-on-issue, which declares it). This
     # runbook selects work; it never reads CI itself.
     ("daintree.workflow.find-issue-work", "forge.getChecks"),
-    # PROHIBITION. This skill exists because a session reached for raw git in the
+    # PROHIBITION. This runbook exists because a session reached for raw git in the
     # user's own terminal when the typed wrapper's schema gave it no argument
     # names; its step 5 forbids both the raw `daintree.call` and improvised
     # `git checkout`/`git worktree add`. Declaring it would be a false statement
-    # about the runbook's dependencies — `requiredTools` says what a skill NEEDS,
+    # about the runbook's dependencies — `requiredTools` says what a runbook NEEDS,
     # and this one needs the tool not to be used. (It would not actually withhold
     # anything: the foundation declares `daintree.call` and is projected alongside
     # every specific. The reason is metadata truth, not enforcement.)
@@ -381,15 +381,15 @@ _REVIEWED_UNDECLARED = {
 def _undeclared_references(catalog) -> set[tuple[str, str]]:  # type: ignore[no-untyped-def]
     registry = _registry_dotted_names()
     found: set[tuple[str, str]] = set()
-    for skill in catalog.skills:
-        declared = set(skill.meta.required_tools or ())
-        for token in _TICKED.findall(skill.body):
+    for runbook in catalog.runbooks:
+        declared = set(runbook.meta.required_tools or ())
+        for token in _TICKED.findall(runbook.body):
             if token in registry and token not in declared:
-                found.add((skill.id, token))
+                found.add((runbook.id, token))
     return found
 
 
-def test_declared_tools_cover_what_skill_bodies_actually_use(catalog) -> None:  # type: ignore[no-untyped-def]
+def test_declared_tools_cover_what_runbook_bodies_actually_use(catalog) -> None:  # type: ignore[no-untyped-def]
     """The Stage A measurement: is `requiredTools` an allowlist yet?
 
     Filtering treats it as one. A body that says "call `terminal.run.async`"
@@ -398,15 +398,15 @@ def test_declared_tools_cover_what_skill_bodies_actually_use(catalog) -> None:  
     as the configuration error it is.
 
     Exact set equality, so an improvement is reviewed as carefully as a
-    regression: a pair that disappears must disappear because the skill now
+    regression: a pair that disappears must disappear because the runbook now
     declares the tool, not because the detector stopped seeing it.
     """
     found = _undeclared_references(catalog)
     unexpected = sorted(found - _REVIEWED_UNDECLARED)
     stale = sorted(_REVIEWED_UNDECLARED - found)
     assert not unexpected, (
-        "skill bodies reference tools they do not declare: "
-        f"{unexpected}. If the body instructs the call, add it to that skill's "
+        "runbook bodies reference tools they do not declare: "
+        f"{unexpected}. If the body instructs the call, add it to that runbook's "
         "requiredTools. If it only warns against or explains the tool, add the "
         "pair to _REVIEWED_UNDECLARED with its classification."
     )
@@ -419,30 +419,30 @@ def test_declared_tools_cover_what_skill_bodies_actually_use(catalog) -> None:  
 def test_the_undeclared_detector_can_actually_see_a_missing_tool(catalog) -> None:  # type: ignore[no-untyped-def]
     """A test for the test. The previous detector was circular and could not.
 
-    Take a skill that DOES declare its tools, strip one declaration, and the
+    Take a runbook that DOES declare its tools, strip one declaration, and the
     reference in its body must surface. Building `known` from declarations made
     this impossible: removing the declaration also removed the tool from the
     vocabulary, and the body reference went quiet.
     """
     from dataclasses import replace
 
-    skill = next(
+    runbook = next(
         s
-        for s in catalog.skills
+        for s in catalog.runbooks
         if any(f"`{tool}" in s.body for tool in (s.meta.required_tools or ()))
     )
-    tool = next(t for t in (skill.meta.required_tools or ()) if f"`{t}" in skill.body)
+    tool = next(t for t in (runbook.meta.required_tools or ()) if f"`{t}" in runbook.body)
     stripped = replace(
-        skill,
-        meta=skill.meta.model_copy(
-            update={"required_tools": [t for t in (skill.meta.required_tools or ()) if t != tool]}
+        runbook,
+        meta=runbook.meta.model_copy(
+            update={"required_tools": [t for t in (runbook.meta.required_tools or ()) if t != tool]}
         ),
     )
 
-    class _OneSkill:
-        skills = [stripped]
+    class _OneRunbook:
+        runbooks = [stripped]
 
-    assert (stripped.id, tool) in _undeclared_references(_OneSkill())
+    assert (stripped.id, tool) in _undeclared_references(_OneRunbook())
 
 
 def test_the_core_set_is_bounded_and_real(catalog) -> None:  # type: ignore[no-untyped-def]
@@ -458,7 +458,7 @@ def test_the_core_set_is_bounded_and_real(catalog) -> None:  # type: ignore[no-u
     """
     # Reuse the hygiene suite's registry loader and dotted->wire translation, so
     # the two cannot disagree about what "exists".
-    from test_skill_catalog_hygiene import _known_tool_names, _wire_name
+    from test_runbook_catalog_hygiene import _known_tool_names, _wire_name
 
     known = _known_tool_names()
     assert len(ALWAYS_AVAILABLE) <= 30, "the always-on core is growing; each entry is permanent"
@@ -488,7 +488,7 @@ def _real_inventory() -> list[ToolDef]:
 def test_the_projection_matches_the_real_captured_inventory(catalog) -> None:  # type: ignore[no-untyped-def]
     """Every unit test above passed while the projection matched NOTHING.
 
-    Skills declare dotted names (`terminal.rename`); the CLI sends wire names
+    Runbooks declare dotted names (`terminal.rename`); the CLI sends wire names
     (`terminal__rename`). Comparing them directly withheld the whole captured inventory — a total
     inversion that only showed up against a real inventory, because the synthetic
     helpers were building dotted names on both sides.
@@ -497,34 +497,34 @@ def test_the_projection_matches_the_real_captured_inventory(catalog) -> None:  #
     assert len(tools) > 50, "inventory fixture looks truncated"
     offered = {t.function.name for t in tools}
 
-    skill = catalog.get("daintree.terminals.rename")
-    assert skill is not None
+    runbook = catalog.get("daintree.terminals.rename")
+    assert runbook is not None
     projection = project_tools(
-        offered=tools, active_skills=[skill], catalog=catalog, messages=_user()
+        offered=tools, active_runbooks=[runbook], catalog=catalog, messages=_user()
     )
 
     # The tool this runbook EXISTS to call, spelled literally. A numeric band
     # cannot express that: dropping `terminal.rename` from the frontmatter moves
     # the count by one and stays comfortably inside any range, while filtering
-    # would withhold the one tool the skill is about.
+    # would withhold the one tool the runbook is about.
     assert "terminal__rename" in projection.proposed
 
     # Exact equality, computed independently of the module under test — the
     # translation here is spelled out rather than borrowed from `wire_name`, so a
     # bug in that function cannot make both sides agree with each other.
-    foundation_id = catalog.domain_foundation(skill.id)
-    foundation = catalog.get(foundation_id) if foundation_id and foundation_id != skill.id else None
+    foundation_id = catalog.domain_foundation(runbook.id)
+    foundation = catalog.get(foundation_id) if foundation_id and foundation_id != runbook.id else None
     expected_dotted = (
         set(ALWAYS_AVAILABLE)
-        # A skill is active, so the loaded-skills block renders and instructs the
-        # run scaffold. No skill declares these — they belong to the template.
-        | set(SKILL_SCAFFOLD_TOOLS)
-        | set(skill.meta.required_tools or ())
+        # A runbook is active, so the loaded-runbooks block renders and instructs the
+        # run scaffold. No runbook declares these — they belong to the template.
+        | set(RUNBOOK_SCAFFOLD_TOOLS)
+        | set(runbook.meta.required_tools or ())
         | set(foundation.meta.required_tools or () if foundation else ())
     )
     expected = offered & {name.replace(".", "__") for name in expected_dotted}
     # Plus everything the catalog has no opinion about. Withholding argues from a
-    # skill's metadata, and there is no metadata about a tool no skill declares.
+    # runbook's metadata, and there is no metadata about a tool no runbook declares.
     expected |= offered - catalog.declared_tools
     assert projection.proposed == expected
 
@@ -533,7 +533,7 @@ def test_the_projection_matches_the_real_captured_inventory(catalog) -> None:  #
 
 
 @pytest.mark.parametrize(
-    "skill_id",
+    "runbook_id",
     [
         "daintree.terminals.rename",
         "daintree.edits.spawn-visible-agent",
@@ -541,36 +541,36 @@ def test_the_projection_matches_the_real_captured_inventory(catalog) -> None:  #
         "daintree.workflow.start-work-on-issue",
     ],
 )
-def test_a_typical_turn_would_shed_a_material_share_of_the_payload(catalog, skill_id: str) -> None:  # type: ignore[no-untyped-def]
+def test_a_typical_turn_would_shed_a_material_share_of_the_payload(catalog, runbook_id: str) -> None:  # type: ignore[no-untyped-def]
     """The size of the prize, pinned so a metadata change that quietly admits
     everything shows up as a failed test rather than a lost saving."""
     import json
 
     tools = _real_inventory()
     by_name = {t.function.name: t for t in tools}
-    skill = catalog.get(skill_id)
-    assert skill is not None
+    runbook = catalog.get(runbook_id)
+    assert runbook is not None
 
     projection = project_tools(
-        offered=tools, active_skills=[skill], catalog=catalog, messages=_user()
+        offered=tools, active_runbooks=[runbook], catalog=catalog, messages=_user()
     )
     kept = [by_name[n].model_dump(exclude_none=True) for n in projection.proposed if n in by_name]
     full = json.dumps([t.model_dump(exclude_none=True) for t in tools], separators=(",", ":"))
     reduced = json.dumps(kept, separators=(",", ":"))
     saving = 1 - len(reduced) / len(full)
-    assert saving > 0.3, f"{skill_id}: only {saving:.0%} of the tool payload would be shed"
+    assert saving > 0.3, f"{runbook_id}: only {saving:.0%} of the tool payload would be shed"
 
 
 # ---------------------------------------------------------------------------
-# Degenerate catalog shapes. Each of these is a real skill file away.
+# Degenerate catalog shapes. Each of these is a real runbook file away.
 # ---------------------------------------------------------------------------
 
 
-def _skill_with(tools, skill_id="test.domain.thing", foundation=False):  # type: ignore[no-untyped-def]
-    from daintree_assistant_server.skills.models import Skill, SkillMeta
+def _runbook_with(tools, runbook_id="test.domain.thing", foundation=False):  # type: ignore[no-untyped-def]
+    from daintree_assistant_server.runbooks.models import Runbook, RunbookMeta
 
     fields = {
-        "id": skill_id,
+        "id": runbook_id,
         "title": "T",
         "summary": "S",
         "whenToUse": "W",
@@ -580,21 +580,21 @@ def _skill_with(tools, skill_id="test.domain.thing", foundation=False):  # type:
     # are the two reachable shapes. An explicit null is rejected by the schema.
     if tools is not None:
         fields["requiredTools"] = tools
-    return Skill(meta=SkillMeta(**fields), body="body")
+    return Runbook(meta=RunbookMeta(**fields), body="body")
 
 
 @pytest.mark.parametrize("declared", [None, []], ids=["key-absent", "empty-list"])
-def test_a_skill_declaring_no_tools_still_gets_the_core(catalog, declared) -> None:  # type: ignore[no-untyped-def]
+def test_a_runbook_declaring_no_tools_still_gets_the_core(catalog, declared) -> None:  # type: ignore[no-untyped-def]
     """`requiredTools` is optional, so both absent and empty must behave.
 
     The turn is left with the core alone — correct, and the reason the core
-    exists: a skill that declares nothing still has to be able to orient and
+    exists: a runbook that declares nothing still has to be able to orient and
     reach `tool.search` for what it needs.
     """
     tools = _tools("context.snapshot", "tool.search", "forge.getPR")
     projection = project_tools(
         offered=tools,
-        active_skills=[_skill_with(declared)],
+        active_runbooks=[_runbook_with(declared)],
         catalog=catalog,
         messages=_user(),
     )
@@ -603,7 +603,7 @@ def test_a_skill_declaring_no_tools_still_gets_the_core(catalog, declared) -> No
 
 
 def test_a_declared_tool_the_client_does_not_offer_is_not_invented(catalog) -> None:  # type: ignore[no-untyped-def]
-    """A skill outliving the tool it names must not conjure it back.
+    """A runbook outliving the tool it names must not conjure it back.
 
     `proposed` is a subset of `offered` by construction; if it ever were not, the
     filtered request would name a tool the client cannot execute.
@@ -611,7 +611,7 @@ def test_a_declared_tool_the_client_does_not_offer_is_not_invented(catalog) -> N
     tools = _tools("context.snapshot")
     projection = project_tools(
         offered=tools,
-        active_skills=[_skill_with(["tool.that.was.removed"])],
+        active_runbooks=[_runbook_with(["tool.that.was.removed"])],
         catalog=catalog,
         messages=_user(),
     )
@@ -619,16 +619,16 @@ def test_a_declared_tool_the_client_does_not_offer_is_not_invented(catalog) -> N
     assert wire_name("tool.that.was.removed") not in projection.proposed
 
 
-def test_a_skill_that_is_its_own_foundation_does_not_recurse(catalog) -> None:  # type: ignore[no-untyped-def]
+def test_a_runbook_that_is_its_own_foundation_does_not_recurse(catalog) -> None:  # type: ignore[no-untyped-def]
     """A foundation selected directly is its own `domain_foundation`."""
-    foundations = [s for s in catalog.skills if s.meta.foundation]
-    assert foundations, "catalog has no foundation skill to exercise this with"
+    foundations = [s for s in catalog.runbooks if s.meta.foundation]
+    assert foundations, "catalog has no foundation runbook to exercise this with"
     foundation = foundations[0]
     declared = list(foundation.meta.required_tools or ()) or ["context.snapshot"]
 
     projection = project_tools(
         offered=_tools(*declared),
-        active_skills=[foundation],
+        active_runbooks=[foundation],
         catalog=catalog,
         messages=_user(),
     )
@@ -638,11 +638,11 @@ def test_a_skill_that_is_its_own_foundation_does_not_recurse(catalog) -> None:  
         assert not projection.reasons[wire_name(name)].startswith("foundation:")
 
 
-def test_a_skill_in_no_known_domain_is_not_a_crash(catalog) -> None:  # type: ignore[no-untyped-def]
+def test_a_runbook_in_no_known_domain_is_not_a_crash(catalog) -> None:  # type: ignore[no-untyped-def]
     """An id whose domain has no foundation must degrade, not raise."""
     projection = project_tools(
         offered=_tools("context.snapshot", "forge.getPR"),
-        active_skills=[_skill_with(["forge.getPR"], skill_id="nowhere.at.all")],
+        active_runbooks=[_runbook_with(["forge.getPR"], runbook_id="nowhere.at.all")],
         catalog=catalog,
         messages=_user(),
     )
@@ -653,7 +653,7 @@ def test_a_conversation_with_no_user_turn_is_handled(catalog) -> None:  # type: 
     """Nothing in the projection requires a user message to exist."""
     projection = project_tools(
         offered=_tools("context.snapshot"),
-        active_skills=[],
+        active_runbooks=[],
         catalog=catalog,
         messages=[ChatMessage(role="assistant", content="hello")],
     )
@@ -752,11 +752,11 @@ def test_the_mandated_core_is_pinned_by_name() -> None:
     )
 
 
-def test_the_scaffold_is_admitted_only_with_a_skill_active(catalog) -> None:  # type: ignore[no-untyped-def]
-    """`skill.step.advance` / `skill.run.get` follow the block that instructs them.
+def test_the_scaffold_is_admitted_only_with_a_runbook_active(catalog) -> None:  # type: ignore[no-untyped-def]
+    """`runbook.step.advance` / `runbook.run.get` follow the block that instructs them.
 
-    No skill declares either — they belong to `loaded_skills.md.j2` — so nothing
-    that reads `requiredTools` could admit them, and a skill-less turn never sees
+    No runbook declares either — they belong to `loaded_runbooks.md.j2` — so nothing
+    that reads `requiredTools` could admit them, and a runbook-less turn never sees
     the paragraph that names them.
 
     The WITHHOLDING half is the load-bearing assertion, and it is the one that
@@ -765,40 +765,40 @@ def test_the_scaffold_is_admitted_only_with_a_skill_active(catalog) -> None:  # 
     are classified explicitly, and without that this test would have asserted an
     activation rule that changed nothing on the wire.
     """
-    offered = _tools(*SKILL_SCAFFOLD_TOOLS, "terminal.rename")
-    skill = catalog.get("daintree.terminals.rename")
-    assert skill is not None
+    offered = _tools(*RUNBOOK_SCAFFOLD_TOOLS, "terminal.rename")
+    runbook = catalog.get("daintree.terminals.rename")
+    assert runbook is not None
 
-    with_skill = project_tools(
-        offered=offered, active_skills=[skill], catalog=catalog, messages=_user()
+    with_runbook = project_tools(
+        offered=offered, active_runbooks=[runbook], catalog=catalog, messages=_user()
     )
-    assert {wire_name(n) for n in SKILL_SCAFFOLD_TOOLS} <= with_skill.proposed
-    assert all(with_skill.reasons[wire_name(n)] == "skill_scaffold" for n in SKILL_SCAFFOLD_TOOLS)
+    assert {wire_name(n) for n in RUNBOOK_SCAFFOLD_TOOLS} <= with_runbook.proposed
+    assert all(with_runbook.reasons[wire_name(n)] == "runbook_scaffold" for n in RUNBOOK_SCAFFOLD_TOOLS)
 
-    without = project_tools(offered=offered, active_skills=[], catalog=catalog, messages=_user())
-    assert {wire_name(n) for n in SKILL_SCAFFOLD_TOOLS} <= without.withheld, (
-        "a skill-less turn renders no scaffold paragraph, so it must not pay for "
+    without = project_tools(offered=offered, active_runbooks=[], catalog=catalog, messages=_user())
+    assert {wire_name(n) for n in RUNBOOK_SCAFFOLD_TOOLS} <= without.withheld, (
+        "a runbook-less turn renders no scaffold paragraph, so it must not pay for "
         "the schemas either — and `unclassified` must not smuggle them back in"
     )
 
 
-def test_a_tool_no_skill_declares_is_never_withheld(catalog) -> None:  # type: ignore[no-untyped-def]
+def test_a_tool_no_runbook_declares_is_never_withheld(catalog) -> None:  # type: ignore[no-untyped-def]
     """Silence is not evidence that a turn does not need something.
 
     Withholding argues from metadata, and the catalog has no metadata about a
-    tool nothing declares — a CLI release that ships a tool ahead of the skill
+    tool nothing declares — a CLI release that ships a tool ahead of the runbook
     using it, or an integration contributing its own. The alternative is a tool
     that is withheld by default and stays withheld until someone notices.
     """
     projection = project_tools(
         offered=_tools("forge.getPR", "nobody.declaresThis"),
-        active_skills=[],
+        active_runbooks=[],
         catalog=catalog,
         messages=_user(),
     )
     assert projection.reasons[wire_name("nobody.declaresThis")] == "unclassified"
     # And the rule does not swallow the point: a tool the catalog DOES know, that
-    # no active skill needs, is still withheld.
+    # no active runbook needs, is still withheld.
     assert wire_name("forge.getPR") in projection.withheld
 
 
@@ -829,7 +829,7 @@ def test_every_distinct_open_call_keeps_its_tool() -> None:
     """A parallel batch with several calls unanswered must surface EVERY tool, not
     the last one. This is the property enforcement depends on: a name lost here is
     a tool withheld from a model that has already committed to calling it."""
-    from daintree_assistant_server.skills.tool_projection import _unresolved_tool_calls
+    from daintree_assistant_server.runbooks.tool_projection import _unresolved_tool_calls
 
     messages = [
         ChatMessage(role="user", content="go"),
@@ -849,7 +849,7 @@ def test_every_distinct_open_call_keeps_its_tool() -> None:
 def test_the_same_tool_called_twice_survives_one_answer() -> None:
     """Matched by id rather than by name, so answering one call does not strand
     its namesake."""
-    from daintree_assistant_server.skills.tool_projection import _unresolved_tool_calls
+    from daintree_assistant_server.runbooks.tool_projection import _unresolved_tool_calls
 
     messages = [
         ChatMessage(role="user", content="go"),
@@ -880,7 +880,7 @@ def test_request_validation_refuses_a_transcript_that_reuses_an_open_id() -> Non
 
     call = {"id": "c1", "type": "function", "function": {"name": "t", "arguments": "{}"}}
     request = RespondRequest.model_validate({
-        "protocol_version": 2,
+        "protocol_version": 3,
         "session": {"id": "s", "turn_id": "t"},
         "startup": {},
         "input": {"messages": [

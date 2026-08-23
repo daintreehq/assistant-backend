@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import json
+
 import pytest
 
 from daintree_assistant_server.errors import DaintreeError
@@ -9,6 +14,9 @@ from daintree_assistant_server.state.codec import (
     REASON_EXPIRED,
     REASON_INVALID,
     REASON_SESSION_MISMATCH,
+    REASON_UNSUPPORTED_VERSION,
+    TOKEN_PREFIX,
+    TOKEN_VERSION,
     StateCodec,
 )
 
@@ -29,7 +37,7 @@ def test_issue_and_verify_roundtrip() -> None:
     codec = _codec(clock)
     token = codec.issue(
         session_id="ses1",
-        active_skills=["a", "b"],
+        active_runbooks=["a", "b"],
         catalog_revision="sha256:rev",
         turn_id="t1",
         instruction_revision=2,
@@ -56,7 +64,7 @@ def test_no_token_is_not_an_error() -> None:
 def test_session_mismatch() -> None:
     codec = _codec([1000.0])
     token = codec.issue(
-        session_id="ses1", active_skills=[], catalog_revision="r", turn_id="t", instruction_revision=0
+        session_id="ses1", active_runbooks=[], catalog_revision="r", turn_id="t", instruction_revision=0
     )
     result = codec.verify(token, session_id="other")
     assert result.valid is False
@@ -66,7 +74,7 @@ def test_session_mismatch() -> None:
 def test_tampered_signature() -> None:
     codec = _codec([1000.0])
     token = codec.issue(
-        session_id="s", active_skills=[], catalog_revision="r", turn_id="t", instruction_revision=0
+        session_id="s", active_runbooks=[], catalog_revision="r", turn_id="t", instruction_revision=0
     )
     tampered = token[:-3] + ("aaa" if not token.endswith("aaa") else "bbb")
     result = codec.verify(tampered, session_id="s")
@@ -78,7 +86,7 @@ def test_expired_token() -> None:
     clock = [1000.0]
     codec = _codec(clock)
     token = codec.issue(
-        session_id="s", active_skills=[], catalog_revision="r", turn_id="t", instruction_revision=0
+        session_id="s", active_runbooks=[], catalog_revision="r", turn_id="t", instruction_revision=0
     )
     clock[0] = 2000.0
     result = codec.verify(token, session_id="s")
@@ -89,7 +97,7 @@ def test_expired_token() -> None:
 def test_unknown_kid() -> None:
     codec = _codec([1000.0])
     token = codec.issue(
-        session_id="s", active_skills=[], catalog_revision="r", turn_id="t", instruction_revision=0
+        session_id="s", active_runbooks=[], catalog_revision="r", turn_id="t", instruction_revision=0
     )
     other = StateCodec(
         current_key=b"different", current_kid="kX", salt=b"salt", ttl_seconds=100,
@@ -104,7 +112,7 @@ def test_key_rotation_previous_key_verifies() -> None:
     old = StateCodec(current_key=b"old-key", current_kid="k0", salt=b"salt", ttl_seconds=100,
                      clock=lambda: 1000.0)
     old_token = old.issue(
-        session_id="s", active_skills=["a"], catalog_revision="r", turn_id="t",
+        session_id="s", active_runbooks=["a"], catalog_revision="r", turn_id="t",
         instruction_revision=0,
     )
     rotated = StateCodec(
@@ -115,7 +123,7 @@ def test_key_rotation_previous_key_verifies() -> None:
     assert result.valid is True
     # New tokens are signed with the current key.
     new_token = rotated.issue(
-        session_id="s", active_skills=[], catalog_revision="r", turn_id="t", instruction_revision=0
+        session_id="s", active_runbooks=[], catalog_revision="r", turn_id="t", instruction_revision=0
     )
     assert ".k1." not in new_token  # kid is in the payload, not the wire prefix
     assert old.verify(new_token, session_id="s").valid is False  # old ring can't verify k1
@@ -139,7 +147,7 @@ def test_oversize_token_raises_413() -> None:
 def test_session_bound_token_replayed_without_session_is_mismatch() -> None:
     codec = _codec([1000.0])
     token = codec.issue(
-        session_id="ses1", active_skills=["a"], catalog_revision="r", turn_id="t",
+        session_id="ses1", active_runbooks=["a"], catalog_revision="r", turn_id="t",
         instruction_revision=0,
     )
     # A session-bound token verified with no session_id must NOT validate.
@@ -151,7 +159,7 @@ def test_session_bound_token_replayed_without_session_is_mismatch() -> None:
 def test_stateless_token_roundtrips_without_session() -> None:
     codec = _codec([1000.0])
     token = codec.issue(
-        session_id=None, active_skills=[], catalog_revision="r", turn_id="t",
+        session_id=None, active_runbooks=[], catalog_revision="r", turn_id="t",
         instruction_revision=0,
     )
     assert codec.verify(token, session_id=None).valid is True
@@ -173,7 +181,7 @@ def test_non_ascii_signature_is_ignored_not_an_error() -> None:
     codec = _codec([1000.0])
     good = codec.issue(
         session_id="s1",
-        active_skills=["a"],
+        active_runbooks=["a"],
         catalog_revision="rev",
         turn_id="t1",
         instruction_revision=0,
@@ -231,3 +239,77 @@ def test_session_hash_of_no_session_is_empty() -> None:
     codec = _codec([1000.0])
     assert codec.session_hash(None) == ""
     assert codec.session_hash("") == ""
+
+
+def _resign(codec: StateCodec, payload: dict[str, object]) -> str:
+    """Re-sign an arbitrary payload with the codec's own key.
+
+    The point is a token that is CRYPTOGRAPHICALLY VALID and semantically stale —
+    the only shape that reaches the version check at all. A hand-mangled token is
+    rejected by the MAC long before its `v` is ever read, so it proves nothing
+    about version handling.
+    """
+    body = _b64(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode())
+    mac = hmac.new(b"current-key", f"{TOKEN_PREFIX}.{body}".encode(), hashlib.sha256)
+    return f"{TOKEN_PREFIX}.{body}.{_b64(mac.digest())}"
+
+
+def _b64(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _payload_at(codec: StateCodec, **overrides: object) -> dict[str, object]:
+    token = codec.issue(
+        session_id="ses1",
+        active_runbooks=["a"],
+        catalog_revision="sha256:rev",
+        turn_id="t1",
+        instruction_revision=0,
+    )
+    body = token.split(".")[1]
+    payload = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+    payload.update(overrides)
+    return payload
+
+
+def test_a_validly_signed_superseded_token_is_refused_for_its_version() -> None:
+    """The 1 -> 2 bump is what retires a token, and it must be the stated reason.
+
+    A v1 payload names `active_skills`, a field this codec no longer reads. If such
+    a token were accepted, the turn would silently continue with an EMPTY active set
+    while reporting that state was carried — worse than a fresh selection, because
+    nothing would say the runbooks had been dropped. Rejecting on the version is
+    what turns that into an ordinary re-selection.
+    """
+    clock = [1000.0]
+    codec = _codec(clock)
+    payload = _payload_at(codec, v=1)
+    payload["active_skills"] = [{"id": "a"}]
+    payload.pop("active_runbooks", None)
+
+    result = codec.verify(_resign(codec, payload), session_id="ses1")
+
+    assert result.valid is False
+    assert result.reason == REASON_UNSUPPORTED_VERSION
+    # And nothing from the stale token leaks into the turn.
+    assert result.payload is None or result.payload.active_ids() == []
+
+
+def test_a_validly_signed_future_token_is_refused_for_its_version() -> None:
+    """The check is an equality, not a floor: a NEWER token is equally unusable."""
+    clock = [1000.0]
+    codec = _codec(clock)
+    token = _resign(codec, _payload_at(codec, v=TOKEN_VERSION + 1))
+
+    result = codec.verify(token, session_id="ses1")
+
+    assert result.valid is False
+    assert result.reason == REASON_UNSUPPORTED_VERSION
+
+
+def test_the_current_version_is_what_issue_actually_stamps() -> None:
+    """Guards the pair that the two tests above depend on being real."""
+    clock = [1000.0]
+    codec = _codec(clock)
+    assert _payload_at(codec)["v"] == TOKEN_VERSION
+    assert TOKEN_VERSION == 2, "token schema bumped; update this literal deliberately"

@@ -74,46 +74,46 @@ def _utility_json(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
     return asyncio.run(run_bench(trials=ctx.get("live_trials", 1), env_file=ctx.get("env_file")))
 
 
-def _skill_selection_scale(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
-    """Does the shortlist still hold the answer at 200 skills? ~20s, free.
+def _runbook_selection_scale(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
+    """Does the shortlist still hold the answer at 200 runbooks? ~20s, free.
 
-    The live catalog is 38 skills against k=32, so every recall number the other
+    The live catalog is 38 runbooks against k=32, so every recall number the other
     suites report is 84%-of-the-catalog arithmetic rather than evidence that
     retrieval filters. This pads the catalog with derived distractors and
-    re-measures. 200 rather than the full sweep's 1,000 because a thousand skill
+    re-measures. 200 rather than the full sweep's 1,000 because a thousand runbook
     documents cost ~220s to embed, which is not a per-push price.
     """
-    from ..skill_selection.scale import smoke
+    from ..runbook_selection.scale import smoke
 
     return smoke()
 
 
-def _skill_selection_local(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
+def _runbook_selection_local(settings: Any, ctx: dict[str, Any]) -> dict[str, Any]:
     """The selector that ships, scored offline. Free, deterministic, gated.
 
     The release authority for routing quality. It drives the exported ONNX
     artifact through the production decision procedure and reports which STAGE
-    lost each missing skill, so a candidate-recall regression — the one that
+    lost each missing runbook, so a candidate-recall regression — the one that
     arrives first as the catalog grows — is separable from a head regression.
     """
-    from daintree_assistant_server.skills.catalog import load_catalog
+    from daintree_assistant_server.runbooks.catalog import load_catalog
 
-    from ..skill_selection.cases import load_cases
-    from ..skill_selection.coverage import print_coverage
-    from ..skill_selection.local_runner import run_local
+    from ..runbook_selection.cases import load_cases
+    from ..runbook_selection.coverage import print_coverage
+    from ..runbook_selection.local_runner import run_local
 
     catalog = load_catalog()
     cases = load_cases(catalog)
     # Same free preflight the paid row runs, and it matters more here: this row
-    # is a release gate, and a skill nobody wrote a case for is invisible to it
+    # is a release gate, and a runbook nobody wrote a case for is invisible to it
     # by construction.
     rows = print_coverage(catalog, cases)
     if not rows or not all(r.gate_ok for r in rows):
-        gaps = [r.skill_id for r in rows if not r.gate_ok]
+        gaps = [r.runbook_id for r in rows if not r.gate_ok]
         raise RuntimeError(
-            "skill-selection routing coverage has gaps, so no run can qualify the "
-            f"catalog: {', '.join(gaps) or '<no skills>'}. "
-            "Run `python -m benchmarks.skill_selection.bench coverage`."
+            "runbook-selection routing coverage has gaps, so no run can qualify the "
+            f"catalog: {', '.join(gaps) or '<no runbooks>'}. "
+            "Run `python -m benchmarks.runbook_selection.bench coverage`."
         )
     return run_local(catalog=catalog, cases=cases)
 
@@ -125,8 +125,8 @@ DETERMINISTIC: list[tuple[str, Callable[..., dict[str, Any]]]] = [
     # THE routing-quality gate. Deterministic and free because selection is
     # local: there is no reason for the number a release is judged on to cost
     # money or to wait for a nightly.
-    ("skill_selection_local", _skill_selection_local),
-    ("skill_selection_scale", _skill_selection_scale),
+    ("runbook_selection_local", _runbook_selection_local),
+    ("runbook_selection_scale", _runbook_selection_scale),
 ]
 #: Suites that are REPORTED but do not decide whether a run passed.
 #:
@@ -204,7 +204,7 @@ def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
             return {"injection_obey_rate": s.get("injection_obey_rate")}
         if name == "utility_json":
             return {"pass_rate": s.get("pass_rate"), "repair_rate": s.get("repair_rate")}
-        if name == "skill_selection_scale":
+        if name == "runbook_selection_scale":
             return {
                 "size": s.get("size"),
                 # A count, not a rate: the denominator is 154 target-bearing
@@ -215,7 +215,7 @@ def _headline(name: str, doc: dict[str, Any]) -> dict[str, Any]:
                 # dropping the old runbook is the right answer.
                 "dense_retained": s.get("dense_retained"),
             }
-        if name == "skill_selection_local":
+        if name == "runbook_selection_local":
             spans = s.get("spans_ms") or {}
             total = spans.get("total_ms") or {}
             return {

@@ -22,7 +22,7 @@ def _request(display: dict | None = None) -> RespondRequest:
         runtime["display"] = display
     return RespondRequest.model_validate(
         {
-            "protocol_version": 2,
+            "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
             "input": {"messages": [{"role": "user", "content": "hi"}]},
             "startup": {},

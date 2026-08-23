@@ -11,17 +11,18 @@ import pytest
 from fakes import FakeProvider, ScriptedSelector
 from fastapi.testclient import TestClient
 
+from daintree_assistant_server import PROTOCOL_VERSION
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import build_container, create_app
 from daintree_assistant_server.prompts.loader import PromptLoader
+from daintree_assistant_server.runbooks.catalog import (
+    CatalogManager,
+    default_runbooks_dir,
+    load_catalog,
+)
 from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
 from daintree_assistant_server.services.prompt_assembler import PromptAssembler
 from daintree_assistant_server.services.task_runner import TaskRunner
-from daintree_assistant_server.skills.catalog import (
-    CatalogManager,
-    default_skills_dir,
-    load_catalog,
-)
 from daintree_assistant_server.state.codec import StateCodec
 
 API_KEY = "test-api-key"
@@ -34,15 +35,15 @@ def _isolate_from_dotenv() -> Iterator[None]:
 
     The real process environment is the same hazard by a shorter route, and the
     local-development-only paths are the ones a developer actually exports —
-    ``DAINTREE_SKILLS_OVERLAY_DIR`` is set for as long as they are authoring a
-    skill. A test asserting a field is unset by default must not fail because
+    ``DAINTREE_RUNBOOKS_OVERLAY_DIR`` is set for as long as they are authoring a
+    runbook. A test asserting a field is unset by default must not fail because
     the person running it happened to be using the feature.
     """
     previous = Settings.model_config.get("env_file")
     Settings.model_config["env_file"] = None
     exported = {
         name: os.environ.pop(name)
-        for name in ("DAINTREE_SKILLS_OVERLAY_DIR", "DAINTREE_DUMP_UPSTREAM_DIR")
+        for name in ("DAINTREE_RUNBOOKS_OVERLAY_DIR", "DAINTREE_DUMP_UPSTREAM_DIR")
         if name in os.environ
     }
     yield
@@ -91,7 +92,7 @@ def catalog() -> Any:
 
 @pytest.fixture
 def catalog_manager() -> CatalogManager:
-    primary = default_skills_dir()
+    primary = default_runbooks_dir()
     return CatalogManager(load_catalog(primary), primary_dir=primary)
 
 
@@ -115,7 +116,7 @@ def selector(
 
     Distinct from ``scripted_selector`` below only in which catalog it reads:
     this one takes the test's ``catalog_manager`` fixture, that one builds its
-    own from the packaged skills for the paths that go through
+    own from the packaged runbooks for the paths that go through
     ``build_container``.
     """
     return ScriptedSelector(fake_provider, catalog_manager, settings)
@@ -184,7 +185,7 @@ def scripted_selector(fake_provider: FakeProvider, settings: Settings) -> Script
     """
     return ScriptedSelector(
         fake_provider,
-        CatalogManager(load_catalog(default_skills_dir()), primary_dir=default_skills_dir()),
+        CatalogManager(load_catalog(default_runbooks_dir()), primary_dir=default_runbooks_dir()),
         settings,
     )
 
@@ -243,7 +244,7 @@ def respond_body(
     turn: dict[str, Any] | None = None,
     tools: list[dict[str, Any]] | None = None,
     tool_choice: Any = None,
-    protocol_version: int = 2,
+    protocol_version: int = PROTOCOL_VERSION,
 ) -> dict[str, Any]:
     """Build a native /v1/daintree/respond request body."""
     session: dict[str, Any] = {"id": session_id, "turn_id": turn_id}
@@ -305,13 +306,13 @@ def respond_body(
 
 
 def meta_of(resp_json: dict[str, Any]) -> dict[str, Any]:
-    """Adapt a native respond body (or stream meta event) to a flat skill view."""
-    skills = resp_json.get("skills", {}) or {}
+    """Adapt a native respond body (or stream meta event) to a flat runbook view."""
+    runbooks = resp_json.get("runbooks", {}) or {}
     return {
-        "active_skills": skills.get("active", []),
-        "newly_loaded_skills": skills.get("newly_loaded", []),
-        "selector": skills.get("selector", {}),
-        "prelude": skills.get("prelude", {"tool_executions": []}),
+        "active_runbooks": runbooks.get("active", []),
+        "newly_loaded_runbooks": runbooks.get("newly_loaded", []),
+        "selector": runbooks.get("selector", {}),
+        "prelude": runbooks.get("prelude", {"tool_executions": []}),
         "state": resp_json.get("state"),
         "catalog_revision": resp_json.get("catalog_revision"),
         "warnings": resp_json.get("warnings", []),

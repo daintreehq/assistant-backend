@@ -197,8 +197,8 @@ async def _run_turn_trial(
     if not stream:
         total = time.perf_counter() - t0
         body = outcome.body or {}
-        skills = body.get("skills") or {}
-        selector = skills.get("selector") or {}
+        runbooks = body.get("runbooks") or {}
+        selector = runbooks.get("selector") or {}
         usage = body.get("usage") or {}
         return {
             "ok": True,
@@ -228,7 +228,7 @@ async def _run_turn_trial(
             now = time.perf_counter() - t0
             if event == "meta" and meta_s is None:
                 meta_s = now
-                sel = (payload.get("skills") or {}).get("selector") or {}
+                sel = (payload.get("runbooks") or {}).get("selector") or {}
                 selector_ran = bool(sel.get("ran"))
                 selector_degraded = bool(sel.get("degraded"))
             elif event == "delta" and ttft_s is None and _delta_has_content(payload):
@@ -291,7 +291,7 @@ async def _run_selector_trial(
         "calls": counter.complete_calls,
         "repaired": counter.complete_calls > 1,
         "degraded": decision.degraded,
-        "skill_ids": list(decision.skill_ids),
+        "runbook_ids": list(decision.runbook_ids),
         "endpoint": first.endpoint if first else None,
         # finish_reason is the smoking gun for the truncation failure mode: a
         # `length` finish means the model burned its whole cap and the JSON was cut
@@ -429,7 +429,7 @@ def run(
 
 
 def build_settings_for_bench(env_file: str | None = None) -> Settings:
-    # Skill learning must be OFF for a latency run: it fires after a final-answer
+    # Runbook learning must be OFF for a latency run: it fires after a final-answer
     # turn and would add a GPT-5.6 Sol call plus a catalog reload mid-benchmark,
     # mutating the very catalog the later scenarios select against.
-    return build_settings(env_file, SKILL_LEARNING_MODE="off")
+    return build_settings(env_file, RUNBOOK_LEARNING_MODE="off")

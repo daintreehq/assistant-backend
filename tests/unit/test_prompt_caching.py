@@ -201,28 +201,28 @@ def test_the_cache_evicts_least_recently_USED_not_least_recently_added() -> None
 # ---------------------------------------------------------------------------
 
 
-def test_the_same_skill_set_in_ANY_order_renders_identical_bytes(assembler, catalog) -> None:  # type: ignore[no-untyped-def]
+def test_the_same_runbook_set_in_ANY_order_renders_identical_bytes(assembler, catalog) -> None:  # type: ignore[no-untyped-def]
     """The failure this guards, and why rendering the same list twice missed it.
 
     The block was rendered in the selector's raw output order, so the same set
-    classified in a different order produced different bytes — the skill
+    classified in a different order produced different bytes — the runbook
     sections merely swapped places. That cost a full upstream prefix-cache miss
     on everything behind the block — the integrations, startup and conversation
     rows — and a second LRU entry for a render that says the same thing. (It cost
     the tool schemas too until issue #39 moved the block below them.) Reversing the
     input is what makes the assertion bite — repeating one list cannot.
     """
-    specifics = [s for s in catalog.skills if not s.meta.foundation]
+    specifics = [s for s in catalog.runbooks if not s.meta.foundation]
     assert len(specifics) >= 2
     canonical = specifics[:2]
     assert canonical[0].id < canonical[1].id, "catalog order IS canonical id order"
 
-    cache = assembler._loaded_skills_cache
-    first = assembler.render_loaded_skills(canonical)
+    cache = assembler._loaded_runbooks_cache
+    first = assembler.render_loaded_runbooks(canonical)
     hits_before, misses_before = cache.hits, cache.misses
     entries_before = len(cache._entries)
 
-    second = assembler.render_loaded_skills(list(reversed(canonical)))
+    second = assembler.render_loaded_runbooks(list(reversed(canonical)))
 
     assert second == first
     assert cache.hits == hits_before + 1
@@ -230,17 +230,17 @@ def test_the_same_skill_set_in_ANY_order_renders_identical_bytes(assembler, cata
     assert len(cache._entries) == entries_before, "the reversed call earned its own entry"
 
 
-def test_a_different_skill_set_renders_different_bytes(assembler, catalog) -> None:  # type: ignore[no-untyped-def]
+def test_a_different_runbook_set_renders_different_bytes(assembler, catalog) -> None:  # type: ignore[no-untyped-def]
     ids = sorted(catalog.known_ids)
-    one = assembler.render_loaded_skills(catalog.get_many(ids[:1]))
-    two = assembler.render_loaded_skills(catalog.get_many(ids[:2]))
+    one = assembler.render_loaded_runbooks(catalog.get_many(ids[:1]))
+    two = assembler.render_loaded_runbooks(catalog.get_many(ids[:2]))
     assert one != two
 
 
-def test_the_skill_cache_keys_on_CONTENT_not_id(assembler, catalog) -> None:  # type: ignore[no-untyped-def]
+def test_the_runbook_cache_keys_on_CONTENT_not_id(assembler, catalog) -> None:  # type: ignore[no-untyped-def]
     """The failure this key choice exists to prevent.
 
-    Skill learning rewrites a skill's body in place, keeping its id. An id-keyed
+    Runbook learning rewrites a runbook's body in place, keeping its id. An id-keyed
     cache would keep serving the pre-rewrite body until the process restarted —
     the model operating on a runbook that no longer exists on disk, with nothing
     failing to signal it.
@@ -248,12 +248,12 @@ def test_the_skill_cache_keys_on_CONTENT_not_id(assembler, catalog) -> None:  # 
     from dataclasses import replace
 
     original = catalog.get_many(sorted(catalog.known_ids)[:1])
-    before = assembler.render_loaded_skills(original)
+    before = assembler.render_loaded_runbooks(original)
 
     rewritten = [replace(original[0], body=original[0].body + "\n\nNEW STEP.")]
     assert rewritten[0].id == original[0].id
 
-    after = assembler.render_loaded_skills(rewritten)
+    after = assembler.render_loaded_runbooks(rewritten)
     assert after != before
     assert "NEW STEP." in after
 
@@ -261,8 +261,8 @@ def test_the_skill_cache_keys_on_CONTENT_not_id(assembler, catalog) -> None:  # 
 def test_a_stale_content_hash_cannot_be_constructed(catalog) -> None:  # type: ignore[no-untyped-def]
     """The cache trusts `content_hash` completely, so the hash must be DERIVED.
 
-    It used to be a plain field: `dataclasses.replace(skill, body=...)` produced
-    a skill whose stored hash described the old body, and the cache would then
+    It used to be a plain field: `dataclasses.replace(runbook, body=...)` produced
+    a runbook whose stored hash described the old body, and the cache would then
     serve the previous runbook while the catalog reported the new one. Deriving
     it in `__post_init__` makes that state unconstructable rather than merely
     unreached — the difference between an invariant and a convention.
@@ -291,10 +291,10 @@ def test_the_catalog_revision_moves_when_any_body_changes(catalog) -> None:  # t
     selector menu impossible rather than merely unlikely."""
     from dataclasses import replace
 
-    from daintree_assistant_server.skills.catalog import Catalog
+    from daintree_assistant_server.runbooks.catalog import Catalog
 
-    skills = list(catalog.skills)
-    edited = [replace(skills[0], body=skills[0].body + "\n\nNEW STEP."), *skills[1:]]
+    runbooks = list(catalog.runbooks)
+    edited = [replace(runbooks[0], body=runbooks[0].body + "\n\nNEW STEP."), *runbooks[1:]]
     assert Catalog(edited).revision != catalog.revision
 
 
@@ -306,20 +306,20 @@ def test_the_render_cache_reports_its_own_counters(assembler, catalog) -> None:
     2M chars) were chosen rather than measured, and production cannot answer
     whether they bind if nothing asks.
     """
-    specifics = [s for s in catalog.skills if not s.meta.foundation][:2]
+    specifics = [s for s in catalog.runbooks if not s.meta.foundation][:2]
     before = assembler.render_cache_stats()
     assert set(before) == {
-        "skill_render_cache_hits",
-        "skill_render_cache_misses",
-        "skill_render_cache_entries",
-        "skill_render_cache_chars",
+        "runbook_render_cache_hits",
+        "runbook_render_cache_misses",
+        "runbook_render_cache_entries",
+        "runbook_render_cache_chars",
     }
 
-    assembler.render_loaded_skills(specifics)  # miss
-    assembler.render_loaded_skills(specifics)  # hit
+    assembler.render_loaded_runbooks(specifics)  # miss
+    assembler.render_loaded_runbooks(specifics)  # hit
     after = assembler.render_cache_stats()
 
-    assert after["skill_render_cache_misses"] == before["skill_render_cache_misses"] + 1
-    assert after["skill_render_cache_hits"] == before["skill_render_cache_hits"] + 1
-    assert after["skill_render_cache_entries"] == before["skill_render_cache_entries"] + 1
-    assert after["skill_render_cache_chars"] > before["skill_render_cache_chars"]
+    assert after["runbook_render_cache_misses"] == before["runbook_render_cache_misses"] + 1
+    assert after["runbook_render_cache_hits"] == before["runbook_render_cache_hits"] + 1
+    assert after["runbook_render_cache_entries"] == before["runbook_render_cache_entries"] + 1
+    assert after["runbook_render_cache_chars"] > before["runbook_render_cache_chars"]

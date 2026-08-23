@@ -1,7 +1,7 @@
 """Shared transient-error retry for upstream provider calls.
 
 Every DeepSeek request — the main completion, the stream open (before the first
-model delta), the skill selector, and the utility tasks — funnels through
+model delta), the runbook selector, and the utility tasks — funnels through
 :func:`retry_upstream` so the retry policy is uniform and config-driven
 (``MAX_UPSTREAM_RETRIES`` + ``RETRY_BACKOFF_BASE_SECONDS``).
 

@@ -2,7 +2,7 @@
 
 A Daintree-operated model-orchestration service. It moves the orchestration
 boundary off the local CLI: the server owns the permanent system prompt, the
-skill catalog and bodies, automatic skill selection, prompt assembly, and the
+runbook catalog and bodies, automatic runbook selection, prompt assembly, and the
 small-model utility prompts. The CLI keeps local state and local tool execution.
 
 **The server holds the upstream credential** (`TOGETHER_API_KEY`) and funds every
@@ -11,13 +11,13 @@ destination: account authentication and sign-in are next, and `auth.py` is the
 seam they land in.
 
 It exposes a **Daintree-native** API (`POST /v1/daintree/respond`) — purpose-built,
-not OpenAI-compatible. The session/skill envelope is first-class, skills are surfaced
+not OpenAI-compatible. The session/runbook envelope is first-class, runbooks are surfaced
 as their own response block, and streaming uses named SSE events (`meta`/`status`/`delta`/
 `compaction`/`done`/`error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** Together AI (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-ai/DeepSeek-V4-Flash-0731` for the main completion and every utility task; skill selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Together is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference — and pinning the host is what makes it fast, since the same weights via OpenRouter's default routing measured 3.1x slower (p50 3414ms against 1100ms). **Data handling is currently UNVERIFIED for this host** — the no-training position this project used to state was its previous upstream's, and nobody has read Together's terms yet, so do not repeat it ([`docs/PROVIDER_POLICY.md` §4](docs/PROVIDER_POLICY.md))
-- **Target:** Google Cloud Run (stateless; signed state token carries the active skills)
+- **Upstream:** Together AI (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-ai/DeepSeek-V4-Flash-0731` for the main completion and every utility task; runbook selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Together is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference — and pinning the host is what makes it fast, since the same weights via OpenRouter's default routing measured 3.1x slower (p50 3414ms against 1100ms). **Data handling is currently UNVERIFIED for this host** — the no-training position this project used to state was its previous upstream's, and nobody has read Together's terms yet, so do not repeat it ([`docs/PROVIDER_POLICY.md` §4](docs/PROVIDER_POLICY.md))
+- **Target:** Google Cloud Run (stateless; signed state token carries the active runbooks)
 
 ## Authoritative documents
 
@@ -43,9 +43,9 @@ proof that the whole corpus is accurate.
   agent-roster, and project-instruction data reaches only the main model in a stable framed
   block. The selector never sees `startup`: its evidence is sanitized
   `input.messages` plus bounded turn/workflow hints and tool names.
-- `skill.find` / `skill.load` are never offered to the main model; selection runs
+- `runbook.find` / `runbook.load` are never offered to the main model; selection runs
   server-side as a local two-stage forward pass before the main completion.
-- Only the active skill bodies (max 3) are injected — never the full catalog.
+- Only the active runbook bodies (max 3) are injected — never the full catalog.
 - The selector does **not** re-run on ordinary tool-continuation rounds; it re-runs
   on a new turn, a mid-turn interjection, an invalid/missing state token, a catalog
   change, or `selection.force`.
@@ -56,21 +56,21 @@ proof that the whole corpus is accurate.
   and folds the matching pages into the volatile prompt tail — the client is not
   handed a docs tool to run. Best-effort: any failure leaves the turn to answer
   without documentation, never to fail.
-- Skill selection is LOCAL and two-stage: a bi-encoder shortlists the catalog by
+- Runbook selection is LOCAL and two-stage: a bi-encoder shortlists the catalog by
   cosine, then a set-wise head judges those candidates together. No upstream
   call, no credential spent, and the turn's flow is strictly select → assemble →
   one main completion. A failing selector degrades open to the prior active set,
   never blocks the turn.
-- Neither stage owns per-skill weights — the head reads skill *embeddings* — so a
-  skill added to the catalog is embedded on load and reachable on the next turn,
-  with no retrain and no degraded window. Measured, a never-trained skill wins
+- Neither stage owns per-runbook weights — the head reads runbook *embeddings* — so a
+  runbook added to the catalog is embedded on load and reachable on the next turn,
+  with no retrain and no degraded window. Measured, a never-trained runbook wins
   requests only it plausibly answers and still loses contested ones to trained
-  neighbours, so retraining is what makes a skill *competitive*, not what makes
+  neighbours, so retraining is what makes a runbook *competitive*, not what makes
   it *selectable*.
-- Skill state is portable across instances via a signed, opaque token.
+- Runbook state is portable across instances via a signed, opaque token.
 - Prompt order is cache-critical, and every row below the schemas is ordered widest-shared
   first: two static system blocks (base prompt → response contract) → tool schemas → user-role
-  skill bodies → user-role integrations → stable startup user block → visible conversation →
+  runbook bodies → user-role integrations → stable startup user block → visible conversation →
   one volatile runtime/display/turn user tail. Runtime worktree state is typed and fresh per
   request; stable project/agent facts are not duplicated there.
 
@@ -78,12 +78,12 @@ proof that the whole corpus is accurate.
 
 ```
 src/daintree_assistant_server/
-  api/            # FastAPI routers (chat, models, capabilities, skills, tasks, health)
+  api/            # FastAPI routers (chat, models, capabilities, runbooks, tasks, health)
   contracts/      # Pydantic wire models (OpenAI subset, extension, tasks, errors)
   providers/      # ChatProvider protocol + Together/OpenRouter adapters + SSE parser
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader
-  skills/         # Skill models, loader, catalog + CatalogManager, selector, load events
-  state/          # Signed skill-state token codec
+  runbooks/         # Runbook models, loader, catalog + CatalogManager, selector, load events
+  state/          # Signed runbook-state token codec
   services/       # validation, prompt_assembler, chat_orchestrator, task_runner, docs_mcp
   config.py auth.py errors.py observability.py main.py
 tests/            # unit / integration / contract / golden
@@ -156,17 +156,17 @@ auto-reload during development: `uvicorn daintree_assistant_server.main:app
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| `POST` | `/v1/daintree/respond` | yes | Native generation (+ first-class `skills` block; stream or JSON) |
+| `POST` | `/v1/daintree/respond` | yes | Native generation (+ first-class `runbooks` block; stream or JSON) |
 | `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision |
 | `POST` | `/v1/daintree/auth/verify` | open | Credential probe: is the key this request would spend usable? (no body; no inference — a model listing). With no bearer that is the *server's* key, which answers "can this backend serve me?" |
-| `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
-| `POST` | `/v1/daintree/skills/resolve` | yes | Manual find / load / clear |
+| `GET`  | `/v1/daintree/runbooks` | yes | Runbook metadata (ETag/304); never the body |
+| `POST` | `/v1/daintree/runbooks/resolve` | yes | Manual find / load / clear |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks |
 | `GET`  | `/healthz` | no | Liveness |
 | `GET`  | `/readyz` | no | Readiness (config, secrets, prompts, catalog, provider) |
 | `GET`  | `/version` | no | Build SHA, version, protocol range |
 
-Skill/selection metadata is delivered in the response body's `skills` block
+Runbook/selection metadata is delivered in the response body's `runbooks` block
 (non-streaming) or as the first SSE `meta` event (streaming). The streaming event
 is emitted as soon as selection completes — local selection makes that ~10ms in —
 and always precedes model output.
@@ -189,7 +189,7 @@ push to main → Cloud Build trigger `deploy-main` → cloudbuild.yaml
 ```
 
 A revision that cannot answer `/readyz` never takes traffic, which is what turns
-a bad secret, a malformed prompt template, or an unparseable skill file into a
+a bad secret, a malformed prompt template, or an unparseable runbook file into a
 red build instead of an outage. The commit SHA is the only version this system
 has (see CLAUDE.md, "Versioning"): it tags the image, is baked in as
 `BUILD_SHA`, and is what `/version` reports back.
@@ -222,7 +222,7 @@ OPENROUTER_API_KEY=sk-or-v1-... ./infra/gcp/smoke.sh --full
 ```
 
 `infra/gcp/rollback.sh` moves traffic back when a revision deploys cleanly and is
-nonetheless **wrong** — a prompt change that degrades answers, a skill that routes
+nonetheless **wrong** — a prompt change that degrades answers, a runbook that routes
 badly. The build gate cannot catch those: it only proves the candidate starts and
 reports the right commit. Rolling forward again is the same command with the
 revision you left.

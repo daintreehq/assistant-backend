@@ -14,16 +14,16 @@ All of that is invisible to clients, which never see a real model id.
 
 ## Principles
 
-- **Skills are the core.** Skill selection runs LOCALLY — an in-process two-stage ONNX
-  classifier, no upstream call — and skill bodies are injected server-side; the result is
-  surfaced as a first-class `skills` block (active set, the newly-loaded prelude, and
+- **Runbooks are the core.** Runbook selection runs LOCALLY — an in-process two-stage ONNX
+  classifier, no upstream call — and runbook bodies are injected server-side; the result is
+  surfaced as a first-class `runbooks` block (active set, the newly-loaded prelude, and
   selector telemetry). A small model with the right runbook loaded is the source of the
   system's intelligence.
 - **The server owns all system text.** Clients cannot send `system`/`developer`
   messages or a free-form system prompt; the request schema is strict (`extra="forbid"`).
   Typed startup/project-instruction fields are bounded, server-framed untrusted data.
 - **Cache-optimized prompt layout.** The two static system layers and the tool schemas
-  lead, followed by the injected data rows ordered widest-shared first (skill bodies,
+  lead, followed by the injected data rows ordered widest-shared first (runbook bodies,
   then integrations and a required session-stable startup block), the append-only
   visible conversation, and one small volatile runtime/display/turn tail. See
   [Prompt assembly](#prompt-assembly--caching).
@@ -112,13 +112,23 @@ the main-model timeout. Being a sign-in bootstrap call, it does not require or c
 
 ## Protocol negotiation
 
-A generation or skill-resolve request carries `protocol_version` in its body. Any
-request may additionally declare it as a header — `X-Daintree-Protocol: 2`. The
+A generation or runbook-resolve request carries `protocol_version` in its body. Any
+request may additionally declare it as a header — `X-Daintree-Protocol: 3`. The
 supported range is advertised by `/version` and `/v1/daintree/capabilities`. An
 unsupported version yields `426` from either channel.
 
+**3 is the runbook protocol, and it is a hard break from 2.** The response block is
+`runbooks` rather than `skills`, selection pins are `pinned_runbook_ids`, the catalog
+routes live under `/v1/daintree/runbooks`, and the warning codes say `runbook`. Nothing
+answers to the 2 spelling — there are no aliases, no duplicated fields and no
+compatibility window, because the only client is the CLI in this repo's submodule and
+the two move together. A protocol-2 client is therefore turned away at the door with
+`426 unsupported_daintree_protocol` rather than handed a body it would misparse. This is
+also why the negotiated version is separate from the `/v1/` URL prefix: the prefix is a
+URL-shape escape hatch and has not moved.
+
 The header is checked on every route that runs the caller's content through the model —
-`/respond`, `/skills/resolve` and `/tasks` alike. (`/tasks` has no `protocol_version`
+`/respond`, `/runbooks/resolve` and `/tasks` alike. (`/tasks` has no `protocol_version`
 body field; the header is its whole declaration.) The health, version, capabilities and
 `auth/verify` routes are exempt: they exist to *negotiate* or diagnose compatibility, so
 failing them on a version mismatch would deny a client the very answer it needs to fix
@@ -149,7 +159,7 @@ The single generation endpoint. Returns a native JSON body, or — when
 
 ```jsonc
 {
-  "protocol_version": 2,                       // required
+  "protocol_version": 3,                       // required
 
   "session": {                                 // required (no anonymous mode)
     "id": "sess_…",                            // required, non-empty
@@ -158,7 +168,7 @@ The single generation endpoint. Returns a native JSON body, or — when
     "round": 0                                 // default 0 — tool-continuation round counter
   },
 
-  "state": "dst1.<payload>.<sig>",             // nullable signed skill-state token (see Skills)
+  "state": "dst1.<payload>.<sig>",             // nullable signed runbook-state token (see Runbooks)
 
   "profile": "assistant",                      // default "assistant" | "subagent" (see Profiles)
 
@@ -235,7 +245,7 @@ The single generation endpoint. Returns a native JSON body, or — when
   },
 
   "selection": { "policy": "new_instruction", "force": false,     // "new_instruction" | "always"
-                 "pinned_skill_ids": [] },                        // gated: skills.pinned_skill_ids
+                 "pinned_runbook_ids": [] },                        // gated: runbooks.pinned_runbook_ids
 
   "generation": {                              // only supported params exist; unknown keys are rejected
     "temperature": 0.7, "max_tokens": 1024,
@@ -298,7 +308,7 @@ Notes:
 
 ```jsonc
 {
-  "protocol_version": 2,
+  "protocol_version": 3,
   "request_id": "req_…",
   "model": "daintree-assistant",
   "message": {
@@ -311,15 +321,15 @@ Notes:
   "finish_reason": "stop",                      // "stop" | "tool_calls" | "length" | …
   "usage": { "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "cached_tokens": 0 },
 
-  "skills": {                                   // first-class skill outcome
+  "runbooks": {                                   // first-class runbook outcome
     "active":       [ { "id": "…", "title": "…" } ],
     "newly_loaded": [ { "id": "…", "title": "…" } ],
     "prelude": {                                // OPTIONAL: render before the reply
       "tool_executions": [
         { "call":   { "id": "call_…", "type": "function",
-                      "function": { "name": "skill__load", "arguments": "{\"skillId\":\"…\"}" } },
+                      "function": { "name": "runbook__load", "arguments": "{\"runbookId\":\"…\"}" } },
           "result": { "role": "tool", "tool_call_id": "call_…", "content": "{…}" },
-          "display_name": "skill.load" }
+          "display_name": "runbook.load" }
       ]
     },
     "selector": { "ran": true, "degraded": false, "task_type": "…", "confidence": 0.9,
@@ -339,8 +349,8 @@ Notes:
 
 ```
 event: meta
-data: { "protocol_version":2, "request_id":"req_…", "model":"daintree-assistant",
-        "skills": { …same skills block… }, "state":"dst1.…",
+data: { "protocol_version":3, "request_id":"req_…", "model":"daintree-assistant",
+        "runbooks": { …same runbooks block… }, "state":"dst1.…",
         "catalog_revision":"sha256:…", "prompt_version":"…", "warnings":[] }
 
 event: status
@@ -370,11 +380,11 @@ otherwise the only event carrying it. The HTTP status is already committed to 20
 then, so this is the only channel a failed stream has to identify itself.
 
 Guarantees:
-- `meta` is always first, before any token — so the client renders the skill prelude and
-  active set up front, as if the skill load happened before the reply. It is emitted as soon
+- `meta` is always first, before any token — so the client renders the runbook prelude and
+  active set up front, as if the runbook load happened before the reply. It is emitted as soon
   as authoritative selection and prompt assembly finish — with local selection that is
-  ~10ms in, effectively immediate. `meta` marks skill selection complete; clients can
-  show the skill-load cue immediately.
+  ~10ms in, effectively immediate. `meta` marks runbook selection complete; clients can
+  show the runbook-load cue immediately.
 - `status` (optional) marks a generation phase. Today the only phase is `thinking`, emitted
   once the instant the model's chain-of-thought begins; the `reasoning_content` deltas that
   follow are the CoT to display. It never appears when thinking is off. Unknown future phases
@@ -504,9 +514,9 @@ posture changed.
 
 ---
 
-## Skills
+## Runbooks
 
-Skill selection is removed from the main thread:
+Runbook selection is removed from the main thread:
 
 1. **Selector cadence.** A local in-process classifier — no upstream call (historically a small-model call returning a JSON object via
    `response_format` json_object) runs when: there is no valid
@@ -517,15 +527,15 @@ Skill selection is removed from the main thread:
 2. **Active set.** A **successful** selector run is *authoritative*: its returned ids are the
    complete active set for the instruction (a topic-shift **replacement** — an empty result
    clears the active set), capped (default 3). Each selected specific is additionally paired
-   with its **domain foundation** (the `[foundation]` skill sharing its id namespace) before
-   the cap is applied, so `skills.active`/`newly_loaded` may include a foundation id the
+   with its **domain foundation** (the `[foundation]` runbook sharing its id namespace) before
+   the cap is applied, so `runbooks.active`/`newly_loaded` may include a foundation id the
    selector did not itself return. A tool-continuation round (no run) or a
    degraded selector reuses the prior set unchanged (absent caller pins — see 2b), so a
-   classifier hiccup never evicts an in-progress runbook. The selector is instructed to re-list any active skill it means to
+   classifier hiccup never evicts an in-progress runbook. The selector is instructed to re-list any active runbook it means to
    keep. (The explicit `resolve` `load` action, by contrast, is additive over the prior set.)
-2b. **Caller pins.** `selection.pinned_skill_ids` names skills the caller requires this
+2b. **Caller pins.** `selection.pinned_runbook_ids` names runbooks the caller requires this
    turn whatever the classifier decides. (`force` means "re-run the selector", never
-   "select this skill".) It exists for skill **development** — exercising a runbook you are
+   "select this runbook".) It exists for runbook **development** — exercising a runbook you are
    rewriting against a real turn, instead of reverse-engineering a prompt that talks the
    selector into picking it. The rules:
    - **Alongside, not instead of.** Selection still runs on its usual cadence; pins do not
@@ -535,59 +545,59 @@ Skill selection is removed from the main thread:
      pin (which takes the *leftover* slot, unpaired, because it is the server's inference
      rather than the caller's instruction). A pin whose whole unit does not fit the cap is
      skipped entirely rather than admitted half. The one case a pin loads bare is
-     `profile: "subagent"`, where the menu is narrowed to skills the caller can execute and
+     `profile: "subagent"`, where the menu is narrowed to runbooks the caller can execute and
      a foundation requiring tools it does not hold is filtered out of that menu — the same
-     capability-first exception the profile already makes for selected skills.
-   - **A pin displaces inherited skills.** On a continuation round the prior active set is
+     capability-first exception the profile already makes for selected runbooks.
+   - **A pin displaces inherited runbooks.** On a continuation round the prior active set is
      budgeted *after* the pins, so a pin sent mid-turn can truncate it; the remainder is
      truncated verbatim, which can leave an inherited specific without the foundation it
      arrived with. Sending no pins leaves reuse exactly as it was.
    - **Counted against the cap**, not exempt from it — an exemption would make the
-     advertised `max_active_skills` false and let a pinned turn grow the prompt without
+     advertised `max_active_runbooks` false and let a pinned turn grow the prompt without
      bound.
    - **Applied every round**, so a pin sent on a tool-continuation round is honoured
      without re-running the selector. Once admitted it rides the state token like any other
-     active skill; resend it to keep it through a fresh authoritative round. One exception:
+     active runbook; resend it to keep it through a fresh authoritative round. One exception:
      under `profile: "subagent"` a prior set is re-filtered to the selectable menu each
-     round, so a pinned skill that is hidden from selection (today only the documentation
+     round, so a pinned runbook that is hidden from selection (today only the documentation
      runbook, which that profile does not want anyway) does not persist there — resend it
      every round, or simply do not pin it under that profile.
    - **Refusals are reported, never silent** — a mistyped id that produces a normal-looking
      turn is exactly the failure this would be debugged into. `warnings` carries
-     `unknown_skill_id_ignored` (no such skill), `pinned_skill_not_executable` (a real skill
+     `unknown_runbook_id_ignored` (no such runbook), `pinned_runbook_not_executable` (a real runbook
      outside this `profile`'s narrowed menu — a pin overrides the classifier, not the
-     capability boundary), and `pinned_skill_over_cap` (the pins alone did not fit). None of
+     capability boundary), and `pinned_runbook_over_cap` (the pins alone did not fit). None of
      these is an error: whether a pin fits depends on the live catalog, the foundation
      topology and the configured cap, none of which a request-shape validator can see.
-   Gated by `skills.pinned_skill_ids` in `/v1/daintree/capabilities` — `selection` is
+   Gated by `runbooks.pinned_runbook_ids` in `/v1/daintree/capabilities` — `selection` is
    `extra="forbid"`, so sending the field to a deployment that predates it 422s the turn.
 3. **One upstream call.** Selection is local (an in-process classifier, ~10ms), so both
    response paths are strictly sequential: select → assemble → one main completion. There
    is no speculative or private pre-selection stream.
-4. **Injection.** Only the active skill *bodies* are injected into the main prompt — never
-   the full catalog — and they reach the model as **plain context** (the "Loaded skills"
-   user-role block), not a tool call. The model is **not** shown a synthetic `skill__load`
-   self-call; a `skills.prelude` is still returned for the client to render a visible
-   "Skill loaded" card.
+4. **Injection.** Only the active runbook *bodies* are injected into the main prompt — never
+   the full catalog — and they reach the model as **plain context** (the "Loaded runbooks"
+   user-role block), not a tool call. The model is **not** shown a synthetic `runbook__load`
+   self-call; a `runbooks.prelude` is still returned for the client to render a visible
+   "Runbook loaded" card.
 5. **State token.** `state` is an opaque, signed (`HMAC-SHA256`, key-ring/`kid` rotation),
-   session-bound, expiring token carrying the active skills + catalog revision + cadence
+   session-bound, expiring token carrying the active runbooks + catalog revision + cadence
    keys. It is verified fail-closed; an invalid/expired/wrong-session token is ignored
    (selection simply re-runs) and a `warnings` entry is added.
 
-`skill.find` / `skill.load` (and their wire-safe `skill__find` / `skill__load` forms) are
+`runbook.find` / `runbook.load` (and their wire-safe `runbook__find` / `runbook__load` forms) are
 reserved and rejected if a client offers them as tools or replays them in history.
 
-`/v1/daintree/capabilities` carries `skills.catalog`: every catalog skill as a minimal
-`{id, title}` object, sorted by id, so a client naming a skill can validate the id and
+`/v1/daintree/capabilities` carries `runbooks.catalog`: every catalog runbook as a minimal
+`{id, title}` object, sorted by id, so a client naming a runbook can validate the id and
 suggest near misses before spending a turn. It is the **canonical full catalog** —
 capabilities has neither a `profile` nor a tool inventory, so it is not narrowed to a
-profile's executable menu, and server-pinned skills are included because manual `load`
+profile's executable menu, and server-pinned runbooks are included because manual `load`
 accepts them. Cache it against the `catalog_revision` alongside it: both come from one
 catalog snapshot. That keying is **conservative, not exact** — the revision hashes every
-skill's metadata *and body*, so it moves on a body-only edit that leaves the id/title list
+runbook's metadata *and body*, so it moves on a body-only edit that leaves the id/title list
 byte-identical; a client will occasionally re-fetch a list that did not change. For the
-full metadata (summary, when-to-use, risk, required tools) use `/v1/daintree/skills`,
-which serves it with an ETag; `skills.catalog` deliberately does not repeat it.
+full metadata (summary, when-to-use, risk, required tools) use `/v1/daintree/runbooks`,
+which serves it with an ETag; `runbooks.catalog` deliberately does not repeat it.
 
 ---
 
@@ -603,13 +613,13 @@ of finding it. It is not a hint: it selects a different assembly path.
 |                                | `assistant`                   | `subagent`                                |
 |--------------------------------|-------------------------------|-------------------------------------------|
 | System prompt                  | orchestrator persona          | sub-agent persona                         |
-| Skill selection                | full catalog                  | menu narrowed to skills the caller's tools can execute |
-| Active-set cap                 | `max_active_skills`           | `min(that, 2)`                            |
+| Runbook selection                | full catalog                  | menu narrowed to runbooks the caller's tools can execute |
+| Active-set cap                 | `max_active_runbooks`           | `min(that, 2)`                            |
 | Documentation lookup           | on                            | off — it researches the caller's PROJECT  |
 | Integrations / runtime / turn footer / display | rendered      | dropped                                   |
 | Startup block                  | yes                           | yes — it must know which project it is in |
 
-The narrowed menu is filtered on each skill's declared `requiredTools`: a runbook whose
+The narrowed menu is filtered on each runbook's declared `requiredTools`: a runbook whose
 steps call tools the caller does not hold is worse than no runbook, because it spends
 context and then steers the model toward calls that can only fail.
 
@@ -627,8 +637,8 @@ machine — unlike the Daintree control plane, which drives local terminals and 
 behind a per-session token.
 
 1. **Classification.** The local selector already on the turn's first-byte path returns a
-   second answer alongside `skill_ids`: `docs_query`, a short search string, or `null`. It is
-   independent of skill selection — a turn can need both, either, or neither — and `null` is
+   second answer alongside `runbook_ids`: `docs_query`, a short search string, or `null`. It is
+   independent of runbook selection — a turn can need both, either, or neither — and `null` is
    the common case. A turn that skips selection (continuation round, no-task fast path) or
    whose selector degraded never looks anything up.
 2. **Retrieval.** One stateless JSON-RPC `tools/call` to the docs server's `search` tool,
@@ -647,8 +657,8 @@ behind a per-session token.
    the tail carrying the pages is rebuilt every round, so without this a usage question that
    takes a tool call to answer would lose its sources between asking and answering. A new
    instruction is classified afresh and never inherits the query.
-4. **Visibility.** The search appears in `skills.prelude.tool_executions` as a `docs__search`
-   execution (display name `docs.search`), the same channel a skill load rides, so the user
+4. **Visibility.** The search appears in `runbooks.prelude.tool_executions` as a `docs__search`
+   execution (display name `docs.search`), the same channel a runbook load rides, so the user
    sees which query produced the cited pages. Its result carries the matched **paths only** —
    the page text is already going to the model through the prompt.
 **Best-effort by construction.** Every failure — no client, no budget, a docs server that
@@ -685,7 +695,7 @@ first, so a change to one never re-encodes anything above it:
 | 1 | Base system prompt | system | static — cached across all sessions |
 | 2 | Response contract | system | static — output-shape rules; the last system block |
 | 3 | Tool schemas | top-level `tools` | 77 schemas, 77,258 compact-JSON bytes, ~21.5k tokens (measured 2026-08-16) |
-| 4 | Active skill bodies | user | shared by TASK — any two sessions running the same runbook share the prefix through here. Replaced wholesale on a selector topic shift; omitted when empty |
+| 4 | Active runbook bodies | user | shared by TASK — any two sessions running the same runbook share the prefix through here. Replaced wholesale on a selector topic shift; omitted when empty |
 | 5 | Integrations (MCP servers) | user | per session and instance — carries the client's MCP endpoint URL. Client tools are NOT listed here; their schemas already ride the function-calling interface |
 | 6 | Injected startup context | user | session-stable project/agent/instruction data. The `startup` request field is required; the row is emitted only when it renders non-empty |
 | 7 | Visible `input.messages` conversation | user/assistant/tool | append-only. The learner reads a bounded transcript of it; the selector reads only the newest message plus a small labelled slice of history |
@@ -693,8 +703,8 @@ first, so a change to one never re-encodes anything above it:
 
 Rows 4 and 5 were system-role until issue #39. That put a per-machine MCP
 endpoint URL and every selector topic shift ahead of all 21.5k tokens of
-schemas; moving them below makes a skill load cost its own bytes instead of the
-tool region. Skill bodies stay ahead of the conversation rather than joining the
+schemas; moving them below makes a runbook load cost its own bytes instead of the
+tool region. Runbook bodies stay ahead of the conversation rather than joining the
 volatile tail — a large runbook in the tail is re-paid uncached on every round of
 every turn, far worse than one conversation re-encode when the set changes.
 
@@ -719,20 +729,20 @@ Reasoning is controlled by the unified `reasoning` object, sent explicitly on ev
 `{"enabled": false}` turns thinking off, `{"effort": "<tier>"}` turns it on at a tier.
 DeepSeek V4 Flash thinks when the field is ABSENT, so the explicit directive is what keeps a
 non-thinking call actually non-thinking — measured, `{"enabled": false}` drops
-`reasoning_tokens` out of the usage block entirely. Skill selection sends nothing at all: it
+`reasoning_tokens` out of the usage block entirely. Runbook selection sends nothing at all: it
 is local and makes no upstream call.
 
 The thinking posture is **hardcoded — a product decision like the model ids, not
 configuration**. **The whole interactive surface is non-thinking**: the main `/respond` call,
 every utility task, and the selector all send `{"enabled": false}`. This workload does not
-need a chain-of-thought — the main model routes a request onto a skill runbook and emits tool
+need a chain-of-thought — the main model routes a request onto a runbook and emits tool
 calls, and the utility tasks are bounded extractions and classifications over text the client
 already gathered — while reasoning cost seconds of first-byte latency (a measured greeting
 turn spent 366 reasoning tokens and ~3.5s of an 11.5s wall-clock).
 
 There is **no middle tier to retreat to**: measured over 5 samples each on a fixed prompt,
 `low` and `high` produced statistically identical chain-of-thought (mean 662 vs 656 reasoning
-tokens), so the only real step below `high` is off — which is the posture taken. Skill
+tokens), so the only real step below `high` is off — which is the posture taken. Runbook
 selection is not part of this decision at all any more: it runs locally and makes no upstream
 call, so it has no thinking posture to set. (Historically it did, and it reached "off" first
 on its own first-byte argument.)
@@ -780,8 +790,8 @@ the problem, because that is the whole reason these are separate codes.
 | 400  | `missing_tool_call_id`, `dangling_tool_message`, `duplicate_tool_call_id`, `unresolved_tool_calls`, `malformed_tool_call_id`, `tool_calls_on_non_assistant_message` | The tool-call transcript is not a valid exchange. An assistant turn opens a BATCH of calls, every call is answered exactly once, and only then may a user/assistant message follow; order *within* a batch is free. Ids are compared verbatim — surrounding whitespace is rejected rather than trimmed, because they travel upstream raw. A trailing unresolved batch is legal. Client bug in every case: report it with the request id rather than retrying. |
 | 400  | `invalid_image`, `remote_image_not_allowed` | An image part failed the data-URL policy: media type outside the allowlist (`image/png`, `image/jpeg`, `image/webp`, `image/gif`), not `;base64`, empty, or not valid base64. |
 | 401  | `invalid_api_key` | Bearer missing or malformed **at Daintree's door**. Send a valid header. |
-| 413  | `request_too_large` | Body cap, a per-message / per-tool byte cap, or a request-SHAPE cap: too many messages, content parts, tool calls in one message, stop sequences, pinned skill ids or images. `param` names the field. |
-| 413  | `context_window_exceeded` | The assembled prompt does not fit the model's context window. Distinct from `request_too_large`, which is about the bytes the CLIENT sent: this one counts the whole prompt — base prompt, tool schemas, active skill bodies, startup and the transcript — so a small request can trip it in a long session. Not retryable; start a new session or shorten the conversation. Raised before the upstream call when the server can see it, and mapped from the host's own rejection when it cannot, so the code is the same either way. |
+| 413  | `request_too_large` | Body cap, a per-message / per-tool byte cap, or a request-SHAPE cap: too many messages, content parts, tool calls in one message, stop sequences, pinned runbook ids or images. `param` names the field. |
+| 413  | `context_window_exceeded` | The assembled prompt does not fit the model's context window. Distinct from `request_too_large`, which is about the bytes the CLIENT sent: this one counts the whole prompt — base prompt, tool schemas, active runbook bodies, startup and the transcript — so a small request can trip it in a long session. Not retryable; start a new session or shorten the conversation. Raised before the upstream call when the server can see it, and mapped from the host's own rejection when it cannot, so the code is the same either way. |
 | 426  | `unsupported_daintree_protocol` | Upgrade the client. |
 | 404  | `unknown_task` | `/v1/daintree/tasks` was asked for a task profile that does not exist. Read the available ids from `/v1/daintree/capabilities`. |
 | 503  | *(not ready)* | `/readyz` is failing; the instance has not finished starting or is misconfigured. |
@@ -834,11 +844,11 @@ changing the already-committed HTTP status. When an exhausted rate limit carried
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| `POST` | `/v1/daintree/respond` | yes | Generation (native, + first-class skills) |
-| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision + skill `{id, title}` listing |
+| `POST` | `/v1/daintree/respond` | yes | Generation (native, + first-class runbooks) |
+| `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision + runbook `{id, title}` listing |
 | `POST` | `/v1/daintree/auth/verify` | yes | Sign-in probe: does the upstream recognise the server credential? (no body; no inference). `valid` plus optional budget metadata; recognised is not the same as fundable |
-| `GET`  | `/v1/daintree/skills` | yes | Skill metadata (ETag/304); never the body |
-| `POST` | `/v1/daintree/skills/resolve` | yes | Manual `find` / `load` / `clear`; returns the same `skills` block + `state` |
+| `GET`  | `/v1/daintree/runbooks` | yes | Runbook metadata (ETag/304); never the body |
+| `POST` | `/v1/daintree/runbooks/resolve` | yes | Manual `find` / `load` / `clear`; returns the same `runbooks` block + `state` |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks (server-owned prompts; no client task prompt) |
 | `GET`  | `/healthz` | no | Liveness |
 | `GET`  | `/readyz` | no | Readiness (config, secrets, prompts, catalog, provider) |
@@ -849,5 +859,5 @@ changing the already-committed HTTP status. When an exhausted rate limit carried
 `protocol_version` is explicit per request. `prompt_version` is a stable prompt-family
 label (`"main"`) — pre-release, it is not bumped on prompt edits; everything on disk is
 simply the current prompt. `catalog_revision` is the real change signal: it is a content
-hash that moves whenever any skill changes, so the client re-runs selection when the
+hash that moves whenever any runbook changes, so the client re-runs selection when the
 catalog moves. Both are returned on every response.
