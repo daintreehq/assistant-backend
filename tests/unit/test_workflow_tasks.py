@@ -110,6 +110,21 @@ async def test_plan_duplicate_node_ids_repair(
     # The repair retry re-anchors on the plan contract.
     repair_text = fake_provider.requests[1].messages[-1]["content"]
     assert "acyclic" in repair_text
+    # ...and names the STRUCTURAL defect the validator found, rather than telling
+    # a model that produced valid, correctly-shaped JSON that its JSON was bad.
+    # The opener is asserted as well as the detail: reverting the validator
+    # re-raise to the default `schema` kind would still carry "duplicate node id"
+    # and would still not say "not valid JSON", so the detail alone pins nothing.
+    assert repair_text.startswith(
+        "Your previous response was valid JSON of the right shape, but it is not a "
+        "usable result."
+    )
+    assert "The problem: <repair_error>duplicate node id" in repair_text
+    assert "not valid JSON" not in repair_text
+    # The rejected graph comes back framed as data, inside the user-role
+    # correction — never as a fabricated assistant turn.
+    assert "<rejected_output>" in repair_text
+    assert all(m["role"] != "assistant" for m in fake_provider.requests[1].messages)
 
 
 @pytest.mark.asyncio
