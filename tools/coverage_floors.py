@@ -32,6 +32,12 @@ from pathlib import Path
 # excluded, so the gap stays visible.
 FLOORS: dict[str, int] = {
     "src/daintree_assistant_server/auth.py": 95,
+    # Added 2026-08-24. The Authorization header, read two ways. `parse_bearer` is
+    # the door's own grammar and `credential_candidates` decides what never
+    # reaches a log line — and the second is the one a percentage protects badly,
+    # because a branch that stops being exercised there does not fail anything, it
+    # just quietly stops masking a shape of credential.
+    "src/daintree_assistant_server/services/bearer.py": 98,
     # Added 2026-08-24 (measured 95.58%). `config.py` earned a floor when it took
     # on the OAuth deployment configuration: `auth_manifest_problems()` decides
     # what `/v1/daintree/auth/config` will PUBLISH to any caller, and that route

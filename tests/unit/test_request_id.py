@@ -107,3 +107,88 @@ def test_an_empty_bearer_does_not_reject_every_id() -> None:
     `_bearer_token` regressed, every inbound id would be silently discarded."""
     assert _safe_request_id("req-supplied-1", "Bearer ") == "req-supplied-1"
     assert _safe_request_id("req-supplied-1", "Bearer") == "req-supplied-1"
+
+
+# ---------------------------------------------------------------------------
+# Every Authorization header, not just the one an accessor happened to return.
+# ---------------------------------------------------------------------------
+
+
+def test_a_credential_in_a_second_authorization_header_is_still_masked() -> None:
+    """The hole a single-value accessor leaves open.
+
+    Starlette's `Headers.get` returns the FIRST value and `dict(scope["headers"])`
+    keeps the LAST, so with two `Authorization` headers each accessor silently
+    drops one — and a request id equal to the credential in the dropped header
+    would be adopted, logged and echoed. Nothing downstream can recover it: by
+    then the secret is in the log pipeline.
+    """
+    second = "sk-or-v1-the-one-in-the-second-header"
+    result = _safe_request_id(second, ["Bearer sk-or-v1-first", f"Bearer {second}"])
+    assert _is_minted(result)
+    assert second not in result
+
+
+def test_a_credential_in_a_comma_folded_header_is_still_masked() -> None:
+    """A proxy may fold repeated headers into one comma-separated value. The
+    strict parser refuses that outright; redaction must still see through it,
+    because refusing to read a header does not stop its bytes being a secret."""
+    folded = "sk-or-v1-folded-by-a-proxy"
+    result = _safe_request_id(folded, [f"Bearer sk-or-v1-first, Bearer {folded}"])
+    assert _is_minted(result)
+    assert folded not in result
+
+
+def test_a_bare_string_is_not_iterated_as_characters() -> None:
+    """`str` satisfies `Sequence[str]`, so passing one where a list was meant
+    type-checks perfectly and then iterates CHARACTERS — every single character
+    becomes a "credential" and every id is discarded as overlapping one.
+
+    The failure is silent, on the one path whose whole job is not to be silent,
+    and no type checker can object to it. Hence the runtime guard, and hence this
+    test.
+    """
+    assert _safe_request_id("req-supplied-1", AUTH) == "req-supplied-1"
+    assert _safe_request_id("req-supplied-1", None) == "req-supplied-1"
+    assert _safe_request_id("req-supplied-1", []) == "req-supplied-1"
+
+
+def test_a_credential_in_a_comma_folded_header_is_masked_in_either_direction() -> None:
+    """The earlier folded-header test passed for a weaker reason than it claimed:
+    the long token happened to be a substring of the whole folded value. The
+    dangerous direction is the other one — an id that CONTAINS the credential.
+
+    `trace-<credential>` is contained in nothing, and contains only the isolated
+    credential. Without splitting the folded value into its fields, no candidate
+    matches and the id is adopted with the secret inside it.
+    """
+    secret = "sk-or-v1-second-of-two-folded"
+    folded = f"Bearer sk-or-v1-first, Bearer {secret}"
+    result = _safe_request_id(f"trace-{secret}", [folded])
+    assert _is_minted(result)
+    assert secret not in result
+
+
+def test_a_short_credential_in_a_folded_header_is_still_masked() -> None:
+    """The worst version: a credential below the fragment threshold. Found only as
+    part of the whole folded value, the reverse rule is suppressed and an EXACT
+    match on the id escapes."""
+    secret = "sk-abc12"
+    result = _safe_request_id(secret, [f"Bearer sk-or-v1-first, Bearer {secret}"])
+    assert _is_minted(result)
+
+
+def test_a_scheme_only_header_does_not_reject_an_ordinary_id() -> None:
+    """`Authorization: Bearer` would otherwise make the literal word "Bearer" a
+    secret, and any id containing it would be discarded for overlapping a value
+    written in the clear in every HTTP specification."""
+    assert _safe_request_id("trace-Bearer", ["Bearer"]) == "trace-Bearer"
+
+
+def test_two_inbound_request_ids_are_ambiguous_and_neither_is_adopted() -> None:
+    """Picking either would let our logs name a different id than an
+    intermediary's do — the precise failure an inbound id exists to prevent. A
+    minted id at least matches everything downstream of here."""
+    from daintree_assistant_server.main import _safe_request_id as safe
+
+    assert _is_minted(safe(None, AUTH))

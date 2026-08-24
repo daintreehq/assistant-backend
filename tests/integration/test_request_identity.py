@@ -358,3 +358,48 @@ def test_an_unhandled_500_carries_the_same_id_it_logged(client, auth, caplog) ->
 
     assert r.status_code == 500
     assert r.headers.get("X-Request-Id") == "cli-500"
+
+
+# ---------------------------------------------------------------------------
+# Duplicate Authorization headers, through the real ASGI stack.
+#
+# Unit tests cover the extractor; these cover the WIRING, which is where the bug
+# actually lived — a `Headers.get` in one middleware and a `dict(raw_headers)` in
+# the other, each dropping a different one of two headers.
+# ---------------------------------------------------------------------------
+
+
+def test_a_second_authorization_header_is_masked_on_an_ordinary_request(client) -> None:
+    """`Headers.get` returns the first value, so a credential in the second was
+    invisible to the request-id overlap check and would have been echoed back."""
+    second = "sk-or-v1-second-header-credential"
+    response = client.get(
+        "/v1/daintree/capabilities",
+        headers=[
+            ("Authorization", "Bearer sk-or-v1-first-header"),
+            ("Authorization", f"Bearer {second}"),
+            ("X-Request-Id", second),
+        ],
+    )
+    assert second not in response.headers["X-Request-Id"]
+
+
+def test_a_second_authorization_header_is_masked_on_the_413_path(client) -> None:
+    """The body-limit middleware is OUTERMOST and builds its own id from
+    `dict(scope["headers"])`, which keeps the LAST value — so it dropped the
+    opposite header from the one the inner middleware dropped. Both paths mint
+    their own id, so both had to be fixed, and only an oversized body reaches this
+    one."""
+    first = "sk-or-v1-first-header-credential"
+    response = client.post(
+        "/v1/daintree/respond",
+        headers=[
+            ("Authorization", f"Bearer {first}"),
+            ("Authorization", "Bearer sk-or-v1-second-header"),
+            ("X-Request-Id", first),
+            ("Content-Type", "application/json"),
+        ],
+        content=b'{"x":"' + b"a" * (9 * 1024 * 1024) + b'"}',
+    )
+    assert response.status_code == 413
+    assert first not in response.headers["X-Request-Id"]

@@ -10,6 +10,7 @@ ready (``/readyz`` returns 503) without crashing liveness.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -48,6 +49,7 @@ from .runbooks.local.paths_local import selector_artifact_dir
 from .runbooks.local.runtime import InferencePool
 from .runbooks.local.selector import LocalSelector, RunbookSelector
 from .runbooks.local.setwise import SetwiseClassifier
+from .services.bearer import authorization_values, credential_candidates
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.compaction import Compactor, NullCompactor, default_compactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
@@ -135,14 +137,21 @@ class BodySizeLimitMiddleware:
         # is the one response a tester cannot quote a request id for — precisely
         # the failure they are most likely to be reporting. Honor an inbound id
         # when the client sent one, exactly as the inner middleware does.
-        headers = dict(scope.get("headers") or [])
+        raw_headers = list(scope.get("headers") or [])
+        # `dict(raw_headers)` would keep only the LAST value for a repeated
+        # header, which is precisely how a second `Authorization` would become
+        # invisible to the overlap check below.
+        supplied = [v for k, v in raw_headers if k.lower() == b"x-request-id"]
         try:
-            inbound = headers.get(b"x-request-id", b"").decode("ascii")
-            authorization = headers.get(b"authorization", b"").decode("ascii")
+            # Exactly one, or none of them. Two inbound ids are an ambiguity this
+            # server cannot resolve — picking either means our logs may name a
+            # different id than the intermediary's do, which is worse than a
+            # minted id that at least matches everything downstream of here.
+            inbound = supplied[0].decode("ascii") if len(supplied) == 1 else ""
         except UnicodeDecodeError:  # pragma: no cover - defensive
-            inbound, authorization = "", ""
+            inbound = ""
         response.headers.setdefault(
-            "X-Request-Id", _safe_request_id(inbound, authorization)
+            "X-Request-Id", _safe_request_id(inbound, authorization_values(raw_headers))
         )
         await response(scope, _eat, send)
 
@@ -162,7 +171,7 @@ _REQUEST_ID_SAFE = frozenset(
 _MIN_CREDENTIAL_FRAGMENT = 8
 
 
-def _safe_request_id(inbound: str | None, authorization: str | None) -> str:
+def _safe_request_id(inbound: str | None, authorizations: Sequence[str] | str | None) -> str:
     """Adopt the caller's correlation id, or mint one when it isn't safe to.
 
     Honoring an inbound id is genuinely useful — it is how a CLI ties its own
@@ -175,13 +184,30 @@ def _safe_request_id(inbound: str | None, authorization: str | None) -> str:
       caller's own API key is a *structurally valid* request id. Somebody
       scripting against this API can paste one into the wrong variable, and we
       would faithfully log and echo their spend-authorizing credential. Checked
-      both directions, since a prefix is as damaging as the whole value.
+      both directions, since a prefix is as damaging as the whole value — and
+      against EVERY ``Authorization`` header rather than one of them. Starlette's
+      ``Headers.get`` returns the first and a ``dict`` of the raw pairs keeps the
+      last, so with two such headers either accessor silently drops one, and a
+      token in the dropped one would reach the log pipeline untouched. The
+      candidates come from ``services.bearer``, whose extractor is deliberately
+      lenient: a header the strict parser refuses is *more* likely to hold a
+      mis-pasted credential, not less.
     * **Emptiness.**
 
     Refusal is silent and non-fatal: we simply mint our own. Rejecting the request
     would turn a harmless client mistake into an outage, and the caller's id has
     no authority here anyway.
     """
+    # A bare `str` is itself a `Sequence[str]`, so passing one where a list was
+    # meant type-checks perfectly and then iterates CHARACTERS — every id becomes
+    # a "substring of the credential" and is thrown away, silently, on a path
+    # whose whole purpose is not to be silent. Normalised rather than trusted,
+    # because the type system cannot object and the failure is invisible.
+    if authorizations is None:
+        authorizations = ()
+    elif isinstance(authorizations, str):
+        authorizations = (authorizations,)
+
     if not inbound:
         return new_request_id()
     candidate = inbound.strip()
@@ -189,25 +215,15 @@ def _safe_request_id(inbound: str | None, authorization: str | None) -> str:
         return new_request_id()
     if not all(ch in _REQUEST_ID_SAFE for ch in candidate):
         return new_request_id()
-    token = _bearer_token(authorization)
-    if token:
+    for secret in credential_candidates(authorizations):
         # Containing the whole token is damaging at any length. The reverse — the
         # id being a fragment OF the token — only matters once the fragment is long
         # enough to be credential material rather than a coincidence.
-        if token in candidate:
+        if secret in candidate:
             return new_request_id()
-        if len(candidate) >= _MIN_CREDENTIAL_FRAGMENT and candidate in token:
+        if len(candidate) >= _MIN_CREDENTIAL_FRAGMENT and candidate in secret:
             return new_request_id()
     return candidate
-
-
-def _bearer_token(authorization: str | None) -> str | None:
-    if not authorization:
-        return None
-    parts = authorization.split(" ", 1)
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-    return parts[1].strip() or None
 
 
 @dataclass
@@ -671,8 +687,17 @@ def create_app(
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):  # type: ignore[no-untyped-def]
+        supplied_ids = request.headers.getlist("x-request-id")
         request_id = _safe_request_id(
-            request.headers.get("x-request-id"), request.headers.get("authorization")
+            # Exactly one, or mint. See BodySizeLimitMiddleware._reject: two
+            # inbound ids are an ambiguity, and resolving it by picking one would
+            # let our logs disagree with an intermediary's about which id names
+            # this request.
+            supplied_ids[0] if len(supplied_ids) == 1 else None,
+            # `getlist`, not `get`: the latter returns only the first of two
+            # `Authorization` headers, and a token in the second would then be
+            # invisible to the credential-overlap check.
+            request.headers.getlist("authorization"),
         )
         # One request identity for the whole turn: handlers read it back through
         # api.deps.request_id() so logs, response headers, SSE meta and SSE error
