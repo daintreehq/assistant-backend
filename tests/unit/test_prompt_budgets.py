@@ -160,10 +160,13 @@ BASE_PARTIAL_CEILINGS = {
     # region of the request on a topic shift. A rule governing an
     # unconditionally-offered tool has to be unconditional too.
     #
-    # Sized to the measured 2628 B, close rather than round: the enabled variant
+    # Sized to the measured 2853 B, close rather than round: the enabled variant
     # is already over the aggregate ceiling below, so this is the only ratchet
-    # actually holding this text.
-    "25-forked-terminal-calls.md": 2816,
+    # actually holding this text. Raised once from 2816 B, to spell out that an
+    # edit branch needs acceptance criteria the spawn tool marks optional —
+    # measured against the live model, which omitted them on all four branches
+    # of a real fork and cost every one of them a repair and a fallback.
+    "25-forked-terminal-calls.md": 3008,
     "30-skills.md": 3 * 1024,
     "35-daintree-docs.md": 2304,
     # Raised from 3 KiB with the base ceiling above, and for the same rule: the

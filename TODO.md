@@ -14,6 +14,25 @@ claim about today's behaviour against the source before acting on it.
 
 **Trigger: before `FORKED_TERMINAL_CALLS_MODE=enabled` reaches production.**
 
+**One live smoke run has happened** (2026-08-24, one four-way fan-out against
+Together). It settled three things that were assumptions: the model does reach
+for the fork tool unprompted on a fan-out-shaped request; the four expansions
+DO share a prefix cache (branches after the first reported 13,973 of 13,994
+prompt tokens cached, ~99.9%, with one branch racing to a partial 51%); and the
+branches genuinely overlap (`sum_branch_ms` 22,382 against `wall_ms` 15,410).
+
+It also found the bug this entry exists for. Every branch omitted
+`acceptanceCriteria` — the spawn tool marks it optional, so the model follows
+the schema — and the backend rejected all four, repaired all four, and fell
+back on all four: eight model calls to produce zero model-written prompts.
+Fixed by supplying the field instead of demanding it. Nothing offline could
+have found that, because every fake returned the field.
+
+What one run does NOT settle: the latency delta against a serial baseline (that
+run's wall time was dominated by a single 15.4s branch outlier against ~2s
+siblings), the variance, or the repair/fallback rate across varied plans. The
+benchmark below is still owed.
+
 The feature is built and gated off. What is NOT measured is the thing it exists
 for: time from the user's submission to the client holding four executable spawn
 calls, candidate against baseline, on the same conversation and the same four

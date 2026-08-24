@@ -641,9 +641,6 @@ async def test_context_file_paths_from_the_plan_reach_the_call() -> None:
         pytest.param(spawn_result("not json at all"), id="invalid_json"),
         pytest.param(spawn_result({"taskPrompt": "no title"}), id="missing_title"),
         pytest.param(spawn_result({"title": "t"}), id="missing_prompt"),
-        pytest.param(
-            spawn_result({"title": "t", "taskPrompt": "p"}), id="missing_acceptance_for_edit"
-        ),
         pytest.param(spawn_result(good_args(), name="fs__read"), id="wrong_function"),
         pytest.param(spawn_result(good_args(), calls=2), id="two_calls"),
         pytest.param(spawn_result(good_args(), calls=0), id="no_call"),
@@ -850,7 +847,6 @@ def test_finalize_repairs_a_near_miss_key_against_the_real_schema() -> None:
     [
         {"title": "  ", "taskPrompt": "p", "acceptanceCriteria": "a"},
         {"title": "t", "taskPrompt": "", "acceptanceCriteria": "a"},
-        {"title": "t", "taskPrompt": "p"},
         {"title": 7, "taskPrompt": "p", "acceptanceCriteria": "a"},
     ],
 )
@@ -1006,3 +1002,100 @@ def test_a_whitespace_only_title_hint_falls_back_to_the_branch_id() -> None:
         ]
     )
     assert fallback_arguments(hinted, hinted.branches[0])["title"] == "backend"
+
+
+# ---------------------------------------------------------------------------
+# Acceptance criteria are SUPPLIED, not demanded.
+#
+# Measured against the live model: the spawn tool marks `acceptanceCriteria`
+# optional, so the model follows the schema and omits it — on all four branches
+# of a real fork. Rejecting the branch for that threw away a good task prompt,
+# spent a repair call getting the same answer, and fell back to a synthesized
+# prompt. The one field the backend can write deterministically was being used
+# to discard the one it cannot.
+# ---------------------------------------------------------------------------
+
+
+def test_a_missing_acceptance_criteria_is_filled_rather_than_rejected() -> None:
+    spawn_plan = plan()
+    merged, _ = finalize_arguments(
+        {"title": "t", "taskPrompt": "p"},
+        plan=spawn_plan,
+        branch=spawn_plan.branches[0],
+        spawn_schema=SPAWN_SCHEMA,
+    )
+    assert merged["acceptanceCriteria"].strip()
+    assert merged["taskPrompt"] == "p"
+
+
+def test_the_plans_acceptance_hint_wins_over_the_default() -> None:
+    hinted = plan(
+        branches=[
+            {
+                "id": "backend",
+                "worktreeId": "/repo/backend",
+                "brief": "Own the backend scope; nothing else.",
+                "acceptanceHint": "The payment path is covered end to end.",
+            },
+            *[
+                {"id": b, "worktreeId": f"/repo/{b}", "brief": f"Own the {b} scope."}
+                for b in BRANCH_IDS[1:]
+            ],
+        ]
+    )
+    merged, _ = finalize_arguments(
+        {"title": "t", "taskPrompt": "p"},
+        plan=hinted,
+        branch=hinted.branches[0],
+        spawn_schema=SPAWN_SCHEMA,
+    )
+    assert merged["acceptanceCriteria"] == "The payment path is covered end to end."
+
+
+def test_the_models_own_acceptance_criteria_are_kept() -> None:
+    spawn_plan = plan()
+    merged, _ = finalize_arguments(
+        {"title": "t", "taskPrompt": "p", "acceptanceCriteria": "Written by the model."},
+        plan=spawn_plan,
+        branch=spawn_plan.branches[0],
+        spawn_schema=SPAWN_SCHEMA,
+    )
+    assert merged["acceptanceCriteria"] == "Written by the model."
+
+
+@pytest.mark.asyncio
+async def test_a_branch_omitting_acceptance_criteria_costs_no_repair() -> None:
+    # The whole point of the change: this shape used to cost a repair call and a
+    # fallback on EVERY branch, which is two model calls spent to discard a good
+    # prompt.
+    provider = ScriptedProvider(
+        default=spawn_result({"title": "t", "taskPrompt": "a real prompt"})
+    )
+    result = await expand(service(provider))
+    assert [b.repaired for b in result.branches] == [False] * 4
+    assert [b.fallback for b in result.branches] == [False] * 4
+    assert len(provider.requests) == 4
+    assert args_of(result.calls[0])["taskPrompt"] == "a real prompt"
+
+
+@pytest.mark.asyncio
+async def test_a_watch_goal_hint_fills_in_when_the_expander_omits_one() -> None:
+    hinted = plan(
+        branches=[
+            {
+                "id": "backend",
+                "worktreeId": "/repo/backend",
+                "brief": "Own the backend scope; nothing else.",
+                "watchGoalHint": "Surface what the agent reported.",
+            },
+            *[
+                {"id": b, "worktreeId": f"/repo/{b}", "brief": f"Own the {b} scope."}
+                for b in BRANCH_IDS[1:]
+            ],
+        ]
+    )
+    provider = ScriptedProvider(
+        default=spawn_result({"title": "t", "taskPrompt": "p", "acceptanceCriteria": "a"})
+    )
+    result = await expand(service(provider), hinted)
+    assert args_of(result.calls[0])["watchGoal"] == "Surface what the agent reported."
