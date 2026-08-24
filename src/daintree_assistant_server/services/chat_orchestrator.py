@@ -118,6 +118,7 @@ from .fast_response import (
     FastResponsePolicyDecision,
     FastResponseResult,
     FastResponseService,
+    fast_context_runbooks,
 )
 from .output_policy import lint_output, repair_tables, resolve_content_width
 from .prompt_assembler import (
@@ -1480,7 +1481,11 @@ class ChatOrchestrator:
         if fast_policy.run and self.fast_response is not None:
             fast_task = asyncio.create_task(
                 self.fast_response.generate(
-                    request, active_runbooks=runbooks, request_id=request_id
+                    request,
+                    active_runbooks=fast_context_runbooks(
+                        decision, runbooks, resolved_catalog
+                    ),
+                    request_id=request_id,
                 )
             )
             # Registered so shutdown drains it. A bare task is weakly referenced by
@@ -1577,6 +1582,11 @@ class ChatOrchestrator:
                 continuation_message=self.fast_response.continuation_message
                 if self.fast_response is not None
                 else "",
+                # Rides the continuation row, never the assistant one, and only on
+                # a turn whose preamble is actually being SHOWN. A plan delivered
+                # on a shadow-mode turn would steer an answer the evidence for
+                # which the user never saw.
+                plan=fast.plan,
                 invocation_id=fast.invocation_id,
                 content_sha256=fast.content_sha256,
             )

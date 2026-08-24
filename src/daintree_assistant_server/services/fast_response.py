@@ -45,6 +45,8 @@ from ..prompts.loader import (
     PromptLoader,
 )
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
+from ..runbooks.catalog import Catalog
+from ..runbooks.decision import SelectionDecision
 from ..runbooks.models import Runbook
 from ..runbooks.tool_projection import session_bucket
 from ..text_utils import sanitize_line
@@ -57,19 +59,35 @@ logger = get_logger(__name__)
 MAX_PREAMBLE_WORDS = 120
 MAX_PREAMBLE_CHARS = 1200
 
-#: Generated tokens. Deliberately a little above the word cap so a reply that runs
-#: long is TRUNCATED by the provider and then rejected by `finish_reason == length`
-#: below, rather than being silently cut mid-sentence and shown to a user.
-MAX_OUTPUT_TOKENS = 160
+#: Generated tokens, covering BOTH parts — the visible opening and the hidden
+#: technical plan. Still deliberately above what the two caps allow (120 words and
+#: 2,000 characters), so a reply that runs long is TRUNCATED by the provider and
+#: then rejected on `finish_reason == length`, rather than being silently cut
+#: mid-sentence and shown to a user.
+#:
+#: Raised from 160 when the plan was added. The cost is paid twice — as Cerebras
+#: output, then as executor input — so this is a ceiling for runaway output, not a
+#: target: a good plan is well under it.
+MAX_OUTPUT_TOKENS = 700
 
-#: Conversation slice. Enough to resolve "it"/"that"/"continue", not enough to
-#: turn a cheap call into an expensive one.
-_MAX_SLICE_MESSAGES = 4
-_MAX_SLICE_CHARS = 4000
+#: The whole fast prompt, in characters.
+#:
+#: The serving model holds 131k tokens. This ceiling is ~65k at the usual four
+#: characters per token, and the gap is deliberate rather than timid: chars/4 is
+#: an average over prose, and a transcript is not prose. Tool output, paths and
+#: JSON run nearer one token per character, so a budget set at the true window
+#: would overflow exactly on the turns that carry the most evidence — the ones
+#: where the preview is worth most. At 2.5 chars/token this still fits.
+#:
+#: `EXECUTOR_CONTEXT_TOKENS` gets the same treatment for the same reason
+#: (`context_budget.py`), and the constant that would let this be exact — a
+#: measured tokens-per-character for real traffic — is the same one owed there.
+_MAX_INPUT_CHARS = 260_000
 
-#: The whole fast prompt. If the runbooks alone exceed this there is nothing to
-#: trim that would not misrepresent the procedure, so the stage skips.
-_MAX_INPUT_CHARS = 32_000
+#: Reserved out of that budget for the layers ahead of the transcript, so a very
+#: long conversation cannot squeeze the runbooks out. It is a floor for THEM, not
+#: a cap: the transcript gets whatever the earlier layers leave.
+_TRANSCRIPT_MIN_CHARS = 8_000
 
 #: Verbs that describe work on the project — the things a preamble must not claim
 #: to have already done. `read` carries a guard because "I have read-only access"
@@ -151,6 +169,71 @@ _DISCLOSURE = re.compile(
 #: be read as a turn-finality declaration by the scanner downstream.
 _CONTROL_MARKER = re.compile(r"\[\[DAINTREE:[A-Z]+\]\]")
 
+#: The hidden technical plan, and the tag that carries it.
+#:
+#: Named distinctively on purpose: the split is done by literal tag match on model
+#: output, so a tag a model might emit incidentally (`<plan>`) would let ordinary
+#: prose silently become a hidden block — or worse, leave half a plan visible.
+_PLAN_TAG = "daintree_plan"
+_PLAN_BLOCK = re.compile(
+    rf"<{_PLAN_TAG}\s*>(?P<body>.*?)</{_PLAN_TAG}\s*>", re.IGNORECASE | re.DOTALL
+)
+#: Any stray occurrence of the tag name, used to refuse output that opened a block
+#: it never closed. A visible half of a truncated plan is the one split failure a
+#: user would actually see.
+_PLAN_TAG_ANY = re.compile(rf"</?{_PLAN_TAG}", re.IGNORECASE)
+
+#: The injection guard, kept for the HIDDEN half but narrowed to meta-instructions.
+#:
+#: The visible half is held to `_ADDRESSES_THE_MODEL`, which refuses to talk to the
+#: model at all. The plan cannot be: instructing the executor is its entire job, and
+#: "call scratch.create, then spawn five agents" is exactly what it is for.
+#:
+#: So the line moves from "does it address the model" to "what does it address the
+#: model ABOUT". Object-level work is allowed; anything about the conversation's own
+#: rules is not. That distinction is what keeps the guard meaningful: the fast
+#: model's input contains user-controlled text, so a crafted message trying to
+#: launder "ignore your instructions" through a server-generated block is a
+#: reachable attack, and it is the only shape of instruction this refuses.
+_PLAN_META_INSTRUCTION = re.compile(
+    r"\b(?:ignore|disregard|override|bypass|forget)\s+(?:the\s+|any\s+|all\s+|your\s+)?"
+    r"(?:previous|prior|above|following|next|remaining|earlier|system|safety)?\s*"
+    r"(?:message|instruction|rule|guideline|policy|prompt|constraint)s?\b"
+    r"|\btreat\s+the\s+task\s+as\s+(?:complete|done|finished)\b"
+    r"|\bskip\s+(?:the\s+)?(?:confirmation|approval|permission)s?\b"
+    r"|\bdo\s+not\s+(?:ask|confirm|check\s+with)\s+the\s+user\b",
+    re.IGNORECASE,
+)
+
+#: Completion claims in TELEGRAPHIC form, which is the only form the plan uses.
+#:
+#: `_OVERCLAIM` was tuned for prose and anchors on a subject or auxiliary — "I
+#: checked", "has been run". The plan is explicitly asked for fragments and arrows,
+#: so it produces "already checked the loader -> patch line 40", which has neither
+#: and walked straight past that pattern. Same false claim, in the half the
+#: executor reads most closely.
+#:
+#: Anchored on the ADVERB rather than the verb, and that is the whole reason it is
+#: safe: a plan is written in imperatives, so "check the loader" and "run pytest"
+#: are ordinary intent and must pass. "already checked" and "just ran" cannot be
+#: read as intent at all.
+_PLAN_TELEGRAPHIC_OVERCLAIM = re.compile(
+    rf"\b(?:{_ADVERB})(?:{_DID})\b", re.IGNORECASE
+)
+
+#: The register the visible half is asked NOT to use: a first-person commitment to
+#: work about to happen. LOGGED, never rejected — and the asymmetry is deliberate.
+#:
+#: The cost of this drifting is a mildly repetitive reply, because the continuing
+#: model announces its own actions anyway. The cost of rejecting it is losing the
+#: preamble to a generic fallback that says nothing about THIS task. A real opening
+#: in the wrong register beats a safe one with no content, so this measures the
+#: rate instead of paying that price — if it climbs, the prompt is what to fix.
+_ANNOUNCEMENT_OPENING = re.compile(
+    r"^\s*(?:i'?l+\s|i\s+will\b|let\s+me\b|first,?\s+i\b|i'?m\s+going\s+to\b)",
+    re.IGNORECASE,
+)
+
 #: Finish reasons that mean "the model stopped because it was done". Anything
 #: else — a filter, a truncation, an unrecognised value — is not a whole reply.
 _CLEAN_FINISH_REASONS = frozenset({"stop", "end_turn", None})
@@ -180,6 +263,10 @@ class FastResponseResult:
     """What the stage produced, and everything the turn needs to account for it."""
 
     content: str | None = None
+    #: The hidden technical plan, or None. NEVER shown to a user and never part of
+    #: `content`: `has_content` gates VISIBILITY, and a plan folded into it would
+    #: be rendered. It reaches the executor through the handoff's continuation row.
+    plan: str | None = None
     source: FastResponseSource = "none"
     degraded: bool = False
     reason: str | None = None
@@ -209,18 +296,60 @@ class FastResponseResult:
 #: turn is clearly actionable. It names NOTHING — no file, no command, no cause —
 #: because the one thing a fallback must never do is invent the specifics it was
 #: reached for lacking.
+#: Written in the same REASONING register the model is asked for, not the
+#: first-person announcement register. That is not cosmetic here: the continuing
+#: model announces its own actions as it takes them, so a fallback that also
+#: announces produces the same sentence twice and makes the reply read as padded —
+#: the exact failure the visible half was rewritten to avoid. A fallback that
+#: reintroduced it would put the defect back on precisely the turns where the
+#: model already failed once.
 _FALLBACK_ACTIONABLE = (
-    "I'll work through the relevant steps, check the current state, make only the "
-    "changes the evidence supports, and confirm the result before reporting back."
+    "Work like this turns on establishing the current state before changing any of "
+    "it, so that what follows is driven by evidence rather than assumption — and so "
+    "that only the changes that evidence supports get made."
 )
 _FALLBACK_READ_ONLY = (
-    "I'll look at the relevant information, compare it with the current state, and "
-    "report the clearest supported answer and next step."
+    "The useful first move here is establishing what the current state actually is, "
+    "since the answer worth giving is the one the evidence supports rather than the "
+    "one that sounds most likely."
 )
 
 #: Tool names that indicate a runbook MUTATES things. Used only to pick which of
 #: the two fallbacks is honest, never to gate anything.
 _MUTATING_HINTS = ("spawn", "write", "edit", "commit", "push", "create", "delete", "run")
+
+
+def fast_context_runbooks(
+    decision: SelectionDecision,
+    active: list[Runbook],
+    catalog: Catalog,
+) -> list[Runbook]:
+    """What the fast stage READS, which is wider than what the turn RUNS.
+
+    The active set is capped, floor-filtered and cardinality-gated — it answers
+    "what will be executed". The preview is written before any of that matters and
+    its job is to describe the shape of the TASK, so it also gets the near-misses:
+    the runbooks the head ranked highest and admission threw away. A second-ranked
+    runbook is the strongest available evidence about what kind of request this
+    is, and the admission gates exist to discard exactly that.
+
+    Rank order is preserved and the ACTIVE ones lead, because `build_messages`
+    drops from the bottom when the budget runs out — so what goes is always a
+    runbook the turn was not going to run anyway.
+
+    Degrades to the active set alone: a reused or degraded decision has no ranking
+    of its own, and borrowing the previous turn's would describe a request that is
+    no longer being made.
+    """
+    seen = {r.id for r in active}
+    extra: list[Runbook] = []
+    for rid in decision.ranked_runbook_ids:
+        if rid in seen:
+            continue
+        runbook = catalog.get(rid)
+        if runbook is not None:
+            extra.append(runbook)
+    return [*active, *extra]
 
 
 def should_generate_fast_response(
@@ -292,6 +421,69 @@ def should_generate_fast_response(
     # preambles against real turns before any user sees one.
     visible = settings.fast_response_mode == "visible"
     return FastResponsePolicyDecision(run=True, visible=visible, reason="eligible")
+
+
+#: Hard ceiling on the hidden plan. It is executor INPUT on every eligible turn, so
+#: a runaway plan is paid for twice exactly like the visible half.
+MAX_PLAN_CHARS = 2_000
+
+
+def split_preamble(text: str) -> tuple[str, str | None]:
+    """Separate what the user sees from what only the executor sees.
+
+    Returns ``(visible, plan)``. ``plan`` is None when the model emitted no block,
+    which is a NORMAL outcome and not an error: the visible half is the product,
+    the plan is an enhancement, and a turn that gets one but not the other is
+    strictly better than a turn that gets neither.
+
+    The block is matched wherever it lands rather than assumed to be last. Models
+    reorder, and a plan emitted first would otherwise be shown to the user in
+    full — the single worst failure this split can have.
+    """
+    match = _PLAN_BLOCK.search(text)
+    if match is None:
+        return text.strip(), None
+    visible = (text[: match.start()] + text[match.end() :]).strip()
+    return visible, match.group("body").strip()
+
+
+def validate_plan(plan: str) -> FastResponseValidation:
+    """The hidden half. Different rules, because it has a different reader.
+
+    Structure, tool names and paths are the POINT here — the visible half refuses
+    all three. What survives from that validator is the part that is about
+    authority rather than presentation: this text becomes context the executor
+    reads as its own, so it may not claim work has happened, may not carry a
+    control marker the declaration scanner would read, and may not instruct the
+    model about the conversation's own rules.
+    """
+
+    def reject(reason: str) -> FastResponseValidation:
+        return FastResponseValidation(valid=False, content="", reject_reason=reason)
+
+    content = plan.strip()
+    if not content:
+        return reject("plan_empty")
+    if len(content) > MAX_PLAN_CHARS:
+        return reject("plan_too_long")
+    if any(ch in content for ch in "\x00\r") or any(
+        ord(ch) < 0x20 and ch not in "\n\t" for ch in content
+    ):
+        return reject("plan_control_characters")
+    if _CONTROL_MARKER.search(content):
+        return reject("plan_control_marker")
+    if _PLAN_TAG_ANY.search(content):
+        # A nested or unbalanced tag means the split is not what it looks like.
+        return reject("plan_nested_tag")
+    if _OVERCLAIM.search(content) or _PLAN_TELEGRAPHIC_OVERCLAIM.search(content):
+        # The same rule as the visible half plus the fragment form that half never
+        # produces, and it matters MORE here: this is the half the executor reads
+        # closely, so "already checked the loader" tells the model the job is
+        # partly done in the most credible possible place.
+        return reject("plan_overclaim")
+    if _PLAN_META_INSTRUCTION.search(content):
+        return reject("plan_meta_instruction")
+    return FastResponseValidation(valid=True, content=content)
 
 
 def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: bool) -> (
@@ -405,72 +597,108 @@ class FastResponseService:
     def build_messages(
         self, request: RespondRequest, *, active_runbooks: list[Runbook]
     ) -> list[dict[str, Any]] | None:
-        """The fast model's input, or None when the runbooks do not fit.
+        """The fast model's input, or None when the runbooks alone do not fit.
 
-        Runbook bodies are MANDATORY in this phase and are never trimmed. Silently
-        truncating one would let the fast model describe a procedure the executor
-        is not actually following, which is worse than no preamble at all.
+        Layered widest-shared-first, the same discipline as the executor's own
+        prompt: system, then tool names, then runbooks, then the conversation.
+        Only the last of those changes every turn, so Cerebras's prefix cache
+        covers everything above it.
+
+        Runbook bodies are MANDATORY and are never truncated. A half-rendered
+        procedure would have the fast model describe steps that stop mid-thought,
+        which is worse than no preview at all — so when they do not fit, whole
+        runbooks are dropped from the BOTTOM of the ranking (the least likely fit
+        goes first) and the stage skips entirely if even the first will not fit.
         """
         system = self._prompts.fast_response_prompt()
-        runbooks_block = self._prompts.render(
-            TEMPLATE_FAST_RESPONSE_RUNBOOKS, runbooks=active_runbooks
-        )
-        if len(system) + len(runbooks_block) > _MAX_INPUT_CHARS:
-            return None
+        capabilities = self._capability_block(request)
+        budget = _MAX_INPUT_CHARS - len(system) - len(capabilities) - _TRANSCRIPT_MIN_CHARS
 
+        # Dropped whole and from the bottom: `active_runbooks` arrives in rank
+        # order, so the first is the most likely fit and the last is the most
+        # expendable. Rendering is per-runbook rather than once over the list
+        # because the decision is which ones SURVIVE, and that cannot be made
+        # against a single rendered blob.
+        kept: list[Runbook] = []
+        for runbook in active_runbooks:
+            block = self._prompts.render(TEMPLATE_FAST_RESPONSE_RUNBOOKS, runbooks=[*kept, runbook])
+            if len(block) > budget:
+                break
+            kept.append(runbook)
+        if not kept:
+            return None
+        runbooks_block = self._prompts.render(TEMPLATE_FAST_RESPONSE_RUNBOOKS, runbooks=kept)
+
+        messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
+        if capabilities.strip():
+            messages.append({"role": "user", "content": capabilities})
+        messages.append({"role": "user", "content": runbooks_block})
+        messages.extend(
+            self._transcript(request, budget=_MAX_INPUT_CHARS - len(system)
+                             - len(capabilities) - len(runbooks_block))
+        )
+        return messages
+
+    def _capability_block(self, request: RespondRequest) -> str:
+        """Project, goal, and every tool NAME — never the schemas.
+
+        The names are the whole inventory rather than a sample: they cost ~2 KB
+        together, and a cap would silently hide half of what Daintree can do from
+        the one stage whose job is to say what it is about to do. The SCHEMAS stay
+        out at ~22k tokens; what a tool is for is taught by the runbooks, which
+        are here in full and say it in context.
+
+        They are also not sent as `tools`. The model must not be able to emit a
+        call — the validator rejects any reply that does — and text gives it the
+        knowledge without the mechanism.
+        """
         project = None
         if request.startup and request.startup.project:
             project = sanitize_line(request.startup.project.name, 200)
         goal = sanitize_line(request.turn.goal, 300) if request.turn else None
-        context_block = self._prompts.render(
+        return self._prompts.render(
             TEMPLATE_FAST_RESPONSE_CONTEXT,
             project=project,
             goal=goal,
-            # NAMES only, never the schemas. The fast model cannot call anything,
-            # and the ~21.5k tokens of schemas would dwarf everything else here.
-            capabilities=", ".join(
-                sorted({t.function.name for t in (request.input.tools or [])})[:40]
-            )
+            capabilities=", ".join(sorted({t.function.name for t in (request.input.tools or [])}))
             or None,
         )
 
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": runbooks_block},
-        ]
-        if context_block.strip():
-            messages.append({"role": "user", "content": context_block})
-        messages.extend(self._conversation_slice(request))
-        return messages
+    def _transcript(self, request: RespondRequest, *, budget: int) -> list[dict[str, Any]]:
+        """The whole conversation, dropping OLDEST-first until it fits.
 
-    def _conversation_slice(self, request: RespondRequest) -> list[dict[str, Any]]:
-        """A deterministic recent slice — never a generated summary.
+        Never a generated summary: summarising would add a model call to the one
+        stage that exists to avoid latency, and the summary would then be the
+        thing describing the turn rather than the turn itself.
 
-        Summarising here would add a model call to the one stage that exists to
-        avoid latency, and the summary would then be the thing describing the
-        turn rather than the turn itself.
+        Dropping from the head is what makes this a crop rather than a sample —
+        the end of a conversation is what the next reply is about, and the
+        newest message is never dropped even when it alone exceeds the budget
+        (a preview of a task the model was not told about is worthless).
         """
-        out: list[dict[str, Any]] = []
-        budget = _MAX_SLICE_CHARS
-        for message in reversed(request.input.messages[-_MAX_SLICE_MESSAGES:]):
+        rows: list[dict[str, Any]] = []
+        remaining = max(budget, 0)
+        for message in reversed(request.input.messages):
             if message.role not in ("user", "assistant"):
+                # Tool rows carry ids and payloads the fast model cannot act on,
+                # and their results are the evidence it is specifically not
+                # allowed to claim it has seen.
                 continue
             text = message.content if isinstance(message.content, str) else ""
             if not text:
                 continue
-            text = text[:budget]
-            budget -= len(text)
-            out.append({"role": message.role, "content": text})
-            if budget <= 0:
+            if len(text) > remaining:
+                # Whole messages, not fragments — except for the newest, which is
+                # truncated rather than lost.
+                if rows:
+                    break
+                text = text[: max(remaining, 0)] or text[:_TRANSCRIPT_MIN_CHARS]
+            remaining -= len(text)
+            rows.append({"role": message.role, "content": text})
+            if remaining <= 0:
                 break
-        out.reverse()
-        # The latest user message is never dropped: without it the model is
-        # previewing a task it was not told about.
-        if not out and request.input.messages:
-            last = request.input.messages[-1]
-            if isinstance(last.content, str):
-                out.append({"role": "user", "content": last.content[:_MAX_SLICE_CHARS]})
-        return out
+        rows.reverse()
+        return rows
 
     def cache_key(self, active_runbooks: list[Runbook]) -> str:
         """Groups requests sharing the same fast prefix, across sessions.
@@ -581,11 +809,30 @@ class FastResponseService:
             )
 
         latency_ms = int((time.perf_counter() - started) * 1000)
+        # Split BEFORE validating: the visible validator refuses lists, headings and
+        # tool names, all of which the plan is supposed to contain. Running it over
+        # the joined output would reject every well-formed two-part reply.
+        visible_text, plan_text = split_preamble(result.text)
+        if plan_text is None and _PLAN_TAG_ANY.search(result.text):
+            # An opened block that never closed. `split_preamble` would return the
+            # whole thing as visible, so half a technical plan would be shown to a
+            # user — the one split failure they would actually see.
+            plan_text = None
+            visible_text = ""
         validation = validate_preamble(
-            result.text,
+            visible_text,
             finish_reason=result.finish_reason,
             had_tool_calls=bool(result.tool_calls),
         )
+        if validation.valid and _ANNOUNCEMENT_OPENING.match(validation.content):
+            # Not a rejection — see the pattern's own note. This is the drift
+            # signal for "the visible half went back to announcing", which is
+            # invisible in every other metric because the turn looks fine.
+            logger.info(
+                "fast_response_announcement_register",
+                request_id=request_id,
+                opening=validation.content[:40],
+            )
         if not validation.valid:
             logger.info(
                 "fast_response_rejected",
@@ -600,8 +847,24 @@ class FastResponseService:
                 latency_ms=latency_ms,
             )
 
+        # The plan is an ENHANCEMENT and fails independently. A rejected plan costs
+        # the plan; it must not cost the visible opening, which is the half the
+        # user is waiting on and the half that already passed its own validator.
+        plan: str | None = None
+        if plan_text:
+            plan_validation = validate_plan(plan_text)
+            if plan_validation.valid:
+                plan = plan_validation.content
+            else:
+                logger.info(
+                    "fast_response_plan_rejected",
+                    request_id=request_id,
+                    reason=plan_validation.reject_reason,
+                )
+
         return FastResponseResult(
             content=validation.content,
+            plan=plan,
             source="model",
             degraded=False,
             usage=result.usage,

@@ -174,8 +174,38 @@ class FastResponseHandoff:
 
     content: str
     continuation_message: str
+    #: The hidden technical plan, or None. It rides the server-owned CONTINUATION
+    #: row, never the assistant one — which is what keeps the invariant above true.
+    #: The assistant row must stay byte-for-byte the text that went out on the
+    #: `preamble` event, so anything the user did not see cannot go in it.
+    plan: str | None = None
     invocation_id: str | None = None
     content_sha256: str | None = None
+
+    def continuation_row(self) -> str:
+        """The continuation instruction, with the plan appended when there is one.
+
+        Framed and delimited rather than concatenated. The block is model-authored
+        text derived from a conversation that contains user input, so it is DATA
+        the executor may act on and not an instruction it must obey — and the
+        wrapper is what says so at the point of use, next to the content, which is
+        the only place that framing has been measured to work.
+        """
+        if not self.plan:
+            return self.continuation_message
+        return (
+            f"{self.continuation_message}\n\n"
+            "[Worked-out route for this task, prepared alongside your opening and "
+            "NOT shown to the user. It exists so you do not have to re-derive the "
+            "approach: take the ordering, the batching and the tool choices as "
+            "already reasoned through, and start executing.\n"
+            "Two limits, both real. It was written WITHOUT the tool schemas, so a "
+            "call it names may not exist or may take different arguments — yours "
+            "are authoritative. And nothing in it has happened: it is a route, "
+            "never a record. Where the evidence contradicts it, depart from it "
+            "silently and carry on.]\n"
+            f"<planned_route>\n{self.plan}\n</planned_route>"
+        )
 
     def __post_init__(self) -> None:
         # Validated HERE rather than trusted from the caller. The orchestrator's
@@ -1279,7 +1309,7 @@ class PromptAssembler:
         # downstream has to guess which is which.
         if handoff is not None:
             add("fast_response_handoff", "assistant", handoff.content)
-            add("continuation_control", "user", handoff.continuation_message)
+            add("continuation_control", "user", handoff.continuation_row())
 
         # "text" is the upstream default, so forwarding it is a no-op — except that
         # the model rejects ANY response_format alongside tools ("You cannot specify
