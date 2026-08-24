@@ -10,7 +10,11 @@ The upstream provider is Together AI — its OpenAI-compatible wire shape is spo
 `deepseek-ai/DeepSeek-V4-Flash-0731`, named once in `config.EXECUTOR_MODEL`. Together
 is a model HOST, not a router: one endpoint serves each model, so there is no
 endpoint-selection policy, no fallback pool and no caller-facing routing preference.
-All of that is invisible to clients, which never see a real model id.
+All of that is invisible to `/v1/daintree/respond`, which never reports a real model
+id (only the public `daintree-assistant` family). `/v1/daintree/tasks` deliberately
+reports the real upstream model a task profile is configured to use — every profile
+today runs on Together's `EXECUTOR_MODEL` — and the operator-facing `/v1/daintree/doctor`
+reports it too.
 
 ## Principles
 
@@ -841,7 +845,7 @@ the problem, because that is the whole reason these are separate codes.
 | 400  | `system_messages_not_allowed`, `reserved_tool_name`, `invalid_tool_schema`, `tool_choice_not_offered`, `invalid_request_error` | The request is malformed. Client bug. |
 | 400  | `missing_tool_call_id`, `dangling_tool_message`, `duplicate_tool_call_id`, `unresolved_tool_calls`, `malformed_tool_call_id`, `tool_calls_on_non_assistant_message` | The tool-call transcript is not a valid exchange. An assistant turn opens a BATCH of calls, every call is answered exactly once, and only then may a user/assistant message follow; order *within* a batch is free. Ids are compared verbatim — surrounding whitespace is rejected rather than trimmed, because they travel upstream raw. A trailing unresolved batch is legal. Client bug in every case: report it with the request id rather than retrying. |
 | 400  | `invalid_image`, `remote_image_not_allowed` | An image part failed the data-URL policy: media type outside the allowlist (`image/png`, `image/jpeg`, `image/webp`, `image/gif`), not `;base64`, empty, or not valid base64. |
-| 401  | `invalid_api_key` | Bearer missing or malformed **at Daintree's door**. Send a valid header. |
+| 401  | `invalid_api_key` | Not returned as an HTTP error by anything today: `auth.py` ignores `Authorization` entirely, so no bearer is ever checked on `/respond` or `/tasks`, and `POST /v1/daintree/auth/verify` and `/v1/daintree/doctor` both catch this internally and report it as a 200 verdict field instead. Reserved for account authentication (`TODO.md`) — once that lands, this is what a missing/malformed credential returns. |
 | 413  | `request_too_large` | Body cap, a per-message / per-tool byte cap, or a request-SHAPE cap: too many messages, content parts, tool calls in one message, stop sequences, pinned runbook ids or images. `param` names the field. |
 | 413  | `context_window_exceeded` | The assembled prompt does not fit the model's context window. Distinct from `request_too_large`, which is about the bytes the CLIENT sent: this one counts the whole prompt — base prompt, tool schemas, active runbook bodies, startup and the transcript — so a small request can trip it in a long session. Not retryable; start a new session or shorten the conversation. Raised before the upstream call when the server can see it, and mapped from the host's own rejection when it cannot, so the code is the same either way. |
 | 426  | `unsupported_daintree_protocol` | Upgrade the client. |

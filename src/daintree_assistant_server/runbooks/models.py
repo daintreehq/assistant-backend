@@ -33,8 +33,10 @@ class RunbookMeta(BaseModel):
     when_to_use: str = Field(min_length=1, max_length=4096, alias="whenToUse")
     # Layer marker: a foundation runbook carries the base judgment for a whole
     # domain (how to read state, choose safe actions) rather than one concrete
-    # workflow. The selector is told to pair a domain's foundation with the
-    # specific workflow runbook(s) it selects — see selector/system.md.j2.
+    # workflow. `selector_view()` exposes this flag, but the selector itself does
+    # not consume it as a classifier feature and does not pair a foundation with
+    # the specifics it picks — admission does that afterward, deterministically —
+    # see runbooks/active_set.py::_admit_with_domain_foundations.
     foundation: bool = Field(default=False)
     # DESCRIPTIVE metadata, NOT policy. Nothing in this server enforces `risk`: it
     # gates nothing, is not sent to the selector, and never crosses the wire. Real

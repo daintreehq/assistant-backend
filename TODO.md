@@ -457,20 +457,22 @@ the server ENFORCED it per request (`data_collection: "deny"` plus endpoint
 filtering). A single host has no such lever, so the claim now rests entirely on the
 host's published policy — which makes the identity of the host a privacy fact.
 
-The section was written against Cerebras — a host this service no longer uses —
-and still cites Cerebras's trust centre.
-The serving host is Together. Nobody has read Together's terms and rewritten it, so
-the section is marked unverified rather than re-vendored: swapping the name would
-have produced a confident guarantee nobody had checked, which is the worst possible
+The section was written when Cerebras was the sole serving host and still cites
+Cerebras's trust centre. That is no longer the whole picture rather than simply
+wrong: Together now answers every executor/utility turn, and Cerebras has RETURNED
+in a narrower role — it writes the fast-response preamble on eligible streaming
+turns (`FAST_RESPONSE_MODEL`, off by default). Nobody has read either host's terms
+and rewritten this section, so it stays marked unverified rather than re-vendored:
+swapping in a confident guarantee nobody had checked would be the worst possible
 form of this document to be wrong.
 
 To close it: read <https://www.together.ai/privacy> and
-<https://www.together.ai/terms-of-service>, state what Together actually commits to
-(training, retention, caching, sub-processors), and say plainly which parts Daintree
-can promise and which are the host's to change. Then DELETE the Cerebras
-material rather than keeping it: that host is gone and this service is not
-returning to it, so a second published position beside the real one is just an
-opportunity to quote the wrong one.
+<https://www.together.ai/terms-of-service>, and do the same for Cerebras's current
+terms (not the old trust-centre citation — re-read it, since the relationship
+changed). State what each host actually commits to (training, retention, caching,
+sub-processors) for the content it actually receives, and say plainly which parts
+Daintree can promise and which are each host's to change. This is now a two-host
+privacy statement, not a one-host swap.
 
 ## Shed context instead of only refusing it
 
