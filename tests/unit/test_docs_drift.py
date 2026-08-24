@@ -26,7 +26,6 @@ import pytest
 
 from daintree_assistant_server import PROTOCOL_MAX, PROTOCOL_MIN
 from daintree_assistant_server import main as main_module
-from daintree_assistant_server.auth import authenticate
 from daintree_assistant_server.config import (
     EXECUTOR_KEY_ENV,
     EXECUTOR_MODEL,
@@ -433,14 +432,13 @@ def test_a_caller_supplied_key_still_overrides_the_server_credential() -> None:
     assert resolved.get_secret_value() == "sk-caller-supplied"
 
 
-# THE DOOR IS OPEN, and the docs must say so plainly.
+# THE DOOR IS OPEN BY DEFAULT, and the docs must say so plainly.
 #
-# This is the inverse of the gate that used to live here. Authentication still
-# does not vary by environment — ``authenticate`` takes no environment argument —
-# but the unconditional outcome flipped from "reject" to "accept": the server
-# holds the upstream credential, so there is no per-request credential for a
-# bearer to supply. A document that still tells a tester their request will be
-# rejected without a key sends them hunting for a credential that does not exist.
+# Verification exists now, behind `AUTH_MODE`, but the shipped posture is still
+# `open`: the server holds the upstream credential, so there is no per-request
+# credential for a bearer to supply. A document that tells a tester their request
+# will be rejected without a key sends them hunting for something that does not
+# exist on any deployment running today.
 _KEY_IS_REQUIRED = re.compile(
     r"(?:request|call|every request)[^.\n]{0,60}"
     r"\b(?:without|lacking|missing)\b[^.\n]{0,30}"
@@ -460,27 +458,33 @@ def test_no_document_claims_a_caller_key_is_required(path: Path) -> None:
             continue
         pytest.fail(
             f"{path.name}:{number} says {match.group(0)!r}. Every request is "
-            "served: auth.authenticate ignores the Authorization header entirely "
-            "and the server funds the turn. See auth.py."
+            "served on the default posture: AUTH_MODE is `open`, under which "
+            "auth.authenticate does not read the Authorization header at all and "
+            "the server funds the turn. See auth.py."
         )
 
 
-def test_the_authorization_header_is_ignored_not_merely_optional() -> None:
+def test_the_open_door_is_still_the_default_posture() -> None:
     """The distinction that protects a CLI mid-migration.
 
     "Optional" would mean reading a bearer when one is sent — and a client still
-    holding its old OpenRouter key would have that key threaded to the provider
-    and forwarded to Cerebras, which rejects a credential it never issued. The
-    caller would see ``provider_invalid_api_key``: their key blamed for a header
-    they were right to still be sending.
+    holding its old key would have that key threaded to the provider and
+    forwarded upstream, which rejects a credential it never issued. The caller
+    would see ``provider_invalid_api_key``: their key blamed for a header they
+    were right to still be sending.
 
-    Asserted at the door AND at the source, because the source is where the
-    temptation to "just parse it while we're here" would land.
+    Verification EXISTS now, so the promise is carried by ``AUTH_MODE`` rather
+    than by there being no code to break it. Asserted on the default rather than
+    on the mechanism: a deployment that sets nothing must not have moved.
     """
-    for header in (None, "Bearer sk-or-v1-stale", "Bearer bad key", "Basic x"):
-        principal = authenticate(header)
-        assert principal.id == "anonymous"
-        assert not hasattr(principal, "api_key")
+    from daintree_assistant_server.config import Settings
+
+    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, TOGETHER_API_KEY="k")
+    assert settings.auth_mode == "open"
+    text = _read(SRC_ROOT / "auth.py")
+    assert 'if mode == "open"' in text and "return ANONYMOUS" in text, (
+        "auth.py no longer short-circuits the open door before reading the header"
+    )
 
 
 def test_no_route_hands_a_caller_supplied_key_to_the_provider() -> None:
@@ -643,6 +647,7 @@ _ERROR_CODES = (
     "auth_token_expired",
     "auth_session_revoked",
     "auth_client_not_allowed",
+    "auth_permission_denied",
     "subscription_required",
     "subscription_inactive",
     "usage_limit_reached",
@@ -1688,18 +1693,24 @@ def test_both_cached_token_shapes_are_read() -> None:
 
 
 def test_no_document_claims_the_serving_path_spends_a_caller_key() -> None:
-    """`auth.py` ignores the Authorization header; the server funds every turn.
+    """The server funds every turn from its own key, whatever the auth posture.
 
     `ProviderChatRequest.api_key` still exists as the slot an account-mapped
-    credential will occupy, so its comment claiming the serving path "always"
+    credential would occupy, so its comment claiming the serving path "always"
     fills it with the caller's own key was the credential model exactly
     inverted — on the one field where being wrong routes a real secret.
+
+    Account authentication did NOT change this. A verified principal carries an
+    identity and no credential: an account is an entitlement to spend Daintree's
+    key, not a mapping to one of the caller's.
     """
-    principal = authenticate("Bearer sk-whatever-the-client-sent")
-    assert not hasattr(principal, "api_key"), (
-        "Principal now carries a credential — this test and every doc describing "
-        "the open door need rewriting together"
-    )
+    from daintree_assistant_server.auth import Principal
+
+    for attribute in ("api_key", "token", "access_token", "credential"):
+        assert attribute not in Principal.__dataclass_fields__, (
+            f"Principal now carries {attribute} — this test and every doc "
+            "describing the credential model need rewriting together"
+        )
 
     base = _read(SRC_ROOT / "providers" / "base.py")
     assert "always the\n    # CALLER's own key" not in base

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..auth import Principal, require_auth
+from ..auth import PERMISSION_RUNBOOKS_READ, Principal, require_auth, require_permission
 from ..errors import DaintreeError, invalid_request
 from ..observability import get_logger
 from ..runbooks.loader import RunbookLoadError
@@ -22,7 +22,7 @@ logger = get_logger("daintree.runbooks")
 async def list_runbooks(
     request: Request,
     response: Response,
-    _principal: Principal = Depends(require_auth),
+    _principal: Principal = Depends(require_permission(PERMISSION_RUNBOOKS_READ)),
     _ready: None = Depends(require_ready),
 ) -> Response:
     container = request.app.state.container
@@ -57,7 +57,7 @@ class ResolveRequest(BaseModel):
 async def resolve_runbooks(
     body: ResolveRequest,
     request: Request,
-    principal: Principal = Depends(require_auth),
+    principal: Principal = Depends(require_permission(PERMISSION_RUNBOOKS_READ)),
     _ready: None = Depends(require_ready),
     _protocol: None = Depends(check_protocol_header),
 ) -> JSONResponse:

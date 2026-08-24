@@ -95,20 +95,6 @@ def test_every_documented_mode_parses(mode: str) -> None:
     assert _complete(AUTH_MODE=mode).auth_mode == mode
 
 
-@pytest.mark.parametrize("mode", ["observe", "enforce"])
-def test_a_mode_whose_behaviour_does_not_exist_yet_is_refused(mode: str) -> None:
-    """The footgun this closes: nothing reads a token on any path yet, so a
-    deployment that set `enforce` would pass readiness, tell every client a
-    credential was required, and go on serving unauthenticated requests. An
-    operator would believe the door was shut while it stood open.
-
-    Failing readiness is the fail-closed answer — the revision never takes
-    traffic. Lifted by the change that makes the modes real, not before.
-    """
-    problems = _complete(AUTH_MODE=mode).auth_problems()
-    assert any("not implemented in this build" in p for p in problems), problems
-
-
 def test_the_manifest_itself_is_not_condemned_by_an_unsupported_mode() -> None:
     """`auth_manifest_problems` answers "are these values safe to publish", which
     has nothing to do with whether this build can enforce. Collapsing the two
@@ -128,18 +114,9 @@ def test_an_unknown_mode_is_rejected_rather_than_defaulted() -> None:
 # ---- Completeness is required only once the mode is not `open` -------------
 
 
-def test_a_complete_configuration_is_ready_under_the_implemented_mode() -> None:
-    assert _complete(AUTH_MODE="open").auth_problems() == []
-
-
-@pytest.mark.parametrize("mode", ["observe", "enforce"])
-def test_a_complete_configuration_fails_only_on_the_unimplemented_mode(mode: str) -> None:
-    """The completeness and validity rules must not also be firing — otherwise the
-    refusal above would be masking a second defect, and lifting it later would
-    surface one nobody had seen."""
-    problems = _complete(AUTH_MODE=mode).auth_problems()
-    assert len(problems) == 1, problems
-    assert "not implemented in this build" in problems[0]
+@pytest.mark.parametrize("mode", ["open", "observe", "enforce"])
+def test_a_complete_configuration_is_ready_in_every_mode(mode: str) -> None:
+    assert _complete(AUTH_MODE=mode).auth_problems() == []
 
 
 @pytest.mark.parametrize("missing", _MANIFEST_ENV)
@@ -783,16 +760,52 @@ def test_a_session_duration_is_bounded_at_both_ends(field: str) -> None:
 # ---- `required` cannot outrun the implementation ---------------------------
 
 
-def test_required_is_false_while_enforcement_does_not_exist() -> None:
-    """`auth_problems()` refuses a non-open mode, so such a deployment never
-    becomes ready — but `/auth/config` deliberately answers ANYWAY. Without the
-    implementation conjunct, a deployment that never started would still be out
-    here telling every client a credential was required.
+def test_required_needs_both_the_mode_and_a_manifest_to_follow() -> None:
+    """`required` is derived from two things, not from the mode alone.
+
+    Telling a client a credential is mandatory while withholding the only
+    description of how to obtain one is a dead end — and `/auth/config` answers
+    while the service is unready, so readiness cannot be what prevents it.
     """
     from daintree_assistant_server.api.daintree_auth import _auth_config_body
-    from daintree_assistant_server.config import AUTH_ENFORCEMENT_IMPLEMENTED
 
-    assert AUTH_ENFORCEMENT_IMPLEMENTED is False
-    body = _auth_config_body(_complete(AUTH_MODE="enforce"))
-    assert body["configured"] is True
+    assert _auth_config_body(_complete(AUTH_MODE="enforce"))["required"] is True
+    assert _auth_config_body(_complete(AUTH_MODE="observe"))["required"] is False
+    assert _auth_config_body(_complete(AUTH_MODE="open"))["required"] is False
+    # No manifest to follow means no demand for one, whatever the mode says.
+    unconfigured = _settings(AUTH_MODE="enforce")
+    body = _auth_config_body(unconfigured)
+    assert body["configured"] is False
     assert body["required"] is False
+
+
+# ---- the defensive guards, which are reachable and worth reaching ----------
+
+
+def test_a_scheme_with_no_default_port_is_not_given_a_fabricated_one() -> None:
+    """`_origin_of` returns None rather than inventing a port for an unknown
+    scheme. A fabricated one would make two unrelated origins compare equal."""
+    problems = _settings(SUPABASE_AUTH_ISSUER="ftp://abcdefghij.supabase.co/auth/v1").auth_problems()
+    assert any("SUPABASE_AUTH_ISSUER" in p for p in problems), problems
+
+
+def test_an_unparseable_endpoint_is_reported_once_not_twice() -> None:
+    """The origin and path checks skip a value the shape check already refused, so
+    one broken URL produces one complaint rather than three."""
+    problems = _complete(SUPABASE_JWKS_URL="https://:notaport/x").auth_problems()
+    jwks = [p for p in problems if "SUPABASE_JWKS_URL" in p]
+    assert len(jwks) == 1, jwks
+
+
+def test_an_unparseable_link_is_reported_once_too() -> None:
+    problems = _complete(DAINTREE_ACCOUNT_URL="https://:notaport/x").auth_problems()
+    links = [p for p in problems if "DAINTREE_ACCOUNT_URL" in p]
+    assert len(links) == 1, links
+
+
+def test_an_issuer_with_no_path_does_not_break_containment() -> None:
+    """A parent path of "" contains everything, which is correct — and the issuer
+    is separately refused for not ending in /auth/v1, so the configuration still
+    fails rather than passing on a technicality."""
+    problems = _complete(SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co").auth_problems()
+    assert any("/auth/v1" in p for p in problems), problems

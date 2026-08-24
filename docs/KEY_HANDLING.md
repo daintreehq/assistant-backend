@@ -38,9 +38,16 @@ code enforces:
   its presence — without it nothing can be answered at all, and discovering that
   on the first turn surfaces as an upstream 401 that reads like the caller's
   fault. Unit tests pin both halves.
-- **The `Authorization` header is ignored entirely.** Not parsed, not validated,
-  not rejected. `auth.authenticate` returns the same anonymous principal whatever
-  arrives, and `Principal` carries no credential field at all.
+- **Under the shipped posture the `Authorization` header is never read for
+  authentication.** Not parsed, not verified, not rejected. `auth.authenticate`
+  dispatches on `AUTH_MODE`, whose default is `open`, and returns the same
+  anonymous principal whatever arrives. `Principal` carries no credential field
+  in any mode.
+
+  The header IS read for redaction, in every mode and before authentication runs
+  at all — see §2a. That is not a contradiction of the above: one reads it to
+  decide who you are, the other reads it to make sure it never appears in a log,
+  and the second job cannot be done by refusing to look.
 
   That is stronger than "a key is optional", and the difference is why it is
   written this way. A CLI mid-migration may still be sending the OpenRouter key
@@ -71,20 +78,48 @@ code enforces:
   reading the header again, validating it against an account store rather than
   against its own shape, and the rest of the server does not move.
 
+## 2a. The ACCOUNT credential
+
+A different secret with different rules, and the separation is the point: the
+provider key below is the deployment's and is spent upstream; this one is a
+user's and is never spent anywhere — it is only ever checked.
+
+| Property | Rule | Code |
+|---|---|---|
+| Read | every raw `Authorization` header, never a single-value accessor. `Headers.get` returns the first of two and `dict(scope["headers"])` keeps the last, so either silently validates a credential the upstream may not have seen | `services/bearer.py` |
+| Shape | exactly one header, one credential, RFC 6750 `b64token` grammar, 8 KiB. Refused rather than trimmed, so the value checked and the value used are one string | `services/bearer.py` |
+| Verified | locally, against a cached JWKS. Algorithms, audience, skew and required claims are hardcoded; only the project and the client id are configured | `services/supabase_auth.py` |
+| In-process form | not stored. It is verified and discarded; `Principal` carries the resulting identity | `auth.Principal` |
+| Propagation | **none.** It is never forwarded, never logged, never placed on a request object, and never reaches a provider | — |
+| Redaction | every raw header, split into its fields, is compared against an inbound `X-Request-Id` before that id is adopted — including a comma-folded one, where the credential is only visible once the value is split | `main._safe_request_id` |
+| In errors | never. A refusal names the rule that failed, not the value; the four identity 401s take no message parameter at all, so a caller cannot be handed `str(exception)` by a future edit | `errors.py`, `services/bearer.py` |
+
+**What is not yet true.** A verified token proves who is calling and that the
+token has not expired. It does not prove the session still exists: nothing
+reaches back into a minted JWT, so a logout leaves the signature valid until
+`exp`. That check needs infrastructure this service does not have, and `TODO.md`
+carries it.
+
+
 ## 2. Server-side handling
 
-> **The first three rows below are RETIRED and kept as history.** `auth.py` does
-> not read the `Authorization` header at all — not parsed, not validated, not
-> rejected — and `Principal` carries no credential. Refusing to look is what lets a
-> CLI still sending an old key work rather than fail confusingly (see §1 and
-> `CLAUDE.md`). What remains live is everything from **Propagation** down, which
-> now describes the SERVER's keys.
+> **The first three rows below described a CALLER-SUPPLIED PROVIDER KEY and are
+> retired for good.** No bearer has ever been a model credential since the key
+> moved to the server, and none ever will be again: an account is an entitlement
+> to spend Daintree's key, not a mapping to one of the caller's.
+>
+> They are NOT retired because nothing reads the header. Something does now —
+> `services/bearer.py` parses it and `services/supabase_auth.py` verifies it —
+> but what it reads is an IDENTITY, and identity is handled by §2a rather than
+> here. Under the shipped `AUTH_MODE=open` even that does not run. What remains
+> live below is everything from **Propagation** down, which describes the
+> SERVER's keys.
 
 | Stage | Behaviour | Code |
 |---|---|---|
-| ~~Extraction~~ *(retired)* | ~~`Authorization: Bearer <token>`; raw header length-bounded *before* any scanning~~ — the header is ignored entirely | `auth.py` |
-| ~~Structural validation~~ *(retired)* | ~~printable non-space ASCII, ≤ 4096 bytes~~ — rejecting a malformed bearer only meant something while a bearer meant something | `auth.py` |
-| ~~In-process form~~ *(retired)* | ~~`SecretStr` on a frozen `Principal`~~ — `Principal` holds no credential | `auth.Principal` |
+| ~~Extraction~~ *(retired)* | ~~`Authorization: Bearer <token>` as a PROVIDER key~~ — a bearer is an account credential now, never a model one | `auth.py` |
+| ~~Structural validation~~ *(retired)* | ~~printable non-space ASCII, ≤ 4096 bytes~~ — the shape a bearer must have now lives in `services/bearer.py`, and it is stricter | `auth.py` |
+| ~~In-process form~~ *(retired)* | ~~`SecretStr` on a frozen `Principal`~~ — `Principal` holds an identity and no credential of any kind | `auth.Principal` |
 | Propagation | the SERVER's key, threaded as `ProviderChatRequest.api_key` to every provider call. `ProviderChatRequest.api_key` stays live and tested as the field an account-mapped credential will occupy | `providers/base.py` |
 | Header construction | a fresh per-call header dict; the shared `httpx` client's own headers are never mutated, so concurrent calls carrying different keys cannot bleed into one another | `openrouter._headers` |
 | Malformed value | rejected in `_resolve_key` **before** httpx sees it — h11's `LocalProtocolError` embeds the offending header value verbatim and httpcore logs it at DEBUG, so the permissive path would leak the key into logs | `openrouter._resolve_key` |

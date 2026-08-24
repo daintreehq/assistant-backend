@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
-from ..auth import Principal, require_auth
+from ..auth import PERMISSION_TASKS, Principal, require_permission
 from ..contracts.tasks import TaskRequest
 from ..services.validation import reject_forbidden_prompt_keys
 from .deps import check_protocol_header, request_id, require_ready
@@ -17,7 +17,7 @@ router = APIRouter()
 async def run_task(
     body: TaskRequest,
     request: Request,
-    principal: Principal = Depends(require_auth),
+    principal: Principal = Depends(require_permission(PERMISSION_TASKS)),
     _ready: None = Depends(require_ready),
     # `_protocol` carries the same rule as /respond and /runbooks/resolve: a task
     # sends the caller's content upstream and returns a typed result the client

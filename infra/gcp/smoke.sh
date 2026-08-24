@@ -109,10 +109,13 @@ fi
 # --------------------------------------------------------------------------
 head_ "Authentication posture"
 
-# The door is open, deliberately and temporarily: the server holds the upstream
-# credential, so a request without a bearer has one to spend. Asserted rather
-# than assumed — this is the check that must start failing when account
-# authentication lands.
+# The door is open, deliberately: AUTH_MODE defaults to `open`, under which the
+# Authorization header is not read at all and the server's own credential funds
+# the turn. Account authentication has LANDED — the verifier and the enforce mode
+# are built and tested — so this is no longer "the check that fails when auth
+# arrives". It is now the check that a deployment has not been switched to
+# `observe` or `enforce` without anyone noticing, which is the more useful
+# question and the one that survives the cutover.
 code="$(req "$URL/v1/daintree/capabilities")"; load_body
 if [ "$code" = "200" ]; then
   pass "a request with no bearer token is served (server holds the credential)"
@@ -122,7 +125,9 @@ fi
 
 # A header that IS present is ignored too, not merely tolerated. A CLI still
 # sending its old OpenRouter key must be served, not have that key forwarded to
-# Together and rejected as the caller's own.
+# Together and rejected as the caller's own. Under `enforce` this same request
+# would be a 401 auth_token_invalid, which is exactly what makes it a posture
+# check rather than a formality.
 code="$(req -H 'Authorization: Bearer sk-or-v1-a-stale-openrouter-key' "$URL/v1/daintree/capabilities")"; load_body
 if [ "$code" = "200" ]; then
   pass "a stale OpenRouter bearer is ignored, not forwarded"

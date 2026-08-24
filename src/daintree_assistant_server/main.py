@@ -55,6 +55,7 @@ from .services.compaction import Compactor, NullCompactor, default_compactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
 from .services.fast_response import FastResponseService
 from .services.prompt_assembler import PromptAssembler
+from .services.supabase_auth import JwksCache, SupabaseTokenVerifier
 from .services.task_runner import TaskRunner
 from .state.codec import StateCodec
 from .tracing import (
@@ -619,12 +620,68 @@ def build_container(
     )
 
 
+async def _build_token_verifier(
+    settings: Settings,
+) -> tuple[Any, httpx.AsyncClient | None]:
+    """The account-token verifier, or ``None`` when this deployment has no OAuth.
+
+    Built OUTSIDE the container, and that separation is load-bearing rather than
+    tidy. ``/v1/daintree/doctor`` deliberately answers when the container failed to
+    build — a doctor that goes down with the patient cannot diagnose the outage a
+    tester is calling about — and it is an authenticated route. A verifier living
+    on the container would therefore be unavailable in exactly the state the
+    diagnostic exists for, so an operator investigating a bad upstream key would
+    find they could not authenticate to ask about it.
+    """
+    if settings.auth_mode == "open" or not settings.auth_is_configured:
+        return None, None
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(5.0, connect=2.0),
+        # Never follow a redirect to another host for signing keys. Set here as
+        # well as at the call site: two locks on a door that opens onto key
+        # material.
+        follow_redirects=False,
+    )
+    try:
+        verifier = SupabaseTokenVerifier(
+            issuer=settings.supabase_auth_issuer,
+            allowed_client_ids=frozenset({settings.supabase_oauth_client_id}),
+            jwks=JwksCache(url=settings.supabase_jwks_url, client=client),
+        )
+    except Exception:
+        # The client exists and nothing else holds a reference to it yet, so an
+        # exception from here on would strand an open connection pool for the life
+        # of the process. Closed on the way out rather than left to the caller,
+        # which has no way to know one was created.
+        await client.aclose()
+        raise
+    return verifier, client
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     settings: Settings = app.state.settings
     injected: ChatProvider | None = getattr(app.state, "injected_provider", None)
     injected_selector: RunbookSelector | None = getattr(app.state, "injected_selector", None)
     injected_compactor: Compactor | None = getattr(app.state, "injected_compactor", None)
+    # Before the container, and outside its try: a container that fails to build
+    # must not take authentication down with it (see `_build_token_verifier`).
+    #
+    # Guarded by a try of its OWN rather than sharing the container's, because
+    # this runs before the `yield` and an escape here would fail the whole
+    # lifespan — turning a configuration problem into a dead process, which is
+    # precisely the posture every other startup failure in this file avoids
+    # ("readiness must not crash liveness"). Degrading to no verifier is safe and
+    # already exercised: under `enforce` every request then answers
+    # `auth_dependency_unavailable`, which is the honest verdict for a door that
+    # could not be built.
+    try:
+        verifier, jwks_client = await _build_token_verifier(settings)
+    except Exception as exc:  # noqa: BLE001 - see above
+        logger.error("auth_verifier_build_failed", error=str(exc))
+        verifier, jwks_client = None, None
+    app.state.token_verifier = verifier
+    app.state.jwks_client = jwks_client
     try:
         # Local-development-only features (runbook learning) must never be enabled in
         # production; checked always, even with an injected provider.
@@ -656,6 +713,9 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         final_container: Container | None = getattr(app.state, "container", None)
         if final_container is not None:
             await final_container.aclose()
+        final_jwks_client: httpx.AsyncClient | None = getattr(app.state, "jwks_client", None)
+        if final_jwks_client is not None:
+            await final_jwks_client.aclose()
 
 
 def create_app(
@@ -682,6 +742,11 @@ def create_app(
     app.state.injected_compactor = compactor
     app.state.ready = False
     app.state.ready_error = None
+    # Defined here as well as in lifespan so a request served by an app that never
+    # entered one (the tests do this deliberately) reads `None` rather than raising
+    # AttributeError on the auth path.
+    app.state.token_verifier = None
+    app.state.jwks_client = None
 
     register_exception_handlers(app)
 

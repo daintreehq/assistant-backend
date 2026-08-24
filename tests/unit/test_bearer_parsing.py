@@ -296,29 +296,33 @@ def test_no_module_reads_the_authorization_header_with_a_single_value_accessor()
     each silently ignores a different one of two. That is how it got into two
     separate middlewares here.
 
-    `services/bearer.py` is the only module allowed to read it, and it reads the
-    raw list. Everything else goes through `authorization_values`.
-
-    `auth.py` is the one carve-out and it shrinks to nothing in the phase that
-    wires this in: it currently passes the header to a function that ignores it
-    entirely, so there is no value being read wrongly — but it IS the exact place
-    the trap springs the moment that function starts reading, which is why it is
-    named here rather than left to be noticed.
+    `services/bearer.py` is the only module allowed to read the header directly;
+    everything else goes through `authorization_values`. There is no carve-out:
+    `auth.py` had one while it still passed the header to a function that ignored
+    it, and gave it up when it started reading for real.
     """
+    import re
     from pathlib import Path
 
     src = Path(__file__).resolve().parents[2] / "src" / "daintree_assistant_server"
-    allowed = {src / "services" / "bearer.py", src / "auth.py"}
+    # The two accessors by shape, rather than by any mention of the word. The
+    # earlier version of this gate flagged `authorization_values(request.scope.get(
+    # "headers"))` — the correct call — because it contained both "authorization"
+    # and ".get(" on one line.
+    single_value = re.compile(r"""\.get\(\s*b?["']authorization["']""", re.IGNORECASE)
+    # Scoped to the RAW ASGI headers. A bare `dict(...headers...)` is not the
+    # bug — `dict(exc.headers or {})` on a response is perfectly fine — so this
+    # only matches a dict built over the scope's header list, which is the one
+    # place duplicates exist to be lost.
+    collapsing = re.compile(r"""\bdict\([^)]*(?:scope\[["']headers["']\]|raw_headers)""")
     offenders: list[str] = []
     for path in sorted(src.rglob("*.py")):
-        if path in allowed:
+        if path == src / "services" / "bearer.py":
             continue
-        text = path.read_text(encoding="utf-8")
-        for number, line in enumerate(text.splitlines(), start=1):
-            lowered = line.lower()
-            if "authorization" not in lowered or lowered.lstrip().startswith("#"):
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if line.lstrip().startswith("#"):
                 continue
-            if ".get(" in lowered or "dict(" in lowered:
+            if single_value.search(line) or collapsing.search(line):
                 offenders.append(f"{path.relative_to(src)}:{number}: {line.strip()}")
     assert not offenders, (
         "these read the Authorization header with an accessor that silently drops "

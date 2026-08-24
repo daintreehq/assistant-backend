@@ -508,18 +508,6 @@ FastResponseMode = Literal["off", "shadow", "visible"]
 #: enforce   a verified token is required; failures are the account 4xx family.
 AuthMode = Literal["open", "observe", "enforce"]
 
-#: Whether anything in this build actually reads a token. **False**, and it is the
-#: switch that keeps `AUTH_MODE` honest: `auth.py` still returns the anonymous
-#: principal for every request, so a deployment must not be able to claim an
-#: authentication boundary it does not have. Two things read it — `auth_problems()`
-#: refuses any mode but `open`, and `/v1/daintree/auth/config` reports `required:
-#: false` regardless of the mode — and they must agree, because the endpoint
-#: deliberately answers while the service is unready and would otherwise publish
-#: `required: true` from a deployment that never started.
-#:
-#: Flipped by the change that makes verification real, in the same commit.
-AUTH_ENFORCEMENT_IMPLEMENTED = False
-
 #: The OAuth callback, and **not** deployment configuration despite looking like
 #: it. The client compiles this exact string in (`internal/auth/loopback.go`:
 #: "registered with the identity provider and cannot vary at runtime"), sends it
@@ -1303,6 +1291,13 @@ class Settings(BaseSettings):
         an OAuth client id, and demanding one would fail readiness on every
         instance running today's posture.
 
+        A third rule lived here until verification existed and has been removed
+        rather than left inert: while nothing read a token, a non-``open`` mode was
+        refused outright, so a deployment could not report an authentication
+        boundary it did not have. That gate did its job — ``auth.py`` verifies for
+        real now — and keeping a guard whose condition can no longer be false is a
+        branch every later reader has to reason about and no test can reach.
+
         What is deliberately NOT here: a rule that ``open`` and ``observe`` are
         refused in production. The master spec asks for one, and it is right about
         the destination and wrong about today — ``open`` IS the deployed
@@ -1316,13 +1311,6 @@ class Settings(BaseSettings):
 
         if self.auth_mode == "open":
             return problems
-
-        if not AUTH_ENFORCEMENT_IMPLEMENTED:
-            problems.append(
-                f"AUTH_MODE={self.auth_mode} is not implemented in this build — no token "
-                "is read on any path yet (see auth.py), so this deployment would report "
-                "an authentication boundary it does not have. Use AUTH_MODE=open."
-            )
 
         for name in self._MANIFEST_FIELDS:
             if not str(getattr(self, name)).strip():

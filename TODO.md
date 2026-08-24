@@ -48,41 +48,50 @@ is fine while the event can never be emitted, and is a blocker the moment it can
 
 ---
 
-## Account authentication and sign-in
+## Turn account authentication on
 
-**Trigger: now. This is the next piece of work, not a someday.**
+**Trigger: a provisioned staging Supabase project and a CLI that can complete a
+login. The backend half is done; nothing here is a code task.**
 
-The door is currently open. The server holds the upstream credential
-(`TOGETHER_API_KEY`) and funds every turn from it, and `auth.py` serves a request
-with no `Authorization` header as an anonymous principal. Combined with a public
-Cloud Run service that is an open, Daintree-funded endpoint with no rate limiting
-— which is the accepted state for this stage and the reason this entry is first.
+The door is still open, and now that is a SETTING rather than an absence.
+`AUTH_MODE` defaults to `open`, under which the `Authorization` header is not read
+at all; `observe` verifies a present credential and changes nothing a caller can
+see; `enforce` requires one. All three are built and tested
+(`tests/integration/test_account_auth.py`), and the question this entry used to
+pose — whether an authenticated caller spends Daintree's key or brings their own —
+is answered: an account is an ENTITLEMENT. `Principal` carries an identity and no
+credential, and the server funds every turn from `TOGETHER_API_KEY` regardless.
 
-**The seam already exists**, deliberately, and nothing about it is a shim:
+What is left on THIS side is not code — but two entries below are, and they are
+sequenced into the list:
 
-- `auth.authenticate` is the one place a request becomes a `Principal`. It
-  currently ignores the `Authorization` header entirely — see `docs/KEY_HANDLING.md`
-  for why *ignore* rather than *optional*: a CLI mid-migration is still sending
-  its old OpenRouter key, and reading it would forward that key to Together and
-  blame the caller for the rejection. When accounts land, this function starts
-  reading the header again and the rest of the server does not move.
-- `ProviderChatRequest.api_key` still overrides the server's default in
-  `OpenRouterProvider._resolve_key`. So a per-account credential is a **value**
-  flowing through existing plumbing, not new plumbing. Benchmarks and live tests
-  are its only callers today, which is what keeps it from rotting before it is
-  used.
+1. Provision a staging Supabase project, enable its OAuth server with asymmetric
+   signing keys, and register the Assistant as a public client with the exact
+   loopback callback (`config.OAUTH_REDIRECT_URI`).
+2. Set the `SUPABASE_*` and `DAINTREE_*` values on the staging deployment. Getting
+   any of them wrong fails readiness rather than a request.
+3. Move to `observe` and read `auth_observed` for a while. It is the only mode that
+   produces evidence without changing a verdict, and skipping it wastes the one
+   safe measurement available. Not literally free: a well-formed token costs a
+   verification and, on a cold cache, a JWKS fetch, so watch latency as well as
+   the outcome counts.
+4. Add `auth_permission_denied` to the CLI's account taxonomy. The backend can
+   emit it; the CLI does not recognise it, so it would fall through to generic
+   403 handling and read as "sign in again" — the exact loop the account codes
+   exist to prevent. Unreachable until a second OAuth client with a narrower grant
+   exists, and the cross-repo gate will demand it the moment the pin moves.
+5. Then `enforce` — but see the two entries below first. Session revocation is not
+   implemented, so `enforce` means "a genuine, unexpired token" and not yet "a live
+   session", and the CLI cannot complete a login against a backend that does not
+   understand the unconfigured discovery shape.
 
-What has to be decided rather than merely built: whether an authenticated caller
-still spends Daintree's key (an account is an entitlement) or brings their own
-(an account is a credential mapping). The code supports either; the tests that
-enumerate the open door are the ones that must start failing when this
-lands, and they are written to be found:
-`test_every_authorization_header_is_ignored`,
-`test_no_route_hands_a_caller_supplied_key_to_the_provider`,
-`test_every_route_ignores_an_authorization_header_entirely`, and the smoke
-script's "Authentication posture" block.
+Entitlement, usage accounting and the Polar outbox are a separate body of work that
+needs a database and a Redis this service does not have. The error taxonomy for all
+of it already exists on both sides (`errors.py`, and the CLI's `account.go`), so
+that layer will be plumbing rather than design.
 
 ---
+
 
 ## Check that a verified session still exists
 
@@ -193,9 +202,11 @@ type means extending the documented type union in both repos at once.
 
 ---
 
-## Refuse `AUTH_MODE=open` in production once enforcement lands
+## Refuse `AUTH_MODE=open` in production at the cutover
 
-**Trigger: the commit that makes `enforce` real. Not before, and not separately.**
+**Trigger: the release that sets production to `enforce`. Not the release that
+made `enforce` possible — those are different days, and an earlier revision of
+this entry got that wrong.**
 
 `Settings.auth_problems()` deliberately does NOT implement the master spec's rule
 that `open` and `observe` are refused in production. The spec is right about the
@@ -204,22 +215,19 @@ is documented as such in `docs/DAINTREE_API.md`, and `infra/gcp/smoke.sh` assert
 it. Adding that gate now would fail `/readyz` on the very next release and the
 revision would never take traffic.
 
-Two changes belong to the same commit, and shipping either one alone is a
-regression:
+This entry previously said the gate had to land in the same commit as the
+verification code, on the reasoning that lifting the "mode not implemented"
+refusal without it was a regression. That was a mistake, and worth naming rather
+than quietly editing: it conflated the code EXISTING with the fleet being SWITCHED
+to it. Between those two events `open` is not merely acceptable in production, it
+is the only correct value — the verifier is built and tested, and no Supabase
+project is provisioned for it to verify against.
 
-- Lift the refusal of `observe`/`enforce`, which currently fails readiness for
-  any mode but `open` because nothing reads a token yet. A deployment must never
-  be able to report an authentication boundary it does not have — that is the
-  whole reason the refusal exists, and it stops being true the moment
-  `authenticate` starts verifying.
-- Add the production gate the spec asks for, so the fleet cannot silently sit on
-  `open` after the cutover.
-
-Between those two, `AUTH_MODE` is a setting with exactly one legal value in
-production, which is the correct amount of freedom for a switch whose wrong
-value is invisible.
+The gate belongs to the release that actually flips production, and it is what
+stops the fleet silently sitting on `open` afterwards.
 
 ---
+
 
 ## Retrain the selector so a reserved candidate can actually be kept
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
-from ..auth import Principal, require_auth
+from ..auth import PERMISSION_RUNBOOKS_READ, Principal, require_permission
 from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
 from ..contracts.daintree_api import COMPACTION_BLOCK_NAME
 from ..services.docs_events import DOCS_SEARCH_WIRE_NAME
@@ -17,7 +17,7 @@ router = APIRouter()
 @router.get("/v1/daintree/capabilities")
 async def capabilities(
     request: Request,
-    _principal: Principal = Depends(require_auth),
+    _principal: Principal = Depends(require_permission(PERMISSION_RUNBOOKS_READ)),
     _ready: None = Depends(require_ready),
 ) -> dict[str, object]:
     container = request.app.state.container

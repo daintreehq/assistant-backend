@@ -332,6 +332,31 @@ def auth_client_not_allowed(
     )
 
 
+def auth_permission_denied(
+    message: str = "This credential is not permitted to perform this operation.",
+) -> DaintreeError:
+    """403 — a credential this deployment accepts, for an operation it may not do.
+
+    Distinct from ``auth_client_not_allowed``, and the distinction is the message
+    rather than the remedy. Both are 403s that a refresh cannot fix, so both would
+    "work" as one code — but that code says the token came from an OAuth client
+    this deployment does not accept, and telling someone that when their client IS
+    accepted sends whoever reads the log looking for a configuration error that
+    does not exist.
+
+    Unreachable today: every allowlisted client holds the whole permission set, so
+    only a second client with a narrower grant can produce this. Defined now
+    because the alternative was to let the wrong code be correct-by-accident until
+    that client existed.
+    """
+    return DaintreeError(
+        status_code=403,
+        message=message,
+        type=TYPE_AUTHENTICATION,
+        code="auth_permission_denied",
+    )
+
+
 def subscription_required(
     message: str = "This account does not have a plan that includes the Daintree Assistant.",
 ) -> DaintreeError:

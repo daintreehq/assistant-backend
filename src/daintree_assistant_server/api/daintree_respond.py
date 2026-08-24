@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from ..auth import Principal, require_auth
+from ..auth import PERMISSION_CHAT, Principal, require_permission
 from ..contracts.daintree_api import RespondRequest
 from ..services.validation import validate_respond_request
 from .deps import check_protocol_header, check_protocol_value, request_id, require_ready
@@ -22,7 +22,7 @@ router = APIRouter()
 async def respond(
     body: RespondRequest,
     request: Request,
-    principal: Principal = Depends(require_auth),
+    principal: Principal = Depends(require_permission(PERMISSION_CHAT)),
     _ready: None = Depends(require_ready),
     _protocol: None = Depends(check_protocol_header),
 ) -> JSONResponse | StreamingResponse:

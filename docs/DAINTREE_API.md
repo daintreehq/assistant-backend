@@ -40,34 +40,52 @@ reports it too.
 SERVER holds the upstream credential (`TOGETHER_API_KEY`) and funds every turn from it.
 Callers supply no key of their own.
 
-There is no inbound API key to configure, and the `Authorization` header is **ignored
-entirely** — not parsed, not validated, not rejected. That is stronger than "a key is
-optional", and the difference is the point: a client still sending the key it used to
-authenticate with would otherwise have that key threaded upstream and refused as
-*theirs*, so the caller would see their own credential blamed for a header they were
-right to still be sending. Refusing to look is what makes an old client work.
+There is no inbound API key to configure. Account authentication is OAuth, and under
+the shipped posture the `Authorization` header is **never read for authentication** — not
+parsed, not verified, not rejected. That is stronger than "a credential is optional", and the
+difference is the point: a client still sending the key it used to authenticate with
+would otherwise have that key threaded upstream and refused as *theirs*, so the caller
+would see their own credential blamed for a header they were right to still be sending.
+Refusing to look is what makes an old client work.
 
-This is a stage, not a destination — account authentication is next, and `auth.py` is
-the seam. Because no caller key travels, the `provider_invalid_api_key` /
-`provider_insufficient_credits` / `provider_key_forbidden` family now describes the
-SERVER's credential: they mean the deployment is misconfigured or unfunded, not that
-the caller did anything wrong. See [Errors](#errors).
+An account is an **entitlement to spend Daintree's key**, never a mapping to one of
+yours. A verified caller changes who the turn is attributed to; it does not change which
+credential funds it. So the `provider_invalid_api_key` /
+`provider_insufficient_credits` / `provider_key_forbidden` family describes the SERVER's
+credential in every posture: they mean the deployment is misconfigured or unfunded, not
+that the caller did anything wrong. See [Errors](#errors).
 
 `/healthz`, `/readyz`, and `/version` are unauthenticated (Cloud Run probes them; they
 carry no user data), and so is `GET /v1/daintree/auth/config` — a client has to be able
 to read how to sign in before it holds anything to sign in with.
 
 The posture is named by one server setting, `AUTH_MODE`, so a client never has to infer
-it. **Today the only implemented value is `open`** — the header is not read on any path —
-and the other two (`observe`, which will verify a token that is present and record the
-outcome without changing authorization, and `enforce`, which will require one) are
-refused at readiness until the code behind them exists. A deployment cannot report an
-authentication boundary it does not have.
+it:
+
+- **`open`** — the default, and what every deployment runs today. The header is not read
+  for authentication. (It is still read for redaction, in every mode: an inbound
+  `X-Request-Id` that overlaps your credential is discarded rather than logged back to you.)
+- **`observe`** — a credential that IS present is verified and the outcome recorded, and
+  **nothing a caller can observe changes**. Same status, same body, same permissions as
+  `open`, for a good token and a bad one alike, and a failure inside the verifier is
+  swallowed rather than surfaced. It exists to produce evidence against real traffic
+  before anybody's request depends on the answer. It is not free: verifying costs time,
+  and a cold key cache costs a fetch.
+- **`enforce`** — a verified credential is required, and failures are the
+  [account error family](#your-daintree-account).
 
 `/v1/daintree/auth/config` reports what a client needs from that as `required`, alongside
 `configured` — whether signing in is possible here at all. The two are separate on
-purpose: during a rollout a deployment will publish a complete manifest while still
-serving anonymous requests.
+purpose: during a rollout a deployment publishes a complete manifest while still serving
+anonymous requests.
+
+Under `enforce` a token is verified locally against the configured Supabase project's
+JWKS: an asymmetric signature (RS256 or ES256, never chosen by the token), the exact
+issuer, the `authenticated` audience, expiry within 60 seconds of clock skew, and an
+OAuth `client_id` on this deployment's allowlist. **A verified token establishes identity
+only.** It does not establish that the session still exists — nothing reaches back into a
+minted JWT, so a logout leaves the signature valid until it expires — and it does not
+establish entitlement, which does not exist here yet.
 
 ### GET /v1/daintree/auth/config
 
@@ -1001,6 +1019,14 @@ not one code.
 | 401 | `auth_token_expired` | The credential verified and is past its expiry. | Refresh once, then replay — but only while nothing has been shown to the user. |
 | 401 | `auth_session_revoked` | The signature is fine; the session is gone (logout, grant revocation, security action). | Delete the local credential. Refreshing cannot succeed — the session that would authorize it no longer exists. |
 | 403 | `auth_client_not_allowed` | A valid, current token from an OAuth client this deployment does not accept. | Report the mismatch. **Never refresh** — every refresh mints another token wrong in the same way. |
+| 403 | `auth_permission_denied` | A credential this deployment DOES accept, for an operation it may not perform. | Report it. Never refresh, for the same reason — a new token carries the same authority. |
+
+The two 403s differ in their message rather than their remedy, and the split is worth the
+extra code: telling someone their OAuth client is not accepted, when it is, sends whoever
+reads that log hunting a configuration error that does not exist. `auth_permission_denied`
+is unreachable today — every allowlisted client holds the whole permission set — and is
+defined now so the wrong code cannot be correct-by-accident until a narrower client
+exists.
 
 Which specific check failed is deliberately not on the wire: `auth_token_invalid` covers
 all of them. Narrating the reason to an unauthenticated caller would make the endpoint an

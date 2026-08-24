@@ -42,11 +42,7 @@ import math
 from fastapi import APIRouter, Depends, Request, Response
 
 from ..auth import Principal, require_auth
-from ..config import (
-    AUTH_ENFORCEMENT_IMPLEMENTED,
-    OAUTH_REDIRECT_URI,
-    Settings,
-)
+from ..config import OAUTH_REDIRECT_URI, Settings
 from ..errors import DaintreeError
 from .deps import require_ready
 
@@ -94,17 +90,15 @@ def _auth_config_body(settings: Settings) -> dict[str, object]:
     requests: a client that collapsed the two would either refuse to sign in when
     it could, or demand a sign-in that is not yet being enforced.
 
-    Both are derived rather than reported, and ``required`` is derived from three
-    things rather than from the mode alone. It needs a publishable manifest —
-    telling a client a credential is mandatory while withholding the only
-    description of how to obtain one is a dead end — and it needs enforcement to
-    actually EXIST. That last conjunct is not belt-and-braces: ``auth_problems()``
-    refuses a non-``open`` mode at readiness, but this endpoint deliberately
-    answers while the service is unready, so without it a deployment that never
-    started would still be out here telling clients a credential was required.
+    Both are derived rather than reported. ``required`` needs a publishable
+    manifest as well as the mode: telling a client a credential is mandatory while
+    withholding the only description of how to obtain one is a dead end, and the
+    honest answer when we cannot say how to sign in is that we are not demanding
+    it.
 
-    ``configured`` is false unless the values are complete AND valid, for the same
-    reason: readiness cannot be this endpoint's filter.
+    ``configured`` is false unless the values are complete AND valid — this
+    endpoint deliberately answers while the service is unready, so readiness
+    cannot be its filter.
 
     ``version`` is checked FIRST by the client and gates everything after it, so
     it is present in both shapes — including the unconfigured one, where there is
@@ -117,9 +111,7 @@ def _auth_config_body(settings: Settings) -> dict[str, object]:
         "version": _AUTH_CONFIG_VERSION,
         "environment": settings.environment,
         "configured": configured,
-        "required": (
-            configured and AUTH_ENFORCEMENT_IMPLEMENTED and settings.auth_mode == "enforce"
-        ),
+        "required": configured and settings.auth_mode == "enforce",
     }
     if not configured:
         return body

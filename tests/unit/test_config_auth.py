@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -170,6 +173,18 @@ def test_secret_not_in_repr() -> None:
     assert "sk-should-not-appear" not in repr(s)
 
 
+def _open_request(header: str | None) -> Any:
+    """A request object with just enough shape for `authenticate` under `open`."""
+    raw = [] if header is None else [(b"authorization", header.encode("iso-8859-1"))]
+    settings = Settings(
+        STATE_SIGNING_KEY_CURRENT="x" * 32, TOGETHER_API_KEY="sk-server-owned"
+    )
+    return SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(settings=settings, token_verifier=None)),
+        scope={"headers": raw},
+    )
+
+
 @pytest.mark.parametrize(
     "header",
     [
@@ -178,12 +193,13 @@ def test_secret_not_in_repr() -> None:
         "   ",
         # A CLI mid-migration, still sending the OpenRouter key it used to
         # authenticate with. This is the case the ignore rule exists for: read it,
-        # and it would be forwarded to Cerebras and rejected as the CALLER's bad
+        # and it would be forwarded upstream and rejected as the CALLER's bad
         # key — an error blaming them for a header they were right to still send.
         "Bearer sk-or-v1-a-stale-openrouter-key",
-        # Shapes that used to be our own 401. A malformed bearer only meant
-        # something while a bearer meant something; rejecting one now would
-        # refuse a request the server can serve, over a value it does not read.
+        # Shapes that would be a 401 under enforcement. A malformed bearer only
+        # means something while a bearer means something; rejecting one under the
+        # open door would refuse a request the server can serve, over a value it
+        # does not read.
         "Bearer",
         "Bearer  ",
         "Bearer bad key",
@@ -193,28 +209,26 @@ def test_secret_not_in_repr() -> None:
         "not-a-scheme-at-all",
     ],
 )
-def test_every_authorization_header_is_ignored(header: str | None) -> None:
-    """The header is not parsed, not validated, and never rejected.
+@pytest.mark.asyncio
+async def test_every_authorization_header_is_ignored_under_the_open_door(
+    header: str | None,
+) -> None:
+    """Under `AUTH_MODE=open` the header is not parsed, not validated, and never
+    rejected.
 
-    This is stronger than "a key is optional", and the difference is the whole
-    point: the server holds the upstream credential, so there is no per-request
-    credential for a bearer to supply and nothing for its shape to be wrong
-    about.
+    This is stronger than "a credential is optional", and the difference is the
+    whole point: the server holds the upstream credential, so there is no
+    per-request credential for a bearer to supply and nothing for its shape to be
+    wrong about.
+
+    The mode is what carries that promise now, rather than the absence of any code
+    to break it — which is why these cases are kept rather than deleted. They are
+    the assertion that turning the machinery ON did not turn the default posture
+    on with it.
     """
-    principal = authenticate(header)
-    assert principal.id == "anonymous"
-    assert principal.has_scope("chat")
-
-
-def test_the_principal_carries_no_credential_at_all() -> None:
-    """Not `None` — absent.
-
-    A `SecretStr | None` field that is structurally always None is a trap: the
-    next reader threads it through, sees no type error, and believes a caller key
-    is reaching the provider. The field comes back with account authentication,
-    deliberately.
-    """
-    assert not hasattr(authenticate("Bearer anything"), "api_key")
+    principal = await authenticate(_open_request(header))
+    assert not principal.is_authenticated
+    assert principal.has_permission("chat")
 
 
 # ---- upstream request dumping (local-development-only guard) --------------
@@ -363,3 +377,181 @@ def test_the_rollout_controls_do_not_gate_readiness() -> None:
     settings = _settings(TOOL_PROJECTION_MODE="enforced", TOOL_PROJECTION_ROLLOUT_PERCENT=100)
     assert settings.missing_secrets() == []
     assert settings.local_only_problems() == []
+
+
+# ---- permissions -----------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_anonymous_principal_holds_every_permission() -> None:
+    """Under the open door there is no identity to narrow authority by, so a
+    narrower set would refuse requests this deployment is meant to serve — the
+    mode would stop meaning "the header is not read" and start meaning "everyone
+    is a restricted user", which is a different and much worse thing to ship by
+    accident."""
+    from daintree_assistant_server.auth import ANONYMOUS, ASSISTANT_PERMISSIONS
+
+    assert ANONYMOUS.permissions == ASSISTANT_PERMISSIONS
+    assert not ANONYMOUS.is_authenticated
+
+
+@pytest.mark.asyncio
+async def test_require_permission_refuses_a_caller_without_it() -> None:
+    """403 `auth_permission_denied`, not a 401: the credential is fine and a
+    refresh would mint another token with exactly the same authority.
+
+    And not `auth_client_not_allowed` either, though both are 403s a refresh
+    cannot fix. That one says the token came from an OAuth client this deployment
+    does not accept — saying it about a client that IS accepted sends whoever
+    reads the log hunting a configuration error that does not exist.
+    """
+    from daintree_assistant_server.auth import Principal, require_permission
+    from daintree_assistant_server.errors import DaintreeError
+
+    dependency = require_permission("chat")
+    request = _open_request(None)
+    request.app.state.settings = Settings(
+        STATE_SIGNING_KEY_CURRENT="x" * 32, TOGETHER_API_KEY="k"
+    )
+
+    # Stand in a principal that holds nothing, the way a future second OAuth
+    # client with a narrower grant would.
+    import daintree_assistant_server.auth as auth_module
+
+    original = auth_module.ANONYMOUS
+    auth_module.ANONYMOUS = Principal(permissions=frozenset())
+    try:
+        with pytest.raises(DaintreeError) as exc:
+            await dependency(request)
+    finally:
+        auth_module.ANONYMOUS = original
+    assert exc.value.status_code == 403
+    assert exc.value.code == "auth_permission_denied"
+
+
+def test_runbooks_write_is_not_granted_to_anybody() -> None:
+    """The reload route it would gate is local-authoring only and is already
+    refused twice over in a hardened deployment. A permission for it would be the
+    first step toward shipping the route."""
+    from daintree_assistant_server.auth import ASSISTANT_PERMISSIONS
+
+    assert not any(p.endswith(":write") for p in ASSISTANT_PERMISSIONS)
+
+
+# ---- the verifier's own lifecycle ------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_no_verifier_is_built_for_the_open_door() -> None:
+    """A deployment not doing account authentication should not hold an open
+    connection pool for a provider it never calls."""
+    from daintree_assistant_server.main import _build_token_verifier
+
+    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, TOGETHER_API_KEY="k")
+    verifier, client = await _build_token_verifier(settings)
+    assert verifier is None and client is None
+
+
+@pytest.mark.asyncio
+async def test_a_configured_non_open_deployment_builds_one() -> None:
+    from daintree_assistant_server.main import _build_token_verifier
+
+    settings = Settings(
+        STATE_SIGNING_KEY_CURRENT="x" * 32,
+        TOGETHER_API_KEY="k",
+        AUTH_MODE="observe",
+        SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co/auth/v1",
+        SUPABASE_JWKS_URL="https://abcdefghij.supabase.co/auth/v1/.well-known/jwks.json",
+        SUPABASE_OAUTH_AUTHORIZE_URL="https://abcdefghij.supabase.co/auth/v1/oauth/authorize",
+        SUPABASE_OAUTH_TOKEN_URL="https://abcdefghij.supabase.co/auth/v1/oauth/token",
+        SUPABASE_OAUTH_CLIENT_ID="daintree-assistant",
+        DAINTREE_ACCOUNT_URL="https://staging.daintree.org/account",
+        DAINTREE_SUBSCRIBE_URL="https://staging.daintree.org/subscribe",
+    )
+    verifier, client = await _build_token_verifier(settings)
+    assert verifier is not None and client is not None
+    try:
+        # The redirect refusal is set on the client as well as at the call site.
+        assert client.follow_redirects is False
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_a_failed_verifier_build_does_not_strand_its_connection_pool() -> None:
+    """The client is created before the verifier, and nothing else holds a
+    reference to it yet — so an exception from the constructor would leave an open
+    pool for the life of the process, owned by nobody."""
+    import daintree_assistant_server.main as main_module
+
+    settings = Settings(
+        STATE_SIGNING_KEY_CURRENT="x" * 32,
+        TOGETHER_API_KEY="k",
+        AUTH_MODE="observe",
+        SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co/auth/v1",
+        SUPABASE_JWKS_URL="https://abcdefghij.supabase.co/auth/v1/.well-known/jwks.json",
+        SUPABASE_OAUTH_AUTHORIZE_URL="https://abcdefghij.supabase.co/auth/v1/oauth/authorize",
+        SUPABASE_OAUTH_TOKEN_URL="https://abcdefghij.supabase.co/auth/v1/oauth/token",
+        SUPABASE_OAUTH_CLIENT_ID="daintree-assistant",
+        DAINTREE_ACCOUNT_URL="https://staging.daintree.org/account",
+        DAINTREE_SUBSCRIBE_URL="https://staging.daintree.org/subscribe",
+    )
+    created: list[Any] = []
+    real_client = main_module.httpx.AsyncClient
+
+    def _record(*args: Any, **kwargs: Any) -> Any:
+        client = real_client(*args, **kwargs)
+        created.append(client)
+        return client
+
+    def _explode(**kwargs: Any) -> Any:
+        raise RuntimeError("constructor failed")
+
+    main_module.httpx.AsyncClient = _record  # type: ignore[misc]
+    original_verifier = main_module.SupabaseTokenVerifier
+    main_module.SupabaseTokenVerifier = _explode  # type: ignore[misc]
+    try:
+        with pytest.raises(RuntimeError):
+            await main_module._build_token_verifier(settings)
+    finally:
+        main_module.httpx.AsyncClient = real_client  # type: ignore[misc]
+        main_module.SupabaseTokenVerifier = original_verifier  # type: ignore[misc]
+    assert created, "no client was created, so this proves nothing"
+    assert created[0].is_closed
+
+
+@pytest.mark.asyncio
+async def test_a_failed_verifier_build_does_not_take_liveness_down() -> None:
+    """It runs before the `yield`, so an escape would fail the whole lifespan —
+    turning a configuration problem into a dead process, which is the opposite of
+    what every other startup failure in `main.py` does.
+
+    Degrading to no verifier is safe: under `enforce` every request then answers
+    `auth_dependency_unavailable`, which is the honest verdict for a door that
+    could not be built.
+    """
+    from fastapi.testclient import TestClient
+
+    import daintree_assistant_server.main as main_module
+    from tests.fakes import FakeProvider  # type: ignore[import-not-found]
+
+    async def _explode(settings: Any) -> Any:
+        raise RuntimeError("cannot build a verifier")
+
+    original = main_module._build_token_verifier
+    main_module._build_token_verifier = _explode  # type: ignore[assignment]
+    try:
+        app = main_module.create_app(
+            settings=Settings(
+                STATE_SIGNING_KEY_CURRENT="x" * 32,
+                TOGETHER_API_KEY="k",
+                RETRY_BACKOFF_BASE_SECONDS=0.0,
+            ),
+            provider=FakeProvider(),
+        )
+        with TestClient(app) as client:
+            # Liveness is up, which is the whole point.
+            assert client.get("/healthz").status_code == 200
+            assert app.state.token_verifier is None
+    finally:
+        main_module._build_token_verifier = original  # type: ignore[assignment]
