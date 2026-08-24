@@ -75,6 +75,10 @@ _SCHEMA_TASK = "terminal_extract_json"
 logger = get_logger("daintree.tasks")
 
 MAX_DISTILLED_FACTS = 10
+#: Matches the "at most 200 characters" cap in tasks/memory_distill.md — kept as
+#: a truncation floor rather than a validation error, since a model overrunning
+#: the prompted limit slightly should not fail the whole task.
+MAX_DISTILLED_FACT_CHARS = 200
 
 # Headroom over a profile's per-call timeout for the whole task: a task makes at
 # most two upstream calls (first attempt plus one JSON repair) and spends a little
@@ -505,7 +509,7 @@ def _p_memory_distill(raw: str, _req: TaskRequest) -> dict[str, Any]:
         if key in seen:
             continue
         seen.add(key)
-        facts.append({"fact": fact[:400], "kind": kind})
+        facts.append({"fact": fact[:MAX_DISTILLED_FACT_CHARS], "kind": kind})
         if len(facts) >= MAX_DISTILLED_FACTS:
             break
     return {"facts": facts}
@@ -733,8 +737,8 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
             TaskProfile(
                 "terminal_judge", TerminalJudgeInput, "json", _u_judge, _p_judge,
                 max_output_tokens=300, sensitive_fields=frozenset({"tail"}),
-                repair_hint="Return a single JSON object with keys matched (boolean), "
-                "confidence (0-1), reason.",
+                repair_hint="Return a single JSON object with keys reason, confidence (0-1), "
+                "matched (boolean), in that order.",
             ),
             TaskProfile(
                 "terminal_summarize", TerminalSummarizeInput, "text", _u_summarize, _p_text,
@@ -754,7 +758,8 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 "extraction_verdict", ExtractionVerdictInput, "json", _u_extraction_verdict,
                 _p_extraction_verdict, max_output_tokens=300,
                 sensitive_fields=frozenset({"result"}),
-                repair_hint="Return a single JSON object with keys pass (boolean) and reason.",
+                repair_hint="Return a single JSON object with keys reason, pass (boolean), "
+                "in that order.",
             ),
             TaskProfile(
                 "runbook_step_consistency", RunbookStepConsistencyInput, "json",

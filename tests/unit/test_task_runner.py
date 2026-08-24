@@ -20,6 +20,7 @@ from daintree_assistant_server.contracts.tasks import (
 from daintree_assistant_server.errors import DaintreeError, upstream_error, upstream_timeout
 from daintree_assistant_server.providers.base import ProviderUsage
 from daintree_assistant_server.services.task_runner import (
+    MAX_DISTILLED_FACT_CHARS,
     TaskParseError,
     TaskProfile,
     TaskRunner,
@@ -131,6 +132,21 @@ async def test_memory_distill_array_and_dedupe(task_runner: TaskRunner, fake_pro
     assert len(facts) == 3
     assert facts[1] == {"fact": "tried X it failed", "kind": "semantic"}
     assert facts[2]["kind"] == "semantic"  # invalid kind coerced
+
+
+@pytest.mark.asyncio
+async def test_memory_distill_truncates_to_the_prompted_limit(
+    task_runner: TaskRunner, fake_provider: FakeProvider
+) -> None:
+    """The parser's truncation floor must match the "at most 200 characters" cap
+    tasks/memory_distill.md prompts for — a looser floor silently accepts what the
+    prompt tells the model never to produce."""
+    overlong = "x" * 300
+    payload = [{"fact": overlong, "kind": "semantic"}]
+    fake_provider.complete_result = make_result(content=json.dumps(payload))
+    out = await _run(task_runner, "memory_distill", {"transcript": "..."})
+    assert out["facts"] == [{"fact": overlong[:MAX_DISTILLED_FACT_CHARS], "kind": "semantic"}]
+    assert len(out["facts"][0]["fact"]) == MAX_DISTILLED_FACT_CHARS
 
 
 @pytest.mark.asyncio
