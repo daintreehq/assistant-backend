@@ -9,6 +9,7 @@ requiredTools:
   - forge.getIssue
   - forge.getPR
   - forge.getChecks
+  - forge.listIssueComments
   - forge.listPRs
   - daintree.call
   - agentTask.spawnForEdits
@@ -93,8 +94,7 @@ It gives names and links, not the job-log body.
 `forge.getIssue` reports `commentCount` but no comment text. For the text:
 
 ```
-daintree.call({"name": "forge.listIssueComments",
-               "arguments": {"issueNumber": <int>, "perPage": 50}})
+forge.listIssueComments({"issueNumber": <int>, "perPage": 50})
 ```
 
 -> `{ items: [{ id, body, url, createdAt, author? }], nextCursor, hasMore, totalCount? }`.

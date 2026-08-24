@@ -9,17 +9,6 @@ request (~77 KB of compact wire JSON — ~63% of the assembled prompt bytes; the
 assembler's whole cache layout exists to keep byte-stable, so the prompt-cost,
 injection, and session-trace suites load this rather than a toy stub.
 
-> **It is not a pure capture right now.** The skill -> runbook rename edited two
-> entries in place — `skill__run__get` -> `runbook__run__get` and
-> `skill__step__advance` -> `runbook__step__advance`, along with their `skillId`
-> argument key and their descriptions. The pinned CLI still registers the `skill.*`
-> ids, so those entries describe the CLI AFTER its rename rather than at the pinned
-> commit. Everything else is the capture verbatim. The divergence is bounded and
-> enforced by `test_the_fixtures_run_ahead_of_the_cli_only_where_we_said_they_do`,
-> and `test_the_gate_above_retires_itself_when_the_cli_renames` FAILS the moment the
-> Go side renames — that failure is the cue to re-capture per the recipe below and
-> delete both tests. Do not add further hand edits under this exception.
-
 **Shape:** a bare JSON array of `{"type": "function", "function": {...}}` dicts —
 exactly what `RespondRequest.input.tools` accepts, no envelope. Serialized with
 `json.dumps(tools, indent=1, ensure_ascii=True)` and **no trailing newline**.
@@ -104,10 +93,17 @@ each other.
    python -m tools.baseline capture > benchmarks/baseline.json
    ```
 
-Last refreshed 2026-08-15 (85 → 79 → 77 tools). The 79 → 77 step is the CLI
-dropping its `docs__search` / `docs__getPage` / `docs__getRelatedPages` family:
-the backend classifies documentation questions on the selector call and searches
-the public docs MCP itself, so the client no longer carries a docs tool or a second
-MCP connection. It added `forge__getChecks`, a typed CI-state read. Net effect on
-the wire is larger than the count suggests — the compact tool region fell ~10%,
-84.2 KB → 75.8 KB, and it is 63% of an assembled request.
+Last refreshed 2026-08-24 (85 -> 79 -> 77 -> 89 tools). The 77 -> 89 step is the
+protocol-3 runbooks line landing on the CLI's develop: the `skill.*` run tools became
+`runbook.*` (so this capture is a pure capture again — the hand-edited exception that
+stood here is retired, along with the two tests in
+`tests/unit/test_runbook_catalog_hygiene.py` that bounded it), and ten tools were added,
+none removed — `agentSessionHistory__list`, `browser__getConsoleMessages`,
+`daintree__invoke`, `errors__recent`, `forge__listIssueComments`,
+`notifications__recent`, `project__detectRunners`, `project__runCheck`, `tool__schema`,
+`worktree__resource__status`.
+
+The 79 -> 77 step before it was the CLI dropping its `docs__search` / `docs__getPage` /
+`docs__getRelatedPages` family: the backend classifies documentation questions on the
+selector call and searches the public docs MCP itself, so the client no longer carries a
+docs tool or a second MCP connection. It added `forge__getChecks`, a typed CI-state read.

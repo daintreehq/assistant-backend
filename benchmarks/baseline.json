@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:18679167537c58fc21812272c1b6ff87bbd6b8bcce28d7e6825a5a65aeb93631",
+    "revision": "sha256:c11f4d49096c2a62f322fa10bfda7a71c7f96dc09ecc331f7f9b4896a67b40a8",
     "runbooks": 39
   },
   "identity": {
@@ -11,7 +11,7 @@
   },
   "prompt": {
     "base_prompt_bytes": 24813,
-    "runbook_body_bytes_total": 290592,
+    "runbook_body_bytes_total": 290570,
     "subagent_prompt_bytes": 5375
   },
   "selector": {
@@ -23,8 +23,8 @@
     "trained_runbooks": 38
   },
   "tools": {
-    "count": 79,
-    "names_sha256": "76a1631117fa114b1529e2c964484997f37e6dccfe122e639ecabeea34cba00d",
-    "tool_inventory_bytes": 99686
+    "count": 89,
+    "names_sha256": "318aff8d487a5d46e77dfd09929acf6cad7071ad23ee52e9d61edde88b938a58",
+    "tool_inventory_bytes": 110676
   }
 }

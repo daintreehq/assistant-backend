@@ -50,9 +50,11 @@ def _print(doc: dict[str, Any]) -> None:
         for L in sorted(det["layer_budget"]["layers"], key=lambda x: -x["bytes"]):
             print(f"    {L['layer']:24} {L['bytes']:>7}B {L['byte_pct']:>5}%  "
                   f"~{L['token_est']} tok")
-        sp = det["selector_prompt_cost"]
-        print(f"  selector prompt ~{sp['selector_prompt_token_est']} tok / "
-              f"{sp['catalog_runbooks']} runbooks")
+        # No selector-prompt row: the two-stage selector is local and costs the
+        # upstream request nothing, so the deterministic doc stopped reporting
+        # `selector_prompt_cost` when that prompt was retired to the test seam.
+        # This printer kept reading the key and took `bench run` — the refresh
+        # gate the fixture recipe tells you to run — down with a KeyError.
         print(f"  state token bytes: "
               f"{[s['token_bytes'] for s in det['state_token_size']['sizes']]}")
     live = doc.get("live")

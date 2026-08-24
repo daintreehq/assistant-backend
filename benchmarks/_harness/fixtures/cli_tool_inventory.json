@@ -638,7 +638,7 @@
       "maxProperties": 1,
       "properties": {
        "all": {
-        "description": "AND \u2014 every nested condition (each the same one-key WatchCondition shape; modelJudge is not supported anywhere in the tree) must hold.",
+        "description": "AND over nested one-key conditions; no modelJudge anywhere.",
         "items": {
          "maxProperties": 1,
          "minProperties": 1,
@@ -648,7 +648,7 @@
         "type": "array"
        },
        "any": {
-        "description": "OR \u2014 at least one nested condition (same one-key shape; no modelJudge anywhere) holds.",
+        "description": "OR over nested one-key conditions; no modelJudge anywhere.",
         "items": {
          "maxProperties": 1,
          "minProperties": 1,
@@ -658,28 +658,28 @@
         "type": "array"
        },
        "contains": {
-        "description": "Fires when the terminal tail contains this literal substring (non-empty). Matches the COMBINED tail across multiple terminalIds.",
+        "description": "Tail contains this literal substring. Matches the COMBINED tail across terminalIds.",
         "minLength": 1,
         "type": "string"
        },
        "noOutputForMs": {
-        "description": "Fires once no NEW output has appeared for this many ms.",
+        "description": "No new output for this many ms.",
         "minimum": 1,
         "type": "integer"
        },
        "not": {
-        "description": "Negates ONE nested condition (same one-key shape; no modelJudge anywhere). This is a property named not, NOT the JSON-Schema keyword.",
+        "description": "Negates ONE nested one-key condition; no modelJudge anywhere. A property named not, NOT the JSON-Schema keyword.",
         "maxProperties": 1,
         "minProperties": 1,
         "type": "object"
        },
        "regex": {
-        "description": "Fires when the tail matches this Go/RE2 regular expression (must compile). Matches the COMBINED tail across multiple terminalIds, so it can straddle a terminal boundary.",
+        "description": "Tail matches this Go/RE2 regex (must compile). Matches the COMBINED tail, so it can straddle a terminal boundary.",
         "minLength": 1,
         "type": "string"
        },
        "runtimeStatusIs": {
-        "description": "Fires on the coarse terminal runtime status.",
+        "description": "Coarse terminal runtime status.",
         "enum": [
          "running",
          "exited"
@@ -687,7 +687,7 @@
         "type": "string"
        },
        "stateIs": {
-        "description": "Fires when the agent state equals this value exactly. Do NOT use stateIs:'waiting' to mean finished \u2014 pass {} instead (it confirms a real finish).",
+        "description": "Agent state equals this value exactly.",
         "enum": [
          "idle",
          "working",
@@ -842,7 +842,7 @@
   "type": "function",
   "function": {
    "name": "daintree__listTools",
-   "description": "List the Daintree MCP tools, with their names and descriptions. Each entry carries a `callable` flag: tools marked `callable: false` are known to exist but are not offered in this turn's tool spec (e.g. an active runbook narrowed the toolset), so calling them would do nothing.",
+   "description": "List every Daintree MCP action with its description and policy (`risk`, `requiredTier`, `confirms`, `preferredTool`, `invocable`). Prefer `tool.search` \u2014 this dumps the whole catalog \u2014 and `tool.schema` for one action's arguments. `callable: false` means the action exists but is not in this turn's tool spec.",
    "parameters": {
     "additionalProperties": false,
     "properties": {},
@@ -854,7 +854,7 @@
   "type": "function",
   "function": {
    "name": "tool__search",
-   "description": "Search Daintree MCP tools by keyword. The query is split on spaces and a tool matches when EVERY word appears in its name or description (order and filler words don't matter), so prefer a couple of plain keywords (e.g. `rename terminal`) over a long phrase \u2014 name matches rank first. Each match carries a `callable` flag: tools marked `callable: false` exist but are not offered in this turn's tool spec, so calling them would do nothing \u2014 only `callable: true` results can be invoked now.",
+   "description": "Search Daintree MCP actions by keyword. The query splits on spaces and an action matches when EVERY word appears in its name or description, so prefer a couple of plain keywords (e.g. `rename terminal`) over a phrase \u2014 name matches rank first. Each match carries its policy: `risk`, `requiredTier`, `confirms`, `preferredTool`, and `invocable` \u2014 whether `daintree.invoke` can run it (with `unavailableReason` when not). Read its arguments with `tool.schema` before invoking. `callable:false` means the tool exists but is not in this turn's tool spec.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -877,8 +877,30 @@
  {
   "type": "function",
   "function": {
+   "name": "tool__schema",
+   "description": "Look up ONE Daintree MCP action's exact input schema \u2014 its argument shape \u2014 plus its policy (`risk`, `requiredTier`, `confirms`, `invocable`), without invoking it. Call with the literal object {\"name\":\"recipe.run\"}. This schema is what `daintree.invoke` validates arguments against. Reach for it whenever you would otherwise guess an argument key \u2014 above all for a wrapper's opaque `arguments` record, whose keys are documented nowhere else.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "name": {
+      "description": "Exact MCP tool name, copied from tool.search or daintree.listTools. Not auto-corrected.",
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
    "name": "daintree__call",
-   "description": "Raw passthrough to ANY Daintree MCP tool. Escape hatch \u2014 highest risk ('system'), always confirmed, requires the 'system' tier. Prefer purpose-built tools; use this only when no wrapper exists. Tools that already have a wrapper (e.g. agent.launch, terminal.getOutput, panel.focus) are refused here and redirected to the wrapper.",
+   "description": "Raw passthrough to ANY Daintree MCP tool. Escape hatch \u2014 highest risk ('system'), always confirmed, 'system' tier, never grantable. Prefer a purpose-built tool, then `daintree.invoke` (which gates an action at ITS OWN risk instead of this blanket system-tier prompt). Use this only for an action `daintree.invoke` refuses as policy-unknown. Wrapped tools (agent.launch, terminal.getOutput, panel.focus) are redirected to their wrapper.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -898,6 +920,37 @@
     },
     "required": [
      "name"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "daintree__invoke",
+   "description": "Invoke ONE Daintree MCP action that has no typed wrapper, gated as THAT action: a read runs with no confirmation, a mutation confirms at its own risk. Find the action with tool.search, read its shape with tool.schema, then call {\"action\":\"terminal.list\",\"arguments\":{...}}. Only actions tool.search reports `invocable: true` run here; anything else is refused with the alternative named. An action this build has not reviewed stays reachable only via daintree.call.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "action": {
+      "description": "Exact action name from tool.search, never auto-corrected.",
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+     },
+     "arguments": {
+      "additionalProperties": true,
+      "description": "Object matching the inputSchema tool.schema returned. Validated against it before anything runs or is confirmed.",
+      "type": "object"
+     },
+     "requestKey": {
+      "description": "Idempotency key Daintree dedupes on. Set one for every autonomous mutation. Do not repeat it inside the arguments object.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "action"
     ],
     "type": "object"
    }
@@ -1653,6 +1706,255 @@
      "arguments": {
       "additionalProperties": true,
       "type": "object"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "project__detectRunners",
+   "description": "List the runnable commands a project defines, by inspecting its manifests. The direct source of the runnerId project.runCheck requires \u2014 never guess one. It returns every script it finds, publish and deploy included, and synthesizes conventional commands for some frameworks, so check what an unfamiliar runner runs before running it.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "projectId": {
+      "description": "The project to inspect. Omit for the active project; the call fails when none is active.",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "project__runCheck",
+   "description": "Run ONE of a project's detected commands (test, lint, build, \u2026) and report its exit code and output. Get runnerId from project.detectRunners \u2014 never guess one, and confirm what an unfamiliar id runs, since detection surfaces every script, not only checks. A command that FAILS returns ok with passed:false: read the verdict, not the call. Never point it at a long-lived server \u2014 it blocks until the timeout expires.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "cwd": {
+      "description": "Run directory: the project root (default) or one of its worktrees. A PATH, not a worktree id.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "projectId": {
+      "description": "The project whose command to run; its id rides this turn's runtime context.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "runnerId": {
+      "description": "Which detected command to run \u2014 an id from project.detectRunners. Never guess one.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "timeoutMs": {
+      "default": 600000,
+      "description": "Wall-clock ceiling in ms. Daintree kills the process tree when it elapses and reports timedOut:true.",
+      "maximum": 3600000,
+      "minimum": 1000,
+      "type": "integer"
+     }
+    },
+    "required": [
+     "projectId",
+     "runnerId"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "forge__listIssueComments",
+   "description": "Read ONE page of a GitHub issue's comment thread. Comments come back OLDEST FIRST, so the newest reply is at the END: page with nextCursor until hasMore is false before concluding what the thread says. An empty page genuinely means nobody commented \u2014 a missing issue fails instead, so silence is never ambiguous. PARALLEL: forge.* reads batched in ONE reply run concurrently.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "cursor": {
+      "description": "Opaque cursor \u2014 pass the previous response's nextCursor for the next page.",
+      "type": "string"
+     },
+     "cwd": {
+      "description": "Legacy alias for worktreePath.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "issueNumber": {
+      "description": "The issue whose comments to read (positive integer).",
+      "minimum": 1,
+      "type": "integer"
+     },
+     "perPage": {
+      "default": 20,
+      "description": "Comments per page.",
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "worktreeId": {
+      "description": "Worktree id. Takes precedence over a path.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "worktreePath": {
+      "description": "Absolute worktree path.",
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "required": [
+     "issueNumber"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "agentSessionHistory__list",
+   "description": "List CLOSED agent sessions that can be relaunched, from the on-disk journal \u2014 which sessions exist, carrying no transcript text. Newest first; read `total`/`hasMore` before concluding you have seen them all. It must resolve a worktree or project scope and FAILS rather than listing everything, so pass one when this session has none. Retention prunes old records, so absence does not prove a session never existed.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "limit": {
+      "default": 20,
+      "description": "Max records, newest first.",
+      "maximum": 100,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "offset": {
+      "default": 0,
+      "description": "Records to skip, for paging past the limit.",
+      "minimum": 0,
+      "type": "integer"
+     },
+     "projectId": {
+      "description": "Scope to one project id; combines with worktreeId.",
+      "minLength": 1,
+      "type": "string"
+     },
+     "worktreeId": {
+      "description": "Scope to one worktree id. Omit it; never pass \"\".",
+      "minLength": 1,
+      "type": "string"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "browser__getConsoleMessages",
+   "description": "Read captured console output (logs, warnings, errors, stack traces) from a DEV PREVIEW panel \u2014 the only panel kind that captures it; any other target fails rather than returning nothing. Omit terminalId for the focused panel. `counts` covers the whole pane, not the rows returned, so a higher errorCount means the level filter or limit hid some.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "level": {
+      "description": "Return only messages at this level.",
+      "enum": [
+       "log",
+       "info",
+       "warning",
+       "error"
+      ],
+      "type": "string"
+     },
+     "limit": {
+      "description": "Max messages, newest kept. Omit for every captured message.",
+      "maximum": 500,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "terminalId": {
+      "description": "The dev preview panel to read. Omit for the focused panel.",
+      "type": "string"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "errors__recent",
+   "description": "List recent entries from Daintree's DIAGNOSTICS error log \u2014 runtime and inter-process failures, newest first. SEPARATE store from the user's notification inbox (notifications.recent): a full picture of what went wrong usually means reading both. An empty list means nothing was recorded OR all of it was dismissed. PARALLEL: pair the two in ONE batch and both run concurrently.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "includesDismissed": {
+      "default": false,
+      "description": "Include errors the user dismissed (default false \u2014 active errors only).",
+      "type": "boolean"
+     },
+     "limit": {
+      "default": 20,
+      "description": "Max errors to return, newest first (default 20, max 50).",
+      "maximum": 50,
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "notifications__recent",
+   "description": "List recent entries from the user's NOTIFICATION INBOX \u2014 completion, waiting and informational messages, including quiet ones that never surfaced as a toast \u2014 newest first. SEPARATE store from the diagnostics error log (errors.recent): a full picture of what went wrong usually means reading both. PARALLEL: pair the two in ONE batch.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "limit": {
+      "default": 20,
+      "description": "Max notifications to return, newest first (default 20, max 50).",
+      "maximum": 50,
+      "minimum": 1,
+      "type": "integer"
+     },
+     "type": {
+      "description": "Return only notifications of this type.",
+      "enum": [
+       "success",
+       "error",
+       "info",
+       "warning"
+      ],
+      "type": "string"
+     },
+     "unreadOnly": {
+      "default": false,
+      "description": "Only notifications the user has not yet seen as a toast (default false).",
+      "type": "boolean"
+     }
+    },
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "worktree__resource__status",
+   "description": "Run a worktree's configured remote-resource status command (e.g. a cloud devbox) and report what it said. It EXECUTES a real command and waits, so it costs whatever that command costs. `configured:false` means no status command is set up \u2014 not a failure, and not evidence the resource is down. A failing status command fails this call rather than returning a stale cached answer, so a result is always fresh.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "worktreeId": {
+      "description": "The worktree whose remote resource to check. Omit for the focused or active worktree; the call fails when neither resolves.",
+      "type": "string"
      }
     },
     "type": "object"

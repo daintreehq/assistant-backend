@@ -6,6 +6,7 @@ whenToUse: Use when the user asks to prepare a branch for review, open or ready 
 risk: external
 requiredTools:
   - context.snapshot
+  - project.runCheck
   - worktree.getCurrent
   - forge.listPRs
   - forge.getPR
@@ -103,9 +104,8 @@ the push already updated it. To flip a draft to ready, `daintree.call forge.mark
 
 ## Checks and conflicts — run the check yourself, spawn only for edits
 Running a detected runner is a CALL, not a delegation — do NOT spawn an agent merely to
-execute a check. `project.runCheck` has no typed wrapper, so it goes through the escape
-hatch:
-`daintree.call {"name":"project.runCheck","arguments":{"projectId":"…","runnerId":"…","cwd":"<worktree path>"}}`.
+execute a check. `project.runCheck({"projectId":"…","runnerId":"…","cwd":"<worktree path>"})`
+is a typed wrapper — call it directly, never through `daintree.call`.
 Take `runnerId` from step 3's `detectedRunners` — never invent one, and confirm what an
 unfamiliar id runs: detection surfaces every runnable script, not just checks, and pointing
 this at a long-lived server blocks until the timeout. Pass `cwd` explicitly for the worktree

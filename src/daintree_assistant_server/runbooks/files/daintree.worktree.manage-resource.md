@@ -10,18 +10,19 @@ requiredTools:
   - worktree.getCurrent
   - user.askMultipleChoice
   - timer.schedule
+  - worktree.resource.status
   - daintree.call
 ---
 Use when: the user wants status or lifecycle control for a worktree's project-configured remote resource.
 
-The actual MCP actions are `worktree.resource.status`, `worktree.resource.provision`, `worktree.resource.pause`, `worktree.resource.resume`, and `worktree.resource.teardown`. They have no typed Assistant CLI wrappers, so even the status read goes through system-risk, always-confirmed and ungrantable `daintree.call`. All accept optional `{worktreeId}`, but this runbook ALWAYS supplies the exact id.
+The actual MCP actions are `worktree.resource.status`, `worktree.resource.provision`, `worktree.resource.pause`, `worktree.resource.resume`, and `worktree.resource.teardown`. The STATUS read has a typed Assistant wrapper, `worktree.resource.status` — call it directly; sending it through `daintree.call` returns USE_TYPED_WRAPPER and does nothing. The four LIFECYCLE actions have no wrapper and still go through system-risk, always-confirmed and ungrantable `daintree.call`, which is the right gate for them: each one executes a project-configured command. All accept optional `{worktreeId}`, but this runbook ALWAYS supplies the exact id.
 
 Procedure:
 
 1. RESOLVE ONE EXACT WORKTREE from the injected roster, `worktree.getCurrent`, or `worktree.list`. A worktree id is the exact id returned by Daintree, not a branch name. If several match, use `user.askMultipleChoice`. Never rely on focused/active fallback for infrastructure actions.
 
 2. READ FRESH STATUS first:
-   `daintree.call({"name":"worktree.resource.status","arguments":{"worktreeId":"<exact id>"}})`.
+   `worktree.resource.status({"worktreeId":"<exact id>"})`.
    Inspect `structuredContent`: `{configured:boolean,status:null|{lastStatus?,lastOutput?,error?,lastCheckedAt?,endpoint?,meta?,provider?,resumedAt?,pausedAt?}}`. `configured:false,status:null` means no status command is configured. The action runs a real command and fails instead of returning stale cached state. Treat `unknown` as unknown, never healthy. Do not echo raw `lastOutput`, `meta`, or credential-shaped endpoints unless needed and demonstrably safe.
 
 3. REQUIRE AN EXPLICIT INTERACTIVE REQUEST for provision, pause or resume. These execute arbitrary project-configured commands; provision/resume may incur cost, and pause is not guaranteed to be the inverse of resume. Call exactly one:

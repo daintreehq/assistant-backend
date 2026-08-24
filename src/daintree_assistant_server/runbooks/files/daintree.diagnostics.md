@@ -9,6 +9,8 @@ requiredTools:
   - daintree.listTools
   - tool.search
   - context.snapshot
+  - errors.recent
+  - notifications.recent
   - daintree.call
 ---
 Use when: something in Daintree is not working and the user wants to know why.
@@ -23,9 +25,9 @@ Procedure:
    - `daintree.status` reports the MCP link: endpoint, connected, transport, tool count, and the error text when it is down. It works WHILE disconnected, which is exactly when you need it.
    - `context.snapshot` for workspace state — worktrees, terminals, agents — when the complaint is about something that should be there and isn't.
    - A DISCONNECTED link explains almost every "nothing works" report at once: the control-plane tools (terminal, agent, worktree, git, forge) all stop, so say that first and give the reconnect step rather than diagnosing each missing capability separately. Note what still WORKS, because it changes what you can do next: `daintree.status` itself is designed to answer while disconnected, and documentation retrieval does not go through that link — so a how-to question can still be answered while the app is unreachable.
-   - When the complaint is a runtime/inter-process error, call `daintree.call({"name":"errors.recent","arguments":{"limit":20,"includesDismissed":false}})`. It returns newest-first active entries under `errors`, including message/details/source/timestamp, context ids, retryability, recovery hint and occurrence count. `includesDismissed:true` is only for forensics; an empty default list can also mean every recorded error was dismissed.
-   - For completion/waiting/informational events and quiet inbox entries, call `daintree.call({"name":"notifications.recent","arguments":{"limit":20}})`. Optional `type` is `success`, `error`, `info` or `warning`; `unreadOnly:true` means not seen as a toast, not necessarily not read anywhere. It returns `notifications` with title/message/timestamp and optional worktree/panel/event context.
-   - These two reads are separate stores. Read both for "what went wrong" because an error can be recorded without a notification and a failed operation can notify without an error-log row. They are Daintree workbench reads, but the lack of typed CLI wrappers means `daintree.call` still incurs the CLI's system-risk confirmation. Never call them while MCP is disconnected and present the resulting transport error as the original cause.
+   - When the complaint is a runtime/inter-process error, call `errors.recent({"limit":20,"includesDismissed":false})`. It returns newest-first active entries under `errors`, including message/details/source/timestamp, context ids, retryability, recovery hint and occurrence count. `includesDismissed:true` is only for forensics; an empty default list can also mean every recorded error was dismissed.
+   - For completion/waiting/informational events and quiet inbox entries, call `notifications.recent({"limit":20})`. Optional `type` is `success`, `error`, `info` or `warning`; `unreadOnly:true` means not seen as a toast, not necessarily not read anywhere. It returns `notifications` with title/message/timestamp and optional worktree/panel/event context.
+   - These two reads are separate stores. Read both for "what went wrong" because an error can be recorded without a notification and a failed operation can notify without an error-log row. Both are typed read wrappers now, so they need no confirmation and must NOT be sent through `daintree.call` — that returns USE_TYPED_WRAPPER and does nothing. Never call them while MCP is disconnected and present the resulting transport error as the original cause.
 
 2. A MISSING TOOL is a real diagnosis, not a dead end. `daintree.listTools` marks each tool `callable`. A tool that exists but is `callable: false` was not offered THIS turn — say so and name what it does, rather than calling it and reporting a confusing failure. `tool.search({"query":"rename terminal"})` finds a capability by a couple of plain keywords when you know the job but not the name. If the capability genuinely does not exist, saying that IS the answer.
 
