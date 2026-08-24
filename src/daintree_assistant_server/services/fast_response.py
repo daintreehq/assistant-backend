@@ -175,13 +175,18 @@ _CONTROL_MARKER = re.compile(r"\[\[DAINTREE:[A-Z]+\]\]")
 #: output, so a tag a model might emit incidentally (`<plan>`) would let ordinary
 #: prose silently become a hidden block — or worse, leave half a plan visible.
 _PLAN_TAG = "daintree_plan"
+#: Whitespace is tolerated everywhere a model might drift — after `<`, after `</`,
+#: and before `>`. Tolerated rather than rejected because the alternative is worse:
+#: a variant the matcher does not recognise is not a rejection, it is a hidden
+#: block that stays in the visible half.
 _PLAN_BLOCK = re.compile(
-    rf"<{_PLAN_TAG}\s*>(?P<body>.*?)</{_PLAN_TAG}\s*>", re.IGNORECASE | re.DOTALL
+    rf"<\s*{_PLAN_TAG}\s*>(?P<body>.*?)<\s*/\s*{_PLAN_TAG}\s*>",
+    re.IGNORECASE | re.DOTALL,
 )
 #: Any stray occurrence of the tag name, used to refuse output that opened a block
 #: it never closed. A visible half of a truncated plan is the one split failure a
 #: user would actually see.
-_PLAN_TAG_ANY = re.compile(rf"</?{_PLAN_TAG}", re.IGNORECASE)
+_PLAN_TAG_ANY = re.compile(rf"<\s*/?\s*{_PLAN_TAG}", re.IGNORECASE)
 
 #: The injection guard, kept for the HIDDEN half but narrowed to meta-instructions.
 #:
@@ -196,12 +201,37 @@ _PLAN_TAG_ANY = re.compile(rf"</?{_PLAN_TAG}", re.IGNORECASE)
 #: launder "ignore your instructions" through a server-generated block is a
 #: reachable attack, and it is the only shape of instruction this refuses.
 _PLAN_META_INSTRUCTION = re.compile(
-    r"\b(?:ignore|disregard|override|bypass|forget)\s+(?:the\s+|any\s+|all\s+|your\s+)?"
+    # Telling the model to disregard what it was told.
+    r"\b(?:ignore|disregard|override|bypass|forget|suspend)\s+"
+    r"(?:the\s+|any\s+|all\s+|your\s+)?"
     r"(?:previous|prior|above|following|next|remaining|earlier|system|safety)?\s*"
-    r"(?:message|instruction|rule|guideline|policy|prompt|constraint)s?\b"
+    r"(?:message|instruction|rule|guideline|policy|prompt|constraint|check|guard)s?\b"
+    # Declaring the work already finished.
     r"|\btreat\s+the\s+task\s+as\s+(?:complete|done|finished)\b"
-    r"|\bskip\s+(?:the\s+)?(?:confirmation|approval|permission)s?\b"
-    r"|\bdo\s+not\s+(?:ask|confirm|check\s+with)\s+the\s+user\b",
+    # Skipping the human. The confirmation matrix is the ONLY guard on the
+    # irreversible tiers that get no prompt, so a plan that manufactures consent
+    # is the highest-value thing an injected instruction could achieve here.
+    r"|\bskip\s+(?:the\s+)?(?:confirmation|approval|permission|safety|check)s?\b"
+    r"|\b(?:do\s+not|don'?t|never)\s+"
+    r"(?:ask|confirm|prompt|check\s+with|seek\s+consent|wait\s+for)\b"
+    r"|\b(?:approval|authoriz\w+|permission|consent|sign-?off)\s+"
+    r"(?:has\s+|is\s+|was\s+)?(?:already\s+)?"
+    r"(?:been\s+)?(?:granted|given|implicit|implied|assumed|not\s+required|unnecessary)\b"
+    r"|\bno\s+(?:confirmation|approval|permission|consent)\s+(?:is\s+)?"
+    r"(?:needed|required|necessary)\b"
+    r"|\bproceed\s+without\s+(?:prompting|asking|confirmation|approval)\b",
+    re.IGNORECASE,
+)
+
+#: Markers the SERVER owns in the assembled prompt. A plan containing one could
+#: close the wrapper it is delivered inside and continue as text that reads to the
+#: executor as server-authored — the classic delimiter escape, and the reason
+#: framing an untrusted block is worth nothing if the block can end the frame.
+#:
+#: Refused rather than escaped: escaping invents an encoding the executor was
+#: never taught to read, and a plan needs none of these strings to describe work.
+_PLAN_FRAME_ESCAPE = re.compile(
+    r"</?\s*planned_route\b|\[Daintree continuation|server-owned instruction",
     re.IGNORECASE,
 )
 
@@ -217,8 +247,32 @@ _PLAN_META_INSTRUCTION = re.compile(
 #: safe: a plan is written in imperatives, so "check the loader" and "run pytest"
 #: are ordinary intent and must pass. "already checked" and "just ran" cannot be
 #: read as intent at all.
+#: Unambiguously PAST-tense verbs only. `run` and `read` are spelled the same in
+#: both tenses, so "now run pytest" is ordinary intent and must not be swept up —
+#: which is why this list is not just `_DID`.
+_DID_PAST_ONLY = (
+    r"checked|found|looked at|inspected|reviewed|ran|executed|fixed|changed|edited|"
+    r"updated|added|removed|deleted|tested|verified|confirmed|identified|discovered|"
+    r"determined|resolved|traced|debugged|patched|created|wrote|committed|pushed|"
+    r"deployed|passed|failed|completed|applied|merged|installed"
+)
 _PLAN_TELEGRAPHIC_OVERCLAIM = re.compile(
-    rf"\b(?:{_ADVERB})(?:{_DID})\b", re.IGNORECASE
+    # "already checked the loader" — an adverb makes completion unambiguous even
+    # for a verb whose tense is not. `_DID_PAST_ONLY`, not `_DID`, on PURPOSE:
+    # `_DID` still carries "run"/"read", and an adverb does not disambiguate
+    # those — "now run pytest" is an ordinary imperative, not a claim, and an
+    # earlier version of this pattern rejected it. The trade this makes is real:
+    # "already read the file" no longer trips this branch either. Accepted,
+    # because the plan is asked to instruct future steps far more than to report
+    # finished ones, so the false-positive cost on the common case outweighs the
+    # narrowed catch on the rare one.
+    rf"\b(?:{_ADVERB})(?:{_DID_PAST_ONLY})\b"
+    # "root cause identified", "tests passed", "fix applied", "branch pushed" —
+    # past participle with no adverb at all, which is how a plan actually writes
+    # a completion claim.
+    rf"|\b(?:{_DID_PAST_ONLY})\b"
+    rf"|\bstatus:\s*(?:done|complete|passed|fixed)\b",
+    re.IGNORECASE,
 )
 
 #: The register the visible half is asked NOT to use: a first-person commitment to
@@ -348,6 +402,11 @@ def fast_context_runbooks(
             continue
         runbook = catalog.get(rid)
         if runbook is not None:
+            # Added to `seen` as well: the ranking is unique in production, but a
+            # helper that only reads the set and never writes it would render the
+            # same body twice the moment that stopped being true — spending budget
+            # on a duplicate and reading to the model as emphasis.
+            seen.add(rid)
             extra.append(runbook)
     return [*active, *extra]
 
@@ -440,11 +499,17 @@ def split_preamble(text: str) -> tuple[str, str | None]:
     reorder, and a plan emitted first would otherwise be shown to the user in
     full — the single worst failure this split can have.
     """
-    match = _PLAN_BLOCK.search(text)
-    if match is None:
+    matches = list(_PLAN_BLOCK.finditer(text))
+    if not matches:
         return text.strip(), None
-    visible = (text[: match.start()] + text[match.end() :]).strip()
-    return visible, match.group("body").strip()
+    # EVERY block is removed, not just the one we keep. A model that emits two —
+    # a retry, a self-correction, a stray copy of the template — used to have its
+    # second block survive into the visible half and get printed to the user
+    # verbatim, tags and all, because only the first match was cut out. The plan
+    # is the FIRST block; the rest are malformed output and are discarded, but
+    # they must still leave.
+    visible = _PLAN_BLOCK.sub("", text).strip()
+    return visible, matches[0].group("body").strip()
 
 
 def validate_plan(plan: str) -> FastResponseValidation:
@@ -483,6 +548,8 @@ def validate_plan(plan: str) -> FastResponseValidation:
         return reject("plan_overclaim")
     if _PLAN_META_INSTRUCTION.search(content):
         return reject("plan_meta_instruction")
+    if _PLAN_FRAME_ESCAPE.search(content):
+        return reject("plan_frame_escape")
     return FastResponseValidation(valid=True, content=content)
 
 
@@ -524,6 +591,14 @@ def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: b
         return reject("control_characters")
     if _CONTROL_MARKER.search(content):
         return reject("control_marker")
+    if _PLAN_TAG_ANY.search(content):
+        # The LAST line of defence, and the only one that does not depend on the
+        # split being correct. `content` is what rides the `preamble` SSE event
+        # straight to a user's screen, so any surviving trace of the hidden block
+        # means the split failed and this text must not be shown. Cheap, absolute,
+        # and it fails in the safe direction: the cost is a preamble, and the cost
+        # of being wrong is showing someone the half they were never meant to see.
+        return reject("plan_tag_in_visible_half")
     if _STRUCTURE.search(content):
         return reject("structured_output")
     if content.count("```") % 2 or content.startswith("{") or content.startswith("["):
@@ -814,11 +889,26 @@ class FastResponseService:
         # the joined output would reject every well-formed two-part reply.
         visible_text, plan_text = split_preamble(result.text)
         if plan_text is None and _PLAN_TAG_ANY.search(result.text):
-            # An opened block that never closed. `split_preamble` would return the
-            # whole thing as visible, so half a technical plan would be shown to a
-            # user — the one split failure they would actually see.
-            plan_text = None
-            visible_text = ""
+            # An opened block that never closed. `split_preamble` would hand the
+            # whole thing back as visible, so half a technical plan would be shown
+            # to a user — the one split failure they would actually see.
+            #
+            # Returned here with its OWN reason rather than blanked and left to
+            # the validator, which would have reported `invalid_output:empty` and
+            # pointed whoever read it at a model that said nothing, rather than at
+            # a model that said too much in the wrong shape.
+            logger.info(
+                "fast_response_rejected",
+                request_id=request_id,
+                reason="unclosed_plan_block",
+                latency_ms=latency_ms,
+            )
+            return self._fallback(
+                active_runbooks,
+                reason="invalid_output:unclosed_plan_block",
+                usage=result.usage,
+                latency_ms=latency_ms,
+            )
         validation = validate_preamble(
             visible_text,
             finish_reason=result.finish_reason,
@@ -831,7 +921,12 @@ class FastResponseService:
             logger.info(
                 "fast_response_announcement_register",
                 request_id=request_id,
-                opening=validation.content[:40],
+                # NO content. `observability.py` is the metadata-only plane by
+                # contract — exact content belongs to `tracing/`, behind its own
+                # config and its own access story. Logging the first 40 characters
+                # of the preamble put model prose derived from a user's
+                # conversation in front of everyone who can read a log line.
+                content_chars=len(validation.content),
             )
         if not validation.valid:
             logger.info(
