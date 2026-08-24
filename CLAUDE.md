@@ -519,9 +519,18 @@ core.
 
 ## Forked terminal-spawn calls
 
-A fan-out of four agent terminals is expensive in exactly one place — the four
-detailed `taskPrompt` values, which the main model writes one after another on the
-turn's critical path. `daintree_internal__fork_spawn_terminals` is a **server-owned
+**Measured 2026-08-24: this is NOT a latency win** — fork 15.1s mean against
+direct 16.0s over 9 live runs, inside a 5-40s spread. The premise below held in
+theory and not in practice: the model writes ~250 characters per `taskPrompt`
+when writing four directly, so the serial cost removed is small and four extra
+round trips eat it. What it does buy is ~52% longer worker prompts at ~5x the
+input tokens. The flag stays `disabled` pending a quality decision (`TODO.md`),
+and deleting the feature is a live option. The mechanism description below is
+accurate; only its motivation turned out to be wrong.
+
+A fan-out of four agent terminals was expected to be expensive in exactly one
+place — the four detailed `taskPrompt` values, which the main model writes one
+after another on the turn's critical path. `daintree_internal__fork_spawn_terminals` is a **server-owned
 tool** that lets it write a compact plan instead: one shared goal, four short
 branch briefs, and the exact `agentId`/`worktreeId`/`mode`/`watch` per branch. The
 backend intercepts that call, expands each brief into a full

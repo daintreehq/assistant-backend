@@ -10,51 +10,46 @@ claim about today's behaviour against the source before acting on it.
 
 ---
 
-## Measure forked-spawn latency against the serial baseline before enabling it
+## Forked spawns are NOT a latency win — decide whether quality justifies them
 
-**Trigger: before `FORKED_TERMINAL_CALLS_MODE=enabled` reaches production.**
+**Trigger: before `FORKED_TERMINAL_CALLS_MODE=enabled` reaches production. The
+measurement below is done; what is owed is a product decision.**
 
-**One live smoke run has happened** (2026-08-24, one four-way fan-out against
-Together). It settled three things that were assumptions: the model does reach
-for the fork tool unprompted on a fan-out-shaped request; the four expansions
-DO share a prefix cache (branches after the first reported 13,973 of 13,994
-prompt tokens cached, ~99.9%, with one branch racing to a partial 51%); and the
-branches genuinely overlap (`sum_branch_ms` 22,382 against `wall_ms` 15,410).
+Measured 2026-08-24 against the live host: three scenarios (release split, four
+issues, four read-only investigations), three runs per arm, both arms starting
+from the same state (worktrees already verified), timing wall-clock to four
+executable spawn calls.
 
-It also found the bug this entry exists for. Every branch omitted
-`acceptanceCriteria` — the spawn tool marks it optional, so the model follows
-the schema — and the backend rejected all four, repaired all four, and fell
-back on all four: eight model calls to produce zero model-written prompts.
-Fixed by supplying the field instead of demanding it. Nothing offline could
-have found that, because every fake returned the field.
+    arm      mean      median    range
+    direct   16031 ms  13742 ms  5.3s - 40.3s
+    fork     15096 ms  13081 ms  5.6s - 41.3s
 
-What one run does NOT settle: the latency delta against a serial baseline (that
-run's wall time was dominated by a single 15.4s branch outlier against ~2s
-siblings), the variance, or the repair/fallback rate across varied plans. The
-benchmark below is still owed.
+**That is noise, not a win.** ~6% on the mean against a 5-40s spread; n=3 per
+cell cannot resolve it, and more samples will not, because the effect is smaller
+than the variance.
 
-The feature is built and gated off. What is NOT measured is the thing it exists
-for: time from the user's submission to the client holding four executable spawn
-calls, candidate against baseline, on the same conversation and the same four
-branch objectives. Nothing offline can answer it — the arms differ only in how
-many upstream calls run and how they overlap, so a fake provider measures the
-harness rather than the feature.
+**The design's premise does not hold.** It assumed four `taskPrompt`s written
+serially were the bottleneck — 300-600 tokens each. Measured, the model writes
+about 250 CHARACTERS each (~60 tokens) when writing them directly, so the serial
+cost being removed is small, while four extra round trips each prefilling 14-20k
+tokens of context eat the saving. The mechanism works exactly as designed; the
+thing it optimises turned out not to be expensive.
 
-Measure at minimum: main completion time, fork-plan output tokens, expansion wall
-time against the sum of the four branch times (the concurrency claim, stated as a
-ratio), per-branch cached-token ratio (the prefix-reuse claim), the repair and
-fallback rates, and the total token and cost delta. The `fork_expansion_complete`
-event already carries all of it — this is a harness and a corpus, not new
-instrumentation.
+What the fork path does buy, also measured: task prompts ~52% longer (1558 vs
+1028 chars), because each branch reads the whole context for its own scope
+instead of the main model rationing attention across four. It costs ~5x the
+prompt tokens per turn (70-82k vs 13-15k), with prefix caching working well
+(41-70k cached).
 
-Two results would each stop the rollout on their own: a cached-token ratio that
-says the expansions are NOT reusing the main prefix (which would make the feature
-cost four full prompts to save some output tokens), and a fallback rate high
-enough that the normal path is no longer one main call plus four first-attempt
-expansions.
+So the open question is no longer "is it faster" but "are the richer prompts
+worth 5x the input tokens", which is a quality evaluation nobody has run. Until
+then the flag stays `disabled`. If the answer is no, the honest move is to
+delete this feature rather than leave it dark — git history keeps it.
 
-Belongs in a nightly paid run beside the other live suites, not in the
-deterministic dashboard — CI gates nothing that costs money, deliberately.
+Still unmeasured either way: variance across time of day and load, the
+repair/fallback rate over varied plans, and whether the branch-latency outliers
+(one 15.4s branch against ~2s siblings in an earlier run) are a Together
+property or a prompt-shape one.
 
 ## A prompt-behaviour corpus for the fork trigger
 
