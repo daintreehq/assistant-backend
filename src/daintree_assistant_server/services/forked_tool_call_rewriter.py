@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..config import ForkedTerminalCallsMode
-from ..contracts.forked_terminals import ForkSpawnPlan
+from ..contracts.forked_terminals import FORK_BRANCH_COUNT, ForkSpawnPlan
 from ..errors import fork_call_not_alone, fork_plan_invalid, fork_target_unavailable
 from ..observability import get_logger
 from ..providers.base import ProviderChatRequest, ProviderUsage
@@ -138,6 +138,36 @@ def mentions_fork_tool(fragment: object) -> bool:
     if not isinstance(name, str) or not name:
         return False
     return name in FORK_TOOL_WIRE_NAME or FORK_TOOL_WIRE_NAME.startswith(name)
+
+
+def is_direct_spawn_batch(names: list[str], *, fork: ForkFeatureDecision) -> bool:
+    """Whether this round spawned a fork-shaped batch by hand.
+
+    An UPPER BOUND on missed forks, and deliberately not called one. The only
+    facts available here are that the tool was offered and that four spawn names
+    appeared — and the shipped rule makes eligibility depend on the four units
+    being INDEPENDENT. Four rivals in a competition, or a panel polled on one
+    question, are four direct spawns done exactly right. Naming this a "miss"
+    would file correct behaviour as a violation and make a rising number
+    unreadable.
+
+    So: zero of these means there are no missed forks at all, and a non-zero
+    number is a population to go and look at, not a failure count. That is worth
+    having, because withholding the spawn tool is not available as a fix — it is
+    in the always-on core because a hard rule instructs it, it is the only way to
+    spawn ONE agent, and the fork tool refuses to be offered without it, since
+    expansion validates against its runtime schema. Whether the model reaches for
+    the fork is a prompt property, and an unmeasured prompt property is a hope.
+
+    EXACTLY four, not four-or-more. The fork is fixed at four and must be called
+    alone, so it cannot replace four calls inside a five-call batch without
+    adding a round and delaying the fifth spawn — which is why the runbook sends
+    every other count down the direct path. A five-spawn batch is not a candidate
+    for anything.
+    """
+    if not fork.enabled:
+        return False
+    return sum(1 for name in names if name == SPAWN_TOOL_WIRE_NAME) == FORK_BRANCH_COUNT
 
 
 @dataclass(frozen=True)

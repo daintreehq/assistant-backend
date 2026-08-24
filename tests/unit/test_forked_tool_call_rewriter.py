@@ -41,6 +41,7 @@ from daintree_assistant_server.services.forked_tool_call_rewriter import (
     ForkedToolCallRewriter,
     decide_fork_feature,
     inject_fork_tool,
+    is_direct_spawn_batch,
     is_fork_call,
     mentions_fork_tool,
 )
@@ -452,3 +453,60 @@ async def test_a_target_tool_with_no_usable_schema_fails_rather_than_guessing() 
             request_id="req-1",
         )
     assert exc.value.code == "fork_target_unavailable"
+
+
+# ---------------------------------------------------------------------------
+# The direct-spawn shape metric.
+#
+# Withholding the spawn tool is not available as a fix: a hard rule instructs
+# it, it is the only way to spawn ONE agent, and `decide_fork_feature` refuses
+# to offer the fork tool without it. So whether the model reaches for the fork
+# is a prompt property — and this is the upper bound on how often it did not.
+# ---------------------------------------------------------------------------
+
+
+def _offered() -> Any:
+    return _decide()
+
+
+def test_four_hand_written_spawns_are_a_candidate() -> None:
+    # The exact shape the fork exists to replace: four full task prompts written
+    # one after another on the critical path, with the compact alternative
+    # sitting unused in the tool list.
+    assert is_direct_spawn_batch([SPAWN_TOOL_WIRE_NAME] * 4, fork=_offered()) is True
+
+
+def test_five_spawns_are_not_a_candidate() -> None:
+    # The fork is fixed at four and must be called alone, so it cannot replace
+    # four calls inside a five-call batch without adding a round and delaying
+    # the fifth spawn. The runbook sends every other count down the direct path,
+    # so counting this would file correct behaviour as a candidate.
+    assert is_direct_spawn_batch([SPAWN_TOOL_WIRE_NAME] * 5, fork=_offered()) is False
+
+
+@pytest.mark.parametrize("count", [0, 1, 2, 3])
+def test_fewer_than_four_spawns_is_not_a_candidate(count: int) -> None:
+    names = [SPAWN_TOOL_WIRE_NAME] * count
+    assert is_direct_spawn_batch(names, fork=_offered()) is False
+
+
+def test_a_turn_that_was_never_offered_the_tool_did_nothing_wrong() -> None:
+    disabled = _decide(mode="disabled")
+    assert is_direct_spawn_batch([SPAWN_TOOL_WIRE_NAME] * 4, fork=disabled) is False
+
+
+def test_other_tools_do_not_dilute_the_count() -> None:
+    names = [SPAWN_TOOL_WIRE_NAME] * 4 + ["fs__read", "git__status"]
+    assert is_direct_spawn_batch(names, fork=_offered()) is True
+
+
+def test_the_predicate_is_an_upper_bound_not_a_verdict() -> None:
+    """Four rivals in a competition are four correct direct spawns.
+
+    The predicate cannot tell them from four independent units — the names are
+    identical — which is exactly why the event is named for the SHAPE it saw and
+    not for a judgement about it. A test that expected `False` here would be
+    asserting a distinction the data does not carry.
+    """
+    competition = [SPAWN_TOOL_WIRE_NAME] * 4
+    assert is_direct_spawn_batch(competition, fork=_offered()) is True

@@ -596,6 +596,25 @@ mean the backend, not the model, chose an unsupervised fleet. One worktree per b
 is required across all four with no carve-out for read-only branches, because
 `mode: "explore"` is a line in the agent's prompt, not filesystem isolation.
 
+**The direct spawn tool stays offered, and compliance is COUNTED instead.** The
+obvious way to stop the model writing four task prompts by hand is to withhold
+`agentTask.spawnForEdits` while the fork tool is offered. That is not available:
+it is in `ALWAYS_AVAILABLE` because `10-hard-rules.md` says every spawn goes
+through it, it is the only way to spawn ONE agent (or two, three, five), and
+`decide_fork_feature` refuses to offer the fork tool without it, since expansion
+validates each generated call against that tool's RUNTIME schema. So whether the
+model reaches for the fork is a prompt property, and a prompt property that is not
+measured is a hope: `direct_spawn_batch` fires when the tool was offered and the
+round emitted exactly four spawn calls anyway.
+
+It is an UPPER BOUND on missed forks, not a miss count, and the name says so on
+purpose. Eligibility depends on the four units being INDEPENDENT, which this layer
+cannot see — four rivals in a competition are four direct spawns done right, and
+they look identical to four independent units from here. Zero of these means there
+are no missed forks at all; a non-zero number is a population to go and look at.
+`measured=false` marks a round whose call names could not be read (a stream that
+dropped to passthrough), so an unmeasured round is never counted as a clean one.
+
 Not built, deliberately: variable branch counts, other target tools, and starting
 expansion from a partially-streamed plan (`TODO.md`). The fan-out runbook keeps its
 direct per-unit path for every case the fixed four does not cover.

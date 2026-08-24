@@ -96,7 +96,7 @@ from .docs_mcp import (
     DocsLookupError,
     DocsMcpClient,
 )
-from .forked_terminal_calls import FORK_TOOL_DEFINITION
+from .forked_terminal_calls import FORK_TOOL_DEFINITION, SPAWN_TOOL_WIRE_NAME
 from .forked_tool_call_rewriter import (
     REASON_DISABLED as REASON_FORK_DISABLED,
 )
@@ -106,6 +106,7 @@ from .forked_tool_call_rewriter import (
     RewrittenToolCalls,
     decide_fork_feature,
     inject_fork_tool,
+    is_direct_spawn_batch,
     is_fork_call,
     mentions_fork_tool,
 )
@@ -802,6 +803,15 @@ class ChatOrchestrator:
         # finish_reason is a second, independent signal: treat a continuation round as
         # such even if a malformed upstream drops the tool_calls payload.
         had_tool_calls = bool(result.tool_calls) or result.finish_reason == "tool_calls"
+        self._log_direct_spawn_batch(
+            [c.get("function", {}).get("name", "") for c in result.tool_calls],
+            fork=prepared.fork,
+            rewritten=rewrite.rewritten,
+            # A non-streamed result is a whole message; there is no fragment
+            # stream to lose track of, so the names are always readable.
+            measured=True,
+            request_id=request_id,
+        )
         self._grade_projection(
             prepared.projection,
             # The REWRITTEN names. Grading the raw ones would report the internal
@@ -2693,6 +2703,18 @@ class ChatOrchestrator:
                     graded_names = [
                         call.get("function", {}).get("name", "") for call in remaining
                     ]
+            # Classified HERE, beside the rewrite and before the calls go out,
+            # rather than after `done`. A success emits `fork_rewrite` at this
+            # point, so recording the misses later would give the two
+            # populations different lifecycle filters: a disconnect after the
+            # batch was built would drop a decision already known.
+            self._log_direct_spawn_batch(
+                tool_call_buffer.called_names,
+                fork=fork,
+                rewritten=graded_names is not None,
+                measured=tool_call_buffer.names_complete,
+                request_id=meta.request_id,
+            )
             if remaining:
                 # ONE consolidated delta, and every call in it CARRIES ITS INDEX.
                 # That is not cosmetic: the client accumulates streamed fragments
@@ -3330,6 +3352,43 @@ class ChatOrchestrator:
             base_request=base_request,
             request_id=request_id,
             budget=budget,
+        )
+
+    @staticmethod
+    def _log_direct_spawn_batch(
+        names: list[str],
+        *,
+        fork: ForkFeatureDecision,
+        rewritten: bool,
+        measured: bool,
+        request_id: str,
+    ) -> None:
+        """Record a fork-shaped batch the model spawned by hand.
+
+        An upper bound on missed forks rather than a miss count — four
+        independent units and four rivals in a competition look identical from
+        here, and only the first is a fork the model should have taken. See
+        `is_direct_spawn_batch`.
+
+        `measured` carries whether the round's call names could be read at all.
+        A stream that dropped to passthrough stops recording them, so its four
+        spawn calls would otherwise be counted as ZERO — an unmeasured round
+        reported as a clean one, which is the same false all-clear the
+        projection grading already guards against.
+        """
+        if rewritten:
+            return
+        if not measured:
+            if fork.enabled:
+                logger.info("direct_spawn_batch", request_id=request_id, measured=False)
+            return
+        if not is_direct_spawn_batch(names, fork=fork):
+            return
+        logger.info(
+            "direct_spawn_batch",
+            request_id=request_id,
+            measured=True,
+            spawn_calls=sum(1 for name in names if name == SPAWN_TOOL_WIRE_NAME),
         )
 
     @staticmethod

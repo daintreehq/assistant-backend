@@ -55,6 +55,13 @@ Grade: correct trigger, valid compact plan, control-field accuracy, branch
 disjointness, first-try expansion validity, and whether the four generated prompts
 duplicate each other's scope.
 
+The cheapest version of this is already shipping: `direct_spawn_batch` counts the
+rounds that emitted exactly four spawn calls with the fork tool sitting unused in
+the inventory. That is an upper bound rather than a verdict — it cannot tell four
+independent units from four rivals in a competition, and only the first should
+have forked. Zero of them proves there is nothing to fix; a non-zero number is
+exactly the population this corpus would classify.
+
 ## Reconcile the declaration rule with branch-expansion mode
 
 **Trigger: before compaction's producer and forked spawns are enabled on the same
