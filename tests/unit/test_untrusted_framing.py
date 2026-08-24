@@ -169,10 +169,11 @@ def test_the_turn_footer_states_that_its_values_are_data(assembler) -> None:  # 
     lowered = text.lower()
     assert "client-supplied data" in lowered
     assert "not independent" in lowered
-    # And it must NOT tell the model to refuse imperatives: a goal is normally
-    # phrased as one, and "report rather than obey" turned every ordinary turn
-    # into a passive summary.
-    assert "following it is usually right" in lowered
+    # And it must NOT tell the model to refuse imperatives: the goal is a routing
+    # hint to act on, not something to merely report — "report rather than obey"
+    # turned every ordinary turn into a passive summary.
+    assert "routing hint" in lowered
+    assert "report only" not in lowered
 
 
 def test_the_workflow_trust_line_scopes_trust_to_progress(assembler) -> None:  # type: ignore[no-untyped-def]
