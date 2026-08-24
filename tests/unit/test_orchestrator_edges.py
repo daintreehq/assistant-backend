@@ -158,3 +158,90 @@ async def test_a_task_that_finishes_inside_the_timeout_is_not_cancelled(
     await orchestrator.drain_background_tasks(timeout=5.0)
     assert done.is_set()
     assert not task.cancelled()
+
+
+# ---------------------------------------------------------------------------
+# The fast-response join deadline: bounded, and it ends the call it gave up on.
+# ---------------------------------------------------------------------------
+
+
+def _join_orchestrator(join_deadline_ms: int) -> Any:
+    orchestrator = ChatOrchestrator.__new__(ChatOrchestrator)
+    orchestrator._background_tasks = set()
+
+    class _Settings:
+        fast_response_join_deadline_ms = join_deadline_ms
+
+    orchestrator.settings = _Settings()  # type: ignore[assignment]
+    return orchestrator
+
+
+@pytest.mark.asyncio
+async def test_the_join_deadline_cancels_the_call_it_gave_up_on() -> None:
+    """Giving up and leaving it running are different things, and only one works.
+
+    A detached call outlives the request that owns it, and five separate
+    lifetimes assume it does not: the trace scope closes and silently drops its
+    record, `turn_cost` reads the missing usage as "never ran", client
+    cancellation stops reaching the provider, and the shutdown drain takes its
+    snapshot before the task exists. So the deadline ends the call rather than
+    merely stopping the wait."""
+    from daintree_assistant_server.services.fast_response import FastResponseResult
+
+    started = asyncio.Event()
+
+    async def slow() -> FastResponseResult:
+        started.set()
+        await asyncio.sleep(10)
+        return FastResponseResult(content="too late", source="model")
+
+    task = asyncio.create_task(slow())
+    await started.wait()
+    result = await _join_orchestrator(20)._collect_fast_response(
+        task, request_id="r", visible=True
+    )
+
+    assert result.content is None
+    assert result.reason == "join_deadline_exceeded"
+    # Settled, not orphaned. Awaited here so the assertion is about the task
+    # having ENDED rather than about a cancel having been requested.
+    await asyncio.gather(task, return_exceptions=True)
+    assert task.done()
+
+
+@pytest.mark.asyncio
+async def test_a_call_dropped_at_the_deadline_still_counts_as_having_run() -> None:
+    """`turn_cost` reads a missing fast usage as "the stage did not run" and lets
+    the turn report its total as exact. That is right for a turn that skipped the
+    stage and wrong for one that opened a provider connection and then abandoned
+    it — whether the provider billed the work it had already done is precisely
+    what nobody knows. An empty usage says "ran, reported nothing", which is what
+    clears `complete` instead of hiding the gap."""
+    from daintree_assistant_server.services.fast_response import FastResponseResult
+
+    async def slow() -> FastResponseResult:
+        await asyncio.sleep(10)
+        return FastResponseResult()
+
+    task = asyncio.create_task(slow())
+    result = await _join_orchestrator(20)._collect_fast_response(
+        task, request_id="r", visible=True
+    )
+    await asyncio.gather(task, return_exceptions=True)
+
+    assert result.usage is not None, "a cancelled call must not read as one that never ran"
+    assert result.usage.cost is None
+
+
+@pytest.mark.asyncio
+async def test_a_preamble_that_beats_the_deadline_is_returned_whole() -> None:
+    """The deadline must not have quietly disabled the stage."""
+    from daintree_assistant_server.services.fast_response import FastResponseResult
+
+    async def prompt() -> FastResponseResult:
+        return FastResponseResult(content="in good time", source="model")
+
+    result = await _join_orchestrator(5_000)._collect_fast_response(
+        asyncio.create_task(prompt()), request_id="r", visible=True
+    )
+    assert result.content == "in good time"

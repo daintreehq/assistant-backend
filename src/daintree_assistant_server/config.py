@@ -505,8 +505,30 @@ class Settings(BaseSettings):
     # Short and absolute. The stage exists to make the system feel responsive; a
     # retry that succeeds at five seconds has failed that purpose AND delayed the
     # executor behind it, so there is no retry and the timeout is tight.
+    #
+    # This is the TRANSPORT ceiling — how long the provider call may live — and it
+    # is not the same question as how long the executor may be held for it. See
+    # the join deadline below.
     fast_response_timeout_seconds: float = Field(
         default=3.0, gt=0.0, le=15.0, alias="FAST_RESPONSE_TIMEOUT_SECONDS"
+    )
+    # How long the EXECUTOR may be held waiting for a preamble that has not
+    # arrived, once everything else preparation needs is ready.
+    #
+    # These are two different questions and one number was answering both. The
+    # transport timeout above is a safety ceiling on a socket; using it as the
+    # executor's wait meant an optimisation whose entire purpose is perceived
+    # speed could add its full three seconds — up to fifteen, configured — to the
+    # substantive answer. A preamble that arrives that late has already lost the
+    # argument it exists to win, and it is now costing the turn twice.
+    #
+    # Operational rather than a product decision, which is why it is env-driven at
+    # all: the right value is whatever the p50/p90 distribution says this week,
+    # and it is the dial to reach for when the stage starts costing more than it
+    # returns. The provider call is left to finish or time out on its own — it is
+    # already paid for, and shadow-mode evidence wants the latency sample.
+    fast_response_join_deadline_ms: int = Field(
+        default=600, ge=0, le=10_000, alias="FAST_RESPONSE_JOIN_DEADLINE_MS"
     )
     cerebras_api_key: SecretStr = Field(default=SecretStr(""), alias="CEREBRAS_API_KEY")
     cerebras_base_url: str = Field(default="", alias="CEREBRAS_BASE_URL")

@@ -680,6 +680,87 @@ Owed, in the order the risk runs:
    The rate is what says whether any of those forms is precise enough to promote.
 
 
+## Emit `meta` before preparation finishes
+
+**Trigger: when time-to-first-visible-byte becomes the thing being optimised —
+realistically alongside the CLI's protocol work, not before it.**
+
+`_stream_with_heartbeat` awaits the entire preparation task before yielding
+anything semantic, so `meta` lands after selection, the docs lookup, the preamble
+join, state issuance, assembly, projection and context measurement. The connection
+is alive on heartbeat comments throughout, so nothing breaks — but a preamble
+whose whole purpose is to arrive early is queued behind every one of those.
+
+The blocker is not the split; it is the STATE TOKEN. It is issued after the docs
+lookup and carries `docs_query` only when pages came back, so an early `meta`
+would carry a token that does not yet know whether documentation was retrieved.
+Three ways out, in preference order:
+
+1. a `state_update` event before the executor opens — initial `meta` carries the
+   selection state, the later event carries the final token;
+2. `docs_status: pending|ready|failed` in the payload, with the token replaced;
+3. accept one re-attempt of a failed docs lookup on the continuation round and
+   carry the query early.
+
+All three are wire changes the CLI moves with, and the CLI has not landed
+`preamble` decoding yet — so this is downstream of the protocol work above, not a
+parallel track.
+
+
+## Make shadow mode latency-neutral
+
+**Trigger: before shadow is used to produce the measurements the rollout is
+gated on — i.e. before anyone believes a number that came out of it.**
+
+Shadow generates, validates, bills and traces a preamble and shows nobody, so it
+exists to answer "what would this cost" against real turns. It is awaited, so
+every shadow turn pays the full stage latency — the arm measuring the cost is
+paying it, its own latency numbers are the contaminated ones, and a shadow
+deployment can regress production while looking switched off.
+
+The obvious fix — do not await it — was built and reverted, and the reason is
+worth keeping. Detaching the task from the request breaks five lifetimes that all
+assume it belongs to one:
+
+1. `TraceScope` closes at turn end; `record_event` then silently returns `""`, so
+   the late record is dropped. `record_model_invocation` does not even check
+   `_closed` — it appends to `_invocations` after the manifest is written.
+2. `turn_cost` reads a missing fast usage as "the stage did not run" and reports
+   the turn total as `complete`, which is false for a call that ran and billed.
+3. `ModelInvocationTrace.accepted` is a durable field the exporter reads; a
+   correction event emitted later cannot fix a record written afterwards, and
+   `training/export_context_traces.py` ignores drop events entirely.
+4. Client cancellation stops propagating: the provider call runs on for up to the
+   transport timeout, holding the request, the runbooks and a connection.
+5. `drain_background_tasks` takes ONE snapshot; a preparation task inside that
+   snapshot can create a fast task after it, and shutdown then closes the trace
+   recorder and the provider underneath it.
+
+What it needs is a supervised background collector with a lifetime of its own —
+a sink that outlives the turn, an explicit "ran, usage unknown" fact for
+accounting, and a shutdown drain that is transitive under one absolute deadline.
+That is a real piece of work and it should be done deliberately, not as a side
+effect of a latency fix.
+
+
+## Give the fast stage a bulkhead
+
+**Trigger: `FAST_RESPONSE_MODE=visible` above a 20% cohort, or the first Cerebras
+incident that shows up in turn latency.**
+
+The join deadline bounds what any ONE turn pays for a sick provider, which is most
+of the harm and the reason this is not urgent. What it does not bound is
+concurrency: during an outage every eligible turn still opens a connection and
+still waits out the deadline, so the failure is cheap per turn and unbounded in
+aggregate.
+
+Wanted: a small dedicated semaphore whose saturation is an immediate SKIP rather
+than a queue (queueing converts a capacity problem into a latency problem, which
+is the thing this stage must never do to the executor), and a rolling
+error/latency circuit breaker with a short probe interval. Both belong beside the
+provider, not in the orchestrator, and both must fail toward "no preamble".
+
+
 ## Decide whether the executor should get a hidden capsule at all
 
 **Trigger: after the four measurements above have a shadow corpus behind them,

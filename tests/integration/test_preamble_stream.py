@@ -8,6 +8,8 @@ not switched on.
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
 
 import httpx
@@ -21,8 +23,12 @@ from daintree_assistant_server.services.fast_response import FastResponseService
 PREAMBLE = "I'll look at the failing step and make the smallest change that fixes it."
 
 
-def _cerebras(text: str = PREAMBLE, *, status: int = 200) -> CerebrasProvider:
-    def handler(request: httpx.Request) -> httpx.Response:
+def _cerebras(
+    text: str = PREAMBLE, *, status: int = 200, delay: float = 0.0
+) -> CerebrasProvider:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if delay:
+            await asyncio.sleep(delay)
         if status != 200:
             return httpx.Response(status, json={"error": {"message": "no"}})
         return httpx.Response(
@@ -299,3 +305,39 @@ def test_shadow_mode_is_traced_even_though_nothing_is_shown(
     # Generated and billed, but never delivered — and the record says which.
     assert fast[0]["accepted"] is False
     assert fast[0]["discard_reason"] == "shadow_mode"
+
+
+def test_a_late_preamble_is_dropped_rather_than_held_for(
+    client: Any, auth: dict[str, str], fake_provider: Any
+) -> None:
+    """The join deadline is a different question from the transport timeout, and
+    one number used to answer both.
+
+    A preamble that arrives after the executor was ready has already lost the
+    argument it exists to win — perceived speed — and holding the substantive
+    answer for it means the turn pays twice. Past the deadline it is dropped and
+    the turn proceeds exactly as if the stage had not run."""
+    _enable(client, fake_provider, mode="visible", delay=1.0)
+    container = client.app.state.container
+    container.orchestrator.settings = container.orchestrator.settings.model_copy(
+        update={"fast_response_join_deadline_ms": 50}
+    )
+    started = time.perf_counter()
+    names = _stream(client, auth)
+    elapsed = time.perf_counter() - started
+    assert "preamble" not in names
+    assert names[-1] == "done"
+    assert elapsed < 0.9, f"the turn waited {elapsed:.2f}s past the join deadline"
+
+
+def test_a_prompt_preamble_still_arrives_under_the_join_deadline(
+    client: Any, auth: dict[str, str], fake_provider: Any
+) -> None:
+    """The deadline must not have quietly disabled the feature. A stage that
+    answers in time is still shown, in the same position as before — otherwise
+    the previous two tests would pass against a stage that never delivers."""
+    _enable(client, fake_provider, mode="visible")
+    names = _stream(client, auth)
+    assert "preamble" in names
+    assert names.index("meta") < names.index("preamble")
+    assert names[-1] == "done"

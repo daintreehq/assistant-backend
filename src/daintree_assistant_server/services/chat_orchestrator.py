@@ -306,6 +306,19 @@ class _Timings:
     upstream_open_ms: int | None = None
     #: The preamble call, when the stage ran.
     fast_response_ms: int | None = None
+    #: What the preamble actually COST the executor: wall-clock spent waiting for
+    #: it after everything else preparation needed was already in hand.
+    #:
+    #: Distinct from `fast_response_ms`, which is the provider call's own
+    #: duration — most of which overlaps the docs lookup on a turn that searches,
+    #: and none of which the executor pays on a turn where the preamble was ready
+    #: first. Reporting the provider latency as the feature's cost overstates it
+    #: on a fast turn and understates nothing, so the two are not interchangeable
+    #: and the join deadline is tuned against THIS one.
+    #:
+    #: Diagnostics, never payload: it rides the `respond` log record and does not
+    #: reach `TurnTimings` or any client.
+    fast_added_wait_ms: int | None = None
     #: Request in until the PREAMBLE reached the client. Separate from
     #: `first_output_ms` because with a preamble the two differ, and the pair is
     #: the whole story: this feature buys a large improvement in time-to-visible-
@@ -1528,53 +1541,21 @@ class ChatOrchestrator:
             docs_query=docs_query if docs is not None else None,
         )
 
-        # Awaited here, after the docs lookup it was overlapped with.
-        fast = await self._collect_fast_response(fast_task, request_id=request_id)
+        # Joined here, after the docs lookup it was overlapped with — under a
+        # deadline, and not at all in shadow mode.
+        t_join = time.perf_counter()
+        fast = await self._collect_fast_response(
+            fast_task,
+            request_id=request_id,
+            visible=fast_policy.visible,
+        )
         timings.fast_response_ms = fast.latency_ms
-
-        # Traced HERE, before visibility is decided, so SHADOW mode is recorded
-        # too. Shadow's entire purpose is to be measured against real turns
-        # without being shown; a trace written only on the visible branch would
-        # capture nothing from the stage of the rollout that exists to produce
-        # evidence.
-        if fast_policy.run:
-            await trace.record_model_invocation(
-                ModelInvocationTrace(
-                    invocation_id=fast.invocation_id or f"inv_{request_id}_fast",
-                    stage="fast_response",
-                    provider=FAST_RESPONSE_PROVIDER,
-                    model=FAST_RESPONSE_MODEL,
-                    started_at="",
-                    usage=InvocationUsage(
-                        prompt_tokens=fast.usage.prompt_tokens or 0,
-                        completion_tokens=fast.usage.completion_tokens or 0,
-                        total_tokens=fast.usage.total_tokens or 0,
-                        cached_tokens=fast.usage.cached_tokens,
-                        cost=fast.usage.cost,
-                    )
-                    if fast.usage is not None
-                    else None,
-                    # `accepted` separates a preamble that reached the executor
-                    # from one that was generated and then withheld — shadow mode,
-                    # or a validator rejection. Both were billed; only one shaped
-                    # the turn.
-                    accepted=fast.has_content and fast_policy.visible,
-                    discard_reason=None
-                    if (fast.has_content and fast_policy.visible)
-                    else (fast.reason or "shadow_mode"),
-                )
-            )
-            await trace.record_event(
-                "fast_response.response",
-                attributes={
-                    "source": fast.source,
-                    "degraded": fast.degraded,
-                    "reason": fast.reason,
-                    "latency_ms": fast.latency_ms,
-                    "visible": fast_policy.visible,
-                },
-                content={"content": fast.content} if fast.content else None,
-            )
+        # The number that says what the feature actually COST. `fast_response_ms`
+        # is the provider call's own duration, most of which overlaps the docs
+        # lookup on a turn that searches — so it is the stage's latency and never
+        # the executor's. This is the executor's: wall-clock spent waiting after
+        # everything else preparation needed was already in hand.
+        timings.fast_added_wait_ms = round((time.perf_counter() - t_join) * 1000)
 
         # A handoff exists only when the preamble will actually be SHOWN. Shadow
         # mode generates, validates and traces a real preamble and then stops:
@@ -1817,6 +1798,61 @@ class ChatOrchestrator:
             except Exception:  # noqa: BLE001 — a lost estimate must not be a lost turn
                 logger.warning("context_measurement_failed", request_id=request_id)
 
+        # Traced HERE — after the context budget has had its say, and before the
+        # turn's own record — so `accepted` describes what the executor actually
+        # received rather than what the stage produced.
+        #
+        # It used to be recorded straight after the join, which was earlier than
+        # anything could contradict it: the context-budget branch above can still
+        # drop a perfectly good preamble, and the record already claimed
+        # `accepted=true` with no discard reason. That is the one field this
+        # record exists to get right, and the rollout is judged on rates derived
+        # from it.
+        #
+        # Still gated on `fast_policy.run` rather than on visibility, so SHADOW is
+        # recorded too — its whole purpose is to be measured against real turns
+        # without being shown, and a record written only on the visible branch
+        # would capture nothing from the stage of the rollout that exists to
+        # produce evidence.
+        if fast_policy.run:
+            await trace.record_model_invocation(
+                ModelInvocationTrace(
+                    invocation_id=fast.invocation_id or f"inv_{request_id}_fast",
+                    stage="fast_response",
+                    provider=FAST_RESPONSE_PROVIDER,
+                    model=FAST_RESPONSE_MODEL,
+                    started_at="",
+                    usage=InvocationUsage(
+                        prompt_tokens=fast.usage.prompt_tokens or 0,
+                        completion_tokens=fast.usage.completion_tokens or 0,
+                        total_tokens=fast.usage.total_tokens or 0,
+                        cached_tokens=fast.usage.cached_tokens,
+                        cost=fast.usage.cost,
+                    )
+                    if fast.usage is not None
+                    else None,
+                    # `handoff`, not `fast.has_content`: the preamble reached the
+                    # executor exactly when the handoff survived to be assembled.
+                    # Reading the result instead would report a discarded preamble
+                    # as accepted, which is the failure this whole block moved for.
+                    accepted=handoff is not None,
+                    discard_reason=None
+                    if handoff is not None
+                    else (fast.reason or "shadow_mode"),
+                )
+            )
+            await trace.record_event(
+                "fast_response.response",
+                attributes={
+                    "source": fast.source,
+                    "degraded": fast.degraded,
+                    "reason": fast.reason,
+                    "latency_ms": fast.latency_ms,
+                    "visible": fast_policy.visible,
+                },
+                content={"content": fast.content} if fast.content else None,
+            )
+
         if context is not None and exceeds_window(context):
             logger.warning(
                 "context_window_exceeded", request_id=request_id, **context.log_fields()
@@ -1850,6 +1886,14 @@ class ChatOrchestrator:
             # with these two alongside it.
             selector_endpoint=decision.endpoint,
             selector_calls=decision.calls,
+            # The preamble's own latency and the one it charged the executor. The
+            # pair is the whole rollout argument — a stage that takes 900ms but
+            # was ready before preparation finished cost the turn nothing, and a
+            # stage that took 200ms it did not overlap cost the turn 200ms.
+            fast_response_ms=timings.fast_response_ms,
+            fast_added_wait_ms=timings.fast_added_wait_ms,
+            fast_response_reason=fast.reason,
+            fast_response_visible=fast_policy.visible,
             # TOOL PROJECTION. Emitted on every turn, which makes this record the
             # denominator for every rate the rollout is judged on: enforcement rate
             # is `enforced / assistant turns`, fail-open rate is
@@ -1987,20 +2031,72 @@ class ChatOrchestrator:
         task: asyncio.Task[FastResponseResult] | None,
         *,
         request_id: str,
+        visible: bool,
     ) -> FastResponseResult:
-        """Await the preamble without letting it fail or stall the turn.
+        """Join the preamble under a deadline, and give up on it properly.
 
-        `FastResponseService.generate` already bounds itself and swallows its own
-        errors, so in practice this returns promptly. The guard here is for the
-        one thing it cannot cover — the task being cancelled or dying in a way the
-        service never sees — because a turn must not be lost to an optimisation.
+        **The deadline is a different question from the transport timeout, and one
+        number used to answer both.** `FAST_RESPONSE_TIMEOUT_SECONDS` bounds how
+        long the provider call may live; it is a ceiling on a socket. It was also
+        being used as the executor's budget, so an optimisation whose entire
+        purpose is perceived speed could add its full three seconds — up to the
+        configured fifteen — to the substantive answer. A preamble that arrives
+        that late has already lost the argument it exists to win, and holding the
+        real reply for it means the turn pays twice.
+
+        **A late call is CANCELLED, not left running**, and the cancellation is
+        awaited so nothing outlives the join. Leaving it detached to finish its
+        own trace is tempting — the latency sample is exactly the evidence this
+        deadline should be tuned from — and it was tried. It does not work: the
+        turn's trace scope closes and silently drops the late record, `turn_cost`
+        reads a missing usage as "the stage never ran" and reports a partial total
+        as complete, client cancellation stops reaching the provider call, and the
+        shutdown drain takes its snapshot before the task exists. Five lifetimes
+        assume this task belongs to the request. It does, so it ends with it.
+
+        `shield` is required rather than decorative: `wait_for` cancels its
+        argument on timeout even when that argument is already a Task, so without
+        it the cancellation could not be ordered separately from the wait.
+
+        **Shadow mode awaits without a deadline**, which is a known compromise
+        rather than an oversight: it is invisible in output but not in latency, so
+        it contaminates the very measurement it exists to produce. Fixing that
+        means detaching the task, which is the design above that does not work.
+        `TODO.md` carries the supervised collector it actually needs.
+
+        `FastResponseService.generate` bounds itself and swallows its own errors,
+        so the exception guard is for the one thing it cannot cover — the task
+        dying in a way the service never sees.
         """
         if task is None:
             return FastResponseResult(source="none", reason="not_eligible")
         try:
-            return await task
+            if not visible:
+                return await task
+            deadline = self.settings.fast_response_join_deadline_ms / 1000
+            return await asyncio.wait_for(asyncio.shield(task), timeout=deadline)
         except asyncio.CancelledError:
             raise
+        except TimeoutError:
+            logger.info(
+                "fast_response_join_deadline_exceeded",
+                request_id=request_id,
+                deadline_ms=self.settings.fast_response_join_deadline_ms,
+            )
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+            return FastResponseResult(
+                source="none",
+                degraded=True,
+                reason="join_deadline_exceeded",
+                # NOT None. `turn_cost` reads a missing usage as "the stage did
+                # not run" and reports the turn's total as complete — but this
+                # call did run, and whether the provider billed the work it had
+                # already done before the cancel reached it is precisely what
+                # nobody knows. An empty usage says "ran, reported nothing",
+                # which is what clears `complete` instead of hiding the gap.
+                usage=ProviderUsage(),
+            )
         except Exception as exc:  # pragma: no cover - the service catches its own
             logger.info(
                 "fast_response_failed",
@@ -2778,9 +2874,21 @@ class ChatOrchestrator:
         fast_usage = fast_response.usage if fast_response is not None else None
         try:
             # The metadata event is always first, before any token: the client gets
-            # the runbook prelude, active set, refreshed state, and selector outcome
-            # as soon as selection finishes — local selection is ~10ms, so this
-            # arrives effectively immediately, well before the upstream opens.
+            # the runbook prelude, active set, refreshed state, and selector
+            # outcome ahead of everything the upstream produces.
+            #
+            # It is NOT emitted as soon as selection finishes, and a comment here
+            # used to say it was. This generator awaits the whole preparation task
+            # before yielding anything semantic, so `meta` lands after selection,
+            # the docs lookup, the preamble join, state issuance, assembly, tool
+            # projection and context measurement. Local selection really is ~10ms;
+            # it is simply not what gates this event. The client stays alive on
+            # SSE heartbeat comments in the meantime, which is why the gap was
+            # easy to describe wrongly and hard to notice.
+            #
+            # Emitting it earlier means splitting preparation in two and settling
+            # what the state token carries before the docs lookup has resolved —
+            # a wire change the CLI would have to move with. `TODO.md` carries it.
             yield self._sse(
                 "meta",
                 StreamMeta(

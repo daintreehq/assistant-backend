@@ -416,10 +416,12 @@ then, so this is the only channel a failed stream has to identify itself.
 
 Guarantees:
 - `meta` is always first, before any token — so the client renders the runbook prelude and
-  active set up front, as if the runbook load happened before the reply. It is emitted as soon
-  as authoritative selection and prompt assembly finish — with local selection that is
-  ~10ms in, effectively immediate. `meta` marks runbook selection complete; clients can
-  show the runbook-load cue immediately.
+  active set up front, as if the runbook load happened before the reply. It is emitted once
+  the server has finished preparing the turn: selection, any documentation lookup, any
+  preamble, state issuance and prompt assembly. Selection itself is ~10ms, but it is not
+  what gates the event, and the connection is held with SSE heartbeat comments until the
+  event arrives. `meta` marks runbook selection complete; clients can show the
+  runbook-load cue on receipt.
 - `status` (optional) marks a generation phase. Today the only phase is `thinking`, emitted
   once the instant the model's chain-of-thought begins; the `reasoning_content` deltas that
   follow are the CoT to display. It never appears when thinking is off. Unknown future phases

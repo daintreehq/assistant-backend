@@ -167,7 +167,7 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    cost benchmark); the manifest is diagnostics, never payload, and never reaches a
    client.
 
-6. **Respond** — the runbooks/selection metadata is delivered first: as the response body's `runbooks` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential — select → assemble → upstream call (TWO calls when the fast-response stage runs: the preamble first, then the executor, never concurrently, because the executor's input contains the preamble); the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
+6. **Respond** — the runbooks/selection metadata is delivered first: as the response body's `runbooks` block (non-streaming) or the first SSE `meta` event (streaming). **`meta` is NOT immediate, and comments here and in `chat_orchestrator.py` used to say it was**: the stream generator awaits the WHOLE preparation task before yielding anything semantic, so `meta` lands after selection, the docs lookup, the preamble join, state issuance, assembly, projection and context measurement. Local selection really is ~10ms; it is simply not what gates the event, and SSE heartbeat comments hold the connection in the meantime — which is why the gap was easy to describe wrongly. Emitting earlier means splitting preparation and settling what the state token carries before docs resolve, a wire change the CLI moves with (`TODO.md`). The flow is strictly sequential — select → assemble → upstream call (TWO calls when the fast-response stage runs: the preamble first, then the executor, never concurrently, because the executor's input contains the preamble); the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
 
 6b. **Turn-finality declaration and compaction** (`services/response_declaration.py`,
    `services/compaction.py`) — when compaction is live the model opens its reply with
@@ -600,6 +600,36 @@ message is cropped head-AND-tail with a declared omission marker, because a
 message long enough to overflow is almost always a paste with the actual
 instruction underneath it — a head slice kept the evidence and deleted the
 request.
+
+**It cannot hold the executor for its own timeout.** The transport timeout
+(`FAST_RESPONSE_TIMEOUT_SECONDS`, 3s, configurable to 15) bounds how long the
+provider CALL may live; the join deadline (`FAST_RESPONSE_JOIN_DEADLINE_MS`,
+600ms) bounds how long the EXECUTOR waits for it once preparation is otherwise
+ready. One number used to answer both, so an optimisation for perceived speed
+could add its full transport ceiling to the substantive answer. Past the deadline
+the call is **cancelled** and the turn proceeds with no preamble.
+
+Cancelled rather than detached, and that is the load-bearing half. Leaving it
+running to finish its own trace is tempting — the latency sample is exactly the
+evidence the deadline should be tuned from — and it does not work: five separate
+lifetimes assume the task belongs to the request. The trace scope closes and
+`record_event` silently drops the late record; `turn_cost` reads a missing usage
+as "the stage never ran" and reports a partial total as `complete`; client
+cancellation stops reaching the provider; and `drain_background_tasks` takes its
+snapshot before the task exists. A dropped call therefore returns an EMPTY
+`ProviderUsage` rather than `None` — "ran, reported nothing" is what clears
+`complete`, where `None` would claim the stage never ran.
+
+**Shadow mode is still awaited, and that is a known compromise.** It is invisible
+in output but not in latency, so it contaminates the measurement it exists to
+produce. Fixing it means detaching the task, which is the design above that does
+not work; `TODO.md` carries the supervised collector it actually needs.
+
+`fast_added_wait_ms` on the `respond` record is what the executor actually paid,
+as distinct from `fast_response_ms`, the provider call's own duration — most of
+which overlaps the docs lookup on a turn that searches. The invocation trace is
+written AFTER the context-budget branch has had its say, so `accepted` describes
+what the executor received rather than what the stage produced.
 
 **It never runs on a continuation round** (gated on `session.round`, not on whether the
 selector ran — selection reruns for reasons that are not a new instruction), on a
