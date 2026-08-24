@@ -241,6 +241,25 @@ def test_a_bare_intent_re_roll_keeps_the_preamble_and_adds_only_the_nudge() -> N
     assert "discarded" in reroll.messages[-1]["content"]
 
 
+@pytest.mark.asyncio
+async def test_a_skipped_fast_response_carries_its_specific_reason() -> None:
+    """`_collect_fast_response` must not collapse every skip to one generic
+    reason: `should_generate_fast_response` already computes a specific one per
+    case (`no_active_runbooks`, `continuation_round`, ...), and nothing else in
+    the turn observes it — this is the only place it can survive to."""
+    from daintree_assistant_server.services.chat_orchestrator import ChatOrchestrator
+
+    result = await ChatOrchestrator._collect_fast_response(
+        None, request_id="r1", skip_reason="no_active_runbooks"
+    )
+    assert result.source == "none"
+    assert result.reason == "no_active_runbooks"
+
+    # The default is preserved for a caller that omits the reason entirely.
+    default = await ChatOrchestrator._collect_fast_response(None, request_id="r1")
+    assert default.reason == "not_eligible"
+
+
 # ---------------------------------------------------------------------------
 # The hidden plan. It rides the CONTINUATION row and nothing else.
 # ---------------------------------------------------------------------------

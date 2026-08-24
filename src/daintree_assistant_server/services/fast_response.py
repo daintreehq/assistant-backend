@@ -49,7 +49,7 @@ from ..runbooks.catalog import Catalog
 from ..runbooks.decision import SelectionDecision
 from ..runbooks.models import Runbook
 from ..runbooks.tool_projection import session_bucket
-from ..text_utils import sanitize_line
+from ..text_utils import message_text, sanitize_line
 
 logger = get_logger(__name__)
 
@@ -292,6 +292,16 @@ _ANNOUNCEMENT_OPENING = re.compile(
 #: else — a filter, a truncation, an unrecognised value — is not a whole reply.
 _CLEAN_FINISH_REASONS = frozenset({"stop", "end_turn", None})
 
+#: A trailing `[...` with no closing bracket — what an arbitrary character
+#: slice leaves behind when it cuts through a `[image: <media>]` marker
+#: (`text_utils.message_text`'s rendering of an image part). Deliberately not
+#: anchored on the literal word "image": a cut can land anywhere inside the
+#: marker, including before "image" is fully spelled ("[ima", "[i", bare "["),
+#: and any of those is equally a fragment rather than content. A COMPLETE
+#: marker never matches — `[^\]]*` cannot consume the closing `]`, so anchoring
+#: on end-of-string only fires when the bracket never closes.
+_UNCLOSED_TRAILING_BRACKET = re.compile(r"\[[^\]]*$")
+
 FastResponseSource = Literal["model", "deterministic_fallback", "none"]
 
 
@@ -472,7 +482,10 @@ def should_generate_fast_response(
     if choice is not None and choice not in ("auto", "none"):
         return no("forced_tool_choice")
 
-    bucket = session_bucket(request.session.id)
+    # Own namespace, deliberately distinct from tool projection's default: two
+    # rollouts hashing the same session id under the same bytes would always
+    # co-enrol, making it impossible to tell the two experiments' effects apart.
+    bucket = session_bucket(request.session.id, namespace=b"fast-response\x00")
     if bucket >= settings.fast_response_rollout_percent:
         return no("not_in_rollout_cohort")
 
@@ -750,6 +763,14 @@ class FastResponseService:
         the end of a conversation is what the next reply is about, and the
         newest message is never dropped even when it alone exceeds the budget
         (a preview of a task the model was not told about is worthless).
+
+        ``message_text`` is the shared flattening helper for ``str | list[
+        ContentPart] | None`` (also used for tool-row content elsewhere) — a
+        text-plus-image message must not become empty text just because
+        ``content`` is a list rather than a string. A bare
+        ``isinstance(..., str)`` check here used to do exactly that: an
+        image-attached current instruction would launch a preview describing a
+        task the fast model was never actually told about.
         """
         rows: list[dict[str, Any]] = []
         remaining = max(budget, 0)
@@ -759,8 +780,11 @@ class FastResponseService:
                 # and their results are the evidence it is specifically not
                 # allowed to claim it has seen.
                 continue
-            text = message.content if isinstance(message.content, str) else ""
-            if not text:
+            text = message_text(message.content)
+            if not text.strip():
+                # Not a bare `not text`: several empty text parts flatten to a
+                # join of empty strings — e.g. "\n" for two of them — which is
+                # truthy and would otherwise become a blank transcript row.
                 continue
             if len(text) > remaining:
                 # Whole messages, not fragments — except for the newest, which is
@@ -768,6 +792,17 @@ class FastResponseService:
                 if rows:
                     break
                 text = text[: max(remaining, 0)] or text[:_TRANSCRIPT_MIN_CHARS]
+                # The slice can land mid-marker: `message_text` renders an image
+                # as `[image: <media>]`, and cutting through it leaves a
+                # dangling `[image...` fragment with no closing bracket — never
+                # legitimate content, only a marker cut in half. Drop it rather
+                # than show the fast model a garbled tail.
+                text = _UNCLOSED_TRAILING_BRACKET.sub("", text).rstrip()
+                if not text:
+                    # The whole truncated slice WAS the incomplete marker —
+                    # nothing legitimate survives. An empty row is worse than no
+                    # row at all, so this behaves like the message did not fit.
+                    continue
             remaining -= len(text)
             rows.append({"role": message.role, "content": text})
             if remaining <= 0:

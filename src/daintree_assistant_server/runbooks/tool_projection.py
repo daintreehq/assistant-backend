@@ -387,7 +387,13 @@ class EnforcementDecision:
         return self.reason in _FAIL_OPEN_REASONS
 
 
-def session_bucket(session_id: str) -> int:
+#: Default hash namespace — this module's own rollout. Kept as the default so
+#: every existing caller and `test_the_bucket_is_pinned_to_literal_values`'s
+#: literals are unaffected by the `namespace` parameter below.
+_DEFAULT_NAMESPACE = b"tool-projection\x00"
+
+
+def session_bucket(session_id: str, *, namespace: bytes = _DEFAULT_NAMESPACE) -> int:
     """A stable 0-99 bucket for a session.
 
     Bucketed on the SESSION, never the request: a percentage that re-rolled per
@@ -399,8 +405,16 @@ def session_bucket(session_id: str) -> int:
 
     Monotonic in the percentage by construction: raising the threshold only ever
     adds sessions, so a promotion never drops a session that was already enrolled.
+
+    ``namespace`` exists because this bucketing is reused by more than one
+    rollout (tool projection, the fast-response stage): the same session hashed
+    under the same namespace lands in the same bucket for both, which correlates
+    two experiments that are supposed to be independent — a session enrolled in
+    one is then always enrolled in the other whenever the two percentages
+    overlap. Each caller should pass its own literal namespace; the default is
+    this module's, kept only for backward compatibility.
     """
-    digest = hashlib.sha256(b"tool-projection\x00" + session_id.encode("utf-8")).digest()
+    digest = hashlib.sha256(namespace + session_id.encode("utf-8")).digest()
     return int.from_bytes(digest[:8], "big") % 100
 
 

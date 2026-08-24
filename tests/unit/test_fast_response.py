@@ -474,6 +474,83 @@ def test_the_newest_message_survives_even_when_the_budget_is_gone() -> None:
     assert "THE ACTUAL REQUEST" in str(messages[-1]["content"])
 
 
+def test_a_multimodal_current_instruction_is_not_dropped() -> None:
+    """A text-plus-image message must not collapse to empty text just because
+    ``content`` is a list rather than a string — the fast model would otherwise
+    plan against a task it was never actually told about."""
+    messages = _service().build_messages(
+        _request(
+            input={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "THE ACTUAL REQUEST"},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": "data:image/png;base64,AAAA"},
+                            },
+                        ],
+                    }
+                ]
+            }
+        ),
+        active_runbooks=[FOUNDATION],
+    )
+    assert messages is not None
+    rendered = "\n".join(str(m["content"]) for m in messages)
+    assert "THE ACTUAL REQUEST" in rendered
+    assert "[image: image/png]" in rendered
+
+
+def test_a_truncated_image_marker_is_not_shown_dangling() -> None:
+    """A budget-forced slice can cut through the synthetic `[image: ...]`
+    marker `message_text` appends — the result must never contain a `[` with
+    no matching `]`, whatever point of the marker it was cut at."""
+    request = _request(
+        input={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "X" * 100},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "data:image/png;base64,AAAA"},
+                        },
+                    ],
+                }
+            ]
+        }
+    )
+    # Budget lands the cut a few characters into the marker: "X"*100 + "\n[ima".
+    rows = _service()._transcript(request, budget=105)
+    assert rows
+    content = str(rows[-1]["content"])
+    assert "[" not in content
+    assert content == "X" * 100
+
+
+def test_a_message_of_only_empty_text_parts_does_not_become_a_blank_row() -> None:
+    """Two empty text parts join to a bare newline, which is truthy — the row
+    must still be treated as having nothing to show."""
+    request = _request(
+        input={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": ""},
+                        {"type": "text", "text": ""},
+                    ],
+                }
+            ]
+        }
+    )
+    rows = _service()._transcript(request, budget=10_000)
+    assert rows == []
+
+
 def test_the_cache_key_groups_by_runbook_set_and_carries_no_session() -> None:
     """Keyed on the prompt prefix so two DIFFERENT conversations loading the same
     runbooks share a cacheable prefix — which a per-session key would defeat."""

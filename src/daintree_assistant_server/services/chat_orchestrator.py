@@ -1524,7 +1524,9 @@ class ChatOrchestrator:
         )
 
         # Awaited here, after the docs lookup it was overlapped with.
-        fast = await self._collect_fast_response(fast_task, request_id=request_id)
+        fast = await self._collect_fast_response(
+            fast_task, request_id=request_id, skip_reason=fast_policy.reason
+        )
         timings.fast_response_ms = fast.latency_ms
 
         # Traced HERE, before visibility is decided, so SHADOW mode is recorded
@@ -1982,11 +1984,12 @@ class ChatOrchestrator:
             active_runbooks=active_runbooks,
         )
 
+    @staticmethod
     async def _collect_fast_response(
-        self,
         task: asyncio.Task[FastResponseResult] | None,
         *,
         request_id: str,
+        skip_reason: str = "not_eligible",
     ) -> FastResponseResult:
         """Await the preamble without letting it fail or stall the turn.
 
@@ -1994,9 +1997,15 @@ class ChatOrchestrator:
         errors, so in practice this returns promptly. The guard here is for the
         one thing it cannot cover — the task being cancelled or dying in a way the
         service never sees — because a turn must not be lost to an optimisation.
+
+        `skip_reason` carries `FastResponsePolicyDecision.reason` from the caller
+        when `task` is None — the specific reason the policy already computed
+        (`no_active_runbooks`, `continuation_round`, `mode_off`, ...). Collapsing
+        every skip to a single generic reason here made the policy's own
+        per-case reasons unreadable downstream: nothing else observes them.
         """
         if task is None:
-            return FastResponseResult(source="none", reason="not_eligible")
+            return FastResponseResult(source="none", reason=skip_reason)
         try:
             return await task
         except asyncio.CancelledError:

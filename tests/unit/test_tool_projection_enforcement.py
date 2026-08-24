@@ -142,6 +142,20 @@ def test_the_bucket_is_pinned_to_literal_values(session_id: str, bucket: int) ->
     assert session_bucket(session_id) == bucket
 
 
+def test_a_different_namespace_decorrelates_the_bucket() -> None:
+    """Two rollouts hashing the same session id under the same bytes would
+    always co-enrol, making the two experiments' effects indistinguishable.
+
+    Distinct namespaces are what the fast-response stage relies on to keep its
+    own rollout independent of this module's — see
+    `services/fast_response.py::should_generate_fast_response`.
+    """
+    default = session_bucket("sess-1")
+    other = session_bucket("sess-1", namespace=b"fast-response\x00")
+    assert 0 <= other < 100
+    assert other != default
+
+
 def test_enrollment_is_monotonic_in_the_percentage() -> None:
     """Raising the percentage only ever ADDS sessions.
 
