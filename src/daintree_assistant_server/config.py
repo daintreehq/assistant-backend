@@ -12,7 +12,7 @@ from __future__ import annotations
 from functools import lru_cache
 from ipaddress import ip_address
 from typing import ClassVar, Literal
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -186,8 +186,35 @@ _URL_FORBIDDEN = frozenset(chr(c) for c in range(0x21)) | {"\x7f", "\\"}
 
 #: Hostnames that name the reader's own machine. Refused in production/staging on
 #: any scheme: a manifest pointing every client at its own loopback interface is
-#: not a deployment, and `https://` does not make it one.
+#: not a deployment, and `https://` does not make it one. Names belong here — a
+#: production issuer called `localhost` is wrong however it resolves.
 _LOCAL_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _is_loopback_literal(host: str) -> bool:
+    """Whether ``host`` is a LITERAL loopback IP address.
+
+    Names are deliberately refused, ``localhost`` included, and the asymmetry with
+    :data:`_LOCAL_HOSTNAMES` above is the point. That set answers "is this a
+    machine-local name?", which is the right question for refusing one in
+    production. This function answers "is plaintext safe here?", and only an IP
+    literal establishes that: ``evil.localhost`` resolves through DNS or
+    ``/etc/hosts`` to wherever someone points it, so a name-based exemption would
+    let a plaintext token exchange — carrying the authorization code AND the PKCE
+    verifier — travel to a remote host.
+
+    A trailing dot is NOT stripped, for the same reason: ``127.0.0.1.`` is not
+    IP-literal syntax, it is a fully-qualified DNS name that merely looks like
+    one, and it is resolved as a name.
+
+    The client applies exactly this rule (`isLoopbackHost` in
+    `internal/auth/discovery.go`), so accepting a name here would mean publishing
+    a manifest it refuses.
+    """
+    try:
+        return ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
 
 
 def _origin_of(value: str) -> tuple[str, str, int] | None:
@@ -215,30 +242,56 @@ def _origin_of(value: str) -> tuple[str, str, int] | None:
     return (parsed.scheme, parsed.hostname, port)
 
 
-def _url_shape_problem(*, value: str, env_name: str) -> str | None:
+#: Bounds one published URL. The client caps the WHOLE manifest body, so an
+#: unbounded value here is not merely untidy — enough of it makes every field
+#: unreadable at once, and the failure names the size rather than the field that
+#: caused it.
+_MAX_AUTH_URL_LENGTH = 2048
+
+
+def _url_shape_problem(
+    *, value: str, env_name: str, allow_fragment: bool = False
+) -> str | None:
     """The checks every published URL gets, whatever it is for.
 
     Deliberately runs BEFORE parsing, because parsing is what destroys the
     evidence. Nothing here echoes ``value``: these strings reach the startup log
     and, outside production, a readiness response, and the one input most likely
     to be malformed is one with a credential accidentally pasted into it.
+
+    ``allow_fragment`` is the one rule that varies by role. A fragment is
+    meaningless on an issuer or a token endpoint and suspicious on a callback, but
+    an ordinary account page may legitimately be a single-page app whose route
+    lives in one — and the client permits it there.
     """
+    if len(value) > _MAX_AUTH_URL_LENGTH:
+        return f"{env_name} is longer than {_MAX_AUTH_URL_LENGTH} characters"
     if any(ch in _URL_FORBIDDEN for ch in value):
         return f"{env_name} contains whitespace or a control character"
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        # A lone surrogate, which env can carry in through surrogateescape. It
+        # survives every check below and then raises while the response is being
+        # serialized — turning a configuration mistake into a 500 on a public
+        # endpoint.
+        return f"{env_name} is not valid UTF-8"
     origin = _origin_of(value)
     if origin is None:
         return f"{env_name} is not a usable absolute URL (check the scheme, host and port)"
     parsed = urlsplit(value)
     if parsed.username is not None or parsed.password is not None:
         return f"{env_name} must not embed credentials in the URL"
-    if parsed.fragment:
+    if parsed.fragment and not allow_fragment:
         return f"{env_name} must not carry a URL fragment"
     if not 1 <= origin[2] <= 65535:
         return f"{env_name} names an unusable port"
     return None
 
 
-def _auth_url_problem(*, value: str, env_name: str, hardened: bool) -> str | None:
+def _auth_url_problem(
+    *, value: str, env_name: str, hardened: bool, allow_fragment: bool = False
+) -> str | None:
     """``None`` when ``value`` is a URL this server may publish to a client.
 
     HTTPS is required because everything named by these URLs carries or mints a
@@ -254,7 +307,9 @@ def _auth_url_problem(*, value: str, env_name: str, hardened: bool) -> str | Non
     somewhere different, and none of those places is us. ``https://`` does not
     redeem it, which is why the check is on the host rather than on the scheme.
     """
-    problem = _url_shape_problem(value=value, env_name=env_name)
+    problem = _url_shape_problem(
+        value=value, env_name=env_name, allow_fragment=allow_fragment
+    )
     if problem:
         return problem
     origin = _origin_of(value)
@@ -271,11 +326,13 @@ def _auth_url_problem(*, value: str, env_name: str, hardened: bool) -> str | Non
         return None
     if scheme == "https":
         return None
-    if scheme == "http" and host.lower() in _LOCAL_HOSTNAMES:
+    if scheme == "http" and _is_loopback_literal(host):
         return None
     return (
-        f"{env_name} must be an https:// URL "
-        "(http:// is allowed only on loopback, and only outside production)"
+        f"{env_name} must be an https:// URL (http:// is allowed only on a literal "
+        "loopback address such as 127.0.0.1, and only outside production — a NAME "
+        "like localhost resolves wherever it is pointed, so it does not establish "
+        "that there is no network to intercept)"
     )
 
 
@@ -296,6 +353,76 @@ def _is_private_host(host: str) -> bool:
         or address.is_reserved
         or address.is_unspecified
     )
+
+
+#: The only identity providers whose tokens this product accepts, and the only
+#: sites its links may open. Pinned rather than configured, and the reason is the
+#: same as certificate pinning: discovery may supply the project, the client id,
+#: the endpoints and the paths, but it must not be able to choose which company
+#: issues a user's tokens or which site is asked for their card details.
+#:
+#: The CLI pins exactly these two lists (`internal/auth/discovery.go`), and
+#: refuses a manifest naming anything else. Duplicating them here is not
+#: redundancy — it is what turns "the client will reject this" into "this server
+#: never published it", which is the difference between a login that fails
+#: confusingly at a user's machine and a deploy that fails at readiness.
+_ALLOWED_ISSUER_SUFFIXES = ("supabase.co", "daintree.org")
+_ALLOWED_LINK_SUFFIXES = ("daintree.org",)
+
+#: An OAuth client id goes into a URL query string and, on the client, into a
+#: credential-store account key. Both bounds mirror the CLI's.
+_CLIENT_ID_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~"
+)
+_MAX_CLIENT_ID_LENGTH = 200
+
+
+def _host_allowed(host: str, suffixes: tuple[str, ...]) -> bool:
+    """Whether ``host`` is one of ``suffixes`` or a subdomain of one.
+
+    A trailing dot is stripped first: ``daintree.org.`` and ``daintree.org`` are
+    the same name to DNS, and only one of them matches a plain comparison.
+    """
+    # One trailing dot, not all of them: the client removes a single suffix, so
+    # `proj.supabase.co..` matches here and is refused there.
+    cleaned = host.lower().strip("[]")
+    cleaned = cleaned[:-1] if cleaned.endswith(".") else cleaned
+    return any(cleaned == suffix or cleaned.endswith("." + suffix) for suffix in suffixes)
+
+
+def _is_under_path(child: str, parent: str) -> bool:
+    """Whether ``child``'s path is contained by ``parent``'s, on a segment boundary.
+
+    A prefix test is not containment, and it fails in two ways that both matter:
+
+    * ``/auth/v1malicious/token`` has ``/auth/v1`` as a prefix and is a different
+      route, which a sibling handler on the same host can own.
+    * ``/auth/v1/../capture`` passes a prefix test and resolves, in any server or
+      proxy that normalises dot segments, to ``/capture`` — outside the issuer
+      entirely.
+
+    Dot segments are refused rather than normalised: normalising would mean
+    betting that our interpretation matches the far end's, and a real OAuth
+    endpoint never contains one.
+
+    **Both paths are percent-decoded before the comparison**, and that single call
+    is what makes the dot-segment rule mean anything. ``urlsplit`` leaves
+    ``.path`` encoded, so ``/auth/v1/%2e%2e/capture`` splits into the innocuous
+    segments ``auth``, ``v1``, ``%2e%2e``, ``capture`` — no ``..`` in sight — and
+    sails through, while every server and proxy downstream decodes it to
+    ``/auth/v1/../capture`` and resolves it to ``/capture``, outside the issuer
+    entirely. (Go's ``url.Parse`` decodes on the way in, which is why the client
+    catches this one for free and this side had to be told.) Decoding also splits
+    an encoded slash into a real segment boundary, which can only make the check
+    see more segments and therefore only make it stricter.
+    """
+    child_path = unquote(child or "/")
+    parent_path = unquote(parent or "/").rstrip("/")
+    if any(segment in (".", "..") for segment in child_path.split("/")):
+        return False
+    if not parent_path:
+        return True
+    return child_path == parent_path or child_path.startswith(parent_path + "/")
 
 
 def _loopback_redirect_problem(*, value: str, env_name: str) -> str | None:
@@ -380,6 +507,33 @@ FastResponseMode = Literal["off", "shadow", "visible"]
 #:           served exactly as `open` would serve it. Evidence, not enforcement.
 #: enforce   a verified token is required; failures are the account 4xx family.
 AuthMode = Literal["open", "observe", "enforce"]
+
+#: Whether anything in this build actually reads a token. **False**, and it is the
+#: switch that keeps `AUTH_MODE` honest: `auth.py` still returns the anonymous
+#: principal for every request, so a deployment must not be able to claim an
+#: authentication boundary it does not have. Two things read it — `auth_problems()`
+#: refuses any mode but `open`, and `/v1/daintree/auth/config` reports `required:
+#: false` regardless of the mode — and they must agree, because the endpoint
+#: deliberately answers while the service is unready and would otherwise publish
+#: `required: true` from a deployment that never started.
+#:
+#: Flipped by the change that makes verification real, in the same commit.
+AUTH_ENFORCEMENT_IMPLEMENTED = False
+
+#: The OAuth callback, and **not** deployment configuration despite looking like
+#: it. The client compiles this exact string in (`internal/auth/loopback.go`:
+#: "registered with the identity provider and cannot vary at runtime"), sends it
+#: in the authorization request, and compares the manifest's value against it for
+#: EQUALITY — so a backend that could vary it could only ever be wrong. It is the
+#: same binary against every environment, and Supabase registers the same loopback
+#: URI for each OAuth client, so there is nothing here for an environment to
+#: change.
+#:
+#: Hardcoded for the reason CLAUDE.md gives for hardcoding the model: one right
+#: answer, already settled, and an env var over it would only be a way to break a
+#: login. `tests/unit/test_auth_config_cli_contract.py` pins it against the
+#: client's own three constants.
+OAUTH_REDIRECT_URI = "http://127.0.0.1:42813/oauth/callback"
 
 
 class Settings(BaseSettings):
@@ -723,10 +877,6 @@ class Settings(BaseSettings):
     supabase_oauth_authorize_url: str = Field(default="", alias="SUPABASE_OAUTH_AUTHORIZE_URL")
     supabase_oauth_token_url: str = Field(default="", alias="SUPABASE_OAUTH_TOKEN_URL")
     supabase_oauth_client_id: str = Field(default="", alias="SUPABASE_OAUTH_CLIENT_ID")
-    #: The CLI's fixed loopback callback. Supabase matches redirect URIs EXACTLY,
-    #: so this is a compiled-in constant on the client side and a published one
-    #: here; the two must agree or every login fails at the redirect.
-    supabase_oauth_redirect_uri: str = Field(default="", alias="SUPABASE_OAUTH_REDIRECT_URI")
     daintree_account_url: str = Field(default="", alias="DAINTREE_ACCOUNT_URL")
     daintree_subscribe_url: str = Field(default="", alias="DAINTREE_SUBSCRIBE_URL")
     #: Published so the client can schedule its own refresh. These MIRROR the
@@ -734,11 +884,16 @@ class Settings(BaseSettings):
     #: them — so they are the one pair here that can drift without anything
     #: noticing: raise the project's session length and a stale value tells every
     #: client to sign in early. Change them together.
+    #: Bounded at both ends. The floor keeps a typo from telling every client to
+    #: refresh continuously; the ceiling (one year) exists because the client
+    #: decodes these into a fixed-width integer, so an unbounded Python int would
+    #: not merely be implausible — it would fail to decode and take the whole
+    #: manifest with it.
     auth_access_token_seconds: int = Field(
-        default=3600, ge=60, alias="AUTH_ACCESS_TOKEN_SECONDS"
+        default=3600, ge=60, le=31_536_000, alias="AUTH_ACCESS_TOKEN_SECONDS"
     )
     auth_session_max_age_seconds: int = Field(
-        default=2_592_000, ge=60, alias="AUTH_SESSION_MAX_AGE_SECONDS"
+        default=2_592_000, ge=60, le=31_536_000, alias="AUTH_SESSION_MAX_AGE_SECONDS"
     )
 
     # ---- Policy ---------------------------------------------------------
@@ -935,15 +1090,20 @@ class Settings(BaseSettings):
     #: The eight values that make a publishable manifest. Ordered as the manifest
     #: reads, so a completeness failure names fields in the order an operator
     #: filled them in.
+    #: The values that must be present for a manifest to be publishable.
+    #:
+    #: The callback is absent because it is a constant rather than a setting
+    #: (``OAUTH_REDIRECT_URI``), and the two links are absent because the client
+    #: treats them as OPTIONAL. Requiring them here would have reported an
+    #: otherwise perfectly working OAuth deployment as unconfigured and withheld
+    #: the entire manifest over a missing subscribe page — suppressing sign-in to
+    #: enforce a nicety. They are still validated whenever they are set.
     _MANIFEST_FIELDS: ClassVar[tuple[str, ...]] = (
         "supabase_auth_issuer",
         "supabase_jwks_url",
         "supabase_oauth_authorize_url",
         "supabase_oauth_token_url",
         "supabase_oauth_client_id",
-        "supabase_oauth_redirect_uri",
-        "daintree_account_url",
-        "daintree_subscribe_url",
     )
 
     def auth_manifest_problems(self) -> list[str]:
@@ -970,22 +1130,31 @@ class Settings(BaseSettings):
             ("DAINTREE_ACCOUNT_URL", self.daintree_account_url),
             ("DAINTREE_SUBSCRIBE_URL", self.daintree_subscribe_url),
         )
+        links = {"DAINTREE_ACCOUNT_URL", "DAINTREE_SUBSCRIBE_URL"}
         for env_name, value in urls:
             if not value:
                 continue
             problem = _auth_url_problem(
-                value=value, env_name=env_name, hardened=self.is_hardened
+                value=value,
+                env_name=env_name,
+                hardened=self.is_hardened,
+                allow_fragment=env_name in links,
             )
             if problem:
                 problems.append(problem)
-
-        if self.supabase_oauth_redirect_uri:
-            problem = _loopback_redirect_problem(
-                value=self.supabase_oauth_redirect_uri,
-                env_name="SUPABASE_OAUTH_REDIRECT_URI",
-            )
-            if problem:
-                problems.append(problem)
+            # Percent-escapes in an OAuth endpoint path are refused outright, and
+            # the reason is that every way of HANDLING them diverges from the
+            # client. Decoding sees `%2f` as a segment boundary where the client's
+            # parser refuses the URL entirely; not decoding lets `%2e%2e` past the
+            # dot-segment rule; and a malformed `%zz` is untouched here and fatal
+            # there. A real issuer, authorize, token or JWKS path never contains
+            # one, so refusing is both strictly safer and costs nothing.
+            elif env_name not in links and "%" in urlsplit(value).path:
+                problems.append(
+                    f"{env_name} must not percent-encode anything in its path "
+                    "(an OAuth endpoint path never needs it, and clients disagree "
+                    "about how to read one)"
+                )
 
         # The issuer is compared for EQUALITY against a token's `iss`, so its path
         # is part of the credential check rather than decoration. Supabase serves
@@ -1001,14 +1170,41 @@ class Settings(BaseSettings):
                 "would match nothing)"
             )
 
-        # Same-origin, against the ISSUER rather than against each other. A token
-        # endpoint on a host the issuer does not name is where an authorization
-        # code would be exchanged with a stranger, and it is the check that stops
-        # a half-edited configuration — three URLs updated for a new project and
-        # one left behind — from pointing part of the login at the old one.
+        # The issuer is the root of trust, so it is pinned to Daintree's own
+        # identity providers. Discovery supplies the project, the client id and the
+        # endpoints; it must not be able to choose which company issues a user's
+        # tokens. Loopback is exempt outside production because a local provider is,
+        # by construction, one the developer is already running.
         issuer_origin = _origin_of(self.supabase_auth_issuer) if self.supabase_auth_issuer else None
         if issuer_origin is not None:
-            expected = f"{issuer_origin[0]}://{issuer_origin[1]}:{issuer_origin[2]}"
+            issuer_host = issuer_origin[1]
+            if not _host_allowed(issuer_host, _ALLOWED_ISSUER_SUFFIXES) and not (
+                not self.is_hardened and issuer_host.lower() in _LOCAL_HOSTNAMES
+            ):
+                allowed = ", ".join(_ALLOWED_ISSUER_SUFFIXES)
+                problems.append(
+                    f"SUPABASE_AUTH_ISSUER names a host that is not a Daintree "
+                    f"identity provider (expected {allowed} or a subdomain)"
+                )
+
+        # Same origin AND under the issuer's path, against the ISSUER rather than
+        # against each other. A token endpoint on a host the issuer does not name is
+        # where an authorization code would be exchanged with a stranger, and it is
+        # the check that stops a half-edited configuration — three URLs updated for a
+        # new project and one left behind — from pointing part of the login at the
+        # old one. The path half matters for the same reason one origin down: a
+        # sibling handler on the issuer's own host is still not the issuer.
+        if issuer_origin is not None:
+            # Compared as WRITTEN rather than as parsed, because that is how the
+            # client compares them. `https://h` and `https://h:443` are the same
+            # origin by any semantic reading and are two different strings to a
+            # textual one — so a configuration mixing the two spellings passes a
+            # semantic check here and is refused on the user's machine. Being the
+            # stricter of the two implementations is the only way this endpoint's
+            # promise holds.
+            issuer_netloc = urlsplit(self.supabase_auth_issuer).netloc
+            expected = f"{issuer_origin[0]}://{issuer_netloc}"
+            issuer_path = urlsplit(self.supabase_auth_issuer).path
             for env_name, value in (
                 ("SUPABASE_JWKS_URL", self.supabase_jwks_url),
                 ("SUPABASE_OAUTH_AUTHORIZE_URL", self.supabase_oauth_authorize_url),
@@ -1017,11 +1213,72 @@ class Settings(BaseSettings):
                 if not value:
                     continue
                 other = _origin_of(value)
-                if other is not None and other != issuer_origin:
+                if other is None:
+                    continue
+                if urlsplit(value).netloc != issuer_netloc:
                     problems.append(
-                        f"{env_name} must share the SUPABASE_AUTH_ISSUER origin ({expected})"
+                        f"{env_name} must be written with exactly the same authority as "
+                        f"SUPABASE_AUTH_ISSUER ({expected})"
                     )
+                elif not _is_under_path(urlsplit(value).path, issuer_path):
+                    problems.append(
+                        f"{env_name} must be under the SUPABASE_AUTH_ISSUER path "
+                        f"({issuer_path or '/'})"
+                    )
+
+        # Where the manifest may send a BROWSER. Pinned separately from the issuer
+        # because these are ordinary web pages rather than a token endpoint, and for
+        # the same reason: the assistant opens them under its own recommendation
+        # ("manage your account", "buy a plan"), so a value that could be chosen
+        # freely could point someone at a convincing phishing page with the product
+        # vouching for it.
+        for env_name, value in (
+            ("DAINTREE_ACCOUNT_URL", self.daintree_account_url),
+            ("DAINTREE_SUBSCRIBE_URL", self.daintree_subscribe_url),
+        ):
+            if not value:
+                continue
+            origin = _origin_of(value)
+            if origin is None:
+                continue
+            host = origin[1]
+            if not _host_allowed(host, _ALLOWED_LINK_SUFFIXES) and not (
+                not self.is_hardened and host.lower() in _LOCAL_HOSTNAMES
+            ):
+                problems.append(
+                    f"{env_name} must point at a Daintree site "
+                    f"({_ALLOWED_LINK_SUFFIXES[0]} or a subdomain)"
+                )
+
+        problems.extend(self._client_id_problems())
         return problems
+
+    def _client_id_problems(self) -> list[str]:
+        """The OAuth client id, which is not a URL and needs its own rules.
+
+        Surrounding whitespace is REJECTED rather than trimmed, and that is the
+        rule worth explaining. The client trims what it receives and validates the
+        trimmed copy — so a value with spaces would pass every check on both sides
+        while this server published the raw one. Validating a value and then
+        transmitting a different value is how `" client "` reaches a URL query
+        string with its spaces intact.
+        """
+        value = self.supabase_oauth_client_id
+        if not value:
+            return []
+        if value != value.strip():
+            return ["SUPABASE_OAUTH_CLIENT_ID must not have leading or trailing whitespace"]
+        if len(value) > _MAX_CLIENT_ID_LENGTH:
+            return [
+                f"SUPABASE_OAUTH_CLIENT_ID is {len(value)} characters, which is not a "
+                f"plausible identifier (max {_MAX_CLIENT_ID_LENGTH})"
+            ]
+        if not set(value) <= _CLIENT_ID_CHARS:
+            return [
+                "SUPABASE_OAUTH_CLIENT_ID contains characters that are not valid in an "
+                "OAuth client id (letters, digits, and - _ . ~)"
+            ]
+        return []
 
     def auth_problems(self) -> list[str]:
         """Account-authentication configuration that must fail readiness.
@@ -1060,11 +1317,12 @@ class Settings(BaseSettings):
         if self.auth_mode == "open":
             return problems
 
-        problems.append(
-            f"AUTH_MODE={self.auth_mode} is not implemented in this build — no token "
-            "is read on any path yet (see auth.py), so this deployment would report "
-            "an authentication boundary it does not have. Use AUTH_MODE=open."
-        )
+        if not AUTH_ENFORCEMENT_IMPLEMENTED:
+            problems.append(
+                f"AUTH_MODE={self.auth_mode} is not implemented in this build — no token "
+                "is read on any path yet (see auth.py), so this deployment would report "
+                "an authentication boundary it does not have. Use AUTH_MODE=open."
+            )
 
         for name in self._MANIFEST_FIELDS:
             if not str(getattr(self, name)).strip():

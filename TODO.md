@@ -84,6 +84,34 @@ script's "Authentication posture" block.
 
 ---
 
+## Teach the client to read the unconfigured `/auth/config` shape
+
+**Trigger: the next CLI change in `internal/auth/` — it is a small addition there
+and cannot be done from this repo at all.**
+
+`GET /v1/daintree/auth/config` answers a deployment with no account authentication
+with `configured: false` and no endpoints. That is the right server-side contract:
+"there are no accounts here" is the accurate description of production today, and a
+404 or a 503 would make a working deployment indistinguishable from a broken one.
+
+The client does not understand it yet. `Manifest` in
+`internal/auth/discovery.go` has no `Configured` or `Required` field, so both are
+dropped on decode and `Validate` reaches the issuer check with an empty string and
+reports `the backend named no issuer`. Accurate in a narrow sense, useless as an
+explanation — the deployment is not misconfigured, it simply has no sign-in.
+
+The fix is on the client side and is small: decode both fields, branch on
+`configured == false` BEFORE validating the issuer, and report "this backend does
+not offer sign-in" instead. `required` should imply `configured` there as it does
+here. Nothing on this side changes; the shape is already what the client will want
+to read.
+
+Until then the misleading message is reachable only by pointing a build that has
+OAuth at a deployment that does not, which is the current state of every
+deployment — so it is worth doing before enforcement, not after.
+
+---
+
 ## Move the `cli/` pin forward to the CLI's account taxonomy
 
 **Trigger: the next time the CLI pin moves for any reason — this rides along.**
@@ -94,9 +122,11 @@ compares this server's twelve account error codes and statuses against
 gate SKIPS: the contract it exists to protect is currently unguarded in CI, and
 the two halves were aligned by reading the sibling checkout by hand.
 
-The same pin bump also brings `internal/auth/` (discovery, PKCE, keyring,
-loopback) into view, which is what a future gate over the `/v1/daintree/auth/config`
-manifest would read. Both gates go live together.
+`tests/unit/test_auth_config_cli_contract.py` skips for the same reason and
+covers the other half: it reads `cli/internal/auth/discovery.go` and checks the
+manifest version, the decoded field names, the environment and scope allowlists,
+the issuer and link trust anchors, and the client-id bound. Both gates go live on
+the same bump.
 
 Note the standing hazard from CLAUDE.md: a pin bump that removes or renames a CLI
 tool reddens `tests/unit/test_runbook_catalog_hygiene.py`, and

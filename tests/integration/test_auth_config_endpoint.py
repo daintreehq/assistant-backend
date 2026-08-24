@@ -90,6 +90,7 @@ def test_an_unconfigured_deployment_reports_that_as_a_200(client: TestClient) ->
     today, not an error. A 404 or a 503 would make a working deployment
     indistinguishable from a broken one."""
     body = client.get(URL).json()
+    assert body["version"] == 1
     assert body["configured"] is False
     assert body["required"] is False
     # No manifest at all, rather than a manifest of empty strings — a client must
@@ -103,18 +104,32 @@ def test_the_always_present_fields_are_present_in_both_shapes(
 ) -> None:
     """A client reads these unconditionally and only then decides whether the
     endpoints exist."""
-    always = {"environment", "configured", "required"}
+    always = {"version", "environment", "configured", "required"}
     assert always <= set(client.get(URL).json())
     with _client(_configured_settings(), fake_provider) as configured:
         assert always <= set(configured.get(URL).json())
 
 
-def test_no_shape_version_is_published(fake_provider: Any) -> None:
-    """CLAUDE.md: nothing this repo ships carries a version. The only client moves
-    in lockstep, so a shape version would be a compatibility branch nobody needs —
-    and the master spec's example JSON carrying one does not override that."""
+def test_the_manifest_version_is_published_in_both_shapes(fake_provider: Any) -> None:
+    """The client checks `version` FIRST and refuses the whole manifest on a
+    mismatch, so a body without it decodes as version 0 and every sign-in fails
+    with "this backend describes auth configuration version 0".
+
+    It is present in the unconfigured shape too: "a manifest I am too old to
+    understand" and "a deployment with no accounts" are different answers, and a
+    client that could not tell them apart would report the wrong one.
+
+    This is the exception to CLAUDE.md's no-versioning rule, not a violation of
+    it — that rule governs internal artifacts a lockstep client never negotiates
+    over, and explicitly preserves wire metadata like `X-Daintree-Protocol`.
+    """
     with _client(_configured_settings(), fake_provider) as client:
-        assert "version" not in client.get(URL).json()
+        assert client.get(URL).json()["version"] == 1
+    unconfigured = Settings(
+        TOGETHER_API_KEY="tgp_v1_test-key", STATE_SIGNING_KEY_CURRENT="test-signing-key"
+    )
+    with _client(unconfigured, fake_provider) as client:
+        assert client.get(URL).json()["version"] == 1
 
 
 def test_a_configured_deployment_publishes_the_manifest(fake_provider: Any) -> None:

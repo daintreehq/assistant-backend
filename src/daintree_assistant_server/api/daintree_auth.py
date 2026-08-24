@@ -42,7 +42,11 @@ import math
 from fastapi import APIRouter, Depends, Request, Response
 
 from ..auth import Principal, require_auth
-from ..config import Settings
+from ..config import (
+    AUTH_ENFORCEMENT_IMPLEMENTED,
+    OAUTH_REDIRECT_URI,
+    Settings,
+)
 from ..errors import DaintreeError
 from .deps import require_ready
 
@@ -52,15 +56,35 @@ router = APIRouter()
 #: configured because they are not a deployment fact: Supabase supports the
 #: standard set and no application-defined scopes, so there is nothing to vary
 #: and nothing a per-environment value could express. Backend permissions will
-#: come from the allowlisted client id instead — never from these.
+#: come from the allowlisted client id instead — never from these. The CLI holds
+#: a closed allowlist of its own and refuses a manifest naming anything outside
+#: it, so widening this is a two-repo change.
 _OAUTH_SCOPES = ("openid", "email")
+
+#: The manifest shape version, and **the one number in this repo that is a real
+#: version rather than a label.**
+#:
+#: CLAUDE.md is emphatic that nothing here carries a version, and it is right
+#: about what it covers: prompts, runbooks, task identifiers and prompt-family
+#: labels are all "simply the current version", because they are internal
+#: artifacts a lockstep client never negotiates over. It carves out exactly this
+#: category — `protocol_version`, `X-Daintree-Protocol`, the signed-state
+#: `TOKEN_VERSION` — as "real wire metadata", and a discovery manifest is that.
+#:
+#: It is also not optional. The CLI's decoder (`internal/auth/discovery.go`,
+#: `SupportedManifestVersion`) checks this FIRST and refuses the whole manifest on
+#: a mismatch, so a body without it decodes as version 0 and every sign-in fails
+#: with "this backend describes auth configuration version 0". Omitting it is not
+#: a smaller contract; it is a broken one.
+_AUTH_CONFIG_VERSION = 1
 
 
 def _auth_config_body(settings: Settings) -> dict[str, object]:
     """The manifest, or an honest statement that there is no account auth here.
 
-    Two fields are always present, so a client reads them unconditionally and only
-    then decides whether the endpoints exist. The alternative — a 404 or a 503 when
+    ``version``, ``environment``, ``configured`` and ``required`` are always
+    present, so a client reads them unconditionally and only then decides whether
+    the endpoints exist. The alternative — a 404 or a 503 when
     OAuth is unconfigured — would make "this deployment has no accounts", which is
     the CURRENT and correct state of production, indistinguishable from "this
     deployment is broken".
@@ -70,24 +94,32 @@ def _auth_config_body(settings: Settings) -> dict[str, object]:
     requests: a client that collapsed the two would either refuse to sign in when
     it could, or demand a sign-in that is not yet being enforced.
 
-    Both are derived rather than reported. ``configured`` is false unless the
-    values are complete AND valid, so a manifest that failed readiness is never
-    served — this endpoint deliberately answers while the service is unready, so
-    readiness cannot be its filter. ``required`` additionally requires a
-    publishable manifest: telling a client a credential is mandatory while
-    withholding the only description of how to obtain one is a dead end, and the
-    honest answer when we cannot say how to sign in is that we are not demanding
-    it.
+    Both are derived rather than reported, and ``required`` is derived from three
+    things rather than from the mode alone. It needs a publishable manifest —
+    telling a client a credential is mandatory while withholding the only
+    description of how to obtain one is a dead end — and it needs enforcement to
+    actually EXIST. That last conjunct is not belt-and-braces: ``auth_problems()``
+    refuses a non-``open`` mode at readiness, but this endpoint deliberately
+    answers while the service is unready, so without it a deployment that never
+    started would still be out here telling clients a credential was required.
 
-    There is no ``version`` field. This repo does not version what it ships — the
-    only client moves in lockstep and CLAUDE.md is explicit that a shape version
-    here would be a compatibility branch nobody needs.
+    ``configured`` is false unless the values are complete AND valid, for the same
+    reason: readiness cannot be this endpoint's filter.
+
+    ``version`` is checked FIRST by the client and gates everything after it, so
+    it is present in both shapes — including the unconfigured one, where there is
+    nothing else to describe. A client must be able to tell "a manifest I do not
+    understand" from "a deployment with no accounts", and those are different
+    answers with different advice.
     """
     configured = settings.auth_is_configured
     body: dict[str, object] = {
+        "version": _AUTH_CONFIG_VERSION,
         "environment": settings.environment,
         "configured": configured,
-        "required": configured and settings.auth_mode == "enforce",
+        "required": (
+            configured and AUTH_ENFORCEMENT_IMPLEMENTED and settings.auth_mode == "enforce"
+        ),
     }
     if not configured:
         return body
@@ -98,7 +130,7 @@ def _auth_config_body(settings: Settings) -> dict[str, object]:
             "token_endpoint": settings.supabase_oauth_token_url,
             "jwks_uri": settings.supabase_jwks_url,
             "client_id": settings.supabase_oauth_client_id,
-            "redirect_uri": settings.supabase_oauth_redirect_uri,
+            "redirect_uri": OAUTH_REDIRECT_URI,
             "scopes": list(_OAUTH_SCOPES),
             "account_url": settings.daintree_account_url,
             "subscribe_url": settings.daintree_subscribe_url,

@@ -80,12 +80,20 @@ get a token is a bootstrap no client can satisfy. It is also **not gated on read
 it is built from configuration alone, and the moment someone most needs to know how to
 sign in is the moment the rest of the service is unhappy.
 
-Two fields are always present, so a client reads them unconditionally and only then
+These fields are always present, so a client reads them unconditionally and only then
 decides whether the endpoints exist:
 
 ```json
-{ "environment": "production", "configured": false, "required": false }
+{ "version": 1, "environment": "production", "configured": false, "required": false }
 ```
+
+`version` is the manifest's shape, and a client checks it before anything else. It is
+present even in the unconfigured shape, because "a manifest I am too old to understand"
+and "a deployment with no accounts" are different answers with different advice.
+
+This is one of the few real versions in this service — wire metadata negotiated with a
+client, in the same category as `X-Daintree-Protocol`, and not the kind of artifact
+version [Versioning](#versioning) rules out.
 
 `configured` and `required` answer **different questions**, and collapsing them breaks a
 rollout. A deployment can publish a complete manifest while still serving anonymous
@@ -104,6 +112,7 @@ When `configured` is true the manifest is also present:
 
 ```json
 {
+  "version": 1,
   "environment": "staging",
   "configured": true,
   "required": false,
@@ -124,13 +133,37 @@ Nothing here is a secret: every value is operator-supplied deployment configurat
 no credential this server holds is reachable through it.
 
 The manifest appears **only when it is complete and valid**, which is a stronger
-condition than readiness and deliberately independent of it. A published endpoint must be
-HTTPS (loopback `http://` is permitted outside production, so a local Supabase is
-developable), must share the issuer's origin, must carry no credentials, fragment, or
-control characters, and `redirect_uri` must be an IPv4-loopback callback with an explicit
-port and path. A configuration that fails any of those reports `configured: false` rather
-than publishing something a client would have to reject — this endpoint answers while the
-service is unready, so readiness cannot be what filters it.
+condition than readiness and deliberately independent of it. A configuration that fails
+any rule reports `configured: false` rather than publishing something a client would have
+to reject — this endpoint answers while the service is unready, so readiness cannot be
+what filters it.
+
+The rules mirror the client's own, deliberately. The CLI validates this manifest before
+using any of it, so anything it would refuse must never be published in the first place:
+that turns a login failing confusingly on a user's machine into a deploy failing at
+readiness. A published value must
+
+- be HTTPS, with no credentials, fragment, or control characters (loopback `http://` is
+  permitted outside production, so a local Supabase is developable);
+- name `supabase.co` or `daintree.org` for the `issuer` — the trust anchor is pinned, so
+  discovery can supply the project, the client, and the endpoints, but not which company
+  issues a user's tokens;
+- for `authorization_endpoint`, `token_endpoint` and `jwks_uri`, share the issuer's origin
+  **and** sit under its path, on a segment boundary and with no dot segments;
+- for `account_url` and `subscribe_url`, point at `daintree.org` or a subdomain — these
+  open in the user's browser under the assistant's own recommendation, so a free choice
+  here is a phishing page with the product vouching for it;
+`redirect_uri` is **not configurable**. The client compiles the callback in — it is
+registered with the identity provider and cannot vary at runtime — and compares this
+field against it for equality, so a value this server could vary could only ever be
+wrong. It is published from a constant, pinned against the client's own definition.
+
+`account_url` and `subscribe_url` are **optional**: a deployment with working sign-in and
+no subscription page still publishes a usable manifest. Withholding the whole manifest
+over a missing link would suppress sign-in to enforce a nicety.
+- for `client_id`, be at most 200 characters of `A-Za-z0-9-_.~`, with no surrounding
+  whitespace — the client trims what it receives and validates the trimmed copy, so a
+  value with spaces would validate on both sides while this server published the raw one.
 
 The response carries a strong `ETag` over the exact bytes served, honours
 `If-None-Match` with a 304, and is `Cache-Control: private, max-age=60`. `private`
@@ -138,15 +171,14 @@ because the response also carries a per-request `X-Request-Id` that a shared cac
 replay to unrelated callers, and 60 seconds so a cached `configured: false` cannot keep
 clients from signing in for long after a cutover.
 
-There is no `version` field: this repo does not version what it ships, and its only
-client moves in lockstep.
-
 `scopes` is fixed. Supabase supports the standard OAuth scopes and no application-defined
 ones, so backend permissions will be derived from the allowlisted `client_id` — never
 from a scope the caller could ask for.
 
-`session_policy` is *reported*, not enforced here: it mirrors the Supabase project's own
-session settings so a client can schedule its refresh.
+`session_policy` is *reported*, not enforced here, and not acted on either: it mirrors the
+Supabase project's own session settings so a client can tell someone how long a login
+lasts. A client schedules its refresh from the access token's own expiry, which is the
+only value that can be right for the token in its hand.
 
 ### POST /v1/daintree/auth/verify
 

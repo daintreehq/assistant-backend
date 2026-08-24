@@ -13,13 +13,29 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from daintree_assistant_server.config import Settings
+from daintree_assistant_server.config import (
+    OAUTH_REDIRECT_URI,
+    Settings,
+    _loopback_redirect_problem,
+)
 
 _ISSUER = "https://abcdefghij.supabase.co/auth/v1"
 _JWKS = "https://abcdefghij.supabase.co/auth/v1/.well-known/jwks.json"
 _AUTHORIZE = "https://abcdefghij.supabase.co/auth/v1/oauth/authorize"
 _TOKEN = "https://abcdefghij.supabase.co/auth/v1/oauth/token"
-_REDIRECT = "http://127.0.0.1:42813/oauth/callback"
+
+
+#: The values a manifest must actually have. The callback is absent because it is
+#: a CONSTANT rather than a setting, and the two links are absent because the
+#: client treats them as optional — requiring them would have withheld an entire
+#: working manifest over a missing subscribe page.
+_MANIFEST_ENV = (
+    "SUPABASE_AUTH_ISSUER",
+    "SUPABASE_JWKS_URL",
+    "SUPABASE_OAUTH_AUTHORIZE_URL",
+    "SUPABASE_OAUTH_TOKEN_URL",
+    "SUPABASE_OAUTH_CLIENT_ID",
+)
 
 
 def _settings(**overrides: object) -> Settings:
@@ -38,7 +54,6 @@ def _complete(**overrides: object) -> Settings:
         "SUPABASE_OAUTH_AUTHORIZE_URL": _AUTHORIZE,
         "SUPABASE_OAUTH_TOKEN_URL": _TOKEN,
         "SUPABASE_OAUTH_CLIENT_ID": "daintree-assistant-staging",
-        "SUPABASE_OAUTH_REDIRECT_URI": _REDIRECT,
         "DAINTREE_ACCOUNT_URL": "https://staging.daintree.org/account",
         "DAINTREE_SUBSCRIBE_URL": "https://staging.daintree.org/subscribe",
     }
@@ -127,36 +142,12 @@ def test_a_complete_configuration_fails_only_on_the_unimplemented_mode(mode: str
     assert "not implemented in this build" in problems[0]
 
 
-@pytest.mark.parametrize(
-    "missing",
-    [
-        "SUPABASE_AUTH_ISSUER",
-        "SUPABASE_JWKS_URL",
-        "SUPABASE_OAUTH_AUTHORIZE_URL",
-        "SUPABASE_OAUTH_TOKEN_URL",
-        "SUPABASE_OAUTH_CLIENT_ID",
-        "SUPABASE_OAUTH_REDIRECT_URI",
-        "DAINTREE_ACCOUNT_URL",
-        "DAINTREE_SUBSCRIBE_URL",
-    ],
-)
+@pytest.mark.parametrize("missing", _MANIFEST_ENV)
 def test_enforce_requires_every_manifest_field(missing: str) -> None:
     """A deployment checking tokens must also be able to tell a client how to get
     one. Half a manifest is a sign-in that cannot be started."""
     problems = _complete(AUTH_MODE="enforce", **{missing: ""}).auth_problems()
     assert any(missing in p and "requires" in p for p in problems), problems
-
-
-_MANIFEST_ENV = (
-    "SUPABASE_AUTH_ISSUER",
-    "SUPABASE_JWKS_URL",
-    "SUPABASE_OAUTH_AUTHORIZE_URL",
-    "SUPABASE_OAUTH_TOKEN_URL",
-    "SUPABASE_OAUTH_CLIENT_ID",
-    "SUPABASE_OAUTH_REDIRECT_URI",
-    "DAINTREE_ACCOUNT_URL",
-    "DAINTREE_SUBSCRIBE_URL",
-)
 
 
 @pytest.mark.parametrize("missing", _MANIFEST_ENV)
@@ -249,65 +240,81 @@ def test_an_endpoint_on_another_origin_is_refused(field: str) -> None:
     one left pointing at the old one. A token endpoint the issuer does not name is
     where an authorization code would be exchanged with a stranger."""
     problems = _complete(**{field: "https://elsewhere.supabase.co/auth/v1/x"}).auth_problems()
-    assert any(field in p and "origin" in p for p in problems), problems
+    assert any(field in p and "same authority" in p for p in problems), problems
 
 
-def test_an_explicit_default_port_is_the_same_origin() -> None:
-    """`https://h` and `https://h:443` are one origin; rejecting the pair would
-    fail readiness on a correct configuration."""
-    assert (
-        _complete(
-            SUPABASE_JWKS_URL="https://abcdefghij.supabase.co:443/auth/v1/.well-known/jwks.json"
-        ).auth_problems()
-        == []
-    )
+def test_an_explicit_default_port_is_still_a_different_authority() -> None:
+    """`https://h` and `https://h:443` are the same origin by any semantic reading
+    and are two different strings to a textual one — and the client compares them
+    textually. So a configuration mixing the two spellings must be refused HERE,
+    where it is an operator's typo, rather than on a user's machine, where it is
+    an unexplained login failure.
+
+    Being the stricter of the two implementations is the only way this endpoint's
+    promise — that it never publishes what the client would reject — holds.
+    """
+    problems = _complete(
+        SUPABASE_JWKS_URL="https://abcdefghij.supabase.co:443/auth/v1/.well-known/jwks.json"
+    ).auth_problems()
+    assert any("same authority" in p for p in problems), problems
 
 
-def test_a_different_port_is_a_different_origin() -> None:
+def test_a_different_port_is_a_different_authority() -> None:
     problems = _complete(
         SUPABASE_JWKS_URL="https://abcdefghij.supabase.co:8443/auth/v1/.well-known/jwks.json"
     ).auth_problems()
-    assert any("origin" in p for p in problems), problems
+    assert any("same authority" in p for p in problems), problems
 
 
 # ---- The loopback callback -------------------------------------------------
 
 
-def test_localhost_is_refused_as_a_callback_host() -> None:
-    """`localhost` resolves through the host's own name lookup, so /etc/hosts or
-    an IPv6-first resolver can hand the authorization code to a listener that is
-    not the CLI's. The spec binds IPv4 loopback; a name is not a binding."""
-    problems = _complete(
-        SUPABASE_OAUTH_REDIRECT_URI="http://localhost:42813/oauth/callback"
-    ).auth_problems()
-    assert any("SUPABASE_OAUTH_REDIRECT_URI" in p for p in problems), problems
+def test_the_callback_is_a_constant_rather_than_a_setting() -> None:
+    """The client compiles this exact string in and compares the manifest's value
+    against it for EQUALITY, so a backend that could vary it could only ever be
+    wrong. It is the same binary against every environment, and the same loopback
+    URI is registered for each OAuth client, so there is nothing here for a
+    deployment to change.
+
+    Asserted as an absence too: an env var over it would be a way to break a login
+    and no way to fix one.
+    """
+    assert OAUTH_REDIRECT_URI == "http://127.0.0.1:42813/oauth/callback"
+    assert "supabase_oauth_redirect_uri" not in Settings.model_fields
+
+
+def test_the_callback_constant_satisfies_the_rules_it_would_be_held_to() -> None:
+    """It is hardcoded, not unchecked. IPv4 loopback (not `localhost`, which
+    resolves through the host's own name lookup), an explicit port (the client
+    matches redirect URIs exactly), and a real path."""
+    assert _loopback_redirect_problem(
+        value=OAUTH_REDIRECT_URI, env_name="OAUTH_REDIRECT_URI"
+    ) is None
 
 
 @pytest.mark.parametrize(
     "value",
     [
+        "http://localhost:42813/oauth/callback",
         "http://0.0.0.0:42813/oauth/callback",
         "http://192.168.1.10:42813/oauth/callback",
         "https://staging.daintree.org/oauth/callback",
+        "http://127.0.0.1/oauth/callback",
+        "http://127.0.0.1:42813/",
+        "http://u:p@127.0.0.1:42813/oauth/callback",
+        "http://127.0.0.1:42813/oauth/callback#x",
+    ],
+    ids=[
+        "localhost", "wildcard", "lan", "https-remote",
+        "no-port", "no-path", "userinfo", "fragment",
     ],
 )
-def test_a_non_loopback_callback_is_refused(value: str) -> None:
-    problems = _complete(SUPABASE_OAUTH_REDIRECT_URI=value).auth_problems()
-    assert any("SUPABASE_OAUTH_REDIRECT_URI" in p for p in problems), problems
-
-
-def test_a_callback_without_an_explicit_port_is_refused() -> None:
-    """Supabase matches redirect URIs by exact string, so a port the client picks
-    at runtime can never match a registered URI."""
-    problems = _complete(
-        SUPABASE_OAUTH_REDIRECT_URI="http://127.0.0.1/oauth/callback"
-    ).auth_problems()
-    assert any("port" in p for p in problems), problems
-
-
-def test_a_callback_without_a_path_is_refused() -> None:
-    problems = _complete(SUPABASE_OAUTH_REDIRECT_URI="http://127.0.0.1:42813/").auth_problems()
-    assert any("path" in p for p in problems), problems
+def test_the_callback_validator_still_refuses_every_wrong_shape(value: str) -> None:
+    """The validator outlives the setting it was written for: it is what proves
+    the constant above, and it is what a future per-client callback would be held
+    to. Each case is a different way of getting an authorization code delivered
+    somewhere it should not go."""
+    assert _loopback_redirect_problem(value=value, env_name="X") is not None
 
 
 # ---- Readiness aggregation and secret hygiene ------------------------------
@@ -369,16 +376,26 @@ def test_whitespace_and_control_characters_are_refused_before_parsing(value: str
 
 @pytest.mark.parametrize(
     "field",
-    ["SUPABASE_AUTH_ISSUER", "DAINTREE_ACCOUNT_URL", "SUPABASE_OAUTH_REDIRECT_URI"],
+    ["SUPABASE_AUTH_ISSUER", "SUPABASE_JWKS_URL", "SUPABASE_OAUTH_TOKEN_URL"],
 )
-def test_no_published_url_may_carry_a_fragment(field: str) -> None:
+def test_an_oauth_endpoint_may_not_carry_a_fragment(field: str) -> None:
     values = {
         "SUPABASE_AUTH_ISSUER": _ISSUER + "#x",
-        "DAINTREE_ACCOUNT_URL": "https://staging.daintree.org/account#x",
-        "SUPABASE_OAUTH_REDIRECT_URI": _REDIRECT + "#x",
+        "SUPABASE_JWKS_URL": _JWKS + "#x",
+        "SUPABASE_OAUTH_TOKEN_URL": _TOKEN + "#x",
     }
     problems = _complete(**{field: values[field]}).auth_problems()
     assert any(field in p and "fragment" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("field", ["DAINTREE_ACCOUNT_URL", "DAINTREE_SUBSCRIBE_URL"])
+def test_a_browser_link_may_carry_a_fragment(field: str) -> None:
+    """The one rule that varies by role. A fragment is meaningless on an issuer
+    and suspicious on a callback, but an account page may legitimately be a
+    single-page app whose route lives in one — and the client permits it there, so
+    refusing it here would reject a configuration that works."""
+    value = "https://staging.daintree.org/account#/billing"
+    assert _complete(**{field: value}).auth_manifest_problems() == []
 
 
 @pytest.mark.parametrize(
@@ -386,13 +403,14 @@ def test_no_published_url_may_carry_a_fragment(field: str) -> None:
     [
         ("SUPABASE_AUTH_ISSUER", "https://u:p@abcdefghij.supabase.co/auth/v1"),
         ("DAINTREE_ACCOUNT_URL", "https://u:p@staging.daintree.org/account"),
-        ("SUPABASE_OAUTH_REDIRECT_URI", "http://u:p@127.0.0.1:42813/oauth/callback"),
+        ("SUPABASE_JWKS_URL", "https://u:p@abcdefghij.supabase.co/auth/v1/jwks"),
     ],
 )
 def test_no_published_url_may_embed_credentials(field: str, value: str) -> None:
-    """The redirect URI is the one that was missed: it went through its own helper,
-    which never checked userinfo, so a password in it passed readiness and was then
-    served to anyone who asked `/auth/config`."""
+    """Every published URL, through one helper. The redirect URI was the one that
+    escaped this originally — it went through a helper of its own that never
+    checked userinfo, so a password in it passed readiness and was then served to
+    anyone who asked `/auth/config`."""
     problems = _complete(**{field: value}).auth_problems()
     assert any(field in p and "credentials" in p for p in problems), problems
 
@@ -401,7 +419,7 @@ def test_no_published_url_may_embed_credentials(field: str, value: str) -> None:
     ("field", "value"),
     [
         ("SUPABASE_AUTH_ISSUER", "https://abcdefghij.supabase.co:0/auth/v1"),
-        ("SUPABASE_OAUTH_REDIRECT_URI", "http://127.0.0.1:0/oauth/callback"),
+        ("SUPABASE_JWKS_URL", "https://abcdefghij.supabase.co:0/auth/v1/jwks"),
     ],
 )
 def test_port_zero_is_refused(field: str, value: str) -> None:
@@ -477,7 +495,7 @@ def test_a_trailing_slash_on_a_correct_issuer_is_tolerated() -> None:
         ("SUPABASE_AUTH_ISSUER", "not a url"),
         ("SUPABASE_OAUTH_TOKEN_URL", "https://attacker.example/token"),
         ("SUPABASE_JWKS_URL", "https://attacker.example/jwks"),
-        ("SUPABASE_OAUTH_REDIRECT_URI", "https://attacker.example/callback"),
+        ("SUPABASE_OAUTH_AUTHORIZE_URL", "https://abcdefghij.supabase.co/elsewhere"),
         ("DAINTREE_ACCOUNT_URL", "http://plain.example/account"),
     ],
 )
@@ -491,3 +509,290 @@ def test_a_complete_but_invalid_manifest_is_not_published(field: str, value: str
     settings = _complete(**{field: value})
     assert settings.auth_manifest_problems(), "the fixture is meant to be invalid"
     assert not settings.auth_is_configured
+
+
+# ---- The trust anchors, pinned rather than configured -----------------------
+#
+# The client refuses a manifest naming anything outside these lists. Duplicating
+# them here is not redundancy: it turns "the client will reject this" into "this
+# server never published it", which is the difference between a login failing
+# confusingly on a user's machine and a deploy failing at readiness.
+
+
+@pytest.mark.parametrize(
+    "issuer",
+    [
+        "https://abcdefghij.supabase.co/auth/v1",
+        "https://auth.daintree.org/auth/v1",
+        "https://staging.daintree.org/auth/v1",
+    ],
+)
+def test_a_daintree_identity_provider_is_accepted(issuer: str) -> None:
+    same_origin = issuer.rsplit("/auth/v1", 1)[0]
+    assert (
+        _complete(
+            SUPABASE_AUTH_ISSUER=issuer,
+            SUPABASE_JWKS_URL=f"{same_origin}/auth/v1/.well-known/jwks.json",
+            SUPABASE_OAUTH_AUTHORIZE_URL=f"{same_origin}/auth/v1/oauth/authorize",
+            SUPABASE_OAUTH_TOKEN_URL=f"{same_origin}/auth/v1/oauth/token",
+        ).auth_manifest_problems()
+        == []
+    )
+
+
+@pytest.mark.parametrize(
+    "issuer",
+    [
+        "https://evil.example/auth/v1",
+        # The near-misses a plain suffix test would wave through.
+        "https://supabase.co.evil.example/auth/v1",
+        "https://daintree.org.evil.example/auth/v1",
+        "https://notsupabase.co/auth/v1",
+    ],
+)
+def test_an_issuer_outside_the_trust_anchor_is_refused(issuer: str) -> None:
+    """The anchor check is the one rule a self-consistent hostile manifest cannot
+    satisfy: everything else about it can be made internally coherent."""
+    problems = _settings(SUPABASE_AUTH_ISSUER=issuer).auth_problems()
+    assert any("identity provider" in p for p in problems), problems
+
+
+def test_a_trailing_dot_does_not_evade_the_anchor() -> None:
+    """`daintree.org.` and `daintree.org` are the same name to DNS, and only one of
+    them matches a plain string comparison."""
+    assert (
+        _complete(
+            SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co./auth/v1",
+            SUPABASE_JWKS_URL="https://abcdefghij.supabase.co./auth/v1/jwks",
+            SUPABASE_OAUTH_AUTHORIZE_URL="https://abcdefghij.supabase.co./auth/v1/authorize",
+            SUPABASE_OAUTH_TOKEN_URL="https://abcdefghij.supabase.co./auth/v1/token",
+        ).auth_manifest_problems()
+        == []
+    )
+
+
+@pytest.mark.parametrize("field", ["DAINTREE_ACCOUNT_URL", "DAINTREE_SUBSCRIBE_URL"])
+def test_a_browser_link_outside_daintree_is_refused(field: str) -> None:
+    """These open in the user's browser under the assistant's own recommendation —
+    "manage your account", "buy a plan" — so a free choice here is a phishing page
+    with the product vouching for it."""
+    problems = _complete(**{field: "https://evil.example/account"}).auth_problems()
+    assert any(field in p and "Daintree site" in p for p in problems), problems
+
+
+def test_a_daintree_subdomain_link_is_accepted() -> None:
+    assert (
+        _complete(
+            DAINTREE_ACCOUNT_URL="https://staging.daintree.org/account",
+            DAINTREE_SUBSCRIBE_URL="https://staging.daintree.org/subscribe",
+        ).auth_manifest_problems()
+        == []
+    )
+
+
+# ---- Endpoints live under the issuer, not merely beside it -----------------
+
+
+@pytest.mark.parametrize(
+    "jwks",
+    [
+        # A sibling handler on the issuer's own host is still not the issuer.
+        "https://abcdefghij.supabase.co/jwks",
+        "https://abcdefghij.supabase.co/other/v1/jwks",
+        # Prefix, not containment: a different route a sibling handler can own.
+        "https://abcdefghij.supabase.co/auth/v1malicious/jwks",
+        # Resolves to /capture in anything that normalises dot segments.
+        "https://abcdefghij.supabase.co/auth/v1/../capture",
+    ],
+    ids=["off-path", "sibling-namespace", "prefix-not-segment", "dot-segment"],
+)
+def test_an_endpoint_outside_the_issuer_path_is_refused(jwks: str) -> None:
+    problems = _complete(SUPABASE_JWKS_URL=jwks).auth_problems()
+    assert any("SUPABASE_JWKS_URL" in p and "path" in p for p in problems), problems
+
+
+def test_an_endpoint_under_the_issuer_path_is_accepted() -> None:
+    assert (
+        _complete(
+            SUPABASE_JWKS_URL=_ISSUER + "/.well-known/jwks.json"
+        ).auth_manifest_problems()
+        == []
+    )
+
+
+# ---- The OAuth client id ---------------------------------------------------
+
+
+def test_surrounding_whitespace_on_the_client_id_is_refused_not_trimmed() -> None:
+    """The client trims what it receives and validates the trimmed copy. Trimming
+    here too would mean validating one value and publishing another — which is
+    exactly how `" client "` reaches a URL query string with its spaces intact."""
+    problems = _complete(SUPABASE_OAUTH_CLIENT_ID=" abc ").auth_problems()
+    assert any("whitespace" in p for p in problems), problems
+
+
+def test_an_implausibly_long_client_id_is_refused() -> None:
+    problems = _complete(SUPABASE_OAUTH_CLIENT_ID="a" * 201).auth_problems()
+    assert any("plausible identifier" in p for p in problems), problems
+    assert _complete(SUPABASE_OAUTH_CLIENT_ID="a" * 200).auth_manifest_problems() == []
+
+
+@pytest.mark.parametrize("value", ["a b", "a/b", "a?b", "a#b", "a%2e", "aé"])
+def test_a_client_id_outside_the_charset_is_refused(value: str) -> None:
+    """It goes into a URL query string and, on the client, into a credential-store
+    account key. Neither has any business holding an arbitrary wire value."""
+    problems = _complete(SUPABASE_OAUTH_CLIENT_ID=value).auth_problems()
+    assert problems, value
+
+
+@pytest.mark.parametrize("value", ["daintree-assistant", "abc_123", "a.b~c", "A-Z0"])
+def test_an_ordinary_client_id_is_accepted(value: str) -> None:
+    assert _complete(SUPABASE_OAUTH_CLIENT_ID=value).auth_manifest_problems() == []
+
+
+@pytest.mark.parametrize(
+    "jwks",
+    [
+        "https://abcdefghij.supabase.co/auth/v1/%2e%2e/capture",
+        "https://abcdefghij.supabase.co/auth/v1/%2E%2E/capture",
+        "https://abcdefghij.supabase.co/auth/v1/%2e%2e%2fcapture",
+    ],
+    ids=["lower", "upper", "encoded-slash"],
+)
+def test_a_percent_encoded_dot_segment_does_not_evade_containment(jwks: str) -> None:
+    """`urlsplit` leaves `.path` ENCODED, so `%2e%2e` splits into an innocuous
+    segment and the dot-segment rule never sees it — while every server and proxy
+    downstream decodes it and resolves the URL to `/capture`, outside the issuer.
+
+    Go's `url.Parse` decodes on the way in, so the client catches this for free.
+    This side had to be told, and a check that only caught the already-decoded
+    spelling would have been the more dangerous kind of green test.
+    """
+    problems = _complete(SUPABASE_JWKS_URL=jwks).auth_problems()
+    assert any("SUPABASE_JWKS_URL" in p and "path" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("host", ["localhost", "evil.localhost", "127.0.0.1."])
+def test_plaintext_is_refused_on_a_loopback_NAME_even_in_development(host: str) -> None:
+    """The http exemption exists because there is no network to intercept, and a
+    NAME does not establish that: `evil.localhost` resolves through DNS or
+    /etc/hosts to wherever someone points it, and `127.0.0.1.` is a fully-qualified
+    DNS name that merely looks like an IP literal.
+
+    A plaintext token exchange carries the authorization code AND the PKCE
+    verifier, so a name-based exemption would let both travel to a remote host.
+    The client applies exactly this rule, so accepting a name here would publish a
+    manifest it refuses.
+    """
+    problems = _settings(
+        ENVIRONMENT="development", SUPABASE_AUTH_ISSUER=f"http://{host}:54321/auth/v1"
+    ).auth_problems()
+    assert any("SUPABASE_AUTH_ISSUER" in p and "https" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "[::1]"])
+def test_plaintext_is_allowed_on_a_loopback_LITERAL_in_development(host: str) -> None:
+    assert (
+        _settings(
+            ENVIRONMENT="development", SUPABASE_AUTH_ISSUER=f"http://{host}:54321/auth/v1"
+        ).auth_manifest_problems()
+        == []
+    )
+
+
+# ---- Staying the STRICTER of the two implementations -----------------------
+#
+# Everything below exists because the client would refuse it. Each is a
+# configuration that would otherwise pass here and fail on a user's machine,
+# where the person hitting it can do nothing about it and the operator never sees
+# it. The endpoint's whole promise is that this list is empty in production.
+
+
+@pytest.mark.parametrize(
+    "jwks",
+    [
+        # Decoding sees this as a segment boundary; the client's parser refuses
+        # the URL outright.
+        "https://abcdefghij.supabase.co/auth/v1%2Fmalicious",
+        # `unquote` leaves a malformed escape untouched; the client's parser does
+        # not, and rejects the whole URL.
+        "https://abcdefghij.supabase.co/auth/v1/%zz",
+    ],
+    ids=["encoded-slash", "malformed-escape"],
+)
+def test_a_percent_escape_in_an_endpoint_path_is_refused(jwks: str) -> None:
+    """Refused outright rather than interpreted, because every way of HANDLING a
+    percent-escape here diverges from the client. A real issuer, authorize, token
+    or JWKS path never contains one."""
+    problems = _complete(SUPABASE_JWKS_URL=jwks).auth_problems()
+    assert any("SUPABASE_JWKS_URL" in p and "percent-encode" in p for p in problems), problems
+
+
+def test_a_browser_link_may_still_percent_encode() -> None:
+    """The rule is scoped to the OAuth endpoints. An account page may legitimately
+    carry an encoded query, and the client applies no path-containment rule to
+    these at all."""
+    assert (
+        _complete(
+            DAINTREE_ACCOUNT_URL="https://staging.daintree.org/account?next=%2Fbilling"
+        ).auth_manifest_problems()
+        == []
+    )
+
+
+def test_more_than_one_trailing_dot_does_not_match_the_trust_anchor() -> None:
+    """The client removes a single trailing dot, so `...co..` matches here and is
+    refused there if this strips them all."""
+    problems = _settings(
+        SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co../auth/v1"
+    ).auth_problems()
+    assert any("identity provider" in p for p in problems), problems
+
+
+def test_a_value_that_cannot_be_encoded_fails_readiness_rather_than_a_request() -> None:
+    """A lone surrogate — which the environment can carry in through
+    surrogateescape — survives every structural check and then raises while the
+    response is being serialized, turning a configuration mistake into a 500 on a
+    public endpoint."""
+    problems = _settings(
+        SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co/auth/v1\udc80"
+    ).auth_problems()
+    assert any("UTF-8" in p for p in problems), problems
+
+
+def test_an_unbounded_url_is_refused() -> None:
+    """The client caps the whole manifest body, so one enormous value does not
+    merely bloat the response — it makes every other field unreadable, and the
+    failure names the size rather than the field that caused it."""
+    long_url = "https://staging.daintree.org/account?x=" + "a" * 4000
+    problems = _complete(DAINTREE_ACCOUNT_URL=long_url).auth_problems()
+    assert any("longer than" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("field", ["AUTH_ACCESS_TOKEN_SECONDS", "AUTH_SESSION_MAX_AGE_SECONDS"])
+def test_a_session_duration_is_bounded_at_both_ends(field: str) -> None:
+    """The client decodes these into a fixed-width integer, so an unbounded Python
+    int is not merely implausible — it fails to decode and takes the whole manifest
+    with it."""
+    for bad in (0, 59, 10**20):
+        with pytest.raises(ValidationError):
+            _complete(**{field: bad})
+    assert _complete(**{field: 31_536_000}).auth_manifest_problems() == []
+
+
+# ---- `required` cannot outrun the implementation ---------------------------
+
+
+def test_required_is_false_while_enforcement_does_not_exist() -> None:
+    """`auth_problems()` refuses a non-open mode, so such a deployment never
+    becomes ready — but `/auth/config` deliberately answers ANYWAY. Without the
+    implementation conjunct, a deployment that never started would still be out
+    here telling every client a credential was required.
+    """
+    from daintree_assistant_server.api.daintree_auth import _auth_config_body
+    from daintree_assistant_server.config import AUTH_ENFORCEMENT_IMPLEMENTED
+
+    assert AUTH_ENFORCEMENT_IMPLEMENTED is False
+    body = _auth_config_body(_complete(AUTH_MODE="enforce"))
+    assert body["configured"] is True
+    assert body["required"] is False
