@@ -58,26 +58,9 @@ class SelectionDecision:
     # question that takes a tool call to answer keeps its sources on the
     # continuation round; nothing carries across a new instruction.
     docs_query: str | None = None
-    #: The head's ranking, widest-useful-slice first, INDEPENDENT of what was
-    #: admitted. ``runbook_ids`` is what the turn will actually execute — capped,
-    #: floor-filtered and cardinality-gated. This is what the turn is plausibly
-    #: ABOUT, and the two are different questions.
-    #:
-    #: It exists for the fast-response stage, which writes a preview of intended
-    #: work and benefits from seeing near-misses the executor never loads: a
-    #: runbook ranked second is the strongest available evidence about what kind
-    #: of task this is, and the admission gates deliberately throw that away.
-    #: Nothing else reads it, and NOTHING may load a runbook from it — admission
-    #: is ``resolve_active_runbooks``'s job and stays there.
-    #:
-    #: Empty on a degraded or reused decision, which have no ranking of their own.
-    ranked_runbook_ids: list[str] = None  # type: ignore[assignment]
-
     def __post_init__(self) -> None:
         if self.warnings is None:
             self.warnings = []
-        if self.ranked_runbook_ids is None:
-            self.ranked_runbook_ids = []
 
     @classmethod
     def reuse(cls, active_ids: list[str]) -> SelectionDecision:

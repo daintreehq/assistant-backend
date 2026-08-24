@@ -44,14 +44,6 @@ from .setwise import SetwiseClassifier
 
 _log = logging.getLogger(__name__)
 
-#: How much of the head's ranking the fast-response stage is shown. Five rather
-#: than the active cap of three on purpose: the extra two are the near-misses, and
-#: they are the point. A preview written from the admitted set alone can only
-#: restate what the executor already holds; the runbooks that ALMOST loaded are
-#: what let it describe the shape of the task rather than the shape of the answer.
-#: Costs one list slice — these ids are already ranked and already in hand.
-FAST_CONTEXT_RUNBOOKS = 5
-
 
 class RunbookSelector(Protocol):
     """What the orchestrator needs from a selector — nothing more.
@@ -255,16 +247,6 @@ class LocalSelector:
             calls=0,
             warnings=[],
             authoritative=True,
-            # The head's own ranking, filtered against the same snapshot as the
-            # admitted ids and truncated to the fast stage's width. Taken from
-            # `ranked` rather than `scores` because `scores` is already a top-five
-            # LOG line — reading it here would tie a prompt input to a diagnostic
-            # someone could shorten without ever thinking about this.
-            ranked_runbook_ids=[
-                sid
-                for sid, _ in result.ranked[:FAST_CONTEXT_RUNBOOKS]
-                if sid in catalog.selectable_ids
-            ],
             docs_query=_docs_search_query(docs_text) if result.docs_wanted else None,
         )
 

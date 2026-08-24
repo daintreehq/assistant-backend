@@ -118,7 +118,6 @@ from .fast_response import (
     FastResponsePolicyDecision,
     FastResponseResult,
     FastResponseService,
-    fast_context_runbooks,
 )
 from .output_policy import lint_output, repair_tables, resolve_content_width
 from .prompt_assembler import (
@@ -1482,9 +1481,15 @@ class ChatOrchestrator:
             fast_task = asyncio.create_task(
                 self.fast_response.generate(
                     request,
-                    active_runbooks=fast_context_runbooks(
-                        decision, runbooks, resolved_catalog
-                    ),
+                    # The ACTIVE set, and only it. A previous version widened this
+                    # with the selector's near-misses — the runbooks admission
+                    # ranked and threw away — on the theory that a second-ranked
+                    # candidate is evidence about what kind of request this is.
+                    # It is, but a full PROCEDURE is far too strong a
+                    # representation of that evidence: it supplies steps, tools
+                    # and an order for a workflow the executor was never given,
+                    # and the opening can end up framing the turn around it.
+                    active_runbooks=runbooks,
                     request_id=request_id,
                 )
             )

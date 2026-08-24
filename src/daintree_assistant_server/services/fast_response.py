@@ -68,8 +68,6 @@ from ..prompts.loader import (
     PromptLoader,
 )
 from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
-from ..runbooks.catalog import Catalog
-from ..runbooks.decision import SelectionDecision
 from ..runbooks.models import Runbook
 from ..runbooks.tool_projection import session_bucket
 from ..text_utils import sanitize_line
@@ -109,17 +107,24 @@ MAX_OUTPUT_TOKENS = 320
 
 #: The whole fast prompt, in characters.
 #:
-#: The serving model holds 131k tokens. This ceiling is ~65k at the usual four
-#: characters per token, and the gap is deliberate rather than timid: chars/4 is
-#: an average over prose, and a transcript is not prose. Tool output, paths and
-#: JSON run nearer one token per character, so a budget set at the true window
-#: would overflow exactly on the turns that carry the most evidence — the ones
-#: where the preview is worth most. At 2.5 chars/token this still fits.
+#: ~40k tokens at the pessimistic 2.5 characters per token that a transcript
+#: actually costs — paths, JSON and tool output run nearer one token per
+#: character than the four an average over prose assumes.
 #:
-#: `EXECUTOR_CONTEXT_TOKENS` gets the same treatment for the same reason
-#: (`context_budget.py`), and the constant that would let this be exact — a
-#: measured tokens-per-character for real traffic — is the same one owed there.
-_MAX_INPUT_CHARS = 260_000
+#: Cut from 260,000, which was ~65k tokens and set by asking what the model's
+#: 131k-token window could survive rather than what an opening needs. That is the
+#: wrong question in both directions. It is far more context than one paragraph
+#: of orientation can use, so most of it was prefill latency bought for nothing
+#: on the one path whose entire value is being fast. And a large window carries
+#: content risk of its own: the further back the transcript reaches, the more
+#: stale hypotheses and abandoned approaches there are for a context-limited
+#: model to frame the CURRENT request around.
+#:
+#: A product budget, not a technical limit, and deliberately generous against the
+#: layers below it: one active specific runbook plus its domain foundation is
+#: ~30,000 characters, so this leaves room for a long conversation on top of a
+#: fully loaded active set rather than trading the two against each other.
+_MAX_INPUT_CHARS = 100_000
 
 #: Reserved out of that budget for the layers ahead of the transcript, so a very
 #: long conversation cannot squeeze the runbooks out. It is a floor for THEM, not
@@ -398,44 +403,6 @@ class FastResponseResult:
         return bool(self.content and self.content.strip())
 
 
-def fast_context_runbooks(
-    decision: SelectionDecision,
-    active: list[Runbook],
-    catalog: Catalog,
-) -> list[Runbook]:
-    """What the fast stage READS, which is wider than what the turn RUNS.
-
-    The active set is capped, floor-filtered and cardinality-gated — it answers
-    "what will be executed". The preview is written before any of that matters and
-    its job is to describe the shape of the TASK, so it also gets the near-misses:
-    the runbooks the head ranked highest and admission threw away. A second-ranked
-    runbook is the strongest available evidence about what kind of request this
-    is, and the admission gates exist to discard exactly that.
-
-    Rank order is preserved and the ACTIVE ones lead, because `build_messages`
-    drops from the bottom when the budget runs out — so what goes is always a
-    runbook the turn was not going to run anyway.
-
-    Degrades to the active set alone: a reused or degraded decision has no ranking
-    of its own, and borrowing the previous turn's would describe a request that is
-    no longer being made.
-    """
-    seen = {r.id for r in active}
-    extra: list[Runbook] = []
-    for rid in decision.ranked_runbook_ids:
-        if rid in seen:
-            continue
-        runbook = catalog.get(rid)
-        if runbook is not None:
-            # Added to `seen` as well: the ranking is unique in production, but a
-            # helper that only reads the set and never writes it would render the
-            # same body twice the moment that stopped being true — spending budget
-            # on a duplicate and reading to the model as emphasis.
-            seen.add(rid)
-            extra.append(runbook)
-    return [*active, *extra]
-
-
 def should_generate_fast_response(
     request: RespondRequest,
     *,
@@ -562,6 +529,46 @@ def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: b
     return FastResponseValidation(valid=True, content=content)
 
 
+def _crop_head_and_tail(text: str, budget: int) -> str:
+    """Keep both ends of an oversized message, and say where the middle went.
+
+    The newest message is the one thing the opening cannot be written without, so
+    it is cropped instead of dropped. WHICH part survives is the whole question,
+    and taking the head — which is what a plain slice does — gets it backwards on
+    exactly the shape that overflows.
+
+    A message long enough to blow this budget is almost always a paste: a stack
+    trace, a diff, a wall of CI output, with the actual instruction written
+    underneath it. "…and fix whatever that is" lives in the last hundred
+    characters, so a head crop deletes the request and keeps the evidence for a
+    request the model can no longer see. It then writes an opening for the paste.
+
+    Two thirds to the head and one third to the tail: the head still carries what
+    the paste IS, and the tail reliably reaches back past a one- or two-sentence
+    instruction. The marker is not decoration — without it the two halves join
+    into a single passage that reads as continuous, and the model draws
+    conclusions across a seam that is not there.
+    """
+    if budget <= 0:
+        # Nothing may be returned for a non-positive budget. Guarded explicitly
+        # because the obvious tail slice below does the OPPOSITE at zero:
+        # `text[-0:]` is `text[0:]`, so the whole string comes back. Unreachable
+        # from `build_messages`, which never offers less than the transcript
+        # floor — but a helper whose budget is only honoured for some inputs is
+        # one refactor away from being wrong somewhere it matters.
+        return ""
+    if len(text) <= budget:
+        return text
+    marker = "\n\n[… middle omitted …]\n\n"
+    if budget <= len(marker):
+        # No room to say anything honest about a crop; the tail is the half that
+        # carries the instruction, so it is the half to keep.
+        return text[-budget:]
+    room = budget - len(marker)
+    head = (room * 2) // 3
+    return text[:head] + marker + text[-(room - head):]
+
+
 class FastResponseService:
     """Builds the fast prompt, calls Cerebras once, and validates what comes back."""
 
@@ -606,60 +613,67 @@ class FastResponseService:
     def build_messages(
         self, request: RespondRequest, *, active_runbooks: list[Runbook]
     ) -> list[dict[str, Any]] | None:
-        """The fast model's input, or None when the runbooks alone do not fit.
+        """The fast model's input, or None when the runbooks do not fit.
 
         Layered widest-shared-first, the same discipline as the executor's own
-        prompt: system, then tool names, then runbooks, then the conversation.
+        prompt: system, then typed facts, then runbooks, then the conversation.
         Only the last of those changes every turn, so Cerebras's prefix cache
         covers everything above it.
 
-        Runbook bodies are MANDATORY and are never truncated. A half-rendered
-        procedure would have the fast model describe steps that stop mid-thought,
-        which is worse than no preview at all — so when they do not fit, whole
-        runbooks are dropped from the BOTTOM of the ranking (the least likely fit
-        goes first) and the stage skips entirely if even the first will not fit.
+        **The active set is ALL-OR-NOTHING.** Runbook bodies are never truncated —
+        a half-rendered procedure has the fast model describe steps that stop
+        mid-thought — and now they are never partially dropped either: if the set
+        does not fit, the stage skips.
+
+        That is a change of rule, not a tightening of the old one. This loop used
+        to drop from the BOTTOM of the ranking, which was sound while the list
+        was the active set plus the selector's near-misses: what went was always a
+        runbook the turn was not going to run. With the near-misses gone every
+        entry here is one the EXECUTOR will actually follow, so dropping the tail
+        no longer discards surplus — it hands the fast model a different procedure
+        set from the one the turn runs, and an opening framed on a partial set is
+        precisely the failure removing the near-misses was meant to end. No
+        preamble is the honest answer.
         """
         system = self._prompts.fast_response_prompt()
-        capabilities = self._capability_block(request)
-        budget = _MAX_INPUT_CHARS - len(system) - len(capabilities) - _TRANSCRIPT_MIN_CHARS
+        context = self._context_block(request)
+        budget = _MAX_INPUT_CHARS - len(system) - len(context) - _TRANSCRIPT_MIN_CHARS
 
-        # Dropped whole and from the bottom: `active_runbooks` arrives in rank
-        # order, so the first is the most likely fit and the last is the most
-        # expendable. Rendering is per-runbook rather than once over the list
-        # because the decision is which ones SURVIVE, and that cannot be made
-        # against a single rendered blob.
-        kept: list[Runbook] = []
-        for runbook in active_runbooks:
-            block = self._prompts.render(TEMPLATE_FAST_RESPONSE_RUNBOOKS, runbooks=[*kept, runbook])
-            if len(block) > budget:
-                break
-            kept.append(runbook)
-        if not kept:
+        if not active_runbooks:
             return None
-        runbooks_block = self._prompts.render(TEMPLATE_FAST_RESPONSE_RUNBOOKS, runbooks=kept)
+        runbooks_block = self._prompts.render(
+            TEMPLATE_FAST_RESPONSE_RUNBOOKS, runbooks=active_runbooks
+        )
+        if len(runbooks_block) > budget:
+            return None
 
         messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
-        if capabilities.strip():
-            messages.append({"role": "user", "content": capabilities})
+        if context.strip():
+            messages.append({"role": "user", "content": context})
         messages.append({"role": "user", "content": runbooks_block})
         messages.extend(
             self._transcript(request, budget=_MAX_INPUT_CHARS - len(system)
-                             - len(capabilities) - len(runbooks_block))
+                             - len(context) - len(runbooks_block))
         )
         return messages
 
-    def _capability_block(self, request: RespondRequest) -> str:
-        """Project, goal, and every tool NAME — never the schemas.
+    def _context_block(self, request: RespondRequest) -> str:
+        """Project and goal. No tool inventory, and that is the change.
 
-        The names are the whole inventory rather than a sample: they cost ~2 KB
-        together, and a cap would silently hide half of what Daintree can do from
-        the one stage whose job is to say what it is about to do. The SCHEMAS stay
-        out at ~22k tokens; what a tool is for is taught by the runbooks, which
-        are here in full and say it in context.
+        Every offered tool NAME used to be listed here — the whole inventory, on
+        the reasoning that a cap would hide half of what Daintree can do from the
+        stage whose job is to say what it is about to do.
 
-        They are also not sent as `tools`. The model must not be able to emit a
-        call — the validator rejects any reply that does — and text gives it the
-        knowledge without the mechanism.
+        That reasoning belonged to the hidden plan, which was asked to name a
+        route and needed to know what was callable. With one visible paragraph
+        left, the inventory is worse than useless: it is enough information to
+        invent a tool sequence and not nearly enough to know the sequence is
+        valid, because the SCHEMAS stay out at ~22k tokens. The opening is now
+        told never to name a tool, so the names could only ever be a temptation
+        toward the one thing the contract forbids.
+
+        What a turn can DO is taught by the runbooks, which are here in full and
+        say it in context — including which tools their own procedure needs.
         """
         project = None
         if request.startup and request.startup.project:
@@ -669,8 +683,6 @@ class FastResponseService:
             TEMPLATE_FAST_RESPONSE_CONTEXT,
             project=project,
             goal=goal,
-            capabilities=", ".join(sorted({t.function.name for t in (request.input.tools or [])}))
-            or None,
         )
 
     def _transcript(self, request: RespondRequest, *, budget: int) -> list[dict[str, Any]]:
@@ -698,10 +710,10 @@ class FastResponseService:
                 continue
             if len(text) > remaining:
                 # Whole messages, not fragments — except for the newest, which is
-                # truncated rather than lost.
+                # CROPPED rather than lost.
                 if rows:
                     break
-                text = text[: max(remaining, 0)] or text[:_TRANSCRIPT_MIN_CHARS]
+                text = _crop_head_and_tail(text, max(remaining, _TRANSCRIPT_MIN_CHARS))
             remaining -= len(text)
             rows.append({"role": message.role, "content": text})
             if remaining <= 0:

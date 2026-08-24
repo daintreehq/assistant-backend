@@ -21,7 +21,6 @@ from daintree_assistant_server.contracts.daintree_api import RespondRequest
 from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.providers.cerebras import CerebrasProvider
 from daintree_assistant_server.runbooks.catalog import default_runbooks_dir, load_catalog
-from daintree_assistant_server.runbooks.decision import SelectionDecision
 from daintree_assistant_server.services.fast_response import (
     _ANNOUNCEMENT_OPENING,
     _MAX_INPUT_CHARS,
@@ -29,7 +28,7 @@ from daintree_assistant_server.services.fast_response import (
     MAX_PREAMBLE_CHARS,
     MAX_PREAMBLE_WORDS,
     FastResponseService,
-    fast_context_runbooks,
+    _crop_head_and_tail,
     should_generate_fast_response,
     validate_preamble,
 )
@@ -362,48 +361,27 @@ def test_a_runbook_that_cannot_fit_at_all_skips_rather_than_being_truncated() ->
     assert _service().build_messages(_request(), active_runbooks=[giant]) is None
 
 
-def test_extra_ranked_runbooks_are_dropped_from_the_BOTTOM() -> None:
-    """The list arrives in rank order, so the last entry is the least likely fit
-    and the first is the one the turn is most probably about. Dropping from the
-    bottom means what goes is a runbook the turn was not going to run anyway —
-    dropping from the top would discard the best evidence to keep the worst."""
-    # Two-thirds of the budget each: the first fits, the second cannot join it.
+def test_an_active_set_that_does_not_fit_skips_rather_than_being_narrowed() -> None:
+    """All-or-nothing, and the rule CHANGED here rather than tightening.
+
+    This loop used to drop from the bottom of the ranking, which was sound while
+    the list was the active set plus the selector's near-misses: what went was
+    always a runbook the turn would not run. Every entry is active now, so the
+    executor follows all of them — and a partial drop would have the fast model
+    describe a different procedure set from the one the turn actually runs, which
+    is the exact framing hazard removing the near-misses was meant to end."""
+    # Two-thirds of the budget each: either alone fits, the pair cannot.
     big = _MAX_INPUT_CHARS * 2 // 3
     first = FOUNDATION.__class__(meta=FOUNDATION.meta, body="A" * big)
     second = FOUNDATION.__class__(meta=FOUNDATION.meta, body="B" * big)
-    messages = _service().build_messages(_request(), active_runbooks=[first, second])
-    assert messages is not None
-    rendered = "\n".join(str(m["content"]) for m in messages)
-    assert "A" * 100 in rendered
-    assert "B" * 100 not in rendered
 
+    assert _service().build_messages(_request(), active_runbooks=[first, second]) is None
 
-def test_every_tool_name_is_offered_and_no_schema_is() -> None:
-    """Names are the whole inventory, not a sample: they cost ~2 KB together, and
-    a cap would hide half of what Daintree can do from the one stage whose job is
-    to say what it is about to do. The SCHEMAS stay out — what a tool is FOR is
-    taught by the runbooks, which are here in full."""
-    tools = [
-        {"type": "function", "function": {"name": f"tool__{i}", "parameters": {"type": "object"}}}
-        for i in range(60)
-    ]
-    messages = _service().build_messages(
-        _request(input={"messages": [{"role": "user", "content": "go"}], "tools": tools}),
-        active_runbooks=[FOUNDATION],
-    )
-    assert messages is not None
-    rendered = "\n".join(str(m["content"]) for m in messages)
-    # Parsed as a delimited LIST, not by substring: `"tool__1" in rendered` is
-    # satisfied by `tool__10`, so a cap that dropped exactly the single-digit
-    # names would have passed a substring check.
-    listed = {
-        name.strip()
-        for line in rendered.splitlines()
-        if line.startswith("Available capabilities:")
-        for name in line.split(":", 1)[1].split(",")
-    }
-    assert listed == {f"tool__{i}" for i in range(60)}
-    assert '"parameters"' not in rendered
+    # ...and either one on its own still works, so the skip is about the SET not
+    # fitting rather than a ceiling that has quietly become unreachable.
+    alone = _service().build_messages(_request(), active_runbooks=[first])
+    assert alone is not None
+    assert "A" * 100 in "\n".join(str(m["content"]) for m in alone)
 
 
 def test_the_whole_transcript_is_carried_when_it_fits() -> None:
@@ -431,7 +409,7 @@ def test_the_whole_transcript_is_carried_when_it_fits() -> None:
 
 def test_the_newest_message_survives_even_when_the_budget_is_gone() -> None:
     """A preview of a task the model was never told about is worthless, so the
-    newest message is truncated rather than dropped."""
+    newest message is cropped rather than dropped."""
     runbook = FOUNDATION.__class__(
         meta=FOUNDATION.meta, body="R" * (_MAX_INPUT_CHARS - 20_000)
     )
@@ -745,76 +723,6 @@ async def test_a_reply_python_cannot_encode_falls_open_instead_of_raising() -> N
 
 
 # ---------------------------------------------------------------------------
-# What the fast stage READS is wider than what the turn RUNS.
-# ---------------------------------------------------------------------------
-
-
-def _decision(ranked: list[str]) -> SelectionDecision:
-    return SelectionDecision(
-        runbook_ids=list(ranked[:1]), ran=True, degraded=False, ranked_runbook_ids=ranked
-    )
-
-
-def test_the_fast_stage_sees_the_near_misses_the_executor_never_loads() -> None:
-    """The point of the wider set. A preview written from the admitted runbooks
-    alone can only restate what the executor already holds; the ones that ALMOST
-    loaded are what let it describe the shape of the task."""
-    explore = CATALOG.get("daintree.explore.repository")
-    assert explore is not None
-    context = fast_context_runbooks(
-        _decision([FOUNDATION.id, explore.id]), [FOUNDATION], CATALOG
-    )
-    assert [r.id for r in context] == [FOUNDATION.id, explore.id]
-
-
-def test_the_active_runbooks_lead_so_a_dropped_one_is_never_going_to_run() -> None:
-    """`build_messages` drops from the bottom, so ordering decides what is
-    expendable. Active first means the budget can only ever cost a near-miss."""
-    explore = CATALOG.get("daintree.explore.repository")
-    assert explore is not None
-    # Ranked puts the near-miss FIRST; the active one must still lead the result.
-    context = fast_context_runbooks(
-        _decision([explore.id, FOUNDATION.id]), [FOUNDATION], CATALOG
-    )
-    assert context[0].id == FOUNDATION.id
-
-
-def test_an_active_runbook_is_never_duplicated_into_the_context() -> None:
-    """The ranking contains the admitted ids too — sending a body twice would
-    spend the budget on nothing and read as emphasis."""
-    context = fast_context_runbooks(
-        _decision([FOUNDATION.id, FOUNDATION.id]), [FOUNDATION], CATALOG
-    )
-    assert [r.id for r in context] == [FOUNDATION.id]
-
-
-def test_an_unknown_ranked_id_is_dropped_rather_than_raising() -> None:
-    """A catalog reload between selection and assembly is the real case. The
-    preview is an optimisation and must not be the thing that fails a turn."""
-    context = fast_context_runbooks(
-        _decision([FOUNDATION.id, "daintree.not.a.runbook"]), [FOUNDATION], CATALOG
-    )
-    assert [r.id for r in context] == [FOUNDATION.id]
-
-
-@pytest.mark.parametrize(
-    "decision",
-    [
-        SelectionDecision.reuse([FOUNDATION.id]),
-        SelectionDecision.degraded_open(["local_runbook_selector_failed_open"]),
-    ],
-    ids=["reused", "degraded_open"],
-)
-def test_a_decision_with_no_ranking_falls_back_to_the_active_set(
-    decision: SelectionDecision,
-) -> None:
-    """Both shapes, because they are different objects and only one was covered.
-    Neither has a ranking of its own, and borrowing the previous turn's would
-    describe a request that is no longer being made."""
-    assert fast_context_runbooks(decision, [FOUNDATION], CATALOG) == [FOUNDATION]
-
-
-# ---------------------------------------------------------------------------
 # The visible opening, which is now the stage's only output.
 # ---------------------------------------------------------------------------
 
@@ -915,18 +823,6 @@ def _generate(text: str) -> Any:
 # paraphrase of it — a fix that only handles the paraphrase would look green
 # while the actual gap stayed open.
 # ---------------------------------------------------------------------------
-
-
-def test_a_repeated_ranked_id_does_not_duplicate_the_runbook_body() -> None:
-    """`extra` only ever grows by reading `seen`; without also writing to it, a
-    duplicate id in the ranking (never true in production today, but nothing in
-    this function enforces that) would render the same body twice — spending
-    budget on a copy and reading to the fast model as emphasis that was never
-    intended."""
-    context = fast_context_runbooks(
-        _decision([FOUNDATION.id, FOUNDATION.id, FOUNDATION.id]), [], CATALOG
-    )
-    assert [r.id for r in context] == [FOUNDATION.id]
 
 
 def test_the_register_drift_log_carries_no_model_content() -> None:
@@ -1208,3 +1104,119 @@ def test_comparison_operators_in_prose_are_not_frame_escapes(text: str) -> None:
     exactly what separates `< y >` from `<y>`. An earlier version of the pattern
     tolerated that space and rejected ordinary arithmetic prose."""
     assert validate_preamble(text, finish_reason="stop", had_tool_calls=False).valid
+
+
+# ---------------------------------------------------------------------------
+# The context is built for orientation, not for a second execution.
+# ---------------------------------------------------------------------------
+
+
+def test_no_tool_inventory_reaches_the_fast_model() -> None:
+    """The whole list used to be here, and the opening is now told never to name
+    a tool — so the names could only be a temptation toward the one thing the
+    contract forbids.
+
+    They were enough information to invent a sequence and never enough to know
+    it was valid, because the schemas stay out at ~22k tokens. What a turn can do
+    is taught by the runbooks, in context, including the tools their own
+    procedure needs."""
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": f"tool__{i}",
+                "description": "d",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        }
+        for i in range(60)
+    ]
+    messages = _service().build_messages(
+        _request(input={"messages": [{"role": "user", "content": "go"}], "tools": tools}),
+        active_runbooks=[FOUNDATION],
+    )
+    assert messages is not None
+    rendered = "\n".join(str(m["content"]) for m in messages)
+    assert "Available capabilities" not in rendered
+    for i in range(60):
+        assert f"tool__{i}" not in rendered
+    assert '"parameters"' not in rendered
+
+
+def test_the_project_and_goal_still_reach_the_fast_model() -> None:
+    """Dropping the inventory must not take the typed facts with it. They are
+    cheap, they are server-owned rather than model-authored, and the project a
+    request is about is exactly the kind of thing an opening can use without
+    claiming anything."""
+    messages = _service().build_messages(
+        _request(turn={"goal": "Prepare the branch for review"}),
+        active_runbooks=[FOUNDATION],
+    )
+    assert messages is not None
+    rendered = "\n".join(str(m["content"]) for m in messages)
+    assert "Test Project" in rendered
+    assert "Prepare the branch for review" in rendered
+
+
+def test_the_input_ceiling_is_the_tightened_one() -> None:
+    """~40k tokens at the pessimistic rate, down from ~65k.
+
+    Asserted against the largest real active unit rather than as a bare number:
+    the budget has to clear a specific runbook plus its domain foundation with
+    room for a conversation on top, or the stage skips the turns it is worth most
+    on. A cut that looked tidy but crossed that line would break the feature
+    without breaking a test that only checked the constant."""
+    assert _MAX_INPUT_CHARS == 100_000
+    biggest_unit = max(len(r.body) for r in CATALOG.runbooks) + len(FOUNDATION.body)
+    assert biggest_unit * 2 < _MAX_INPUT_CHARS
+
+
+def test_an_oversized_newest_message_keeps_the_instruction_at_its_end() -> None:
+    """The bug this replaces was a plain head slice.
+
+    A message long enough to blow the budget is almost always a paste — a stack
+    trace, a diff, a wall of CI output — with the actual instruction written
+    underneath it. Keeping the head deleted the request and kept the evidence for
+    a request the model could no longer see, and it then wrote an opening for the
+    paste."""
+    pasted_log = "ERROR: connection refused at line 12\n" * 4_000
+    instruction = "and work out why only CI sees that"
+    messages = _service().build_messages(
+        _request(input={"messages": [{"role": "user", "content": pasted_log + instruction}]}),
+        active_runbooks=[FOUNDATION],
+    )
+    assert messages is not None
+    newest = str(messages[-1]["content"])
+    assert instruction in newest
+    # The head survives too — what the paste IS still matters to the framing.
+    assert "connection refused" in newest
+    # And the seam is declared, so no conclusion is drawn across it.
+    assert "middle omitted" in newest
+
+
+def test_a_message_that_fits_is_returned_byte_identical() -> None:
+    """The crop must be inert on the overwhelmingly common case. A marker
+    injected into a message that never needed cropping would be the server
+    putting words into the user's turn."""
+    text = "fix the failing build"
+    assert _crop_head_and_tail(text, 10_000) == text
+
+
+
+def test_a_non_positive_crop_budget_returns_nothing() -> None:
+    """The obvious tail slice does the OPPOSITE at zero — `text[-0:]` is
+    `text[0:]`, so the whole string comes back and the budget is ignored
+    entirely. Unreachable from `build_messages`, which never offers less than the
+    transcript floor, but a helper that honours its budget only for some inputs
+    is one refactor away from being wrong where it matters."""
+    assert _crop_head_and_tail("abcdef", 0) == ""
+    assert _crop_head_and_tail("abcdef", -5) == ""
+
+
+def test_the_crop_never_returns_more_than_its_budget() -> None:
+    """Swept across every budget rather than spot-checked: the head/tail split is
+    integer arithmetic around a fixed-width marker, and the interesting failures
+    are all within a character or two of where the marker stops fitting."""
+    text = "ABCDEFGHIJ" * 10
+    for budget in range(1, len(text) + 20):
+        assert len(_crop_head_and_tail(text, budget)) <= budget

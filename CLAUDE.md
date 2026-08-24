@@ -586,6 +586,21 @@ and an unsupported causal prior — because both patterns have an unmeasured
 false-positive rate against phrasings the contract actually wants, and rejecting on a
 suspicion spends real openings.
 
+**Its context is built for orientation, not for a second execution.** The fast
+model gets the ACTIVE runbooks, the project and the goal, and the conversation
+under a 100,000-character ceiling (~40k tokens at the pessimistic rate) — and
+nothing else. Two inputs were removed with the plan they were there to serve. The
+selector's NEAR-MISSES were deliberately included on the theory that a
+second-ranked candidate is evidence about the request; it is, but a full
+procedure is far too strong a representation of that evidence, supplying steps
+and an order for a workflow the executor was never given. And the complete tool
+NAME inventory went with them: enough to invent a sequence, never enough to know
+it is valid, on a stage now told never to name a tool. An oversized newest
+message is cropped head-AND-tail with a declared omission marker, because a
+message long enough to overflow is almost always a paste with the actual
+instruction underneath it — a head slice kept the evidence and deleted the
+request.
+
 **It never runs on a continuation round** (gated on `session.round`, not on whether the
 selector ran — selection reruns for reasons that are not a new instruction), on a
 sub-agent, on a background wake, on a non-streaming request, or with no runbook loaded.
