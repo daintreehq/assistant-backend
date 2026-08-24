@@ -166,6 +166,313 @@ def upstream_timeout(message: str = "The upstream model provider timed out.") ->
 
 
 # --------------------------------------------------------------------------
+# Daintree ACCOUNT failures — who the caller is, and what their plan allows.
+#
+# **These are not the provider-account family below, and the distinction is the
+# whole reason both exist.** These describe the caller's Daintree login and
+# subscription at OUR door; those describe the credential this server sends
+# UPSTREAM, which is the operator's problem and which no caller can fix by
+# signing in again. Collapsing them is how a broken deployment key ends up
+# telling a user their session expired.
+#
+# The wire contract is not being invented here. The CLI already recognises every
+# one of these codes (`internal/backend/account.go`), so a code reworded or
+# restatused on this side silently stops matching a consumer that is already
+# written. What it does with them varies by group and is worth being exact about:
+# the five IDENTITY codes carry a typed `AuthRemedy` each, while the subscription,
+# usage and dependency codes carry none — they are classified for retryability and
+# for "is this the account's problem", and their handling is the client's to build.
+# Three groups, and the grouping is the CLI's:
+#
+# * **Identity** (401/403) — who you are. Each has a DIFFERENT next step, which
+#   is why they are not one code: sign in, refresh once, delete the credential,
+#   or fix the configuration. A single `401 unauthorized` would collapse all four
+#   into "log in again", and two of them are refresh loops that can never succeed.
+# * **Subscription** (402) — authenticated, not entitled. Two codes because the
+#   fixes differ: a first purchase versus the billing portal. Suggesting a second
+#   checkout to someone whose card merely failed is how people pay twice.
+# * **Dependency** (503) — we could not CHECK. Never a verdict. Presenting an
+#   outage as "you are not subscribed" or "you are signed out" destroys a
+#   perfectly good session over a blip, which is why these three are retryable
+#   and the ones above are not. None of them sets a fixed `Retry-After`, and that
+#   omission is deliberate: the CLI treats a server-supplied value as
+#   AUTHORITATIVE and replaces its own jittered exponential schedule with it, so a
+#   hardcoded "5" would pin every client on Earth to the same five-second cadence
+#   for the duration of a dependency outage — synchronising the herd against the
+#   dependency that is already struggling, and capping the backoff exactly when it
+#   most needs to grow. The parameter is there for a caller that has a REAL
+#   recovery estimate to pass on.
+#
+# Nothing on this path is emitted yet: `auth.py` still serves every request
+# anonymously, and entitlement and usage accounting do not exist. They are the
+# vocabulary those layers will raise, defined here first so the taxonomy, the
+# documentation and the CLI's existing handling agree before anything depends on
+# them.
+# --------------------------------------------------------------------------
+
+#: A 401 challenge, per RFC 6750. `auth_required` gets the bare form because no
+#: credential was presented, so there is no token to describe as invalid; the
+#: rest name the reason, which is what makes the header useful rather than
+#: ceremonial.
+_BEARER_CHALLENGE = "Bearer"
+_INVALID_TOKEN_CHALLENGE = 'Bearer error="invalid_token"'
+
+
+def auth_required() -> DaintreeError:
+    """401 — no bearer credential arrived at all.
+
+    Distinct from ``auth_token_invalid`` because the remedy differs: there is
+    nothing to refresh, so the only move is a sign-in. Never retried
+    automatically — a replay of the same credential-free request is the same
+    request.
+    """
+    return DaintreeError(
+        status_code=401,
+        message="This endpoint requires a Daintree account credential.",
+        type=TYPE_AUTHENTICATION,
+        code="auth_required",
+        headers={"WWW-Authenticate": _BEARER_CHALLENGE},
+    )
+
+
+def auth_token_invalid() -> DaintreeError:
+    """401 — malformed, wrong issuer/audience, or a bad signature.
+
+    **Deliberately one code for all of those**, and deliberately vague on the
+    wire. Which specific check failed is diagnostic detail about a credential we
+    did not accept, and narrating it to an unauthenticated caller turns the
+    endpoint into an oracle for probing what this deployment will take. The
+    reason belongs in the server's own logs, where the request id joins it up.
+    The message is therefore NOT overridable: a caller that could pass one would
+    eventually pass ``str(exception)``, and the leak would arrive by accident
+    rather than by decision.
+
+    **One case that looks like it belongs here and does not:** a token whose
+    ``client_id`` is outside this deployment's allowlist is
+    ``auth_client_not_allowed``, never this. The distinction is load-bearing
+    rather than tidy — this code tells a client to REFRESH, and refreshing a
+    perfectly valid token from the wrong OAuth client mints another token wrong
+    in exactly the same way, forever. Draw the line at the claim: a malformed,
+    unverifiable or wrong-``aud`` token is invalid; a verified token from an
+    unallowlisted client is not.
+    """
+    return DaintreeError(
+        status_code=401,
+        message="The account credential could not be verified.",
+        type=TYPE_AUTHENTICATION,
+        code="auth_token_invalid",
+        headers={"WWW-Authenticate": _INVALID_TOKEN_CHALLENGE},
+    )
+
+
+def auth_token_expired() -> DaintreeError:
+    """401 — the token verified but is past its expiry.
+
+    Split from ``auth_token_invalid`` because it is the one identity failure a
+    client can fix silently: refresh once and replay. That makes it the only one
+    worth telling apart at all, and getting it wrong in either direction is
+    expensive — a refresh loop on a genuinely dead credential, or a sign-in
+    prompt for a token that needed one round trip.
+
+    ``retryable`` stays False: the single refresh-and-replay belongs to the
+    client's auth ladder, which knows whether anything has been shown to the user
+    yet. A transport-level retry underneath it would multiply one deliberate
+    replay into a loop against a credential nothing has re-minted.
+    """
+    return DaintreeError(
+        status_code=401,
+        message="The account credential has expired.",
+        type=TYPE_AUTHENTICATION,
+        code="auth_token_expired",
+        headers={"WWW-Authenticate": _INVALID_TOKEN_CHALLENGE},
+    )
+
+
+def auth_session_revoked() -> DaintreeError:
+    """401 — the signature is fine and the session is gone.
+
+    A logout, a grant revocation or a security action ended it, which means the
+    refresh token died with it. Refreshing is guaranteed to fail, so the only
+    correct response is to delete the local credential — the reason this is not
+    ``auth_token_expired``.
+    """
+    return DaintreeError(
+        status_code=401,
+        message="The session behind this credential no longer exists.",
+        type=TYPE_AUTHENTICATION,
+        code="auth_session_revoked",
+        headers={"WWW-Authenticate": _INVALID_TOKEN_CHALLENGE},
+    )
+
+
+def auth_client_not_allowed(
+    message: str = (
+        "This credential was issued to an OAuth client this deployment does not accept."
+    ),
+) -> DaintreeError:
+    """403 — a valid, fresh token from the wrong OAuth client.
+
+    **403 and not 401, and no challenge header.** Both are deliberate. The
+    credential is not the problem: it verified, it is current, and re-presenting
+    it will keep verifying. What is wrong is the pairing of client and
+    deployment, and a 401 with a `WWW-Authenticate` invites exactly the refresh
+    loop that cannot terminate — every refresh mints another token that is wrong
+    in the same way.
+
+    The reason is that a refresh cannot help, NOT that the header is forbidden
+    here: RFC 7235 requires a challenge on a 401 and does not prohibit one on
+    other statuses. Getting that rationale right matters, because "the RFC says
+    so" is the kind of justification a later edit overturns by reading the RFC.
+    """
+    return DaintreeError(
+        status_code=403,
+        message=message,
+        type=TYPE_AUTHENTICATION,
+        code="auth_client_not_allowed",
+    )
+
+
+def subscription_required(
+    message: str = "This account does not have a plan that includes the Daintree Assistant.",
+) -> DaintreeError:
+    """402 — authenticated, and no product grants access.
+
+    The login is fine and must be KEPT. A client that treated this as an auth
+    failure would sign the user out on the way to the checkout page.
+    """
+    return DaintreeError(
+        status_code=402,
+        message=message,
+        type=TYPE_AUTHENTICATION,
+        code="subscription_required",
+    )
+
+
+def subscription_inactive(
+    message: str = "This account's subscription does not currently grant access.",
+) -> DaintreeError:
+    """402 — a subscription exists and is not currently granting access.
+
+    Payment failed, paused, or ended. Distinct from ``subscription_required``
+    because the fix is the billing portal rather than a first purchase, and
+    offering a fresh checkout to someone whose card merely bounced is how a
+    person ends up paying for two subscriptions.
+    """
+    return DaintreeError(
+        status_code=402,
+        message=message,
+        type=TYPE_AUTHENTICATION,
+        code="subscription_inactive",
+    )
+
+
+def usage_limit_reached(
+    message: str = "This account has used its plan's usage allowance for the current period.",
+) -> DaintreeError:
+    """429 — the plan's hard usage cap is spent.
+
+    Shares its status with ``account_rate_limited`` and is its opposite: that one
+    is transient and this one holds until the period rolls over or the plan
+    changes. Not retryable, and that is the more expensive of the two mistakes to
+    get wrong — replaying an exhausted quota spends the entire backoff budget to
+    re-derive the same refusal.
+    """
+    return DaintreeError(
+        status_code=429,
+        message=message,
+        type=TYPE_RATE_LIMIT,
+        code="usage_limit_reached",
+    )
+
+
+def account_rate_limited(
+    message: str = "Too many requests from this account.",
+    retry_after: str | None = None,
+) -> DaintreeError:
+    """429 — this account is sending requests too quickly. Genuinely transient."""
+    headers = {"Retry-After": retry_after} if retry_after else None
+    return DaintreeError(
+        status_code=429,
+        message=message,
+        type=TYPE_RATE_LIMIT,
+        code="account_rate_limited",
+        headers=headers,
+        retryable=True,
+    )
+
+
+def auth_dependency_unavailable(
+    message: str = "The account credential could not be checked right now.",
+    retry_after: str | None = None,
+) -> DaintreeError:
+    """503 — we could not establish session validity safely.
+
+    **This is not a logout.** The user is not signed out by it; we simply could
+    not check, and converting "we don't know" into "you are signed out" deletes a
+    perfectly good credential during an outage. Retryable for that reason.
+    """
+    return DaintreeError(
+        status_code=503,
+        message=message,
+        type=TYPE_API,
+        code="auth_dependency_unavailable",
+        headers={"Retry-After": retry_after} if retry_after else None,
+        retryable=True,
+    )
+
+
+def entitlement_unavailable(
+    message: str = "The billing authority is unavailable and no recent result is usable.",
+    retry_after: str | None = None,
+) -> DaintreeError:
+    """503 — we could not determine entitlement, and will not guess.
+
+    **Must never be presented as "you are not subscribed."** A paying customer
+    told to buy again during a billing outage is the single worst outcome this
+    whole taxonomy exists to prevent, and it is why an unknown answer gets its
+    own code rather than degrading into ``subscription_required``.
+    """
+    return DaintreeError(
+        status_code=503,
+        message=message,
+        type=TYPE_API,
+        code="entitlement_unavailable",
+        headers={"Retry-After": retry_after} if retry_after else None,
+        retryable=True,
+    )
+
+
+def usage_accounting_unavailable(
+    message: str = "Usage could not be recorded durably, so the request was not started.",
+    retry_after: str | None = None,
+) -> DaintreeError:
+    """503 — the durable usage write failed BEFORE any paid work began.
+
+    Fails closed on purpose: work that cannot be accounted for is work billed to
+    nobody, so the provider is never invoked rather than run unrecorded. It is
+    safe to retry precisely because nothing was spent.
+
+    **"Before" is the entire contract, and the name does not carry it.** The CLI
+    retries this code unconditionally, including from a mid-stream error, on the
+    strength of that promise. Raising it after the provider has run would make
+    every replay a double-spend while the wire still said nothing was spent — the
+    one bug in this family that costs real money. A post-work accounting failure
+    is a DIFFERENT condition and needs its own code; it must not borrow this one
+    because the wording happens to fit. The name cannot be improved to say so:
+    the CLI already ships this exact string, so the constraint lives here, in the
+    only place a future caller will read.
+    """
+    return DaintreeError(
+        status_code=503,
+        message=message,
+        type=TYPE_API,
+        code="usage_accounting_unavailable",
+        headers={"Retry-After": retry_after} if retry_after else None,
+        retryable=True,
+    )
+
+
+# --------------------------------------------------------------------------
 # Provider account failures.
 #
 # These four used to collapse into one 502 ``upstream_error``, which meant a
@@ -181,15 +488,24 @@ def upstream_timeout(message: str = "The upstream model provider timed out.") ->
 
 
 def provider_invalid_api_key(
-    message: str = "The model provider rejected this API key. Replace or rotate it.",
+    message: str = (
+        "The model provider rejected this deployment's API key. This is a server "
+        "configuration problem; signing in again will not change it."
+    ),
 ) -> DaintreeError:
-    """Upstream 401 — the provider does not recognise the caller's credential.
+    """Upstream 401 — the provider does not recognise the credential WE sent.
 
-    Deliberately 401 with a code distinct from our own ``invalid_api_key``. Both
-    mean "fix your key", but ours means the header was missing or malformed at
-    Daintree's door, and this one means the key travelled fine and the provider
-    refused it. A client that cannot tell them apart cannot write correct copy
-    for either.
+    The key is the server's own (``TOGETHER_API_KEY``), so this is an operator
+    problem and no caller action can fix it. Deliberately 401 with a code
+    distinct from our own door's 401s, and deliberately carrying no
+    ``WWW-Authenticate``: a challenge here would tell a client to go and refresh
+    a Daintree login because the deployment's provider key is broken. The CLI
+    relies on that, excluding the provider-account codes from ``IsAuth()`` by
+    code rather than by status.
+
+    The 401 status is inherited from the upstream and is arguably the wrong
+    outward-facing shape for an operator fault — ``TODO.md`` carries that, since
+    changing it is a coordinated change with the CLI's own cost accounting.
     """
     return DaintreeError(
         status_code=401,
@@ -201,11 +517,16 @@ def provider_invalid_api_key(
 
 def provider_insufficient_credits(
     message: str = (
-        "The model provider account backing this API key has insufficient credits. "
-        "Add credits or use a different key."
+        "The model provider account funding this deployment has insufficient credits. "
+        "This is a server configuration problem, not an account or billing issue for "
+        "the caller."
     ),
 ) -> DaintreeError:
-    """Upstream 402 — the key is valid and the account cannot fund the call."""
+    """Upstream 402 — the key is valid and the deployment's account cannot fund it.
+
+    An operator problem, like every code in this group. Nothing the caller holds
+    or buys affects it.
+    """
     return DaintreeError(
         status_code=402,
         message=message,
@@ -216,14 +537,16 @@ def provider_insufficient_credits(
 
 def provider_key_forbidden(
     message: str = (
-        "The model provider refused this request for this API key. Check the key's "
-        "model permissions, spend limits and guardrails."
+        "The model provider refused this request for this deployment's API key — its "
+        "model permissions, spend limits or guardrails. A server configuration problem."
     ),
 ) -> DaintreeError:
     """Upstream 403 — recognised, funded, and not permitted to do *this*.
 
     Covers a key scoped away from the model, a per-key spend cap, and a provider
-    moderation/guardrail block. All are settings on the caller's own account.
+    moderation/guardrail block. All are settings on the DEPLOYMENT's provider
+    account — they were the caller's own when callers supplied the key, and that
+    has not been true since the credential moved to the server.
     """
     return DaintreeError(
         status_code=403,

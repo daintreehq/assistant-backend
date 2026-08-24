@@ -84,6 +84,58 @@ script's "Authentication posture" block.
 
 ---
 
+## Move the `cli/` pin forward to the CLI's account taxonomy
+
+**Trigger: the next time the CLI pin moves for any reason — this rides along.**
+
+`tests/unit/test_account_error_taxonomy.py::test_the_cli_and_the_backend_agree_on_every_account_code`
+compares this server's twelve account error codes and statuses against
+`cli/internal/backend/account.go`. The vendored pin predates that file, so the
+gate SKIPS: the contract it exists to protect is currently unguarded in CI, and
+the two halves were aligned by reading the sibling checkout by hand.
+
+The same pin bump also brings `internal/auth/` (discovery, PKCE, keyring,
+loopback) into view, which is what a future gate over the `/v1/daintree/auth/config`
+manifest would read. Both gates go live together.
+
+Note the standing hazard from CLAUDE.md: a pin bump that removes or renames a CLI
+tool reddens `tests/unit/test_runbook_catalog_hygiene.py`, and
+`benchmarks/_harness/fixtures/cli_tool_inventory.json` has to be refreshed with
+it. That is why this is not a drive-by.
+
+---
+
+## Restatus the provider-account 401, and give billing its own error type
+
+**Trigger: when account enforcement ships — these are the same conversation, and
+both need the CLI moved in lockstep.**
+
+Two inconsistencies that are harmless while nothing raises the account family and
+are worth fixing before something does.
+
+`provider_invalid_api_key` is an HTTP 401 describing the credential THIS SERVER
+sends upstream. The key is the server's own, so it is an operator fault a caller
+cannot act on, and the correct outward shape is a 5xx rather than a 401 that
+carries no `WWW-Authenticate` — which is itself the one 401 on the surface that
+does not challenge. It is safe today because the CLI classifies it by code
+(`IsAuth()` excludes the provider-account codes explicitly), so the missing
+challenge never reads as "sign in again". Changing the status means moving
+`internal/backend/client.go`'s cost accounting in the same release, which is why
+it is not a drive-by edit here. The default messages have already been corrected
+to describe a deployment problem rather than telling the caller to rotate a key
+they do not hold.
+
+Separately, `subscription_required` and `subscription_inactive` are typed
+`authentication_error` because the OpenAI taxonomy this envelope borrows has no
+billing bucket, and because `provider_insufficient_credits` already sits there.
+Both are states where authentication SUCCEEDED, so the type contradicts the code.
+The CLI is unaffected — it branches on `code` — but a second consumer could
+reasonably read `authentication_error` as licence to clear the credential, which
+is the exact failure the split codes exist to prevent. Adding a `billing_error`
+type means extending the documented type union in both repos at once.
+
+---
+
 ## Refuse `AUTH_MODE=open` in production once enforcement lands
 
 **Trigger: the commit that makes `enforce` real. Not before, and not separately.**

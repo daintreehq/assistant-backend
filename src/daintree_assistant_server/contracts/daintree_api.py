@@ -518,9 +518,11 @@ class StreamError(BaseModel):
     path that is already terminating, and saves the client from having to have
     retained the earlier event to report the failure.
 
-    ``retry_after`` preserves the upstream's raw ``Retry-After`` header when a
-    rate-limited open/prefetch exhausts its internal retries after SSE metadata
-    has already committed the HTTP 200. It is absent for every other error.
+    ``retry_after`` preserves the raw ``Retry-After`` header from any error that
+    carries one — today that is a rate-limited open/prefetch which exhausted its
+    internal retries after SSE metadata had already committed the HTTP 200, and it
+    will also be the account dependency 503s once anything raises them. It is
+    absent whenever the failing error set no such header, which is the usual case.
     """
 
     error: ErrorDetail

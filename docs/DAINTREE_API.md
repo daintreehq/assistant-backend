@@ -937,13 +937,79 @@ the problem, because that is the whole reason these are separate codes.
 | 400  | `system_messages_not_allowed`, `reserved_tool_name`, `invalid_tool_schema`, `tool_choice_not_offered`, `invalid_request_error` | The request is malformed. Client bug. |
 | 400  | `missing_tool_call_id`, `dangling_tool_message`, `duplicate_tool_call_id`, `unresolved_tool_calls`, `malformed_tool_call_id`, `tool_calls_on_non_assistant_message` | The tool-call transcript is not a valid exchange. An assistant turn opens a BATCH of calls, every call is answered exactly once, and only then may a user/assistant message follow; order *within* a batch is free. Ids are compared verbatim — surrounding whitespace is rejected rather than trimmed, because they travel upstream raw. A trailing unresolved batch is legal. Client bug in every case: report it with the request id rather than retrying. |
 | 400  | `invalid_image`, `remote_image_not_allowed` | An image part failed the data-URL policy: media type outside the allowlist (`image/png`, `image/jpeg`, `image/webp`, `image/gif`), not `;base64`, empty, or not valid base64. |
-| 401  | `invalid_api_key` | Not returned as an HTTP error by anything today: `auth.py` ignores `Authorization` entirely, so no bearer is ever checked on `/respond` or `/tasks`, and `POST /v1/daintree/auth/verify` and `/v1/daintree/doctor` both catch this internally and report it as a 200 verdict field instead. Reserved for account authentication (`TODO.md`) — once that lands, this is what a missing/malformed credential returns. |
+| 401  | `invalid_api_key` | Not returned as an HTTP error by anything today: `auth.py` ignores `Authorization` entirely, so no bearer is ever checked on `/respond` or `/tasks`, and `POST /v1/daintree/auth/verify` and `/v1/daintree/doctor` both catch this internally and report it as a 200 verdict field instead. **Not** what account authentication will return — that is `auth_required` / `auth_token_invalid` in the account family below, which say which of the two happened. This code predates them and is on its way out. |
 | 413  | `request_too_large` | Body cap, a per-message / per-tool byte cap, or a request-SHAPE cap: too many messages, content parts, tool calls in one message, stop sequences, pinned runbook ids or images. `param` names the field. |
 | 413  | `context_window_exceeded` | The assembled prompt does not fit the model's context window. Distinct from `request_too_large`, which is about the bytes the CLIENT sent: this one counts the whole prompt — base prompt, tool schemas, active runbook bodies, startup and the transcript — so a small request can trip it in a long session. Not retryable; start a new session or shorten the conversation. Raised before the upstream call when the server can see it, and mapped from the host's own rejection when it cannot, so the code is the same either way. |
 | 426  | `unsupported_daintree_protocol` | Upgrade the client. |
 | 404  | `unknown_task` | `/v1/daintree/tasks` was asked for a task profile that does not exist. Read the available ids from `/v1/daintree/capabilities`. |
 | 503  | *(not ready)* | `/readyz` is failing; the instance has not finished starting or is misconfigured. |
 | 500  | `internal_error` | Daintree bug. Report with the request id. |
+
+### Your Daintree account
+
+**Not yet emitted by anything.** `auth.py` still serves every request anonymously and
+entitlement does not exist, so no code in this table can currently be returned. They are
+defined and documented ahead of the layers that will raise them, because the CLI already
+recognises all twelve — the taxonomy has a consumer before it has a producer, and the two
+have to agree from the start.
+
+The "what a client should do" column describes the correct handling, not a survey of what
+any client has built: the CLI carries a typed remedy for each of the five identity codes,
+and classifies the rest for retryability without yet acting on them.
+
+Three groups, and the grouping is what a client should switch on.
+
+**Identity — who you are.** Each has a different next step, which is the reason they are
+not one code.
+
+| HTTP | Code | Meaning | What a client should do |
+|------|------|---------|--------------------------|
+| 401 | `auth_required` | No credential arrived. | Offer sign-in. Never retry automatically. |
+| 401 | `auth_token_invalid` | Malformed, wrong issuer/audience, or a bad signature. | Refresh only if a stored session exists to refresh from; otherwise sign in. |
+| 401 | `auth_token_expired` | The credential verified and is past its expiry. | Refresh once, then replay — but only while nothing has been shown to the user. |
+| 401 | `auth_session_revoked` | The signature is fine; the session is gone (logout, grant revocation, security action). | Delete the local credential. Refreshing cannot succeed — the session that would authorize it no longer exists. |
+| 403 | `auth_client_not_allowed` | A valid, current token from an OAuth client this deployment does not accept. | Report the mismatch. **Never refresh** — every refresh mints another token wrong in the same way. |
+
+Which specific check failed is deliberately not on the wire: `auth_token_invalid` covers
+all of them. Narrating the reason to an unauthenticated caller would make the endpoint an
+oracle for what this deployment accepts. The detail is in the server log under the request
+id.
+
+Every 401 here carries `WWW-Authenticate` (bare `Bearer` for `auth_required`, since no
+token was presented; `Bearer error="invalid_token"` for the rest). The 403 does not — RFC
+7235 reserves the challenge for 401, and offering one here would invite exactly the
+refresh loop that cannot terminate.
+
+**Subscription — authenticated, not entitled.** The login is fine in both cases and must
+be kept; signing the user out on the way to a checkout page is a bug.
+
+| HTTP | Code | Meaning | What a client should do |
+|------|------|---------|--------------------------|
+| 402 | `subscription_required` | No product on this account includes the Assistant. | Open the `subscribe_url` from `/v1/daintree/auth/config`. |
+| 402 | `subscription_inactive` | A subscription exists but is not currently granting access (payment failed, paused, ended). | Open the `account_url` from `/v1/daintree/auth/config` — **not** a second checkout. Offering a fresh purchase to someone whose card bounced is how a person pays twice. |
+
+**Usage and dependency.**
+
+| HTTP | Code | Meaning | What a client should do |
+|------|------|---------|--------------------------|
+| 429 | `usage_limit_reached` | The plan's hard usage allowance for the period is spent. | Send them to `account_url` to upgrade. Not retryable — it holds until the period rolls over or the plan changes. The error carries no period or reset timestamp, so a client cannot show when it lifts. |
+| 429 | `account_rate_limited` | Too many requests from this account. Transient. | Honour `Retry-After` when present; otherwise back off. |
+| 503 | `auth_dependency_unavailable` | Session validity could not be established. | Retry with backoff. **This is not a logout** — do not delete the credential. |
+| 503 | `entitlement_unavailable` | The billing authority is unreachable and no acceptable recent result exists. | Retry. **Never present the user as unsubscribed** — telling a paying customer to buy again during an outage is the worst outcome this taxonomy exists to prevent. |
+| 503 | `usage_accounting_unavailable` | A durable usage write failed before any paid work began, so nothing was started. | Retry. Nothing was spent. |
+
+None of the 503s carries a fixed `Retry-After`. That is deliberate rather than an
+omission: a client treats a server-supplied value as authoritative and drops its own
+jittered backoff for it, so a hardcoded delay would pin every client to one cadence for
+the length of an outage — synchronising the herd against the dependency that is already
+struggling. One is sent only when something actually knows a recovery estimate.
+
+**Branch on `code`, not on status.** The two 429s share a status and are opposites: one is
+transient, the other holds for the rest of the period. The two 402s are both final and
+differ only in where to send the user. The three 503s are alike — all "we could not
+check", all to be retried with the credential preserved. A client branching on status
+alone would replay an exhausted quota until its backoff budget was gone, or delete a good
+credential because a database blinked.
 
 ### The server's provider account
 
