@@ -34,6 +34,15 @@ dependencies = [
     "numpy>=1.26",
     "onnxruntime>=1.19",
     "tokenizers>=0.20",
+    # Account-token verification. The `crypto` extra is what pulls in
+    # `cryptography` for RS256/ES256 — without it PyJWT installs happily and then
+    # refuses every asymmetric algorithm at runtime, which would present as "every
+    # login is rejected" rather than as a missing dependency.
+    #
+    # Only the library. JWKS is fetched over the httpx client this service already
+    # owns rather than through PyJWT's `PyJWKClient`, which is synchronous and
+    # would block the event loop on every key rotation.
+    "pyjwt[crypto]>=2.10",
 ]
 
 [project.optional-dependencies]

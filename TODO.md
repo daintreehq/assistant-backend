@@ -84,6 +84,33 @@ script's "Authentication posture" block.
 
 ---
 
+## Check that a verified session still exists
+
+**Trigger: before `AUTH_MODE=enforce` reaches anyone real. Verification without
+it is a 60-minute window in which logout does nothing.**
+
+`services/supabase_auth.py` establishes that a token is genuine and unexpired. It
+cannot establish that the session behind it still exists, because nothing reaches
+back into an already-minted JWT: after a logout, a grant revocation or a security
+action, the signature keeps verifying until `exp`. With one-hour access tokens
+that is up to an hour of accepted requests on a credential the user believes they
+revoked.
+
+The master spec's design is a `session_id` lookup against Supabase's own session
+table, cached (60s positive, 5s negative) with a bounded stale-positive grace on a
+database outage and `auth_dependency_unavailable` — never a fake logout — when
+there is no evidence either way. `auth_session_revoked` already exists in the
+error taxonomy and the CLI already maps it to "delete the local credential", so
+the wire contract for this is finished; only the lookup is missing.
+
+It needs a database connection and a Redis cache, neither of which this service
+has, so it lands with that infrastructure rather than before it. Until then
+`enforce` should be understood as "a genuine token from a session that existed
+when the token was minted", which is a real boundary and not the one the product
+will eventually promise.
+
+---
+
 ## Teach the client to read the unconfigured `/auth/config` shape
 
 **Trigger: the next CLI change in `internal/auth/` — it is a small addition there

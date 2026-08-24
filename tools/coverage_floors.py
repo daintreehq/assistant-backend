@@ -38,6 +38,13 @@ FLOORS: dict[str, int] = {
     # because a branch that stops being exercised there does not fail anything, it
     # just quietly stops masking a shape of credential.
     "src/daintree_assistant_server/services/bearer.py": 98,
+    # Added 2026-08-24. The token verifier. On this list for the obvious reason
+    # and for a less obvious one: most of its branches are REFUSALS, and a refusal
+    # that stops being exercised does not break a test — it silently starts
+    # accepting something. 94 is the measured figure rounded down, per the ratchet
+    # rule above — the five uncovered branches are the JWKS refresh's own
+    # bookkeeping, not a verification rule.
+    "src/daintree_assistant_server/services/supabase_auth.py": 94,
     # Added 2026-08-24 (measured 95.58%). `config.py` earned a floor when it took
     # on the OAuth deployment configuration: `auth_manifest_problems()` decides
     # what `/v1/daintree/auth/config` will PUBLISH to any caller, and that route
