@@ -31,6 +31,7 @@ This README is a summary. Where it disagrees with one of these, the document win
 | [`docs/PROVIDER_POLICY.md`](docs/PROVIDER_POLICY.md) | Model ids, upstream wire shape, privacy posture, thinking posture, both retry layers, failure mapping |
 | [`docs/KEY_HANDLING.md`](docs/KEY_HANDLING.md) | What a key is, how it moves, where it must never appear, verification, rotation |
 | [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md) | The wire contract |
+| [`docs/CONTEXT_COMPILER.md`](docs/CONTEXT_COMPILER.md) | **Future work, not built.** The query-aware context-compiler design, assessed against what already exists here |
 
 `tests/unit/test_docs_drift.py` pins the highest-risk facts in those documents —
 privacy wording, thinking posture, model ids, credential ownership, retry layers,

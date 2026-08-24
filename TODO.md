@@ -595,6 +595,60 @@ prediction.
 
 ---
 
+## Start capturing local traces for the context compiler
+
+**Trigger: now, for the capture half. The compiler itself is gated on having
+traces, and traces only accumulate with wall-clock time.**
+
+`docs/CONTEXT_COMPILER.md` assesses an external design — a query-aware context
+compiler that selects exact source units instead of summarising — against what
+this repository already has. Read it before acting on anything here; it records
+which parts are already built under other names, and which parts contradict
+measured decisions (the assembly order, the tool-withholding boundary, the
+unversioned runbook schema).
+
+Everything downstream needs a corpus, and there is none: the trace plane is built
+and correct and has **never been switched on**, so the dataset targets start from
+zero. Capture is local-only and the code already enforces that — `cloudbuild.yaml`
+sets no `TRACE_*` variable, `full_internal` fails `/readyz` in a hardened
+environment and is refused again per-request by `eligibility.decide`, and
+`TRACE_SINK=filesystem` is separately forbidden in production/staging. Nothing new
+is needed to keep this off Cloud Run.
+
+What is owed, in the order it pays off:
+
+- **Turn capture on locally.** `ENVIRONMENT=development`,
+  `TRACE_CAPTURE_MODE=full_internal`, `TRACE_SINK=filesystem`,
+  `TRACE_FILESYSTEM_DIR=.tmp/traces`, `TRACE_IDENTITY_KEY` set. Zero code.
+- **Trace `/v1/daintree/tasks`.** It is untraced today, so every `context_compact`
+  call — a real transcript-in / reconciled-state-out pair, the closest thing to
+  pre-labelled compaction data that exists — is computed and discarded. Every
+  untraced call is permanently lost, which is what makes this the first code
+  change rather than a later one.
+- **Session-grouped export.** `training/export_context_traces.py` maps one trace
+  directory to one example. Group on `header.session_key`, order by
+  `header.round`, last-round-wins — the client resends the full transcript every
+  round, so the last round of a session already IS the conversation. The server is
+  stateless and has no session-end signal, so this is a dedupe on export, never a
+  capture-time decision.
+- **Emit `tool.call.observed` / `tool.result.observed`.** They exist only in
+  `tests/unit/test_trace_exporter.py`, so the exporter's `_tool_graph_is_sound`
+  check is inert against every real trace — and call/result pairing is exactly
+  what the compiler's atomicity rule needs to be able to trust.
+
+Two entries already point the same way and should be read together: "Capture the
+exact provider wire body in traces" below (`wire_request_ref` is always `None`)
+and "Shed context instead of only refusing it" above, whose priority ordering is
+already most of the compiler's budget-allocation stage.
+
+The fork this eventually forces is in `docs/CONTEXT_COMPILER.md` §7 and is worth
+deciding before either side is built: the shipped `context_compact` task
+*generates* reconciled state, and the compiler design says retained history must
+be exact source bytes. They are not competitors at the same layer — selection over
+evidence, reconciliation over a small state ledger — but nothing has tested that.
+
+---
+
 ## Verify the serving model's real context window
 
 **Trigger: with the live provider-contract suite below.**
