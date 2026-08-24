@@ -32,6 +32,14 @@ from pathlib import Path
 # excluded, so the gap stays visible.
 FLOORS: dict[str, int] = {
     "src/daintree_assistant_server/auth.py": 95,
+    # Added 2026-08-24 (measured 95.58%). `config.py` earned a floor when it took
+    # on the OAuth deployment configuration: `auth_manifest_problems()` decides
+    # what `/v1/daintree/auth/config` will PUBLISH to any caller, and that route
+    # deliberately answers while the service is unready — so readiness is not a
+    # second line of defence behind it. A validation branch that stops being
+    # exercised is a manifest nobody checks, and the aggregate 90% is exactly
+    # wide enough to absorb losing a few of them.
+    "src/daintree_assistant_server/config.py": 95,
     "src/daintree_assistant_server/errors.py": 93,
     "src/daintree_assistant_server/main.py": 95,
     "src/daintree_assistant_server/api/daintree_auth.py": 93,

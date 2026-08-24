@@ -10,7 +10,8 @@ process fails *readiness* — not import — when a secret is absent.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from ipaddress import ip_address
+from typing import ClassVar, Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr
@@ -172,6 +173,170 @@ def _origin_problem(*, value: str, expected_host: str, env_name: str) -> str | N
     )
 
 
+#: Characters that must never appear in a URL this server publishes. `urlsplit`
+#: SILENTLY NORMALISES them away — it strips leading/trailing spaces and C0
+#: controls and deletes embedded tab/CR/LF — so a value containing any of them
+#: validates as the clean URL and is then published RAW. The client receives
+#: something it will parse differently or reject outright, and every trace of why
+#: was erased before the check ran. Backslash is here for the same reason from the
+#: other direction: `urlsplit` does not treat it as an authority separator and
+#: browser-lineage parsers do, so `https://host\\evil/` is two different URLs
+#: depending on who reads it.
+_URL_FORBIDDEN = frozenset(chr(c) for c in range(0x21)) | {"\x7f", "\\"}
+
+#: Hostnames that name the reader's own machine. Refused in production/staging on
+#: any scheme: a manifest pointing every client at its own loopback interface is
+#: not a deployment, and `https://` does not make it one.
+_LOCAL_HOSTNAMES = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _origin_of(value: str) -> tuple[str, str, int] | None:
+    """``(scheme, host, port)`` with the default port made explicit, or ``None``.
+
+    Defaulting the port is what makes the comparison correct rather than merely
+    convenient: ``https://x.supabase.co`` and ``https://x.supabase.co:443`` are
+    the same origin, and a same-origin check that compared ``None`` against
+    ``443`` would reject a perfectly good configuration. A scheme with no default
+    port yields ``None`` rather than a sentinel, because a fabricated port would
+    make two unrelated origins compare equal.
+    """
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:  # a non-numeric or out-of-range port
+        return None
+    if not parsed.scheme or not parsed.hostname:
+        return None
+    if port is None:
+        default = {"https": 443, "http": 80}.get(parsed.scheme)
+        if default is None:
+            return None
+        port = default
+    return (parsed.scheme, parsed.hostname, port)
+
+
+def _url_shape_problem(*, value: str, env_name: str) -> str | None:
+    """The checks every published URL gets, whatever it is for.
+
+    Deliberately runs BEFORE parsing, because parsing is what destroys the
+    evidence. Nothing here echoes ``value``: these strings reach the startup log
+    and, outside production, a readiness response, and the one input most likely
+    to be malformed is one with a credential accidentally pasted into it.
+    """
+    if any(ch in _URL_FORBIDDEN for ch in value):
+        return f"{env_name} contains whitespace or a control character"
+    origin = _origin_of(value)
+    if origin is None:
+        return f"{env_name} is not a usable absolute URL (check the scheme, host and port)"
+    parsed = urlsplit(value)
+    if parsed.username is not None or parsed.password is not None:
+        return f"{env_name} must not embed credentials in the URL"
+    if parsed.fragment:
+        return f"{env_name} must not carry a URL fragment"
+    if not 1 <= origin[2] <= 65535:
+        return f"{env_name} names an unusable port"
+    return None
+
+
+def _auth_url_problem(*, value: str, env_name: str, hardened: bool) -> str | None:
+    """``None`` when ``value`` is a URL this server may publish to a client.
+
+    HTTPS is required because everything named by these URLs carries or mints a
+    credential, and because the CLI is instructed to REFUSE a manifest whose
+    endpoints are not HTTPS — publishing one would be handing every client a
+    configuration it must throw away. The loopback exemption exists so a local
+    Supabase (``http://127.0.0.1:54321/auth/v1``) is developable.
+
+    Both relaxations are withdrawn together in production/staging, and the SECOND
+    one is the less obvious: a real deployment's manifest is read by clients on
+    other machines, so a host naming the READER's own machine — or a private or
+    link-local address only reachable from inside one network — sends each of them
+    somewhere different, and none of those places is us. ``https://`` does not
+    redeem it, which is why the check is on the host rather than on the scheme.
+    """
+    problem = _url_shape_problem(value=value, env_name=env_name)
+    if problem:
+        return problem
+    origin = _origin_of(value)
+    assert origin is not None  # _url_shape_problem returned None, so it parsed
+    scheme, host, _ = origin
+    if hardened:
+        if host.lower() in _LOCAL_HOSTNAMES or _is_private_host(host):
+            return (
+                f"{env_name} must name a publicly reachable host in production "
+                "(a loopback or private address points every client at its own network)"
+            )
+        if scheme != "https":
+            return f"{env_name} must be an https:// URL"
+        return None
+    if scheme == "https":
+        return None
+    if scheme == "http" and host.lower() in _LOCAL_HOSTNAMES:
+        return None
+    return (
+        f"{env_name} must be an https:// URL "
+        "(http:// is allowed only on loopback, and only outside production)"
+    )
+
+
+def _is_private_host(host: str) -> bool:
+    """Whether ``host`` is an IP literal that is not routable on the public internet.
+
+    Only IP LITERALS. A DNS name is not resolved: resolution at startup would make
+    readiness depend on the network, and the answer could change afterwards anyway.
+    """
+    try:
+        address = ip_address(host)
+    except ValueError:
+        return False
+    return (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_reserved
+        or address.is_unspecified
+    )
+
+
+def _loopback_redirect_problem(*, value: str, env_name: str) -> str | None:
+    """``None`` when ``value`` is the CLI's fixed IPv4-loopback OAuth callback.
+
+    It gets the same shape checks every other published URL gets — this value is
+    served to anyone who asks ``/v1/daintree/auth/config``, so a credential or a
+    control character in it is exactly as bad here as in the issuer — plus three
+    refusals of its own, each closing a real hole rather than tidying the string:
+
+    * **Not loopback.** A redirect URI naming any other host sends the
+      authorization code somewhere off the machine that asked for it.
+    * **``localhost`` rather than ``127.0.0.1``.** It resolves through the host's
+      own name lookup, so a ``/etc/hosts`` entry or an IPv6-first resolver can
+      point it at a listener that is not the CLI's. The master spec binds IPv4
+      loopback for exactly this reason, and a name is not a binding.
+    * **No explicit port.** Supabase matches redirect URIs by exact string, so a
+      port the client picks at runtime can never match a registered URI. A missing
+      one here means the value was written for a client that chooses its own,
+      which cannot work.
+    """
+    problem = _url_shape_problem(value=value, env_name=env_name)
+    if problem:
+        return problem
+    parsed = urlsplit(value)
+    origin = _origin_of(value)
+    assert origin is not None  # _url_shape_problem returned None, so it parsed
+    scheme, host, _ = origin
+    if scheme != "http" or host != "127.0.0.1":
+        return (
+            f"{env_name} must be an http://127.0.0.1:<port>/<path> loopback callback "
+            "(not localhost, which resolves through the host's name lookup, and not "
+            "a non-loopback address, which would send the authorization code off-box)"
+        )
+    if parsed.port is None:
+        return f"{env_name} must name an explicit port (Supabase matches redirect URIs exactly)"
+    if not parsed.path or parsed.path == "/":
+        return f"{env_name} must name a callback path"
+    return None
+
+
 #: The three tool-projection postures. Declared HERE rather than beside the
 #: projector because config sits below runbooks in the import graph — the
 #: catalog reads DOCS_RUNBOOK_ID from this module, so the arrow cannot reverse.
@@ -194,6 +359,28 @@ TraceSinkKind = Literal["null", "filesystem", "gcs"]
 #: visible  emit the preamble and append it to the executor's input
 FastResponseMode = Literal["off", "shadow", "visible"]
 
+#: The account-authentication posture. An operational ROLLOUT switch, closed for
+#: the same reason every mode above is: each gate keys on this value, so a
+#: free-form typo ("enforced", "Observe") would fall through to the permissive
+#: branch — failing OPEN on the one setting whose whole job is to stop doing that.
+#:
+#: It is NOT one of the product decisions CLAUDE.md says must be hardcoded. Which
+#: model answers a turn has one right answer we have benchmarked; whether today's
+#: fleet is checking tokens is a question only production can answer, and the
+#: answer changes during a rollout. The precedent is `TOOL_PROJECTION_MODE` — a
+#: switch over behaviour that WITHHOLDS something from a caller, kept operational
+#: precisely so "turn it off" costs a config-only revision rather than a deploy.
+#:
+#: open      the Authorization header is not read at all. Every request is served
+#:           anonymously and the server funds it — today's shipped posture, and
+#:           the default, so a deployment that sets nothing does not move.
+#: observe   a token that IS present is parsed and verified, and the outcome is
+#:           recorded. Authorization is UNCHANGED: an observed identity grants
+#:           nothing, denies nothing, and a request with no token or a bad one is
+#:           served exactly as `open` would serve it. Evidence, not enforcement.
+#: enforce   a verified token is required; failures are the account 4xx family.
+AuthMode = Literal["open", "observe", "enforce"]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -208,8 +395,9 @@ class Settings(BaseSettings):
     # A CLOSED set on purpose. Every hardening gate below keys on this value, so a
     # free-form string meant a typo ("prod", "Production", "staging") silently skipped
     # weak-secret checks and the local-only-feature gate — i.e. it failed OPEN, in
-    # the one direction that matters. (Authentication itself no longer varies by
-    # environment: every request needs a caller key everywhere — see auth.py.)
+    # the one direction that matters. (Authentication does not vary by environment
+    # either: the posture is `AUTH_MODE`, which is read the same way everywhere —
+    # see auth.py.)
     environment: Literal["development", "test", "staging", "production"] = Field(
         default="development", alias="ENVIRONMENT"
     )
@@ -515,6 +703,44 @@ class Settings(BaseSettings):
         default=False, alias="CEREBRAS_PROMPT_CACHE_ENABLED"
     )
 
+    # ---- Account authentication (Supabase Auth as an OAuth 2.1 server) ---
+    #
+    # Every value here is DEPLOYMENT IDENTITY, not product policy. Which Supabase
+    # project issues our tokens and which OAuth client the CLI registers as differ
+    # per environment and cannot be hardcoded; what a valid token MUST look like
+    # (the audience, the signing algorithms, the clock skew, what each client is
+    # permitted to do) is policy with one right answer and is hardcoded beside the
+    # verifier instead. Nothing here is a secret: a JWKS URL, an issuer and a
+    # public client id are published to any caller by `/v1/daintree/auth/config`,
+    # which is why they are absent from `missing_secrets()` — listing them there
+    # would tell an operator to mount public configuration out of Secret Manager.
+    auth_mode: AuthMode = Field(default="open", alias="AUTH_MODE")
+    #: The exact issuer, ending in `/auth/v1`. Compared for equality against the
+    #: token's `iss`, so a token minted by a different Supabase project — the
+    #: production one against a staging deployment, or vice versa — is refused.
+    supabase_auth_issuer: str = Field(default="", alias="SUPABASE_AUTH_ISSUER")
+    supabase_jwks_url: str = Field(default="", alias="SUPABASE_JWKS_URL")
+    supabase_oauth_authorize_url: str = Field(default="", alias="SUPABASE_OAUTH_AUTHORIZE_URL")
+    supabase_oauth_token_url: str = Field(default="", alias="SUPABASE_OAUTH_TOKEN_URL")
+    supabase_oauth_client_id: str = Field(default="", alias="SUPABASE_OAUTH_CLIENT_ID")
+    #: The CLI's fixed loopback callback. Supabase matches redirect URIs EXACTLY,
+    #: so this is a compiled-in constant on the client side and a published one
+    #: here; the two must agree or every login fails at the redirect.
+    supabase_oauth_redirect_uri: str = Field(default="", alias="SUPABASE_OAUTH_REDIRECT_URI")
+    daintree_account_url: str = Field(default="", alias="DAINTREE_ACCOUNT_URL")
+    daintree_subscribe_url: str = Field(default="", alias="DAINTREE_SUBSCRIBE_URL")
+    #: Published so the client can schedule its own refresh. These MIRROR the
+    #: Supabase project's session settings — this server neither sets nor enforces
+    #: them — so they are the one pair here that can drift without anything
+    #: noticing: raise the project's session length and a stale value tells every
+    #: client to sign in early. Change them together.
+    auth_access_token_seconds: int = Field(
+        default=3600, ge=60, alias="AUTH_ACCESS_TOKEN_SECONDS"
+    )
+    auth_session_max_age_seconds: int = Field(
+        default=2_592_000, ge=60, alias="AUTH_SESSION_MAX_AGE_SECONDS"
+    )
+
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")
@@ -637,8 +863,9 @@ class Settings(BaseSettings):
     def is_hardened(self) -> bool:
         """True where production hardening applies: no local-only features, weak
         secrets rejected, the upstream origin pinned, internal detail withheld
-        from responses. (Authentication is NOT environment-dependent: every
-        request needs a caller key everywhere — see auth.py.)
+        from responses, and OAuth endpoints required to be https rather than
+        loopback. (It does not decide the authentication POSTURE: that is
+        `AUTH_MODE`, and it is read the same way in every environment.)
 
         The single place that decides "is this a real deployment?", so the checks
         below and ``/readyz`` cannot drift apart.
@@ -702,7 +929,172 @@ class Settings(BaseSettings):
             )
         problems.extend(self.trace_problems())
         problems.extend(self.fast_response_problems())
+        problems.extend(self.auth_problems())
         return problems
+
+    #: The eight values that make a publishable manifest. Ordered as the manifest
+    #: reads, so a completeness failure names fields in the order an operator
+    #: filled them in.
+    _MANIFEST_FIELDS: ClassVar[tuple[str, ...]] = (
+        "supabase_auth_issuer",
+        "supabase_jwks_url",
+        "supabase_oauth_authorize_url",
+        "supabase_oauth_token_url",
+        "supabase_oauth_client_id",
+        "supabase_oauth_redirect_uri",
+        "daintree_account_url",
+        "daintree_subscribe_url",
+    )
+
+    def auth_manifest_problems(self) -> list[str]:
+        """Everything wrong with the OAuth values THEMSELVES, ignoring the mode.
+
+        Split from :meth:`auth_problems` because "this manifest is unsafe to
+        publish" and "this deployment is not allowed to run in that mode" are
+        different questions with different consumers.
+        ``/v1/daintree/auth/config`` deliberately answers while the service is
+        unready, so it cannot use readiness as its filter: it asks THIS method
+        whether the values may be served, and a mode it does not support must not
+        be the reason a valid manifest is withheld.
+
+        Run in every mode, including ``open``. A malformed value is not dormant
+        under the open door — it is still published, and still rejected by every
+        client that reads it.
+        """
+        problems: list[str] = []
+        urls = (
+            ("SUPABASE_AUTH_ISSUER", self.supabase_auth_issuer),
+            ("SUPABASE_JWKS_URL", self.supabase_jwks_url),
+            ("SUPABASE_OAUTH_AUTHORIZE_URL", self.supabase_oauth_authorize_url),
+            ("SUPABASE_OAUTH_TOKEN_URL", self.supabase_oauth_token_url),
+            ("DAINTREE_ACCOUNT_URL", self.daintree_account_url),
+            ("DAINTREE_SUBSCRIBE_URL", self.daintree_subscribe_url),
+        )
+        for env_name, value in urls:
+            if not value:
+                continue
+            problem = _auth_url_problem(
+                value=value, env_name=env_name, hardened=self.is_hardened
+            )
+            if problem:
+                problems.append(problem)
+
+        if self.supabase_oauth_redirect_uri:
+            problem = _loopback_redirect_problem(
+                value=self.supabase_oauth_redirect_uri,
+                env_name="SUPABASE_OAUTH_REDIRECT_URI",
+            )
+            if problem:
+                problems.append(problem)
+
+        # The issuer is compared for EQUALITY against a token's `iss`, so its path
+        # is part of the credential check rather than decoration. Supabase serves
+        # auth under `/auth/v1`, and the overwhelmingly common way to get this
+        # wrong is to paste the bare project URL — which would then match no token
+        # ever minted and present as "every login is rejected".
+        issuer_parses = bool(self.supabase_auth_issuer) and _origin_of(self.supabase_auth_issuer)
+        issuer_path = urlsplit(self.supabase_auth_issuer).path if issuer_parses else "/auth/v1"
+        if not issuer_path.rstrip("/").endswith("/auth/v1"):
+            problems.append(
+                "SUPABASE_AUTH_ISSUER must end in /auth/v1 (it is compared for "
+                "equality against the token's `iss`, so the bare project URL "
+                "would match nothing)"
+            )
+
+        # Same-origin, against the ISSUER rather than against each other. A token
+        # endpoint on a host the issuer does not name is where an authorization
+        # code would be exchanged with a stranger, and it is the check that stops
+        # a half-edited configuration — three URLs updated for a new project and
+        # one left behind — from pointing part of the login at the old one.
+        issuer_origin = _origin_of(self.supabase_auth_issuer) if self.supabase_auth_issuer else None
+        if issuer_origin is not None:
+            expected = f"{issuer_origin[0]}://{issuer_origin[1]}:{issuer_origin[2]}"
+            for env_name, value in (
+                ("SUPABASE_JWKS_URL", self.supabase_jwks_url),
+                ("SUPABASE_OAUTH_AUTHORIZE_URL", self.supabase_oauth_authorize_url),
+                ("SUPABASE_OAUTH_TOKEN_URL", self.supabase_oauth_token_url),
+            ):
+                if not value:
+                    continue
+                other = _origin_of(value)
+                if other is not None and other != issuer_origin:
+                    problems.append(
+                        f"{env_name} must share the SUPABASE_AUTH_ISSUER origin ({expected})"
+                    )
+        return problems
+
+    def auth_problems(self) -> list[str]:
+        """Account-authentication configuration that must fail readiness.
+
+        Three rules, and the split between them is the point.
+
+        **Whatever is set is validated in every mode** — see
+        :meth:`auth_manifest_problems`.
+
+        **A mode whose behaviour does not exist yet is refused outright.** Nothing
+        reads a token today: ``auth.py`` still returns the anonymous principal for
+        every request. So a deployment that set ``AUTH_MODE=enforce`` would pass
+        readiness, report ``required`` to every client, and go on serving
+        unauthenticated requests — an operator believing the door was shut while
+        it stood open, which is worse than having no setting at all. Refusing at
+        readiness is the fail-closed answer: the revision never takes traffic.
+        This gate is lifted by the change that makes the modes real, in the same
+        commit, and not before.
+
+        **Completeness is required only once the mode is not ``open``.** A
+        deployment that is not doing account authentication has no reason to hold
+        an OAuth client id, and demanding one would fail readiness on every
+        instance running today's posture.
+
+        What is deliberately NOT here: a rule that ``open`` and ``observe`` are
+        refused in production. The master spec asks for one, and it is right about
+        the destination and wrong about today — ``open`` IS the deployed
+        production posture, documented as such in ``docs/DAINTREE_API.md`` and
+        asserted by ``infra/gcp/smoke.sh``. Adding that gate now would fail
+        ``/readyz`` on the very next release and the revision would never take
+        traffic. It belongs to the cutover, and ``TODO.md`` carries it with that
+        trigger.
+        """
+        problems = self.auth_manifest_problems()
+
+        if self.auth_mode == "open":
+            return problems
+
+        problems.append(
+            f"AUTH_MODE={self.auth_mode} is not implemented in this build — no token "
+            "is read on any path yet (see auth.py), so this deployment would report "
+            "an authentication boundary it does not have. Use AUTH_MODE=open."
+        )
+
+        for name in self._MANIFEST_FIELDS:
+            if not str(getattr(self, name)).strip():
+                env_name = name.upper()
+                problems.append(
+                    f"AUTH_MODE={self.auth_mode} requires {env_name} "
+                    "(a deployment checking tokens must also be able to tell a "
+                    "client how to obtain one)"
+                )
+        return problems
+
+    @property
+    def auth_is_configured(self) -> bool:
+        """Whether a complete and VALID OAuth manifest exists.
+
+        Validity is half of it, and it is the half that is easy to leave out.
+        ``/v1/daintree/auth/config`` deliberately answers while the service is
+        unready, so a manifest that failed readiness is still reachable: without
+        this check, a deployment whose token endpoint had been typo'd onto another
+        host would fail to start AND publish that host to every client, which is
+        the one shape of this bug that could send an authorization code to a
+        stranger. Completeness alone is not a licence to publish.
+
+        The mode is deliberately not consulted. Whether this build supports
+        ``enforce`` has nothing to do with whether these eight values are safe to
+        serve.
+        """
+        if self.auth_manifest_problems():
+            return False
+        return all(str(getattr(self, name)).strip() for name in self._MANIFEST_FIELDS)
 
     def fast_response_problems(self) -> list[str]:
         """Configuration that must fail readiness rather than degrade silently.

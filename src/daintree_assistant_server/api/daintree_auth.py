@@ -1,4 +1,21 @@
-"""Credential verification — "can this backend actually run a turn for me?".
+"""The account-authentication surface: OAuth discovery, and the legacy key probe.
+
+Two endpoints that answer two different questions, and the split between them is
+the whole reason this module is worth reading.
+
+``GET /v1/daintree/auth/config`` is **public OAuth discovery** — the non-secret
+manifest a client reads to learn how to obtain a credential for THIS deployment.
+It has to be public and it has to be unauthenticated, because requiring a token
+to learn how to get a token is a bootstrap no client can satisfy. The CLI has
+already reached the same conclusion from the other side: its token source keeps a
+closed list of paths it may call with no Authorization header, and this path sits
+on it beside the liveness probes. (That is upstream `develop`, not the pin in
+`cli/` — the vendored submodule predates it and still has the frozen `apiKey`, so
+a reader checking there will not find it.)
+
+``POST /v1/daintree/auth/verify`` is the older question, and it is about the
+SERVER's own upstream credential rather than the caller's — see its docstring.
+It stays until the CLI stops calling it.
 
 Originally this answered "is the key you just pasted valid?", because the caller
 supplied the credential that funded their turns and our own auth was structural
@@ -18,15 +35,118 @@ credential works — a question that returns, not one that went away.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from ..auth import Principal, require_auth
+from ..config import Settings
 from ..errors import DaintreeError
 from .deps import require_ready
 
 router = APIRouter()
+
+#: The OAuth scopes the Assistant client requests. Hardcoded rather than
+#: configured because they are not a deployment fact: Supabase supports the
+#: standard set and no application-defined scopes, so there is nothing to vary
+#: and nothing a per-environment value could express. Backend permissions will
+#: come from the allowlisted client id instead — never from these.
+_OAUTH_SCOPES = ("openid", "email")
+
+
+def _auth_config_body(settings: Settings) -> dict[str, object]:
+    """The manifest, or an honest statement that there is no account auth here.
+
+    Two fields are always present, so a client reads them unconditionally and only
+    then decides whether the endpoints exist. The alternative — a 404 or a 503 when
+    OAuth is unconfigured — would make "this deployment has no accounts", which is
+    the CURRENT and correct state of production, indistinguishable from "this
+    deployment is broken".
+
+    ``configured`` and ``required`` are two questions, not one. A deployment
+    mid-rollout will publish a complete manifest while still serving anonymous
+    requests: a client that collapsed the two would either refuse to sign in when
+    it could, or demand a sign-in that is not yet being enforced.
+
+    Both are derived rather than reported. ``configured`` is false unless the
+    values are complete AND valid, so a manifest that failed readiness is never
+    served — this endpoint deliberately answers while the service is unready, so
+    readiness cannot be its filter. ``required`` additionally requires a
+    publishable manifest: telling a client a credential is mandatory while
+    withholding the only description of how to obtain one is a dead end, and the
+    honest answer when we cannot say how to sign in is that we are not demanding
+    it.
+
+    There is no ``version`` field. This repo does not version what it ships — the
+    only client moves in lockstep and CLAUDE.md is explicit that a shape version
+    here would be a compatibility branch nobody needs.
+    """
+    configured = settings.auth_is_configured
+    body: dict[str, object] = {
+        "environment": settings.environment,
+        "configured": configured,
+        "required": configured and settings.auth_mode == "enforce",
+    }
+    if not configured:
+        return body
+    body.update(
+        {
+            "issuer": settings.supabase_auth_issuer,
+            "authorization_endpoint": settings.supabase_oauth_authorize_url,
+            "token_endpoint": settings.supabase_oauth_token_url,
+            "jwks_uri": settings.supabase_jwks_url,
+            "client_id": settings.supabase_oauth_client_id,
+            "redirect_uri": settings.supabase_oauth_redirect_uri,
+            "scopes": list(_OAUTH_SCOPES),
+            "account_url": settings.daintree_account_url,
+            "subscribe_url": settings.daintree_subscribe_url,
+            "session_policy": {
+                "access_token_seconds": settings.auth_access_token_seconds,
+                "session_max_age_seconds": settings.auth_session_max_age_seconds,
+            },
+        }
+    )
+    return body
+
+
+@router.get("/v1/daintree/auth/config")
+async def auth_config(request: Request) -> Response:
+    """Public, non-secret OAuth discovery for this deployment.
+
+    **Deliberately not gated on readiness or on the container.** It is built from
+    settings alone, and the moment someone most needs to know how to sign in is
+    the moment the rest of the service is unhappy. ``require_ready`` would turn a
+    bad upstream key into "you cannot log in either", which is both false and the
+    least useful possible answer. What it does NOT skip is validation of the
+    values themselves: ``auth_is_configured`` consults
+    ``Settings.auth_manifest_problems()``, so the same defects that fail readiness
+    also withhold the manifest.
+
+    The response is serialized ONCE and returned as those exact bytes, with the
+    ETag taken over them. An ETag computed from a re-serialization of the same
+    object is a strong validator for bytes nobody ever sent — key order and
+    unicode escaping are both free to differ — and the whole contract of a strong
+    validator is that it changes whenever the representation does.
+
+    ``private`` rather than ``public`` on the cache, and 60 seconds rather than
+    300. A shared cache is the wrong place for this in two ways: the response
+    carries a per-request ``X-Request-Id``, which a shared copy would replay to
+    unrelated callers and make correlation ids meaningless, and a cached
+    ``configured: false`` would keep clients from signing in for the whole TTL
+    after an enforcement cutover. The client that asked is the only one that
+    benefits from caching it anyway.
+    """
+    settings: Settings = request.app.state.settings
+    payload = json.dumps(
+        _auth_config_body(settings), separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    etag = '"' + hashlib.sha256(payload).hexdigest()[:32] + '"'
+    headers = {"ETag": etag, "Cache-Control": "private, max-age=60"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    return Response(content=payload, media_type="application/json", headers=headers)
 
 
 @router.post("/v1/daintree/auth/verify")

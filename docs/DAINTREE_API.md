@@ -54,7 +54,99 @@ SERVER's credential: they mean the deployment is misconfigured or unfunded, not 
 the caller did anything wrong. See [Errors](#errors).
 
 `/healthz`, `/readyz`, and `/version` are unauthenticated (Cloud Run probes them; they
-carry no user data).
+carry no user data), and so is `GET /v1/daintree/auth/config` — a client has to be able
+to read how to sign in before it holds anything to sign in with.
+
+The posture is named by one server setting, `AUTH_MODE`, so a client never has to infer
+it. **Today the only implemented value is `open`** — the header is not read on any path —
+and the other two (`observe`, which will verify a token that is present and record the
+outcome without changing authorization, and `enforce`, which will require one) are
+refused at readiness until the code behind them exists. A deployment cannot report an
+authentication boundary it does not have.
+
+`/v1/daintree/auth/config` reports what a client needs from that as `required`, alongside
+`configured` — whether signing in is possible here at all. The two are separate on
+purpose: during a rollout a deployment will publish a complete manifest while still
+serving anonymous requests.
+
+### GET /v1/daintree/auth/config
+
+Public, unauthenticated OAuth discovery: how to obtain a credential for **this**
+deployment. It exists so a client never hardcodes a Supabase project, OAuth client id,
+account URL or callback that can then drift from the backend.
+
+It is unauthenticated by necessity, not by omission — requiring a token to learn how to
+get a token is a bootstrap no client can satisfy. It is also **not gated on readiness**:
+it is built from configuration alone, and the moment someone most needs to know how to
+sign in is the moment the rest of the service is unhappy.
+
+Two fields are always present, so a client reads them unconditionally and only then
+decides whether the endpoints exist:
+
+```json
+{ "environment": "production", "configured": false, "required": false }
+```
+
+`configured` and `required` answer **different questions**, and collapsing them breaks a
+rollout. A deployment can publish a complete manifest while still serving anonymous
+requests (`AUTH_MODE=observe`): a client that read only one of them would either refuse
+to sign in when it could, or demand a sign-in nothing is enforcing yet.
+
+- `configured` — this deployment has a complete OAuth manifest, so signing in is possible.
+- `required` — a verified token is *required*; requests without one are refused.
+
+Today production answers `configured: false, required: false`, which is the accurate
+description of the open door below, **not** an error. A deployment with no account
+authentication is a working deployment, so it is a 200 rather than a 404 or a 503 —
+otherwise "there are no accounts here" would be indistinguishable from "this is broken".
+
+When `configured` is true the manifest is also present:
+
+```json
+{
+  "environment": "staging",
+  "configured": true,
+  "required": false,
+  "issuer": "https://<project-ref>.supabase.co/auth/v1",
+  "authorization_endpoint": "https://<project-ref>.supabase.co/auth/v1/oauth/authorize",
+  "token_endpoint": "https://<project-ref>.supabase.co/auth/v1/oauth/token",
+  "jwks_uri": "https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json",
+  "client_id": "<public-oauth-client-id>",
+  "redirect_uri": "http://127.0.0.1:42813/oauth/callback",
+  "scopes": ["openid", "email"],
+  "account_url": "https://staging.daintree.org/account",
+  "subscribe_url": "https://staging.daintree.org/subscribe",
+  "session_policy": { "access_token_seconds": 3600, "session_max_age_seconds": 2592000 }
+}
+```
+
+Nothing here is a secret: every value is operator-supplied deployment configuration, and
+no credential this server holds is reachable through it.
+
+The manifest appears **only when it is complete and valid**, which is a stronger
+condition than readiness and deliberately independent of it. A published endpoint must be
+HTTPS (loopback `http://` is permitted outside production, so a local Supabase is
+developable), must share the issuer's origin, must carry no credentials, fragment, or
+control characters, and `redirect_uri` must be an IPv4-loopback callback with an explicit
+port and path. A configuration that fails any of those reports `configured: false` rather
+than publishing something a client would have to reject — this endpoint answers while the
+service is unready, so readiness cannot be what filters it.
+
+The response carries a strong `ETag` over the exact bytes served, honours
+`If-None-Match` with a 304, and is `Cache-Control: private, max-age=60`. `private`
+because the response also carries a per-request `X-Request-Id` that a shared cache would
+replay to unrelated callers, and 60 seconds so a cached `configured: false` cannot keep
+clients from signing in for long after a cutover.
+
+There is no `version` field: this repo does not version what it ships, and its only
+client moves in lockstep.
+
+`scopes` is fixed. Supabase supports the standard OAuth scopes and no application-defined
+ones, so backend permissions will be derived from the allowlisted `client_id` — never
+from a scope the caller could ask for.
+
+`session_policy` is *reported*, not enforced here: it mirrors the Supabase project's own
+session settings so a client can schedule its refresh.
 
 ### POST /v1/daintree/auth/verify
 

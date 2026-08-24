@@ -84,6 +84,34 @@ script's "Authentication posture" block.
 
 ---
 
+## Refuse `AUTH_MODE=open` in production once enforcement lands
+
+**Trigger: the commit that makes `enforce` real. Not before, and not separately.**
+
+`Settings.auth_problems()` deliberately does NOT implement the master spec's rule
+that `open` and `observe` are refused in production. The spec is right about the
+destination and wrong about today: `open` IS the deployed production posture, it
+is documented as such in `docs/DAINTREE_API.md`, and `infra/gcp/smoke.sh` asserts
+it. Adding that gate now would fail `/readyz` on the very next release and the
+revision would never take traffic.
+
+Two changes belong to the same commit, and shipping either one alone is a
+regression:
+
+- Lift the refusal of `observe`/`enforce`, which currently fails readiness for
+  any mode but `open` because nothing reads a token yet. A deployment must never
+  be able to report an authentication boundary it does not have — that is the
+  whole reason the refusal exists, and it stops being true the moment
+  `authenticate` starts verifying.
+- Add the production gate the spec asks for, so the fleet cannot silently sit on
+  `open` after the cutover.
+
+Between those two, `AUTH_MODE` is a setting with exactly one legal value in
+production, which is the correct amount of freedom for a switch whose wrong
+value is invisible.
+
+---
+
 ## Retrain the selector so a reserved candidate can actually be kept
 
 **Trigger: the next selector retrain — this rides along with it, and should not
