@@ -1582,11 +1582,6 @@ class ChatOrchestrator:
                 continuation_message=self.fast_response.continuation_message
                 if self.fast_response is not None
                 else "",
-                # Rides the continuation row, never the assistant one, and only on
-                # a turn whose preamble is actually being SHOWN. A plan delivered
-                # on a shadow-mode turn would steer an answer the evidence for
-                # which the user never saw.
-                plan=fast.plan,
                 invocation_id=fast.invocation_id,
                 content_sha256=fast.content_sha256,
             )

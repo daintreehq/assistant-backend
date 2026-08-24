@@ -528,14 +528,32 @@ sentences describing the work about to happen — written by `gemma-4-31b` on Ce
 while the executor request is still being assembled. `services/fast_response.py` owns
 it; `providers/cerebras.py` is the adapter.
 
-**Six things about it are load-bearing.**
+**Seven things about it are load-bearing.**
 
 **It is an optimisation and it fails open.** A timeout, a provider error, output the
-validator refuses, runbooks that do not fit its budget — each resolves to a
-deterministic fallback (a generic preview that names no file, command or cause) or to
-no preamble at all. `generate()` does not raise, and there is **no retry**: one that
-succeeds at five seconds has already lost the argument the stage exists to win and has
-delayed the executor behind it.
+validator refuses, runbooks that do not fit its budget — every one of them resolves to
+**no preamble**, and the turn proceeds as if the stage had never run. `generate()` does
+not raise, and there is **no retry**: one that succeeds at five seconds has already lost
+the argument the stage exists to win and has delayed the executor behind it. There used
+to be a generic prose fallback here; it arrived only after the attempt had spent its
+whole deadline, so it paid the stage's full latency to print a sentence with no
+information in it, and then became the executor's own prior turn — spending the opening
+slot on content that framed nothing (`_no_preamble` has the argument).
+
+**It produces ONE artifact.** A hidden technical plan — tool order, paths, dependencies,
+the most likely failure — used to ride the continuation row inside `<planned_route>`,
+and it is gone with nothing in its place. The wrapper was careful and the validators were
+thorough; the REQUEST was the problem. This model holds tool names and no schemas,
+runbook bodies the selector may have rejected, and a transcript with every tool result
+stripped out, and the plan put the most specific artifact in the turn in the freshest
+user-role row — the position the executor weighs most heavily — immediately before it
+answered. A paragraph saying "this is only a proposal" does not make generated text
+non-authoritative, and a plausible wrong route costs more than no route. The visible
+opening survives that argument because it is the opposite artifact: specific about the
+FRAME, silent about the conclusion, so being written without evidence is a constraint it
+can satisfy. Whether a bounded, typed, source-checked capsule could earn the slot back is
+an open experiment in `TODO.md`, not an assumption — and it stays unbuilt until the arms
+that would judge it exist.
 
 **The preamble is appended to the EXECUTOR's own input**, as an assistant row, followed
 by a server-owned continuation instruction (`prompts/fast_response/continuation.md`).
@@ -560,8 +578,13 @@ executor's own prior assistant turn, so a claim that work already happened tells
 MODEL the job is partly done, and an instruction ("ignore the next message…") carries an
 assistant's authority into a context that already contains user-controlled text.
 `validate_preamble` refuses completed-work claims in four grammatical shapes, text
-addressed to the model, structure, internal disclosure, control markers, and any finish
-reason that is not cleanly `stop`.
+addressed to the model, structure, internal disclosure, control markers, any tag-shaped
+token (the assembled prompt delimits its own layers with angle brackets, so an opening
+carrying one could close a frame it was never inside), and any finish reason that is not
+cleanly `stop`. Two things are COUNTED rather than refused — an announcement register
+and an unsupported causal prior — because both patterns have an unmeasured
+false-positive rate against phrasings the contract actually wants, and rejecting on a
+suspicion spends real openings.
 
 **It never runs on a continuation round** (gated on `session.round`, not on whether the
 selector ran — selection reruns for reasons that are not a new instruction), on a

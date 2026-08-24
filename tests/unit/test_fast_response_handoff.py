@@ -242,61 +242,22 @@ def test_a_bare_intent_re_roll_keeps_the_preamble_and_adds_only_the_nudge() -> N
 
 
 # ---------------------------------------------------------------------------
-# The hidden plan. It rides the CONTINUATION row and nothing else.
+# One artifact. The continuation row is server-authored, end to end.
 # ---------------------------------------------------------------------------
 
-PLAN_SENTINEL = "SENTINEL_PLAN_terminal.list -> terminal.end x5"
 
+def test_the_continuation_row_is_the_server_message_and_nothing_else() -> None:
+    """The row carries no model-authored bytes at all, and that is the property
+    to pin rather than "no plan was attached this time".
 
-def _handoff_with_plan() -> FastResponseHandoff:
-    return FastResponseHandoff(
-        content=PREAMBLE, continuation_message=CONTINUATION, plan=PLAN_SENTINEL
-    )
-
-
-def test_the_assistant_row_stays_byte_identical_even_when_a_plan_exists() -> None:
-    """The load-bearing one. The assistant row mirrors what the user was SHOWN, and
-    the plan is the half they were not. Appending it there would put text in the
-    client's committed history that never appeared on screen, and every later
-    round would reason about a conversation that did not happen."""
-    _, segments = _build(_handoff_with_plan())
-    rows = [s for s in segments if s.id == "fast_response_handoff"]
-    assert len(rows) == 1
-    messages, _ = _build(_handoff_with_plan())
-    assistant = [m for m in messages.messages if m["role"] == "assistant"]
-    assert assistant[-1]["content"] == PREAMBLE
-    assert PLAN_SENTINEL not in assistant[-1]["content"]
-    assert "planned_route" not in assistant[-1]["content"]
-
-
-def test_the_plan_rides_the_continuation_row_exactly_once() -> None:
-    """Framed and delimited rather than concatenated: the block is model-authored
-    text derived from a conversation containing user input, so the executor has to
-    be told at the point of use that it is a route and not a record."""
-    messages, _ = _build(_handoff_with_plan())
-    final = messages.messages[-1]
-    assert final["role"] == "user"
-    assert final["content"].count(PLAN_SENTINEL) == 1
-    assert "<planned_route>" in final["content"]
-    # Both limits are stated next to the content, which is where framing works.
-    assert "never a record" in final["content"]
-    assert "yours\nare authoritative" in final["content"] or "authoritative" in final["content"]
-
-
-def test_a_handoff_without_a_plan_adds_no_route_framing_at_all() -> None:
-    """The overwhelmingly common shape: the model wrote prose and no block. The
-    continuation row must then be exactly the server-owned message, or every
-    plan-less turn pays bytes for a wrapper around nothing."""
+    A hidden technical plan used to be appended here inside `<planned_route>`,
+    wrapped in a disclaimer. The disclaimer was the tell: a row that needs one is
+    a row carrying text the executor might wrongly obey. With the plan gone the
+    row is fixed server prose, so byte-equality with the loaded message is a
+    complete statement of what the executor receives — an assertion that could
+    not have been written while the plan existed."""
     messages, _ = _build(_handoff())
     assert messages.messages[-1]["content"] == CONTINUATION
     assert "planned_route" not in messages.messages[-1]["content"]
+    assert "planned_route" not in messages.messages[-1]["content"]
 
-
-def test_the_plan_adds_no_extra_message_rows() -> None:
-    """It rides an EXISTING row. A third row would be a new position in the array
-    for every downstream reader to account for, and the manifest names rows by
-    layer — an unnamed one would send a reader chasing a segment that is not there."""
-    with_plan, seg_with = _build(_handoff_with_plan())
-    without, seg_without = _build(_handoff())
-    assert len(with_plan.messages) == len(without.messages)
-    assert [s.id for s in seg_with] == [s.id for s in seg_without]

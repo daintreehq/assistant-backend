@@ -8,11 +8,10 @@ and nothing else.
 
 **It is an optimisation, and it behaves like one.** No failure here can fail,
 alter or delay the turn. A timeout, a transport error, output that fails
-validation, runbooks that do not fit the budget — each resolves either to a
-DETERMINISTIC FALLBACK (a safe generic preview that names nothing, used when a
-runbook is loaded so work genuinely is about to happen) or to no preamble at all.
-It is not "no preamble on every failure": a generic preview is still better than
-silence when the turn is clearly actionable, and section 8.14 specifies it.
+validation, runbooks that do not fit the budget — every one of them resolves to
+NO PREAMBLE, and the turn proceeds exactly as if the stage had never run. There
+is no generic prose fallback: see `_no_preamble` for why the one that used to be
+here made the product worse at precisely the moment it was already failing.
 
 There is no retry: one that succeeds at five seconds has already lost the
 perceived-latency argument this stage exists to win, and has delayed the executor
@@ -25,6 +24,30 @@ bytes the user sees are appended to the executor's messages as an assistant turn
 so a preamble that claims work already happened does not merely mislead a reader —
 it tells the model the job is partly done. That is what the overclaim checks and
 the server-owned continuation message are both for.
+
+**It produces ONE artifact, and that is a deliberate narrowing.** A hidden
+technical plan used to ride alongside the visible opening — tool order, paths,
+dependencies, the most likely failure — wrapped in `<planned_route>` on the
+server-owned continuation row. It is gone, and nothing replaced it.
+
+The problem was never the wrapper, which was careful, or the validators, which
+were thorough. It was the request: this model is asked to name a tool sequence
+while holding tool NAMES and no schemas, runbook bodies the selector may have
+rejected, and a cropped transcript with every tool result stripped out. Then the
+most specific artifact in the turn — a concrete route — was placed in the freshest
+user-role row, the position the executor weighs most heavily, immediately before
+it answered. A paragraph saying "this is only a proposal" does not make arbitrary
+generated text non-authoritative, and a plausible wrong route is worse than no
+route at all: it costs the executor the work of departing from it, and a smaller
+model may simply not.
+
+The visible opening survives that argument because it is the opposite artifact.
+It is asked to be specific about the FRAME and silent about the conclusion, so
+being written without evidence is a constraint it can actually satisfy.
+
+Whether a bounded, typed, source-checked capsule could earn the hidden slot back
+is an open question and an experiment, not an assumption — `TODO.md` carries it
+with the arms that would settle it.
 """
 
 from __future__ import annotations
@@ -56,19 +79,33 @@ logger = get_logger(__name__)
 #: Hard ceiling on the visible preamble. The stage's cost is paid twice — once on
 #: Cerebras as output, then again as executor INPUT — so a verbose preamble is
 #: the one failure mode that is expensive in both directions.
-MAX_PREAMBLE_WORDS = 120
-MAX_PREAMBLE_CHARS = 1200
-
-#: Generated tokens, covering BOTH parts — the visible opening and the hidden
-#: technical plan. Still deliberately above what the two caps allow (120 words and
-#: 2,000 characters), so a reply that runs long is TRUNCATED by the provider and
-#: then rejected on `finish_reason == length`, rather than being silently cut
-#: mid-sentence and shown to a user.
 #:
-#: Raised from 160 when the plan was added. The cost is paid twice — as Cerebras
-#: output, then as executor input — so this is a ceiling for runaway output, not a
-#: target: a good plan is well under it.
-MAX_OUTPUT_TOKENS = 700
+#: 80 words rather than the 120 this started at, and the reason is not cost. The
+#: opening's job is to remove the dead air after Enter with ONE useful
+#: distinction; past two sentences it stops being an opening and starts being an
+#: answer written without the evidence to support one. It also competes with the
+#: executor for the same communication slot — the longer it runs, the more of the
+#: reply the executor has to avoid restating.
+MAX_PREAMBLE_WORDS = 80
+MAX_PREAMBLE_CHARS = 800
+
+#: Generated tokens. Deliberately above what the visible caps allow (80 words,
+#: 800 characters), so a reply that runs long is TRUNCATED by the provider and
+#: then rejected on `finish_reason == length`, rather than being silently cut
+#: mid-sentence and shown to a user. The gap is the mechanism; the number is not
+#: a target.
+#:
+#: Cut from 700, which was sized to carry a hidden technical plan alongside the
+#: visible opening. There is no second part any more, so the ceiling is now a
+#: runaway guard over one short paragraph.
+#:
+#: **Sized against the CHARACTER cap at the pessimistic rate, not the average
+#: one.** 800 characters is ~200 tokens of ordinary prose and ~320 of anything
+#: denser — a quoted path, a CJK sentence — and a ceiling set at the prose rate
+#: truncates a legal reply the moment it is not prose, turning a preamble that
+#: obeyed every rule into a `finish_reason == length` rejection. Truncation is
+#: meant to catch runaway output, which is nowhere near this line.
+MAX_OUTPUT_TOKENS = 320
 
 #: The whole fast prompt, in characters.
 #:
@@ -169,112 +206,6 @@ _DISCLOSURE = re.compile(
 #: be read as a turn-finality declaration by the scanner downstream.
 _CONTROL_MARKER = re.compile(r"\[\[DAINTREE:[A-Z]+\]\]")
 
-#: The hidden technical plan, and the tag that carries it.
-#:
-#: Named distinctively on purpose: the split is done by literal tag match on model
-#: output, so a tag a model might emit incidentally (`<plan>`) would let ordinary
-#: prose silently become a hidden block — or worse, leave half a plan visible.
-_PLAN_TAG = "daintree_plan"
-#: Whitespace is tolerated everywhere a model might drift — after `<`, after `</`,
-#: and before `>`. Tolerated rather than rejected because the alternative is worse:
-#: a variant the matcher does not recognise is not a rejection, it is a hidden
-#: block that stays in the visible half.
-_PLAN_BLOCK = re.compile(
-    rf"<\s*{_PLAN_TAG}\s*>(?P<body>.*?)<\s*/\s*{_PLAN_TAG}\s*>",
-    re.IGNORECASE | re.DOTALL,
-)
-#: Any stray occurrence of the tag name, used to refuse output that opened a block
-#: it never closed. A visible half of a truncated plan is the one split failure a
-#: user would actually see.
-_PLAN_TAG_ANY = re.compile(rf"<\s*/?\s*{_PLAN_TAG}", re.IGNORECASE)
-
-#: The injection guard, kept for the HIDDEN half but narrowed to meta-instructions.
-#:
-#: The visible half is held to `_ADDRESSES_THE_MODEL`, which refuses to talk to the
-#: model at all. The plan cannot be: instructing the executor is its entire job, and
-#: "call scratch.create, then spawn five agents" is exactly what it is for.
-#:
-#: So the line moves from "does it address the model" to "what does it address the
-#: model ABOUT". Object-level work is allowed; anything about the conversation's own
-#: rules is not. That distinction is what keeps the guard meaningful: the fast
-#: model's input contains user-controlled text, so a crafted message trying to
-#: launder "ignore your instructions" through a server-generated block is a
-#: reachable attack, and it is the only shape of instruction this refuses.
-_PLAN_META_INSTRUCTION = re.compile(
-    # Telling the model to disregard what it was told.
-    r"\b(?:ignore|disregard|override|bypass|forget|suspend)\s+"
-    r"(?:the\s+|any\s+|all\s+|your\s+)?"
-    r"(?:previous|prior|above|following|next|remaining|earlier|system|safety)?\s*"
-    r"(?:message|instruction|rule|guideline|policy|prompt|constraint|check|guard)s?\b"
-    # Declaring the work already finished.
-    r"|\btreat\s+the\s+task\s+as\s+(?:complete|done|finished)\b"
-    # Skipping the human. The confirmation matrix is the ONLY guard on the
-    # irreversible tiers that get no prompt, so a plan that manufactures consent
-    # is the highest-value thing an injected instruction could achieve here.
-    r"|\bskip\s+(?:the\s+)?(?:confirmation|approval|permission|safety|check)s?\b"
-    r"|\b(?:do\s+not|don'?t|never)\s+"
-    r"(?:ask|confirm|prompt|check\s+with|seek\s+consent|wait\s+for)\b"
-    r"|\b(?:approval|authoriz\w+|permission|consent|sign-?off)\s+"
-    r"(?:has\s+|is\s+|was\s+)?(?:already\s+)?"
-    r"(?:been\s+)?(?:granted|given|implicit|implied|assumed|not\s+required|unnecessary)\b"
-    r"|\bno\s+(?:confirmation|approval|permission|consent)\s+(?:is\s+)?"
-    r"(?:needed|required|necessary)\b"
-    r"|\bproceed\s+without\s+(?:prompting|asking|confirmation|approval)\b",
-    re.IGNORECASE,
-)
-
-#: Markers the SERVER owns in the assembled prompt. A plan containing one could
-#: close the wrapper it is delivered inside and continue as text that reads to the
-#: executor as server-authored — the classic delimiter escape, and the reason
-#: framing an untrusted block is worth nothing if the block can end the frame.
-#:
-#: Refused rather than escaped: escaping invents an encoding the executor was
-#: never taught to read, and a plan needs none of these strings to describe work.
-_PLAN_FRAME_ESCAPE = re.compile(
-    r"</?\s*planned_route\b|\[Daintree continuation|server-owned instruction",
-    re.IGNORECASE,
-)
-
-#: Completion claims in TELEGRAPHIC form, which is the only form the plan uses.
-#:
-#: `_OVERCLAIM` was tuned for prose and anchors on a subject or auxiliary — "I
-#: checked", "has been run". The plan is explicitly asked for fragments and arrows,
-#: so it produces "already checked the loader -> patch line 40", which has neither
-#: and walked straight past that pattern. Same false claim, in the half the
-#: executor reads most closely.
-#:
-#: Anchored on the ADVERB rather than the verb, and that is the whole reason it is
-#: safe: a plan is written in imperatives, so "check the loader" and "run pytest"
-#: are ordinary intent and must pass. "already checked" and "just ran" cannot be
-#: read as intent at all.
-#: Unambiguously PAST-tense verbs only. `run` and `read` are spelled the same in
-#: both tenses, so "now run pytest" is ordinary intent and must not be swept up —
-#: which is why this list is not just `_DID`.
-_DID_PAST_ONLY = (
-    r"checked|found|looked at|inspected|reviewed|ran|executed|fixed|changed|edited|"
-    r"updated|added|removed|deleted|tested|verified|confirmed|identified|discovered|"
-    r"determined|resolved|traced|debugged|patched|created|wrote|committed|pushed|"
-    r"deployed|passed|failed|completed|applied|merged|installed"
-)
-_PLAN_TELEGRAPHIC_OVERCLAIM = re.compile(
-    # "already checked the loader" — an adverb makes completion unambiguous even
-    # for a verb whose tense is not. `_DID_PAST_ONLY`, not `_DID`, on PURPOSE:
-    # `_DID` still carries "run"/"read", and an adverb does not disambiguate
-    # those — "now run pytest" is an ordinary imperative, not a claim, and an
-    # earlier version of this pattern rejected it. The trade this makes is real:
-    # "already read the file" no longer trips this branch either. Accepted,
-    # because the plan is asked to instruct future steps far more than to report
-    # finished ones, so the false-positive cost on the common case outweighs the
-    # narrowed catch on the rare one.
-    rf"\b(?:{_ADVERB})(?:{_DID_PAST_ONLY})\b"
-    # "root cause identified", "tests passed", "fix applied", "branch pushed" —
-    # past participle with no adverb at all, which is how a plan actually writes
-    # a completion claim.
-    rf"|\b(?:{_DID_PAST_ONLY})\b"
-    rf"|\bstatus:\s*(?:done|complete|passed|fixed)\b",
-    re.IGNORECASE,
-)
-
 #: The register the visible half is asked NOT to use: a first-person commitment to
 #: work about to happen. LOGGED, never rejected — and the asymmetry is deliberate.
 #:
@@ -288,11 +219,136 @@ _ANNOUNCEMENT_OPENING = re.compile(
     re.IGNORECASE,
 )
 
+#: Server-owned framing the ASSEMBLED prompt uses, and any tag-shaped token.
+#:
+#: These bytes become an ``assistant`` row directly above a server-owned
+#: continuation instruction, in a request whose other layers are delimited with
+#: exactly this syntax — ``<runbook id="…">``, ``<fast_task_data>``, the docs
+#: sections. A preamble that emits a tag can therefore close a frame it was never
+#: inside, and everything after it reads to the executor as server-authored. That
+#: is the delimiter escape, and framing an untrusted block buys nothing if the
+#: block can end the frame.
+#:
+#: This replaces a check that named ONE tag. While a hidden plan rode alongside
+#: the visible half, ``<daintree_plan>`` was the seam between two products and got
+#: its own guard; with one product there is no seam, so the guard generalises to
+#: the shape rather than the string.
+#:
+#: **Attributes are the shape that matters**, and the first version of this
+#: pattern missed them — it matched ``<runbook>`` while the frame it was written
+#: to catch is ``<runbook id="…">``. So the name is followed by an optional
+#: attribute run, and dots and colons are in the name class because
+#: ``<ns:policy>`` and ``<policy.rules>`` are tags too.
+#:
+#: **The name must start immediately after the bracket**, with no space. That is
+#: what keeps ordinary prose out: ``x < y > z`` is a comparison, and a version
+#: that tolerated the space rejected it — silently costing that turn its preamble,
+#: since a rejection is no longer softened by a fallback. Real tags never carry
+#: that space, so requiring its absence separates the two exactly.
+_FRAME_ESCAPE = re.compile(
+    # <tag>, </tag>, <tag/>, <tag attr="v">, <ns:tag>, <tag.sub>
+    r"</?[a-z_][a-z0-9_.:-]*(?:\s[^<>]*)?/?>"
+    # Comments and processing instructions, which frame text just as well.
+    r"|<!--|-->|<\?"
+    # The server's own continuation marker, in the spellings a model drifts to.
+    r"|\[\s*daintree\s+continuation|server[\s-]*owned\s+instruction",
+    re.IGNORECASE,
+)
+
+#: Authority the preamble cannot create, in the phrasings that try to.
+#:
+#: This is the highest-value thing an injected instruction could achieve here, and
+#: it is reachable: the fast model's input contains user-controlled text, and its
+#: output becomes the executor's own prior assistant turn. The CLI's confirmation
+#: matrix is the only guard on the irreversible tiers that get no prompt, so a
+#: preamble that manufactures consent is attacking the one control that has no
+#: second line behind it.
+#:
+#: These patterns are inherited rather than invented. They guarded the hidden plan,
+#: which is gone — and `_ADDRESSES_THE_MODEL` beside them does not cover any of
+#: them, because it asks whether the text talks TO the model rather than what it
+#: claims about permission. "Approval has already been granted" addresses nobody
+#: and passed every remaining check.
+_MANUFACTURED_AUTHORITY = re.compile(
+    r"\bskip\s+(?:the\s+)?(?:confirmation|approval|permission|safety|check)s?\b"
+    r"|\b(?:do\s+not|don'?t|never)\s+"
+    r"(?:ask|confirm|prompt|check\s+with|seek\s+consent|wait\s+for)\b"
+    r"|\b(?:approval|authoriz\w+|permission|consent|sign-?off)\s+"
+    r"(?:has\s+|is\s+|was\s+)?(?:already\s+)?"
+    r"(?:been\s+)?(?:granted|given|implicit|implied|assumed|not\s+required|unnecessary)\b"
+    r"|\bno\s+(?:confirmation|approval|permission|consent)\s+(?:is\s+)?"
+    r"(?:needed|required|necessary)\b"
+    r"|\bproceed\s+without\s+(?:prompting|asking|confirmation|approval)\b",
+    re.IGNORECASE,
+)
+
+#: Completion claims with no subject and no auxiliary — the form `_OVERCLAIM`
+#: cannot see, because it anchors on exactly those.
+#:
+#: "Tests passed. Status: done." is short plain prose that clears every other
+#: check and tells the executor verification already finished. It used to be
+#: caught only in the hidden plan, where fragments were the expected register;
+#: with one artifact left, the same claim reaches the same reader through the
+#: visible half instead.
+#:
+#: **Deliberately NOT the pattern that guarded the plan.** That one ended in a
+#: bare alternation over every past-tense verb, which is safe in telegraphic
+#: fragments and catastrophic in prose: "separating what CHANGED from what the
+#: change was for" is exactly the register this stage asks for, and a bare
+#: `changed` would reject it. So the catch is narrowed to the two shapes that
+#: cannot be read as anything but a claim — an unambiguous completion adverb, or
+#: a named artifact paired with a completion participle.
+_DID_PAST_ONLY = (
+    r"checked|found|looked at|inspected|reviewed|ran|executed|fixed|changed|edited|"
+    r"updated|added|removed|deleted|tested|verified|confirmed|identified|discovered|"
+    r"determined|resolved|traced|debugged|patched|created|wrote|committed|pushed|"
+    r"deployed|passed|failed|completed|applied|merged|installed"
+)
+_TELEGRAPHIC_OVERCLAIM = re.compile(
+    # "already checked the loader", "just ran the suite".
+    rf"\b(?:{_ADVERB})(?:{_DID_PAST_ONLY})\b"
+    # "tests passed", "root cause identified", "fix applied", "branch pushed".
+    r"|\b(?:tests?|checks?|suite|build|fix|change|patch|branch|commit|"
+    r"root\s+cause|issue|bug|problem)\s+"
+    r"(?:passed|failed|applied|pushed|identified|committed|merged|deployed|"
+    r"fixed|resolved|confirmed|verified)\b"
+    r"|\bstatus:\s*(?:done|complete|passed|fixed)\b",
+    re.IGNORECASE,
+)
+
+#: An unsupported causal prior: the opening picking a winner between branches the
+#: evidence has not separated yet. LOGGED, never rejected, for the same reason
+#: `_ANNOUNCEMENT_OPENING` is.
+#:
+#: This is the failure the visible half is most likely to have and the hardest to
+#: see, because a confident wrong opening reads BETTER than a careful right one.
+#: "A CI-only failure usually means the environment differs" is fluent, plausible,
+#: and frames the whole turn around a branch nobody has checked — and it becomes
+#: the executor's own prior assistant turn, so the anchoring is paid twice.
+#:
+#: Not a rejection, because the surrounding grammar decides whether these words
+#: are a claim at all. "The failure is likely a loader mismatch" places a bet;
+#: "separating those is likely to matter more than the assertion text" is the
+#: result-stable framing the prompt asks for, and both contain `likely`. No
+#: pattern here can tell them apart, so hard rejection would spend real openings
+#: on a false-positive rate nobody has measured. Count first; `TODO.md` carries
+#: the promotion decision, and the count is what would justify it.
+_UNSUPPORTED_PRIOR = re.compile(
+    r"\busually means\b|\balmost certainly\b|\bthe right fix is\b"
+    r"|\bprobably (?:means|caused|because|a|the)\b"
+    r"|\b(?:is|are|was|were)\s+(?:likely|probably|clearly|obviously)\s+"
+    r"(?:a|an|the|caused|due|because)\b"
+    r"|\bthe (?:problem|issue|cause|culprit) is\b"
+    r"|\bthis is (?:clearly|obviously) a\b"
+    r"|\b(?:points to|indicates|suggests) (?:a|an|the)\b",
+    re.IGNORECASE,
+)
+
 #: Finish reasons that mean "the model stopped because it was done". Anything
 #: else — a filter, a truncation, an unrecognised value — is not a whole reply.
 _CLEAN_FINISH_REASONS = frozenset({"stop", "end_turn", None})
 
-FastResponseSource = Literal["model", "deterministic_fallback", "none"]
+FastResponseSource = Literal["model", "none"]
 
 
 @dataclass(frozen=True)
@@ -317,10 +373,6 @@ class FastResponseResult:
     """What the stage produced, and everything the turn needs to account for it."""
 
     content: str | None = None
-    #: The hidden technical plan, or None. NEVER shown to a user and never part of
-    #: `content`: `has_content` gates VISIBILITY, and a plan folded into it would
-    #: be rendered. It reaches the executor through the handoff's continuation row.
-    plan: str | None = None
     source: FastResponseSource = "none"
     degraded: bool = False
     reason: str | None = None
@@ -344,33 +396,6 @@ class FastResponseResult:
         # validator already rejects it on the model path; this closes the same
         # hole for the fallback and any future caller.
         return bool(self.content and self.content.strip())
-
-
-#: Used when the model could not be reached or its output was rejected, and the
-#: turn is clearly actionable. It names NOTHING — no file, no command, no cause —
-#: because the one thing a fallback must never do is invent the specifics it was
-#: reached for lacking.
-#: Written in the same REASONING register the model is asked for, not the
-#: first-person announcement register. That is not cosmetic here: the continuing
-#: model announces its own actions as it takes them, so a fallback that also
-#: announces produces the same sentence twice and makes the reply read as padded —
-#: the exact failure the visible half was rewritten to avoid. A fallback that
-#: reintroduced it would put the defect back on precisely the turns where the
-#: model already failed once.
-_FALLBACK_ACTIONABLE = (
-    "Work like this turns on establishing the current state before changing any of "
-    "it, so that what follows is driven by evidence rather than assumption — and so "
-    "that only the changes that evidence supports get made."
-)
-_FALLBACK_READ_ONLY = (
-    "The useful first move here is establishing what the current state actually is, "
-    "since the answer worth giving is the one the evidence supports rather than the "
-    "one that sounds most likely."
-)
-
-#: Tool names that indicate a runbook MUTATES things. Used only to pick which of
-#: the two fallbacks is honest, never to gate anything.
-_MUTATING_HINTS = ("spawn", "write", "edit", "commit", "push", "create", "delete", "run")
 
 
 def fast_context_runbooks(
@@ -482,77 +507,6 @@ def should_generate_fast_response(
     return FastResponsePolicyDecision(run=True, visible=visible, reason="eligible")
 
 
-#: Hard ceiling on the hidden plan. It is executor INPUT on every eligible turn, so
-#: a runaway plan is paid for twice exactly like the visible half.
-MAX_PLAN_CHARS = 2_000
-
-
-def split_preamble(text: str) -> tuple[str, str | None]:
-    """Separate what the user sees from what only the executor sees.
-
-    Returns ``(visible, plan)``. ``plan`` is None when the model emitted no block,
-    which is a NORMAL outcome and not an error: the visible half is the product,
-    the plan is an enhancement, and a turn that gets one but not the other is
-    strictly better than a turn that gets neither.
-
-    The block is matched wherever it lands rather than assumed to be last. Models
-    reorder, and a plan emitted first would otherwise be shown to the user in
-    full — the single worst failure this split can have.
-    """
-    matches = list(_PLAN_BLOCK.finditer(text))
-    if not matches:
-        return text.strip(), None
-    # EVERY block is removed, not just the one we keep. A model that emits two —
-    # a retry, a self-correction, a stray copy of the template — used to have its
-    # second block survive into the visible half and get printed to the user
-    # verbatim, tags and all, because only the first match was cut out. The plan
-    # is the FIRST block; the rest are malformed output and are discarded, but
-    # they must still leave.
-    visible = _PLAN_BLOCK.sub("", text).strip()
-    return visible, matches[0].group("body").strip()
-
-
-def validate_plan(plan: str) -> FastResponseValidation:
-    """The hidden half. Different rules, because it has a different reader.
-
-    Structure, tool names and paths are the POINT here — the visible half refuses
-    all three. What survives from that validator is the part that is about
-    authority rather than presentation: this text becomes context the executor
-    reads as its own, so it may not claim work has happened, may not carry a
-    control marker the declaration scanner would read, and may not instruct the
-    model about the conversation's own rules.
-    """
-
-    def reject(reason: str) -> FastResponseValidation:
-        return FastResponseValidation(valid=False, content="", reject_reason=reason)
-
-    content = plan.strip()
-    if not content:
-        return reject("plan_empty")
-    if len(content) > MAX_PLAN_CHARS:
-        return reject("plan_too_long")
-    if any(ch in content for ch in "\x00\r") or any(
-        ord(ch) < 0x20 and ch not in "\n\t" for ch in content
-    ):
-        return reject("plan_control_characters")
-    if _CONTROL_MARKER.search(content):
-        return reject("plan_control_marker")
-    if _PLAN_TAG_ANY.search(content):
-        # A nested or unbalanced tag means the split is not what it looks like.
-        return reject("plan_nested_tag")
-    if _OVERCLAIM.search(content) or _PLAN_TELEGRAPHIC_OVERCLAIM.search(content):
-        # The same rule as the visible half plus the fragment form that half never
-        # produces, and it matters MORE here: this is the half the executor reads
-        # closely, so "already checked the loader" tells the model the job is
-        # partly done in the most credible possible place.
-        return reject("plan_overclaim")
-    if _PLAN_META_INSTRUCTION.search(content):
-        return reject("plan_meta_instruction")
-    if _PLAN_FRAME_ESCAPE.search(content):
-        return reject("plan_frame_escape")
-    return FastResponseValidation(valid=True, content=content)
-
-
 def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: bool) -> (
     FastResponseValidation
 ):
@@ -591,41 +545,21 @@ def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: b
         return reject("control_characters")
     if _CONTROL_MARKER.search(content):
         return reject("control_marker")
-    if _PLAN_TAG_ANY.search(content):
-        # The LAST line of defence, and the only one that does not depend on the
-        # split being correct. `content` is what rides the `preamble` SSE event
-        # straight to a user's screen, so any surviving trace of the hidden block
-        # means the split failed and this text must not be shown. Cheap, absolute,
-        # and it fails in the safe direction: the cost is a preamble, and the cost
-        # of being wrong is showing someone the half they were never meant to see.
-        return reject("plan_tag_in_visible_half")
+    if _FRAME_ESCAPE.search(content):
+        return reject("frame_escape")
     if _STRUCTURE.search(content):
         return reject("structured_output")
     if content.count("```") % 2 or content.startswith("{") or content.startswith("["):
         return reject("not_plain_prose")
     if _DISCLOSURE.search(content):
         return reject("internal_disclosure")
-    if _OVERCLAIM.search(content):
+    if _OVERCLAIM.search(content) or _TELEGRAPHIC_OVERCLAIM.search(content):
         return reject("overclaim")
     if _ADDRESSES_THE_MODEL.search(content):
         return reject("addresses_the_model")
+    if _MANUFACTURED_AUTHORITY.search(content):
+        return reject("manufactured_authority")
     return FastResponseValidation(valid=True, content=content)
-
-
-def deterministic_fallback(active_runbooks: list[Runbook]) -> str | None:
-    """A safe generic preview, or nothing.
-
-    Only reached when at least one runbook is active, so there IS work about to
-    happen and saying so is honest. Picking between the two variants on declared
-    tools keeps the read-only case from promising changes it will not make.
-    """
-    if not active_runbooks:
-        return None
-    tools = " ".join(
-        tool.lower() for runbook in active_runbooks for tool in (runbook.meta.required_tools or [])
-    )
-    mutating = any(hint in tools for hint in _MUTATING_HINTS)
-    return _FALLBACK_ACTIONABLE if mutating else _FALLBACK_READ_ONLY
 
 
 class FastResponseService:
@@ -819,7 +753,7 @@ class FastResponseService:
                 error_type=type(exc).__name__,
                 code=getattr(exc, "code", None),
             )
-            return self._fallback(active_runbooks, reason="internal_error")
+            return self._no_preamble(reason="internal_error")
 
     async def _generate_inner(
         self,
@@ -832,8 +766,8 @@ class FastResponseService:
         assert self._provider is not None
         messages = self.build_messages(request, active_runbooks=active_runbooks)
         if messages is None:
-            return self._fallback(
-                active_runbooks, reason="runbooks_over_budget"
+            return self._no_preamble(
+                reason="runbooks_over_budget"
             )
 
         provider_request = ProviderChatRequest(
@@ -864,8 +798,8 @@ class FastResponseService:
             # The TURN was cancelled, not just this call. Propagate.
             raise
         except TimeoutError:
-            return self._fallback(
-                active_runbooks, reason="timeout",
+            return self._no_preamble(
+                reason="timeout",
                 latency_ms=int((time.perf_counter() - started) * 1000),
             )
         except Exception as exc:
@@ -878,46 +812,34 @@ class FastResponseService:
                 error_type=type(exc).__name__,
                 code=getattr(exc, "code", None),
             )
-            return self._fallback(
-                active_runbooks, reason="provider_error",
+            return self._no_preamble(
+                reason="provider_error",
                 latency_ms=int((time.perf_counter() - started) * 1000),
             )
 
         latency_ms = int((time.perf_counter() - started) * 1000)
-        # Split BEFORE validating: the visible validator refuses lists, headings and
-        # tool names, all of which the plan is supposed to contain. Running it over
-        # the joined output would reject every well-formed two-part reply.
-        visible_text, plan_text = split_preamble(result.text)
-        if plan_text is None and _PLAN_TAG_ANY.search(result.text):
-            # An opened block that never closed. `split_preamble` would hand the
-            # whole thing back as visible, so half a technical plan would be shown
-            # to a user — the one split failure they would actually see.
-            #
-            # Returned here with its OWN reason rather than blanked and left to
-            # the validator, which would have reported `invalid_output:empty` and
-            # pointed whoever read it at a model that said nothing, rather than at
-            # a model that said too much in the wrong shape.
-            logger.info(
-                "fast_response_rejected",
-                request_id=request_id,
-                reason="unclosed_plan_block",
-                latency_ms=latency_ms,
-            )
-            return self._fallback(
-                active_runbooks,
-                reason="invalid_output:unclosed_plan_block",
-                usage=result.usage,
-                latency_ms=latency_ms,
-            )
         validation = validate_preamble(
-            visible_text,
+            result.text,
             finish_reason=result.finish_reason,
             had_tool_calls=bool(result.tool_calls),
         )
-        if validation.valid and _ANNOUNCEMENT_OPENING.match(validation.content):
-            # Not a rejection — see the pattern's own note. This is the drift
-            # signal for "the visible half went back to announcing", which is
-            # invisible in every other metric because the turn looks fine.
+        if not validation.valid:
+            logger.info(
+                "fast_response_rejected",
+                request_id=request_id,
+                reason=validation.reject_reason,
+                latency_ms=latency_ms,
+            )
+            return self._no_preamble(
+                reason=f"invalid_output:{validation.reject_reason}",
+                usage=result.usage,
+                latency_ms=latency_ms,
+            )
+
+        # Two drift signals, neither of them a rejection — see each pattern's own
+        # note. Logged AFTER the validity gate, so the rates describe openings
+        # that were actually shown rather than being diluted by rejected output.
+        if _ANNOUNCEMENT_OPENING.match(validation.content):
             logger.info(
                 "fast_response_announcement_register",
                 request_id=request_id,
@@ -928,38 +850,15 @@ class FastResponseService:
                 # conversation in front of everyone who can read a log line.
                 content_chars=len(validation.content),
             )
-        if not validation.valid:
+        if _UNSUPPORTED_PRIOR.search(validation.content):
             logger.info(
-                "fast_response_rejected",
+                "fast_response_unsupported_prior",
                 request_id=request_id,
-                reason=validation.reject_reason,
-                latency_ms=latency_ms,
+                content_chars=len(validation.content),
             )
-            return self._fallback(
-                active_runbooks,
-                reason=f"invalid_output:{validation.reject_reason}",
-                usage=result.usage,
-                latency_ms=latency_ms,
-            )
-
-        # The plan is an ENHANCEMENT and fails independently. A rejected plan costs
-        # the plan; it must not cost the visible opening, which is the half the
-        # user is waiting on and the half that already passed its own validator.
-        plan: str | None = None
-        if plan_text:
-            plan_validation = validate_plan(plan_text)
-            if plan_validation.valid:
-                plan = plan_validation.content
-            else:
-                logger.info(
-                    "fast_response_plan_rejected",
-                    request_id=request_id,
-                    reason=plan_validation.reject_reason,
-                )
 
         return FastResponseResult(
             content=validation.content,
-            plan=plan,
             source="model",
             degraded=False,
             usage=result.usage,
@@ -968,26 +867,38 @@ class FastResponseService:
             content_sha256=hashlib.sha256(validation.content.encode("utf-8")).hexdigest(),
         )
 
-    def _fallback(
+    def _no_preamble(
         self,
-        active_runbooks: list[Runbook],
         *,
         reason: str,
         usage: ProviderUsage | None = None,
         latency_ms: int | None = None,
     ) -> FastResponseResult:
-        text = deterministic_fallback(active_runbooks)
-        if text is None:
-            return FastResponseResult(
-                source="none", degraded=True, reason=reason,
-                usage=usage, latency_ms=latency_ms,
-            )
+        """Every failure resolves here, and it shows the user nothing.
+
+        There used to be two fixed paragraphs of generic prose here, emitted
+        whenever a runbook was active on the grounds that saying something beats
+        saying nothing. It does not, for three reasons that only became clear
+        once they were written down.
+
+        It arrives LATE by construction — the attempt has already spent its whole
+        deadline — so it pays the stage's full latency cost and returns a sentence
+        that could have been printed before the request was read. It is
+        indistinguishable from the real thing to a reader, so the one moment the
+        product is least reliable is the moment it sounds most templated. And it
+        becomes the executor's own prior assistant turn, spending the opening slot
+        on content with no information in it and leaving the executor to avoid
+        restating a frame that framed nothing.
+
+        The client already owns a better answer for this: a local activity cue it
+        can show the instant the user presses Enter, uncommitted and honest about
+        being a spinner rather than a thought. Silence here is what lets that
+        stand.
+        """
         return FastResponseResult(
-            content=text,
-            source="deterministic_fallback",
+            source="none",
             degraded=True,
             reason=reason,
             usage=usage,
             latency_ms=latency_ms,
-            content_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
         )

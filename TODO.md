@@ -672,6 +672,53 @@ Owed, in the order the risk runs:
 
 `shadow` is the mode that produces all four without showing anyone anything.
 
+5. **Result stability.** The failure the visible half is most likely to have and
+   the hardest to see: an opening that picks a winner between branches nobody has
+   checked reads BETTER than one that does not. `_UNSUPPORTED_PRIOR` counts the
+   phrasings without rejecting them, because the pattern's false-positive rate is
+   unmeasured and hard rejection would spend real openings to catch a suspicion.
+   The rate is what says whether any of those forms is precise enough to promote.
+
+
+## Decide whether the executor should get a hidden capsule at all
+
+**Trigger: after the four measurements above have a shadow corpus behind them,
+and only if the visible opening is already carrying its weight.**
+
+The stage used to produce two artifacts: the visible opening and a free-form
+technical plan — tool order, paths, dependencies, likely failure — delivered to
+the executor inside `<planned_route>` on the server-owned continuation row. The
+plan is gone (`services/fast_response.py` has the argument). Nothing replaced it,
+and the open question is whether anything should.
+
+The case against restoring it in any form: this model holds tool NAMES and no
+schemas, runbook bodies the selector may have rejected, and a transcript with
+every tool result stripped out. Anything specific it produces about EXECUTION is
+produced from the weakest evidence in the turn and lands in the position the
+executor weighs most heavily.
+
+The case for a bounded successor: the objective, the explicit constraints the
+user stated, and the exact identifiers in a long request are things a small model
+can index reliably, because indexing is not deciding. A capsule of typed, capped,
+source-checked fields — never a root cause, a tool sequence, a likely failure or
+a permission claim — is a different artifact from a plan, not a smaller one.
+
+What would settle it is an arm comparison on one corpus, not an argument:
+
+- **A** no fast stage (the executor baseline);
+- **B** visible opening only (what ships today);
+- **D** visible opening plus the capsule.
+
+D earns the slot only by beating B on executor task success, tool-selection
+correctness, invalid calls and rounds-to-completion — and by holding up under
+deliberately WRONG seeded capsules, where the measure is how often the executor
+adopts a plausible-but-false frame it would not have reached on its own. If B and
+D tie, B wins: it is one fewer authority-bearing artifact for the same outcome.
+
+Do not build the capsule before the arms exist to judge it. Building it first
+guarantees it ships, because nobody deletes working code to settle a question the
+code has already answered by existing.
+
 
 ## Capture the exact provider wire body in traces
 

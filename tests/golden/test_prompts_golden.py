@@ -481,49 +481,6 @@ def test_full_upstream_messages_with_fast_response_handoff(
     assert_golden("upstream_messages_with_handoff.json", snapshot)
 
 
-def test_full_upstream_messages_with_a_planned_route(assembler: PromptAssembler) -> None:
-    """The plan-bearing branch, which the case above never reaches.
-
-    Two things are only reviewable here. The assistant row must be byte-identical
-    to what the user was SHOWN — the plan is the half they were not — so a diff
-    that ever moves the route into that row is the failure this snapshot exists to
-    make visible. And the route's framing sits next to the content on purpose:
-    it is model-authored text derived from a conversation containing user input,
-    so the executor is told at the point of use that it is a route and not a
-    record. Both are prose decisions, which is exactly what a golden reviews.
-    """
-    runbook = _fixture_catalog().get("daintree.example.alpha")
-    req = RespondRequest.model_validate(
-        {
-            "protocol_version": 3,
-            "session": {"id": "s", "turn_id": "t"},
-            "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
-            "startup": _startup_payload(),
-            "turn": {"goal": "Prepare this branch for review."},
-        }
-    )
-    pr = assembler.build_main_request(
-        request=req,
-        runbooks=[runbook],
-        upstream_model="deepseek-v4-flash",
-        handoff=FastResponseHandoff(
-            content=(
-                "Reviewing a branch usefully means separating what changed from "
-                "what the change was for, since a diff read on its own tends to "
-                "surface style and miss intent."
-            ),
-            continuation_message=PromptLoader().fast_response_continuation(),
-            plan=(
-                "1. `git.status` + `git.diff` (base=develop) -> changed paths.\n"
-                "2. `fs.read` each changed file -> conventions check.\n"
-                "3. risk: generated files in the diff -> detect via path prefix."
-            ),
-        ),
-    )
-    snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
-    assert_golden("upstream_messages_with_planned_route.json", snapshot)
-
-
 def test_full_upstream_messages_subagent(assembler: PromptAssembler) -> None:
     """The sub-agent profile's assembled array — the layout, not just its pieces.
 
