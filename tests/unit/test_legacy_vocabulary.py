@@ -63,6 +63,11 @@ _ALLOWED_LINES: dict[str, tuple[str, ...]] = {
     # Claude Code's own skill directory, referenced by path from the training docs.
     "training/EXPERIMENTS.md": (".claude/skills",),
     "training/README.md": (".claude/skills",),
+    # Ignores the pre-rename PACKAGE PATH, which is a directory name and not a
+    # present-tense claim about what the code is called — `git mv` cannot rename
+    # what was never tracked, so untracked fp32 export leftovers kept surfacing
+    # there after the rename moved everything real out.
+    ".gitignore": ("skills/",),
 }
 
 _SKILL = re.compile(r"\bskills?\b|skill_|_skill|Skill", re.IGNORECASE)

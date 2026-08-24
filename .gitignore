@@ -120,3 +120,15 @@ src/daintree_assistant_server/runbooks/local/artifacts/docs_head.npz
 # content — messages, tool arguments, terminal output. Never commit them, and
 # never include them in a diagnostic bundle or a copytree.
 .tmp/traces/
+
+# The pre-rename package path. `skills/` -> `runbooks/` moved every TRACKED file
+# out via `git mv`; it never touches the untracked fp32 export intermediates
+# (`model.onnx`, `vocab.txt` — the shipped artifact is `model_int8.onnx` +
+# `tokenizer.json` under runbooks/) that a local export run had already dropped
+# there. Nothing loads them and nothing ever should: nothing under the old
+# package path is a real source location any more, so the whole directory is
+# ignored rather than pattern-matched file by file, which is what let these
+# resurface in every git client's changed-files view despite never having been
+# committed — untracked status is re-derived from scratch on every refresh, so
+# a file nothing ignores looks "new" forever, not just once.
+src/daintree_assistant_server/skills/
