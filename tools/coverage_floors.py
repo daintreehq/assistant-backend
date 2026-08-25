@@ -75,6 +75,12 @@ FLOORS: dict[str, int] = {
     # rule that stops being exercised does not fail — it just stops catching an
     # incoherent body that a future edit assembles.
     "src/daintree_assistant_server/contracts/account.py": 100,
+    # Added 2026-08-25 (measured 97%). The gate on the two routes that spend
+    # money. Every branch here is a decision about somebody's money or somebody's
+    # session, and the two directions fail very differently: a lost refusal is
+    # unbilled work, while a refusal that stops being an outage-shaped 503 is a
+    # paying customer told to buy a second plan.
+    "src/daintree_assistant_server/api/paid_access.py": 97,
     "src/daintree_assistant_server/providers/base.py": 92,
     # The SERVING adapter's implementation. `providers/together.py` subclasses it
     # and changes three class attributes plus a key decoder, so this is where

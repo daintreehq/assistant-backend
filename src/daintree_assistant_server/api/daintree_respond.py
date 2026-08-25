@@ -10,10 +10,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from ..auth import PERMISSION_CHAT, Principal, require_permission
+from ..auth import PERMISSION_CHAT, Principal
 from ..contracts.daintree_api import RespondRequest
 from ..services.validation import validate_respond_request
 from .deps import check_protocol_header, check_protocol_value, request_id, require_ready
+from .paid_access import require_paid_access
 
 router = APIRouter()
 
@@ -22,7 +23,11 @@ router = APIRouter()
 async def respond(
     body: RespondRequest,
     request: Request,
-    principal: Principal = Depends(require_permission(PERMISSION_CHAT)),
+    # Identity, permission AND entitlement, resolved before the handler body — so
+    # a caller with no plan is refused while there is still nothing to undo: no
+    # provider call in flight, and no SSE stream already opened with a `meta`
+    # event promising an answer.
+    principal: Principal = Depends(require_paid_access(PERMISSION_CHAT)),
     _ready: None = Depends(require_ready),
     _protocol: None = Depends(check_protocol_header),
 ) -> JSONResponse | StreamingResponse:

@@ -93,6 +93,66 @@ initial posture:               open, or observe
 later posture:                 enforce, after an end-to-end sign-in is validated
 ```
 
+## Account entitlement
+
+Identity says the token is genuine. **Entitlement says the account behind it has
+paid**, and it is staged on its own axis so a billing outage can never present as
+a signed-out session.
+
+`ENTITLEMENT_MODE` is `off` (the shipped default), `observe` or `enforce`, and the
+two non-default modes both require `AUTH_MODE=enforce` — under any other mode
+every request resolves to the anonymous principal, which has no account to ask
+about. A configuration that does not satisfy that fails readiness rather than
+quietly reverting to `off`.
+
+- **`off`** — paid routes never ask. Nothing is looked up and a turn's first byte
+  pays nothing for the question.
+- **`observe`** — paid routes resolve the verdict, record it, and **never refuse on
+  it**. The mirror of `AUTH_MODE=observe`, and with the same precise promise: the
+  status, body and headers a caller receives are exactly what `off` would have
+  returned, including on every failure path. It moves no verdict. It does move
+  LATENCY — an uncached lookup is a bounded 5s network call on the turn's
+  first-byte path — so this is a mode to watch timings under, not one that is
+  free.
+- **`enforce`** — `access: granted` is required.
+
+Only `POST /v1/daintree/respond` and `POST /v1/daintree/tasks` are gated: they are
+the two routes that can issue **billable inference**. (`/v1/daintree/auth/verify`
+and the doctor route do reach the provider, but only through its tokenless key
+probe, which spends nothing.) Health, version, auth discovery, account
+status, capabilities and the runbook catalog are not, and `POST
+/v1/daintree/runbooks/resolve` is not either — runbook selection is a local
+classifier, so that route spends nothing and there is nothing for a gate to
+protect.
+
+The verdict is reached **before** the upstream call is opened and before any byte
+is streamed, so a refusal is an ordinary HTTP status rather than a stream that
+opens and then apologises. Under `enforce`:
+
+| verdict | response |
+|---|---|
+| granted | the turn proceeds |
+| no plan | `402 subscription_required` — open the `subscribe_url` from `/v1/daintree/auth/config` |
+| plan not currently granting | `402 subscription_inactive` — open the `account_url`; **not** an invitation to buy a second plan |
+| the billing authority refused the token | `401 auth_session_revoked` |
+| the billing authority refused the OAuth client | `403 auth_client_not_allowed` or `auth_permission_denied` |
+| too many requests | `429 account_rate_limited` |
+| we could not decide | `503 entitlement_unavailable`, retryable |
+
+**Uncertainty is never a verdict.** An outage, a timeout, a malformed answer and a
+contradictory one all resolve to `entitlement_unavailable`, and none of them is
+ever reported as "you have not paid". A paying customer told to buy a second plan
+during a billing outage is the failure this whole taxonomy exists to prevent.
+
+Verdicts are cached per instance for at most 60 seconds once granted and 15 once
+refused, and nothing uncertain is cached at all — so a paid request costs at most
+one lookup and often none. Any refusal purges the entry, so a revoked grant stops
+being honoured at the first refusal rather than at expiry; and because every
+cached entry is at most that old, the bound holds however many instances are warm.
+
+A deployment in a binding mode that cannot build a client for the configured URL
+**fails readiness** rather than taking traffic and refusing every turn.
+
 The Supabase issuer, JWKS, authorize and token URLs and the public OAuth client id come
 from that environment's own Supabase project. They are published to every caller by this
 endpoint, so they are ordinary deployment configuration rather than secrets — but they
@@ -105,7 +165,8 @@ issuer, the `authenticated` audience, expiry within 60 seconds of clock skew, an
 OAuth `client_id` on this deployment's allowlist. **A verified token establishes identity
 only.** It does not establish that the session still exists — nothing reaches back into a
 minted JWT, so a logout leaves the signature valid until it expires — and it does not
-establish entitlement, which does not exist here yet.
+establish entitlement, which is a separate question with its own staged mode (see
+[Account entitlement](#account-entitlement) above).
 
 ### GET /v1/daintree/auth/config
 
@@ -223,8 +284,11 @@ only value that can be right for the token in its hand.
 A readiness probe for the SERVER's own upstream credential, not the caller's — no caller
 key exists to check. It asks the provider directly whether the credential this deployment
 holds is usable, which is otherwise only discovered on the first real turn. It is a
-tokenless introspection call (not a model call), takes **no request body**, and reads no
-bearer header (this route ignores `Authorization`, like every other route).
+tokenless introspection call (not a model call) that spends no tokens, and takes **no
+request body**. It is subject to the deployment's `AUTH_MODE` like any other
+non-discovery route — under `open` the header is not read, under `enforce` a verified
+credential is required — but it carries no entitlement gate, because the probe costs
+nothing to run.
 
 `POST /v1/daintree/auth/verify` with no body →
 
@@ -1093,7 +1157,7 @@ the problem, because that is the whole reason these are separate codes.
 | 400  | `system_messages_not_allowed`, `reserved_tool_name`, `invalid_tool_schema`, `tool_choice_not_offered`, `invalid_request_error` | The request is malformed. Client bug. |
 | 400  | `missing_tool_call_id`, `dangling_tool_message`, `duplicate_tool_call_id`, `unresolved_tool_calls`, `malformed_tool_call_id`, `tool_calls_on_non_assistant_message` | The tool-call transcript is not a valid exchange. An assistant turn opens a BATCH of calls, every call is answered exactly once, and only then may a user/assistant message follow; order *within* a batch is free. Ids are compared verbatim — surrounding whitespace is rejected rather than trimmed, because they travel upstream raw. A trailing unresolved batch is legal. Client bug in every case: report it with the request id rather than retrying. |
 | 400  | `invalid_image`, `remote_image_not_allowed` | An image part failed the data-URL policy: media type outside the allowlist (`image/png`, `image/jpeg`, `image/webp`, `image/gif`), not `;base64`, empty, or not valid base64. |
-| 401  | `invalid_api_key` | Not returned as an HTTP error by anything today: `auth.py` ignores `Authorization` entirely, so no bearer is ever checked on `/respond` or `/tasks`, and `POST /v1/daintree/auth/verify` and `/v1/daintree/doctor` both catch this internally and report it as a 200 verdict field instead. **Not** what account authentication will return — that is `auth_required` / `auth_token_invalid` in the account family below, which say which of the two happened. This code predates them and is on its way out. |
+| 401  | `invalid_api_key` | About the SERVER's own upstream credential, never the caller's, and not returned as an HTTP error by anything today: `POST /v1/daintree/auth/verify` and `/v1/daintree/doctor` both catch it internally and report it as a 200 verdict field instead. **Not** what account authentication returns — that is `auth_required` / `auth_token_invalid` in the account family below, which say which of the two happened. This code predates them and is on its way out. |
 | 413  | `request_too_large` | Body cap, a per-message / per-tool byte cap, or a request-SHAPE cap: too many messages, content parts, tool calls in one message, stop sequences, pinned runbook ids or images. `param` names the field. |
 | 413  | `context_window_exceeded` | The assembled prompt does not fit the model's context window. Distinct from `request_too_large`, which is about the bytes the CLIENT sent: this one counts the whole prompt — base prompt, tool schemas, active runbook bodies, startup and the transcript — so a small request can trip it in a long session. Not retryable; start a new session or shorten the conversation. Raised before the upstream call when the server can see it, and mapped from the host's own rejection when it cannot, so the code is the same either way. |
 | 426  | `unsupported_daintree_protocol` | Upgrade the client. |
@@ -1103,11 +1167,18 @@ the problem, because that is the whole reason these are separate codes.
 
 ### Your Daintree account
 
-**Not yet emitted by anything.** `auth.py` still serves every request anonymously and
-entitlement does not exist, so no code in this table can currently be returned. They are
-defined and documented ahead of the layers that will raise them, because the CLI already
-recognises all twelve — the taxonomy has a consumer before it has a producer, and the two
-have to agree from the start.
+**Which of these a deployment can actually return depends on its posture, and the
+codes themselves are stable regardless.** The identity codes are raised under
+`AUTH_MODE=enforce`; the subscription and dependency codes under
+`ENTITLEMENT_MODE=enforce`. Under the shipped defaults (`open` and `off`) none of
+them is reachable, and that is a rollout state rather than a gap in the contract —
+the CLI already recognises all twelve, so the taxonomy agrees on both sides before
+either side switches its half on.
+
+Two remain unreachable for a reason other than posture. `auth_permission_denied`
+needs a second OAuth client with a narrower grant, and there is only one;
+`usage_limit_reached` needs numeric plan allowances, which are a product decision
+nobody has made — this server records what a turn cost and enforces no quota.
 
 The "what a client should do" column describes the correct handling, not a survey of what
 any client has built: the CLI carries a typed remedy for each of the five identity codes,

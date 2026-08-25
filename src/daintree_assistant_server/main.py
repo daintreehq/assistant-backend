@@ -752,10 +752,9 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     app.state.token_verifier = verifier
     app.state.jwks_client = jwks_client
     # Guarded like the verifier above and for the same reason: a configuration
-    # problem here must not take the process down. Absent means the account
-    # endpoint reports `unverified` and — under enforcement — a paid route answers
-    # `entitlement_unavailable`, which is the honest verdict for an authority we
-    # could not build a client for.
+    # problem here must not take the process down. Absent is a NORMAL state while
+    # entitlement is off — it is every deployment running the identity-only
+    # rollout, and it is what makes the account endpoint report `unverified`.
     try:
         app.state.entitlement_service = await _build_entitlement_service(settings)
     except Exception as exc:  # noqa: BLE001 - see above
@@ -767,6 +766,19 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         problems = list(settings.local_only_problems())
         if injected is None:
             problems.extend(settings.missing_secrets() + settings.weak_secrets())
+        if settings.entitlement_mode != "off" and app.state.entitlement_service is None:
+            # A binding mode with no client is refused HERE rather than left to
+            # answer `entitlement_unavailable` on every paid request. The
+            # per-request refusal is correct and fails closed, but a revision that
+            # reports itself ready while refusing every turn is the shape of
+            # outage that takes longest to diagnose — `/readyz` is the one place
+            # that can say "do not send me traffic". Static validation already
+            # refuses a bad URL (`entitlement_problems`); this covers the runtime
+            # half, where the values were fine and the client still did not build.
+            problems.append(
+                f"ENTITLEMENT_MODE={settings.entitlement_mode} requires a usable "
+                "DAINTREE_ENTITLEMENT_URL (no entitlement client could be built)"
+            )
         if problems:
             raise RuntimeError(f"configuration problems: {', '.join(problems)}")
         container = build_container(
