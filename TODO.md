@@ -606,7 +606,7 @@ The section was written when Cerebras was the sole serving host and still cites
 Cerebras's trust centre. That is no longer the whole picture rather than simply
 wrong: Together now answers every executor/utility turn, and Cerebras has RETURNED
 in a narrower role — it writes the fast-response preamble on eligible streaming
-turns (`FAST_RESPONSE_MODEL`, off by default). Nobody has read either host's terms
+turns (`FAST_RESPONSE_MODEL`), on every eligible turn. Nobody has read either host's terms
 and rewritten this section, so it stays marked unverified rather than re-vendored:
 swapping in a confident guarantee nobody had checked would be the worst possible
 form of this document to be wrong.
@@ -867,7 +867,9 @@ Then move the submodule pin and re-capture both tool fixtures together.
 
 ## Measure what the preamble actually costs and buys
 
-**Trigger: before `FAST_RESPONSE_MODE=visible` goes past a 1% cohort.**
+**Trigger: the stage now runs on every eligible turn of every deployment, so
+this is owed on the next paid measurement window rather than gated on a rollout
+step that no longer exists.**
 
 The stage is built, gated and off. What it does to real turns is unmeasured, and
 every number below needs paid calls, which is why none of it is in the offline
@@ -899,20 +901,43 @@ Owed, in the order the risk runs:
    `I'll start by reading the current state`, `I'll check the current state of the
    project`. Observed on most real turns.
 
+   **THREE attempts, all reverted, and none of them worked.** That is the finding —
+   the executor announces with the stage on, with the stage off, and with every
+   prompt intervention tried so far.
+
+   **A causal claim recorded here earlier was WRONG and is retracted.** It said
+   those interventions caused tool-call syntax to leak into visible content
+   (`<｜DSML｜tool_calls>`, `<tool_use>{...}`), on evidence of 2 leaks in 3 turns
+   with them versus 0 in 3 without. A larger sample after reverting everything
+   shows the leak at **1 in 8 turns on the same request with no intervention
+   present**, so it is a pre-existing, intermittent DeepSeek behaviour that the
+   small samples happened to straddle. It is a real bug — see the separate entry
+   below — but it is not a reason those attempts failed, and it must not be used
+   to argue against retrying this class of fix.
+
    **What was tried:** a conditional base-prompt partial
    (`45-opening-already-shown.md`) withdrawing the opening-clause permission that
    `40-communication.md` grants, plus a per-turn reminder in the volatile tail for
    proximity. Both were reverted, for two independent reasons and neither is a
    reason to retry the same shape:
    - **It did not work.** The executor kept announcing with the rule present. It
-     also announces identically with `FAST_RESPONSE_MODE=off`, so the announcement
+     also announced identically with the stage disabled, so the announcement
      is baseline behaviour rather than something the preamble provokes.
-   - **It appeared to make things worse.** With the partial shipped,
-     `<｜DSML｜tool_calls>` — DeepSeek's tool-call syntax — leaked into the visible
-     content stream on 2 of 3 turns; with it off, 0 of 3. Small samples, so treat
-     it as a signal rather than proof, but it is the same failure class recorded
-     for gpt-oss-120b and the response declaration: instructing a model about how
-     to OPEN, around tool calls, makes it emit tool-call syntax as prose.
+   - **Editing `20-tool-discipline.md` at the source.** That rule pairs "emit its
+     call in the SAME reply" with `"I'll check the logs"` as its example, so it
+     arguably teaches the announcement it is trying to bound. Adding "prefer
+     emitting it with no preface at all" changed nothing about the announcements,
+     so it was reverted too. The rule text stands as it was — but this is the most
+     promising thread of the three, because it addresses the rule that DEMONSTRATES
+     the behaviour rather than one that merely forbids it, and it was abandoned on
+     a single sample plus the leak scare that has since been retracted.
+   - **It changed nothing measurable.** The executor announced at the same rate
+     with the partial as without it.
+
+   What DID land, and is kept: `40-communication.md` no longer grants the opening
+   round a clause for orienting the user, since the preamble now always occupies
+   that slot. It does not stop the executor announcing — nothing tried so far does
+   — but it is correct on its own terms, costs nothing, and showed no leak.
 
    So the repetition is a real, accepted cost of the concurrent design today. Do
    NOT strip executor text post hoc because it resembles the preamble; that
@@ -926,7 +951,22 @@ Owed, in the order the risk runs:
    the prompt's explicit tense rule was added for. Rejections are silent by
    design — no fallback — so this rate IS the feature's availability.
 
-7. **Cost, and where it actually goes.** Measured: the fast prompt is 9.8-17.7 KB,
+7. **The executor leaks raw tool-call syntax into visible content, ~1 turn in 8.**
+   Measured on the current build with no prompt intervention present: 1 of 8
+   identical "Add a --verbose flag" turns put `<｜DSML｜tool_calls>` /
+   `<tool_use>{…}` into the delta stream instead of emitting a structured tool
+   call. The user sees markup mid-reply.
+
+   Pre-existing and independent of the fast-response work — it was found while
+   investigating that, and mis-attributed to it at first (see 5 above). Nothing in
+   this repo detects it: the output lint does not look for provider tool-call
+   syntax, and `content_parts` happily accumulates it. Cheapest first step is a
+   lint rule that COUNTS it so the real rate is known across request shapes, since
+   one request shape at n=8 is not a rate. A stripper is tempting and probably
+   wrong: the model failed to make the call at all, so hiding the evidence leaves
+   a turn that silently did nothing.
+
+8. **Cost, and where it actually goes.** Measured: the fast prompt is 9.8-17.7 KB,
    of which the three runbook bodies are ~85%. The user-message history added
    later is ~4 KB at its ceiling and usually far less. If this stage needs to get
    cheaper, the runbooks are the only lever worth pulling — sending summaries or

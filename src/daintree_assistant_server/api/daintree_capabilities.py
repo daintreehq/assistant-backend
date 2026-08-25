@@ -60,7 +60,10 @@ async def capabilities(
             # provisional bubble it never receives is worse off than one that
             # never expected it.
             "fast_response": {
-                "enabled": settings.fast_response_mode == "visible",
+                # Always on. The field stays because the CLI gates on it during
+                # rollout and a disappearing key is a harder change for a client
+                # than a constant one.
+                "enabled": True,
                 "streaming_only": True,
                 "event": "preamble",
                 # DISPLAY-ONLY. The client renders it and NEVER commits it to

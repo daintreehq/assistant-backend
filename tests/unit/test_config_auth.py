@@ -13,29 +13,62 @@ from daintree_assistant_server.config import (
     EXECUTOR_KEY_ENV,
     EXECUTOR_ORIGIN,
     EXECUTOR_URL_ENV,
+    FAST_RESPONSE_KEY_ENV,
     Settings,
 )
 
 
 def _settings(**overrides: object) -> Settings:
-    base: dict[str, object] = {"STATE_SIGNING_KEY_CURRENT": "sk", EXECUTOR_KEY_ENV: "sk-test"}
+    base: dict[str, object] = {
+        "STATE_SIGNING_KEY_CURRENT": "sk",
+        EXECUTOR_KEY_ENV: "sk-test",
+        FAST_RESPONSE_KEY_ENV: "csk-test",
+    }
     base.update(overrides)
     return Settings(**base)  # type: ignore[arg-type]
 
 
-def test_missing_secrets_reports_both_server_owned_secrets() -> None:
-    # Both are the SERVER's own material, which is the whole shape of the current
-    # credential model: Daintree holds the upstream key and callers hold none.
-    # The SERVING key must fail READINESS — without it nothing can be answered,
-    # and discovering that on the first turn surfaces as an upstream 401 that
-    # reads like the caller's fault.
-    s = Settings(**{EXECUTOR_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": ""})  # type: ignore[arg-type]
-    assert s.missing_secrets() == ["STATE_SIGNING_KEY_CURRENT", EXECUTOR_KEY_ENV]
+def test_missing_secrets_reports_every_server_owned_secret() -> None:
+    # All three are the SERVER's own material, which is the whole shape of the
+    # current credential model: Daintree holds every upstream key and callers hold
+    # none. The SERVING key must fail READINESS — without it nothing can be
+    # answered, and discovering that on the first turn surfaces as an upstream 401
+    # that reads like the caller's fault. The fast-response key joined them when
+    # that stage lost its off switch: it now runs on every eligible turn, so a
+    # missing key is the feature failing open silently on all of them.
+    s = Settings(  # type: ignore[arg-type]
+        **{EXECUTOR_KEY_ENV: "", FAST_RESPONSE_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": ""}
+    )
+    assert s.missing_secrets() == [
+        "STATE_SIGNING_KEY_CURRENT",
+        EXECUTOR_KEY_ENV,
+        FAST_RESPONSE_KEY_ENV,
+    ]
 
 
 def test_missing_upstream_key_alone_still_fails_readiness() -> None:
-    s = Settings(**{EXECUTOR_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": "sk"})  # type: ignore[arg-type]
+    s = Settings(  # type: ignore[arg-type]
+        **{
+            EXECUTOR_KEY_ENV: "",
+            FAST_RESPONSE_KEY_ENV: "csk-test",
+            "STATE_SIGNING_KEY_CURRENT": "sk",
+        }
+    )
     assert s.missing_secrets() == [EXECUTOR_KEY_ENV]
+
+
+def test_missing_fast_response_key_alone_still_fails_readiness() -> None:
+    """A weaker requirement than the executor key — the turn still answers — but
+    not a soft one. Failing open silently on every turn is indistinguishable from
+    a model that chose not to answer, which is the failure nobody notices."""
+    s = Settings(  # type: ignore[arg-type]
+        **{
+            EXECUTOR_KEY_ENV: "sk-test",
+            FAST_RESPONSE_KEY_ENV: "",
+            "STATE_SIGNING_KEY_CURRENT": "sk",
+        }
+    )
+    assert s.missing_secrets() == [FAST_RESPONSE_KEY_ENV]
 
 
 def test_missing_secrets_empty_when_present() -> None:
@@ -44,7 +77,7 @@ def test_missing_secrets_empty_when_present() -> None:
 
 def test_no_inbound_api_key_is_ever_required() -> None:
     # There is still no INBOUND key to configure — the door is open by design
-    # until account auth lands. A deployment carrying only the two server-owned
+    # until account auth lands. A deployment carrying only the server-owned
     # secrets is complete, in development AND in production shape.
     for env in ("development", "production"):
         s = _settings(

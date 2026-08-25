@@ -96,5 +96,8 @@ variable "secret_ids" {
     STATE_SIGNING_KEY_CURRENT = "state-signing-key-current"
     STATE_SALT                = "state-salt"
     TOGETHER_API_KEY          = "together-api-key"
+    # Required since the fast-response stage lost its off switch: it runs on
+    # every eligible turn, so readiness refuses a deployment without it.
+    CEREBRAS_API_KEY          = "cerebras-api-key"
   }
 }

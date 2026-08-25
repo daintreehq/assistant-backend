@@ -405,8 +405,7 @@ class PromptLoader:
         self._validate_display_context()
         # The fast-response stage's own prompts. Registered here so a missing or
         # misnamed file fails READINESS with a name, rather than at the first turn
-        # that reaches the stage — which, with the feature defaulting to off,
-        # could be weeks after the file was lost.
+        # that reaches the stage.
         if not self.fast_response_prompt().strip():
             raise PromptError("fast-response base prompt is empty")
         # Every REGISTERED task must have its prompt on disk. Without this a task

@@ -61,6 +61,10 @@ def settings(tmp_path: Any) -> Settings:
         # `assert key not in body` is unsatisfiable rather than merely weak.
         # A sentinel here makes both environments run the same test.
         TOGETHER_API_KEY="tgp_v1_test-key",
+        # Required for readiness since the fast-response stage lost its off
+        # switch — the same reasoning as the executor key above, and a sentinel
+        # rather than a real key for the same redaction reason.
+        CEREBRAS_API_KEY="csk-test-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         STATE_SIGNING_KID="k1",
         STATE_SALT="test-salt",

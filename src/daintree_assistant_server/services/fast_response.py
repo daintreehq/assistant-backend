@@ -63,7 +63,6 @@ from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
 from ..runbooks.catalog import Catalog
 from ..runbooks.decision import SelectionDecision
 from ..runbooks.models import Runbook
-from ..runbooks.tool_projection import session_bucket
 from ..text_utils import message_text
 
 logger = get_logger(__name__)
@@ -306,6 +305,25 @@ _ANNOUNCEMENT_OPENING = re.compile(
 #: else — a filter, a truncation, an unrecognised value — is not a whole reply.
 _CLEAN_FINISH_REASONS = frozenset({"stop", "end_turn", None})
 
+#: Typographic punctuation folded to ASCII — for MATCHING ONLY, never for display.
+#:
+#: `gpt-oss-120b` writes real typography: it emits U+2019 for an apostrophe on
+#: essentially every reply ("it isn't", "I'll", "the terminal's state"). Every
+#: pattern below was written with the ASCII `'`, so all of them silently failed
+#: against the one model this stage actually runs. That is not a cosmetic gap: it
+#: defeated `_OVERCLAIM` — the strictest guard here — so "I've already run the
+#: tests" validated clean, and it defeated `_ANNOUNCEMENT_OPENING`, so "I'll start
+#: by reading…" reached a user's screen as the very first thing they saw.
+#:
+#: Folded for the PROBE and not for the content, which is the whole point of
+#: keeping the two separate: curly apostrophes and em dashes are better typography
+#: than their ASCII equivalents and there is no reason to degrade what the reader
+#: sees. Only the regexes need the plain form.
+_TYPOGRAPHY = str.maketrans({
+    "\u2018": "'", "\u2019": "'", "\u02bc": "'", "\u2032": "'",
+    "\u201c": '"', "\u201d": '"',
+})
+
 #: Exotic Unicode spaces, normalised to a plain one before anything else looks at
 #: the line.
 #:
@@ -337,10 +355,16 @@ FastResponseSource = Literal["model", "declined", "none"]
 
 @dataclass(frozen=True)
 class FastResponsePolicyDecision:
-    """Whether to run, whether to show it, and — always — why not."""
+    """Whether the stage runs for this turn, and — always — why not.
+
+    There is no separate "visible" any more. The stage used to carry three modes
+    (`off` / `shadow` / `visible`) and a rollout percentage, which existed to get
+    it into production carefully; that decision is made, so the toggles are gone
+    and running IS showing. What remains here are the turn-shape gates, which are
+    about whether a preamble makes sense at all rather than about rollout.
+    """
 
     run: bool
-    visible: bool
     reason: str
 
 
@@ -373,10 +397,12 @@ class FastResponseResult:
     def has_content(self) -> bool:
         """Whether anything was produced — NOT whether it may be shown.
 
-        Deliberately not called `visible`: shadow mode produces real, valid
-        content that must never reach a client, and a property named `visible`
-        returning True for it is the shape of the bug that leaks it. Visibility is
-        `FastResponsePolicyDecision.visible`, and it stays there.
+        Deliberately not called `visible`. Whether the text reaches a screen is a
+        question about the RACE — has the executor already produced a visible byte —
+        and that lives in `PreambleGate`, which is the only thing positioned to
+        answer it. A property here returning True would read as permission and is
+        the shape of the bug that shows a preamble under an answer already
+        underway.
         """
         # `.strip()`, not a bare truth test: whitespace-only content would
         # otherwise count as a preamble and the client would render a blank line.
@@ -425,7 +451,6 @@ def fast_context_runbooks(
 def should_generate_fast_response(
     request: RespondRequest,
     *,
-    settings: Settings,
     selector_ran: bool,
     no_task_fast_path: bool,
     active_runbooks: list[Runbook],
@@ -441,10 +466,8 @@ def should_generate_fast_response(
     """
 
     def no(reason: str) -> FastResponsePolicyDecision:
-        return FastResponsePolicyDecision(run=False, visible=False, reason=reason)
+        return FastResponsePolicyDecision(run=False, reason=reason)
 
-    if settings.fast_response_mode == "off":
-        return no("mode_off")
     if not provider_available:
         return no("provider_unavailable")
     # Non-streaming has no first-byte to improve: the client sees one response
@@ -486,17 +509,7 @@ def should_generate_fast_response(
     if choice is not None and choice not in ("auto", "none"):
         return no("forced_tool_choice")
 
-    # Own namespace, deliberately distinct from tool projection's default: two
-    # rollouts hashing the same session id under the same bytes would always
-    # co-enrol, making it impossible to tell the two experiments' effects apart.
-    bucket = session_bucket(request.session.id, namespace=b"fast-response\x00")
-    if bucket >= settings.fast_response_rollout_percent:
-        return no("not_in_rollout_cohort")
-
-    # Shadow RUNS but does not show: the point is to measure and trace real
-    # preambles against real turns before any user sees one.
-    visible = settings.fast_response_mode == "visible"
-    return FastResponsePolicyDecision(run=True, visible=visible, reason="eligible")
+    return FastResponsePolicyDecision(run=True, reason="eligible")
 
 
 def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: bool) -> (
@@ -524,6 +537,8 @@ def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: b
         # answer as truncated for a line about to be shown to a user.
         return reject(f"unclean_finish:{finish_reason}")
 
+    # `content` is what a user sees; `probe` is what the patterns read. They differ
+    # only in typography — see `_TYPOGRAPHY`.
     content = text.translate(_EXOTIC_SPACES).strip()
     if not content:
         # NOT read as a decline. Silence has a spelling (`_DECLINE`) precisely so
@@ -552,21 +567,22 @@ def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: b
         ord(ch) < 0x20 and ch != "\n" for ch in content
     ):
         return reject("control_characters")
-    if _CONTROL_MARKER.search(content):
+    probe = content.translate(_TYPOGRAPHY)
+    if _CONTROL_MARKER.search(probe):
         return reject("control_marker")
-    if _STRUCTURE.search(content):
+    if _STRUCTURE.search(probe):
         return reject("structured_output")
-    if _MARKUP.search(content):
+    if _MARKUP.search(probe):
         return reject("markup_in_prose")
-    if content.count("```") % 2 or content.startswith("{") or content.startswith("["):
+    if probe.count("```") % 2 or probe.startswith("{") or probe.startswith("["):
         return reject("not_plain_prose")
-    if _DISCLOSURE.search(content):
+    if _DISCLOSURE.search(probe):
         return reject("internal_disclosure")
-    if _OVERCLAIM.search(content):
+    if _OVERCLAIM.search(probe):
         return reject("overclaim")
-    if _ADDRESSES_THE_MODEL.search(content):
+    if _ADDRESSES_THE_MODEL.search(probe):
         return reject("addresses_the_model")
-    if _ANNOUNCEMENT_OPENING.match(content):
+    if _ANNOUNCEMENT_OPENING.match(probe):
         # The duplicate-announcement failure. See the pattern's own note: the
         # executor owns this register, and two of them in two seconds is worse
         # than one plus silence.
@@ -590,7 +606,14 @@ class FastResponseService:
 
     @property
     def available(self) -> bool:
-        return self._provider is not None and self._settings.fast_response_mode != "off"
+        """Whether the stage can run at all — i.e. whether a provider was built.
+
+        Readiness refuses a deployment with no Cerebras credential, so in practice
+        this is True everywhere. It stays as a property because `build_container`
+        is also called directly by tests and benchmarks, which never probe
+        readiness and may legitimately hold no provider.
+        """
+        return self._provider is not None
 
     def policy_for(
         self,
@@ -602,7 +625,6 @@ class FastResponseService:
     ) -> FastResponsePolicyDecision:
         return should_generate_fast_response(
             request,
-            settings=self._settings,
             selector_ran=selector_ran,
             no_task_fast_path=no_task_fast_path,
             active_runbooks=active_runbooks,
@@ -1029,7 +1051,7 @@ class PreambleGate:
             return None
         self._collect()
         result = self.result
-        if result is None or not result.has_content or not self.policy.visible:
+        if result is None or not result.has_content:
             return None
         self.claimed = True
         self._window_open = False

@@ -22,7 +22,7 @@ There are **two internal provider ROLES**, and exactly one public product.
 | Role | Host | Model | When it is called |
 |---|---|---|---|
 | **executor** | Together AI (`https://api.together.xyz/v1`) | `deepseek-ai/DeepSeek-V4-Flash-0731` | every turn, and every utility task |
-| **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gpt-oss-120b` | eligible streaming turns only, CONCURRENTLY with the executor, and **off by default** |
+| **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gpt-oss-120b` | every eligible streaming turn, CONCURRENTLY with the executor |
 
 A caller cannot choose between them and is never told which answered. The public
 model id stays `daintree-assistant`; the backend composes the two calls behind it.

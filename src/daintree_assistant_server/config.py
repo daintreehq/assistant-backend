@@ -488,16 +488,6 @@ ToolProjectionMode = Literal["disabled", "shadow", "enforced"]
 TraceCaptureMode = Literal["off", "metadata", "full_internal"]
 TraceSinkKind = Literal["null", "filesystem", "gcs"]
 
-#: The fast-response stage. An operational KILL SWITCH, not a product choice —
-#: closed for the same reason the others are, so a typo cannot silently widen it.
-#:
-#: off      no Cerebras call at all; the executor request is byte-identical to
-#:          what it is today, which is what makes rollback a config-only revision
-#: shadow   generate, validate and trace the preamble — but do not emit it and do
-#:          not hand it to the executor. The turn the user sees is unchanged
-#: visible  emit the preamble and append it to the executor's input
-FastResponseMode = Literal["off", "shadow", "visible"]
-
 #: The account-authentication posture. An operational ROLLOUT switch, closed for
 #: the same reason every mode above is: each gate keys on this value, so a
 #: free-form typo ("enforced", "Observe") would fall through to the permissive
@@ -832,18 +822,17 @@ class Settings(BaseSettings):
 
     # ---- Fast response (the Cerebras stage) ------------------------------
     #
-    # `off` by default, so a deployment that sets nothing behaves exactly as it
-    # does today: one upstream call, the same bytes. That is deliberate — the
-    # rollback story for this feature is "set the mode back to off and roll a
-    # config-only revision", and a default of anything else would make the
-    # feature's failure mode the fleet's default state.
-    fast_response_mode: FastResponseMode = Field(default="off", alias="FAST_RESPONSE_MODE")
-    # Bucketed on the SESSION, never the request: a percentage re-rolled per
-    # request would show a preamble on one round of a conversation and not the
-    # next, producing exactly the inconsistent history the client cannot render.
-    fast_response_rollout_percent: int = Field(
-        default=0, ge=0, le=100, alias="FAST_RESPONSE_ROLLOUT_PERCENT"
-    )
+    # There is NO mode and NO rollout percentage. The stage runs on every eligible
+    # turn, of every deployment, and `CEREBRAS_API_KEY` is required for readiness
+    # like any other credential the server spends.
+    #
+    # Both toggles existed to get the feature into production carefully — `off` /
+    # `shadow` / `visible` plus a session-bucketed percentage. That decision is
+    # made, and keeping the dials would leave the product's shape configurable in
+    # exactly the way `CLAUDE.md` says it must not be: which model, which posture,
+    # which prompt are benchmarked decisions with one right answer, not operational
+    # dials. Turning the stage off is now a code change, which is the honest
+    # description of what it would be.
     # Short and absolute, though no longer because the executor is waiting on it —
     # the two calls go out together now, and nothing is behind this one. It is
     # tight because the WINDOW is: a preamble is shown only until the executor's
@@ -1043,13 +1032,20 @@ class Settings(BaseSettings):
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty.
 
-        Both entries are SERVER-owned, which is the whole shape of the credential
-        model: Daintree holds the upstream key and callers hold none (see
-        auth.py). ``TOGETHER_API_KEY`` is therefore required for the server to
-        answer anything at all, and its absence must fail READINESS rather than
-        surface a turn later as an upstream 401 that reads like the caller's
-        fault. There is still no INBOUND key to configure — the door is open by
-        design until account auth lands.
+        All three entries are SERVER-owned, which is the whole shape of the
+        credential model: Daintree holds every upstream key and callers hold none
+        (see auth.py). ``TOGETHER_API_KEY`` is required for the server to answer
+        anything at all, and its absence must fail READINESS rather than surface a
+        turn later as an upstream 401 that reads like the caller's fault. There is
+        still no INBOUND key to configure — the door is open by design until
+        account auth lands.
+
+        ``CEREBRAS_API_KEY`` joined them when the fast-response stage lost its off
+        switch. It is a weaker requirement than the other two — the turn still
+        answers without it — but not a soft one: the stage runs on every eligible
+        turn, so a missing key is the feature failing open silently on all of them,
+        which is indistinguishable from a model that chose not to answer. That is
+        exactly the failure that never gets noticed in production.
 
         (Contrast OPENROUTER_API_KEY, deliberately absent: nothing on the serving
         path routes there, so a deployment without it is complete.)
@@ -1059,6 +1055,8 @@ class Settings(BaseSettings):
             missing.append("STATE_SIGNING_KEY_CURRENT")
         if not self.serving_api_key.get_secret_value():
             missing.append(EXECUTOR_KEY_ENV)
+        if not self.cerebras_api_key.get_secret_value():
+            missing.append(FAST_RESPONSE_KEY_ENV)
         return missing
 
     def local_only_problems(self) -> list[str]:
@@ -1362,23 +1360,19 @@ class Settings(BaseSettings):
 
         The fast stage is best-effort BY DESIGN — a Cerebras outage costs a
         preamble, never a turn — and that is exactly why a misconfiguration has to
-        be loud here instead. A missing credential would otherwise present as
-        "the preamble never appears", which is indistinguishable from the feature
-        working and the model declining, and could sit unnoticed through a whole
-        rollout.
+        be loud somewhere. The missing-credential half of that moved to
+        `missing_secrets()` when the stage lost its off switch, since the key
+        became simply one of the three credentials this server owns.
 
-        Nothing is checked when the mode is `off`: a deployment that is not
-        running the stage has no reason to hold its key.
+        What is left here is where that credential gets SENT, which is a different
+        question and still belongs beside the executor's identical check.
+
+        The KEY itself is not checked here — it moved to `missing_secrets()` when
+        the stage lost its off switch, because it is now simply one of the three
+        credentials the server owns. What is left is the origin check below, which
+        is about where that credential gets sent rather than whether it exists.
         """
-        if self.fast_response_mode == "off":
-            return []
         problems: list[str] = []
-        if not self.cerebras_api_key.get_secret_value():
-            problems.append(
-                f"FAST_RESPONSE_MODE={self.fast_response_mode} requires "
-                f"{FAST_RESPONSE_KEY_ENV} (the stage would fail open on every turn "
-                "and look identical to a model that chose not to answer)"
-            )
         # The SAME check the executor's origin gets, through the same helper —
         # which exists for exactly this reason ("so both providers get the same
         # check rather than a copy each"). A hostname comparison alone is not it:

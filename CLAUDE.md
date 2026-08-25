@@ -10,7 +10,7 @@ The Daintree Assistant Server moves the model-orchestration boundary off the loc
 
 **Account authentication exists and is off.** `auth.py` dispatches on `AUTH_MODE`, and the shipped default is `open`, under which the `Authorization` header is **never read for authentication** — not parsed, not verified, not rejected. (It IS read for redaction on every request, in every mode: `_safe_request_id` compares it against an inbound `X-Request-Id` so a mis-pasted credential cannot be logged. Refusing to look would make that impossible.) That is stronger than "a credential is optional", and the difference is the whole point: a CLI mid-migration may still be sending its old OpenRouter key, and a door that *read* the header would have to decide what to do with something it cannot check. Refusing to look is what makes an old client work rather than fail confusingly.
 
-The other two modes are built, tested and inert until chosen. `observe` verifies a credential that IS present, records the outcome, and changes nothing a caller can observe — the fast-response `shadow` precedent, and the property `tests/integration/test_account_auth.py` pins hardest. Not free, though: a well-formed token costs a verification and, on a cold cache, a JWKS fetch, so it moves latency even though it moves no verdict. `enforce` requires one. What a valid token looks like (audience, algorithms, 60s skew, required claims) is hardcoded beside the verifier in `services/supabase_auth.py`; only which Supabase project and which OAuth client are configured. Verification is LOCAL against a cached JWKS — with asymmetric keys a signature check is arithmetic over bytes we hold, so asking the provider per request would add a round trip to every turn's first byte to learn something we can compute.
+The other two modes are built, tested and inert until chosen. `observe` verifies a credential that IS present, records the outcome, and changes nothing a caller can observe — the shape the fast-response stage's own `shadow` mode used to have before that stage went single-mode, and the property `tests/integration/test_account_auth.py` pins hardest. Not free, though: a well-formed token costs a verification and, on a cold cache, a JWKS fetch, so it moves latency even though it moves no verdict. `enforce` requires one. What a valid token looks like (audience, algorithms, 60s skew, required claims) is hardcoded beside the verifier in `services/supabase_auth.py`; only which Supabase project and which OAuth client are configured. Verification is LOCAL against a cached JWKS — with asymmetric keys a signature check is arithmetic over bytes we hold, so asking the provider per request would add a round trip to every turn's first byte to learn something we can compute.
 
 **What `enforce` does NOT yet establish is that the session still exists.** Nothing reaches back into a minted JWT, so after a logout the signature keeps verifying until `exp` — up to an hour. The lookup needs a database and a Redis this service does not have; `auth_session_revoked` is already in the taxonomy and already handled by the CLI, so only the query is missing (`TODO.md`). `ProviderChatRequest.api_key` stays live and tested as the field a per-account provider credential would occupy; benchmarks and live tests are its only callers today.
 
@@ -18,7 +18,7 @@ The public API is **Daintree-native** (`POST /v1/daintree/respond`), not OpenAI-
 
 The upstream is **Together AI** (OpenAI wire shape, spoken *internally* behind the `ChatProvider` abstraction in `providers/`): **one model, `deepseek-ai/DeepSeek-V4-Flash-0731`** (`config.EXECUTOR_MODEL`), for the main completion and every utility task. The public response says `daintree-assistant`.
 
-**There are TWO internal provider ROLES, and they are not a product tier.** `config.EXECUTOR_MODEL` on Together answers every turn; `config.FAST_RESPONSE_MODEL` (`gpt-oss-120b`) on Cerebras writes one short visible preamble line **concurrently with it**, on eligible streaming turns, and is **off by default** (`FAST_RESPONSE_MODE=off`). The executor's request does not contain the preamble, so the two calls genuinely overlap and a line that loses the race is dropped unshown. A caller cannot choose between them, is never told which answered, and still targets one public model. **Both hosts receive prompt content on an eligible turn** — Cerebras is not a cache or an infrastructure service here, and `docs/PROVIDER_POLICY.md` section 1 says so.
+**There are TWO internal provider ROLES, and they are not a product tier.** `config.EXECUTOR_MODEL` on Together answers every turn; `config.FAST_RESPONSE_MODEL` (`gpt-oss-120b`) on Cerebras writes two or three visible sentences **concurrently with it**, on every eligible streaming turn — there is no mode and no rollout percentage, and `CEREBRAS_API_KEY` gates readiness like any other credential the server spends. The executor's request does not contain the preamble, so the two calls genuinely overlap and a line that loses the race is dropped unshown. A caller cannot choose between them, is never told which answered, and still targets one public model. **Both hosts receive prompt content on an eligible turn** — Cerebras is not a cache or an infrastructure service here, and `docs/PROVIDER_POLICY.md` section 1 says so.
 
 **A two-mode split also briefly lived here, and it is still gone** — a `pro` tier on Cerebras/`gemma-4-31b`, with a `modes.py` registry, per-mode credentials and per-turn route threading. Cerebras's pricing could not be made to work as a TIER: a second full-length answer per turn is a different cost shape from a one-line preamble, which is why one came back and the other did not. Git history has the whole of it. The distinction that matters: a role is internal composition, a mode is a caller-visible choice. Do not reintroduce mode plumbing, a registry, or a `routing` field on the wire.
 
@@ -522,7 +522,7 @@ few runbooks survive `executable_with`, so most of their turns are runbook-less 
 exactly the shape where a core tuned for the ASSISTANT base prompt is the wrong
 core.
 
-## The fast-response stage (`FAST_RESPONSE_MODE`, default `off`)
+## The fast-response stage (always on)
 
 An eligible streaming turn can open with ONE short visible **preamble** line —
 "what is about to happen", in the user's terms — written by `gpt-oss-120b` on
@@ -571,10 +571,16 @@ it (`TODO.md`).
 see the preamble, so it opens with its own "I'll start by reading the current
 state" — the same opening it produces with the stage off, so the preamble does not
 cause it. A conditional base partial withdrawing that permission was built,
-measured and REVERTED: it did not change the behaviour, and with it shipped
-DeepSeek's `<｜DSML｜tool_calls>` syntax began leaking into visible content (2 of 3
-turns, against 0 of 3 without). `TODO.md` carries the full record — read it before
-retrying that shape.
+measured and REVERTED, along with a per-turn tail reminder and an edit to
+`20-tool-discipline.md` at the rule's own source. None of the three changed the
+behaviour — and note that the executor announces identically with the stage OFF,
+so the preamble does not provoke it. An earlier revision of this paragraph blamed
+those attempts for leaking raw tool-call syntax into visible content; that claim
+is RETRACTED, and `TODO.md` carries why — the leak reproduces at ~1 turn in 8 with
+no intervention present, so it is a pre-existing DeepSeek behaviour that a
+3-turn sample straddled. It now has its own TODO entry. What was kept is the
+narrow, safe half: `40-communication.md` no longer grants an opening clause for
+orienting the user, because the preamble now always occupies that slot.
 
 **Silence is a first-class answer.** The model replies with the exact token `NONE`
 when a line would be noise — a small or conversational request, a follow-up it
@@ -627,10 +633,14 @@ the selector ran — selection reruns for reasons that are not a new instruction
 a sub-agent, on a background wake, on a non-streaming request, or with no runbook
 loaded.
 
-**`shadow` is a real mode, not a half-off one.** It generates, validates, bills and
-TRACES a preamble and shows nothing — which is the point: it produces evidence
-against real turns before any user sees one. Rollback at any stage is
-`FAST_RESPONSE_MODE=off` plus a config-only revision.
+**There is ONE deployment shape.** No `off`/`shadow`/`visible`, no rollout
+percentage, no per-session cohort. Those existed to land the feature carefully and
+that decision is made; keeping them would leave the product's shape configurable
+in exactly the way this file's own rule forbids — which model, which posture,
+which prompt are benchmarked decisions, not operational dials. Turning the stage
+off is a code change, which is the honest description of what it would be. What
+DOES remain is the turn-shape eligibility above, which is about whether a preamble
+makes sense at all.
 
 ## Training traces (`TRACE_CAPTURE_MODE`, default `off`)
 
@@ -706,7 +716,7 @@ Output posture: **structural defects** (cycle, duplicate/unknown node id, moving
 
 `config.py` `Settings` is parsed once, immutable, env-driven (`.env`). The model is **hardcoded** (`config.EXECUTOR_MODEL`, `config.PUBLIC_MODEL_ID`) — a product decision, not config — and so is the **thinking posture**: `INTERACTIVE_THINKING_ENABLED = False`. On Together that is a flag genuinely held down, not a property of the model: DeepSeek V4 Flash reasons by default and the unified `reasoning: {"enabled": false}` is what switches it off, measured. Nothing in this server thinks; the flag and `INTERACTIVE_REASONING_EFFORT` stay as the decision record and the switch a future reasoning-capable serving model would need. The server ships **one optimum** and there are deliberately no env toggles for PRODUCT decisions — which model, which posture, which prompt, which runbooks: things with one right answer we have already benchmarked. That rule is about quality, not about operations, and the handful of env-driven booleans beside it (`MAIN_OUTPUT_LINT_ENABLED`, `EXPOSE_DEBUG_SELECTOR_REASON`, `TOOL_PROJECTION_MODE`) are the other kind: switches whose right value is whatever production says this week. `TOOL_PROJECTION_MODE` is the sharpest case — it gates a behaviour that WITHHOLDS capability from the model, so being able to answer "turn it off" in the time Cloud Run takes to roll a config-only revision is the point of it existing (see "Runbook-aware tool projection" below).
 
-The environment supplies exactly two secrets, **both server-owned**: `STATE_SIGNING_KEY_CURRENT` and `TOGETHER_API_KEY`. Both are in `missing_secrets()` — the upstream key gates readiness because without it nothing can be answered at all, and discovering that on the first turn surfaces as an upstream 401 that reads like the caller's fault. There is **no inbound API key** to configure — account authentication is OAuth, not a shared key, and its settings (issuer, JWKS, client id) are public configuration rather than secrets, which is why they gate readiness through `auth_problems()` rather than `missing_secrets()`. Secrets are `SecretStr`. Missing required secrets — and, in a hardened environment (`production`/`staging`), weak/default ones, including a serving base URL that is not the real origin (`config.EXECUTOR_ORIGIN`), because the server key is forwarded there — **fail readiness** (`/readyz` → 503) rather than crashing the process; liveness (`/healthz`) stays green. `local_only_problems()` adds two more, both development-only: prompt dumping must be off in production, and so must `DAINTREE_RUNBOOKS_OVERLAY_DIR` — a scratch directory of runbook files merged over the packaged catalog so a runbook can be authored against a running server (`POST /v1/daintree/runbooks/reload` rebuilds it live; that route is mounted only when the overlay is configured and the environment is not hardened). `main.py` builds the immutable service `Container` and validates it during lifespan startup; a malformed prompt or runbook prevents readiness without taking down liveness.
+The environment supplies exactly three secrets, **all server-owned**: `STATE_SIGNING_KEY_CURRENT`, `TOGETHER_API_KEY` and `CEREBRAS_API_KEY`. All three are in `missing_secrets()` — the executor key gates readiness because without it nothing can be answered at all, and discovering that on the first turn surfaces as an upstream 401 that reads like the caller's fault; the Cerebras key gates it because the fast-response stage has no off switch, so a missing key fails that stage open on every turn, which is indistinguishable from a model choosing to say nothing. There is **no inbound API key** to configure — account authentication is OAuth, not a shared key, and its settings (issuer, JWKS, client id) are public configuration rather than secrets, which is why they gate readiness through `auth_problems()` rather than `missing_secrets()`. Secrets are `SecretStr`. Missing required secrets — and, in a hardened environment (`production`/`staging`), weak/default ones, including a serving base URL that is not the real origin (`config.EXECUTOR_ORIGIN`), because the server key is forwarded there — **fail readiness** (`/readyz` → 503) rather than crashing the process; liveness (`/healthz`) stays green. `local_only_problems()` adds two more, both development-only: prompt dumping must be off in production, and so must `DAINTREE_RUNBOOKS_OVERLAY_DIR` — a scratch directory of runbook files merged over the packaged catalog so a runbook can be authored against a running server (`POST /v1/daintree/runbooks/reload` rebuilds it live; that route is mounted only when the overlay is configured and the environment is not hardened). `main.py` builds the immutable service `Container` and validates it during lifespan startup; a malformed prompt or runbook prevents readiness without taking down liveness.
 
 ## Conventions
 

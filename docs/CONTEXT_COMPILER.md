@@ -206,9 +206,9 @@ executor's request cannot contain anything the fast call produced, because it
 leaves at the same moment — and git history has all of it, including the
 validators that kept a model-authored plan from manufacturing consent. That is the
 relevant precedent: an execution spec is not free to deliver, and delivering it
-cost the concurrency that made the stage worth having. `FAST_RESPONSE_MODE` still
-defaults to `off`. Do not build a compiler that depends on an execution spec until
-the stage that would produce one is switched on and shown to earn its latency.
+cost the concurrency that made the stage worth having. Do not build a compiler
+that depends on an execution spec until something actually produces one and is
+shown to earn its latency.
 
 **§6/§35's "mine successful plans into improved runbooks" is a retread.** A
 runbook-learning builder existed and was removed; it is the reason the `risk` key

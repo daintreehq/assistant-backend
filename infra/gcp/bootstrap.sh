@@ -103,8 +103,8 @@ say "Secrets"
 # STATE_SIGNING_KEY_CURRENT must be >=32 chars and STATE_SALT must not be the
 # packaged default, or production readiness fails (Settings.weak_secrets).
 #
-# together-api-key is DIFFERENT IN KIND from the two below: it cannot be
-# generated, only supplied. So this script creates the secret shell and stops —
+# The two upstream credentials are DIFFERENT IN KIND from the two below: they
+# cannot be generated, only supplied. So this script creates the secret shell and stops —
 # a random value here would deploy a service that fails /readyz on a credential
 # nobody realised was fake.
 ensure_secret() {
@@ -148,16 +148,13 @@ ensure_supplied_secret() {
 }
 ensure_supplied_secret together-api-key 'tgp_v1_...' gates
 
-# The FAST-RESPONSE credential, and deliberately NOT gating. The stage is `off` by
-# default, the deploy mounts this secret only when it exists, and a deployment
-# without it is complete rather than degraded — it simply never opens a preamble.
-# Creating the shell here means turning the feature on later is "add a version",
-# not "re-run bootstrap".
-#
-# The dangerous combination — the mode on, the key absent — is caught by readiness
-# (`Settings.fast_response_problems`), so a revision in that state never takes
-# traffic.
-ensure_supplied_secret cerebras-api-key 'csk-...' optional
+# The FAST-RESPONSE credential, and it GATES now. The stage lost its off switch:
+# it runs on every eligible turn of every deployment, the deploy mounts this
+# secret unconditionally, and readiness (`Settings.missing_secrets`) refuses a
+# revision without it. That refusal is the point — a missing key would otherwise
+# fail the stage open on every single turn, which is indistinguishable from a
+# model that simply chose not to say anything.
+ensure_supplied_secret cerebras-api-key 'csk-...' gates
 
 # ---------------------------------------------------------------------------
 say "Runtime service account (what the container runs as)"

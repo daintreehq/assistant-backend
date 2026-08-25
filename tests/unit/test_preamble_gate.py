@@ -24,9 +24,8 @@ from daintree_assistant_server.services.fast_response import (
     PreambleGate,
 )
 
-VISIBLE = FastResponsePolicyDecision(run=True, visible=True, reason="eligible")
-SHADOW = FastResponsePolicyDecision(run=True, visible=False, reason="eligible")
-SKIPPED = FastResponsePolicyDecision(run=False, visible=False, reason="mode_off")
+ELIGIBLE = FastResponsePolicyDecision(run=True, reason="eligible")
+SKIPPED = FastResponsePolicyDecision(run=False, reason="continuation_round")
 
 LINE = FastResponseResult(
     content="Tracing the failing step back to the change that could explain it.",
@@ -56,7 +55,7 @@ def _running() -> asyncio.Task[FastResponseResult]:
     return asyncio.create_task(never())
 
 
-def _gate(task: asyncio.Task[FastResponseResult] | None, policy: Any = VISIBLE) -> PreambleGate:
+def _gate(task: asyncio.Task[FastResponseResult] | None, policy: Any = ELIGIBLE) -> PreambleGate:
     return PreambleGate(task, policy, request_id="req_1")
 
 
@@ -182,16 +181,6 @@ async def test_closing_twice_records_one_drop() -> None:
 
 
 @pytest.mark.asyncio
-async def test_shadow_mode_settles_the_call_but_shows_nothing() -> None:
-    """Shadow produces real, valid content that must never reach a client — and
-    must still be accounted and traced, which is the entire point of the mode."""
-    gate = _gate(await _settled(LINE), SHADOW)
-    assert gate.poll() is None
-    assert gate.shown is False
-    assert gate.usage == LINE.usage
-
-
-@pytest.mark.asyncio
 async def test_a_declining_model_shows_nothing_and_is_not_a_drop() -> None:
     """Silence is the model's own judgement, not a failure and not a late
     arrival. Recording it as either would corrupt both numbers."""
@@ -221,7 +210,7 @@ async def test_a_gate_with_no_task_is_inert() -> None:
     assert gate.usage is None
     # The skip reason the policy already computed, not a generic one: nothing
     # else downstream observes those per-case reasons.
-    assert gate.finish().reason == "mode_off"
+    assert gate.finish().reason == "continuation_round"
 
 
 # ---------------------------------------------------------------------------

@@ -332,19 +332,17 @@ def _build_docs_client() -> tuple[httpx.AsyncClient, DocsMcpClient]:
 
 
 def _build_fast_response_provider(settings: Settings) -> ChatProvider | None:
-    """The Cerebras adapter, or None — which is every deployment today.
+    """The Cerebras adapter, or None when there is no credential.
 
-    None when the stage is off or its credential is absent, and that is a NORMAL
-    configuration rather than a degraded one: the fast preamble is an
-    optimisation, and a server without it answers exactly as it does now.
+    None only ever means "no credential", and readiness refuses that outright —
+    the stage has no off switch. The None path stays because `build_container` is
+    also called directly by tests and benchmarks, which never probe readiness.
 
     Its own httpx client, not the executor's. The two hosts have opposite latency
     profiles and opposite lifetimes — a three-second preamble call must never
     queue behind a long-lived streaming completion holding a pooled connection,
     which is the same reasoning that gives the docs MCP its own pool.
     """
-    if settings.fast_response_mode == "off":
-        return None
     if not settings.cerebras_api_key.get_secret_value():
         # Readiness already refuses this (`Settings.fast_response_problems`), but
         # `build_container` is also called directly by tests and benchmarks, which

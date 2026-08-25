@@ -53,8 +53,6 @@ def _settings(**overrides: Any) -> Settings:
     base: dict[str, Any] = {
         "STATE_SIGNING_KEY_CURRENT": "x" * 32,
         "TOGETHER_API_KEY": "k",
-        "FAST_RESPONSE_MODE": "visible",
-        "FAST_RESPONSE_ROLLOUT_PERCENT": 100,
         "CEREBRAS_API_KEY": "c",
     }
     base.update(overrides)
@@ -79,7 +77,6 @@ def _request(**overrides: Any) -> RespondRequest:
 
 def _policy(**kwargs: Any) -> Any:
     defaults: dict[str, Any] = {
-        "settings": _settings(),
         "selector_ran": True,
         "no_task_fast_path": False,
         "active_runbooks": [FOUNDATION],
@@ -95,17 +92,20 @@ def _policy(**kwargs: Any) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def test_an_eligible_new_instruction_runs_and_is_visible() -> None:
+def test_an_eligible_new_instruction_runs() -> None:
+    """There is no separate "visible" any more — running IS showing. The three
+    modes and the rollout percentage existed to get this into production
+    carefully; that decision is made, so what is left here are the turn-shape
+    gates rather than rollout controls."""
     decision = _policy()
     assert decision.run is True
-    assert decision.visible is True
     assert decision.reason == "eligible"
+    assert not hasattr(decision, "visible")
 
 
 @pytest.mark.parametrize(
     ("kwargs", "expected"),
     [
-        ({"settings": _settings(FAST_RESPONSE_MODE="off")}, "mode_off"),
         ({"provider_available": False}, "provider_unavailable"),
         ({"request": _request(generation={"stream": False})}, "not_streaming"),
         ({"request": _request(profile="subagent")}, "subagent_profile"),
@@ -116,10 +116,6 @@ def test_an_eligible_new_instruction_runs_and_is_visible() -> None:
         ({"selector_ran": False}, "selection_did_not_run"),
         ({"no_task_fast_path": True}, "no_task_turn"),
         ({"active_runbooks": []}, "no_active_runbooks"),
-        (
-            {"settings": _settings(FAST_RESPONSE_ROLLOUT_PERCENT=0)},
-            "not_in_rollout_cohort",
-        ),
     ],
 )
 def test_the_documented_skip_cases_each_decline_with_their_own_reason(
@@ -155,26 +151,6 @@ def test_a_forced_tool_choice_skips() -> None:
         input={"messages": [{"role": "user", "content": "go"}], "tool_choice": "auto"}
     )
     assert _policy(request=auto).run is True
-
-
-def test_shadow_mode_runs_but_is_not_visible() -> None:
-    """The whole point of shadow: measure and trace real preambles against real
-    turns before any user sees one."""
-    decision = _policy(settings=_settings(FAST_RESPONSE_MODE="shadow"))
-    assert decision.run is True
-    assert decision.visible is False
-
-
-def test_the_rollout_cohort_is_stable_for_a_session() -> None:
-    """A percentage re-rolled per request would show a preamble on one round of a
-    conversation and not the next — exactly the inconsistent history a client
-    cannot render."""
-    settings = _settings(FAST_RESPONSE_ROLLOUT_PERCENT=50)
-    first = _policy(request=_request(session={"id": "stable-1"}), settings=settings)
-    again = _policy(
-        request=_request(session={"id": "stable-1", "turn_id": "t9"}), settings=settings
-    )
-    assert first.run is again.run
 
 
 def test_a_continuation_round_is_gated_on_the_round_not_on_selection() -> None:
@@ -927,17 +903,13 @@ async def test_a_reply_python_cannot_encode_falls_open_instead_of_raising() -> N
 # ---------------------------------------------------------------------------
 
 
-def test_no_fast_provider_is_built_when_the_stage_is_off() -> None:
-    """The default. A deployment that set nothing holds no Cerebras client at
-    all, which is what makes `off` a real off rather than an idle one."""
-    from daintree_assistant_server.main import _build_fast_response_provider
-
-    assert _build_fast_response_provider(_settings(FAST_RESPONSE_MODE="off")) is None
-
-
 def test_no_fast_provider_is_built_without_a_credential() -> None:
-    """Readiness refuses this too, but `build_container` is also called directly
-    by tests and benchmarks, which never probe readiness."""
+    """The only way there is no provider now — the stage has no off switch.
+
+    Readiness refuses a keyless deployment outright, but `build_container` is also
+    called directly by tests and benchmarks, which never probe readiness, so this
+    path has to stay honest rather than raise.
+    """
     from daintree_assistant_server.main import _build_fast_response_provider
 
     assert _build_fast_response_provider(_settings(CEREBRAS_API_KEY="")) is None
@@ -1157,3 +1129,57 @@ def test_a_comprehension_opening_survives() -> None:
     ):
         result = validate_preamble(opening, finish_reason="stop", had_tool_calls=False)
         assert result.valid is True, f"comprehension rejected: {opening!r}"
+
+
+# ---------------------------------------------------------------------------
+# Typography. The model writes it; the patterns were written without it.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "reason"),
+    [
+        # U+2019 RIGHT SINGLE QUOTATION MARK — what gpt-oss-120b actually emits.
+        ("I’ll start by reading the current snapshot.", "announcement_opening"),
+        ("I’ve already run the tests for you.", "overclaim"),
+        ("That’s fixed now.", "overclaim"),
+        ("We’ll pull the roster and classify each terminal.", "announcement_opening"),
+        # U+02BC and U+2018, the other two spellings a model reaches for.
+        ("Iʼll check the failing job first.", "announcement_opening"),
+        ("It‘s done.", "overclaim"),
+    ],
+)
+def test_typographic_apostrophes_do_not_defeat_the_guards(text: str, reason: str) -> None:
+    """The bug this whole `probe` split exists for, and it was a live one.
+
+    `gpt-oss-120b` writes real typography — U+2019 on essentially every reply.
+    Every pattern here was authored with the ASCII `'`, so all of them silently
+    failed against the one model this stage runs. It defeated `_OVERCLAIM`, the
+    strictest guard in the module, and it defeated `_ANNOUNCEMENT_OPENING`, which
+    is how "I'll start by reading the current Daintree snapshot…" reached a user's
+    screen as the first thing they saw.
+
+    Written with explicit escapes rather than pasted glyphs: the failure mode is
+    invisible in a diff, and an editor silently normalising a character would take
+    the regression protection with it.
+    """
+    result = validate_preamble(text, finish_reason="stop", had_tool_calls=False)
+    assert result.valid is False, f"typography defeated the guard: {text!r}"
+    assert result.reject_reason == reason
+
+
+def test_typography_is_folded_for_MATCHING_and_never_for_display() -> None:
+    """The other half, and the reason the probe is a separate string.
+
+    Curly apostrophes and em dashes are better typography than their ASCII
+    equivalents, and there is no reason to degrade what the reader sees. Only the
+    regexes need the plain form — so a valid line comes back exactly as written.
+    """
+    text = (
+        "A build that fails only in CI usually means the environment differs "
+        "— it isn’t the code that changed."
+    )
+    result = validate_preamble(text, finish_reason="stop", had_tool_calls=False)
+    assert result.valid is True
+    assert result.content == text
+    assert "’" in result.content and "—" in result.content

@@ -435,7 +435,7 @@ class _PreparedTurn:
     #: is exactly the case that makes these two different answers.
     fast_policy: FastResponsePolicyDecision = field(
         default_factory=lambda: FastResponsePolicyDecision(
-            run=False, visible=False, reason="not_eligible"
+            run=False, reason="not_eligible"
         )
     )
 
@@ -496,10 +496,10 @@ class ChatOrchestrator:
         # each one carrying a flag check that only ever goes one way in
         # production and is therefore never exercised.
         trace_recorder: TraceRecorder | None = None,
-        # The fast-response stage. Optional, and disabled in every deployment
-        # today — `FastResponseService.available` is False unless an operator set
-        # a mode AND a Cerebras credential exists, so the turn takes exactly the
-        # path it takes now.
+        # The fast-response stage. Optional only in the constructor: readiness
+        # refuses a deployment without a Cerebras credential, so in production
+        # this is always present. The seam stays for tests and benchmarks, which
+        # build a container directly and never probe readiness.
         fast_response: FastResponseService | None = None,
     ) -> None:
         self.settings = settings
@@ -1852,9 +1852,7 @@ class ChatOrchestrator:
     ) -> FastResponsePolicyDecision:
         """Whether the preamble stage runs, and whether its output may be shown."""
         if self.fast_response is None:
-            return FastResponsePolicyDecision(
-                run=False, visible=False, reason="stage_not_configured"
-            )
+            return FastResponsePolicyDecision(run=False, reason="stage_not_configured")
         return self.fast_response.policy_for(
             request,
             selector_ran=selector_ran,
@@ -1960,7 +1958,7 @@ class ChatOrchestrator:
                 ("not_delivered" if gate.claimed else None)
                 or gate.drop_reason
                 or result.reason
-                or ("shadow_mode" if not gate.policy.visible else "not_shown")
+                or "not_shown"
             )
         await trace.record_model_invocation(
             ModelInvocationTrace(
@@ -1994,7 +1992,6 @@ class ChatOrchestrator:
                 "reason": result.reason,
                 "latency_ms": result.latency_ms,
                 "shown": gate.shown,
-                "visible": gate.policy.visible,
             },
             content={"content": result.content} if result.content else None,
         )
@@ -2657,8 +2654,7 @@ class ChatOrchestrator:
         # in the gate; this path only decides when to poll it and when to shut it.
         gate = PreambleGate(
             fast_task,
-            fast_policy
-            or FastResponsePolicyDecision(run=False, visible=False, reason="not_eligible"),
+            fast_policy or FastResponsePolicyDecision(run=False, reason="not_eligible"),
             request_id=meta.request_id,
         )
 

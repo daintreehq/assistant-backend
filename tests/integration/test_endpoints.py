@@ -564,7 +564,7 @@ def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
 def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
     """Production readiness needs no INBOUND key: there is nothing to configure
     on the door. Only the server's own material — the signing key, the salt, and
-    the upstream credential — is validated."""
+    the two upstream credentials — is validated."""
     from fastapi.testclient import TestClient
 
     from daintree_assistant_server.config import Settings
@@ -573,6 +573,7 @@ def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
     settings = Settings(
         ENVIRONMENT="production",
         TOGETHER_API_KEY="sk-server-owned",
+        CEREBRAS_API_KEY="csk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",
     )
@@ -601,6 +602,7 @@ def test_prod_not_ready_when_prompt_dumping_is_enabled(fake_provider) -> None:
     settings = Settings(
         ENVIRONMENT="production",
         TOGETHER_API_KEY="sk-server-owned",
+        CEREBRAS_API_KEY="csk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",
         DAINTREE_DUMP_UPSTREAM_DIR="/tmp/daintree-dump",

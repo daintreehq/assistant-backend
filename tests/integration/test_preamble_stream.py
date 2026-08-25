@@ -76,7 +76,6 @@ def _cerebras(text: str = PREAMBLE, *, status: int = 200) -> CerebrasProvider:
 def _enable(
     client: Any,
     fake_provider: Any,
-    mode: str = "visible",
     **provider_kwargs: Any,
 ) -> None:
     """Turn the stage on for the container the route actually reads.
@@ -88,13 +87,8 @@ def _enable(
     CEREBRAS_CALLS.clear()
     fake_provider.selection_result = selection_result(["daintree.foundation"])
     container = client.app.state.container
-    # `Settings` is a frozen Pydantic model, not a dataclass.
-    settings = container.settings.model_copy(
-        update={"fast_response_mode": mode, "fast_response_rollout_percent": 100}
-    )
-    container.orchestrator.settings = settings
     container.orchestrator.fast_response = FastResponseService(
-        settings=settings,
+        settings=container.settings,
         prompt_loader=container.prompt_loader,
         provider=_cerebras(**provider_kwargs),
     )
@@ -144,15 +138,25 @@ def _stream(client: Any, auth: dict[str, str], **body_kwargs: Any) -> list[str]:
     return [name or "" for name, _ in parse_sse(text)]
 
 
-def test_the_stage_is_off_by_default_and_emits_no_preamble(
-    client: Any, auth: dict[str, str]
+def test_a_turn_with_no_runbook_loaded_emits_no_preamble(
+    client: Any, auth: dict[str, str], fake_provider: Any
 ) -> None:
-    """The property that makes this safe to merge: a deployment that configured
-    nothing sees exactly the stream it saw before."""
+    """The one remaining "nothing to describe" gate, now that there is no off
+    switch to test.
+
+    With no runbook selected the stage has no evidence about what the work
+    involves, and a preamble written from the user's message alone would be the
+    invented filler the prompt spends most of its length refusing. Asserts the
+    call was never DISPATCHED, not merely that nothing was shown — those are the
+    same stream and only one of them is this gate working.
+    """
+    _enable(client, fake_provider)
+    fake_provider.selection_result = selection_result([])
     names = _stream(client, auth)
+
     assert "preamble" not in names
-    assert names[0] == "meta"
     assert names[-1] == "done"
+    assert CEREBRAS_CALLS == [], "an ineligible turn must not spend a Cerebras call"
 
 
 def test_meta_stays_first_and_done_stays_terminal_with_a_preamble(
@@ -217,19 +221,6 @@ def test_the_preamble_payload_carries_its_commit_semantics(
         assert internal not in rendered
 
 
-def test_shadow_mode_runs_the_stage_and_shows_nothing(
-    client: Any, auth: dict[str, str], fake_provider: Any
-) -> None:
-    """The stage generates, validates and traces a real preamble — and the user's
-    stream is byte-for-byte the one they would have got without it."""
-    _enable(client, fake_provider, mode="shadow")
-    names = _stream(client, auth)
-
-    assert "preamble" not in names
-    assert names[0] == "meta"
-    assert names[-1] == "done"
-
-
 def test_a_failing_fast_provider_does_not_disturb_the_turn(
     client: Any, auth: dict[str, str], fake_provider: Any
 ) -> None:
@@ -240,6 +231,9 @@ def test_a_failing_fast_provider_does_not_disturb_the_turn(
     assert names[0] == "meta"
     assert names[-1] == "done"
     assert "error" not in names
+    # The call WAS dispatched — otherwise this test passes just as well against a
+    # build where the stage never runs at all.
+    assert len(CEREBRAS_CALLS) == 1
     # And NOTHING is shown. There is no deterministic fallback sentence any more:
     # the model is asked to judge whether a line is worth writing, and a
     # server-authored filler emitted on failure would contradict that judgement.
@@ -274,34 +268,35 @@ def test_a_non_streaming_turn_never_produces_a_preamble(
     assert PREAMBLE not in body["message"]["content"]
 
 
-def test_the_executor_request_is_byte_identical_in_every_mode(
+def test_the_executor_request_does_not_depend_on_the_fast_stage(
     client: Any, auth: dict[str, str], fake_provider: Any
 ) -> None:
     """The strongest statement the concurrent design makes.
 
-    The preamble is no longer part of the executor's input — the two calls leave
-    together, so it CANNOT be. That turns what used to be "the system region is
-    unchanged" into "the whole request is unchanged", which is also what makes
-    `FAST_RESPONSE_MODE=off` a genuine no-op on the wire rather than a
-    different-but-similar request. Rollback is a config-only revision.
+    The preamble is not part of the executor's input — the two calls leave
+    together, so it CANNOT be. What the fast stage did on a given turn therefore
+    has no effect on the bytes the executor receives.
 
-    Compared across all three modes in one test rather than parametrized: the
-    claim is that they AGREE, and three separate runs each asserting their own
-    shape cannot say that.
+    Compared across a turn that PRODUCED a preamble and one whose provider died,
+    in a single test rather than parametrized: the claim is that the two AGREE,
+    and separate runs each asserting their own shape cannot say that. (Under the
+    old three-mode design this compared off/shadow/visible; there is one mode now,
+    so the variable that remains is whether the call succeeded.)
     """
     sent: dict[str, Any] = {}
-    for mode in ("off", "shadow", "visible"):
-        _enable(client, fake_provider, mode=mode)
+    for label, status in (("succeeded", 200), ("failed", 500)):
+        _enable(client, fake_provider, status=status)
         # Streaming turns land in `stream_requests`, not `requests`.
         fake_provider.stream_requests.clear()
-        _stream(client, auth)
+        names = _stream(client, auth)
+        assert ("preamble" in names) is (status == 200), "the setup must actually differ"
         request = fake_provider.stream_requests[-1]
         # The WHOLE request, not just `messages`. The handoff test this replaces
         # compared `tools` explicitly, and dropping to messages-only would let a
         # mutation that varied the tool array, the model, the token cap or the
-        # reasoning posture by mode go straight through. `api_key` is excluded
-        # because it is `repr=False` and identical by construction.
-        sent[mode] = {
+        # reasoning posture go straight through. `api_key` is excluded because it
+        # is `repr=False` and identical by construction.
+        sent[label] = {
             "messages": request.messages,
             "tools": request.tools,
             "tool_choice": request.tool_choice,
@@ -314,9 +309,9 @@ def test_the_executor_request_is_byte_identical_in_every_mode(
             "reasoning_effort": request.reasoning_effort,
         }
 
-    assert sent["off"] == sent["shadow"] == sent["visible"]
-    assert len([m for m in sent["visible"]["messages"] if m.get("role") == "system"]) == 2
-    assert PREAMBLE not in json.dumps(sent["visible"]["messages"])
+    assert sent["succeeded"] == sent["failed"]
+    assert len([m for m in sent["succeeded"]["messages"] if m.get("role") == "system"]) == 2
+    assert PREAMBLE not in json.dumps(sent["succeeded"]["messages"])
 
 
 def test_a_preamble_that_loses_the_race_is_dropped_rather_than_shown(
@@ -333,10 +328,13 @@ def test_a_preamble_that_loses_the_race_is_dropped_rather_than_shown(
     _enable(client, fake_provider)
     service = client.app.state.container.orchestrator.fast_response
 
+    started = asyncio.Event()
+
     async def slow(*args: Any, **kwargs: Any) -> Any:
         # Long enough to lose to a fake provider that answers instantly, short
         # enough that the turn does not wait on it — which is the point: nothing
         # awaits this any more.
+        started.set()
         await asyncio.sleep(0.2)
         return FastResponseResult(content=PREAMBLE, source="model")
 
@@ -345,6 +343,7 @@ def test_a_preamble_that_loses_the_race_is_dropped_rather_than_shown(
 
     assert "preamble" not in names, "a line that arrives after the answer must be dropped"
     assert names[-1] == "done", "and the turn is otherwise untouched"
+    assert started.is_set(), "the stage must have RUN — otherwise this proves nothing"
 
 
 def test_a_dropped_preamble_is_recorded_as_a_drop_and_not_as_a_failure(
@@ -367,41 +366,6 @@ def test_a_dropped_preamble_is_recorded_as_a_drop_and_not_as_a_failure(
     dropped = [e for e in logs if e.get("event") == "fast_response_dropped"]
     assert dropped, "the drop must be observable"
     assert dropped[0]["reason"] == "executor_output_first"
-
-
-def test_shadow_mode_is_traced_even_though_nothing_is_shown(
-    client: Any, auth: dict[str, str], fake_provider: Any, tmp_path: Any
-) -> None:
-    """Shadow exists to produce evidence, so a trace written only on the visible
-    branch would capture nothing from the stage of the rollout that needs it."""
-    from daintree_assistant_server.tracing import (
-        DefaultTraceRecorder,
-        FilesystemTraceSink,
-        decide,
-    )
-
-    _enable(client, fake_provider, mode="shadow")
-    client.app.state.container.orchestrator.trace_recorder = DefaultTraceRecorder(
-        sink=FilesystemTraceSink(tmp_path),
-        identity_key=b"k",
-        eligibility=decide(mode="full_internal", is_hardened=False),
-        max_event_bytes=8 * 1024 * 1024,
-        max_pending_bytes=32 * 1024 * 1024,
-        flush_grace_seconds=2.0,
-    )
-
-    names = _stream(client, auth)
-    assert "preamble" not in names
-
-    import json
-
-    directory = next(p for p in tmp_path.iterdir() if p.is_dir())
-    manifest = json.loads((directory / "manifest.json").read_text())
-    fast = [i for i in manifest["invocations"] if i["stage"] == "fast_response"]
-    assert fast, f"the shadow call was not traced: {manifest['invocations']}"
-    # Generated and billed, but never delivered — and the record says which.
-    assert fast[0]["accepted"] is False
-    assert fast[0]["discard_reason"] == "shadow_mode"
 
 
 def test_the_turn_completes_even_if_the_fast_call_never_returns(
@@ -522,6 +486,7 @@ def test_a_chunk_carrying_prose_AND_a_tool_call_closes_the_window(
 
     assert "delta" in names, "the scripted chunks must actually have streamed"
     assert "preamble" not in names, "prose in a tool-call chunk must close the window"
+    assert release.is_set(), "the stage must have RUN — otherwise this proves nothing"
 
 
 def test_a_preamble_that_won_is_not_lost_when_the_stream_ends_first(

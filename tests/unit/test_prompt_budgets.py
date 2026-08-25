@@ -107,7 +107,12 @@ from daintree_assistant_server.runbooks.catalog import load_catalog
 # which is the SECOND static system message and is not measured here. A cleanup that
 # moves shape rules out of base lowers this number without lowering what the model
 # receives, so read a drop against the contract's size too.
-BASE_PROMPT_CEILING = 25 * 1024
+#
+# RAISED 2026-08-25, 25600 -> 26112 B, for the same change as the
+# `40-communication.md` ceiling below — withdrawing the opening-clause permission
+# now that the fast-response stage runs on every eligible turn. The whole increase
+# is that one rule; nothing else grew. See the per-partial note for the argument.
+BASE_PROMPT_CEILING = 26112
 
 # Per-partial ceilings. The aggregate alone hides where growth actually happens —
 # tool-discipline is nearly half the prompt on its own, and a rule added there is
@@ -155,7 +160,22 @@ BASE_PARTIAL_CEILINGS = {
     # no-task turn is a COMMUNICATION concern (what a reply must contain when the
     # user hands you nothing to do), so it belongs here rather than in the hard
     # rules or tool discipline.
-    "40-communication.md": 4 * 1024,
+    # RAISED 2026-08-25, 4096 -> 4608 B, to withdraw the opening-clause permission.
+    #
+    #   What behaviour needs this?  The fast-response stage now runs on EVERY
+    #   eligible turn, so two or three sentences describing the work are already on
+    #   the user's screen before the executor writes anything. The rule this file
+    #   used to carry — "only a turn's OPENING round may spend one short clause
+    #   orienting the user" — became a licence to say the same thing twice in two
+    #   seconds, which is exactly what makes a fast reply read as padded.
+    #
+    #   Why here rather than a separate partial?  A conditional partial contradicting
+    #   this permission was tried and reverted (`TODO.md`): it did not change the
+    #   behaviour, and it coincided with tool-call syntax leaking into visible
+    #   content. The permission lives in this file, so withdrawing it belongs in this
+    #   file — one rule, one owner. There is no longer a deployment without the
+    #   preamble, so the rule needs no condition.
+    "40-communication.md": 4608,
     "50-formatting.md": 3 * 1024,
 }
 # The SECOND static system message, and the other half of the permanent prompt.

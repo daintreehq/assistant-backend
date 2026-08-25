@@ -554,8 +554,9 @@ Nothing about the preamble reaches the main model: its request is byte-identical
 whether the stage ran, was withheld, or is switched off entirely.
 
 `/v1/daintree/capabilities` reports `respond.fast_response.enabled` for the
-instance you are talking to. It is **off by default**, so most deployments will
-never send this event.
+instance you are talking to. It is always `true` on a current backend — the stage
+has no off switch — but read the field rather than assuming it, since that is what
+lets an older or differently-configured backend tell you otherwise.
 
 `request_id` is on the **error** event as well as `meta` because a stream can fail
 *before* `meta` is ever sent — a preparation failure does exactly that — and `meta` is
