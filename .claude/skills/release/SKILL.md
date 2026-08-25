@@ -185,9 +185,15 @@ the container no matter how healthy the service is. Or just run the script that
 already knows all of this:
 
 ```bash
-./infra/gcp/smoke.sh                                    # free checks only
-OPENROUTER_API_KEY=sk-or-v1-... ./infra/gcp/smoke.sh --full   # + two real turns
+./infra/gcp/smoke.sh --expect-env production            # free checks only
+./infra/gcp/smoke.sh --expect-env production --full     # + two real turns
 ```
+
+Pass `--expect-env`: without it the script checks whatever is at the URL and never
+notices that it is the wrong deployment, which is precisely the mistake a release
+can make. `--full` needs no key — the server holds the upstream credential now, so
+those two turns spend DAINTREE's money rather than yours, which is why they stay
+opt-in.
 
 `build_sha` disagreeing with `RELEASE_SHA` means traffic is still on an older
 revision — say so plainly rather than reporting success. Confirm the rollout:
