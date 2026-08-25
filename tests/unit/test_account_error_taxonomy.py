@@ -2,8 +2,8 @@
 
 Nothing raises these yet: ``auth.py`` still serves every request anonymously and
 entitlement does not exist. They are pinned now because the taxonomy already has a
-CONSUMER — the CLI recognises all twelve codes in
-``internal/backend/account.go`` (with a typed remedy for each of the five
+CONSUMER — the CLI recognises all thirteen codes in
+``internal/backend/account.go`` (with a typed remedy for each of the six
 identity ones) — so a code reworded or restatused here silently
 stops matching a client that is already written, and nothing would fail until the
 day the producer landed.
@@ -31,6 +31,7 @@ from daintree_assistant_server.errors import (
     account_rate_limited,
     auth_client_not_allowed,
     auth_dependency_unavailable,
+    auth_permission_denied,
     auth_required,
     auth_session_revoked,
     auth_token_expired,
@@ -55,6 +56,7 @@ ACCOUNT_ERRORS: list[tuple[Callable[[], DaintreeError], str, int, str, bool]] = 
     (auth_token_expired, "auth_token_expired", 401, TYPE_AUTHENTICATION, False),
     (auth_session_revoked, "auth_session_revoked", 401, TYPE_AUTHENTICATION, False),
     (auth_client_not_allowed, "auth_client_not_allowed", 403, TYPE_AUTHENTICATION, False),
+    (auth_permission_denied, "auth_permission_denied", 403, TYPE_AUTHENTICATION, False),
     (subscription_required, "subscription_required", 402, TYPE_AUTHENTICATION, False),
     (subscription_inactive, "subscription_inactive", 402, TYPE_AUTHENTICATION, False),
     (usage_limit_reached, "usage_limit_reached", 429, TYPE_RATE_LIMIT, False),
@@ -82,8 +84,10 @@ def test_each_account_error_keeps_its_wire_contract(
 
 
 def test_every_account_code_is_distinct() -> None:
-    """The whole point of twelve codes rather than four statuses. Two of these
-    sharing a code would make two different remedies indistinguishable."""
+    """The whole point of thirteen codes rather than four statuses. Two of these
+    sharing a code would make two different remedies indistinguishable — which is
+    exactly what the two 403s would be if they collapsed, since they share a
+    remedy and are told apart only by the code."""
     codes = [code for _, code, _, _, _ in ACCOUNT_ERRORS]
     assert len(set(codes)) == len(codes)
 
@@ -96,7 +100,8 @@ def test_every_account_code_is_distinct() -> None:
 @pytest.mark.parametrize(
     "factory",
     [auth_required, auth_token_invalid, auth_token_expired, auth_session_revoked,
-     auth_client_not_allowed, subscription_required, subscription_inactive, usage_limit_reached],
+     auth_client_not_allowed, auth_permission_denied, subscription_required,
+     subscription_inactive, usage_limit_reached],
     ids=lambda f: f.__name__,
 )
 def test_a_verdict_about_the_caller_is_never_retryable(
@@ -104,7 +109,7 @@ def test_a_verdict_about_the_caller_is_never_retryable(
 ) -> None:
     """Every one of these holds identically on replay. Two are actively expensive
     to get wrong: `usage_limit_reached` would spend the whole backoff budget
-    re-deriving the same refusal, and `auth_client_not_allowed` would refresh
+    re-deriving the same refusal, and the two 403s would refresh
     forever, minting a token wrong in exactly the same way each time.
 
     `auth_token_expired` is the subtle one. It IS fixable by a refresh — but the
@@ -198,12 +203,16 @@ def test_the_challenge_is_exactly_what_it_should_be(
     assert factory().headers["WWW-Authenticate"] == challenge
 
 
-def test_the_403_does_not_challenge() -> None:
-    """`auth_client_not_allowed` carries a valid, current credential — the pairing
-    of client and deployment is what is wrong. RFC 7235 reserves the challenge for
-    401, and offering one here would invite the refresh loop that cannot terminate.
+@pytest.mark.parametrize(
+    "factory", [auth_client_not_allowed, auth_permission_denied], ids=lambda f: f.__name__
+)
+def test_the_403s_do_not_challenge(factory: Callable[[], DaintreeError]) -> None:
+    """Both 403s carry a valid, current credential — what is wrong is the pairing of
+    client and deployment, or the authority that credential holds. RFC 7235 reserves
+    the challenge for 401, and offering one here would invite the refresh loop that
+    cannot terminate.
     """
-    err = auth_client_not_allowed()
+    err = factory()
     assert err.status_code == 403
     assert "WWW-Authenticate" not in err.headers
 
@@ -335,7 +344,7 @@ def test_the_cli_and_the_backend_agree_on_every_account_code() -> None:
     `account.go` — so this skips today and starts enforcing the moment the
     submodule moves, which is exactly when drift becomes possible. `TODO.md`
     carries the bump. Verified against the sibling checkout by hand when written:
-    all twelve codes and statuses agreed.
+    all thirteen codes and statuses agreed.
     """
     if not CLI_ACCOUNT_GO.exists():
         pytest.skip(

@@ -179,15 +179,19 @@ def upstream_timeout(message: str = "The upstream model provider timed out.") ->
 # one of these codes (`internal/backend/account.go`), so a code reworded or
 # restatused on this side silently stops matching a consumer that is already
 # written. What it does with them varies by group and is worth being exact about:
-# the five IDENTITY codes carry a typed `AuthRemedy` each, while the subscription,
+# the six IDENTITY codes carry a typed `AuthRemedy` each, while the subscription,
 # usage and dependency codes carry none — they are classified for retryability and
 # for "is this the account's problem", and their handling is the client's to build.
 # Three groups, and the grouping is the CLI's:
 #
 # * **Identity** (401/403) — who you are. Each has a DIFFERENT next step, which
 #   is why they are not one code: sign in, refresh once, delete the credential,
-#   or fix the configuration. A single `401 unauthorized` would collapse all four
-#   into "log in again", and two of them are refresh loops that can never succeed.
+#   or report a refusal no credential operation can lift. A single `401
+#   unauthorized` would collapse them all into "log in again", and three of them
+#   are refresh loops that can never succeed. The two 403s are the exception that
+#   proves the rule: they SHARE a next step and are still two codes, because the
+#   message differs and telling someone their OAuth client is not accepted when it
+#   is sends them hunting a registration problem that does not exist.
 # * **Subscription** (402) — authenticated, not entitled. Two codes because the
 #   fixes differ: a first purchase versus the billing portal. Suggesting a second
 #   checkout to someone whose card merely failed is how people pay twice.
