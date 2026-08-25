@@ -276,8 +276,14 @@ def test_enforce_is_the_one_posture_that_reports_required(fake_provider: Any) ->
 
 def test_required_is_never_true_without_a_manifest_to_follow(fake_provider: Any) -> None:
     """Telling a client a credential is mandatory while withholding the only
-    description of how to obtain one is a dead end. Asserted at the body builder,
-    because no mode combination can currently produce it over HTTP."""
+    description of how to obtain one is a dead end.
+
+    Asserted at the body builder rather than over HTTP, and the reason is not that
+    the mode is unreachable — `enforce` runs, and the test above drives it through
+    the endpoint. It is that a deployment cannot HOLD this shape: `enforce` with an
+    incomplete manifest fails readiness, so the combination never reaches a served
+    request. The rule is still worth pinning, because `required` is derived from
+    two independent inputs and only one of them is guarded that way."""
     from daintree_assistant_server.api.daintree_auth import _auth_config_body
 
     settings = Settings(

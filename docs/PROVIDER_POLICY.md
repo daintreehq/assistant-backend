@@ -353,14 +353,25 @@ The CLI never replays:
   not the status, decides;
 - a respond turn that has already streamed visible tokens.
 
-⚠️ **The verdict exclusion is narrower than it looks.** It applies only when the
-error arrives as an HTTP response. The same `upstream_error` delivered as a
-terminal **SSE** event *is* retried, provided no visible content has committed.
-Because `meta` is emitted before the canonical upstream stream is opened, a
-deterministic upstream rejection — a revoked key, a malformed parameter mix —
-can reach the CLI as an SSE `upstream_error` and be replayed to no purpose. This
-is the strongest argument for the error-taxonomy work in §6: with distinct codes,
-the SSE path could exclude the deterministic ones too.
+⚠️ **The verdict exclusion is narrower than it looks, and one half of it has been
+closed.** It applies only when the error arrives as an HTTP response — a verdict
+delivered as a terminal SSE event is still retried, provided no visible content
+has committed.
+
+What no longer applies is the deterministic case. The CLI now keys those on the
+code rather than the transport (`deterministicUpstreamCodes` in
+`internal/backend/retry.go`), and refuses to replay six of them on either path:
+`provider_invalid_api_key`, `provider_insufficient_credits`,
+`provider_key_forbidden`, `upstream_no_compliant_provider`,
+`upstream_request_rejected` and `upstream_protocol_error`. A revoked key or a
+malformed parameter mix reaching the CLI as an SSE error is therefore surfaced
+immediately rather than replayed through the full backoff to re-derive the same
+refusal. `upstream_unavailable` and `upstream_timeout` are deliberately excluded
+from that set — they are the genuinely transient half, and giving up on them
+would trade one wrong behaviour for another.
+
+A residual catch-all `upstream_error` delivered over SSE can still be retried,
+which is the remaining argument for the taxonomy work in §6.
 
 A retry after `meta` adopts that meta's signed `state` token in the next POST, so
 the backend reuses the same selection rather than re-running the selector.

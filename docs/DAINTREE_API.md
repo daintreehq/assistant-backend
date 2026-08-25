@@ -79,6 +79,26 @@ it:
 purpose: during a rollout a deployment publishes a complete manifest while still serving
 anonymous requests.
 
+**The posture is not the environment.** `ENVIRONMENT` (`development`, `test`, `staging`,
+`production`) says where a deployment is and which hardening rules apply to the URLs it
+publishes; `AUTH_MODE` says what it does about credentials. They are independent axes and
+there is deliberately no fourth `staging` auth mode — a staging deployment sits in
+whichever posture its rollout has reached, and the posture moves by a config-only
+revision rather than a redeploy. The staged rollout, with no secret in it:
+
+```text
+assistant.daintree.org:        ENVIRONMENT=staging
+browser account/payment links: staging.daintree.org
+initial posture:               open, or observe
+later posture:                 enforce, after an end-to-end sign-in is validated
+```
+
+The Supabase issuer, JWKS, authorize and token URLs and the public OAuth client id come
+from that environment's own Supabase project. They are published to every caller by this
+endpoint, so they are ordinary deployment configuration rather than secrets — but they
+are per-deployment, and a value written into source is one that follows every copy of
+it.
+
 Under `enforce` a token is verified locally against the configured Supabase project's
 JWKS: an asymmetric signature (RS256 or ES256, never chosen by the token), the exact
 issuer, the `authenticated` audience, expiry within 60 seconds of clock skew, and an

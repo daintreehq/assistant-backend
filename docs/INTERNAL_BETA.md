@@ -192,14 +192,43 @@ a typo like `prod` cannot fail open past the hardening gates):
 | `staging` | **fails readiness** | on | real upstream smoke, no external testers |
 | `production` | **fails readiness** | on | the tester endpoint |
 
-Authentication does **not** vary by environment, and currently that means the
-door is open in all four: the server holds the upstream credential, so every
-request has one to spend. The `Authorization` header is **ignored entirely** —
-not parsed, not validated, not rejected — so a client still sending an old
-OpenRouter key is served rather than having that key forwarded upstream and
-rejected as theirs. Account authentication is being built next. The operational endpoints — `/`, `/health`, `/healthz`,
-`/readyz`, `/version` — have always been unauthenticated, because a probe that
-needs a credential is not a health check.
+## 7a. Authentication posture
+
+Authentication does **not** vary by environment. It is a separate axis, named by
+`AUTH_MODE`, and the two are deliberately independent: there is no fourth
+`staging` auth mode, so a staging deployment is `ENVIRONMENT=staging` in whichever
+posture its rollout has reached. (It lives in its own section rather than in the
+table above for the same reason — a reader who finds the two in one table starts
+looking for the row where they interact, and there isn't one.)
+
+| Mode | The `Authorization` header | An anonymous request |
+|---|---|---|
+| `open` (default) | not read for authentication | served |
+| `observe` | parsed when present; a well-formed bearer is verified and the outcome recorded | served, unchanged |
+| `enforce` | required, and verified | refused — `auth_required`, 401 |
+
+Under `enforce` a 403 is reachable but not by an anonymous caller: it means a
+credential that verified and belongs to an OAuth client this deployment does not
+accept (`auth_client_not_allowed`), or one not permitted the operation
+(`auth_permission_denied`). Both are deliberately not 401s, because a refresh
+would mint another token wrong in exactly the same way.
+
+All three are built and tested; `open` is what every deployment runs today, which
+is why a client still sending an old OpenRouter key is served rather than having
+that key forwarded upstream and rejected as theirs. `enforce` establishes that a
+token is genuine and unexpired — not that the session behind it still exists,
+which needs a lookup this service cannot yet make.
+
+The staged rollout for `assistant.daintree.org` is `ENVIRONMENT=staging` with
+browser account and payment links on `staging.daintree.org`, starting at `open` or
+`observe` and moving to `enforce` only after an end-to-end sign-in has been
+validated. The mode moves by a config-only revision.
+
+The operational endpoints — `/`, `/health`, `/healthz`, `/readyz`, `/version` —
+have always been unauthenticated, because a probe that needs a credential is not a
+health check. `GET /v1/daintree/auth/config` joins them in every mode: it is how a
+client learns to sign in, and requiring a token to read it is a bootstrap nothing
+can satisfy.
 
 ## 8. Known limitations to publish with the beta
 
@@ -209,9 +238,11 @@ State these to testers up front rather than letting them discover them:
 - The request prompt is large — tool schemas dominate it — so a turn costs more
   than the visible conversation suggests. That is now **Daintree's** spend, not
   the tester's: the server holds the upstream credential.
-- There is no rate limiting and no inbound authentication, so a runaway client
-  burns Daintree's own balance. This is the most important consequence of the
-  credential move and the reason account auth is next.
+- There is no rate limiting, and the deployed posture is `AUTH_MODE=open`, so a
+  runaway client burns Daintree's own balance. Account authentication exists and
+  is off; turning it on bounds WHO can spend, not how much, since entitlement and
+  usage accounting are a separate body of work that needs storage this service
+  does not have.
 - Images: remote image URLs are disabled by default and in the current deployment
   (`ALLOW_REMOTE_IMAGE_URLS=false`, reported in `/v1/daintree/capabilities`).
   Nothing prevents a hardened environment from setting it, so read capabilities

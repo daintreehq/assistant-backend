@@ -1,11 +1,17 @@
 """Who may be recorded, decided explicitly rather than inferred.
 
-The service has no account model yet (``auth.py`` does not read the
-``Authorization`` header at all), so there is nobody to ask for consent and no
-per-account flag to read. That is exactly why this module exists as a real
-decision object instead of an ``if settings.trace_mode == "full_internal"``
-scattered through the orchestrator: when account auth lands, ONE function changes
-and every caller inherits it.
+There is still nobody to ask for consent, and the reason has narrowed rather than
+gone away. ``auth.py`` now verifies a credential under ``observe`` and requires one
+under ``enforce``, so a request CAN carry a verified identity — but an identity is
+not a consent record, and there is no account store to keep one in. A `Principal`
+knows who is calling and nothing about what they have agreed to.
+
+That is exactly why this module exists as a real decision object instead of an
+``if settings.trace_mode == "full_internal"`` scattered through the orchestrator:
+when there is somewhere to record consent, ONE function changes and every caller
+inherits it. The shipped default is also still ``AUTH_MODE=open``, under which the
+header is not read at all — so on today's deployments there is not even an
+identity.
 
 The standing rule is the conservative one: **using the service is not consent.**
 Content capture is available only where an operator has deliberately turned it on

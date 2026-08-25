@@ -6,9 +6,15 @@ runbook catalog and bodies, automatic runbook selection, prompt assembly, and th
 small-model utility prompts. The CLI keeps local state and local tool execution.
 
 **The server holds the upstream credential** (`TOGETHER_API_KEY`) and funds every
-turn from it, so a request needs no API key of its own. That is a stage, not a
-destination: account authentication and sign-in are next, and `auth.py` is the
-seam they land in.
+turn from it, so a request needs no API key of its own. Account authentication is
+built and switched OFF: `AUTH_MODE` selects `open` (the shipped default, under
+which the `Authorization` header is not read for authentication at all), `observe`
+(a present credential is verified and recorded, and nothing a caller can see
+changes) or `enforce` (a verified credential is required). An account is an
+ENTITLEMENT to spend Daintree's key, never a mapping to one of yours — but that
+is a statement about the credential model, not a feature that exists: nothing
+here checks a plan, a subscription or a quota, so authentication today bounds
+WHO may spend Daintree's key and not how much.
 
 It exposes a **Daintree-native** API (`POST /v1/daintree/respond`) — purpose-built,
 not OpenAI-compatible. The session/runbook envelope is first-class, runbooks are surfaced
@@ -126,11 +132,17 @@ export TOGETHER_API_KEY=...               # the upstream credential; funds every
 ```
 
 Those two are the whole list, and both are the **server's own**. There is no
-inbound API key to configure, and the `Authorization` header is **ignored
-entirely** — not parsed, not validated, not rejected. That is deliberate and
-temporary, until account authentication lands, and it is stronger than "a key is
-optional": a CLI still sending the OpenRouter key it used to authenticate with
-would otherwise have that key forwarded upstream and rejected as *theirs*.
+inbound API key to configure — account authentication is OAuth, and its settings
+(issuer, JWKS, client id) are public configuration rather than secrets, which is
+why they gate readiness through `auth_problems()` instead of appearing here.
+
+Under the shipped `AUTH_MODE=open` the `Authorization` header is **not read for
+authentication** — not parsed, not validated, not rejected. That is stronger than
+"a key is optional", and it is what makes an old client work rather than fail
+confusingly: a CLI still sending the OpenRouter key it used to authenticate with
+would otherwise have that key forwarded upstream and rejected as *theirs*. (The
+header IS read for redaction in every mode, so a mis-pasted credential cannot be
+logged back to you.)
 
 Missing required secrets do not crash the process — they fail **readiness**
 (`/readyz` returns 503) so liveness stays green. `TOGETHER_API_KEY` is gated

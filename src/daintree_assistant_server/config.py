@@ -1088,10 +1088,9 @@ class Settings(BaseSettings):
         problems.extend(self.auth_problems())
         return problems
 
-    #: The eight values that make a publishable manifest. Ordered as the manifest
-    #: reads, so a completeness failure names fields in the order an operator
-    #: filled them in.
-    #: The values that must be present for a manifest to be publishable.
+    #: The values that must be present for a manifest to be publishable. Ordered
+    #: as the manifest reads, so a completeness failure names fields in the order
+    #: an operator filled them in.
     #:
     #: The callback is absent because it is a constant rather than a setting
     #: (``OAUTH_REDIRECT_URI``), and the two links are absent because the client
@@ -1348,7 +1347,7 @@ class Settings(BaseSettings):
         stranger. Completeness alone is not a licence to publish.
 
         The mode is deliberately not consulted. Whether this build supports
-        ``enforce`` has nothing to do with whether these eight values are safe to
+        ``enforce`` has nothing to do with whether these values are safe to
         serve.
         """
         if self.auth_manifest_problems():

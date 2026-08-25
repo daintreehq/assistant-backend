@@ -207,11 +207,25 @@ def upstream_timeout(message: str = "The upstream model provider timed out.") ->
 #   most needs to grow. The parameter is there for a caller that has a REAL
 #   recovery estimate to pass on.
 #
-# Nothing on this path is emitted yet: `auth.py` still serves every request
-# anonymously, and entitlement and usage accounting do not exist. They are the
-# vocabulary those layers will raise, defined here first so the taxonomy, the
-# documentation and the CLI's existing handling agree before anything depends on
-# them.
+# The identity half of this path IS emitted now. `auth.py` dispatches on
+# `AUTH_MODE`, and under `enforce` a request without a verified credential raises
+# `auth_required`, `auth_token_invalid`, `auth_token_expired` or
+# `auth_client_not_allowed` for real. What a deployment DOES with that is still a
+# rollout decision — the shipped default is `open`, which reads no header at all —
+# so "reachable" and "reached" are different questions here.
+#
+# The ENTITLEMENT half is not emitted by anything: subscription state, usage
+# accounting and the Polar outbox need a database and a Redis this service does
+# not have. `auth_session_revoked` is in the same position for a different reason
+# — nothing can reach back into a minted JWT to ask whether its session still
+# exists, so `enforce` today means "a genuine, unexpired token" and not "a live
+# session" (`TODO.md`).
+#
+# All of them are defined here regardless, so the taxonomy, the documentation and
+# the CLI's handling agree before anything depends on them. That is not
+# speculative: the CLI already maps every one of these codes
+# (`cli/internal/backend/account.go`), and
+# `tests/unit/test_account_error_taxonomy.py` compares the two lists.
 # --------------------------------------------------------------------------
 
 #: A 401 challenge, per RFC 6750. `auth_required` gets the bare form because no
