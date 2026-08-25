@@ -13,15 +13,17 @@ select between them. The kill switch below is operational, not a menu.
   `openrouter.py`, which spells the same normalized field the OpenAI-standard way.
   Each adapter resolves it to its own single name; sending both is the failure
   mode this rule exists to prevent.
-* **No ``reasoning`` object, ever.** The parent MUST send `{"enabled": false}`
-  because DeepSeek V4 Flash reasons by default and omission means "think". Here
-  omission IS the posture: the model this adapter exists to reach does not reason,
-  and the retired adapter recorded that the wire had no field that could say so
-  (`.env.example`, and the comment in `openrouter._build_body`). Cerebras has
-  since documented `reasoning_effort` for its reasoning-capable models, so the
-  field is sent ONLY when a caller sets it explicitly — never synthesised from
-  `thinking_disabled`, which would put an unverified parameter on every fast call
-  to buy a disable the model does not need.
+* **No ``reasoning`` object, ever — Cerebras spells it ``reasoning_effort``.**
+  The parent MUST send `{"enabled": false}` because DeepSeek V4 Flash reasons by
+  default and omission means "think". Cerebras does not speak that object at all,
+  so it is dropped unconditionally and `reasoning_effort` is sent only for an
+  EXPLICIT effort a caller asked for — never synthesised from `thinking_disabled`,
+  which would put a parameter on the wire to buy a disable that does not exist.
+  This matters more than it used to: the model this adapter reaches is now
+  `gpt-oss-120b`, which DOES reason and which Cerebras defaults to `medium`, so
+  omitting the field is not neutral. `services/fast_response.py` pins it at `low`
+  and pairs it with `thinking_disabled=False`, because that flag is what gates the
+  branch below.
 * **``prompt_cache_key``, and only when enabled.** Cerebras routes requests
   sharing a key to the same engine to reuse its KV cache. It is off by default:
   it is account-gated, and an unadvertised parameter is a needless 400 risk on a

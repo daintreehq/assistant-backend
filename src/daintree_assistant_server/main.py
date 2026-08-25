@@ -568,19 +568,21 @@ def build_container(
     # flight anyway — a model can only declare what it was asked to declare. A
     # compactor whose availability genuinely varies at runtime therefore needs a
     # container rebuild to change the prompt, not just a property returning True.
-    assembler = PromptAssembler(
-        prompt_loader, settings, response_declaration=chat_compactor.available
-    )
-    # Shares the docs pool rather than opening a third: a trace upload is a small
-    # request to a different host on the same latency profile, and a pool per
-    # concern costs connections nothing here is short of.
-    trace_recorder = _build_trace_recorder(settings, docs_http_client)
     fast_response_provider = _build_fast_response_provider(settings)
     fast_response = FastResponseService(
         settings=settings,
         prompt_loader=prompt_loader,
         provider=fast_response_provider,
     )
+    assembler = PromptAssembler(
+        prompt_loader,
+        settings,
+        response_declaration=chat_compactor.available,
+    )
+    # Shares the docs pool rather than opening a third: a trace upload is a small
+    # request to a different host on the same latency profile, and a pool per
+    # concern costs connections nothing here is short of.
+    trace_recorder = _build_trace_recorder(settings, docs_http_client)
     orchestrator = ChatOrchestrator(
         settings=settings,
         catalog_manager=catalog_manager,

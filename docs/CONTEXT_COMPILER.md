@@ -197,8 +197,16 @@ spec's warning applies to the compiler's *logic* — no unit-typing or reducer
 should assume a particular model's tokenizer or wire quirks — and not to
 configuration.
 
-**§7's execution specification is unproven here.** The preamble half shipped and
-is measured; the structured plan half never existed. `FAST_RESPONSE_MODE` still
+**§7's execution specification is unproven here, and the nearest thing to it was
+BUILT AND REMOVED.** The preamble half ships. The structured plan half existed for
+a while: the fast model emitted a hidden `<daintree_plan>` block alongside the
+visible line, and the orchestrator delivered it to the executor inside a framed
+"candidate route" wrapper. It went when the two calls were made concurrent — the
+executor's request cannot contain anything the fast call produced, because it
+leaves at the same moment — and git history has all of it, including the
+validators that kept a model-authored plan from manufacturing consent. That is the
+relevant precedent: an execution spec is not free to deliver, and delivering it
+cost the concurrency that made the stage worth having. `FAST_RESPONSE_MODE` still
 defaults to `off`. Do not build a compiler that depends on an execution spec until
 the stage that would produce one is switched on and shown to earn its latency.
 

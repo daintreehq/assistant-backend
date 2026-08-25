@@ -354,23 +354,36 @@ class StreamStatus(BaseModel):
 
 
 class StreamPreamble(BaseModel):
-    """A short visible preview, streamed BEFORE the executor produces anything.
+    """A short visible line, streamed while the executor is still opening.
+
+    **DISPLAY-ONLY. The client must never commit it to conversation history.**
+    That is the single most important thing about this event and it is a change
+    from how it once worked. The preamble is written by a second model running
+    CONCURRENTLY with the executor, and the executor never sees it — so a client
+    that folded it into the assistant message would send it back on the next turn
+    as an assistant turn the model has no memory of writing. Render it in the
+    assistant bubble, above the answer, and drop it when the turn ends.
+
+    ``provisional`` and ``commit_on`` are kept at their existing values for
+    clients that already read them; a client honouring the rule above will never
+    reach a commit.
 
     It is deliberately its OWN event rather than an ordinary ``delta``, and each
     reason is a thing that breaks if it is not:
 
-    * The client renders it in the same assistant bubble, but must not commit it
-      to conversation history yet — hence ``provisional`` and ``commit_on``.
+    * It is not part of the answer. It is not linted, not counted toward the
+      reply, and not committed.
     * The backend's retry layer treats a visible executor delta as the point
-      after which replay is unsafe. A preamble is server-generated, idempotent
-      intent text; folding it into ``delta`` would make every turn that showed
-      one un-retryable for no reason.
+      after which replay is unsafe. A preamble is server-generated and the
+      executor's own output is still entirely unshown; folding it into ``delta``
+      would make every turn that showed one un-retryable for no reason.
     * Bare-intent detection inspects executor output. The preamble deliberately
-      announces intended work and would be a guaranteed false positive.
+      describes intended work and would be a guaranteed false positive.
 
-    The client joins it to the executor's content with a blank line and commits
-    ONE assistant message on ``done``. On ``error`` it commits nothing — which is
-    what keeps a failed turn out of canonical history.
+    **At most one per turn, and only ever before the first ``delta``.** The
+    server races this stage against the executor and DROPS the line if the answer
+    starts first, so a client never has to decide what to do with one that
+    arrives late — it simply will not.
 
     Carries no provider or model identity: the product is Daintree.
     """

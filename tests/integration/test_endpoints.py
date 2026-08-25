@@ -139,19 +139,24 @@ def test_capabilities(client, auth, app) -> None:
         "done",
         "error",
     ]
-    # The preamble's commit semantics are the contract, not decoration: a client
-    # that renders it without holding it provisional commits a turn that may end
-    # in an error, and one that treats it as a visible executor delta would make
-    # every preamble turn un-retryable for no reason.
+    # The preamble's commit semantics are the contract, not decoration — and they
+    # INVERTED when the stage went concurrent. The executor never sees the line
+    # now, so a client that commits it puts an assistant turn into history that
+    # the model has no memory of writing.
     fast = body["respond"]["fast_response"]
     assert fast["event"] == "preamble"
-    assert fast["provisional_until"] == "done"
-    assert fast["same_assistant_message"] is True
-    assert fast["join_separator"] == "\n\n"
+    assert fast["commit"] == "never"
     assert fast["retry_safe_before_executor_delta"] is True
+    assert fast["at_most_one_per_turn"] is True
+    assert fast["never_after_first_delta"] is True
+    # The old sequential contract must be GONE, not merely falsified: a client
+    # still reading these keys was built against a design where the preamble was
+    # part of the executor's input, and an absent key is what tells it so.
+    assert "same_assistant_message" not in fast
+    assert "join_separator" not in fast
     # ...and it never names the provider or the model behind it.
     rendered = json.dumps(fast).lower()
-    for internal in ("cerebras", "gemma", "deepseek", "together"):
+    for internal in ("cerebras", "gemma", "gpt-oss", "deepseek", "together"):
         assert internal not in rendered
     # Hardcoded posture, not config. Asserted as a literal rather than against the
     # constant on purpose: this field is a wire contract the CLI gates its thinking UI

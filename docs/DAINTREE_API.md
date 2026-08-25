@@ -500,12 +500,12 @@ data: { "protocol_version":3, "request_id":"req_…", "model":"daintree-assistan
         "catalog_revision":"sha256:…", "prompt_version":"…", "warnings":[] }
 
 event: status
-data: { "phase": "fast_response" }               // the preamble stage is running (eligible turns only)
+data: { "phase": "fast_response" }               // a preamble is about to follow (eligible turns only)
                                                  // "executor" once it hands over; "thinking" when CoT
                                                  // begins. IGNORE AN UNKNOWN PHASE — the set grows.
 
 event: preamble                                  // at most once, before any executor output
-data: { "id":"pre_…", "content":"I'll trace the failing build and …",
+data: { "id":"pre_…", "content":"Tracing the failing build back to …",
         "provisional": true, "commit_on": "done" }
 
 event: delta
@@ -528,8 +528,9 @@ data: { "error": { "type":"…","code":"…","message":"…","param":"…" },
 
 #### The `preamble` event, and what a client owes it
 
-A short visible preview of the work, written before the main model answers. It
-exists to put honest text on the screen sooner; it is **not** a result, and the
+One short line about the work that is starting, written by a second model running
+**concurrently** with the main one and shown while the main one is still opening.
+It exists to put honest text on the screen sooner; it is **not** a result, and the
 model that wrote it has inspected nothing.
 
 `meta` is still first, and `done` is still terminal. The rest is a contract:
@@ -537,19 +538,20 @@ model that wrote it has inspected nothing.
 | Rule | Why it is a rule and not a preference |
 |---|---|
 | Render it immediately, in the assistant bubble | That is the whole point of it |
-| Hold it **provisional** until `done` | A turn can still fail after it; committing early puts a sentence into history for an answer that never arrived |
-| On `done`, commit **one** assistant message: preamble + `"\n\n"` + executor content | Two messages would make the model's next turn see a conversation it did not have |
-| On `error`, commit **nothing** | Same reason, in the case where it actually happens |
-| A preamble does **not** end the replay-safe window | It is server-generated, idempotent intent text. Only a visible executor delta makes a retry unsafe |
+| **Never commit it to conversation history** | The main model never saw it. A committed line becomes, on the next turn, an assistant turn the model has no memory of writing |
+| Drop it when the turn ends — on `done` **and** on `error` | It is display state, not content. Commit only the executor's own output, exactly as you would with no preamble at all |
+| A preamble does **not** end the replay-safe window | It is server-generated and nothing of the answer has been shown. Only a visible executor delta makes a retry unsafe |
 | Ignore it if you do not implement it | It is additive; an unknown event name is safe to skip |
 
-For a tool-call round the committed message carries the preamble content **and**
-the tool calls — the preamble is part of that assistant turn, not a separate one.
+`provisional` and `commit_on` are still on the payload for clients that already
+read them. A client following the rule above never reaches a commit.
 
-The backend appends the exact preamble to the main model's own input, followed by
-a server-owned continuation instruction, so the model knows it said those words
-and knows they were intent rather than evidence. That injected pair is internal:
-it is never shown, and a client must not echo it back.
+**At most one per turn, and never after the first `delta`.** The server races the
+two calls and DROPS the line if the answer starts first — so a client never has to
+decide what to do with one that arrives late. It simply will not.
+
+Nothing about the preamble reaches the main model: its request is byte-identical
+whether the stage ran, was withheld, or is switched off entirely.
 
 `/v1/daintree/capabilities` reports `respond.fast_response.enabled` for the
 instance you are talking to. It is **off by default**, so most deployments will
@@ -760,14 +762,15 @@ Runbook selection is removed from the main thread:
    `extra="forbid"`, so sending the field to a deployment that predates it 422s the turn.
 3. **One upstream call on an ordinary turn; two whenever the fast-response stage
    RUNS.**
-   Selection is local (an in-process classifier, ~10ms), so both response paths are
+   Selection is local (an in-process classifier, ~10ms), so the main path is
    strictly sequential: select → assemble → one main completion. There is no
    speculative or private pre-selection stream. When the stage is enabled and the
-   turn is eligible, a second internal call runs FIRST. Note that it runs — and is
-   billed — whether or not you ever see a `preamble`: in `shadow` mode it is
-   generated and withheld, and a reply the validator refuses is discarded. The two
-   calls are sequential, not concurrent: the main call cannot open until the
-   preamble exists, because its exact text is part of that call's input.
+   turn is eligible, a second internal call runs **at the same time** as the main
+   one and nothing waits on it. Note that it runs — and is billed — whether or not
+   you ever see a `preamble`: in `shadow` mode it is generated and withheld, a
+   reply the validator refuses is discarded, and a reply that arrives after the
+   answer has started is dropped. The main call's input never contains the
+   preamble, which is what makes the two concurrent rather than sequential.
 
    "Same connection" refers to the SSE response you are reading — one request in,
    one stream out, with both internal calls behind it. Upstream, the two hosts use

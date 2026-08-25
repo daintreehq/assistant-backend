@@ -63,20 +63,30 @@ async def capabilities(
                 "enabled": settings.fast_response_mode == "visible",
                 "streaming_only": True,
                 "event": "preamble",
-                # The client renders it immediately but must not commit it to
-                # conversation history until the stream terminates successfully.
-                # On `error` it commits nothing, which is what keeps a failed turn
-                # out of canonical history.
+                # DISPLAY-ONLY. The client renders it and NEVER commits it to
+                # conversation history — not on `done`, not on `error`. The
+                # executor runs concurrently and never sees the line, so a
+                # committed preamble becomes, on the next turn, an assistant turn
+                # the model has no memory of writing.
+                #
+                # This REPLACES `same_assistant_message` / `join_separator`, which
+                # advertised the opposite and are deliberately gone rather than
+                # set to false: a client still reading them is a client built
+                # against the sequential design, and an absent key is the signal
+                # that says so. `provisional_until` stays for the same reason in
+                # reverse — clients already read it, and a client honouring
+                # `commit` below never reaches a commit anyway.
                 "provisional_until": "done",
-                # Preamble and executor output become ONE assistant message,
-                # joined by this separator. Fixed rather than negotiated so the
-                # committed text is identical everywhere.
-                "same_assistant_message": True,
-                "join_separator": "\n\n",
-                # A preamble is server-generated, idempotent intent text, so
-                # seeing one does NOT end the replay-safe window the way a visible
-                # executor delta does.
+                "commit": "never",
+                # A preamble is server-generated and nothing of the answer has
+                # been shown, so seeing one does NOT end the replay-safe window
+                # the way a visible executor delta does.
                 "retry_safe_before_executor_delta": True,
+                # The server races this stage against the executor and DROPS the
+                # line if the answer starts first, so a client never has to handle
+                # one arriving mid-answer.
+                "at_most_one_per_turn": True,
+                "never_after_first_delta": True,
             },
             # The main call's thinking posture is hardcoded OFF (a product decision,
             # like the model ids — see INTERACTIVE_THINKING_ENABLED in config.py), so

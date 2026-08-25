@@ -54,7 +54,6 @@ TEMPLATE_DOCS_CONTEXT = "main/docs_context.md.j2"
 # told about. Reusing it would put two uncallable tool names in front of a model
 # whose only job is to describe intent.
 TEMPLATE_FAST_RESPONSE_RUNBOOKS = "fast_response/loaded_runbooks.md.j2"
-TEMPLATE_FAST_RESPONSE_CONTEXT = "fast_response/context.md.j2"
 
 _ALL_TEMPLATES = (
     TEMPLATE_STARTUP_CONTEXT,
@@ -66,7 +65,6 @@ _ALL_TEMPLATES = (
     TEMPLATE_DISPLAY_CONTEXT,
     TEMPLATE_DOCS_CONTEXT,
     TEMPLATE_FAST_RESPONSE_RUNBOOKS,
-    TEMPLATE_FAST_RESPONSE_CONTEXT,
 )
 
 
@@ -306,16 +304,6 @@ class PromptLoader:
         """The static system prompt for the preamble stage."""
         return self._read_fast("base")
 
-    def fast_response_continuation(self) -> str:
-        """The server-owned user message appended after the preamble.
-
-        Load-bearing rather than decorative: without it the executor reads the
-        preceding assistant turn as evidence that the work already happened, and
-        answers as though it had. It is also why the handoff does NOT rely on an
-        assistant-last request — see `docs/DAINTREE_API.md`.
-        """
-        return self._read_fast("continuation")
-
     def _read_fast(self, stem: str) -> str:
         try:
             return self._fast_response_prompts[stem]
@@ -421,8 +409,6 @@ class PromptLoader:
         # could be weeks after the file was lost.
         if not self.fast_response_prompt().strip():
             raise PromptError("fast-response base prompt is empty")
-        if not self.fast_response_continuation().strip():
-            raise PromptError("fast-response continuation prompt is empty")
         # Every REGISTERED task must have its prompt on disk. Without this a task
         # whose prompt file is missing or misnamed passes readiness and the whole
         # test suite, then 500s the first time a client calls it — PromptError has

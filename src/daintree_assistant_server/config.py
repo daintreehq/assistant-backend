@@ -79,7 +79,16 @@ EXECUTOR_CONTEXT_TOKENS = 131_072
 # dial. What IS operational — whether the stage runs at all, and for how many
 # sessions — lives in `Settings` below, because the right value for that is
 # whatever production says this week.
-FAST_RESPONSE_MODEL = "gemma-4-31b"
+FAST_RESPONSE_MODEL = "gpt-oss-120b"
+#: Reasoning effort for the preamble call.
+#:
+#: `gpt-oss-120b` is a reasoning model and Cerebras defaults it to `medium`, so —
+#: exactly like the executor's `reasoning: {"enabled": false}` — omission is not
+#: neutral here, it BUYS thinking. Reasoning tokens are generated tokens: they
+#: count against `max_completion_tokens` and against the clock, on the one call
+#: whose whole value is arriving before the executor does. `low` is the floor
+#: Cerebras exposes; there is no "off".
+FAST_RESPONSE_REASONING_EFFORT = "low"
 FAST_RESPONSE_KEY_ENV = "CEREBRAS_API_KEY"
 FAST_RESPONSE_URL_ENV = "CEREBRAS_BASE_URL"
 FAST_RESPONSE_ORIGIN = "api.cerebras.ai"
@@ -87,17 +96,20 @@ FAST_RESPONSE_ORIGIN = "api.cerebras.ai"
 FAST_RESPONSE_PROVIDER = "cerebras"
 EXECUTOR_PROVIDER = "together"
 
-#: The intended successor is a Qwen model in the 27B class. It is NOT pinned here
-#: and must not be guessed at: no such id is currently documented on the Cerebras
-#: public API (checked when this was written), and committing an unverified model
-#: string as a placeholder would produce a 404 at the first request of a rollout.
-#: Replacing this constant is gated on a verified id plus the live parameter,
-#: latency and overclaim checks in `TODO.md`.
+#: Why this model and not the 31B Gemma that used to sit here: the stage no
+#: longer writes a considered opening the executor continues from. It writes one
+#: short line, from one message and at most three runbooks, and it may decline to
+#: write anything — a job whose quality bar is "is this worth saying" rather than
+#: "is this well argued". What it needs instead is to LAND FIRST, because the two
+#: calls now go out together and a preamble that arrives after the executor's
+#: first visible byte is discarded unshown. `gpt-oss-120b` on Cerebras is the
+#: fastest thing available that can still make the judgement.
 
 __all__ = [
     "EXECUTOR_CONTEXT_TOKENS",
     "EXECUTOR_MODEL",
     "FAST_RESPONSE_MODEL",
+    "FAST_RESPONSE_REASONING_EFFORT",
     "PUBLIC_MODEL_ID",
     "Settings",
     "get_settings",
@@ -832,9 +844,12 @@ class Settings(BaseSettings):
     fast_response_rollout_percent: int = Field(
         default=0, ge=0, le=100, alias="FAST_RESPONSE_ROLLOUT_PERCENT"
     )
-    # Short and absolute. The stage exists to make the system feel responsive; a
-    # retry that succeeds at five seconds has failed that purpose AND delayed the
-    # executor behind it, so there is no retry and the timeout is tight.
+    # Short and absolute, though no longer because the executor is waiting on it —
+    # the two calls go out together now, and nothing is behind this one. It is
+    # tight because the WINDOW is: a preamble is shown only until the executor's
+    # first visible byte, and one that arrives after that is dropped unshown. A
+    # call still running past this point is spending money on an answer that can
+    # no longer be used, which is also why there is no retry.
     fast_response_timeout_seconds: float = Field(
         default=3.0, gt=0.0, le=15.0, alias="FAST_RESPONSE_TIMEOUT_SECONDS"
     )

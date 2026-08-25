@@ -34,8 +34,8 @@ from daintree_assistant_server.prompts.loader import PromptLoader
 from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
 from daintree_assistant_server.runbooks.load_events import RunbookLoadExecution
 from daintree_assistant_server.services.docs_mcp import DocsLookup, DocsSection
+from daintree_assistant_server.services.fast_response import FastResponseService
 from daintree_assistant_server.services.prompt_assembler import (
-    FastResponseHandoff,
     PromptAssembler,
 )
 from daintree_assistant_server.services.task_runner import build_profiles
@@ -443,85 +443,46 @@ def test_full_upstream_messages(assembler: PromptAssembler) -> None:
     assert_golden("upstream_messages.json", snapshot)
 
 
-def test_full_upstream_messages_with_fast_response_handoff(
-    assembler: PromptAssembler,
-) -> None:
-    """The same turn, with the preamble pair — the reviewable record of what the
-    executor is actually told about its own previous turn.
+def test_fast_response_messages(assembler: PromptAssembler) -> None:
+    """Everything the fast model is given, as one reviewable array.
 
-    Worth a snapshot of its own precisely because this is prose the MODEL reads
-    and nobody sees: the assistant row is text the user was already shown, and the
-    continuation row is the server arguing that it is intent rather than evidence.
-    A change to either belongs in a diff someone reads.
+    The system prompt, the runbook bodies, and up to three recent USER messages —
+    nothing else. Worth a snapshot precisely because the value of this stage is a
+    judgement call the prompt has to carry on its own (two or three sentences, or
+    silence), and because the thing most likely to go wrong is context creeping
+    back in. The assistant's turns, the tool inventory and the startup block were
+    all in here once; a diff that reintroduces any of them is visible as an extra
+    row.
     """
-    runbook = _fixture_catalog().get("daintree.example.alpha")
+    del assembler  # the fast stage builds its own request, from the same loader
+    catalog = _fixture_catalog()
     req = RespondRequest.model_validate(
         {
             "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
-            "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
+            "generation": {"stream": True},
+            "input": {
+                "messages": [
+                    {"role": "user", "content": "Take a look at the release branch."},
+                    {"role": "assistant", "content": "An assistant turn, never sent."},
+                    {"role": "user", "content": "Prepare this branch for review."},
+                ]
+            },
             "startup": _startup_payload(),
             "turn": {"goal": "Prepare this branch for review."},
         }
     )
-    pr = assembler.build_main_request(
-        request=req,
-        runbooks=[runbook],
-        upstream_model="deepseek-v4-flash",
-        handoff=FastResponseHandoff(
-            content=(
-                "I'll review what changed on this branch, check it against the "
-                "project's conventions, and report what needs attention before it "
-                "goes up."
-            ),
-            continuation_message=PromptLoader().fast_response_continuation(),
-        ),
+    service = FastResponseService(
+        settings=_settings(),
+        prompt_loader=PromptLoader(),
+        provider=None,
     )
-    snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
-    assert_golden("upstream_messages_with_handoff.json", snapshot)
-
-
-def test_full_upstream_messages_with_a_planned_route(assembler: PromptAssembler) -> None:
-    """The plan-bearing branch, which the case above never reaches.
-
-    Two things are only reviewable here. The assistant row must be byte-identical
-    to what the user was SHOWN — the plan is the half they were not — so a diff
-    that ever moves the route into that row is the failure this snapshot exists to
-    make visible. And the route's framing sits next to the content on purpose:
-    it is model-authored text derived from a conversation containing user input,
-    so the executor is told at the point of use that it is a route and not a
-    record. Both are prose decisions, which is exactly what a golden reviews.
-    """
-    runbook = _fixture_catalog().get("daintree.example.alpha")
-    req = RespondRequest.model_validate(
-        {
-            "protocol_version": 3,
-            "session": {"id": "s", "turn_id": "t"},
-            "input": {"messages": [{"role": "user", "content": "Prepare this branch for review."}]},
-            "startup": _startup_payload(),
-            "turn": {"goal": "Prepare this branch for review."},
-        }
+    messages = service.build_messages(
+        req, active_runbooks=[catalog.get("daintree.example.alpha")]
     )
-    pr = assembler.build_main_request(
-        request=req,
-        runbooks=[runbook],
-        upstream_model="deepseek-v4-flash",
-        handoff=FastResponseHandoff(
-            content=(
-                "Reviewing a branch usefully means separating what changed from "
-                "what the change was for, since a diff read on its own tends to "
-                "surface style and miss intent."
-            ),
-            continuation_message=PromptLoader().fast_response_continuation(),
-            plan=(
-                "1. `git.status` + `git.diff` (base=develop) -> changed paths.\n"
-                "2. `fs.read` each changed file -> conventions check.\n"
-                "3. risk: generated files in the diff -> detect via path prefix."
-            ),
-        ),
-    )
-    snapshot = json.dumps(pr.messages, indent=2, ensure_ascii=False)
-    assert_golden("upstream_messages_with_planned_route.json", snapshot)
+    assert messages is not None
+    snapshot = json.dumps(messages, indent=2, ensure_ascii=False)
+    assert_golden("fast_response_messages.json", snapshot)
 
 
 def test_full_upstream_messages_subagent(assembler: PromptAssembler) -> None:

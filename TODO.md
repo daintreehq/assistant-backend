@@ -835,12 +835,32 @@ The backend moved and the Go CLI has not. Concretely, the CLI must:
   `test_the_gate_above_retires_itself_when_the_cli_renames` documents and enforces.
   That test FAILS the moment the Go side renames; that failure is the cue to
   re-capture both fixtures and delete the pair of tests along with the header note.
-- **decode the `preamble` event** (it currently maps unknown event names to
-  `sseEventUnknown` and drops them, which is why shipping the backend half first is
-  safe): render it in the active assistant bubble, hold it PROVISIONAL, commit one
-  assistant message on `done` joining it to the executor content with `"\n\n"`,
-  commit NOTHING on `error`, keep the turn replay-safe until the first executor
-  delta, and never display the synthetic continuation row.
+- **STOP COMMITTING the `preamble` event.** It already DECODES it — the vendored
+  `cli/` pin is stale, and the live repo has `sseEventPreamble` handling in
+  `internal/backend/sse.go`, so the older note here claiming unknown events are
+  dropped is wrong and shipping the backend half is NOT free. What it does with
+  the line is the problem: `internal/backend/client.go` splices it into the
+  committed assistant message (`result.Message.Content = shownPreamble + "\n\n" +
+  body`), which was correct while the preamble was part of the executor's input
+  and is now exactly the failure mode. Render it in the active assistant bubble
+  as EPHEMERAL DISPLAY STATE and
+  **never commit it to conversation history** — not on `done`, not on `error`. The
+  executor never saw the line (the two calls run concurrently now), so a committed
+  preamble becomes, on the next turn, an assistant turn the model has no memory of
+  writing. Commit exactly what would be committed with no preamble at all. Keep the
+  turn replay-safe until the first executor delta. `provisional`/`commit_on` are
+  still on the payload for compatibility; a client following this rule never
+  reaches a commit. At most one arrives per turn and never after the first `delta`
+  — the server drops a late one — so there is no "what if it lands mid-answer" case
+  to handle.
+  NOTE: this REPLACES the older contract, which had the CLI join the preamble to
+  the executor content with `"\n\n"` and commit one message. That was correct only
+  while the preamble was part of the executor's input.
+  `/v1/daintree/capabilities` now advertises the new rule and, deliberately, no
+  longer advertises the old one: `respond.fast_response.commit` is `"never"`, and
+  `same_assistant_message` / `join_separator` are GONE rather than set to false —
+  a client still reading them was built against the sequential design, and an
+  absent key is what tells it so.
 
 Then move the submodule pin and re-capture both tool fixtures together.
 
@@ -861,15 +881,57 @@ Owed, in the order the risk runs:
    time-to-visible-text for a small regression in time-to-executor-output, and
    quoting the first alone would misrepresent it. Proposed SLO: p50 <= 0.8s,
    p90 <= 1.5s, p99 <= 3.0s.
-2. **Executor non-inferiority.** The same corpus with and without the handoff:
-   task success, tool-selection correctness, tool-call count, bare-intent re-roll
-   rate, invalid tool calls. The handoff must not degrade the executor to improve
-   perceived latency.
-3. **Repetition.** Normalised 5-gram overlap between the preamble and the first
-   200 executor words. Do NOT strip executor text post hoc because it resembles the
-   preamble — that removes substantive content. Fix the prompt or the model.
-4. **Overclaim rate on real traffic.** `validate_preamble` is measured against
+2. **Drop rate.** How often the line loses the race and is discarded unshown
+   (`fast_response_dropped`, reason `executor_output_first`). This is the number
+   that decides whether the stage is worth its spend at all: a high drop rate means
+   we are paying Cerebras for text nobody reads. Distinct from the failure rate and
+   from the decline rate on purpose — all three are "no preamble" and only one of
+   them is a problem.
+3. **Decline rate.** How often the model answers `NONE`. Too high and the stage is
+   silent on turns that wanted a line; too low and it is writing filler. There is
+   no target yet, which is itself the point of measuring it.
+4. **Executor non-inferiority — now free.** The executor's request is
+   byte-identical whether or not the stage ran, so this no longer needs a paired
+   corpus. `test_the_executor_request_is_byte_identical_in_every_mode` asserts it
+   offline; nothing further is owed unless that test is ever relaxed.
+5. **Repetition — MEASURED, UNSOLVED, and one fix already tried and reverted.**
+   The executor cannot see the preamble, so it opens with its own announcement:
+   `I'll start by reading the current state`, `I'll check the current state of the
+   project`. Observed on most real turns.
+
+   **What was tried:** a conditional base-prompt partial
+   (`45-opening-already-shown.md`) withdrawing the opening-clause permission that
+   `40-communication.md` grants, plus a per-turn reminder in the volatile tail for
+   proximity. Both were reverted, for two independent reasons and neither is a
+   reason to retry the same shape:
+   - **It did not work.** The executor kept announcing with the rule present. It
+     also announces identically with `FAST_RESPONSE_MODE=off`, so the announcement
+     is baseline behaviour rather than something the preamble provokes.
+   - **It appeared to make things worse.** With the partial shipped,
+     `<｜DSML｜tool_calls>` — DeepSeek's tool-call syntax — leaked into the visible
+     content stream on 2 of 3 turns; with it off, 0 of 3. Small samples, so treat
+     it as a signal rather than proof, but it is the same failure class recorded
+     for gpt-oss-120b and the response declaration: instructing a model about how
+     to OPEN, around tool calls, makes it emit tool-call syntax as prose.
+
+   So the repetition is a real, accepted cost of the concurrent design today. Do
+   NOT strip executor text post hoc because it resembles the preamble; that
+   removes substantive content. The measurement owed is the 5-gram overlap between
+   the preamble and the first 200 executor words, and any fix needs a paid A/B
+   with the DSML leak as an explicit guardrail metric.
+6. **Overclaim rate on real traffic.** `validate_preamble` is measured against
    hand-written phrasings today. Shadow mode exists to produce the real corpus.
+   One live rejection is already recorded (`reason=overclaim` on an edit request,
+   from perfect-tense phrasing like "once the flag has been added"), which is what
+   the prompt's explicit tense rule was added for. Rejections are silent by
+   design — no fallback — so this rate IS the feature's availability.
+
+7. **Cost, and where it actually goes.** Measured: the fast prompt is 9.8-17.7 KB,
+   of which the three runbook bodies are ~85%. The user-message history added
+   later is ~4 KB at its ceiling and usually far less. If this stage needs to get
+   cheaper, the runbooks are the only lever worth pulling — sending summaries or
+   `whenToUse` lines instead of bodies is the obvious experiment, and it trades
+   directly against how specific the text can be.
 
 `shadow` is the mode that produces all four without showing anyone anything.
 

@@ -118,12 +118,12 @@ from .fast_response import (
     FastResponsePolicyDecision,
     FastResponseResult,
     FastResponseService,
+    PreambleGate,
     fast_context_runbooks,
 )
 from .output_policy import lint_output, repair_tables, resolve_content_width
 from .prompt_assembler import (
     TOOLS_SEGMENT_ID,
-    FastResponseHandoff,
     PromptAssembler,
     PromptSegment,
     segment_log_fields,
@@ -421,10 +421,23 @@ class _PreparedTurn:
     # It travels on the prepared turn because the terminal event is what completes
     # a trace, and that happens in the response path rather than here.
     trace: TraceScope | NullTraceScope = NULL_SCOPE
-    # What the preamble stage produced, or a "did not run" result. Carried rather
-    # than recomputed because the STREAM path is what shows it, and the decision
-    # about whether to show it was made during preparation.
-    fast_response: FastResponseResult = field(default_factory=FastResponseResult)
+    # The preamble call, still IN FLIGHT. Preparation starts it and deliberately
+    # does not await it: the executor request no longer contains the preamble's
+    # bytes, so nothing here depends on the answer. The stream path races it
+    # against the executor's own first visible byte and closes the window.
+    #
+    # Always ``None`` on the non-streaming path — `should_generate_fast_response`
+    # refuses `not_streaming` — which is what keeps `respond()` free of any
+    # obligation to settle a task it never started.
+    fast_task: asyncio.Task[FastResponseResult] | None = None
+    #: Whether the stage ran and whether its output may be SHOWN, decided during
+    #: preparation and carried so the stream path never re-derives it. Shadow mode
+    #: is exactly the case that makes these two different answers.
+    fast_policy: FastResponsePolicyDecision = field(
+        default_factory=lambda: FastResponsePolicyDecision(
+            run=False, visible=False, reason="not_eligible"
+        )
+    )
 
 
 def _carries_output(chunk: dict[str, Any] | None) -> bool:
@@ -1463,14 +1476,15 @@ class ChatOrchestrator:
         # the pages is rebuilt every round. Without the carry, a usage question
         # that takes one tool call to answer arrives at the answer with its
         # sources gone.
-        # The fast preamble is started BEFORE the docs lookup and awaited after it.
+        # The fast preamble is started HERE and never awaited in preparation.
         #
-        # The executor cannot open until the preamble exists — its exact text is
-        # part of the executor's input — so this stage is genuinely serial with
-        # respect to the main call and no amount of arranging changes that. What
-        # CAN overlap is everything preparation does that does not depend on the
-        # preamble's content, and the docs lookup is the expensive one. On a turn
-        # that searches documentation the fast call is very nearly free.
+        # It used to be: the executor's input contained the preamble's exact
+        # bytes, so the main call could not open until this one had finished, and
+        # the best that could be done was to overlap it with the docs lookup. That
+        # dependency is gone — the executor no longer sees the preamble at all —
+        # so the two calls now genuinely run at the same time. This task travels
+        # out on `_PreparedTurn` and is settled by the stream path, which races it
+        # against the executor's first visible byte.
         fast_policy = self._fast_response_policy(
             request,
             selector_ran=decision.ran,
@@ -1489,7 +1503,13 @@ class ChatOrchestrator:
                 )
             )
             # Registered so shutdown drains it. A bare task is weakly referenced by
-            # asyncio and could otherwise be collected mid-flight.
+            # asyncio and could otherwise be collected mid-flight — and unlike
+            # before, this task genuinely can outlive the turn: a preamble that
+            # loses the race is dropped without being cancelled, because the call
+            # is already billed and its usage is still worth collecting.
+            # `drain_background_tasks` therefore waits on it at shutdown, bounded
+            # by the call's own `FAST_RESPONSE_TIMEOUT_SECONDS` (<= 15s, under the
+            # drain's 30s) rather than by anything here.
             self._background_tasks.add(fast_task)
             fast_task.add_done_callback(self._background_tasks.discard)
 
@@ -1523,82 +1543,11 @@ class ChatOrchestrator:
             docs_query=docs_query if docs is not None else None,
         )
 
-        # Awaited here, after the docs lookup it was overlapped with.
-        fast = await self._collect_fast_response(
-            fast_task, request_id=request_id, skip_reason=fast_policy.reason
-        )
-        timings.fast_response_ms = fast.latency_ms
-
-        # Traced HERE, before visibility is decided, so SHADOW mode is recorded
-        # too. Shadow's entire purpose is to be measured against real turns
-        # without being shown; a trace written only on the visible branch would
-        # capture nothing from the stage of the rollout that exists to produce
-        # evidence.
-        if fast_policy.run:
-            await trace.record_model_invocation(
-                ModelInvocationTrace(
-                    invocation_id=fast.invocation_id or f"inv_{request_id}_fast",
-                    stage="fast_response",
-                    provider=FAST_RESPONSE_PROVIDER,
-                    model=FAST_RESPONSE_MODEL,
-                    started_at="",
-                    usage=InvocationUsage(
-                        prompt_tokens=fast.usage.prompt_tokens or 0,
-                        completion_tokens=fast.usage.completion_tokens or 0,
-                        total_tokens=fast.usage.total_tokens or 0,
-                        cached_tokens=fast.usage.cached_tokens,
-                        cost=fast.usage.cost,
-                    )
-                    if fast.usage is not None
-                    else None,
-                    # `accepted` separates a preamble that reached the executor
-                    # from one that was generated and then withheld — shadow mode,
-                    # or a validator rejection. Both were billed; only one shaped
-                    # the turn.
-                    accepted=fast.has_content and fast_policy.visible,
-                    discard_reason=None
-                    if (fast.has_content and fast_policy.visible)
-                    else (fast.reason or "shadow_mode"),
-                )
-            )
-            await trace.record_event(
-                "fast_response.response",
-                attributes={
-                    "source": fast.source,
-                    "degraded": fast.degraded,
-                    "reason": fast.reason,
-                    "latency_ms": fast.latency_ms,
-                    "visible": fast_policy.visible,
-                },
-                content={"content": fast.content} if fast.content else None,
-            )
-
-        # A handoff exists only when the preamble will actually be SHOWN. Shadow
-        # mode generates, validates and traces a real preamble and then stops:
-        # appending it to the executor while withholding it from the user would
-        # make the model's view of its own last turn something the user never saw.
-        handoff = None
-        if fast.has_content and fast_policy.visible and fast.content is not None:
-            handoff = FastResponseHandoff(
-                content=fast.content,
-                continuation_message=self.fast_response.continuation_message
-                if self.fast_response is not None
-                else "",
-                # Rides the continuation row, never the assistant one, and only on
-                # a turn whose preamble is actually being SHOWN. A plan delivered
-                # on a shadow-mode turn would steer an answer the evidence for
-                # which the user never saw.
-                plan=fast.plan,
-                invocation_id=fast.invocation_id,
-                content_sha256=fast.content_sha256,
-            )
-
         assembled, segments = self.assembler.build_main_request_with_segments(
             request=request,
             runbooks=runbooks,
             upstream_model=EXECUTOR_MODEL,
             docs=docs,
-            handoff=handoff,
         )
         provider_request = replace(
             assembled,
@@ -1751,74 +1700,6 @@ class ChatOrchestrator:
             context = measure_context(provider_request)
         except Exception:  # noqa: BLE001 — a lost estimate must not be a lost turn
             logger.warning("context_measurement_failed", request_id=request_id)
-        if context is not None and exceeds_window(context) and handoff is not None:
-            # The preamble is a UX optimisation; the turn is the product. If the
-            # request only fails to fit once the handoff is on it, drop the pair
-            # and re-measure rather than refusing a turn that would otherwise have
-            # worked.
-            #
-            # The CONTENT is dropped with it, and that is the whole point. This
-            # runs during preparation, BEFORE any byte has been streamed, so
-            # nothing has been shown yet — leaving `fast.content` set would emit a
-            # preamble the executor never received, and the client's committed
-            # history would then contain a sentence the model has no knowledge of.
-            # Usage, latency and the reason survive: the call happened and was
-            # billed, and accounting must still say so.
-            logger.info(
-                "fast_response_discarded",
-                request_id=request_id,
-                reason="executor_context_budget",
-            )
-            handoff = None
-            fast = replace(
-                fast,
-                content=None,
-                content_sha256=None,
-                degraded=True,
-                reason="executor_context_budget",
-            )
-            assembled, segments = self.assembler.build_main_request_with_segments(
-                request=request,
-                runbooks=runbooks,
-                upstream_model=EXECUTOR_MODEL,
-                docs=docs,
-                handoff=None,
-            )
-            # The handoff only ever APPENDED two messages, so re-assembly changes
-            # nothing else — and the tools array has already been through
-            # projection and enforcement above. Carrying it across rather than
-            # re-deciding it keeps one gate in one place; re-running enforcement
-            # here would be a second copy that could disagree with the first.
-            provider_request = replace(
-                assembled,
-                api_key=api_key,
-                cache_session_id=cache_session_id,
-                tools=provider_request.tools,
-            )
-            # Recomputed, because the manifest is logged below and describes what
-            # went upstream. Left stale it would name a `fast_response_handoff`
-            # row that was discarded — a diagnostic asserting the opposite of what
-            # happened, on the one record used to explain cache behaviour.
-            #
-            # Guarded exactly like the first computation: a lost manifest is a lost
-            # diagnostic, never a lost turn.
-            try:
-                refreshed_tools_row = PromptSegment.of_wire(
-                    TOOLS_SEGMENT_ID, provider_request.tools or []
-                )
-                segment_fields = segment_log_fields(
-                    [
-                        refreshed_tools_row if seg.id == TOOLS_SEGMENT_ID else seg
-                        for seg in segments
-                    ]
-                )
-            except Exception:  # noqa: BLE001 — a metric must never break a turn
-                logger.warning("prompt_segment_metrics_failed", request_id=request_id)
-            try:
-                context = measure_context(provider_request)
-            except Exception:  # noqa: BLE001 — a lost estimate must not be a lost turn
-                logger.warning("context_measurement_failed", request_id=request_id)
-
         if context is not None and exceeds_window(context):
             logger.warning(
                 "context_window_exceeded", request_id=request_id, **context.log_fields()
@@ -1955,11 +1836,8 @@ class ChatOrchestrator:
             active_ids=active_ids,
             api_key=api_key,
             trace=trace,
-            fast_response=fast if fast_policy.visible else FastResponseResult(
-                source=fast.source, degraded=fast.degraded, reason=fast.reason,
-                usage=fast.usage, latency_ms=fast.latency_ms,
-                invocation_id=fast.invocation_id,
-            ),
+            fast_task=fast_task,
+            fast_policy=fast_policy,
         )
 
     # ---- fast response --------------------------------------------------
@@ -1984,39 +1862,142 @@ class ChatOrchestrator:
             active_runbooks=active_runbooks,
         )
 
-    @staticmethod
-    async def _collect_fast_response(
-        task: asyncio.Task[FastResponseResult] | None,
+    async def _emit_preamble(
+        self,
+        gate: PreambleGate,
         *,
-        request_id: str,
-        skip_reason: str = "not_eligible",
-    ) -> FastResponseResult:
-        """Await the preamble without letting it fail or stall the turn.
+        meta: _RespondMeta,
+        timings: _Timings,
+        budget: RequestBudget | None,
+        trace: TraceScope | NullTraceScope,
+    ) -> AsyncGenerator[str, None]:
+        """Emit the preamble if — and only if — it is ready and still wanted.
 
-        `FastResponseService.generate` already bounds itself and swallows its own
-        errors, so in practice this returns promptly. The guard here is for the
-        one thing it cannot cover — the task being cancelled or dying in a way the
-        service never sees — because a turn must not be lost to an optimisation.
-
-        `skip_reason` carries `FastResponsePolicyDecision.reason` from the caller
-        when `task` is None — the specific reason the policy already computed
-        (`no_active_runbooks`, `continuation_round`, `mode_off`, ...). Collapsing
-        every skip to a single generic reason here made the policy's own
-        per-case reasons unreadable downstream: nothing else observes them.
+        Yields nothing at all in every other case, which is most of them: the call
+        is still running, it failed, the model declined, shadow mode withheld it,
+        or the window has already closed. Safe to call from anywhere in the stream
+        loop for exactly that reason, and it is called from three places precisely
+        because the moment the line becomes available is not something this path
+        gets to choose.
         """
-        if task is None:
-            return FastResponseResult(source="none", reason=skip_reason)
-        try:
-            return await task
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:  # pragma: no cover - the service catches its own
-            logger.info(
-                "fast_response_failed",
-                request_id=request_id,
-                error_type=type(exc).__name__,
+        result = gate.poll()
+        if result is None:
+            return
+        yield self._sse("status", StreamStatus(phase="fast_response").model_dump())
+        yield self._sse(
+            "preamble",
+            StreamPreamble(
+                id=f"pre_{meta.request_id.split('_', 1)[-1]}",
+                content=result.content or "",
+            ).model_dump(),
+        )
+        # AFTER the yield, so a client that disconnected between the `status` and
+        # the `preamble` event is not traced as having received a line it never
+        # got. `poll()` only CLAIMED it; this is what says it was delivered.
+        gate.mark_shown()
+        timings.preamble_at_ms = round(budget.elapsed() * 1000) if budget is not None else 0
+        await trace.record_event(
+            "fast_response.emitted",
+            attributes={
+                "source": result.source,
+                "degraded": result.degraded,
+                "reason": result.reason,
+                "latency_ms": result.latency_ms,
+            },
+            content={"content": result.content},
+        )
+        yield self._sse("status", StreamStatus(phase="executor").model_dump())
+
+    def _abandon_open(self, task: asyncio.Task[Any], *, request_id: str) -> None:
+        """Dispose of an executor open that nobody is going to consume.
+
+        Only reachable because the open now runs as a TASK so the preamble can be
+        raced against it. A directly-awaited call could not leak; a task can, in
+        two ways, and both are handled here — it may still be connecting (cancel
+        it) or it may already hold a live upstream stream (close it). Leaving
+        either would outlive the turn that started it.
+
+        Both disposals are registered as background work rather than awaited: this
+        runs in a `finally` that a client disconnect reaches through
+        ``GeneratorExit``, where awaiting is not reliably permitted.
+        """
+        if not task.done():
+            task.cancel()
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+            return
+        if task.cancelled() or task.exception() is not None:
+            return
+        opened_stream, _first_event, _abandoned = task.result()
+        closer = asyncio.create_task(
+            self._close_quietly(opened_stream, request_id=request_id)
+        )
+        self._background_tasks.add(closer)
+        closer.add_done_callback(self._background_tasks.discard)
+
+    @staticmethod
+    async def _trace_fast_response(
+        gate: PreambleGate, trace: TraceScope | NullTraceScope
+    ) -> None:
+        """Record the stage, whatever it did.
+
+        Traced even in SHADOW mode, and even when the line was dropped for
+        arriving late: shadow's entire purpose is to produce evidence against real
+        turns without being shown, and "generated, valid, too slow" is exactly the
+        outcome the rollout needs to be able to count. A trace written only on the
+        path where a user saw something would capture none of it.
+        """
+        if not gate.policy.run:
+            return
+        result = gate.finish()
+        discard_reason: str | None = None
+        if not gate.shown:
+            discard_reason = (
+                # Claimed but never delivered: the client went away between the
+                # `status` event and the `preamble` event. Checked FIRST because
+                # the result itself looks like a success and would otherwise
+                # report no reason at all.
+                ("not_delivered" if gate.claimed else None)
+                or gate.drop_reason
+                or result.reason
+                or ("shadow_mode" if not gate.policy.visible else "not_shown")
             )
-            return FastResponseResult(source="none", degraded=True, reason="collect_failed")
+        await trace.record_model_invocation(
+            ModelInvocationTrace(
+                invocation_id=result.invocation_id or "inv_fast",
+                stage="fast_response",
+                provider=FAST_RESPONSE_PROVIDER,
+                model=FAST_RESPONSE_MODEL,
+                started_at="",
+                usage=InvocationUsage(
+                    prompt_tokens=result.usage.prompt_tokens or 0,
+                    completion_tokens=result.usage.completion_tokens or 0,
+                    total_tokens=result.usage.total_tokens or 0,
+                    cached_tokens=result.usage.cached_tokens,
+                    cost=result.usage.cost,
+                )
+                if result.usage is not None
+                else None,
+                # `accepted` separates a preamble a user actually READ from one
+                # that was generated and then withheld — shadow mode, a validator
+                # rejection, or the executor simply getting there first. All three
+                # were billed; only one reached a screen.
+                accepted=gate.shown,
+                discard_reason=discard_reason,
+            )
+        )
+        await trace.record_event(
+            "fast_response.response",
+            attributes={
+                "source": result.source,
+                "degraded": result.degraded,
+                "reason": result.reason,
+                "latency_ms": result.latency_ms,
+                "shown": gate.shown,
+                "visible": gate.policy.visible,
+            },
+            content={"content": result.content} if result.content else None,
+        )
 
     # ---- server-side documentation lookup -------------------------------
 
@@ -2120,10 +2101,10 @@ class ChatOrchestrator:
     @staticmethod
     def _turn_cost_for(usage: ProviderUsage, prepared: _PreparedTurn) -> TurnCost | None:
         """The turn's total cost — one home for the arithmetic (turn_accounting)."""
-        # The preamble's usage rides along: a visible turn made two billed calls,
-        # and a total that silently omits one is the partial-sum problem the
-        # `complete` flag exists to make visible.
-        return turn_cost(usage, prepared.meta, fast_response=prepared.fast_response.usage)
+        # No preamble term. This is the NON-streaming path, and the stage refuses
+        # `not_streaming` outright, so there is never a second billed call to fold
+        # in here. The streaming path settles its own from `PreambleGate`.
+        return turn_cost(usage, prepared.meta, fast_response=None)
 
     def _lint_final_output(
         self, result: Any, *, request: RespondRequest, request_id: str, had_tool_calls: bool
@@ -2614,7 +2595,8 @@ class ChatOrchestrator:
             context=prepared.context,
             timings=prepared.timings,
             trace=prepared.trace,
-            fast_response=prepared.fast_response,
+            fast_task=prepared.fast_task,
+            fast_policy=prepared.fast_policy,
         )
         try:
             async for event in body:
@@ -2665,10 +2647,20 @@ class ChatOrchestrator:
         context: ContextMeasurement | None,
         timings: _Timings,
         trace: TraceScope | NullTraceScope = NULL_SCOPE,
-        fast_response: FastResponseResult | None = None,
+        fast_task: asyncio.Task[FastResponseResult] | None = None,
+        fast_policy: FastResponsePolicyDecision | None = None,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
+        # The preamble call is already in flight — started during preparation and
+        # never awaited there. Everything about when it may still be SHOWN lives
+        # in the gate; this path only decides when to poll it and when to shut it.
+        gate = PreambleGate(
+            fast_task,
+            fast_policy
+            or FastResponsePolicyDecision(run=False, visible=False, reason="not_eligible"),
+            request_id=meta.request_id,
+        )
 
         def _mark_first_output(delta: StreamDelta) -> None:
             """Stamp the first VISIBLE token, once per turn.
@@ -2683,9 +2675,15 @@ class ChatOrchestrator:
             let a model that thinks for two minutes report an instant first byte
             — the same rule `_carries_output` applies to the deadline.
             """
-            if budget is None or timings.first_output_ms is not None:
-                return
             if not (delta.content or delta.tool_calls):
+                return
+            # The answer is on screen. Whatever the fast stage is still doing, it
+            # has lost — see `PreambleGate.close_window`. Done BEFORE the
+            # `first_output_ms` guard below, which returns early on every delta
+            # after the first: the window has to shut even on a turn whose mark
+            # was already stamped, and even when there is no budget clock at all.
+            gate.close_window("executor_output_first")
+            if budget is None or timings.first_output_ms is not None:
                 return
             timings.first_output_ms = round(budget.elapsed() * 1000)
 
@@ -2781,10 +2779,6 @@ class ChatOrchestrator:
         # Up to that point nothing of the retry is public, so the first attempt is
         # still replay-safe and remains the honest fail-open answer.
         fallback: tuple[list[StreamDelta], str | None, str] | None = None
-        # `None` when the stage did not run — which is what makes an absent cost a
-        # truthful zero rather than an unknown. Shadow mode DID run and DID bill,
-        # so its usage counts even though nothing was shown.
-        fast_usage = fast_response.usage if fast_response is not None else None
         try:
             # The metadata event is always first, before any token: the client gets
             # the runbook prelude, active set, refreshed state, and selector outcome
@@ -2803,52 +2797,59 @@ class ChatOrchestrator:
                 ).model_dump(exclude_none=True),
             )
 
-            # The preamble, after `meta` and before the executor opens.
+            # The preamble, if it has somehow already landed. Almost never: the
+            # two calls left together moments ago and this runs immediately after
+            # `meta`. The real race is at the executor's open, below — this is here
+            # only so a slow preparation cannot leave a finished line unemitted.
             #
             # `meta` stays first (it carries the runbook state the client needs to
-            # initialise the bubble), and this is its own event rather than a
-            # `delta` for three reasons that each break otherwise: the client must
-            # hold it PROVISIONAL until `done`; the retry layer must still consider
-            # the turn replay-safe, since nothing the executor produced has been
-            # shown; and bare-intent detection must not see it — a preamble
-            # announces intended work by design and would be a guaranteed false
-            # positive.
-            if fast_response is not None and fast_response.has_content:
-                yield self._sse("status", StreamStatus(phase="fast_response").model_dump())
-                yield self._sse(
-                    "preamble",
-                    StreamPreamble(
-                        id=f"pre_{meta.request_id.split('_', 1)[-1]}",
-                        content=fast_response.content or "",
-                    ).model_dump(),
-                )
-                timings.preamble_at_ms = (
-                    round(budget.elapsed() * 1000) if budget is not None else 0
-                )
-                await trace.record_event(
-                    "fast_response.emitted",
-                    attributes={
-                        "source": fast_response.source,
-                        "degraded": fast_response.degraded,
-                        "reason": fast_response.reason,
-                        "latency_ms": fast_response.latency_ms,
-                    },
-                    content={"content": fast_response.content},
-                )
-                yield self._sse("status", StreamStatus(phase="executor").model_dump())
+            # initialise the bubble), and the preamble is its own event rather than
+            # a `delta` for four reasons that each break otherwise: it is
+            # DISPLAY-ONLY and the client must not commit it to history (the
+            # executor never saw it, so a committed line would become an assistant
+            # turn the model never wrote); the retry layer must still consider the
+            # turn replay-safe, since nothing the executor produced has been shown;
+            # bare-intent detection must not see it — a line announcing intended
+            # work is a guaranteed false positive; and the output lint measures the
+            # ANSWER, which this is not part of.
+            async for event in self._emit_preamble(
+                gate, meta=meta, timings=timings, budget=budget, trace=trace
+            ):
+                yield event
 
             while True:
                 t_open = time.perf_counter()
                 if stream is None:
-                    try:
-                        (
-                            opened_stream,
-                            first_event,
-                            abandoned,
-                        ) = await self._open_stream_with_retry(
+                    # THE RACE. This is where the concurrent design pays.
+                    #
+                    # The executor's open is the long wait — retries, connect, and
+                    # a prefill over ~25k tokens of prompt — and the preamble's
+                    # entire purpose is to land inside it. Awaiting the open
+                    # directly would mean the earliest the line could be emitted is
+                    # the executor's own first chunk, which is the moment it stops
+                    # being worth emitting. So the open runs as a task and the two
+                    # are waited on together.
+                    #
+                    # At most one pass: `asyncio.wait` returns when either
+                    # finishes, and `gate.poll()` settles the preamble whichever
+                    # way that went, so the loop condition cannot hold twice.
+                    open_task = asyncio.create_task(
+                        self._open_stream_with_retry(
                             active_request, budget=budget, request_id=meta.request_id
                         )
-                        abandoned_opens += abandoned
+                    )
+                    opened: tuple[ProviderStream, dict[str, Any] | None, int] | None = None
+                    try:
+                        while gate.pending and gate.task is not None and not open_task.done():
+                            await asyncio.wait(
+                                (open_task, gate.task),
+                                return_when=asyncio.FIRST_COMPLETED,
+                            )
+                            async for event in self._emit_preamble(
+                                gate, meta=meta, timings=timings, budget=budget, trace=trace
+                            ):
+                                yield event
+                        opened = await open_task
                     except DaintreeError as exc:
                         # A stalled open that exhausted its retries lands here too,
                         # which is the point: it is a `DaintreeError` now, so the
@@ -2876,6 +2877,15 @@ class ChatOrchestrator:
                         # is how the next reader gets it wrong.
                         content_chars = len(restored)
                         break
+                    finally:
+                        # An open nobody took must not outlive the turn. Reached
+                        # on a client disconnect (GeneratorExit at the `yield`
+                        # above) and on the fail-open `break`, where the task may
+                        # already hold a live upstream connection.
+                        if opened is None:
+                            self._abandon_open(open_task, request_id=meta.request_id)
+                    opened_stream, first_event, abandoned = opened
+                    abandoned_opens += abandoned
                     stream = opened_stream
                 # Phase timing for the round's remaining "dead air": upstream
                 # open-to-first-event. It dominates on cache misses (prefill) and on
@@ -2903,6 +2913,16 @@ class ChatOrchestrator:
                 scanner = DeclarationScanner()
 
                 async for chunk in self._chunk_iter(opened_stream, first_event, budget=budget):
+                    # The last chance. The executor is producing, but until one of
+                    # its deltas actually reaches the client the screen is still
+                    # empty and the line is still worth showing — a reasoning
+                    # fragment or a role-only chunk does not close the window.
+                    # `_mark_first_output` closes it, at the exact points a delta
+                    # reaches the user, and `poll()` is a no-op from then on.
+                    async for event in self._emit_preamble(
+                        gate, meta=meta, timings=timings, budget=budget, trace=trace
+                    ):
+                        yield event
                     finish_reason = self._chunk_finish_reason(chunk) or finish_reason
                     delta = self._chunk_to_delta(chunk)
                     if delta is None:
@@ -3000,6 +3020,21 @@ class ChatOrchestrator:
                         saw_tool_calls = True
                         ready = tool_call_buffer.add(delta.tool_calls)
                         if delta.content or delta.reasoning_content:
+                            # MARKED, like every other site that puts a delta on
+                            # the wire. A chunk can carry prose AND a tool-call
+                            # fragment together, and this branch used to yield
+                            # that prose without stamping anything — so
+                            # `first_output_ms` reported the LATER moment the
+                            # call completed, and the preamble window stayed open
+                            # after visible text had already reached the screen.
+                            # `_mark_first_output` ignores a reasoning-only delta
+                            # on its own, so this is exact rather than eager.
+                            _mark_first_output(
+                                StreamDelta(
+                                    content=delta.content,
+                                    reasoning_content=delta.reasoning_content,
+                                )
+                            )
                             yield self._sse(
                                 "delta",
                                 StreamDelta(
@@ -3016,6 +3051,22 @@ class ChatOrchestrator:
                         continue
                     _mark_first_output(delta)
                     yield self._sse("delta", delta)
+
+                # THE LAST POLL, and it is not redundant with the one at the top
+                # of the loop above.
+                #
+                # Two shapes reach here with the window still open and a finished
+                # preamble uncollected: a reply whose content was HELD by the
+                # bare-intent gate (so no delta ever reached the client and
+                # nothing closed the window), and an executor stream that ended
+                # without producing a chunk at all (so the loop body never ran).
+                # In both the fast call genuinely won — it finished before any
+                # visible byte — and without this the terminal flush below would
+                # close the window and record a drop for a line that was in hand.
+                async for event in self._emit_preamble(
+                    gate, meta=meta, timings=timings, budget=budget, trace=trace
+                ):
+                    yield event
 
                 # A reply that ended mid-marker ("[[DAINT") left real characters
                 # held. They are owed to the client — and to `content_parts`,
@@ -3161,6 +3212,15 @@ class ChatOrchestrator:
                     contradicted=(declared is Declaration.FINAL and saw_tool_calls)
                     or (declared is Declaration.TOOLS and not saw_tool_calls),
                 )
+            # Settled before the terminal event so `done` reports the turn's real
+            # cost, and LATCHED so the terminal `finally` cannot report a
+            # different one. Never awaited — see `PreambleGate.finish`.
+            #
+            # This is also where the stage's own latency reaches the wire.
+            # Preparation used to set it, back when it awaited the call; nothing
+            # replaced that when the two went concurrent, so a shown preamble was
+            # reporting no `fast_response_ms` at all.
+            timings.fast_response_ms = gate.finish().latency_ms
             if compaction_task is not None:
                 compaction = await self._collect_compaction(
                     compaction_task,
@@ -3182,8 +3242,15 @@ class ChatOrchestrator:
                     cost=turn_cost(
                         total_usage,
                         meta,
-                        complete=abandoned_opens == 0,
-                        fast_response=fast_usage,
+                        # `gate.billed_unknown` is the fast stage's version of the
+                        # abandoned-open case: a call that reached the provider
+                        # and came back uncountable (a timeout, a 200 with no
+                        # usage block, one still in flight at the terminal event).
+                        # `turn_cost` reads `fast_response=None` as "the stage did
+                        # not run" and sums an honest zero for it, which is the
+                        # wrong reading for a request that went out.
+                        complete=abandoned_opens == 0 and not gate.billed_unknown,
+                        fast_response=gate.usage,
                     ),
                     # Lint what was actually streamed. A round that ended in tool
                     # calls is interstitial and is not linted, matching the
@@ -3217,6 +3284,12 @@ class ChatOrchestrator:
                 ),
             )
         finally:
+            # The fast stage's own trace, on EVERY exit path and after `finish()`
+            # has settled whatever the call reported. Written here rather than in
+            # preparation — where it used to live — because the outcome is no
+            # longer known by then: the call is still in flight when preparation
+            # returns, and whether it was shown depends on a race this path runs.
+            await self._trace_fast_response(gate, trace)
             # An errored or abandoned stream can never deliver a block, so the
             # call it would have carried is pure waste. Idempotent: on the success
             # path `_collect_compaction` has already settled the task.
@@ -3279,8 +3352,9 @@ class ChatOrchestrator:
                 selector_usage=meta.selector_usage,
                 selector_endpoint=meta.selector_endpoint,
                 turn_cost=turn_cost(
-                    final_usage, meta, complete=abandoned_opens == 0,
-                    fast_response=fast_usage,
+                    final_usage, meta,
+                    complete=abandoned_opens == 0 and not gate.billed_unknown,
+                    fast_response=gate.usage,
                 ),
                 estimated_prompt_tokens=context.input_tokens if context else None,
             )

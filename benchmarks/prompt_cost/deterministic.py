@@ -47,7 +47,6 @@ from daintree_assistant_server.runbooks.tool_projection import (
 )
 from daintree_assistant_server.services.compaction import default_compactor
 from daintree_assistant_server.services.prompt_assembler import (
-    FastResponseHandoff,
     PromptAssembler,
 )
 from daintree_assistant_server.state.codec import StateCodec
@@ -96,10 +95,9 @@ def _body_for(
     runbooks: list[Runbook],
     *,
     enforced: bool = False,
-    handoff: FastResponseHandoff | None = None,
 ) -> dict[str, Any]:
     pr = assembler.build_main_request(
-        request=request, runbooks=runbooks, upstream_model=EXECUTOR_MODEL, handoff=handoff
+        request=request, runbooks=runbooks, upstream_model=EXECUTOR_MODEL
     )
     if enforced:
         # The PRODUCTION filter, not a re-implementation of it. A benchmark that
@@ -200,32 +198,6 @@ def _transitions(
         {
             "transition": "runtime_context_change",
             "expect": "system_tools_stable == 1.0 (runtime change is tail-only)",
-            "floor_system_tools_stable": 1.0,
-            **_stability(before, after),
-        }
-    )
-
-    # 2b. fast-response handoff: the SAME turn, with and without the preamble pair.
-    #     This is the transition that pays for the layout. The handoff rows are
-    #     appended after the volatile tail, so adding them must not move a single
-    #     byte of the system region or the ~21.5k tokens of tool schemas behind
-    #     it — otherwise a feature meant to improve perceived latency would be
-    #     re-encoding the most expensive region of every eligible turn.
-    before = _body_for(assembler, settings, req([_USER]), runbooks)
-    after = _body_for(
-        assembler,
-        settings,
-        req([_USER]),
-        runbooks,
-        handoff=FastResponseHandoff(
-            content="I'll trace the failing step and make the smallest change that fixes it.",
-            continuation_message="[Daintree continuation - server-owned instruction] Continue.",
-        ),
-    )
-    out.append(
-        {
-            "transition": "fast_response_handoff",
-            "expect": "system_tools_stable == 1.0 (handoff is appended after the tail)",
             "floor_system_tools_stable": 1.0,
             **_stability(before, after),
         }

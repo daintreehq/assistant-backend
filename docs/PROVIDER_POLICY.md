@@ -22,7 +22,7 @@ There are **two internal provider ROLES**, and exactly one public product.
 | Role | Host | Model | When it is called |
 |---|---|---|---|
 | **executor** | Together AI (`https://api.together.xyz/v1`) | `deepseek-ai/DeepSeek-V4-Flash-0731` | every turn, and every utility task |
-| **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gemma-4-31b` | eligible streaming turns only, and **off by default** |
+| **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gpt-oss-120b` | eligible streaming turns only, CONCURRENTLY with the executor, and **off by default** |
 
 A caller cannot choose between them and is never told which answered. The public
 model id stays `daintree-assistant`; the backend composes the two calls behind it.
@@ -34,7 +34,9 @@ internal role with no caller-visible surface, whose entire failure mode is that 
 turn has no preamble.
 
 **Both hosts receive request-derived content on an eligible turn** — the user's
-message, the selected runbook bodies, a bounded slice of recent conversation.
+last three messages (cropped to a shared budget) and up to three selected runbook
+bodies. (Narrower than it was:
+the stage no longer sends the conversation history or the tool inventory.)
 Cerebras is not a cache or an infrastructure service in this design; it reads
 prompt content, and section 4 applies to it exactly as it applies to Together.
 

@@ -18,9 +18,9 @@ The public API is **Daintree-native** (`POST /v1/daintree/respond`), not OpenAI-
 
 The upstream is **Together AI** (OpenAI wire shape, spoken *internally* behind the `ChatProvider` abstraction in `providers/`): **one model, `deepseek-ai/DeepSeek-V4-Flash-0731`** (`config.EXECUTOR_MODEL`), for the main completion and every utility task. The public response says `daintree-assistant`.
 
-**There are TWO internal provider ROLES, and they are not a product tier.** `config.EXECUTOR_MODEL` on Together answers every turn; `config.FAST_RESPONSE_MODEL` (`gemma-4-31b`) on Cerebras writes a short visible preamble first, on eligible streaming turns, and is **off by default** (`FAST_RESPONSE_MODE=off`). A caller cannot choose between them, is never told which answered, and still targets one public model. **Both hosts receive prompt content on an eligible turn** — Cerebras is not a cache or an infrastructure service here, and `docs/PROVIDER_POLICY.md` section 1 says so.
+**There are TWO internal provider ROLES, and they are not a product tier.** `config.EXECUTOR_MODEL` on Together answers every turn; `config.FAST_RESPONSE_MODEL` (`gpt-oss-120b`) on Cerebras writes one short visible preamble line **concurrently with it**, on eligible streaming turns, and is **off by default** (`FAST_RESPONSE_MODE=off`). The executor's request does not contain the preamble, so the two calls genuinely overlap and a line that loses the race is dropped unshown. A caller cannot choose between them, is never told which answered, and still targets one public model. **Both hosts receive prompt content on an eligible turn** — Cerebras is not a cache or an infrastructure service here, and `docs/PROVIDER_POLICY.md` section 1 says so.
 
-**A two-mode split also briefly lived here, and it is still gone** — a `pro` tier on Cerebras/`gemma-4-31b`, with a `modes.py` registry, per-mode credentials and per-turn route threading. Cerebras's pricing could not be made to work as a TIER: a second full-length answer per turn is a different cost shape from a 160-token preamble, which is why one came back and the other did not. Git history has the whole of it. The distinction that matters: a role is internal composition, a mode is a caller-visible choice. Do not reintroduce mode plumbing, a registry, or a `routing` field on the wire.
+**A two-mode split also briefly lived here, and it is still gone** — a `pro` tier on Cerebras/`gemma-4-31b`, with a `modes.py` registry, per-mode credentials and per-turn route threading. Cerebras's pricing could not be made to work as a TIER: a second full-length answer per turn is a different cost shape from a one-line preamble, which is why one came back and the other did not. Git history has the whole of it. The distinction that matters: a role is internal composition, a mode is a caller-visible choice. Do not reintroduce mode plumbing, a registry, or a `routing` field on the wire.
 
 **The host is the latency decision, not the model:** these are the weights `context_compact` reached through OpenRouter for months, and the same 62 utility-task payloads measured p50 1100ms on Together against 3414ms through OpenRouter's default routing. **Runbook selection is LOCAL** (an in-process ONNX classifier, `runbooks/local/`) and makes no upstream call.
 
@@ -169,7 +169,7 @@ uvicorn daintree_assistant_server.main:app --reload --port 8473
    cost benchmark); the manifest is diagnostics, never payload, and never reaches a
    client.
 
-6. **Respond** — the runbooks/selection metadata is delivered first: as the response body's `runbooks` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential — select → assemble → upstream call (TWO calls when the fast-response stage runs: the preamble first, then the executor, never concurrently, because the executor's input contains the preamble); the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
+6. **Respond** — the runbooks/selection metadata is delivered first: as the response body's `runbooks` block (non-streaming) or the first SSE `meta` event (streaming), which local selection makes effectively immediate (~10ms in). The flow is strictly sequential — select → assemble → upstream call — with ONE exception: when the fast-response stage runs it fires CONCURRENTLY with the executor and nothing waits on it (the executor's input does not contain the preamble, which is what makes that possible); the speculative-stream machinery that used to race a guessed prompt against the selector was deleted when selection stopped costing 2s (git history has it). Open/prefetch retries happen after metadata but before any model delta; an exhausted open or mid-stream failure emits a terminal `error` event, never a fabricated `done`.
 
 6b. **Turn-finality declaration and compaction** (`services/response_declaration.py`,
    `services/compaction.py`) — when compaction is live the model opens its reply with
@@ -524,56 +524,113 @@ core.
 
 ## The fast-response stage (`FAST_RESPONSE_MODE`, default `off`)
 
-An eligible streaming turn can open with a short visible **preamble** — one or two
-sentences describing the work about to happen — written by `gemma-4-31b` on Cerebras
-while the executor request is still being assembled. `services/fast_response.py` owns
-it; `providers/cerebras.py` is the adapter.
+An eligible streaming turn can open with ONE short visible **preamble** line —
+"what is about to happen", in the user's terms — written by `gpt-oss-120b` on
+Cerebras **at the same time as** the executor call. `services/fast_response.py`
+owns it; `providers/cerebras.py` is the adapter.
 
-**Six things about it are load-bearing.**
+**The two calls are CONCURRENT, and everything else follows from that.** The
+preamble used to be appended to the executor's own input as an assistant row plus
+a server-owned continuation instruction, which forced the calls to be sequential —
+the executor's prompt literally contained the preamble's bytes, so it could not
+open until Cerebras had answered. That handoff is gone. The executor never sees
+the line, so its request is **byte-identical whether the stage ran, was withheld,
+or is off**, and both calls leave together. Gone with it: `FastResponseHandoff`,
+`prompts/fast_response/continuation.md`, the hidden `<daintree_plan>` block the
+preamble used to carry for the executor, and the context-budget path that had to
+drop the pair and re-assemble.
 
-**It is an optimisation and it fails open.** A timeout, a provider error, output the
-validator refuses, runbooks that do not fit its budget — each resolves to a
-deterministic fallback (a generic preview that names no file, command or cause) or to
-no preamble at all. `generate()` does not raise, and there is **no retry**: one that
-succeeds at five seconds has already lost the argument the stage exists to win and has
-delayed the executor behind it.
+**Seven things about it are load-bearing.**
 
-**The preamble is appended to the EXECUTOR's own input**, as an assistant row, followed
-by a server-owned continuation instruction (`prompts/fast_response/continuation.md`).
-That pair goes **after the volatile tail and nowhere else** — the system region and the
-~21.5k tokens of tool schemas stay byte-identical with and without it, which
-`benchmarks/prompt_cost`'s `fast_response_handoff` transition measures at 1.0 rather
-than assuming. The continuation row is not decoration: without it the executor reads the
-assistant turn above as evidence the work already happened. And this is why the design
-does NOT rely on an assistant-last request — DeepSeek's prefix completion is a separate
-beta behaviour behind its own flag and endpoint, and Together's compatibility surface
-establishes no such contract.
+**Late means DROPPED.** The line is worth showing only while the screen is still
+empty. `PreambleGate` (in `fast_response.py`) closes the window at the executor's
+first VISIBLE byte — `_mark_first_output`, the same hook that stamps
+`first_output_ms` — and anything arriving after that is discarded unshown. A
+preview of work the reader can already watch happening is worse than silence: it
+delays real output to say something that has stopped being true. A closed window
+does NOT cancel the call (it is already sent and already billed, and the usage
+still has to reach the turn's cost); the task stays in `_background_tasks` and
+`finish()` folds in whatever it reported, without ever waiting for it.
 
-**The visible bytes and the injected bytes are the same bytes.** If they diverge, the
-client's committed history and the model's view of its own last turn disagree, and every
-later round reasons about a conversation that did not happen. The one path that can break
-this is the context-budget fallback, which drops the handoff when the request only fails
-to fit with it on — so it drops the CONTENT too, because preparation runs before any byte
-is streamed.
+**The race is at the executor's OPEN, and it has to be.** `_stream_body` wraps
+`_open_stream_with_retry` in a task and `asyncio.wait(..., FIRST_COMPLETED)`s it
+against the fast task. Awaiting the open directly would mean the earliest the line
+could be emitted is the executor's first chunk — which is the moment it stops
+being worth emitting, so the feature would buy nothing. The gate is polled at
+three points (after `meta`, in that race, and at the top of the chunk loop) and
+`_abandon_open` disposes of an open nobody consumed, which a directly-awaited call
+could never leak but a task can.
 
-**Validation is strict because the output is authority-bearing.** These bytes become the
-executor's own prior assistant turn, so a claim that work already happened tells the
-MODEL the job is partly done, and an instruction ("ignore the next message…") carries an
-assistant's authority into a context that already contains user-controlled text.
-`validate_preamble` refuses completed-work claims in four grammatical shapes, text
-addressed to the model, structure, internal disclosure, control markers, and any finish
-reason that is not cleanly `stop`.
+**It is display-only and the client must NOT commit it to history.** The executor
+has no knowledge of the line, so a client that folded it into the assistant
+message would send it back next turn as an assistant turn the model never wrote.
+`docs/DAINTREE_API.md` section 8.14 states the rule; the CLI still has to honour
+it (`TODO.md`).
 
-**It never runs on a continuation round** (gated on `session.round`, not on whether the
-selector ran — selection reruns for reasons that are not a new instruction), on a
-sub-agent, on a background wake, on a non-streaming request, or with no runbook loaded.
-A bare-intent re-roll reuses the SAME preamble and handoff and adds only the existing
-nudge; it does not call Cerebras again.
+**The executor still announces, and that is an accepted cost today.** It cannot
+see the preamble, so it opens with its own "I'll start by reading the current
+state" — the same opening it produces with the stage off, so the preamble does not
+cause it. A conditional base partial withdrawing that permission was built,
+measured and REVERTED: it did not change the behaviour, and with it shipped
+DeepSeek's `<｜DSML｜tool_calls>` syntax began leaking into visible content (2 of 3
+turns, against 0 of 3 without). `TODO.md` carries the full record — read it before
+retrying that shape.
+
+**Silence is a first-class answer.** The model replies with the exact token `NONE`
+when a line would be noise — a small or conversational request, a follow-up it
+cannot see the context for, anything that would just restate what the user typed.
+That is a SUCCESS (`source="declined"`), not a failure, and it is why the
+deterministic fallback sentence is gone: a server-authored filler emitted on
+failure would contradict the judgement the model is now being asked to make. A
+sentinel rather than an empty completion, because an empty completion is
+indistinguishable from a truncation or a broken call, and the rate at which the
+model chooses silence is the one number that says whether its judgement works.
+
+**The context is deliberately thin, and its budget is RECENCY-WEIGHTED.** The
+system prompt, at most `MAX_FAST_RUNBOOKS` (3) runbook bodies, and at most
+`MAX_FAST_USER_MESSAGES` (3) recent USER messages. Never the assistant's turns —
+they are the record of work, the one thing this stage must not claim happened —
+and never the ~2 KB tool-name inventory or the startup block, both of which were
+bought for a considered multi-sentence opening this stage no longer writes.
+
+The messages share one `_MAX_HISTORY_CHARS` budget allocated greedily from the
+NEWEST backwards, which is what satisfies two requirements that pull against each
+other: a long paste crowds the history out entirely (correct — it IS the request),
+while "actually do that now" leaves nearly the whole budget for the message that
+makes it legible. An older message whose allowance falls under
+`_MIN_USEFUL_MESSAGE_CHARS` is dropped rather than cropped to a stub, because a
+torn-off clause reads as a different request than the one that was made. The crop
+also refuses to empty a message: a paste that BEGINS with `[` would otherwise be
+deleted whole by the dangling-image-marker cleanup, silently promoting an older
+message to newest.
+
+This host is fast and expensive, so history is bought rather than free — though
+measured, the runbook bodies are ~85% of the prompt and the history under 15%, so
+they are the only lever that would move the cost (`TODO.md`).
+
+**It fails open, always, and there is no retry.** A timeout, a provider error,
+output the validator refuses, runbooks that do not fit the budget — each resolves
+to no preamble at all. `generate()` does not raise. Validation stays strict
+because the bytes go straight to a user's screen: an overclaim tells the reader
+work has happened moments before an answer appears that starts it from nothing,
+and the two visibly disagree.
+
+**`reasoning_effort` is pinned, and omission is not neutral.** `gpt-oss-120b`
+reasons and Cerebras defaults it to `medium`; reasoning tokens count against
+`max_completion_tokens` and against the clock. `FAST_RESPONSE_REASONING_EFFORT`
+holds it at the `low` floor — there is no "off" — and it travels with
+`thinking_disabled=False`, because the adapter only forwards an effort when
+thinking is enabled.
+
+**It never runs on a continuation round** (gated on `session.round`, not on whether
+the selector ran — selection reruns for reasons that are not a new instruction), on
+a sub-agent, on a background wake, on a non-streaming request, or with no runbook
+loaded.
 
 **`shadow` is a real mode, not a half-off one.** It generates, validates, bills and
-TRACES a preamble and shows nothing — which is the point: it produces evidence against
-real turns before any user sees one. Rollback at any stage is `FAST_RESPONSE_MODE=off`
-plus a config-only revision.
+TRACES a preamble and shows nothing — which is the point: it produces evidence
+against real turns before any user sees one. Rollback at any stage is
+`FAST_RESPONSE_MODE=off` plus a config-only revision.
 
 ## Training traces (`TRACE_CAPTURE_MODE`, default `off`)
 
