@@ -22,6 +22,7 @@ from fastapi import FastAPI, Request
 
 from . import __version__
 from .api import (
+    daintree_account,
     daintree_auth,
     daintree_capabilities,
     daintree_doctor,
@@ -876,6 +877,7 @@ def create_app(
     app.include_router(daintree_respond.router)
     app.include_router(daintree_capabilities.router)
     app.include_router(daintree_auth.router)
+    app.include_router(daintree_account.router)
     # Deliberately NOT behind require_ready: a doctor that goes down with the
     # patient cannot diagnose the outage a tester is calling about.
     app.include_router(daintree_doctor.router)

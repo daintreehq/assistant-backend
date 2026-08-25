@@ -22,11 +22,25 @@ def check_protocol_header(request: Request) -> None:
     header = request.headers.get("x-daintree-protocol")
     if header is None:
         return
-    try:
-        version = int(header)
-    except ValueError as exc:
-        raise unsupported_protocol(f"Invalid X-Daintree-Protocol header: {header!r}") from exc
-    _check_version(version)
+    value = header.strip()
+    # The VALUE is never echoed, and never reaches the exception either. It is a
+    # caller-controlled string on a request that has usually already been
+    # authenticated, and the single most likely way for it to be malformed is a
+    # client-side mix-up that put the bearer in the wrong header — the exact
+    # threat `_safe_request_id` already refuses to take for `X-Request-Id`. A
+    # message quoting it would copy the credential into a JSON error body and into
+    # the chained `ValueError`'s string.
+    #
+    # A bounded digit check rather than a bare `int()` for the same reason: `int`
+    # accepts underscores, surrounding whitespace and unicode digits, so the set
+    # of inputs it would carry into an error is wider than the set that looks like
+    # a version.
+    if not value.isascii() or not value.isdigit() or len(value) > 6:
+        raise unsupported_protocol(
+            "The X-Daintree-Protocol header is not a supported protocol version "
+            f"(supported: {PROTOCOL_MIN}..{PROTOCOL_MAX})."
+        )
+    _check_version(int(value))
 
 
 def check_protocol_value(version: int | None) -> None:

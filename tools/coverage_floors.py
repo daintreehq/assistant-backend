@@ -62,6 +62,19 @@ FLOORS: dict[str, int] = {
     "src/daintree_assistant_server/errors.py": 93,
     "src/daintree_assistant_server/main.py": 95,
     "src/daintree_assistant_server/api/daintree_auth.py": 93,
+    # Added 2026-08-25 (measured 98%). The account-status route. Small, and on
+    # this list because of WHAT it decides rather than how much of it there is:
+    # which callers it will answer for at all, and which of four `access` values
+    # it reports. A branch that stops being exercised here either exposes an
+    # account to a caller no longer entitled to read it, or reports an outage as
+    # a settled fact about somebody's plan.
+    "src/daintree_assistant_server/api/daintree_account.py": 98,
+    # Added 2026-08-25 (measured 100%). The account response model. Tiny, and its
+    # cross-field rules are the second boundary the brief asks for: the
+    # entitlement client validates the WEBSITE's contract, this validates OURS. A
+    # rule that stops being exercised does not fail — it just stops catching an
+    # incoherent body that a future edit assembles.
+    "src/daintree_assistant_server/contracts/account.py": 100,
     "src/daintree_assistant_server/providers/base.py": 92,
     # The SERVING adapter's implementation. `providers/together.py` subclasses it
     # and changes three class attributes plus a key decoder, so this is where

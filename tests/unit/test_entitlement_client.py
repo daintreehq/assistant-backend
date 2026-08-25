@@ -616,8 +616,29 @@ async def test_a_status_field_echoing_the_bearer_never_reaches_a_log() -> None:
     with capture_logs() as logs:
         verdict = await _resolve(service)
     assert hostile not in json.dumps(logs)
-    # It is still returned to the account endpoint, which the contract requires.
-    assert verdict.subscription_status == hostile
+    # And DROPPED from the verdict, so it cannot be returned to the client either.
+    # It is the one free-form field in the contract and it is rendered in a
+    # terminal, so it is the route by which an upstream mistake would put a
+    # credential fragment back on somebody's screen. Dropped rather than refused:
+    # nothing branches on it, and turning a cosmetic upstream bug into a billing
+    # outage would be the worse trade.
+    assert verdict.subscription_status is None
+    assert verdict.granted is True
+
+
+@pytest.mark.asyncio
+async def test_a_status_field_echoing_the_raw_subject_is_dropped() -> None:
+    """Same hazard, different secret: this response is pasted into issues."""
+    service, _ = _service(_json_response(_body(subscription_status=str(_SUBJECT))))
+    verdict = await _resolve(service)
+    assert verdict.subscription_status is None
+
+
+@pytest.mark.asyncio
+async def test_an_ordinary_status_survives() -> None:
+    """The guard must not eat the field it is protecting."""
+    service, _ = _service(_json_response(_body(subscription_status="past_due")))
+    assert (await _resolve(service)).subscription_status == "past_due"
 
 
 @pytest.mark.asyncio
@@ -1085,3 +1106,20 @@ def test_eviction_prefers_entries_that_have_already_expired() -> None:
     )
     assert live in service._cache
     assert len(service._cache) <= ENTITLEMENT_CACHE_MAX_ENTRIES
+
+
+def test_the_url_is_readable_for_diagnostics() -> None:
+    """Read at call time from the service rather than captured elsewhere, so a
+    caller reporting where a lookup went is reporting where it actually went."""
+    service, _ = _service(_json_response(_body()))
+    assert service.url == _URL
+
+
+@pytest.mark.asyncio
+async def test_a_verdict_with_no_status_passes_the_echo_guard_untouched() -> None:
+    """The guard has an early exit for the ordinary case; it must not rewrite a
+    verdict that has nothing to redact."""
+    service, _ = _service(_json_response(_body(subscription_status=None)))
+    verdict = await _resolve(service)
+    assert verdict.subscription_status is None
+    assert verdict.granted is True

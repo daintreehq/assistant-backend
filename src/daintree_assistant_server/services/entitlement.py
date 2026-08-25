@@ -45,7 +45,7 @@ import asyncio
 import json
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any, Literal, cast
@@ -462,7 +462,8 @@ class EntitlementService:
             body = await _read_bounded(response)
         finally:
             await response.aclose()
-        return _parse(body, expected_subject=user_id)
+        verdict = _parse(body, expected_subject=user_id)
+        return _without_echoed_secrets(verdict, token=token, user_id=user_id)
 
 
 async def _error_code_of(response: httpx.Response) -> str | None:
@@ -655,6 +656,31 @@ def _parse(body: bytes, *, expected_subject: UUID) -> Entitlement:
         stale=stale,
         checked_at=checked_at,
     )
+
+
+def _without_echoed_secrets(
+    verdict: Entitlement, *, token: str, user_id: UUID
+) -> Entitlement:
+    """Drop ``subscription_status`` if it echoes the credential or the subject.
+
+    It is the ONE free-form field in the contract, and it is returned to the
+    client and rendered in a terminal. Some providers default a status or label
+    string to the identifier it describes — `daintree_auth._safe_label` already
+    guards the same shape for a provider key label — so this is the field through
+    which an upstream mistake would put a bearer fragment or a raw user id back on
+    somebody's screen.
+
+    Dropped rather than refused: the field is diagnostic, nothing branches on it,
+    and refusing the whole answer would convert a cosmetic upstream bug into a
+    billing outage. Losing a status string costs nothing.
+    """
+    status = verdict.subscription_status
+    if not status:
+        return verdict
+    subject = str(user_id)
+    if status in token or token in status or subject in status or status in subject:
+        return replace(verdict, subscription_status=None)
+    return verdict
 
 
 def _no_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

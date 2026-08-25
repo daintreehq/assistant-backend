@@ -276,6 +276,88 @@ answer), and `503` before readiness. The probe carries a short 10s read budget r
 the main-model timeout. Being a sign-in bootstrap call, it does not require or check
 `X-Daintree-Protocol`.
 
+### GET /v1/daintree/account
+
+Who is calling, and what their plan currently permits. Identity-protected,
+protocol-3, and **never a paid route** — it invokes no model, spends nothing
+upstream, and sits deliberately outside the entitlement guard. Someone with no
+subscription has to be able to read their own account and discover that; gating
+the endpoint that explains a refusal behind the refusal itself is a loop with no
+exit.
+
+```json
+{
+  "version": 1,
+  "email": "person@example.com",
+  "subject_hash": "16-lowercase-hex",
+  "access": "granted",
+  "plan_id": "standard",
+  "subscription_status": "active",
+  "entitlement_source": "polar",
+  "entitlement_stale": false,
+  "checked_at": "2026-08-25T12:00:00Z"
+}
+```
+
+**It is a status READ.** A known missing or inactive subscription is a **200**
+whose `access` says so — `subscription_required` or `subscription_inactive`.
+Modelling it as an error here would force a client to handle four exception paths
+to render an ordinary account page. The same facts are what the paid-work routes
+refuse on, as the typed **402** family; see the account error table below.
+
+`access` has one value the website's own contract does not:
+
+- `granted` — a plan includes the Assistant.
+- `subscription_required` — authenticated, and no product grants access.
+- `subscription_inactive` — a subscription exists and is not currently granting.
+- `unverified` — **identity is established and entitlement was not looked up.**
+  This deployment is running the identity-only rollout, or has no billing
+  authority configured. A client must not read it as "no plan": nothing was
+  asked, so nothing was refused.
+
+`email` is display-only and is **omitted** when the token carries no email claim —
+never defaulted, never invented. `subject_hash` is a truncated SHA-256 correlation
+id computed exactly as the CLI's `auth.SubjectHash` computes it, so an id a person
+reads off their own terminal matches the one in this server's logs; the raw
+subject is never returned. When `access` is `unverified` the entitlement-only
+fields are **absent** rather than null — a `plan_id: null` beside
+`entitlement_stale: false` would read as "we checked, you have nothing, and that
+answer is fresh", which is three claims none of which were made.
+
+Failures are reported as themselves rather than flattened into `unverified`:
+`401 auth_session_revoked` when the billing authority refuses a token that
+verified locally (it performs a fresh session check this server cannot),
+`403 auth_client_not_allowed` or `auth_permission_denied` when it refuses the
+OAuth client, `429 account_rate_limited`, and `503 entitlement_unavailable` for
+any outage, timeout or unreadable answer — including a deployment that has a URL
+configured but could not build a client for it. **An outage is never reported as
+"no subscription."**
+
+Every response — success and failure alike — is `Cache-Control: private, no-store`.
+It describes one person's account, and a cached copy is a stale claim about their
+money or their session. Note this is a statement about intermediaries, not a
+promise of a fresh lookup on every call: the server holds a verdict for at most
+60 seconds once granted, and 15 once refused, so a change of plan or a revoked
+grant can take that long to show up here.
+
+It is **not gated on readiness**. This route needs the token verifier and the
+entitlement client, and neither is part of the model-serving container — so a
+missing upstream key or a malformed runbook does not turn "what does my account
+look like?" into a 503 about something else entirely.
+
+**It requires an authenticated principal, and the bar is not lowered to make it
+callable sooner.** Under `AUTH_MODE=open` the `Authorization` header is not read
+at all, and under `observe` a verified caller is deliberately resolved as
+anonymous — so both answer `401 auth_required` here. A client should use this
+endpoint once `/v1/daintree/auth/config` reports `required: true`, which is the
+field that exists for exactly this.
+
+Entitlement is resolved whenever `DAINTREE_ENTITLEMENT_URL` is configured and a
+client for it was built, **including while `ENTITLEMENT_MODE` is `off`**. The mode
+decides whether a verdict may refuse a turn, not whether one can be obtained — so
+the whole contract is exercisable against the real website before it can deny
+anybody.
+
 ## Protocol negotiation
 
 A generation or runbook-resolve request carries `protocol_version` in its body. Any
