@@ -119,7 +119,6 @@ def test_every_field_the_cli_decodes_is_a_field_we_publish() -> None:
         SUPABASE_OAUTH_AUTHORIZE_URL="https://abcdefghij.supabase.co/auth/v1/oauth/authorize",
         SUPABASE_OAUTH_TOKEN_URL="https://abcdefghij.supabase.co/auth/v1/oauth/token",
         SUPABASE_OAUTH_CLIENT_ID="daintree-assistant",
-        SUPABASE_OAUTH_REDIRECT_URI="http://127.0.0.1:42813/oauth/callback",
         DAINTREE_ACCOUNT_URL="https://staging.daintree.org/account",
         DAINTREE_SUBSCRIBE_URL="https://staging.daintree.org/subscribe",
     )

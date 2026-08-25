@@ -295,6 +295,238 @@ def test_the_callback_validator_still_refuses_every_wrong_shape(value: str) -> N
     assert _loopback_redirect_problem(value=value, env_name="X") is not None
 
 
+# ---- The staged deployment contract ----------------------------------------
+#
+# Everything above tests one RULE against one crafted value. This section tests
+# one DEPLOYMENT against all of them at once, and the two are not substitutes.
+# Every property below is already covered by some property test — but each of
+# those runs under `development`, or `production`, or with a single field made
+# wrong, and none of them ever asserts that the exact set of values a staging
+# revision will actually carry survives the exact set of rules a hardened
+# deployment actually applies. That gap is the one an operator falls into: a
+# configuration where each value is individually legal and the combination fails
+# readiness, discovered on the deploy rather than here.
+#
+# The values are the frozen contract for `assistant.daintree.org`. The Supabase
+# project ref and the OAuth client id are placeholders on purpose — the real ones
+# are deployment configuration and never belong in source — but their SHAPE is
+# real, and shape is all these rules read.
+
+_STAGING_CONTRACT: dict[str, object] = {
+    "ENVIRONMENT": "staging",
+    "SUPABASE_AUTH_ISSUER": _ISSUER,
+    "SUPABASE_JWKS_URL": _JWKS,
+    "SUPABASE_OAUTH_AUTHORIZE_URL": _AUTHORIZE,
+    "SUPABASE_OAUTH_TOKEN_URL": _TOKEN,
+    "SUPABASE_OAUTH_CLIENT_ID": "daintree-assistant-staging",
+    "DAINTREE_ACCOUNT_URL": "https://staging.daintree.org/account",
+    "DAINTREE_SUBSCRIBE_URL": "https://staging.daintree.org/subscribe",
+}
+
+
+def _staging(**overrides: object) -> Settings:
+    return _settings(**{**_STAGING_CONTRACT, **overrides})
+
+
+@pytest.mark.parametrize("mode", ["open", "observe", "enforce"])
+def test_the_staged_contract_is_accepted_in_every_posture(mode: str) -> None:
+    """The whole point of the environment/posture split, over the real values.
+
+    `ENVIRONMENT` says where this is and `AUTH_MODE` says what it does about
+    credentials, and they are independent — there is deliberately no fourth
+    `staging` auth mode. So one staging deployment must be able to sit in any of
+    the three postures without its OAuth configuration becoming the reason it
+    cannot start, and the posture must be movable by a config-only revision.
+
+    Named for what it checks. This is the AUTH configuration being accepted, not
+    the deployment being ready: readiness also weighs secrets and the salt, which
+    this fixture does not supply, and `test_auth_problems_reach_the_readiness_
+    aggregate` below is what holds the two lists connected.
+    """
+    assert _staging(AUTH_MODE=mode).auth_problems() == []
+
+
+def test_staging_is_hardened_exactly_as_production_is() -> None:
+    """Staging is not a softer tier, and this is the assertion that says so.
+
+    Every relaxation the URL rules make — plaintext on a loopback literal, a
+    machine-local hostname — is withdrawn for `production` and `staging`
+    TOGETHER, keyed on one property. A staging deployment is read by clients on
+    other machines exactly as production is, so the reasons those relaxations
+    exist do not apply to it.
+    """
+    # The WHOLE closed set, not two of it. Asserting only that staging and
+    # production are hardened leaves `environment != "development"` passing, which
+    # would harden `test` and break every offline fixture that relies on it.
+    hardened = {
+        env: _settings(ENVIRONMENT=env).is_hardened
+        for env in ("development", "test", "staging", "production")
+    }
+    assert hardened == {
+        "development": False,
+        "test": False,
+        "staging": True,
+        "production": True,
+    }
+
+
+@pytest.mark.parametrize(
+    ("issuer", "expected"),
+    [
+        # Each specimen isolates ONE hardened rule. A composite like
+        # `http://127.0.0.1/auth/v1` trips the private-host check first, so it
+        # would keep passing with the HTTPS requirement deleted.
+        ("http://abcdefghij.supabase.co/auth/v1", "https://"),
+        ("https://localhost/auth/v1", "publicly reachable"),
+        ("https://10.0.0.5/auth/v1", "publicly reachable"),
+        ("http://127.0.0.1:54321/auth/v1", "publicly reachable"),
+    ],
+    ids=["public-plaintext", "machine-local-name", "private-address", "loopback"],
+)
+def test_staging_withdraws_every_relaxation_development_allows(
+    issuer: str, expected: str
+) -> None:
+    """Each of these is legal, or nearly so, in development. None is in staging.
+
+    A staging manifest is read by clients on other machines exactly as a
+    production one is, so a host naming the READER's own machine sends each of
+    them somewhere different and none of those places is us.
+    """
+    problems = _staging(
+        SUPABASE_AUTH_ISSUER=issuer,
+        SUPABASE_JWKS_URL=issuer + "/.well-known/jwks.json",
+        SUPABASE_OAUTH_AUTHORIZE_URL=issuer + "/oauth/authorize",
+        SUPABASE_OAUTH_TOKEN_URL=issuer + "/oauth/token",
+    ).auth_problems()
+    assert any(expected in p for p in problems), (issuer, problems)
+
+
+def test_the_staged_contract_publishes_a_manifest_before_it_enforces() -> None:
+    """`configured` and `required` are two questions, and a rollout needs them apart.
+
+    The staging plan is to publish a complete manifest while still serving
+    anonymous requests, so a client can complete a real sign-in against a real
+    identity provider before anybody's request depends on the answer. A build that
+    collapsed the two would make that step impossible: the manifest would appear
+    only once the door had already shut.
+    """
+    for mode in ("open", "observe", "enforce"):
+        assert _staging(AUTH_MODE=mode).auth_is_configured, mode
+
+
+def test_the_staging_browser_links_survive_hardening() -> None:
+    """`staging.daintree.org` is a label-boundary subdomain of the pinned anchor.
+
+    Worth its own case because the anchor is a SUFFIX rule, and the failure it
+    exists to stop — `daintree.org.evil.com`, `notdaintree.org` — is a string that
+    also ends in the anchor's characters. The rule has to accept this and refuse
+    those, and only checking one direction leaves the other free to break.
+    """
+    assert _staging().auth_manifest_problems() == []
+    for lookalike in (
+        "https://staging.daintree.org.evil.com/account",
+        "https://notdaintree.org/account",
+        "https://daintree.org.evil.com/account",
+    ):
+        problems = _staging(DAINTREE_ACCOUNT_URL=lookalike).auth_problems()
+        assert any("Daintree site" in p for p in problems), (lookalike, problems)
+
+
+def test_the_link_host_is_not_admitted_as_an_oauth_endpoint() -> None:
+    """`staging.daintree.org` is where a BROWSER goes, and that is all it is.
+
+    The trap this closes is that `daintree.org` sits in BOTH trust anchors — it is
+    a legal browser link and a legal issuer suffix — so a token endpoint moved onto
+    the link host looks plausible against the anchor rules alone. What refuses it
+    is the separate requirement that the three OAuth endpoints share the ISSUER's
+    exact authority, which a browser link does not.
+
+    The other half of this claim — that nothing DERIVES an endpoint from a link —
+    cannot be made here, because these are plain fields and a settings-level check
+    would only prove Pydantic stores what it is given. It is made over the wire in
+    `test_the_browser_links_move_nothing_but_themselves`.
+    """
+    problems = _staging(
+        SUPABASE_OAUTH_TOKEN_URL="https://staging.daintree.org/auth/v1/oauth/token"
+    ).auth_problems()
+    assert any("SUPABASE_OAUTH_TOKEN_URL" in p and "authority" in p for p in problems), problems
+
+
+#: Every published URL, with a value of the right SHAPE for its role. Used to
+#: sweep one prohibited shape across all of them at once.
+_STAGING_URL_FIELDS: dict[str, str] = {
+    "SUPABASE_AUTH_ISSUER": _ISSUER,
+    "SUPABASE_JWKS_URL": _JWKS,
+    "SUPABASE_OAUTH_AUTHORIZE_URL": _AUTHORIZE,
+    "SUPABASE_OAUTH_TOKEN_URL": _TOKEN,
+    "DAINTREE_ACCOUNT_URL": "https://staging.daintree.org/account",
+    "DAINTREE_SUBSCRIBE_URL": "https://staging.daintree.org/subscribe",
+}
+
+_OAUTH_URL_FIELDS = tuple(f for f in _STAGING_URL_FIELDS if f.startswith("SUPABASE_"))
+_LINK_FIELDS = ("DAINTREE_ACCOUNT_URL", "DAINTREE_SUBSCRIBE_URL")
+
+
+@pytest.mark.parametrize("field", tuple(_STAGING_URL_FIELDS))
+def test_no_staged_url_may_embed_credentials(field: str) -> None:
+    """Userinfo, on every field, under staging.
+
+    The rules are tested one crafted value at a time elsewhere, and mostly under
+    `development` — which proves the rule EXISTS without proving it still applies
+    to the deployment that will actually publish these values. Sweeping the shape
+    across every field is what catches a rule that was weakened for one of them.
+    """
+    value = _STAGING_URL_FIELDS[field].replace("https://", "https://u:p@", 1)
+    problems = _staging(**{field: value}).auth_problems()
+    assert any(field in p and "credentials" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("field", _OAUTH_URL_FIELDS)
+def test_no_staged_oauth_endpoint_may_carry_a_fragment(field: str) -> None:
+    """A fragment is meaningless on an issuer or a token endpoint. Only the two
+    browser links may carry one, and they are excluded here rather than merely
+    untested — `test_a_browser_link_may_carry_a_fragment` holds that side."""
+    problems = _staging(**{field: _STAGING_URL_FIELDS[field] + "#x"}).auth_problems()
+    assert any(field in p and "fragment" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("field", _OAUTH_URL_FIELDS)
+def test_no_staged_oauth_path_may_percent_encode(field: str) -> None:
+    """Every way of HANDLING a percent-escape in these paths diverges from the
+    client, so they are refused outright rather than normalised. A real OAuth path
+    never needs one, which is what makes refusing free."""
+    value = _STAGING_URL_FIELDS[field].replace("/auth/v1", "/auth/v1/%2e%2e/x", 1)
+    problems = _staging(**{field: value}).auth_problems()
+    assert any(field in p for p in problems), (value, problems)
+
+
+@pytest.mark.parametrize("field", _LINK_FIELDS)
+@pytest.mark.parametrize(
+    "host",
+    ["staging.daintree.org.evil.com", "notdaintree.org", "daintree.org.evil.com"],
+)
+def test_no_staged_browser_link_accepts_a_lookalike(field: str, host: str) -> None:
+    """BOTH links, not just the account one.
+
+    The anchor is a suffix rule and every one of these ends in its characters, so
+    a weakening to a bare `endswith` admits them. Parameterised across both fields
+    because the two are separate call sites: one of them could be relaxed alone,
+    and a test covering only `DAINTREE_ACCOUNT_URL` would not notice.
+    """
+    problems = _staging(**{field: f"https://{host}/x"}).auth_problems()
+    assert any(field in p and "Daintree site" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("field", ("SUPABASE_JWKS_URL", "SUPABASE_OAUTH_AUTHORIZE_URL"))
+def test_no_staged_oauth_endpoint_may_leave_the_issuers_authority(field: str) -> None:
+    """A half-edited configuration — three URLs moved to a new project and one
+    left behind — is what this catches, and it is the shape that would exchange an
+    authorization code with the previous project."""
+    value = _STAGING_URL_FIELDS[field].replace("abcdefghij", "zzzzzzzzzz", 1)
+    problems = _staging(**{field: value}).auth_problems()
+    assert any(field in p and "authority" in p for p in problems), problems
+
+
 # ---- Readiness aggregation and secret hygiene ------------------------------
 
 

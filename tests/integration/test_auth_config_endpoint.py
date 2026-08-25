@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
-from daintree_assistant_server.config import Settings
+from daintree_assistant_server.config import OAUTH_REDIRECT_URI, Settings
 from daintree_assistant_server.main import create_app
 
 URL = "/v1/daintree/auth/config"
@@ -24,7 +24,6 @@ _COMPLETE: dict[str, Any] = {
     "SUPABASE_OAUTH_AUTHORIZE_URL": "https://abcdefghij.supabase.co/auth/v1/oauth/authorize",
     "SUPABASE_OAUTH_TOKEN_URL": "https://abcdefghij.supabase.co/auth/v1/oauth/token",
     "SUPABASE_OAUTH_CLIENT_ID": "daintree-assistant-staging",
-    "SUPABASE_OAUTH_REDIRECT_URI": "http://127.0.0.1:42813/oauth/callback",
     "DAINTREE_ACCOUNT_URL": "https://staging.daintree.org/account",
     "DAINTREE_SUBSCRIBE_URL": "https://staging.daintree.org/subscribe",
 }
@@ -141,7 +140,14 @@ def test_a_configured_deployment_publishes_the_manifest(fake_provider: Any) -> N
     assert body["token_endpoint"] == _COMPLETE["SUPABASE_OAUTH_TOKEN_URL"]
     assert body["jwks_uri"] == _COMPLETE["SUPABASE_JWKS_URL"]
     assert body["client_id"] == _COMPLETE["SUPABASE_OAUTH_CLIENT_ID"]
-    assert body["redirect_uri"] == _COMPLETE["SUPABASE_OAUTH_REDIRECT_URI"]
+    # Against the CONSTANT, not against a key in `_COMPLETE`. That dict is env,
+    # and `Settings` is `extra="ignore"`, so a `SUPABASE_OAUTH_REDIRECT_URI` entry
+    # was silently dropped on the way in and configured nothing. The assertion
+    # still had force — it was an independent literal — but it described a setting
+    # that does not exist, which is the opposite of what
+    # `test_the_callback_is_a_constant_rather_than_a_setting` establishes, and it
+    # is how a reader concludes the callback is per-deployment.
+    assert body["redirect_uri"] == OAUTH_REDIRECT_URI
     assert body["account_url"] == _COMPLETE["DAINTREE_ACCOUNT_URL"]
     assert body["subscribe_url"] == _COMPLETE["DAINTREE_SUBSCRIBE_URL"]
     assert body["scopes"] == ["openid", "email"]
@@ -157,13 +163,115 @@ def test_a_configured_deployment_is_not_yet_required(fake_provider: Any) -> None
     requests; a client collapsing the two would either refuse to sign in when it
     could, or demand a sign-in nothing is enforcing.
 
-    Today `required` can only be false, because `enforce` is refused at readiness
-    until something actually reads a token.
+    `AUTH_MODE=open` here, which is the posture a rollout publishes from. That it
+    can only be false used to be a property of the BUILD — `enforce` was refused
+    at readiness while nothing read a token — and it is now a property of this
+    deployment's chosen mode, which the test below exercises the other half of.
     """
     with _client(_configured_settings(), fake_provider) as client:
         body = client.get(URL).json()
     assert body["configured"] is True
     assert body["required"] is False
+
+
+def test_a_staging_deployment_publishes_the_contract_it_was_configured_with(
+    fake_provider: Any,
+) -> None:
+    """The frozen staging contract, over HTTP, in the posture it will roll out in.
+
+    The settings-level suite proves these values pass every readiness rule. This
+    proves they come back OUT of the endpoint unchanged — the half a client
+    actually reads, and the half a serializer or a field rename would break
+    without failing anything above.
+
+    `environment` matters on its own: the client checks it against a closed set
+    and fails the whole manifest on a value outside it, so a staging deployment
+    reporting `staging` is a cross-repo contract rather than a label.
+    """
+    staging = _configured_settings(ENVIRONMENT="staging", AUTH_MODE="observe")
+    with _client(staging, fake_provider) as client:
+        # Readiness is asserted, not assumed. This route deliberately answers
+        # while the service is unready, so without this the test would pass
+        # identically against a deployment that failed to start — reporting a
+        # complete manifest for a revision that can serve no turns.
+        assert client.app.state.ready is True, getattr(
+            client.app.state, "ready_error", None
+        )
+        body = client.get(URL).json()
+    assert body["environment"] == "staging"
+    assert body["configured"] is True
+    # `observe` verifies a token that is present and demands none, so a client is
+    # told sign-in is possible and not yet mandatory.
+    assert body["required"] is False
+    assert body["redirect_uri"] == OAUTH_REDIRECT_URI
+    assert body["account_url"] == "https://staging.daintree.org/account"
+    assert body["subscribe_url"] == "https://staging.daintree.org/subscribe"
+    # The four OAuth endpoints too, and NOT because they are tedious to leave out:
+    # a body that sourced any of them from somewhere else — the account link, a
+    # stale field — would be caught by nothing else here. The unit suite can only
+    # see `Settings`, and this is the only test that reads a staging manifest off
+    # the wire.
+    assert body["issuer"] == _COMPLETE["SUPABASE_AUTH_ISSUER"]
+    assert body["authorization_endpoint"] == _COMPLETE["SUPABASE_OAUTH_AUTHORIZE_URL"]
+    assert body["token_endpoint"] == _COMPLETE["SUPABASE_OAUTH_TOKEN_URL"]
+    assert body["jwks_uri"] == _COMPLETE["SUPABASE_JWKS_URL"]
+    assert body["client_id"] == _COMPLETE["SUPABASE_OAUTH_CLIENT_ID"]
+
+
+def test_the_browser_links_move_nothing_but_themselves(fake_provider: Any) -> None:
+    """Where a browser is sent and where a token is minted are separate, proved
+    by moving one and watching the other hold still.
+
+    Asserting "the endpoints equal the Supabase settings" cannot establish this on
+    its own — those are plain fields, so such a check passes as long as Pydantic
+    stores what it was given. Two bodies differing ONLY in the link fields is what
+    makes the claim falsifiable: if anything derived an OAuth endpoint from
+    `DAINTREE_ACCOUNT_URL`, the two would differ somewhere they must not.
+
+    It matters here because `daintree.org` is in BOTH trust anchors — it is a legal
+    browser link and a legal issuer — so the separation cannot be inferred from the
+    hostnames alone.
+    """
+    oauth_keys = (
+        "issuer",
+        "authorization_endpoint",
+        "token_endpoint",
+        "jwks_uri",
+        "client_id",
+        "redirect_uri",
+        "scopes",
+    )
+    with _client(_configured_settings(ENVIRONMENT="staging"), fake_provider) as client:
+        first = client.get(URL).json()
+    moved = _configured_settings(
+        ENVIRONMENT="staging",
+        DAINTREE_ACCOUNT_URL="https://daintree.org/billing",
+        DAINTREE_SUBSCRIBE_URL="https://daintree.org/plans",
+    )
+    with _client(moved, fake_provider) as client:
+        second = client.get(URL).json()
+
+    assert second["account_url"] == "https://daintree.org/billing"
+    assert second["subscribe_url"] == "https://daintree.org/plans"
+    assert first["account_url"] != second["account_url"]
+    assert {k: first[k] for k in oauth_keys} == {k: second[k] for k in oauth_keys}
+
+
+def test_enforce_is_the_one_posture_that_reports_required(fake_provider: Any) -> None:
+    """`required` tracks the mode, and only `enforce` sets it.
+
+    This is reachable over HTTP now. It was not while a non-`open` mode failed
+    readiness, which is why the assertion beside it used to be phrased as a
+    permanent truth about the build rather than a fact about one deployment.
+    """
+    enforcing = _configured_settings(ENVIRONMENT="staging", AUTH_MODE="enforce")
+    with _client(enforcing, fake_provider) as client:
+        assert client.app.state.ready is True, getattr(
+            client.app.state, "ready_error", None
+        )
+        body = client.get(URL).json()
+    assert body["configured"] is True
+    assert body["required"] is True
 
 
 def test_required_is_never_true_without_a_manifest_to_follow(fake_provider: Any) -> None:
