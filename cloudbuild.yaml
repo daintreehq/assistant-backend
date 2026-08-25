@@ -5,6 +5,12 @@
 # infra/gcp/bootstrap.sh. Nothing here is built on a developer machine — this is
 # what "release" means in this repo, and .claude/skills/release drives it.
 #
+# To run it with different substitutions, fire the TRIGGER
+# (`gcloud builds triggers run deploy-main --substitutions=...`) rather than
+# `gcloud builds submit`: the fetch-lfs step needs the authenticated v2 checkout,
+# and COMMIT_SHA/SHORT_SHA are trigger-supplied, so a plain submit produces an
+# empty build SHA and an image tagged with nothing.
+#
 # The commit SHA is the only version this system has (see CLAUDE.md, "Versioning"):
 # it tags the image, is baked into the container as BUILD_SHA, and is what
 # `/version` reports back. That round trip is how a release is confirmed — the
@@ -43,6 +49,41 @@ substitutions:
   # verify nothing, which presents as every session losing its runbooks at once.
   _CURRENT_KID: state-prod
   _PREVIOUS_KID: ''
+
+  # Deployment identity and posture. The defaults are what the `main` trigger has
+  # always deployed, so nothing here changes production; they exist so a second
+  # trigger — or a one-off `gcloud builds submit --substitutions=...` — can raise
+  # a staging revision from the same file rather than from a forked copy of it.
+  #
+  # The staging deployment at assistant.daintree.org is:
+  #   _ENVIRONMENT=staging
+  #   _AUTH_MODE=open, then observe, then enforce as the rollout proceeds
+  #   _DAINTREE_ACCOUNT_URL=https://staging.daintree.org/account
+  #   _DAINTREE_SUBSCRIBE_URL=https://staging.daintree.org/subscribe
+  #   the four _SUPABASE_* values and the client id from the staging Supabase
+  #   project's OAuth configuration
+  _ENVIRONMENT: production
+  _AUTH_MODE: open
+
+  # Public OAuth discovery values. EMPTY by default and never filled in here: the
+  # real ones name a specific Supabase project, and a value committed to this file
+  # is a value that follows every fork of it. Pass them on the trigger or on the
+  # command line. They are not secrets — this endpoint publishes them — but they
+  # are per-deployment, and that is a different reason to keep them out of source.
+  _SUPABASE_AUTH_ISSUER: ''
+  _SUPABASE_JWKS_URL: ''
+  _SUPABASE_OAUTH_AUTHORIZE_URL: ''
+  _SUPABASE_OAUTH_TOKEN_URL: ''
+  _SUPABASE_OAUTH_CLIENT_ID: ''
+  _DAINTREE_ACCOUNT_URL: ''
+  _DAINTREE_SUBSCRIBE_URL: ''
+
+  # Published so a client can schedule its own refresh. These MIRROR the Supabase
+  # project's session settings — this server neither sets nor enforces them — so
+  # set them together with that project, or leave both empty and take the
+  # defaults in config.py.
+  _AUTH_ACCESS_TOKEN_SECONDS: ''
+  _AUTH_SESSION_MAX_AGE_SECONDS: ''
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -133,6 +174,28 @@ steps:
   - id: deploy-rc
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
+    # Every operator-supplied value arrives as an ENVIRONMENT VARIABLE, never as
+    # text interpolated into the script below. Cloud Build substitutes `${_FOO}`
+    # before bash parses, so a substitution written inline is SOURCE CODE: a value
+    # of `$(id)` would execute as the deployment service account, and one
+    # containing a quote could splice in whatever followed it. Setting them here
+    # instead means bash only ever sees `"$$SUPABASE_AUTH_ISSUER"`, an ordinary
+    # quoted expansion that cannot be anything but data.
+    env:
+      - 'ENVIRONMENT=${_ENVIRONMENT}'
+      - 'AUTH_MODE=${_AUTH_MODE}'
+      - 'LOG_LEVEL=INFO'
+      - 'STATE_SIGNING_KID=${_CURRENT_KID}'
+      - 'PREVIOUS_KID=${_PREVIOUS_KID}'
+      - 'SUPABASE_AUTH_ISSUER=${_SUPABASE_AUTH_ISSUER}'
+      - 'SUPABASE_JWKS_URL=${_SUPABASE_JWKS_URL}'
+      - 'SUPABASE_OAUTH_AUTHORIZE_URL=${_SUPABASE_OAUTH_AUTHORIZE_URL}'
+      - 'SUPABASE_OAUTH_TOKEN_URL=${_SUPABASE_OAUTH_TOKEN_URL}'
+      - 'SUPABASE_OAUTH_CLIENT_ID=${_SUPABASE_OAUTH_CLIENT_ID}'
+      - 'DAINTREE_ACCOUNT_URL=${_DAINTREE_ACCOUNT_URL}'
+      - 'DAINTREE_SUBSCRIBE_URL=${_DAINTREE_SUBSCRIBE_URL}'
+      - 'AUTH_ACCESS_TOKEN_SECONDS=${_AUTH_ACCESS_TOKEN_SECONDS}'
+      - 'AUTH_SESSION_MAX_AGE_SECONDS=${_AUTH_SESSION_MAX_AGE_SECONDS}'
     args:
       - -euo
       - pipefail
@@ -150,7 +213,21 @@ steps:
         # rejects "STATE_SIGNING_KEY_PREVIOUS and STATE_SIGNING_KID_PREVIOUS must
         # be set together", so mounting the secret alone would fail the candidate's
         # /readyz and abort the release.
-        ENV_FLAGS="ENVIRONMENT=production,LOG_LEVEL=INFO,STATE_SIGNING_KID=${_CURRENT_KID}"
+        # A closed set, checked HERE as well as in the app. Pydantic will refuse a
+        # bad value and fail /readyz, which aborts the release safely — but it does
+        # so three steps later with a validation traceback, and the operator who
+        # mistyped `prod` learns it from a 503 rather than from the deploy.
+        case "$$ENVIRONMENT" in
+          development|test|staging|production) ;;
+          *) echo "ERROR: _ENVIRONMENT must be development|test|staging|production, got '$$ENVIRONMENT'." >&2
+             exit 1 ;;
+        esac
+        case "$$AUTH_MODE" in
+          open|observe|enforce) ;;
+          *) echo "ERROR: _AUTH_MODE must be open|observe|enforce, got '$$AUTH_MODE'." >&2
+             exit 1 ;;
+        esac
+
         # together-api-key is REQUIRED, not optional like the previous signing key:
         # the server holds the upstream credential and `missing_secrets()` gates
         # /readyz on it, so a deploy without it would build a candidate that can never
@@ -166,23 +243,23 @@ steps:
         gcloud secrets describe state-signing-key-previous \
           --project="$PROJECT_ID" >/dev/null 2>/workspace/secret_err || PREV_STATUS=$$?
         if [ "$$PREV_STATUS" -eq 0 ]; then
-          if [ -z "${_PREVIOUS_KID}" ]; then
+          if [ -z "$$PREVIOUS_KID" ]; then
             echo "ERROR: state-signing-key-previous exists but _PREVIOUS_KID is empty."
             echo "       Deploy with --substitutions=_CURRENT_KID=<new>,_PREVIOUS_KID=<old>"
             echo "       so tokens signed with the old kid still verify."
             exit 1
           fi
-          if [ "${_PREVIOUS_KID}" = "${_CURRENT_KID}" ]; then
+          if [ "$$PREVIOUS_KID" = "$$STATE_SIGNING_KID" ]; then
             # StateCodec installs the current key first and `setdefault`s the
             # previous ones, so a shared kid means the previous key is never
             # selected — the rotation would look configured and do nothing.
-            echo "ERROR: _PREVIOUS_KID and _CURRENT_KID are both '${_CURRENT_KID}'."
+            echo "ERROR: _PREVIOUS_KID and _CURRENT_KID are both '$$STATE_SIGNING_KID'."
             echo "       They must differ, or the previous key can never be selected."
             exit 1
           fi
-          echo "Previous signing key found — mounting it as kid '${_PREVIOUS_KID}'."
+          echo "Previous signing key found — mounting it as kid '$$PREVIOUS_KID'."
           SECRET_FLAGS="$$SECRET_FLAGS,STATE_SIGNING_KEY_PREVIOUS=state-signing-key-previous:latest"
-          ENV_FLAGS="$$ENV_FLAGS,STATE_SIGNING_KID_PREVIOUS=${_PREVIOUS_KID}"
+          export STATE_SIGNING_KID_PREVIOUS="$$PREVIOUS_KID"
         elif grep -qi 'not found\|NOT_FOUND' /workspace/secret_err 2>/dev/null; then
           echo "No previous signing key — deploying with the current key only."
         else
@@ -193,6 +270,43 @@ steps:
           cat /workspace/secret_err >&2
           exit 1
         fi
+
+        # The deployed environment, as a FILE rather than a comma-separated flag.
+        #
+        # `--set-env-vars` takes `K=V,K=V`, and a value containing a comma does not
+        # fail — it silently becomes two entries, last-write-wins. That is a real
+        # hazard rather than a theoretical one on this particular list: the flag
+        # carries AUTH_MODE, so a value of `enforce,AUTH_MODE=open` deploys a
+        # revision that reports enforcement and serves the open door. A guard
+        # rejecting commas would also reject a legitimate `?plans=free,pro` link.
+        # A file has no delimiter, so neither problem exists.
+        #
+        # JSON, which gcloud's YAML parser accepts, and built by python3 from the
+        # environment so no value is ever pasted into a shell word. `PREVIOUS_KID`
+        # is excluded by name: it is this script's own input, delivered to the
+        # service as STATE_SIGNING_KID_PREVIOUS above and only when the secret it
+        # names actually exists.
+        #
+        # An EMPTY value is omitted rather than sent. `Settings` validates whatever
+        # is present in every mode including `open`, and absent is not the same as
+        # blank — an empty issuer would be a value that fails the URL rules, where
+        # no issuer at all is simply a deployment with no account authentication.
+        python3 - <<'PYEOF' > /workspace/env_vars.json
+        import json, os
+
+        NAMES = (
+            "ENVIRONMENT", "AUTH_MODE", "LOG_LEVEL",
+            "STATE_SIGNING_KID", "STATE_SIGNING_KID_PREVIOUS",
+            "SUPABASE_AUTH_ISSUER", "SUPABASE_JWKS_URL",
+            "SUPABASE_OAUTH_AUTHORIZE_URL", "SUPABASE_OAUTH_TOKEN_URL",
+            "SUPABASE_OAUTH_CLIENT_ID",
+            "DAINTREE_ACCOUNT_URL", "DAINTREE_SUBSCRIBE_URL",
+            "AUTH_ACCESS_TOKEN_SECONDS", "AUTH_SESSION_MAX_AGE_SECONDS",
+        )
+        env = {n: os.environ[n] for n in NAMES if os.environ.get(n, "").strip()}
+        json.dump(env, os.sys.stdout, indent=1, sort_keys=True)
+        PYEOF
+        echo "Deploying with env: $$(python3 -c 'import json;print(", ".join(sorted(json.load(open("/workspace/env_vars.json")))))')"
 
         # cerebras-api-key is REQUIRED and mounted unconditionally.
         #
@@ -315,7 +429,7 @@ steps:
           --ingress=all
           --startup-probe=httpGet.path=/healthz,httpGet.port=8080,initialDelaySeconds=0,periodSeconds=3,timeoutSeconds=3,failureThreshold=10
           --liveness-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=30,timeoutSeconds=5,failureThreshold=3
-          --set-env-vars="$$ENV_FLAGS"
+          --env-vars-file=/workspace/env_vars.json
           --set-secrets="$$SECRET_FLAGS"
           --labels=commit-sha=$SHORT_SHA
           --quiet
@@ -332,12 +446,38 @@ steps:
           echo "Release candidate URL: $$(cat /workspace/rc_url)"
         else
           # First ever deploy: Cloud Run rejects --no-traffic when there is no
-          # prior revision to keep serving, and the service is still IAM-private
-          # until bootstrap.sh grants allUsers invoker — so an unauthenticated
-          # smoke curl would get a platform 403 rather than an app response.
-          # Create it, take traffic directly, and let bootstrap.sh finish up.
+          # prior revision to keep serving, so this revision takes 100% the moment
+          # it passes its startup probe. That probe is /healthz, which answers 200
+          # for a process whose lifespan CAUGHT a configuration error and set
+          # /readyz to 503 — liveness and readiness are deliberately different
+          # questions here.
+          #
+          # So the one deploy that cannot be rolled back was also the one no check
+          # could reach: the service is IAM-private until bootstrap.sh grants
+          # allUsers invoker, and an anonymous curl gets a platform 403 rather than
+          # an app response. It used to skip every check for that reason, which is
+          # how a staging service could be created with AUTH_MODE=observe and an
+          # empty manifest, fail /readyz, and still leave a green build.
+          #
+          # An IDENTITY TOKEN closes it. The build's own service account can invoke
+          # a private service, so readiness is checked here rather than assumed and
+          # a misconfigured first revision fails the build it belongs to.
           echo "No existing service — creating ${_SERVICE} and routing traffic to it."
           gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}"
+          NEW_URL="$$(gcloud run services describe "${_SERVICE}" --region="${_REGION}" \
+            --format='value(status.url)')"
+          echo "Created at $$NEW_URL — checking readiness with an identity token."
+          READY_CODE="$$(curl -sS -o /workspace/first_ready -w '%{http_code}' \
+            -H "Authorization: Bearer $$(gcloud auth print-identity-token)" \
+            --max-time 60 "$$NEW_URL/readyz" || echo 000)"
+          if [ "$$READY_CODE" != "200" ]; then
+            echo "ERROR: the new service answered /readyz with $$READY_CODE." >&2
+            cat /workspace/first_ready >&2 || true
+            echo "       It is serving traffic and is not ready. Fix the configuration" >&2
+            echo "       and re-release before granting public access." >&2
+            exit 1
+          fi
+          echo "First revision is ready."
           : > /workspace/skip_smoke
         fi
 
@@ -351,8 +491,9 @@ steps:
       - -c
       - |
         if [ -f /workspace/skip_smoke ]; then
-          echo "First deploy: no public invoker binding yet, skipping the smoke test."
-          echo "Run infra/gcp/bootstrap.sh again to grant it, then re-release."
+          echo "First deploy: readiness was checked with an identity token in deploy-rc."
+          echo "The public smoke needs an invoker binding — run infra/gcp/bootstrap.sh,"
+          echo "then re-release to exercise it."
           exit 0
         fi
         URL="$$(cat /workspace/rc_url)"
