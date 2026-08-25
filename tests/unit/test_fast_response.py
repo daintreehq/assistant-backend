@@ -18,7 +18,6 @@ from typing import Any
 
 import httpx
 import pytest
-import structlog.testing
 from pydantic import SecretStr
 
 from daintree_assistant_server.config import (
@@ -38,7 +37,6 @@ from daintree_assistant_server.services.fast_response import (
     _MIN_USEFUL_MESSAGE_CHARS,
     MAX_FAST_RUNBOOKS,
     MAX_FAST_USER_MESSAGES,
-    MAX_PREAMBLE_CHARS,
     MAX_PREAMBLE_WORDS,
     FastResponseService,
     fast_context_runbooks,
@@ -1104,223 +1102,58 @@ def test_reasoning_openings_are_not_flagged(opening: str) -> None:
     assert not _ANNOUNCEMENT_OPENING.match(opening)
 
 
-def test_an_announcement_opening_is_logged_AND_never_rejected() -> None:
-    """Both halves, because each fails silently on its own.
+def test_an_announcement_opening_costs_the_whole_preamble() -> None:
+    """The reversal that makes the two speakers distinct.
 
-    Not rejected: with no fallback left, rejecting trades a mildly repetitive
-    opening for no opening at all. But LOGGED, or the drift is invisible — the
-    turn looks fine in every other metric, and deleting the log line leaves every
-    other register test green."""
-    with structlog.testing.capture_logs() as logs:
-        result = _generate("I'll inventory the terminals, then report what is safe to close.")
-    assert result.source == "model", "register drift must not cost the line"
-    assert any(entry.get("event") == "fast_response_announcement_register" for entry in logs)
+    The executor opens by announcing its own actions — "I'll triage the fleet" —
+    because that is its job. A preamble that opens the same way puts the same
+    announcement on screen twice in two seconds, which is the exact thing that
+    makes a fast reply feel padded rather than fast.
 
-
-def test_a_reasoning_opening_produces_no_drift_signal() -> None:
-    """The signal has to distinguish, or a rate that is always 100% measures
-    nothing and nobody looks at it again."""
-    with structlog.testing.capture_logs() as logs:
-        _generate("Closing agents cleanly is mostly a question of order.")
-    assert not any(
-        entry.get("event") == "fast_response_announcement_register" for entry in logs
-    )
-
-
-def test_the_register_drift_log_carries_no_model_content() -> None:
-    """`observability.py` is the metadata-only plane by contract — exact content
-    belongs to `tracing/`, behind its own config and its own access story.
-    Logging even the first 40 characters of the line put model prose derived from
-    a user's conversation in front of everyone who can read a log line."""
-    with structlog.testing.capture_logs() as logs:
-        _generate("I'll inventory the terminals, then report what is safe to close.")
-    entry = next(e for e in logs if e.get("event") == "fast_response_announcement_register")
-    assert "opening" not in entry
-    for value in entry.values():
-        assert "inventory" not in str(value).lower()
-
-
-def test_the_models_chain_of_thought_never_reaches_the_visible_line() -> None:
-    """`gpt-oss-120b` reasons, and Cerebras returns the thinking in its own
-    `reasoning` field beside `content` rather than inline.
-
-    Worth pinning here rather than trusting the adapter: this is the one model in
-    the system whose output has two halves, and the visible half is the one that
-    goes straight to a user's screen. A parser change that concatenated them would
-    show somebody the model's internal monologue — and the validator would not
-    catch it, because a chain of thought reads as ordinary prose.
+    This used to be logged and allowed, on the reasoning that a real line in the
+    wrong register beats no line at all. Measured against real traffic that trade
+    was wrong: an announcing preamble is not a slightly worse preamble, it is a
+    visible duplicate of the sentence beneath it. Silence is the better answer.
     """
-
-    def with_reasoning(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "id": "c1",
-                "choices": [
-                    {
-                        "message": {
-                            "role": "assistant",
-                            "reasoning": "THE-HIDDEN-MONOLOGUE: the user wants X, so...",
-                            "content": "Working out which migrations are still outstanding.",
-                        },
-                        "finish_reason": "stop",
-                    }
-                ],
-            },
-        )
-
-    result = asyncio.run(
-        _service(with_reasoning).generate(
-            _request(), active_runbooks=[FOUNDATION], request_id="rr"
-        )
-    )
-    assert result.source == "model"
-    assert result.content == "Working out which migrations are still outstanding."
-    assert "THE-HIDDEN-MONOLOGUE" not in (result.content or "")
-
-
-def test_the_prompt_and_the_validator_agree_on_the_length_contract() -> None:
-    """A validator that rejects what the prompt asks for turns a compliant model
-    into a silent failure rate — and with no fallback left, into no preamble.
-
-    The prompt states a WORD ceiling, so the word cap must bind first. At 320
-    characters it did not: technical prose runs ~8.4 characters per word, which
-    puts a legitimate 40-word line at ~336 and straight into `too_long_chars`.
-    """
-    line = (
-        "The authentication middleware and the session-revocation lookup disagree about "
-        "which identifier is authoritative, so establishing that comes before touching "
-        "either implementation. Configuration differences between the staging and "
-        "production environments matter here as well, and they are the kind of thing "
-        "that reads as a code problem right up until somebody compares the two "
-        "environments directly."
-    )
-    assert len(line.split()) <= MAX_PREAMBLE_WORDS, "the fixture must be a LEGAL line"
-    assert validate_preamble(line, finish_reason="stop", had_tool_calls=False).valid
-
-    # And the backstop still catches what a word count cannot see: one runaway
-    # "word" is a single token to `split()` and enormous on screen.
-    blob = "Reading " + ("x" * MAX_PREAMBLE_CHARS)
-    assert len(blob.split()) < MAX_PREAMBLE_WORDS
-    result = validate_preamble(blob, finish_reason="stop", had_tool_calls=False)
-    assert result.reject_reason == "too_long_chars"
-
-
-def test_exotic_unicode_spaces_are_normalised_rather_than_shown() -> None:
-    """Observed on a live call, not imagined.
-
-    `gpt-oss-120b` returned "a --verbose flag" — U+202F NARROW NO-BREAK
-    SPACE — on one of four real turns. Every check here passes it, which is
-    exactly the problem: it reaches a terminal, where a font without the glyph
-    draws a replacement box in the middle of the first sentence a user sees.
-
-    Normalised, not rejected: the line is otherwise fine and there is no fallback
-    left to fall back to.
-    """
-    result = validate_preamble(
-        "Adding a --verbose flag and wiring it through.",
-        finish_reason="stop",
-        had_tool_calls=False,
-    )
-    assert result.valid is True
-    assert result.content == "Adding a --verbose flag and wiring it through."
-
-
-def test_a_zero_width_space_is_left_alone() -> None:
-    """U+200B means "a break opportunity here", not a space. Turning it into one
-    would insert a gap the model did not write."""
-    result = validate_preamble(
-        "Checking the​configuration.", finish_reason="stop", had_tool_calls=False
-    )
-    assert result.valid is True
-    assert "​" in result.content
+    result = _generate("I'll inventory the terminals, then report what is safe to close.")
+    assert result.has_content is False
+    assert result.reason == "invalid_output:announcement_opening"
 
 
 @pytest.mark.parametrize(
-    "text",
+    "opening",
     [
-        "Working out the sequence.\n<daintree_plan>\nx -> y\n</daintree_plan>",
-        "<thinking>the user wants X</thinking> Checking the loader.",
-        "Reading the config. <br>Then the migrations.",
+        "I'll inventory the terminals first.",
+        "I will first inventory all active terminals.",
+        "Let me check the failing test.",
+        "Let's start with the failing test.",
+        "First, I check what is running.",
+        "I'm going to spawn the agents.",
+        "We'll pull the current roster and classify each terminal.",
+        "We will start by reading the state.",
+        "Next, the terminals get classified.",
+        "To start, the roster needs pulling.",
+        "Starting by reading the current state.",
     ],
 )
-def test_markup_never_reaches_the_visible_line(text: str) -> None:
-    """The visible half is PLAIN PROSE, and markup in it is machinery on a user's
-    screen.
-
-    This used to be enforced incidentally, by the check that refused any trace of
-    the hidden `<daintree_plan>` block surviving the split. That block is gone and
-    the check went with it — but a model asked for one sentence can still emit
-    `<thinking>` or a stray tag, and the property was never really about the plan.
-    """
-    result = validate_preamble(text, finish_reason="stop", had_tool_calls=False)
-    assert result.valid is False
-    assert result.reject_reason == "markup_in_prose"
+def test_every_announcement_shape_is_refused(opening: str) -> None:
+    """First and second person, singular and plural. The live failure was `I'll`,
+    but `We'll pull the current roster…` is the same duplicate wearing a different
+    pronoun, and an earlier pattern caught only half of them."""
+    result = validate_preamble(opening, finish_reason="stop", had_tool_calls=False)
+    assert result.valid is False, f"announcement slipped through: {opening!r}"
+    assert result.reject_reason == "announcement_opening"
 
 
-@pytest.mark.parametrize(
-    "text",
-    [
-        "Narrowing down which step takes < 2 seconds and which does not.",
-        "Working back from the failure to the change that caused it -> then testing.",
-        "Checking whether a < b holds for the boundary case.",
-    ],
-)
-def test_arithmetic_and_arrows_are_not_markup(text: str) -> None:
-    """Narrow on purpose. A guard that swallowed every `<` would reject ordinary
-    technical prose, and there is no fallback left to fall back to."""
-    assert validate_preamble(text, finish_reason="stop", had_tool_calls=False).valid
-
-
-@pytest.mark.parametrize(
-    "content",
-    ["", "   ", "\n\n", [], [{"type": "text", "text": ""}, {"type": "text", "text": "   "}]],
-    ids=["empty", "spaces", "newlines", "no_parts", "empty_parts"],
-)
-def test_a_turn_whose_only_user_message_says_nothing_sends_no_prompt(content: Any) -> None:
-    """A line written without knowing what was asked is exactly the invented
-    filler the prompt spends most of its length refusing.
-
-    Every shape, because they fail differently: `""` is falsy, `"   "` is truthy
-    and blank, and two empty text parts flatten to a bare newline — which is
-    truthy AND non-empty, and would otherwise become a blank row.
-    """
-    request = _request(input={"messages": [{"role": "user", "content": content}]})
-    assert FastResponseService._recent_user_messages(request) == []
-    assert _service().build_messages(request, active_runbooks=[FOUNDATION]) is None
-
-
-def test_a_message_that_merely_starts_with_a_bracket_is_not_deleted() -> None:
-    """The dangling-marker cleanup must never empty a message.
-
-    A user message can legitimately begin with a bracket — a pasted log line, a
-    Markdown link, `[tool] output ...`. For those the "unclosed marker" runs from
-    the first character to the end, so the cleanup deletes everything. The caller
-    reads an empty crop as "did not fit" and moves on, which silently promotes an
-    OLDER message to newest and makes the preview describe a request the user did
-    not just make.
-    """
-    text = "[" + "x" * (_MAX_HISTORY_CHARS + 1_000)
-    cropped = FastResponseService._crop(text, _MAX_HISTORY_CHARS)
-    assert cropped, "the newest message must survive the cleanup"
-    assert cropped.startswith("[x")
-
-    request = _request(
-        input={
-            "messages": [
-                {"role": "user", "content": "AN-OLDER-REQUEST"},
-                {"role": "user", "content": text},
-            ]
-        }
-    )
-    picked = FastResponseService._recent_user_messages(request)
-    assert picked, "the turn must not lose its only usable message"
-    assert picked[-1].startswith("[x"), "the newest message must still be last"
-    assert "AN-OLDER-REQUEST" not in picked[-1]
-
-
-def test_a_genuinely_torn_image_marker_is_still_cleaned() -> None:
-    """The guard must not disarm the cleanup it guards — real content before a
-    half-marker keeps the fix that motivated this helper."""
-    cropped = FastResponseService._crop("Look at this: [image: image/pn", 100)
-    assert cropped == "Look at this:"
+def test_a_comprehension_opening_survives() -> None:
+    """The register the stage IS for: what the request turns on, not what happens
+    next. These must not be swept up, or the feature has nothing left to say."""
+    for opening in (
+        "With several terminals open it is rarely obvious which are still working.",
+        "A test that fails only in CI usually means the environment differs.",
+        "Adding a flag is usually the easy half of the job.",
+        "Illustrating the problem takes a smaller case.",  # must not match "I'll"
+        "Next-generation parsers handle this differently, which is the tension here.",
+    ):
+        result = validate_preamble(opening, finish_reason="stop", had_tool_calls=False)
+        assert result.valid is True, f"comprehension rejected: {opening!r}"

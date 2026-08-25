@@ -24,7 +24,14 @@ from daintree_assistant_server.services.fast_response import (
     FastResponseService,
 )
 
-PREAMBLE = "I'll look at the failing step and make the smallest change that fixes it."
+#: In the COMPREHENSION register the stage now requires, not the announcement
+#: register — an "I'll …" fixture is refused by `validate_preamble` these days,
+#: which is the point: the executor owns that opening and two of them in two
+#: seconds is the duplicate this whole design exists to avoid.
+PREAMBLE = (
+    "A build that fails only some of the time usually means state left over "
+    "between runs rather than the code itself."
+)
 
 
 #: Every Cerebras request the fake transport saw. `"preamble" not in names` is

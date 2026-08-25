@@ -278,16 +278,27 @@ _DISCLOSURE = re.compile(
 #: be read as a turn-finality declaration by the scanner downstream.
 _CONTROL_MARKER = re.compile(r"\[\[DAINTREE:[A-Z]+\]\]")
 
-#: The register the line is asked NOT to use: a first-person commitment. LOGGED,
-#: never rejected — and the asymmetry is deliberate.
+#: The register this stage may NOT use: a first-person commitment to work.
 #:
-#: The cost of this drifting is a mildly repetitive opening, because the executor
-#: announces its own actions anyway. The cost of rejecting it is losing the
-#: preamble entirely, since there is no fallback left to fall back to. A real line
-#: in the wrong register beats no line at all, so this measures the rate instead of
-#: paying that price — if it climbs, the prompt is what to fix.
+#: **REJECTED, not merely logged — and that reversal is the point of the whole
+#: two-speaker design.** The executor opens by announcing its own actions ("I'll
+#: triage the fleet"), because that is its job and it does it well. If this stage
+#: opens the same way the user reads the same announcement twice in two seconds,
+#: which is the exact failure that makes a fast reply feel padded and slow. The two
+#: speakers have to be doing different things: this one says "I understood you",
+#: the executor says "I'll do this".
+#:
+#: It used to be logged and allowed, on the reasoning that a real line in the wrong
+#: register beats no line at all. Observed against real traffic, that trade was
+#: wrong: an announcing preamble is not a slightly worse preamble, it is a visible
+#: duplicate of the sentence directly beneath it. Silence is better than saying the
+#: same thing twice, and the rejection is what makes the register a guarantee rather
+#: than a preference. The reject reason keeps the drift measurable — if the rate
+#: climbs, the prompt is what to fix, not this pattern.
 _ANNOUNCEMENT_OPENING = re.compile(
-    r"^\s*(?:i'?l+\s|i\s+will\b|let\s+me\b|first,?\s+i\b|i'?m\s+going\s+to\b)",
+    r"^\s*(?:i'?l+\s|i\s+will\b|let\s+me\b|let'?s\b|first,?\s+i\b"
+    r"|i'?m\s+going\s+to\b|we'?l+\s|we\s+will\b|we'?re\s+going\s+to\b"
+    r"|next,?\s|to\s+start\b|starting\s+by\b)",
     re.IGNORECASE,
 )
 
@@ -555,6 +566,11 @@ def validate_preamble(text: str, *, finish_reason: str | None, had_tool_calls: b
         return reject("overclaim")
     if _ADDRESSES_THE_MODEL.search(content):
         return reject("addresses_the_model")
+    if _ANNOUNCEMENT_OPENING.match(content):
+        # The duplicate-announcement failure. See the pattern's own note: the
+        # executor owns this register, and two of them in two seconds is worse
+        # than one plus silence.
+        return reject("announcement_opening")
     return FastResponseValidation(valid=True, content=content, warnings=warnings)
 
 
@@ -875,21 +891,6 @@ class FastResponseService:
                 latency_ms=latency_ms,
                 invocation_id=f"inv_{request_id}_fast",
             )
-        if _ANNOUNCEMENT_OPENING.match(validation.content):
-            # Not a rejection — see the pattern's own note. This is the drift
-            # signal for "the line went back to announcing", which is invisible in
-            # every other metric because the turn looks fine.
-            logger.info(
-                "fast_response_announcement_register",
-                request_id=request_id,
-                # NO content. `observability.py` is the metadata-only plane by
-                # contract — exact content belongs to `tracing/`, behind its own
-                # config and its own access story. Logging even the first 40
-                # characters would put model prose derived from a user's
-                # conversation in front of everyone who can read a log line.
-                content_chars=len(validation.content),
-            )
-
         return FastResponseResult(
             content=validation.content,
             source="model",
