@@ -379,11 +379,12 @@ class _PreparedTurn:
     provider_request: ProviderChatRequest
     meta: _RespondMeta
     active_ids: list[str]
-    # The caller's own upstream credential when they supplied one, ``None``
-    # otherwise — which is every request until account auth lands, and means the
-    # provider spends the server's key (see auth.py). Already attached to
-    # provider_request; carried separately so a caller that rebuilds a request
-    # (the bare-intent re-roll) does not have to reach into it.
+    # A per-call upstream credential when one was supplied, ``None`` on every
+    # serving request — an account is an ENTITLEMENT to spend Daintree's key, not
+    # a mapping to one of the caller's, so the provider spends the server's key
+    # (see auth.py). Benchmarks and live tests are the only callers that pass one.
+    # Already attached to provider_request; carried separately so a caller that
+    # rebuilds a request (the bare-intent re-roll) does not have to reach into it.
     api_key: SecretStr | None
     # The SHADOW tool projection for this turn. Carried so both response paths
     # can grade what the model actually called against what a filter would have

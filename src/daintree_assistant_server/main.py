@@ -895,9 +895,11 @@ def create_app(
     app.include_router(daintree_doctor.router)
     app.include_router(daintree_runbooks.router)
     # The overlay reload trigger is mounted ONLY for local runbook authoring. It
-    # mutates process state and `require_auth` gates nothing yet, so rather than
-    # ship a route production has to be trusted not to call, production simply
-    # does not have it — with no overlay configured, or in a hardened
+    # mutates process state, and `require_auth` is not the boundary that stops it:
+    # under the shipped `open` posture every caller is the anonymous principal
+    # holding every permission, and `runbooks:write` deliberately does not exist.
+    # So rather than ship a route production has to be trusted not to call,
+    # production simply does not have it — with no overlay configured, or in a hardened
     # environment, the URL 404s. (A hardened deploy that sets the variable at
     # all also fails readiness; this is the second lock on the same door.)
     if settings.runbooks_overlay_dir and not settings.is_hardened:

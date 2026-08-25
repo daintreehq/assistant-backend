@@ -41,13 +41,13 @@ class TaskUsage(BaseModel):
     completion_tokens: int = 0
     total_tokens: int = 0
     cached_tokens: int = 0
-    # USD this task charged the caller, as reported by the provider. Same rule as
-    # a turn's: absent means the provider reported nothing, never that the call
-    # was free.
+    # USD this task cost, as reported by the provider. Same rule as a turn's:
+    # absent means the provider reported nothing, never that the call was free.
     #
-    # Surfaced for the same reason /respond surfaces it — the caller's key funds
-    # it. A CLI that only counted turns would under-report a session that ran
-    # dozens of summarize/extract calls behind the scenes.
+    # Surfaced for the same reason /respond surfaces it — the spend is real and
+    # attributed to an account, so a CLI that only counted turns would
+    # under-report a session that ran dozens of summarize/extract calls behind
+    # the scenes.
     #
     # A task is USUALLY one upstream call, but a JSON task whose first output did
     # not parse is repaired with a second. There is deliberately no `complete`

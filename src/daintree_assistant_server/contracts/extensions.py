@@ -335,8 +335,8 @@ class SelectorUsage(BaseModel):
     completion_tokens: int = 0
     total_tokens: int = 0
     cached_tokens: int = 0
-    # USD charged to the caller for the selector call. See RespondUsage.cost —
-    # this is deliberately not folded into the turn's main figure.
+    # USD spent on the selector call. See RespondUsage.cost — this is
+    # deliberately not folded into the turn's main figure.
     cost: float | None = None
 
 

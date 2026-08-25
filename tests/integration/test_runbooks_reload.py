@@ -5,7 +5,9 @@ Two properties carry this feature, and they pull in opposite directions:
 * a developer must be able to edit a runbook against a running server and see the
   edit take effect — that is the entire point;
 * production must never do this. The route mutates process state and
-  ``require_auth`` gates nothing yet, so the protection is that the URL does not
+  ``require_auth`` cannot carry it — under the shipped ``open`` posture the
+  anonymous principal holds every permission, and there is deliberately no
+  ``runbooks:write`` — so the protection is that the URL does not
   exist there at all. The tests below assert its ABSENCE as carefully as its
   behaviour.
 

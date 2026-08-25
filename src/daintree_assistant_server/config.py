@@ -1073,8 +1073,9 @@ class Settings(BaseSettings):
         (see auth.py). ``TOGETHER_API_KEY`` is required for the server to answer
         anything at all, and its absence must fail READINESS rather than surface a
         turn later as an upstream 401 that reads like the caller's fault. There is
-        still no INBOUND key to configure — the door is open by design until
-        account auth lands.
+        still no INBOUND key to configure: account authentication is OAuth, and
+        its settings are public configuration gated through ``auth_problems()``
+        rather than secrets. The door's posture is ``AUTH_MODE``, not an absence.
 
         ``CEREBRAS_API_KEY`` joined them when the fast-response stage lost its off
         switch. It is a weaker requirement than the other two — the turn still
@@ -1320,20 +1321,10 @@ class Settings(BaseSettings):
     def auth_problems(self) -> list[str]:
         """Account-authentication configuration that must fail readiness.
 
-        Three rules, and the split between them is the point.
+        Two rules, and the split between them is the point.
 
         **Whatever is set is validated in every mode** — see
         :meth:`auth_manifest_problems`.
-
-        **A mode whose behaviour does not exist yet is refused outright.** Nothing
-        reads a token today: ``auth.py`` still returns the anonymous principal for
-        every request. So a deployment that set ``AUTH_MODE=enforce`` would pass
-        readiness, report ``required`` to every client, and go on serving
-        unauthenticated requests — an operator believing the door was shut while
-        it stood open, which is worse than having no setting at all. Refusing at
-        readiness is the fail-closed answer: the revision never takes traffic.
-        This gate is lifted by the change that makes the modes real, in the same
-        commit, and not before.
 
         **Completeness is required only once the mode is not ``open``.** A
         deployment that is not doing account authentication has no reason to hold
@@ -1346,6 +1337,11 @@ class Settings(BaseSettings):
         boundary it did not have. That gate did its job — ``auth.py`` verifies for
         real now — and keeping a guard whose condition can no longer be false is a
         branch every later reader has to reason about and no test can reach.
+
+        :meth:`entitlement_problems` is the same shape one layer out, and is kept
+        separate for the same reason the modes are: identity and entitlement fail
+        differently, and a single method reporting both would make an operator
+        read a billing misconfiguration as an authentication one.
 
         What is deliberately NOT here: a rule that ``open`` and ``observe`` are
         refused in production. The master spec asks for one, and it is right about

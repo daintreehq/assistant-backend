@@ -232,9 +232,10 @@ async def verify(
     # could reach, so it was yours to see; the key is the server's now, the serving
     # model is hardcoded, and no caller chooses from that list — the CLI's own
     # response struct has never had a field for it. What remained was an
-    # unauthenticated endpoint (`auth.py` ignores the header) publishing the
-    # deployment's full upstream model inventory to anyone who asked, for no
-    # consumer at all. A verdict is the whole answer this endpoint owes.
+    # route publishing the deployment's full upstream model inventory to anyone
+    # who asked — and under the shipped `open` posture that is genuinely anyone,
+    # since the header is not read at all — for no consumer at all. A verdict is
+    # the whole answer this endpoint owes.
     out: dict[str, object] = {"valid": True}
     if isinstance(record, dict):
         # The credential ACTUALLY probed, read through `serving_api_key` rather

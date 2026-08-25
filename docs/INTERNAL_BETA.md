@@ -216,8 +216,10 @@ would mint another token wrong in exactly the same way.
 All three are built and tested; `open` is what every deployment runs today, which
 is why a client still sending an old OpenRouter key is served rather than having
 that key forwarded upstream and rejected as theirs. `enforce` establishes that a
-token is genuine and unexpired — not that the session behind it still exists,
-which needs a lookup this service cannot yet make.
+token is genuine and unexpired — not, on its own, that the session behind it still
+exists, which needs a lookup this service cannot yet make. Where the entitlement
+lookup runs it narrows that window as a side effect, by translating the website's
+own 401 into `auth_session_revoked`.
 
 The staged rollout for `assistant.daintree.org` is `ENVIRONMENT=staging` with
 browser account and payment links on `staging.daintree.org`, starting at `open` or
@@ -238,11 +240,12 @@ State these to testers up front rather than letting them discover them:
 - The request prompt is large — tool schemas dominate it — so a turn costs more
   than the visible conversation suggests. That is now **Daintree's** spend, not
   the tester's: the server holds the upstream credential.
-- There is no rate limiting, and the deployed posture is `AUTH_MODE=open`, so a
-  runaway client burns Daintree's own balance. Account authentication exists and
-  is off; turning it on bounds WHO can spend, not how much, since entitlement and
-  usage accounting are a separate body of work that needs storage this service
-  does not have.
+- There is no rate limiting and no quota, and the deployed posture is
+  `AUTH_MODE=open` with `ENTITLEMENT_MODE=off`, so a runaway client burns
+  Daintree's own balance. Both are built and both are off. Turning them on bounds
+  WHO may spend and WHETHER they are entitled to — not HOW MUCH: the server
+  records what a turn cost against a pseudonymous account and enforces no ceiling,
+  because numeric plan allowances are an undecided product question.
 - Images: remote image URLs are disabled by default and in the current deployment
   (`ALLOW_REMOTE_IMAGE_URLS=false`, reported in `/v1/daintree/capabilities`).
   Nothing prevents a hardened environment from setting it, so read capabilities

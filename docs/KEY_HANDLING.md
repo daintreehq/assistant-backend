@@ -95,10 +95,22 @@ user's and is never spent anywhere — it is only ever checked.
 | In errors | never. A refusal names the rule that failed, not the value; the four identity 401s take no message parameter at all, so a caller cannot be handed `str(exception)` by a future edit | `errors.py`, `services/bearer.py` |
 
 **What is not yet true.** A verified token proves who is calling and that the
-token has not expired. It does not prove the session still exists: nothing
-reaches back into a minted JWT, so a logout leaves the signature valid until
-`exp`. That check needs infrastructure this service does not have, and `TODO.md`
-carries it.
+token has not expired. It does not, on its own, prove the session still exists:
+nothing reaches back into a minted JWT, so a logout leaves the signature valid
+until `exp`.
+
+The entitlement lookup narrows that where it runs, as a side effect rather than as
+a revocation check. The website's endpoint is specified to perform a fresh
+Supabase user check, and `services/entitlement.py` maps a 401 from it to
+`auth_session_revoked` — so on `/respond` and `/tasks` under a non-`off`
+`ENTITLEMENT_MODE`, and on `/v1/daintree/account` wherever a URL is configured,
+the window becomes the verdict cache's TTL rather than `exp`. Identity-only
+deployments keep the full window, and a direct session lookup still needs
+infrastructure this service does not have (`TODO.md`).
+
+The bearer forwarded to that endpoint is the CALLER's own and is transient: it is
+never stored, never a cache key, never logged, and never chained into an
+exception.
 
 
 ## 2. Server-side handling

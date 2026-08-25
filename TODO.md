@@ -75,9 +75,13 @@ sequenced into the list:
    safe measurement available. Not literally free: a well-formed token costs a
    verification and, on a cold cache, a JWKS fetch, so watch latency as well as
    the outcome counts.
-4. Then `enforce` — but see the entry below first. Session revocation is not
-   implemented, so `enforce` means "a genuine, unexpired token" and not yet "a live
-   session".
+4. Then `enforce`. On its own that still means "a genuine, unexpired token" and
+   not "a live session" — see the entry below, which entitlement only partly
+   overtakes, and only once entitlement is actually switched on.
+5. Then `ENTITLEMENT_MODE=observe`, and only then `enforce`. Readiness enforces
+   the DEPENDENCY — neither is permitted without `AUTH_MODE=enforce` and a URL —
+   but not the sequence: nothing stops a deployment going from `off` straight to
+   `enforce`, so taking `observe` first is a discipline rather than a gate.
 
 A fifth step used to sit at the end of this list: teach the CLI the
 `auth_permission_denied` code, without which the backend's second 403 fell through
@@ -85,10 +89,18 @@ to generic handling and read as "sign in again" — the exact loop the account c
 exist to prevent. It is done. The pin now names a CLI carrying the whole account
 taxonomy, and the cross-repo gate that skipped for want of it runs.
 
-Entitlement, usage accounting and the Polar outbox are a separate body of work that
-needs a database and a Redis this service does not have. The error taxonomy for all
-of it already exists on both sides (`errors.py`, and the CLI's `account.go`), so
-that layer will be plumbing rather than design.
+**Entitlement has since landed and needed neither.** `ENTITLEMENT_MODE` stages the
+billing question on its own axis, `services/entitlement.py` asks the WEBSITE — which
+owns the Polar relationship — and the answer is cached in process for at most 60
+seconds. The database and the Redis this entry expected were for holding
+subscription state here; not holding it turned out to be the design rather than a
+compromise, and the per-instance cache is sound because every entry is at most its
+TTL old however many instances are warm.
+
+What remains of that body of work is USAGE accounting: the server records what a
+turn cost against a pseudonymous account and enforces no ceiling, because numeric
+Standard and Pro allowances are an undecided product question. `usage_limit_reached`
+stays defined and unreachable until somebody decides what the numbers are.
 
 ---
 
@@ -112,11 +124,31 @@ there is no evidence either way. `auth_session_revoked` already exists in the
 error taxonomy and the CLI already maps it to "delete the local credential", so
 the wire contract for this is finished; only the lookup is missing.
 
-It needs a database connection and a Redis cache, neither of which this service
-has, so it lands with that infrastructure rather than before it. Until then
-`enforce` should be understood as "a genuine token from a session that existed
-when the token was minted", which is a real boundary and not the one the product
-will eventually promise.
+**Partly overtaken by entitlement, and it is worth being exact about which part —
+including what this side of it can actually promise.**
+
+The locked contract says the website's entitlement endpoint performs a fresh
+Supabase user check. THIS server does not verify that and cannot: all it does is
+map a 401 from that endpoint — against a token it has already verified locally —
+to `auth_session_revoked` (`services/entitlement.py`). The mapping is tested
+against a mocked 401; whether a revoked session actually produces one is the
+website's half of the contract and belongs to the cutover matrix.
+
+Where the website does behave as agreed, the window on the routes that CALL it
+stops being `exp` and becomes the cache TTL — a refusal purges the entry rather
+than waiting it out, though "at most 60 seconds" is the TTL rather than a strict
+wall-clock bound, since a lookup already in flight can be up to five seconds older
+than the entry it writes.
+
+It covers `/respond` and `/tasks` only under `ENTITLEMENT_MODE=observe` or
+`enforce` — under `off` those routes ask nothing at all — and `/v1/daintree/account`
+whenever a URL is configured. It is a side effect of asking a different question
+rather than a revocation check, so identity-only deployments keep the full `exp`
+window.
+
+A direct `session_id` lookup would close it everywhere and needs the database this
+service does not have. It is now a smaller and less urgent piece of work than this
+entry was written for.
 
 ---
 
@@ -125,8 +157,10 @@ will eventually promise.
 **Trigger: when account enforcement ships — these are the same conversation, and
 both need the CLI moved in lockstep.**
 
-Two inconsistencies that are harmless while nothing raises the account family and
-are worth fixing before something does.
+Two inconsistencies that were harmless while nothing raised the account family.
+Something does now — the identity codes under `AUTH_MODE=enforce`, the
+subscription ones under `ENTITLEMENT_MODE=enforce` — so this has moved from
+"before something does" to "before either mode reaches anyone real".
 
 `provider_invalid_api_key` is an HTTP 401 describing the credential THIS SERVER
 sends upstream. The key is the server's own, so it is an operator fault a caller
@@ -989,3 +1023,51 @@ A mocked test proves the adapter builds what we THINK the API wants. Only a live
 one proves the API agrees, and the gap is widest right after a host change —
 which is exactly when this one was removed.
 
+
+---
+
+## Account failed and aborted work
+
+**Trigger: the first billing question that a partial answer cannot settle — a
+disputed charge, or a per-account ceiling that has to count what a turn spent
+before it broke.**
+
+A SUCCESSFUL turn logs `turn_usage` on both paths. What does not log is failure:
+the streaming record sits behind an `if completed` gate, so a stream that errored,
+timed out or was abandoned writes nothing; the non-streaming path raises past its
+record for the same outcomes; and a task that fails its second parse raises before
+`task_run` is written. Both can have spent real money first: a
+mid-stream error, a deadline, a client disconnect, a repair whose second call was
+billed and then rejected.
+
+That was survivable while the figure was diagnostic. It is less so now that a cost
+sits beside a pseudonymous account and a plan, because the records that exist are
+the ones a query will sum — and a sum that silently omits the expensive failures
+is a wrong answer rather than a partial one.
+
+The shape is one outcome-aware accounting record per dispatched turn, emitted on
+every exit including cancellation, carrying whatever usage is known and marking
+the cost incomplete when it is not. The reason it is not done here is that "what
+did an aborted stream cost" has no answer the provider gives us — the usage
+arrives with the final chunk that never came — so this needs a decision about what
+to record rather than a place to record it.
+
+---
+
+## Decide the Standard and Pro allowances, or stop promising a difference
+
+**Trigger: before anything is sold. Not before staging, which can run both active
+plans as the same binary access.**
+
+The website promises Standard has "enough usage for a normal day" and Pro "five
+times the usage". No numeric allowance, usage ledger or quota enforcement exists
+anywhere — this server records what a turn cost against an account and enforces no
+ceiling, which is the honest state and not a gap to be closed casually.
+
+`usage_limit_reached` is defined on both sides and unreachable. It stays that way
+until somebody decides what the numbers are: inventing them here would be setting
+prices, which is not a decision code gets to make.
+
+Two ways out, and they are both real: define and implement exact allowances, or
+remove the differential usage promise from the site. What must not happen is a
+public launch with the promise intact and nothing behind it.

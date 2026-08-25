@@ -1,7 +1,13 @@
 """The Daintree ACCOUNT error family — who the caller is, and what their plan allows.
 
-Nothing raises these yet: ``auth.py`` still serves every request anonymously and
-entitlement does not exist. They are pinned now because the taxonomy already has a
+Which of these a deployment can RAISE depends on its posture: the identity codes
+under ``AUTH_MODE=enforce``, the subscription and dependency codes under
+``ENTITLEMENT_MODE=enforce``, and none of them under the shipped defaults. Two are
+unreachable for a different reason — ``auth_permission_denied`` needs a second
+OAuth client with a narrower grant, and ``usage_limit_reached`` needs numeric plan
+allowances nobody has decided on.
+
+They are pinned regardless because the taxonomy has a
 CONSUMER — the CLI recognises all thirteen codes in
 ``internal/backend/account.go`` (with a typed remedy for each of the six
 identity ones) — so a code reworded or restatused here silently

@@ -1156,14 +1156,16 @@ class TaskRunner:
             thinking_disabled=not thinking_enabled,
             reasoning_effort=reasoning_effort,
             timeout=timeout,
-            # The caller's own credential (threaded from the route handler), and
-            # ONLY for the default provider. A credential is issued by one vendor
+            # A per-call upstream credential when one is supplied, and ONLY for
+            # the default provider. A credential is issued by one vendor
             # and is meaningless — or worse, leaked — at another, so a task
             # routed elsewhere falls back to that provider's own configured key
             # by passing None.
             #
-            # Latent on the serving path, where the route passes no key at all
-            # (auth.py ignores the Authorization header). Not latent for
+            # Latent on the serving path, where the route passes no key at all:
+            # the caller's bearer is an ENTITLEMENT to spend Daintree's key, never
+            # a credential to forward upstream, and it is dropped at the request
+            # boundary. Not latent for
             # benchmarks: `benchmarks/_harness/env.py::caller_api_key` returns
             # a serving credential and the utility-task benchmarks thread it into
             # `TaskRunner.run`, so an unscoped forward would put the serving key

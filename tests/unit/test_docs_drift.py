@@ -636,10 +636,12 @@ def test_no_reasoning_effort_is_sent_by_anything() -> None:
 # ADDING a factory forces a decision about documenting it.
 _ERROR_CODES = (
     "invalid_api_key",
-    # The Daintree ACCOUNT family. Nothing raises these yet — auth.py still serves
-    # every request anonymously — but the CLI already implements all twelve with a
-    # typed remedy per code, so they are a live wire contract rather than a
-    # reservation. Documented now, for the same reason they were defined now: the
+    # The Daintree ACCOUNT family. Which of these a deployment can raise depends
+    # on its posture — the identity codes under AUTH_MODE=enforce, the
+    # subscription and dependency codes under ENTITLEMENT_MODE=enforce, none of
+    # them under the shipped defaults — and two are unreachable for other reasons
+    # (auth_permission_denied needs a second OAuth client, usage_limit_reached
+    # needs plan allowances nobody has decided). Documented regardless: the
     # taxonomy, the docs and the client have to agree before anything depends on
     # them, and afterwards is too late to notice they do not.
     "auth_required",

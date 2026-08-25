@@ -5,6 +5,12 @@
 #   ./infra/gcp/smoke.sh                     # public endpoints + metadata routes
 #   ./infra/gcp/smoke.sh --full              # ... plus two real model turns
 #
+#   DAINTREE_TOKEN="$(daintree-assistant auth token)" \
+#     ./infra/gcp/smoke.sh --account-token-var DAINTREE_TOKEN
+#                                            # ... plus an authenticated check of
+#                                            # /v1/daintree/account. Takes the NAME
+#                                            # of the variable, never the token.
+#
 #   ./infra/gcp/smoke.sh --url https://assistant.daintree.org
 #                                            # test a specific host instead of the
 #                                            # Cloud Run URL discovered from gcloud
@@ -12,6 +18,12 @@
 #   ./infra/gcp/smoke.sh --url https://assistant.daintree.org --expect-env staging
 #                                            # ... and fail if it reports a
 #                                            # different ENVIRONMENT
+#
+#   ./infra/gcp/smoke.sh --expect-posture enforce
+#                                            # ... and fail unless accounts are
+#                                            # actually being enforced. Without
+#                                            # this every posture check below
+#                                            # ADAPTS to whatever is reported.
 #
 # NO BEARER TOKEN IS NEEDED. The server holds its own upstream credential
 # (TOGETHER_API_KEY) and funds every turn from it, so the metadata routes answer
@@ -29,6 +41,19 @@ SERVICE="${SERVICE:-daintree-assistant}"
 URL=""
 FULL=0
 EXPECT_ENV=""
+# The name of an ENVIRONMENT VARIABLE holding a real account token, never the
+# token itself. A credential passed as an argument lands in shell history, in
+# `ps` output, and in the CI log line that echoes the command — so this script
+# accepts a name to read and never a value to copy. Nothing here ever prints it.
+# The posture the operator BELIEVES this deployment is in. Optional, and the
+# reason it exists is that every check below derives its expectation from what
+# auth/config reports — so a deployment that shipped `required: false` when it
+# meant `true` adapts to the anonymous branch and passes every one of them. The
+# script cannot catch that by reading harder; somebody has to state the intent.
+EXPECT_POSTURE=""
+ACCOUNT_TOKEN_VAR=""
+ACCOUNT_TOKEN=""
+ACCOUNT_HEADERS_FILE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -37,6 +62,29 @@ while [ $# -gt 0 ]; do
     --url)  [ $# -gt 1 ] || { echo "--url requires a value" >&2; exit 2; }
             URL="$2"; shift 2 ;;
     --full) FULL=1; shift ;;
+    # Opt-in authenticated check of /v1/daintree/account. Takes the NAME of an
+    # environment variable, e.g.
+    #
+    #   DAINTREE_TOKEN="$(daintree-assistant auth token)" \
+    #     ./infra/gcp/smoke.sh --account-token-var DAINTREE_TOKEN
+    #
+    # Opt-in because this smoke cannot manufacture a user token: obtaining one
+    # needs a real browser sign-in, so the account endpoint otherwise belongs to
+    # the manual cutover rather than to CI.
+    # Assert the deployment is in the auth posture you think it is:
+    #   anonymous — accounts off or optional; requests are served without one
+    #   enforce   — a verified credential is required
+    --expect-posture)
+            [ $# -gt 1 ] || { echo "--expect-posture requires a value" >&2; exit 2; }
+            case "$2" in
+              anonymous|enforce) EXPECT_POSTURE="$2" ;;
+              *) echo "--expect-posture must be anonymous or enforce" >&2; exit 2 ;;
+            esac
+            shift 2 ;;
+    --account-token-var)
+            [ $# -gt 1 ] || { echo "--account-token-var requires a value" >&2; exit 2; }
+            [ -n "$2" ] || { echo "--account-token-var requires a non-empty value" >&2; exit 2; }
+            ACCOUNT_TOKEN_VAR="$2"; shift 2 ;;
     # Assert the deployment reports the environment you think you are pointing
     # at. Optional, because the common use is "check whatever is there" — but a
     # staging URL answering `production` is exactly the mix-up worth catching,
@@ -381,6 +429,17 @@ case "$AUTH_POSTURE" in
     ;;
 esac
 
+# The posture the operator asked for, compared against the one reported. Runs
+# before the checks that BRANCH on the posture, so a mismatch is reported as
+# itself rather than as a downstream 401 nobody expected.
+if [ -n "$EXPECT_POSTURE" ]; then
+  if [ "$AUTH_POSTURE" = "$EXPECT_POSTURE" ]; then
+    pass "auth posture is $AUTH_POSTURE, as expected"
+  else
+    fail "expected auth posture '$EXPECT_POSTURE', deployment reports '$AUTH_POSTURE'" ""
+  fi
+fi
+
 # A header that IS present. Under `open` it is not read at all — a CLI still
 # sending its old OpenRouter key must be SERVED, not have that key forwarded to
 # Together and rejected as the caller's own — and under `enforce` the same
@@ -406,6 +465,106 @@ case "$AUTH_POSTURE" in
     ;;
   *) ;;
 esac
+
+# --------------------------------------------------------------------------
+head_ "Account status"
+
+# UNAUTHENTICATED first, and this one runs always: it needs no credential and it
+# is the half of the contract CI can actually check. What it asserts differs by
+# posture, because the route deliberately requires a real principal — under
+# `open` and `observe` every caller is anonymous, so a 401 there is the endpoint
+# working rather than failing.
+code="$(req "$URL/v1/daintree/account")"; load_body
+case "$AUTH_POSTURE" in
+  enforce|anonymous)
+    if [ "$code" = "401" ]; then
+      pass "/v1/daintree/account requires an account credential"
+    else
+      fail "/v1/daintree/account returned $code without a credential (expected 401)" "$BODY"
+    fi
+    ;;
+  *)
+    echo "  SKIP  posture unknown (auth/config did not parse); skipping the account check"
+    ;;
+esac
+
+# AUTHENTICATED, and opt-in: this script cannot manufacture a user token, so the
+# rest of the contract belongs to the manual cutover unless somebody supplies one.
+if [ -n "$ACCOUNT_TOKEN_VAR" ]; then
+  # The NAME is validated as a shell identifier before it is expanded. Bash's
+  # indirect expansion evaluates array subscripts, so an unvalidated name is a
+  # command-substitution primitive — `${!x}` where x is `a[$(id)]` runs `id`.
+  # This flag exists to keep a credential out of argv; it must not become a way
+  # to get code in.
+  if ! printf '%s' "$ACCOUNT_TOKEN_VAR" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*$'; then
+    fail "--account-token-var must name a shell variable (letters, digits, _)" ""
+  else
+  # `-` inside the expansion, deliberately: under `set -u` a bare `${!VAR}` on an
+  # unset name ABORTS the script, so the "empty or unset" branch below would be
+  # unreachable and the smoke would die instead of reporting.
+  ACCOUNT_TOKEN="${!ACCOUNT_TOKEN_VAR-}"
+  # xtrace off around the value. Nothing here prints it, but `bash -x` prints
+  # every expansion — including the assignment above and the curl below — so a
+  # run under tracing would defeat the whole point of taking a name.
+  set +x
+  if [ -z "$ACCOUNT_TOKEN" ]; then
+    fail "\$$ACCOUNT_TOKEN_VAR is empty or unset" ""
+  else
+    # The credential goes to curl through a --config file on STDIN rather than in
+    # argv, where `ps` would show it to every user on the machine and a CI runner
+    # would echo it into the build log. `header = "..."` is curl's own config
+    # syntax; the URL and the rest stay ordinary arguments.
+    #
+    # Headers are captured on the SAME GET (`-D`) rather than by a second HEAD
+    # request: this route registers GET only — FastAPI does not synthesise HEAD —
+    # so `curl -I` would answer 405 and the Cache-Control assertion below would
+    # be reading an error page's headers.
+    ACCOUNT_HEADERS_FILE="$(mktemp)"
+    code="$(printf 'header = "Authorization: Bearer %s"\n' "$ACCOUNT_TOKEN" \
+      | curl -sS -o "$BODY_FILE" -D "$ACCOUNT_HEADERS_FILE" -w '%{http_code}' \
+             --max-time "${TIMEOUT:-30}" --config - \
+             -H 'X-Daintree-Protocol: 3' "$URL/v1/daintree/account" 2>/dev/null)"
+    load_body
+    if [ "$code" = "200" ]; then
+      ACCOUNT_VERSION="$(jq_field "$BODY" version)"
+      ACCOUNT_ACCESS="$(jq_field "$BODY" access)"
+      ACCOUNT_HASH="$(jq_field "$BODY" subject_hash)"
+      # `access` and `subject_hash` are the two fields every valid answer has;
+      # `email` and the entitlement fields are legitimately absent. The hash is
+      # checked for SHAPE rather than value — it is the only identifier this
+      # endpoint may return, and a raw subject would not match it.
+      if [ "$ACCOUNT_VERSION" != "1" ]; then
+        fail "/v1/daintree/account reports contract version '$ACCOUNT_VERSION', expected 1" ""
+      elif ! printf '%s' "$ACCOUNT_HASH" | grep -Eq '^[0-9a-f]{16}$'; then
+        fail "/v1/daintree/account returned a subject_hash that is not 16 hex characters" ""
+      else
+        case "$ACCOUNT_ACCESS" in
+          granted|subscription_required|subscription_inactive|unverified)
+            # The verdict is printed; nothing derived from the token is.
+            pass "/v1/daintree/account: version 1, access=$ACCOUNT_ACCESS"
+            ;;
+          *)
+            fail "/v1/daintree/account reports an unknown access value" ""
+            ;;
+        esac
+      fi
+      # A status read must never be cached by anything in front of it. Read from
+      # the headers the GET above already captured — no second request, and no
+      # second place for the credential to travel.
+      CACHE_HEADER="$(grep -i '^cache-control:' "$ACCOUNT_HEADERS_FILE" | tr -d '\r')"
+      if printf '%s' "$CACHE_HEADER" | grep -qi 'private, *no-store'; then
+        pass "/v1/daintree/account is not stored by intermediaries"
+      else
+        fail "/v1/daintree/account did not send Cache-Control: private, no-store" ""
+      fi
+    else
+      # Deliberately does not echo the body: an account error names the account.
+      fail "/v1/daintree/account returned $code for the supplied credential" ""
+    fi
+    rm -f "$ACCOUNT_HEADERS_FILE"
+  fi
+  fi
+fi
 
 # --------------------------------------------------------------------------
 head_ "No API route answers with a redirect or a page"

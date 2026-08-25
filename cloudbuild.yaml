@@ -58,12 +58,29 @@ substitutions:
   # The staging deployment at assistant.daintree.org is:
   #   _ENVIRONMENT=staging
   #   _AUTH_MODE=open, then observe, then enforce as the rollout proceeds
+  #   _ENTITLEMENT_MODE=off, then observe, then enforce — a SEPARATE axis, moved
+  #     after identity is already enforced, so a billing outage can never present
+  #     as a signed-out session
+  #   _DAINTREE_ENTITLEMENT_URL=https://staging.daintree.org/api/assistant/entitlement
   #   _DAINTREE_ACCOUNT_URL=https://staging.daintree.org/account
   #   _DAINTREE_SUBSCRIBE_URL=https://staging.daintree.org/subscribe
   #   the four _SUPABASE_* values and the client id from the staging Supabase
   #   project's OAuth configuration
   _ENVIRONMENT: production
   _AUTH_MODE: open
+
+  # Account entitlement: does this account have a paid plan? Staged on its own
+  # axis, and `observe`/`enforce` are refused at readiness unless _AUTH_MODE is
+  # already `enforce` AND the URL below is set — there is nobody to ask about
+  # under an unenforced door. A bad configuration fails readiness rather than
+  # reverting to `off`, so a revision that cannot check never takes traffic.
+  _ENTITLEMENT_MODE: 'off'
+  # The website's authenticated entitlement endpoint. Not a secret and holding no
+  # credential of ours — the CALLER's Supabase bearer authenticates the lookup —
+  # but per-deployment, so it is passed rather than committed. Empty means the
+  # identity-only rollout: /v1/daintree/account reports `unverified` and no paid
+  # route asks.
+  _DAINTREE_ENTITLEMENT_URL: ''
 
   # Public OAuth discovery values. EMPTY by default and never filled in here: the
   # real ones name a specific Supabase project, and a value committed to this file
@@ -184,6 +201,8 @@ steps:
     env:
       - 'ENVIRONMENT=${_ENVIRONMENT}'
       - 'AUTH_MODE=${_AUTH_MODE}'
+      - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
+      - 'DAINTREE_ENTITLEMENT_URL=${_DAINTREE_ENTITLEMENT_URL}'
       - 'LOG_LEVEL=INFO'
       - 'STATE_SIGNING_KID=${_CURRENT_KID}'
       - 'PREVIOUS_KID=${_PREVIOUS_KID}'
@@ -227,6 +246,32 @@ steps:
           *) echo "ERROR: _AUTH_MODE must be open|observe|enforce, got '$$AUTH_MODE'." >&2
              exit 1 ;;
         esac
+        case "$$ENTITLEMENT_MODE" in
+          off|observe|enforce) ;;
+          *) echo "ERROR: _ENTITLEMENT_MODE must be off|observe|enforce, got '$$ENTITLEMENT_MODE'." >&2
+             exit 1 ;;
+        esac
+        # The cross-field rule, checked here for the same reason the enums are:
+        # readiness enforces it and would abort the release safely three steps
+        # later, with the operator learning from a 503 that the revision never
+        # took traffic. Saying it now names the actual mistake. There is nobody to
+        # ask a billing question about under an unenforced door — every request
+        # resolves to the anonymous principal.
+        if [ "$$ENTITLEMENT_MODE" != "off" ]; then
+          if [ "$$AUTH_MODE" != "enforce" ]; then
+            echo "ERROR: _ENTITLEMENT_MODE=$$ENTITLEMENT_MODE requires _AUTH_MODE=enforce (got '$$AUTH_MODE')." >&2
+            exit 1
+          fi
+          # Trimmed before the emptiness test, matching the Python filter below
+          # that decides what actually reaches the deploy: a whitespace-only value
+          # passes `-z`, is then stripped and omitted, and the revision comes up
+          # with no URL under a mode that requires one. Readiness still fails, but
+          # three steps later and about a value the operator believes they set.
+          if [ -z "$$(printf '%s' "$$DAINTREE_ENTITLEMENT_URL" | tr -d '[:space:]')" ]; then
+            echo "ERROR: _ENTITLEMENT_MODE=$$ENTITLEMENT_MODE requires _DAINTREE_ENTITLEMENT_URL." >&2
+            exit 1
+          fi
+        fi
 
         # together-api-key is REQUIRED, not optional like the previous signing key:
         # the server holds the upstream credential and `missing_secrets()` gates
@@ -296,6 +341,7 @@ steps:
 
         NAMES = (
             "ENVIRONMENT", "AUTH_MODE", "LOG_LEVEL",
+            "ENTITLEMENT_MODE", "DAINTREE_ENTITLEMENT_URL",
             "STATE_SIGNING_KID", "STATE_SIGNING_KID_PREVIOUS",
             "SUPABASE_AUTH_ISSUER", "SUPABASE_JWKS_URL",
             "SUPABASE_OAUTH_AUTHORIZE_URL", "SUPABASE_OAUTH_TOKEN_URL",

@@ -11,10 +11,17 @@ built and switched OFF: `AUTH_MODE` selects `open` (the shipped default, under
 which the `Authorization` header is not read for authentication at all), `observe`
 (a present credential is verified and recorded, and nothing a caller can see
 changes) or `enforce` (a verified credential is required). An account is an
-ENTITLEMENT to spend Daintree's key, never a mapping to one of yours — but that
-is a statement about the credential model, not a feature that exists: nothing
-here checks a plan, a subscription or a quota, so authentication today bounds
-WHO may spend Daintree's key and not how much.
+ENTITLEMENT to spend Daintree's key, never a mapping to one of yours — and that is
+now a check rather than only a description. `ENTITLEMENT_MODE` stages the billing
+question on its own axis: `off` (the default) asks nothing, `observe` asks and
+records the answer without ever acting on it, and only `enforce` refuses
+`/respond` and `/tasks` for an account with no active plan. The question goes to
+the Daintree website, which owns the billing relationship — this server stores no
+subscription state. What still does not exist is a QUOTA: numeric plan
+allowances are an undecided product question, so the server records what a turn
+cost against a pseudonymous account and enforces no ceiling. Authentication bounds
+WHO may spend Daintree's key, entitlement bounds WHETHER they may, and neither yet
+bounds how much.
 
 It exposes a **Daintree-native** API (`POST /v1/daintree/respond`) — purpose-built,
 not OpenAI-compatible. The session/runbook envelope is first-class, runbooks are surfaced
@@ -129,12 +136,14 @@ Set this (see `.env.example` for the full list):
 ```bash
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
 export TOGETHER_API_KEY=...               # the upstream credential; funds every turn
+export CEREBRAS_API_KEY=...               # the fast-response stage, which has no off switch
 ```
 
-Those two are the whole list, and both are the **server's own**. There is no
+Those three are the whole list, and all three are the **server's own**. There is no
 inbound API key to configure — account authentication is OAuth, and its settings
-(issuer, JWKS, client id) are public configuration rather than secrets, which is
-why they gate readiness through `auth_problems()` instead of appearing here.
+(issuer, JWKS, client id, and the website's entitlement URL) are public
+configuration rather than secrets, which is why they gate readiness through
+`auth_problems()` and `entitlement_problems()` instead of appearing here.
 
 Under the shipped `AUTH_MODE=open` the `Authorization` header is **not read for
 authentication** — not parsed, not validated, not rejected. That is stronger than
@@ -173,13 +182,19 @@ auto-reload during development: `uvicorn daintree_assistant_server.main:app
 |---|---|---|---|
 | `POST` | `/v1/daintree/respond` | yes | Native generation (+ first-class `runbooks` block; stream or JSON) |
 | `GET`  | `/v1/daintree/capabilities` | yes | Protocol range, limits, stream events, task ids, catalog revision |
-| `POST` | `/v1/daintree/auth/verify` | open | Credential probe: is the key this request would spend usable? (no body; no inference — a model listing). With no bearer that is the *server's* key, which answers "can this backend serve me?" |
+| `POST` | `/v1/daintree/auth/verify` | yes | Credential probe: is the key this request would spend usable? (no body; no inference — a key introspection). That key is always the *server's* own, so this answers "can this backend serve me?" rather than anything about the caller. |
+| `GET` | `/v1/daintree/account` | yes† | Who you are and what your plan permits. A missing or inactive subscription is 200 data here; it becomes a typed 402 only on a paid route. |
 | `GET`  | `/v1/daintree/runbooks` | yes | Runbook metadata (ETag/304); never the body |
 | `POST` | `/v1/daintree/runbooks/resolve` | yes | Manual find / load / clear |
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks |
 | `GET`  | `/healthz` | no | Liveness |
 | `GET`  | `/readyz` | no | Readiness (config, secrets, prompts, catalog, provider) |
 | `GET`  | `/version` | no | Build SHA, version, protocol range |
+
+† `/v1/daintree/account` needs a genuinely authenticated principal, not merely the
+auth dependency: under `open` and `observe` every caller resolves to the anonymous
+one, so it answers `401 auth_required` there. A client should use it once
+`/v1/daintree/auth/config` reports `required: true`.
 
 Runbook/selection metadata is delivered in the response body's `runbooks` block
 (non-streaming) or as the first SSE `meta` event (streaming). The streaming event

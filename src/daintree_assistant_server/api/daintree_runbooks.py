@@ -88,7 +88,9 @@ async def resolve_runbooks(
 # includes this one only when a runbook-overlay directory is configured and the
 # environment is not hardened, so production never exposes it. A runtime guard
 # inside a route production still serves would be a weaker version of the same
-# idea — and `require_auth` cannot carry it, since it gates nothing yet.
+# idea — and `require_auth` cannot carry it: under the shipped `open` posture the
+# anonymous principal holds every permission, and there is deliberately no
+# `runbooks:write` for a narrower one to withhold.
 reload_router = APIRouter()
 
 
