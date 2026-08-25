@@ -43,7 +43,15 @@ def _isolate_from_dotenv() -> Iterator[None]:
     Settings.model_config["env_file"] = None
     exported = {
         name: os.environ.pop(name)
-        for name in ("DAINTREE_RUNBOOKS_OVERLAY_DIR", "DAINTREE_DUMP_UPSTREAM_DIR")
+        for name in (
+            "DAINTREE_RUNBOOKS_OVERLAY_DIR",
+            "DAINTREE_DUMP_UPSTREAM_DIR",
+            # Same hazard, newer: a developer pointing their local backend at a
+            # local website exports both of these, and a test asserting the
+            # shipped default is `off` must not fail because of it.
+            "ENTITLEMENT_MODE",
+            "DAINTREE_ENTITLEMENT_URL",
+        )
         if name in os.environ
     }
     yield

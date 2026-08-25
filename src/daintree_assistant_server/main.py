@@ -13,6 +13,7 @@ import contextlib
 from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from http.cookiejar import DefaultCookiePolicy
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +54,11 @@ from .services.bearer import authorization_values, credential_candidates
 from .services.chat_orchestrator import ChatOrchestrator
 from .services.compaction import Compactor, NullCompactor, default_compactor
 from .services.docs_mcp import DOCS_LOOKUP_TIMEOUT_SECONDS, DocsMcpClient
+from .services.entitlement import (
+    ENTITLEMENT_CONNECT_TIMEOUT_SECONDS,
+    ENTITLEMENT_TIMEOUT_SECONDS,
+    EntitlementService,
+)
 from .services.fast_response import FastResponseService
 from .services.prompt_assembler import PromptAssembler
 from .services.supabase_auth import JwksCache, SupabaseTokenVerifier
@@ -658,6 +664,68 @@ async def _build_token_verifier(
     return verifier, client
 
 
+def _refuse_cookies(client: httpx.AsyncClient) -> None:
+    """Make ``client`` store no cookies and send none.
+
+    Applied to the client's OWN jar after construction, which is the only place it
+    works: ``AsyncClient(cookies=...)`` builds a fresh ``Cookies`` and copies the
+    values across, so a policy set on a jar passed in is silently discarded.
+
+    ``httpx.Cookies`` wraps a stdlib ``CookieJar``, and a policy allowing no domain
+    at all makes both ``set_ok`` and ``return_ok`` false for everything — which is
+    the smallest honest way to say "this client has no cookie behaviour".
+    """
+    client.cookies.jar.set_policy(DefaultCookiePolicy(allowed_domains=[]))
+
+
+async def _build_entitlement_service(settings: Settings) -> EntitlementService | None:
+    """The billing-authority client, or ``None`` when no URL is configured.
+
+    Built beside the token verifier and OUTSIDE the container, for the same reason
+    it is: both answer questions about the CALLER, and both are needed by routes
+    that must keep working when the model-serving half of the process did not
+    build. ``GET /v1/daintree/account`` is exactly such a route — "what does my
+    account own?" is a question worth answering during an upstream outage, not one
+    to take down with it.
+
+    ``None`` is a NORMAL configuration rather than a degraded one: it is every
+    deployment running the identity-only rollout, and it is what makes the account
+    endpoint report ``access: unverified`` instead of failing.
+    """
+    if not settings.entitlement_is_configured:
+        return None
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            ENTITLEMENT_TIMEOUT_SECONDS, connect=ENTITLEMENT_CONNECT_TIMEOUT_SECONDS
+        ),
+        # Two locks on the door, matching `_build_token_verifier`: the call site
+        # sets this too, and this call forwards the CALLER's account credential.
+        follow_redirects=False,
+        # No ambient proxy. The URL is pinned to a Daintree host in configuration,
+        # and an environment variable that could route the caller's bearer through
+        # a third party would undo that pin without changing the configuration
+        # anybody reads. It also keeps a loopback development URL from being sent
+        # to a corporate proxy that cannot reach it. (It also disables ambient
+        # `SSL_CERT_FILE`/`SSL_CERT_DIR`; a custom CA here would need an explicit
+        # SSL context rather than re-enabling environment trust.)
+        trust_env=False,
+    )
+    # No cookies, ever. This client is LONG-LIVED and shared by every caller, so a
+    # `Set-Cookie` from the website while checking one account would be retained
+    # and sent alongside the NEXT caller's bearer — one person's session state
+    # travelling with another person's credential. Clearing the jar per request
+    # would race under concurrency; refusing to store is not a race at all.
+    _refuse_cookies(client)
+    try:
+        return EntitlementService(client, url=settings.daintree_entitlement_url)
+    except Exception:
+        # The client exists and nothing else holds a reference to it yet, so an
+        # exception from here would strand an open connection pool for the life of
+        # the process. Same ownership rule as `_build_token_verifier` above.
+        await client.aclose()
+        raise
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     settings: Settings = app.state.settings
@@ -682,6 +750,16 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         verifier, jwks_client = None, None
     app.state.token_verifier = verifier
     app.state.jwks_client = jwks_client
+    # Guarded like the verifier above and for the same reason: a configuration
+    # problem here must not take the process down. Absent means the account
+    # endpoint reports `unverified` and — under enforcement — a paid route answers
+    # `entitlement_unavailable`, which is the honest verdict for an authority we
+    # could not build a client for.
+    try:
+        app.state.entitlement_service = await _build_entitlement_service(settings)
+    except Exception as exc:  # noqa: BLE001 - see above
+        logger.error("entitlement_service_build_failed", error=str(exc))
+        app.state.entitlement_service = None
     try:
         # Local-development-only features (runbook learning) must never be enabled in
         # production; checked always, even with an injected provider.
@@ -716,6 +794,12 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         final_jwks_client: httpx.AsyncClient | None = getattr(app.state, "jwks_client", None)
         if final_jwks_client is not None:
             await final_jwks_client.aclose()
+        final_entitlement: EntitlementService | None = getattr(
+            app.state, "entitlement_service", None
+        )
+        if final_entitlement is not None:
+            with contextlib.suppress(Exception):  # pragma: no cover - best-effort close
+                await final_entitlement.aclose()
 
 
 def create_app(
@@ -747,6 +831,7 @@ def create_app(
     # AttributeError on the auth path.
     app.state.token_verifier = None
     app.state.jwks_client = None
+    app.state.entitlement_service = None
 
     register_exception_handlers(app)
 

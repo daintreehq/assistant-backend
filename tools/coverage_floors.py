@@ -53,6 +53,12 @@ FLOORS: dict[str, int] = {
     # exercised is a manifest nobody checks, and the aggregate 90% is exactly
     # wide enough to absorb losing a few of them.
     "src/daintree_assistant_server/config.py": 95,
+    # Added 2026-08-25 (measured 97%). The billing authority's client. On this
+    # list because almost all of it is REFUSAL: every branch that is not the happy
+    # path exists to keep an uncertain answer from becoming a verdict about
+    # somebody's plan, and a refusal that stops being exercised does not fail a
+    # test — it silently starts letting a malformed body through as a decision.
+    "src/daintree_assistant_server/services/entitlement.py": 97,
     "src/daintree_assistant_server/errors.py": 93,
     "src/daintree_assistant_server/main.py": 95,
     "src/daintree_assistant_server/api/daintree_auth.py": 93,

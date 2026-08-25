@@ -510,6 +510,28 @@ TraceSinkKind = Literal["null", "filesystem", "gcs"]
 #: enforce   a verified token is required; failures are the account 4xx family.
 AuthMode = Literal["open", "observe", "enforce"]
 
+#: What a verified caller is ENTITLED to, which is a different question from who
+#: they are — and staged separately for exactly that reason. Identity says the
+#: token is genuine; entitlement says the account behind it has paid. Merging the
+#: two rollouts would mean a billing outage presenting as a signed-out user.
+#:
+#: off       paid routes never ask. Today's behaviour, and the default, so a
+#:           deployment that sets nothing does not move.
+#: observe   paid routes resolve the verdict and log it, and NEVER refuse on it.
+#:           The mirror of `AUTH_MODE=observe`: evidence against real traffic
+#:           before anyone's turn depends on the answer. It is not free — a paid
+#:           request costs one lookup against the website — so watch latency as
+#:           well as the verdict counts.
+#: enforce   `access: granted` is required. A known missing or inactive plan is
+#:           the typed 402 family; an answer we could not obtain is the typed 503,
+#:           never a guess.
+#:
+#: `observe` and `enforce` both require `AUTH_MODE=enforce`. There is nobody to
+#: ask about under the open door — the anonymous principal has no subject — so an
+#: entitlement mode above an unenforced identity would resolve nothing on every
+#: request and report that as evidence.
+EntitlementMode = Literal["off", "observe", "enforce"]
+
 #: The OAuth callback, and **not** deployment configuration despite looking like
 #: it. The client compiles this exact string in (`internal/auth/loopback.go`:
 #: "registered with the identity provider and cannot vary at runtime"), sends it
@@ -888,6 +910,20 @@ class Settings(BaseSettings):
         default=2_592_000, ge=60, le=31_536_000, alias="AUTH_SESSION_MAX_AGE_SECONDS"
     )
 
+    # ---- Account entitlement (the website's billing authority) ------------
+    #
+    # Staged INDEPENDENTLY of `AUTH_MODE`, and the independence is the point: a
+    # deployment can enforce identity for a week and only then start asking the
+    # billing question, so the two rollouts fail separately and are diagnosed
+    # separately.
+    #
+    # The URL is not a secret and holds no credential of ours: the caller's own
+    # Supabase bearer authenticates the lookup, which is why there is no service
+    # key here to configure and why this sits with the public OAuth values rather
+    # than in `missing_secrets()`.
+    entitlement_mode: EntitlementMode = Field(default="off", alias="ENTITLEMENT_MODE")
+    daintree_entitlement_url: str = Field(default="", alias="DAINTREE_ENTITLEMENT_URL")
+
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")
@@ -1086,6 +1122,7 @@ class Settings(BaseSettings):
         problems.extend(self.trace_problems())
         problems.extend(self.fast_response_problems())
         problems.extend(self.auth_problems())
+        problems.extend(self.entitlement_problems())
         return problems
 
     #: The values that must be present for a manifest to be publishable. Ordered
@@ -1353,6 +1390,109 @@ class Settings(BaseSettings):
         if self.auth_manifest_problems():
             return False
         return all(str(getattr(self, name)).strip() for name in self._MANIFEST_FIELDS)
+
+    def entitlement_problems(self) -> list[str]:
+        """Entitlement configuration that must fail readiness rather than degrade.
+
+        Fails CLOSED, and never DOWNWARDS. A bad entitlement configuration is not
+        quietly demoted to ``off``: an operator who asked for enforcement and got
+        an open till would have no way to discover it, and the revision would take
+        traffic looking exactly like a working one. Refusing readiness means the
+        revision never gets that far.
+
+        Two rules, and they are separate on purpose.
+
+        **Whatever is set is validated in every mode**, including ``off``. A
+        malformed URL is not dormant — it is the value the account endpoint will
+        use the moment somebody configures a mode, and finding out then is finding
+        out during a rollout.
+
+        **A non-``off`` mode additionally requires enforced identity and a URL.**
+        The identity half is the one worth stating: under ``open`` and ``observe``
+        every request resolves to the anonymous principal, which has no subject to
+        ask about and no bearer to forward. An entitlement mode above an
+        unenforced door would therefore be unable to decide anything, on every
+        request, and would record that as evidence.
+        """
+        problems = self._entitlement_url_problems()
+
+        if self.entitlement_mode == "off":
+            return problems
+
+        if self.auth_mode != "enforce":
+            problems.append(
+                f"ENTITLEMENT_MODE={self.entitlement_mode} requires AUTH_MODE=enforce "
+                "(under any other mode every request is the anonymous principal, "
+                "which has no account to ask about)"
+            )
+        if not self.daintree_entitlement_url.strip():
+            problems.append(
+                f"ENTITLEMENT_MODE={self.entitlement_mode} requires "
+                "DAINTREE_ENTITLEMENT_URL (there is no billing authority to ask)"
+            )
+        return problems
+
+    def _entitlement_url_problems(self) -> list[str]:
+        """Everything wrong with the entitlement URL ITSELF, ignoring the mode.
+
+        Split from :meth:`entitlement_problems` for the same reason
+        :meth:`auth_manifest_problems` is split from :meth:`auth_problems`: "this
+        value is unusable" and "this deployment may not run in that mode" are
+        different questions, and the account endpoint asks only the first.
+        """
+        problems: list[str] = []
+        url = self.daintree_entitlement_url
+        if url:
+            problem = _auth_url_problem(
+                value=url,
+                env_name="DAINTREE_ENTITLEMENT_URL",
+                hardened=self.is_hardened,
+            )
+            if problem:
+                problems.append(problem)
+            else:
+                # A query string is refused rather than forwarded. This URL is the
+                # whole request — the caller's bearer is the only other input —
+                # so anything in a query is configuration deciding what we ask
+                # about, which is the one thing the verified subject must decide.
+                # (`_auth_url_problem` already refuses userinfo and a fragment.)
+                # Tested on the WRITTEN string, not on the parsed components:
+                # `urlsplit` reports an empty query for a URL ending in `?`, so a
+                # component test passes a spelling the contract forbids. It
+                # carries no data, and that is exactly why it should be corrected
+                # in configuration rather than tolerated here.
+                if "?" in url or "#" in url:
+                    problems.append(
+                        "DAINTREE_ENTITLEMENT_URL must not carry a query string or "
+                        "fragment (the caller's verified subject is the only input "
+                        "to this lookup)"
+                    )
+                origin = _origin_of(url)
+                assert origin is not None  # _auth_url_problem returned None
+                host = origin[1]
+                if not _host_allowed(host, _ALLOWED_LINK_SUFFIXES) and not (
+                    not self.is_hardened and _is_loopback_literal(host)
+                ):
+                    problems.append(
+                        "DAINTREE_ENTITLEMENT_URL must point at a Daintree site "
+                        f"({_ALLOWED_LINK_SUFFIXES[0]} or a subdomain) — this call "
+                        "forwards the caller's account credential"
+                    )
+        return problems
+
+    @property
+    def entitlement_is_configured(self) -> bool:
+        """Whether an entitlement lookup can be attempted at all.
+
+        Deliberately independent of ``entitlement_mode``: ``GET
+        /v1/daintree/account`` resolves whenever a usable URL exists, so the
+        contract is exercisable — by a real CLI, against the real website — before
+        it is able to refuse anybody's turn. A mode is what makes a verdict
+        BINDING, not what makes it obtainable.
+        """
+        if not self.daintree_entitlement_url.strip():
+            return False
+        return not self._entitlement_url_problems()
 
     def fast_response_problems(self) -> list[str]:
         """Configuration that must fail readiness rather than degrade silently.

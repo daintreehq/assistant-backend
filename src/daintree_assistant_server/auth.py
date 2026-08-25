@@ -36,6 +36,7 @@ starts presenting as a verdict about another.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -88,6 +89,31 @@ ASSISTANT_PERMISSIONS = frozenset(
 )
 
 
+#: The domain separator the CLI hashes under. Changing either half of this
+#: string, or the truncation below, silently stops the two sides agreeing about
+#: which account a support report is about — and nothing would fail, because both
+#: values are perfectly good hashes of something.
+_SUBJECT_HASH_PREFIX = "daintree-assistant-subject:"
+
+#: 8 bytes / 16 hex characters, matching `SubjectHash` in the CLI
+#: (`cli/internal/auth/status.go`). Long enough that two accounts will not collide
+#: in any realistic support queue, short enough to read aloud, and one-way.
+_SUBJECT_HASH_BYTES = 8
+
+
+def subject_hash(subject: str) -> str:
+    """A stable, non-reversible correlation id for a subject.
+
+    Byte-for-byte the CLI's ``auth.SubjectHash``, and pinned against it by test —
+    the whole value of the id is that a person can quote the one their CLI printed
+    and have it match a log line here.
+    """
+    if not subject:
+        return ""
+    digest = hashlib.sha256((_SUBJECT_HASH_PREFIX + subject).encode("utf-8")).digest()
+    return digest[:_SUBJECT_HASH_BYTES].hex()
+
+
 @dataclass(frozen=True)
 class Principal:
     """The caller. Identity only, and never a credential.
@@ -115,6 +141,17 @@ class Principal:
     @property
     def is_authenticated(self) -> bool:
         return self.user_id is not None
+
+    @property
+    def subject_hash(self) -> str:
+        """The support correlation id for this caller, or ``""`` when anonymous.
+
+        The one identifier that may travel: stable enough to join two reports
+        together, and useless for anything else. Everything that logs or returns
+        an identity uses THIS — the raw user id stays on the principal and goes no
+        further.
+        """
+        return subject_hash(str(self.user_id)) if self.user_id is not None else ""
 
     def has_permission(self, permission: str) -> bool:
         return permission in self.permissions
