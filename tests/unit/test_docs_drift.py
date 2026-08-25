@@ -1084,15 +1084,23 @@ def _require_cli_submodule() -> None:
         pytest.skip("cli/ submodule is not populated (git submodule update --init cli)")
 
 
-# The CLI's key lifecycle was REMOVED, and these guard that removal rather than
-# the flow it replaced. `feat: drop the API-key requirement` deleted the
-# credentials package, the sign-in path and the login/logout commands outright,
-# which is why docs/KEY_HANDLING.md §5 now says there is no client-side storage.
+# The CLI stores ONE secret, and §5 has to keep saying which one.
 #
-# The direction of the check is inverted on purpose. Nothing can assert that a
-# deleted flow still behaves correctly, but the doc DOES make a falsifiable claim
-# — that no key is stored — and the way that claim goes stale is the CLI growing
-# the feature back while §5 still says it has none.
+# The claim these guard has been rewritten twice, in opposite directions, and the
+# second rewrite is why they look the way they do. `feat: drop the API-key
+# requirement` deleted the credentials package, the sign-in path and the
+# login/logout commands, and §5 then said — correctly, for a while — that the CLI
+# stored nothing at all. Account authentication put persistence back: the CLI now
+# keeps exactly one secret, the OAuth refresh token, in the operating system's
+# credential service (`cli/internal/auth/store.go`, `keyring.go`).
+#
+# So an absence check is no longer enough, and the three tests below are split by
+# what they can actually establish. Naming the deleted paths still catches the OLD
+# flow coming back, but it passed unchanged straight through the pin that
+# introduced the keyring — which is exactly the failure mode this comment exists to
+# stop a later reader from re-creating. A doc saying "no credential on disk" while
+# one is on disk is the worst direction for this particular claim to be wrong in,
+# so the store itself is asserted positively as well.
 _REMOVED_CREDENTIAL_SOURCES = (
     Path("internal") / "credentials" / "credentials.go",
     Path("internal") / "cli" / "login.go",
@@ -1101,33 +1109,88 @@ _REMOVED_CREDENTIAL_SOURCES = (
 
 
 @pytest.mark.parametrize("relative", _REMOVED_CREDENTIAL_SOURCES, ids=lambda p: p.name)
-def test_the_cli_still_stores_no_credential(relative: Path) -> None:
+def test_the_cli_never_restores_the_old_key_lifecycle(relative: Path) -> None:
+    """The pre-OAuth flow — a prompted API key in a per-user credentials file — is
+    gone and must not come back. This says nothing about the refresh token the
+    keyring now holds; that is the test below."""
     _require_cli_submodule()
     assert not (CLI_ROOT / relative).exists(), (
-        f"cli/{relative} is back, so the CLI may store a key again — but "
-        f"docs/KEY_HANDLING.md §5 says it stores none. Rewrite §5 against whatever "
-        f"the flow now is; a doc claiming 'no credential on disk' while one exists "
-        f"is the worst direction for this particular claim to be wrong in."
+        f"cli/{relative} is back, so the CLI may collect and store an API key "
+        f"again. docs/KEY_HANDLING.md §5 describes a single OAuth refresh token in "
+        f"the OS credential service and no key lifecycle at all — rewrite §5 "
+        f"against whatever the flow now is."
     )
 
 
-def test_an_unset_key_sends_no_authorization_header() -> None:
-    """The one live claim §5 makes about the wire.
+def test_the_only_persisted_secret_is_the_refresh_token() -> None:
+    """§5's positive claim, and the one an absence check cannot make.
 
-    §5 says an empty `DAINTREE_API_KEY` sends no header at all. That is what lets
-    the server ignore the header without a mid-migration client being blamed for
-    one it was right to still be sending.
+    Two halves, because the interesting way for this to go wrong is not the store
+    disappearing but its TERMS changing. A credential store that quietly degrades
+    to a file on disk when the keychain is unavailable is worse than one that
+    refuses, since the user is told they are signed in and never told the terms
+    changed — so the in-memory fallback is asserted by name, not merely the
+    existence of a keyring.
     """
     _require_cli_submodule()
-    source = (CLI_ROOT / "internal" / "backend" / "client.go").read_text(encoding="utf-8")
+    store = (CLI_ROOT / "internal" / "auth" / "store.go").read_text(encoding="utf-8")
+    assert "Exactly one secret is persisted: the refresh token." in store, (
+        "cli/internal/auth/store.go no longer says the refresh token is the only "
+        "persisted secret. docs/KEY_HANDLING.md §5 says exactly that, and names the "
+        "access token as memory-only — check what changed before editing this."
+    )
+    keyring = (CLI_ROOT / "internal" / "auth" / "keyring.go").read_text(encoding="utf-8")
+    assert "NewMemoryStore(), TierMemory" in keyring, (
+        "cli/internal/auth/keyring.go no longer degrades to the in-memory store when "
+        "no OS credential service is available, so a machine without one may now be "
+        "persisting somewhere else. docs/KEY_HANDLING.md §5 promises no silent "
+        "plaintext: the session evaporates on exit and the user is told so."
+    )
+
+
+def test_no_credential_is_sent_on_the_public_discovery_path() -> None:
+    """§5's live claim about the wire, and it is NOT "an unset key sends no header".
+
+    That older claim died with the frozen `apiKey string` it described. The client
+    resolves a `TokenSource` once at construction — an account credential CHANGES
+    between requests, and a frozen string would pin the client to a token that
+    stops working in an hour — and `NewAccountTokenSource` hands back a live
+    manager precisely WHEN `DAINTREE_API_KEY` is empty. So on a signed-in install
+    an empty key sends a bearer token, and a test asserting otherwise would have
+    been pinning a property the CLI no longer has.
+
+    What survives is narrower and is the half the backend actually depends on:
+    the paths a client must be able to call before it holds anything to sign in
+    with are on a closed allowlist that bypasses credential lookup entirely, and a
+    token source yielding nothing sets no header. Together those are what let this
+    server answer `/v1/daintree/auth/config` to a caller with no credential, and
+    what keeps a signed-out install from being blamed for a header it never sent.
+    """
+    _require_cli_submodule()
+    tokensource = (CLI_ROOT / "internal" / "backend" / "tokensource.go").read_text(
+        encoding="utf-8"
+    )
+    assert '"/v1/daintree/auth/config"' in tokensource, (
+        "cli/internal/backend/tokensource.go no longer lists /v1/daintree/auth/config "
+        "among the paths callable with no credential. That endpoint is the bootstrap: "
+        "requiring a token to learn how to get a token is a loop no client can exit "
+        "(src/daintree_assistant_server/api/daintree_auth.py)."
+    )
+    assert "func (NoTokenSource) AccessToken" in tokensource and (
+        'return ""' in tokensource
+    ), (
+        "cli/internal/backend/tokensource.go no longer has a NoTokenSource that "
+        "yields an empty token, so a signed-out install may now send something."
+    )
+    client = (CLI_ROOT / "internal" / "backend" / "client.go").read_text(encoding="utf-8")
     guarded = re.search(
-        r'if\s+c\.apiKey\s*!=\s*""\s*\{\s*req\.Header\.Set\(\s*"Authorization"',
-        source,
+        r'if\s+token\s*!=\s*""\s*\{\s*req\.Header\.Set\(\s*"Authorization"',
+        client,
     )
     assert guarded, (
-        "internal/backend/client.go no longer guards the Authorization header on a "
-        "non-empty key. docs/KEY_HANDLING.md §5 claims an unset DAINTREE_API_KEY "
-        "sends no header."
+        "cli/internal/backend/client.go no longer guards the Authorization header on "
+        "a non-empty token, so an empty one may now be sent as `Bearer `. "
+        "docs/KEY_HANDLING.md §5 says a source yielding nothing sends no header."
     )
 
 
@@ -1140,6 +1203,7 @@ def test_the_key_is_registered_for_redaction_when_it_is_set() -> None:
         "internal/app/app.go no longer registers cfg.APIKey for redaction, which "
         "docs/KEY_HANDLING.md §5 claims it does"
     )
+
 
 
 @pytest.mark.parametrize("doc", [DOC_BETA, DOC_KEYS])

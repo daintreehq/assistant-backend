@@ -169,6 +169,22 @@ ALWAYS_AVAILABLE: frozenset[str] = frozenset(
         # permanent entries is the cheaper end of that trade.
         "async.cancel",
         "watcher.cancel",
+        # Third footer-instructed tool, and the one that arrived by surprise. The
+        # workflow-digest block says "if a digest looks stale after a tool result or
+        # a wake, call workflow.reconcile", and it renders whenever the CLIENT sends
+        # `turn_context.workflow_state` — a condition no classifier and no runbook
+        # controls. `daintree.orchestration.execute-durable-workflow` declares it,
+        # which is precisely what disqualifies the pass-through: the catalog has an
+        # opinion, so a turn carrying workflow state without that runbook loaded
+        # would render the instruction over an inventory that never offered the call.
+        #
+        # It was invisible until the CLI tool fixture was recaptured. The tools are
+        # registered unless `DAINTREE_WORKFLOW_INTELLIGENCE=0`, but the fixture
+        # generator had them behind an opt-in flag, so the hygiene scanner — which
+        # only counts names the registry snapshot knows — read the footer's mention
+        # as prose about nothing. A stale inventory does not merely under-report the
+        # core; it silently switches off the derivation that builds it.
+        "workflow.reconcile",
         # Remember. `memory.save` is instructed in the base prompt and belongs to
         # no domain.
         "memory.save",

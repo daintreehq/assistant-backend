@@ -212,31 +212,54 @@ not a key record. Then we genuinely do not know, and must not imply a verdict.
 
 ## 5. Client-side storage (the CLI)
 
-**There is none, and that is the current design.** The CLI dropped the API-key
-requirement outright: `internal/credentials/`, `internal/cli/login.go` and
-`internal/app/signin.go` are gone from the vendored source, along with the
-`login`/`logout` commands and the per-user credential file they maintained under
-the CLI's state root. Nothing is persisted, so there is nothing to chmod, nothing
-for `doctor` to inspect, and nothing to delete to sign out.
+**Exactly one secret, and it is not an API key.** The CLI persists the OAuth
+**refresh token** and nothing else. The access token stays in process memory and is
+never written anywhere: it is short-lived and re-derivable, so persisting it would
+add a second place to leak from in exchange for saving one network round trip an
+hour.
 
-What remains is a single escape hatch. `cfg.APIKey` is read only from
-`DAINTREE_API_KEY` and is normally empty; an empty key sends **no**
-`Authorization` header at all (`internal/backend/client.go`, `setHeaders`). When
-it is set, `redact.RegisterSecret` registers it during app construction before
-anything can log — unconditionally, so the rare install that exports it is
-covered without a second code path.
+This section said "there is none" until account authentication landed, and that was
+true of the flow it described. `internal/credentials/`, `internal/cli/login.go` and
+`internal/app/signin.go` are still gone, along with the `login`/`logout` commands
+that prompted for a key and the per-user credential file they maintained. What came
+back is a different thing with different terms, and reading the old sentence as
+still current is the mistake this paragraph exists to prevent.
 
-The server ignores the header regardless (§1, §2), so the env var changes what
-goes over the wire and nothing about what happens to the request. It is a
-transitional affordance, not a credential mechanism.
+**Where it lives, and what happens when it cannot.** The refresh token goes to the
+operating system's credential service (`internal/auth/keyring.go`, reached through
+`internal/auth/store.go`). The rule there is **no silent plaintext**: when no
+credential service is available the store degrades to `MemoryStore` — the session
+lives in that process only and evaporates on exit — and the user is told the tier
+changed. It never falls back to a file. A store that quietly wrote one would be
+worse than a store that refused, because the user would be told they are signed in
+and never told the terms had changed.
 
-The lifecycle table that used to live here described the interactive sign-in
-flow: prompt, verify before persist, show the endpoint, offer logout, redact the
-key. Every row of it is moot now that no key is collected. It was deleted rather
-than marked historical, because a status table nobody can act on is exactly the
-inventory-of-the-past this document was rewritten to stop being. Git history has
-it. When account authentication lands (`TODO.md`), the requirements get written
-fresh against whatever that flow actually is.
+Signing out deletes it (`Manager.Logout`), and a rotation replaces it. So "delete
+this to sign out" now has a real answer again, and it is `daintree auth logout`
+rather than a path.
+
+**The legacy escape hatch is unchanged.** `cfg.APIKey` is read only from
+`DAINTREE_API_KEY`, is empty on virtually every install, and is never persisted. When
+it IS set it takes precedence over the account credential — `NewAccountTokenSource`
+returns nothing rather than silently overriding a key the user explicitly exported —
+and `redact.RegisterSecret` registers it during app construction before anything can
+log, unconditionally, so the rare install that exports it is covered without a second
+code path.
+
+**One older claim here is now wrong and worth naming.** This section used to say an
+empty `DAINTREE_API_KEY` means no `Authorization` header at all. That described a
+client holding a frozen `apiKey string`; the client now resolves a `TokenSource` once
+at construction, and an empty key is precisely the condition under which it builds the
+live account source. On a signed-in install an unset variable therefore sends a bearer
+token. What still holds is narrower: a source with nothing to give yields an empty
+token and `applyHeaders` sends no header for one, and the paths a client must reach
+before it holds any credential — the probes and `GET /v1/daintree/auth/config` — are on
+a closed allowlist that bypasses credential lookup entirely
+(`internal/backend/tokensource.go`, `publicPaths`).
+
+Under `AUTH_MODE=open` the server ignores whatever arrives (§1, §2), so on today's
+deployments none of this changes what happens to a request. Under `observe` it is
+verified and recorded, and under `enforce` it is required.
 
 ## 6. Rotation
 

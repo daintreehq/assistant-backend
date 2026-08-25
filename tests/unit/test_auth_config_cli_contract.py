@@ -72,6 +72,19 @@ def _go_bool_map_keys(source: str, name: str) -> set[str]:
     return set(re.findall(r'"([^"]+)"\s*:\s*true', body))
 
 
+def _go_json_tags(struct_body: str) -> set[str]:
+    """The wire names a Go struct decodes, `omitempty` and friends stripped.
+
+    The obvious pattern — `json:"([^",]+)"` — quietly drops every field whose tag
+    carries an option, because the comma before `omitempty` is not the closing
+    quote it insists on. That is not a cosmetic miss: `configured` and `required`
+    are the two fields on this manifest that HAVE options, so the strict form
+    silently excluded exactly the pair the unconfigured-deployment contract turns
+    on, and reported full agreement while checking neither.
+    """
+    return {tag.split(",", 1)[0] for tag in re.findall(r'json:"([^"]+)"', struct_body)}
+
+
 def test_the_manifest_version_matches_the_version_the_cli_understands() -> None:
     """The client checks this FIRST and refuses everything else on a mismatch, so
     a disagreement here is not a degraded login — it is no login at all, for every
@@ -88,14 +101,14 @@ def test_every_field_the_cli_decodes_is_a_field_we_publish() -> None:
     source = _cli_source()
     struct = re.search(r"type Manifest struct \{(.*?)\n\}", source, re.DOTALL)
     assert struct, "could not find `type Manifest struct` in discovery.go"
-    decoded = set(re.findall(r'json:"([^",]+)"', struct.group(1)))
+    decoded = _go_json_tags(struct.group(1))
     # SessionPolicy is a nested struct, so its fields are decoded from the
     # `session_policy` object rather than the top level. PARSED rather than
     # hardcoded: two names written out here would let a rename on the other side
     # pass a test whose whole job is to catch renames.
     nested_struct = re.search(r"type SessionPolicy struct \{(.*?)\n\}", source, re.DOTALL)
     assert nested_struct, "could not find `type SessionPolicy struct` in discovery.go"
-    nested = set(re.findall(r'json:"([^",]+)"', nested_struct.group(1)))
+    nested = _go_json_tags(nested_struct.group(1))
     assert nested, "parsed no fields out of SessionPolicy"
 
     settings = Settings(
@@ -119,6 +132,40 @@ def test_every_field_the_cli_decodes_is_a_field_we_publish() -> None:
         "each would arrive as a zero value and be rejected for the wrong reason"
     )
     assert set(body["session_policy"]) == nested  # type: ignore[arg-type]
+
+
+def test_the_cli_reads_the_unconfigured_shape_before_it_needs_an_issuer() -> None:
+    """The half `test_every_field_the_cli_decodes_is_a_field_we_publish` cannot see.
+
+    That test walks from the CLI's struct to our body, so it catches a field the
+    client reads and we never send. It is blind in the other direction: if a later
+    pin DELETED `configured`, `decoded` would simply get smaller and it would still
+    pass — while every deployment running the open door went back to being reported
+    as `the backend named no issuer`, which is accurate in a narrow sense and
+    useless as an explanation. That regression is what this asserts against.
+
+    Ordering is the load-bearing half and is asserted as such. Deciding
+    `configured == false` AFTER parsing the issuer would reach the issuer check with
+    an empty string and fail there first, so the branch existing is not enough — it
+    has to come before.
+    """
+    source = _cli_source()
+    struct = re.search(r"type Manifest struct \{(.*?)\n\}", source, re.DOTALL)
+    assert struct, "could not find `type Manifest struct` in discovery.go"
+    decoded = _go_json_tags(struct.group(1))
+    assert {"configured", "required"} <= decoded, (
+        "the CLI's Manifest no longer decodes configured/required, so a deployment "
+        "with no account authentication — which is what the open door publishes — "
+        "reaches the issuer check with an empty string and is reported as broken "
+        "rather than as accountless"
+    )
+
+    branch = source.index("m.Configured != nil && !*m.Configured")
+    issuer_check = source.index('parseAuthURL(m.Issuer, "issuer")')
+    assert branch < issuer_check, (
+        "the CLI validates the issuer before branching on `configured`, so an "
+        "unconfigured manifest now fails as a malformed one"
+    )
 
 
 def test_the_environment_we_report_is_one_the_cli_accepts() -> None:

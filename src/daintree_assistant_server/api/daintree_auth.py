@@ -8,10 +8,13 @@ manifest a client reads to learn how to obtain a credential for THIS deployment.
 It has to be public and it has to be unauthenticated, because requiring a token
 to learn how to get a token is a bootstrap no client can satisfy. The CLI has
 already reached the same conclusion from the other side: its token source keeps a
-closed list of paths it may call with no Authorization header, and this path sits
-on it beside the liveness probes. (That is upstream `develop`, not the pin in
-`cli/` — the vendored submodule predates it and still has the frozen `apiKey`, so
-a reader checking there will not find it.)
+closed allowlist of paths that bypass credential lookup entirely and are always sent
+with no Authorization header, and this path sits on it beside the liveness probes
+(`internal/backend/tokensource.go`, `publicPaths`). That is narrower than "the paths
+it may call unauthenticated" — a signed-out client sends every other route with no
+header too — and the difference is the point: these are the ones it must be able to
+reach BEFORE it holds anything, so acquiring a credential can never be a
+precondition for learning how to acquire one.
 
 ``POST /v1/daintree/auth/verify`` is the older question, and it is about the
 SERVER's own upstream credential rather than the caller's — see its docstring.

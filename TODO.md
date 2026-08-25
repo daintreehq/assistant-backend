@@ -75,15 +75,15 @@ sequenced into the list:
    safe measurement available. Not literally free: a well-formed token costs a
    verification and, on a cold cache, a JWKS fetch, so watch latency as well as
    the outcome counts.
-4. Add `auth_permission_denied` to the CLI's account taxonomy. The backend can
-   emit it; the CLI does not recognise it, so it would fall through to generic
-   403 handling and read as "sign in again" — the exact loop the account codes
-   exist to prevent. Unreachable until a second OAuth client with a narrower grant
-   exists, and the cross-repo gate will demand it the moment the pin moves.
-5. Then `enforce` — but see the two entries below first. Session revocation is not
+4. Then `enforce` — but see the entry below first. Session revocation is not
    implemented, so `enforce` means "a genuine, unexpired token" and not yet "a live
-   session", and the CLI cannot complete a login against a backend that does not
-   understand the unconfigured discovery shape.
+   session".
+
+A fifth step used to sit at the end of this list: teach the CLI the
+`auth_permission_denied` code, without which the backend's second 403 fell through
+to generic handling and read as "sign in again" — the exact loop the account codes
+exist to prevent. It is done. The pin now names a CLI carrying the whole account
+taxonomy, and the cross-repo gate that skipped for want of it runs.
 
 Entitlement, usage accounting and the Polar outbox are a separate body of work that
 needs a database and a Redis this service does not have. The error taxonomy for all
@@ -117,57 +117,6 @@ has, so it lands with that infrastructure rather than before it. Until then
 `enforce` should be understood as "a genuine token from a session that existed
 when the token was minted", which is a real boundary and not the one the product
 will eventually promise.
-
----
-
-## Teach the client to read the unconfigured `/auth/config` shape
-
-**Trigger: the next CLI change in `internal/auth/` — it is a small addition there
-and cannot be done from this repo at all.**
-
-`GET /v1/daintree/auth/config` answers a deployment with no account authentication
-with `configured: false` and no endpoints. That is the right server-side contract:
-"there are no accounts here" is the accurate description of production today, and a
-404 or a 503 would make a working deployment indistinguishable from a broken one.
-
-The client does not understand it yet. `Manifest` in
-`internal/auth/discovery.go` has no `Configured` or `Required` field, so both are
-dropped on decode and `Validate` reaches the issuer check with an empty string and
-reports `the backend named no issuer`. Accurate in a narrow sense, useless as an
-explanation — the deployment is not misconfigured, it simply has no sign-in.
-
-The fix is on the client side and is small: decode both fields, branch on
-`configured == false` BEFORE validating the issuer, and report "this backend does
-not offer sign-in" instead. `required` should imply `configured` there as it does
-here. Nothing on this side changes; the shape is already what the client will want
-to read.
-
-Until then the misleading message is reachable only by pointing a build that has
-OAuth at a deployment that does not, which is the current state of every
-deployment — so it is worth doing before enforcement, not after.
-
----
-
-## Move the `cli/` pin forward to the CLI's account taxonomy
-
-**Trigger: the next time the CLI pin moves for any reason — this rides along.**
-
-`tests/unit/test_account_error_taxonomy.py::test_the_cli_and_the_backend_agree_on_every_account_code`
-compares this server's twelve account error codes and statuses against
-`cli/internal/backend/account.go`. The vendored pin predates that file, so the
-gate SKIPS: the contract it exists to protect is currently unguarded in CI, and
-the two halves were aligned by reading the sibling checkout by hand.
-
-`tests/unit/test_auth_config_cli_contract.py` skips for the same reason and
-covers the other half: it reads `cli/internal/auth/discovery.go` and checks the
-manifest version, the decoded field names, the environment and scope allowlists,
-the issuer and link trust anchors, and the client-id bound. Both gates go live on
-the same bump.
-
-Note the standing hazard from CLAUDE.md: a pin bump that removes or renames a CLI
-tool reddens `tests/unit/test_runbook_catalog_hygiene.py`, and
-`benchmarks/_harness/fixtures/cli_tool_inventory.json` has to be refreshed with
-it. That is why this is not a drive-by.
 
 ---
 

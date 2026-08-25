@@ -3,7 +3,7 @@
 # Consumed by tests/unit/test_runbook_catalog_hygiene.py to check that every runbook's
 # requiredTools entry names a tool that actually exists. It is a SNAPSHOT on purpose:
 # Regenerating it needs a Go build of the pinned cli/ submodule, which CI does not do
-# (it checks the submodule out, but builds nothing). Snapshot taken against cli/ @ 2b38799 (origin/develop).
+# (it checks the submodule out, but builds nothing). Snapshot taken against cli/ @ 272b13c (origin/develop).
 #
 # Format: one wire name per line, sorted, "#" lines are comments. The registry maps
 # an internal dotted name to its OpenAI wire name by replacing EVERY "." with "__"
@@ -101,10 +101,17 @@ watcher__cancel
 watcher__list
 watcher__terminal__create
 watcher__watchPR
+workflow__attachResource
+workflow__cancel
 workflow__create
 workflow__get
+workflow__getGraph
 workflow__list
+workflow__next
+workflow__plan
 workflow__prepBranchForReview
+workflow__reconcile
+workflow__recordEvidence
 workflow__startWorkOnIssue
 workflow__update
 worktree__createWithRecipe

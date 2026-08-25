@@ -186,6 +186,9 @@ _NAMED_IN_TURN_FOOTER: frozenset[str] = frozenset(
         "async__cancel",
         "watcher__cancel",
         "watcher__list",
+        # The workflow-digest block's "call workflow.reconcile". It renders on
+        # client-supplied `turn_context.workflow_state`, so no runbook gates it.
+        "workflow__reconcile",
     }
 )
 

@@ -3070,5 +3070,275 @@
     "type": "object"
    }
   }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__plan",
+   "description": "Create a durable workflow execution graph for a multi-step goal. The backend plans it; the plan is validated and stored locally, survives restarts, and its progress digest is shown to you every round. Use for any task with several dependent steps (delegate \u2192 supervise \u2192 verify \u2192 report). Example: {\"goal\": \"Fix the watcher tests and report when the branch is clean\"}. Returns the workflowId (wfg_\u2026), the active nodes, and a recommended next action \u2014 which you still execute through normal tools.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "activeRunbookIds": {
+      "description": "Currently-loaded runbook ids, so the plan follows their playbooks.",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "existingWorkflowId": {
+      "description": "wfg_\u2026 id of a prior graph this goal relates to.",
+      "type": "string"
+     },
+     "forceReplan": {
+      "description": "Replace the existing (non-terminal) workflow with a fresh plan. Without it, planning over a live workflow is refused \u2014 reconcile instead.",
+      "type": "boolean"
+     },
+     "goal": {
+      "description": "The user's goal, verbatim or lightly summarized.",
+      "type": "string"
+     },
+     "notes": {
+      "description": "Extra constraints or facts the planner should honour.",
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     "scope": {
+      "description": "Optional bounds/constraints on the work.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "goal"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__getGraph",
+   "description": "Read a workflow execution graph (wfg_\u2026 id). Use view \"compact\" for a quick progress check, \"full\" when you need exact node/edge/resource state. Never guess graph state \u2014 read it here when it matters.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "description": "The wfg_\u2026 workflow graph id.",
+      "type": "string"
+     },
+     "view": {
+      "description": "compact (default): progress, active nodes, blockers, next action. full: every node, edge, resource, and evidence item.",
+      "enum": [
+       "compact",
+       "full"
+      ],
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__next",
+   "description": "Compute what can run NOW for a workflow graph: the ready nodes (dependencies satisfied), the nodes still waiting on async work, open blockers, and the stored recommended next action. Call it when unsure what to do next in a tracked workflow.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "id": {
+      "description": "The wfg_\u2026 workflow graph id.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__attachResource",
+   "description": "Link a terminal, watcher, async handle, worktree, branch, PR, or other resource to a workflow graph node, so later events on that resource route back to the right step. Resources created while a single workflow is active are usually linked automatically \u2014 attach manually when you spawned something for a specific node. Example: {\"workflowId\": \"wfg_1a2b3c4d\", \"nodeId\": \"n_repair\", \"type\": \"terminal\", \"ref\": \"terminal-\u2026\", \"label\": \"Claude: repair watcher tests\"}.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "label": {
+      "description": "Short human label.",
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "Node to link the resource to (omit for graph-level).",
+      "type": "string"
+     },
+     "ref": {
+      "description": "The resource's identifier, e.g. a terminal-\u2026 id, wch_\u2026 id, asy_\u2026 handle, branch name, or PR URL.",
+      "type": "string"
+     },
+     "status": {
+      "description": "Resource state, e.g. active, done.",
+      "type": "string"
+     },
+     "type": {
+      "enum": [
+       "terminal",
+       "agent",
+       "worktree",
+       "branch",
+       "pr",
+       "issue",
+       "watcher",
+       "timer",
+       "async",
+       "queue_event",
+       "artifact",
+       "memory",
+       "grant"
+      ],
+      "type": "string"
+     },
+     "workflowId": {
+      "description": "The wfg_\u2026 workflow graph id.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "workflowId",
+     "type",
+     "ref"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__recordEvidence",
+   "description": "Record one bounded evidence item against a workflow graph node \u2014 an observation, outcome, or decision-relevant fact the graph should remember (mutating tool results are captured automatically; use this for things only you observed). Keep the summary to one sentence.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "kind": {
+      "enum": [
+       "tool_call",
+       "tool_result",
+       "queue_event",
+       "watcher_event",
+       "async_completion",
+       "user_message",
+       "assistant_message",
+       "manual_note"
+      ],
+      "type": "string"
+     },
+     "nodeId": {
+      "description": "Node the evidence belongs to (omit for graph-level).",
+      "type": "string"
+     },
+     "refId": {
+      "description": "Id of the source object (tool call id, evt_\u2026, asy_\u2026).",
+      "type": "string"
+     },
+     "summary": {
+      "description": "One bounded sentence of what happened / was learned.",
+      "type": "string"
+     },
+     "workflowId": {
+      "description": "The wfg_\u2026 workflow graph id.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "workflowId",
+     "kind",
+     "summary"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__reconcile",
+   "description": "Reconcile a workflow graph against what actually happened: recent tool results, async completions, failures, and blockers are read by the backend, which returns a validated PATCH (node transitions, blockers, next action) that is applied locally. Call it after a meaningful change \u2014 a failed tool result, an async completion, a wake, resuming stale work \u2014 instead of improvising or repeating calls. It patches the plan; it never re-plans (use workflow.plan with forceReplan for a goal change) and never executes anything itself.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "apply": {
+      "description": "Default true. false previews the patch without committing it.",
+      "type": "boolean"
+     },
+     "latestUserMessage": {
+      "description": "The most recent user message, when it should steer the reconcile.",
+      "type": "string"
+     },
+     "reason": {
+      "enum": [
+       "tool_result",
+       "queue_event",
+       "wake",
+       "manual",
+       "resume",
+       "failure",
+       "user_interjection"
+      ],
+      "type": "string"
+     },
+     "recentEventLimit": {
+      "description": "How many recent workflow events to include (default 20, max 50).",
+      "type": "integer"
+     },
+     "workflowId": {
+      "description": "The wfg_\u2026 workflow graph id.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "workflowId",
+     "reason"
+    ],
+    "type": "object"
+   }
+  }
+ },
+ {
+  "type": "function",
+  "function": {
+   "name": "workflow__cancel",
+   "description": "Cancel a workflow graph (or one node of it). LOCAL STATE ONLY: this never closes terminals, deletes worktrees, or cancels external work \u2014 those remain explicit, user-approved actions. Suggest any needed cleanup separately.",
+   "parameters": {
+    "additionalProperties": false,
+    "properties": {
+     "nodeId": {
+      "description": "Cancel just this node (omit to cancel the whole workflow).",
+      "type": "string"
+     },
+     "reason": {
+      "description": "Why it is being cancelled.",
+      "type": "string"
+     },
+     "workflowId": {
+      "description": "The wfg_\u2026 workflow graph id.",
+      "type": "string"
+     }
+    },
+    "required": [
+     "workflowId"
+    ],
+    "type": "object"
+   }
+  }
  }
 ]

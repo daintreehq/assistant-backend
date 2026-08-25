@@ -744,6 +744,10 @@ def test_the_mandated_core_is_pinned_by_name() -> None:
                 # Stop it — instructed by the TURN FOOTER, not the base prompt.
                 "async.cancel",
                 "watcher.cancel",
+                # Also the footer: the workflow-digest block's "call
+                # workflow.reconcile", which renders on client-supplied
+                # `turn_context.workflow_state` and so is gated by no runbook.
+                "workflow.reconcile",
                 # Remember.
                 "memory.save",
             }

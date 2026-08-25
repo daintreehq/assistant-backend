@@ -145,7 +145,7 @@ reasoning from a stale figure.
 > with declared movement bands, which is the mechanism that actually catches
 > drift; this table is for reading, not for gating.
 
-Measured 2026-08-24, 39 runbooks / 89 tools (sizes are KiB). The catalog holds 39
+Measured 2026-08-25, 39 runbooks / 96 tools (sizes are KiB). The catalog holds 39
 but the selector prompt renders 38 — `daintree.docs.answer-usage-question` is
 server-pinned off the turn's `docs_query` and hidden from the selector, so it
 costs the selector nothing:
@@ -155,16 +155,26 @@ costs the selector nothing:
 | system+tools stable — continuation / runtime / startup / new-session | **1.0000** (enforced floor) |
 | system+tools stable — topic-shift | **1.0000** (enforced floor) |
 | `wire_encoder_matches_httpx` | true |
-| total request | ~131.1 KB, ~33.4k proxy tok |
-| tool schemas share of request | ~88.2 KB, **67.3%**, ~22.5k tok |
-| base prompt | ~24.2 KB, 18.5%, ~6.2k tok |
-| loaded runbooks (2 active) | ~11.7 KB, 8.9%, ~3.0k tok |
+| total request | ~138.2 KB, ~35.2k proxy tok |
+| tool schemas share of request | ~94.8 KB, **68.6%**, ~24.2k tok |
+| base prompt | ~24.7 KB, 17.9%, ~6.3k tok |
+| loaded runbooks (2 active) | ~11.7 KB, 8.4%, ~3.0k tok |
 | runbook selection | **local two-stage selector — 0 upstream bytes** (the ~49.0 KB selector prompt is retired to the test seam) |
 | state token | 392–503 B (0–3 runbooks; 16 KiB cap) |
 
-The tool region rose again, 79.3 → 88.2 KiB (~20.2k → ~22.5k proxy tokens), when
-the pin moved to `2b38799` — the CLI's protocol-3 runbooks line. That capture added
-ten tools and removed none: `agentSessionHistory__list`, `browser__getConsoleMessages`,
+The tool region rose again, 88.2 → 94.8 KiB (~22.5k → ~24.2k proxy tokens), when the
+pin moved to `272b13c` — the CLI's account-authentication line. **No tool definition
+changed at all** in that step: `internal/tools/` is byte-identical across the two
+commits, and what moved was which tools the capture SELECTS. `cmd/tooldump` had gated
+the seven `workflow__*` execution-graph tools behind an opt-in flag while the CLI
+itself registers them unless `DAINTREE_WORKFLOW_INTELLIGENCE=0`, so the dump described
+itself as "the projection a normal launch sends" and was not one; its default now
+matches. The seven were therefore always in a real request and were missing from this
+measurement, which makes this less a rise than a correction — and a reminder that
+diffing tool definitions between two pins says nothing about which of them ship.
+
+Before it, 79.3 → 88.2 KiB when the pin moved to `2b38799` — the CLI's protocol-3
+runbooks line. That capture added ten tools and removed none: `agentSessionHistory__list`, `browser__getConsoleMessages`,
 `daintree__invoke`, `errors__recent`, `forge__listIssueComments`, `notifications__recent`,
 `project__detectRunners`, `project__runCheck`, `tool__schema` and
 `worktree__resource__status`. Most of them are typed wrappers for MCP actions the
@@ -175,7 +185,7 @@ preceding steps were `cb12688` (73.5 → 79.3 KiB, adding `subagent__run` and
 `docs__*` family because the backend retrieves documentation itself now. The region
 remains the largest single part of the request by a wide margin, and the largest
 remaining lever: runbook-aware tool projection (`runbooks/tool_projection.py`, still
-in shadow mode) would cut it to a median ~47.5 KiB.
+in shadow mode) would cut it to ~54.1 KiB on this fixture, 43% off.
 
 The base-prompt row is the one that moved most against the previous snapshot,
 and it moved because the 2026-08-17 reading was already stale rather than because

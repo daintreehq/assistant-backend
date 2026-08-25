@@ -93,7 +93,18 @@ each other.
    python -m tools.baseline capture > benchmarks/baseline.json
    ```
 
-Last refreshed 2026-08-24 (85 -> 79 -> 77 -> 89 tools). The 77 -> 89 step is the
+Last refreshed 2026-08-25 (85 -> 79 -> 77 -> 89 -> 96 tools). The 89 -> 96 step is the
+account-authentication pin move (`2b38799` -> `272b13c`), and it is the one entry in this
+log where **no tool definition changed at all**: `internal/tools/` is byte-identical across
+the two commits. What moved was the generator's own default. `cmd/tooldump` gated the seven
+`workflow__*` execution-graph tools behind an opt-in flag while the CLI itself registered
+them unless `DAINTREE_WORKFLOW_INTELLIGENCE=0`, so the dump advertised itself as "the
+projection a normal launch sends" and was not; the flag now defaults ON to match. Read that
+as a warning about how this fixture goes stale: diffing `internal/tools/` between two pins
+proves the DEFINITIONS did not move and says nothing about which of them are SELECTED, and
+only the latter decides what a turn actually sends.
+
+The 77 -> 89 step is the
 protocol-3 runbooks line landing on the CLI's develop: the `skill.*` run tools became
 `runbook.*` (so this capture is a pure capture again — the hand-edited exception that
 stood here is retired, along with the two tests in

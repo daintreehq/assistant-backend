@@ -8,11 +8,18 @@ requiredTools:
   - context.snapshot
   - workflow.list
   - workflow.get
+  - workflow.plan
+  - workflow.getGraph
+  - workflow.next
+  - workflow.attachResource
+  - workflow.recordEvidence
+  - workflow.reconcile
+  - workflow.cancel
   - user.askMultipleChoice
 ---
 Use when: several dependent phases need a durable execution graph rather than an in-memory plan.
 
-The seven graph tools are REAL Assistant CLI tools, but they are registered only when trusted environment flag `DAINTREE_WORKFLOW_INTELLIGENCE=1` is enabled. They are intentionally omitted from this runbook's `requiredTools` metadata because the default CLI inventory does not offer them. Feature-detect the offered tools before promising graph durability. `wfg_...` graph ids are NOT the older flat-ledger `wfr_...` ids; never send one family to the other's tools.
+The seven graph tools are REAL Assistant CLI tools and they are registered by DEFAULT; the trusted environment flag `DAINTREE_WORKFLOW_INTELLIGENCE=0` is what turns them off. Feature-detect anyway: an operator who has turned them off leaves you naming tools that are not offered, and withholding is final for the turn. `wfg_...` graph ids are NOT the older flat-ledger `wfr_...` ids; never send one family to the other's tools.
 
 Procedure:
 
