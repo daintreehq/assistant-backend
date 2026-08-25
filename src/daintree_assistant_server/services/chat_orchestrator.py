@@ -97,6 +97,7 @@ from ..tracing import (
     TraceScope,
 )
 from ..tracing.scrub import scrub_request
+from .account_context import AccountContext
 from .bare_intent import could_still_be_bare_intent, is_bare_tool_intent
 from .compaction import (
     CompactionRequest,
@@ -697,6 +698,12 @@ class ChatOrchestrator:
         # parameter stays, defaulted, rather than being deleted and rebuilt.
         api_key: SecretStr | None = None,
         request_id: str | None = None,
+        # Who this turn is attributed to, resolved at the route boundary after
+        # identity and entitlement. `None` under the open door and on every
+        # unattributed path — see `services/account_context.py`. Carried rather
+        # than derived here because the orchestrator has no access to the
+        # request's credential and must never acquire one.
+        account: AccountContext | None = None,
     ) -> RespondOutcome:
         request_id = request_id or new_request_id()
         # ONE clock for the whole turn, started before any work. Every phase
@@ -742,6 +749,7 @@ class ChatOrchestrator:
                         prep_task=prep_task,
                         request_id=request_id,
                         budget=budget,
+                        account=account,
                     ),
                     prep_task,
                 ),
@@ -754,6 +762,7 @@ class ChatOrchestrator:
                 api_key=api_key,
                 budget=budget,
                 headers=headers,
+                account=account,
             )
         except DeadlineExceeded as exc:
             # Nothing has been sent yet on this path, so a clean 504 is available
@@ -775,6 +784,7 @@ class ChatOrchestrator:
         api_key: SecretStr | None,
         budget: RequestBudget,
         headers: dict[str, str],
+        account: AccountContext | None = None,
     ) -> RespondOutcome:
         """The non-streaming turn, under the total wall-clock budget.
 
@@ -788,10 +798,11 @@ class ChatOrchestrator:
             async with asyncio.timeout(budget.remaining_total()):
                 return await self._complete_nonstream_inner(
                     request,
-                        request_id=request_id,
+                    request_id=request_id,
                     api_key=api_key,
                     budget=budget,
                     headers=headers,
+                    account=account,
                 )
         except TimeoutError as exc:
             raise DeadlineExceeded(TurnPhase.TOTAL, budget.elapsed()) from exc
@@ -804,6 +815,7 @@ class ChatOrchestrator:
         api_key: SecretStr | None,
         budget: RequestBudget,
         headers: dict[str, str],
+        account: AccountContext | None = None,
     ) -> RespondOutcome:
         """Terminate the trace on EVERY exit, not only the successful one.
 
@@ -827,6 +839,7 @@ class ChatOrchestrator:
                 request_id=request_id,
                 budget=budget,
                 headers=headers,
+                account=account,
             )
         except asyncio.CancelledError:
             # A distinct OUTCOME, not a failure. The client went away or the total
@@ -851,6 +864,7 @@ class ChatOrchestrator:
         request_id: str,
         budget: RequestBudget,
         headers: dict[str, str],
+        account: AccountContext | None = None,
     ) -> RespondOutcome:
         result = await self._complete_with_retry(
             prepared.provider_request, budget=budget
@@ -920,6 +934,7 @@ class ChatOrchestrator:
             estimated_prompt_tokens=(
                 prepared.context.input_tokens if prepared.context else None
             ),
+            account=account,
         )
         # A non-streamed call cannot separate opening the model from generating
         # with it — one await covers both — so the whole upstream wait is reported
@@ -2499,6 +2514,7 @@ class ChatOrchestrator:
         prep_task: asyncio.Task[_PreparedTurn],
         request_id: str,
         budget: RequestBudget | None = None,
+        account: AccountContext | None = None,
     ) -> AsyncGenerator[str, None]:
         """Wrap the event stream with SSE comment heartbeats.
 
@@ -2508,7 +2524,11 @@ class ChatOrchestrator:
         see a live stream. Comments are invisible to SSE event parsing.
         """
         inner = self._stream_events(
-            request, prep_task=prep_task, request_id=request_id, budget=budget
+            request,
+            prep_task=prep_task,
+            request_id=request_id,
+            budget=budget,
+            account=account,
         )
         pending: asyncio.Task[str] | None = None
         try:
@@ -2542,6 +2562,7 @@ class ChatOrchestrator:
         prep_task: asyncio.Task[_PreparedTurn],
         request_id: str,
         budget: RequestBudget | None = None,
+        account: AccountContext | None = None,
     ) -> AsyncGenerator[str, None]:
         """Await prep inside the stream, then delegate to the provider event body.
 
@@ -2586,6 +2607,7 @@ class ChatOrchestrator:
             meta=prepared.meta,
             request=request,
             budget=budget,
+            account=account,
             projection=prepared.projection,
             enforcement=prepared.enforcement,
             projection_computed=prepared.projection_computed,
@@ -2646,6 +2668,7 @@ class ChatOrchestrator:
         trace: TraceScope | NullTraceScope = NULL_SCOPE,
         fast_task: asyncio.Task[FastResponseResult] | None = None,
         fast_policy: FastResponsePolicyDecision | None = None,
+        account: AccountContext | None = None,
     ) -> AsyncGenerator[str, None]:
         finish_reason: str | None = None
         thinking_signaled = False
@@ -3353,6 +3376,7 @@ class ChatOrchestrator:
                     fast_response=gate.usage,
                 ),
                 estimated_prompt_tokens=context.input_tokens if context else None,
+                account=account,
             )
             # Consolidated names only, and only from the buffer that survived:
             # a re-rolled attempt got a fresh buffer, so its discarded calls are

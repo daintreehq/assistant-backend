@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import httpx
 import jwt
@@ -27,6 +27,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
+from daintree_assistant_server.auth import subject_hash
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import create_app
 from daintree_assistant_server.services.entitlement import EntitlementService
@@ -57,14 +58,19 @@ def signing_key() -> tuple[Any, dict[str, Any]]:
     return private, jwk
 
 
-def _token(private: Any) -> str:
+EMAIL = "person@example.com"
+AUTH_SESSION = UUID("11111111-2222-3333-4444-555555555555")
+
+
+def _token(private: Any, subject: UUID = SUBJECT) -> str:
     now = datetime.now(tz=UTC)
     return jwt.encode(
         {
             "iss": ISSUER,
             "aud": "authenticated",
-            "sub": str(SUBJECT),
-            "session_id": str(uuid4()),
+            "sub": str(subject),
+            "email": EMAIL,
+            "session_id": str(AUTH_SESSION),
             "role": "authenticated",
             "is_anonymous": False,
             "client_id": CLIENT_ID,
@@ -118,6 +124,7 @@ def make_client(app: Any, fake_provider: Any) -> Any:
         entitlement_mode: str,
         jwk: dict[str, Any],
         website: _Website | None = None,
+        auth_mode: str = "enforce",
     ) -> tuple[TestClient, _Website | None]:
         settings = Settings(
             TOGETHER_API_KEY="tgp_v1_test-key",
@@ -125,7 +132,7 @@ def make_client(app: Any, fake_provider: Any) -> Any:
             STATE_SIGNING_KID="k1",
             STATE_SALT="test-salt",
             RETRY_BACKOFF_BASE_SECONDS=0.0,
-            AUTH_MODE="enforce",
+            AUTH_MODE=auth_mode,
             ENTITLEMENT_MODE=entitlement_mode,
             **_OAUTH,
             **({"DAINTREE_ENTITLEMENT_URL": ENTITLEMENT_URL} if website else {}),
@@ -703,3 +710,178 @@ def test_production_runbook_selection_cannot_reach_a_provider() -> None:
         "build_container no longer defaults to LocalSelector; re-check whether "
         "/v1/daintree/runbooks/resolve still spends nothing"
     )
+
+
+# --- attribution reaches the accounting ---------------------------------------
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_a_turn_is_attributed_to_the_account_that_paid_for_it(
+    make_client: Any, signing_key: Any, stream: bool
+) -> None:
+    """The P1 the brief names: the real principal used to stop at the route.
+
+    Without this the server cannot say who spent what, which is the prerequisite
+    for every later billing question — and it has to hold on BOTH response paths,
+    because they log their usage from different places.
+    """
+    private, jwk = signing_key
+    website = _Website(httpx.Response(200, json=_entitlement_body(plan_id="pro")))
+    client, _ = make_client("enforce", jwk, website)
+    body = _respond_body()
+    body["generation"] = {"stream": stream}
+
+    with capture_logs() as logs:
+        if stream:
+            with client.stream(
+                "POST",
+                "/v1/daintree/respond",
+                json=body,
+                headers={"Authorization": f"Bearer {_token(private)}"},
+            ) as response:
+                assert response.status_code == 200
+                list(response.iter_lines())
+        else:
+            assert _post(client, "/v1/daintree/respond", private, body).status_code == 200
+
+    usage = [line for line in logs if line["event"] == "turn_usage"]
+    assert len(usage) == 1, "a turn must produce exactly one accounting record"
+    assert usage[0]["account_subject_hash"] == subject_hash(str(SUBJECT))
+    assert usage[0]["account_plan_id"] == "pro"
+    assert usage[0]["account_client_id"] == CLIENT_ID
+    assert usage[0]["account_entitlement_source"] == "polar"
+    # The attribution and the COST have to be on the same record, or the
+    # correlation this whole change exists for cannot be made.
+    assert "turn_cost_usd" in usage[0]
+    assert "turn_cost_complete" in usage[0]
+    assert usage[0]["request_id"]
+
+
+def test_a_task_is_attributed_too(make_client: Any, signing_key: Any) -> None:
+    """A task spends the server's key like any turn, so it earns the same line."""
+    private, jwk = signing_key
+    website = _Website(httpx.Response(200, json=_entitlement_body()))
+    client, _ = make_client("enforce", jwk, website)
+    with capture_logs() as logs:
+        assert _post(client, "/v1/daintree/tasks", private, _task_body()).status_code == 200
+    runs = [line for line in logs if line["event"] == "task_run"]
+    assert len(runs) == 1
+    assert runs[0]["account_subject_hash"] == subject_hash(str(SUBJECT))
+    assert runs[0]["account_plan_id"] == "standard"
+    # Same rule as a turn: the account and what it spent, on one record. Without
+    # these the task half of "correlate spend with an account" does not exist.
+    assert "cost_usd" in runs[0]
+    assert "cost_complete" in runs[0]
+    assert runs[0]["prompt_tokens"] >= 0
+
+
+def test_the_raw_identity_never_reaches_the_accounting_log(
+    make_client: Any, signing_key: Any
+) -> None:
+    """The whole reason the attribution is pseudonymous.
+
+    These records are the ones that survive the request and get queried months
+    later; a raw user id here is a raw user id in a log pipeline forever.
+    """
+    private, jwk = signing_key
+    token = _token(private)
+    website = _Website(httpx.Response(200, json=_entitlement_body()))
+    client, _ = make_client("enforce", jwk, website)
+    with capture_logs() as logs:
+        client.post(
+            "/v1/daintree/respond",
+            json=_respond_body(),
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    rendered = json.dumps(logs)
+    # Every canary the brief names, each with a fixed value so its absence is a
+    # real assertion rather than an accident of a random uuid.
+    assert str(SUBJECT) not in rendered, "raw user uuid"
+    assert str(AUTH_SESSION) not in rendered, "oauth session uuid"
+    assert EMAIL not in rendered, "email"
+    assert token not in rendered, "bearer"
+    # The pseudonymous form IS there — this is attribution, not silence.
+    assert subject_hash(str(SUBJECT)) in rendered
+
+
+def test_an_unattributed_turn_carries_no_account_fields(
+    make_client: Any, signing_key: Any
+) -> None:
+    """Under entitlement `off` there is still an authenticated caller, so the turn
+    IS attributed — but to no plan, because none was looked up.
+
+    ``None`` here says "not asked" rather than "no plan", which are different
+    claims and only one of them is true.
+    """
+    private, jwk = signing_key
+    client, _ = make_client("off", jwk, _Website(httpx.Response(200, json=_entitlement_body())))
+    with capture_logs() as logs:
+        _post(client, "/v1/daintree/respond", private, _respond_body())
+    usage = [line for line in logs if line["event"] == "turn_usage"]
+    assert usage[0]["account_subject_hash"] == subject_hash(str(SUBJECT))
+    assert usage[0]["account_plan_id"] is None
+    assert usage[0]["account_entitlement_source"] is None
+
+
+def test_the_open_door_attributes_nothing(make_client: Any, signing_key: Any) -> None:
+    """Under ``open`` there is no caller to attribute to, and none is invented.
+
+    A context of empty strings would put five null fields on every turn's cost
+    line while identifying nobody. Absent says "not attributed" without
+    pretending otherwise.
+    """
+    _, jwk = signing_key
+    client, _ = make_client("off", jwk, None, auth_mode="open")
+    with capture_logs() as logs:
+        response = client.post("/v1/daintree/respond", json=_respond_body())
+    assert response.status_code == 200
+    usage = [line for line in logs if line["event"] == "turn_usage"]
+    assert usage
+    assert "account_subject_hash" not in usage[0]
+    assert "account_plan_id" not in usage[0]
+
+
+def test_two_accounts_are_attributed_separately(
+    make_client: Any, signing_key: Any
+) -> None:
+    """Guards against attribution that is global, cached, or left over.
+
+    Every other test in this file uses one subject, so a context stashed
+    somewhere process-wide — or reused from the previous request — would pass all
+    of them and misattribute every real customer's spend to whoever went first.
+    """
+    private, jwk = signing_key
+    other = UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        # Answer for whichever subject the caller's own token names, which is what
+        # the client's subject check requires anyway.
+        token = request.headers["authorization"].removeprefix("Bearer ")
+        claims = jwt.decode(token, options={"verify_signature": False})
+        plan = "pro" if claims["sub"] == str(other) else "standard"
+        return httpx.Response(
+            200, json=_entitlement_body(subject=claims["sub"], plan_id=plan)
+        )
+
+    website = _Website(httpx.Response(200, json=_entitlement_body()))
+    client, _ = make_client("enforce", jwk, website)
+    client.app.state.entitlement_service = EntitlementService(
+        httpx.AsyncClient(transport=httpx.MockTransport(handler)), url=ENTITLEMENT_URL
+    )
+
+    with capture_logs() as logs:
+        for subject in (SUBJECT, other):
+            response = client.post(
+                "/v1/daintree/respond",
+                json=_respond_body(),
+                headers={"Authorization": f"Bearer {_token(private, subject)}"},
+            )
+            assert response.status_code == 200
+
+    usage = [line for line in logs if line["event"] == "turn_usage"]
+    assert len(usage) == 2
+    assert usage[0]["account_subject_hash"] == subject_hash(str(SUBJECT))
+    assert usage[0]["account_plan_id"] == "standard"
+    assert usage[1]["account_subject_hash"] == subject_hash(str(other))
+    assert usage[1]["account_plan_id"] == "pro"
+    assert usage[0]["account_subject_hash"] != usage[1]["account_subject_hash"]

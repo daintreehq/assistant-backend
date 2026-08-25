@@ -1,15 +1,19 @@
-"""Turn accounting — what a turn produced, and what it cost the caller.
+"""Turn accounting — what a turn produced, and what it cost.
 
-Every upstream call is funded by the CALLER's own OpenRouter key, so these
-figures are their bill rather than an internal metric. That shapes every rule
-here, and each one exists because its opposite is a plausible-looking lie:
+Every upstream call is funded by the SERVER's own credential. That inverted at the
+move off caller-supplied keys, and this module's rules were written for the old
+world where the figure was the caller's own bill — they survive the inversion
+unchanged, because the figure is now Daintree's spend ATTRIBUTED to an account,
+which is a number that has to be just as honest. Each rule exists because its
+opposite is a plausible-looking lie:
 
 * an unreported cost stays ``None``, never ``0.0`` — a zero claims the turn was
-  free, which is a statement about someone's money we have no basis for;
-* a partial sum is marked ``complete=False`` rather than presented as a total;
+  free, and free is a claim about money nobody has evidence for;
+* a partial sum is marked ``complete=False`` rather than presented as a total,
+  and that qualifier is LOGGED beside the amount now that the amount sits next to
+  an account and a plan;
 * a discarded generation — a re-rolled round, a losing speculative stream — is
-  still summed, because the caller was charged for it whether or not they ever
-  saw a byte of it.
+  still summed, because it was billed whether or not anybody saw a byte of it.
 
 Extracted from ``chat_orchestrator`` unchanged. These were already pure static
 methods; the arithmetic is easier to check, and to test, away from the streaming
@@ -24,6 +28,7 @@ from typing import TYPE_CHECKING
 from ..contracts.daintree_api import RespondUsage, TurnCost
 from ..observability import get_logger
 from ..providers.base import ProviderUsage
+from .account_context import AccountContext
 
 if TYPE_CHECKING:  # pragma: no cover - typing-only, no runtime cycle
     from .chat_orchestrator import _RespondMeta
@@ -147,12 +152,20 @@ def log_turn_usage(
     selector_endpoint: str | None,
     turn_cost: TurnCost | None = None,
     estimated_prompt_tokens: int | None = None,
+    account: AccountContext | None = None,
 ) -> None:
-    """What this turn cost the caller, as metadata.
+    """What this turn cost, as metadata, and which account it is attributed to.
 
-    The response body carries the same numbers to the CLI; this is the half
-    that survives the request, so a tester reporting "it burned through my
-    credit" can be answered from logs rather than from memory.
+    The response body carries the same numbers to the CLI; this is the half that
+    survives the request, so "what did this account spend last week" is a query
+    rather than a reconstruction.
+
+    The attribution arrives already reduced to its safe projection
+    (``AccountContext.log_fields``): a pseudonymous subject, an OAuth client and a
+    plan. There is deliberately no raw user id, email or session uuid in it — see
+    ``services/account_context.py`` — and it is absent entirely rather than nulled
+    on an unattributed turn, because five empty fields on every open-door request
+    identify nobody and cost a line's width on every record.
 
     ``cache_ratio`` is the number the prompt-cache work exists to move, and
     the one most worth watching regress: the assembler's whole layout is
@@ -209,6 +222,12 @@ def log_turn_usage(
     single round is invisible to the first half alone.
     """
     prompt = usage.prompt_tokens or 0
+    # The attribution, when there is one. Absent under the open door and on any
+    # unattributed path, which is why it is spread rather than defaulted: five
+    # null fields on every turn would identify nothing and cost a line's width on
+    # every record. `AccountContext.log_fields` is the ONLY projection read here —
+    # it has nowhere to put the raw subject, the email or a credential.
+    attribution = account.log_fields() if account is not None else {}
     logger.info(
         "turn_usage",
         request_id=request_id,
@@ -264,6 +283,13 @@ def log_turn_usage(
         # The figure that answers "what did this request cost me?" — every
         # upstream call the turn made, including the selector.
         turn_cost_usd=turn_cost.total if turn_cost else None,
+        # Whether that total is a WHOLE one. `TurnCost` has computed this all
+        # along and only the amount was ever logged, which was survivable while
+        # nothing correlated a cost with an account — a short sum was merely
+        # imprecise. It is not survivable now: a partial figure recorded beside a
+        # plan and a subject hash is a claim about what somebody's turn cost, and
+        # it reads as exact.
+        turn_cost_complete=turn_cost.complete if turn_cost else None,
         selector_cost_usd=turn_cost.selector if turn_cost else None,
         # What `services/context_budget.py` estimated for this same prompt,
         # beside what the upstream actually charged for it. The pair is the whole
@@ -273,6 +299,7 @@ def log_turn_usage(
         # `None` when the measurement failed, which must stay distinguishable
         # from a genuine zero.
         estimated_prompt_tokens=estimated_prompt_tokens,
+        **attribution,
     )
 
 

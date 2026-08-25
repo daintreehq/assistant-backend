@@ -80,7 +80,13 @@ FLOORS: dict[str, int] = {
     # session, and the two directions fail very differently: a lost refusal is
     # unbilled work, while a refusal that stops being an outage-shaped 503 is a
     # paying customer told to buy a second plan.
-    "src/daintree_assistant_server/api/paid_access.py": 97,
+    "src/daintree_assistant_server/api/paid_access.py": 98,
+    # Added 2026-08-25 (measured 100%). What may be written down about a paying
+    # account. Tiny, and on this list for one reason: it carries the raw subject
+    # so durable accounting has a key to join on, and every projection that
+    # writes something out has to refuse it. A branch that stops being exercised
+    # here is a raw identifier reaching a log pipeline.
+    "src/daintree_assistant_server/services/account_context.py": 100,
     "src/daintree_assistant_server/providers/base.py": 92,
     # The SERVING adapter's implementation. `providers/together.py` subclasses it
     # and changes three class attributes plus a key decoder, so this is where

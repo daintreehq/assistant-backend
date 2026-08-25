@@ -41,6 +41,7 @@ from ..errors import (
     subscription_required,
 )
 from ..observability import get_logger
+from ..services.account_context import AccountContext
 from ..services.bearer import authorization_values, parse_bearer
 from ..services.entitlement import Entitlement, EntitlementService
 from .deps import request_id
@@ -69,20 +70,64 @@ def require_paid_access(permission: str) -> Callable[[Request], Awaitable[Princi
 
     async def dependency(request: Request) -> Principal:
         principal = await identity(request)
-        await _check(request, principal)
+        verdict = await _check(request, principal)
+        # Stashed rather than returned, because a FastAPI dependency has exactly
+        # one return value and the route already needs the principal. Attached
+        # HERE because this is the only place that holds both halves — who the
+        # caller is, and what the billing authority said about them — and
+        # rebuilding it in the handler would mean resolving entitlement twice.
+        request.state.account = _account_context(request, principal, verdict)
         return principal
 
     return dependency
 
 
-async def _check(request: Request, principal: Principal) -> None:
-    """Apply this deployment's entitlement posture to one paid request."""
+def account_context(request: Request) -> AccountContext | None:
+    """The attribution the guard resolved for this request, if any.
+
+    Read through a helper rather than off ``request.state`` directly, so a route
+    that is not behind the guard gets ``None`` instead of an ``AttributeError``.
+    """
+    context: AccountContext | None = getattr(request.state, "account", None)
+    return context
+
+
+def _account_context(
+    request: Request, principal: Principal, verdict: Entitlement | None
+) -> AccountContext | None:
+    """Build the attribution for a turn, or ``None`` when there is nobody to attribute to.
+
+    ``None`` under the open door is deliberate: an anonymous principal has no
+    subject, and a context full of empty strings would put five null fields on
+    every turn's cost line while identifying nothing. Absent says "not attributed"
+    without pretending otherwise.
+    """
+    if not principal.is_authenticated:
+        return None
+    return AccountContext(
+        subject_hash=principal.subject_hash,
+        request_id=request_id(request),
+        oauth_client_id=principal.oauth_client_id,
+        plan_id=verdict.plan_id if verdict else None,
+        entitlement_source=verdict.source if verdict else None,
+        entitlement_stale=verdict.stale if verdict else None,
+    )
+
+
+async def _check(request: Request, principal: Principal) -> Entitlement | None:
+    """Apply this deployment's entitlement posture to one paid request.
+
+    Returns the verdict when one was obtained, so the caller can attribute the
+    turn to the plan that was in force when it began — including in ``observe``,
+    where the verdict changes no decision but is still the honest thing to record
+    a cost against.
+    """
     settings = request.app.state.settings
     mode = settings.entitlement_mode
     if mode == "off":
         # Today's behaviour, unchanged: nothing is asked, nothing is billed for
         # the asking, and no latency is added to a turn's first byte.
-        return
+        return None
 
     service: EntitlementService | None = getattr(
         request.app.state, "entitlement_service", None
@@ -105,7 +150,7 @@ async def _check(request: Request, principal: Principal) -> None:
                 result="error",
                 code=exc.code,
             )
-            return
+            return None
         raise
     except Exception as exc:  # noqa: BLE001 - see below
         # Anything the client did not already normalise: a bug here, a resolver a
@@ -132,7 +177,7 @@ async def _check(request: Request, principal: Principal) -> None:
             error=type(exc).__name__,
         )
         if mode == "observe":
-            return
+            return None
         raise entitlement_unavailable() from None
 
     if verdict is None:
@@ -148,7 +193,7 @@ async def _check(request: Request, principal: Principal) -> None:
                 subject_hash=principal.subject_hash,
                 result="unresolvable",
             )
-            return
+            return None
         logger.error("entitlement_unresolvable", request_id=correlation)
         raise entitlement_unavailable()
 
@@ -161,10 +206,10 @@ async def _check(request: Request, principal: Principal) -> None:
             would_refuse=not verdict.granted,
             **verdict.log_fields(),
         )
-        return
+        return verdict
 
     if verdict.granted:
-        return
+        return verdict
 
     refusal = _REFUSALS.get(verdict.access)
     if refusal is None:  # pragma: no cover - _ACCESS_VALUES is closed

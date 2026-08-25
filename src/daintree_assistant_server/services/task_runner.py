@@ -62,6 +62,7 @@ from ..providers.base import ChatProvider, ProviderChatRequest, ProviderUsage
 from ..providers.retry import retry_upstream
 from ..runbooks.catalog import CatalogManager
 from ..text_utils import cap_bytes, frame_data_block, frame_value, sanitize_line, utf8_len
+from .account_context import AccountContext
 from .deadlines import BudgetPolicy, RequestBudget, TurnPhase
 from .result_schema import conforms, validate_result_schema
 from .workflow_validation import (
@@ -1015,7 +1016,17 @@ class TaskRunner:
             remaining_seconds=(budget.remaining_total if budget is not None else None),
         )
 
-    async def run(self, request: TaskRequest, *, api_key: SecretStr | None = None) -> TaskResult:
+    async def run(
+        self,
+        request: TaskRequest,
+        *,
+        api_key: SecretStr | None = None,
+        # Who this task is attributed to, resolved at the route boundary after
+        # identity and entitlement. A task spends the server's key like any turn,
+        # so it earns the same attribution. `None` on every unattributed path —
+        # see `services/account_context.py`.
+        account: AccountContext | None = None,
+    ) -> TaskResult:
         """Run one named utility task under a finite total budget.
 
         The per-call `httpx` timeout on a profile is an inactivity bound; a task
@@ -1032,7 +1043,9 @@ class TaskRunner:
         budget = RequestBudget(policy=self._budget_policy(profile))
         try:
             async with asyncio.timeout(budget.remaining_total()):
-                return await self._run_inner(request, api_key=api_key, budget=budget)
+                return await self._run_inner(
+                    request, api_key=api_key, budget=budget, account=account
+                )
         except TimeoutError as exc:
             logger.warning(
                 "task_deadline_exceeded",
@@ -1073,7 +1086,12 @@ class TaskRunner:
         )
 
     async def _run_inner(
-        self, request: TaskRequest, *, api_key: SecretStr | None, budget: RequestBudget
+        self,
+        request: TaskRequest,
+        *,
+        api_key: SecretStr | None,
+        budget: RequestBudget,
+        account: AccountContext | None = None,
     ) -> TaskResult:
         profile = self.profiles.get(request.task)
         if profile is None:
@@ -1236,7 +1254,29 @@ class TaskRunner:
         # attributable if the log says which endpoint answered and whether the
         # parse-repair round-trip doubled the work.
         logger.info(
-            "task_run", task=profile.id, finish_reason=finish, endpoint=endpoint, calls=calls
+            "task_run",
+            task=profile.id,
+            finish_reason=finish,
+            endpoint=endpoint,
+            calls=calls,
+            # What this task actually COST, beside who it is attributed to. The
+            # two have to be on the same record or the correlation the attribution
+            # exists for cannot be made: the response body carries the figure to
+            # the client, and this is the half that survives the request.
+            #
+            # `cost_usd` is the raw sum and `cost_complete` says whether it is a
+            # whole one — a repaired task is billed twice and may have a figure
+            # for only one of the calls, so a short sum presented without that
+            # qualifier reads as exact. (The response body withholds an incomplete
+            # figure entirely, having no field to qualify it; a log line does.)
+            prompt_tokens=usage.prompt_tokens or 0,
+            completion_tokens=usage.completion_tokens or 0,
+            cached_tokens=usage.cached_tokens or 0,
+            cost_usd=usage.cost,
+            cost_complete=usage.cost_complete,
+            # The attribution, when there is one, through the same safe projection
+            # `turn_usage` uses. Absent rather than nulled on an unattributed path.
+            **(account.log_fields() if account is not None else {}),
         )
 
         # A repaired task billed TWICE. If only one of those calls reported a

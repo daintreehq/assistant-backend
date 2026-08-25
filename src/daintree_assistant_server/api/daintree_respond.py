@@ -14,7 +14,7 @@ from ..auth import PERMISSION_CHAT, Principal
 from ..contracts.daintree_api import RespondRequest
 from ..services.validation import validate_respond_request
 from .deps import check_protocol_header, check_protocol_value, request_id, require_ready
-from .paid_access import require_paid_access
+from .paid_access import account_context, require_paid_access
 
 router = APIRouter()
 
@@ -60,6 +60,11 @@ async def respond(
         # credential they mean to spend; the serving path never does.
         # The middleware-resolved id, so logs, X-Request-Id, and SSE meta all agree.
         request_id=request_id(request),
+        # Resolved by the guard above, from the verified principal and whatever
+        # the billing authority said. `None` under the open door. Carries a
+        # pseudonymous subject and a plan — never an email, a session id or a
+        # credential — so a cost line can be attributed without being identifying.
+        account=account_context(request),
     )
 
     if outcome.streaming:
