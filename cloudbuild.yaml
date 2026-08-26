@@ -273,6 +273,92 @@ steps:
           fi
         fi
 
+        # And the SHAPE of that URL, wherever one is set — including under `off`,
+        # matching `_entitlement_url_problems`, which validates it in every mode.
+        # A value that is only checked when a mode binds is one that gets typed
+        # wrong months before anybody finds out.
+        #
+        # This is not a duplicate of readiness so much as the same rule asked at
+        # the moment the mistake is made. Readiness DOES catch every case here and
+        # would abort the release safely — but three steps later, as a 503 on a
+        # candidate revision, which tells an operator that something is wrong
+        # rather than that they typed `daintree.com`.
+        #
+        # The pinning is the point rather than the tidiness: this request forwards
+        # the CALLER's account credential, so a host that could be chosen freely is
+        # a credential sent to a stranger, and a query string is configuration
+        # deciding which account we ask about when the verified subject is the only
+        # thing allowed to decide that.
+        if [ -n "$$DAINTREE_ENTITLEMENT_URL" ]; then
+          URL="$$DAINTREE_ENTITLEMENT_URL"
+          # Tested on the whole string BEFORE anything is split off it. A
+          # whitespace-only value reaches here rather than being trimmed away as
+          # "unset", because readiness validates any non-empty value and would
+          # refuse it — treating it as absent is the one reading that makes the
+          # build laxer than the door it is standing in for.
+          case "$$URL" in
+            *[[:space:]]*)
+              echo "ERROR: _DAINTREE_ENTITLEMENT_URL must not contain whitespace." >&2
+              exit 1 ;;
+            *'?'*|*'#'*)
+              echo "ERROR: _DAINTREE_ENTITLEMENT_URL must carry no query string or fragment" >&2
+              echo "       (the caller's verified subject is the only input to this lookup)." >&2
+              exit 1 ;;
+            *'@'*)
+              echo "ERROR: _DAINTREE_ENTITLEMENT_URL must carry no userinfo." >&2
+              exit 1 ;;
+            *'\'*)
+              # A BACKSLASH IS A HOST SPOOF, and the reason this rule is its own
+              # branch rather than folded into the host check below. WHATWG URL
+              # parsers treat `\` as `/`, so `https://evil.example\.daintree.org/`
+              # is a request to `evil.example` — while the shell splitting below
+              # sees no `/`, keeps the whole string as the host, and matches it
+              # against `*.daintree.org`. Refusing the character outright is the
+              # only reading that cannot disagree with the parser that will
+              # actually dial the connection.
+              echo "ERROR: _DAINTREE_ENTITLEMENT_URL must not contain a backslash" >&2
+              echo "       (URL parsers read it as '/', so it can disguise the host)." >&2
+              exit 1 ;;
+          esac
+          # https only. The loopback exemption the config allows is for a developer
+          # running a local website; it can never be right for a Cloud Run revision,
+          # which would be naming its own container.
+          case "$$URL" in
+            https://*) ;;
+            *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must be an https:// URL, got '$$URL'." >&2
+               exit 1 ;;
+          esac
+          # Host pinned to daintree.org or a subdomain. Split off the authority and
+          # compared on the HOST alone, never on the whole URL: a substring test
+          # would accept `https://daintree.org.evil.example/...` and
+          # `https://evil.example/daintree.org`, the two spellings anybody
+          # attacking this would reach for. This splitting is NOT URL parsing —
+          # the rules above are what remove the characters it cannot handle.
+          AUTHORITY="$${URL#https://}"; AUTHORITY="$${AUTHORITY%%/*}"
+          HOST="$${AUTHORITY%%:*}"; PORT="$${AUTHORITY#$$HOST}"; PORT="$${PORT#:}"
+          case "$$HOST" in
+            daintree.org|*.daintree.org) ;;
+            *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must point at daintree.org or a" >&2
+               echo "       subdomain (this call forwards the caller's account" >&2
+               echo "       credential); got host '$$HOST'." >&2
+               exit 1 ;;
+          esac
+          # A port, if one is written, must be a real one. Everything after the
+          # first colon was being discarded, so `daintree.org:not-a-port` matched
+          # the host rule and shipped a URL readiness then refuses.
+          if [ -n "$$PORT" ]; then
+            case "$$PORT" in
+              ''|*[!0-9]*)
+                echo "ERROR: _DAINTREE_ENTITLEMENT_URL has a non-numeric port '$$PORT'." >&2
+                exit 1 ;;
+            esac
+            if [ "$$PORT" -lt 1 ] || [ "$$PORT" -gt 65535 ]; then
+              echo "ERROR: _DAINTREE_ENTITLEMENT_URL port '$$PORT' is out of range." >&2
+              exit 1
+            fi
+          fi
+        fi
+
         # together-api-key is REQUIRED, not optional like the previous signing key:
         # the server holds the upstream credential and `missing_secrets()` gates
         # /readyz on it, so a deploy without it would build a candidate that can never
