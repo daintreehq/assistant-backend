@@ -19,7 +19,12 @@ share an entry and a leaked key never becomes a lookup handle.
 ``entitlement_unavailable`` (503, retryable), and the one translation this module
 refuses to make is uncertainty into ``subscription_required``: telling a paying
 customer to buy a second plan during a billing outage is the single worst thing
-the account taxonomy exists to prevent. The website's own 401 IS informative,
+the account taxonomy exists to prevent. That rule reaches further than the
+transport failures: a body that ARRIVES intact can still be uncertainty wearing a
+verdict's clothes, which is what the ``(source, stale, access)`` table in
+:func:`_parse` is for — a cache-sourced refusal is the website reporting what it
+believed before it lost the provider, and it is refused as unusable rather than
+served as a 402. The website's own 401 IS informative,
 though, and is the piece the local JWKS check cannot supply: the website performs
 a fresh Supabase user check, so a token that verified here and is refused there
 is a session that no longer exists — ``auth_session_revoked``, which the CLI
@@ -62,7 +67,7 @@ from ..errors import (
     entitlement_unavailable,
 )
 from ..observability import get_logger
-from ..text_utils import sanitize_line
+from ..text_utils import sanitize_line, utf8_len
 
 logger = get_logger("daintree.entitlement")
 
@@ -75,7 +80,17 @@ ENTITLEMENT_CONTRACT_VERSION = 1
 #: One small JSON call. The whole budget, not a per-phase one — a paid request is
 #: waiting behind it, and a lookup that takes longer than this has already cost
 #: more than the answer is worth.
-ENTITLEMENT_TIMEOUT_SECONDS = 5.0
+#:
+#: **Ten seconds is a CROSS-SERVICE number, not a local preference.** The website
+#: gives its own endpoint an 8-second hard total — Supabase verification, Polar,
+#: its cache fallback and serialization, all of it — and the last thing it does
+#: inside that budget is the thing this server most wants: when Polar is slow or
+#: down, it gives up on the provider and answers from its own cached positive. A
+#: 5-second bound here could not reach that answer. It cut the exchange off while
+#: the website was still inside its own budget, on precisely the outage where the
+#: fallback exists, and the caller got a 503 for a question that was about to be
+#: answered. The 2-second margin over the website's 8 is transport, not slack.
+ENTITLEMENT_TIMEOUT_SECONDS = 10.0
 ENTITLEMENT_CONNECT_TIMEOUT_SECONDS = 2.0
 
 #: Refuse to hold more than this before decoding. The real body is a few hundred
@@ -103,9 +118,36 @@ _MAX_RETRY_AFTER_SECONDS = 300
 #: incoherent. Clock skew between two hosts is seconds; minutes is a bug.
 _MAX_CHECKED_AT_SKEW = timedelta(minutes=5)
 
-#: And how far back. An answer stamped days ago is not a fresh billing check,
-#: whatever `stale` says about it.
-_MAX_CHECKED_AT_AGE = timedelta(days=1)
+#: The transport-and-clock allowance on the way BACK, and the same number for the
+#: same reason as the skew above. It is added to the cached-grant bound rather
+#: than folded into it, so the policy stays readable as "a day, plus the margin"
+#: instead of the unexplained 86,700 that sum produces.
+_CLOCK_MARGIN = timedelta(minutes=5)
+
+#: How old a LIVE answer may be. `source: polar` is a claim that the website just
+#: asked the provider, and the whole exchange is bounded by
+#: `ENTITLEMENT_TIMEOUT_SECONDS` — so a healthy one reaches this parser seconds
+#: old. Five minutes is not a latency budget, it is the point past which "we just
+#: checked" stops being a true sentence: anything older is a cached answer that
+#: did not say so, and it must not be honoured as a fresh one.
+_MAX_LIVE_ANSWER_AGE = timedelta(minutes=5)
+
+#: And how old a CACHED grant may be — the website's outage fallback, which is
+#: allowed to be a day old because that is the whole point of it. This is the one
+#: bound the two services must agree on to the second, and accepting exactly
+#: 86,400 plus the margin above is what stops the website's own DEFAULT racing its
+#: boundary in transit.
+#:
+#: **It is the agreed number, and the website has not reached it yet.** Its
+#: stale-positive grace period is configurable up to 604,800 seconds today, so a
+#: deployment configured past a day would serve a body this parser refuses — a
+#: healthy 200 becoming a retryable 503 here. That is the coordinated direction
+#: (the website narrows its maximum to 86,400) rather than a limit to widen from
+#: this side: accepting a week-old grant would make the revocation window a week,
+#: and this bound is the only thing on this side that reads the age at all. Until
+#: the two land, a >24h configuration is the one shape where the halves disagree,
+#: and it fails toward "retry", which is the safe direction.
+_MAX_CACHED_GRANT_AGE = timedelta(seconds=86_400)
 
 #: RFC 3339, and nothing else. ``datetime.fromisoformat`` is much more permissive
 #: — it accepts ISO week dates and basic-format strings this contract does not
@@ -130,7 +172,15 @@ _SOURCE_VALUES = frozenset({"polar", "cache"})
 #: Bounded provider metadata. It is diagnostic — nothing branches on it — but it
 #: is rendered by the CLI and logged here, so it is capped like any other
 #: upstream-controlled string.
-_MAX_STATUS_LENGTH = 64
+#:
+#: BYTES, which is the unit the locked cross-service contract names and the one
+#: `sanitize_line` already crops in. The two used to disagree: the refusal
+#: measured CHARACTERS, so a 64-character multibyte status was 192 bytes, passed
+#: the check, and was then silently CROPPED to 64 bytes by the sanitizer —
+#: repairing an over-contract body instead of refusing it, which is the one thing
+#: every other rule in `_parse` declines to do. Measuring the same unit in both
+#: places is what makes the refusal the only outcome.
+_MAX_STATUS_BYTES = 64
 
 Access = Literal["granted", "subscription_required", "subscription_inactive"]
 
@@ -419,7 +469,8 @@ class EntitlementService:
             },
             # A Timeout OBJECT, not a scalar. A bare float replaces every phase,
             # including the connect bound the client was built with — so passing
-            # `5.0` here silently widened connect from two seconds to five.
+            # `ENTITLEMENT_TIMEOUT_SECONDS` here as a plain number would silently
+            # widen connect from two seconds to the whole ten.
             timeout=httpx.Timeout(
                 self._timeout, connect=ENTITLEMENT_CONNECT_TIMEOUT_SECONDS
             ),
@@ -558,7 +609,9 @@ async def _read_bounded(response: httpx.Response) -> bytes:
     return b"".join(chunks)
 
 
-def _parse(body: bytes, *, expected_subject: UUID) -> Entitlement:
+def _parse(
+    body: bytes, *, expected_subject: UUID, now: datetime | None = None
+) -> Entitlement:
     """Validate a v1 body into a verdict, or refuse it.
 
     Every rule here refuses rather than repairs. A field of the wrong type, a
@@ -566,7 +619,14 @@ def _parse(body: bytes, *, expected_subject: UUID) -> Entitlement:
     dependency that is not behaving as agreed, and the honest answer to "what does
     this account own?" in that state is that we do not know. Unknown FIELDS are
     the one thing ignored, so the website can add one without a lockstep release.
+
+    ``now`` is injectable so the freshness boundaries can be tested AT the second
+    rather than around them. A test that has to sleep to reach a boundary either
+    does not run or does not really test it, and both bounds here are chosen to
+    match the website's to the second.
     """
+    if now is None:
+        now = datetime.now(UTC)
     try:
         payload: Any = json.loads(
             body,
@@ -632,21 +692,68 @@ def _parse(body: bytes, *, expected_subject: UUID) -> Entitlement:
     stale = payload.get("stale")
     if not isinstance(stale, bool):
         raise EntitlementContractError("stale")
+
+    # `source`, `stale` and `access` are read as ONE closed combination rather
+    # than three independent fields, because the invalid pairings are not
+    # type errors — each is a well-formed body making a claim the website cannot
+    # be making, and two of them fail in the expensive direction if waved through.
+    #
+    #   polar / fresh / any      -> live, and must be recent (bounded below)
+    #   polar / stale            -> a live check cannot be stale
+    #   cache / fresh            -> the fallback is stale BY DEFINITION
+    #   cache / stale / granted  -> the outage fallback. The reason all this exists
+    #   cache / stale / refused  -> never authoritative
     if stale and source != "cache":
         raise EntitlementContractError("stale_without_cache")
+    if source == "cache" and not stale:
+        # The website's cache is what it serves when it could not reach the
+        # provider, so a cache hit is a stale answer whatever the flag says. A
+        # body claiming otherwise is one whose two fields disagree, and believing
+        # the flag over the source would let a day-old answer through the
+        # five-minute live bound.
+        raise EntitlementContractError("cache_without_stale")
+    if source == "cache" and access != "granted":
+        # **The rule that keeps an outage from becoming a bill.** A cached GRANT
+        # is safe to honour: the worst case is that somebody keeps working for a
+        # few hours after cancelling. A cached REFUSAL is not the mirror of that —
+        # it is the website telling us what it believed before it lost contact
+        # with the provider, and honouring it turns "we cannot reach Polar" into
+        # a 402 telling a paying customer to buy a second plan. That is the single
+        # outcome this whole taxonomy exists to prevent, so a stale negative is
+        # refused as an unusable body and resolves to the retryable 503 instead.
+        raise EntitlementContractError("cached_denial")
 
     status = payload.get("subscription_status")
     if status is not None and not isinstance(status, str):
         raise EntitlementContractError("subscription_status")
     if isinstance(status, str):
-        if len(status) > _MAX_STATUS_LENGTH:
+        # Measured in the same unit `sanitize_line` crops in, so an over-contract
+        # value is REFUSED here rather than quietly shortened three lines down.
+        #
+        # `utf8_len`, never a bare `.encode`: `json.loads` accepts `"\ud800"`, and
+        # encoding an unpaired surrogate raises `UnicodeEncodeError` — which is
+        # not an `EntitlementContractError`, so it would escape this function's
+        # contract, skip the reason this module logs for an operator, and land in
+        # the broad handler as an anonymous failure.
+        if utf8_len(status) > _MAX_STATUS_BYTES:
             raise EntitlementContractError("subscription_status")
         # The one free-form field in the contract, and it is rendered by the CLI
         # and returned by the account endpoint. Collapsed to a single safe line so
         # upstream text cannot carry control characters or newlines into either.
-        status = sanitize_line(status, _MAX_STATUS_LENGTH) or None
+        status = sanitize_line(status, _MAX_STATUS_BYTES) or None
 
-    checked_at = _checked_at(payload.get("checked_at"))
+    # The age bound is chosen by the SOURCE, which is why this is read last: the
+    # same timestamp is fresh evidence on a live answer and a day-old fallback on
+    # a cached one, and one undifferentiated limit cannot say both.
+    checked_at = _checked_at(
+        payload.get("checked_at"),
+        max_age=(
+            _MAX_LIVE_ANSWER_AGE
+            if source == "polar"
+            else _MAX_CACHED_GRANT_AGE + _CLOCK_MARGIN
+        ),
+        now=now,
+    )
 
     return Entitlement(
         access=cast(Access, access),
@@ -696,13 +803,17 @@ def _reject_constant(name: str) -> Any:
     raise ValueError(f"non-JSON constant: {name}")
 
 
-def _checked_at(value: object) -> datetime:
+def _checked_at(value: object, *, max_age: timedelta, now: datetime) -> datetime:
     """An RFC 3339 timestamp that is timezone-aware and plausible.
 
     Naive values are refused rather than assumed UTC: an assumption here silently
     shifts the freshness of a billing answer by whatever the website's timezone
     happens to be, and the failure would look like clock skew for as long as
     anyone cared to investigate it.
+
+    ``max_age`` is supplied by the caller rather than read from a constant here,
+    because how old an answer may be is a property of what KIND of answer it
+    claims to be — and this function is deliberately not the place that knows.
     """
     if not isinstance(value, str):
         raise EntitlementContractError("checked_at")
@@ -721,9 +832,11 @@ def _checked_at(value: object) -> datetime:
         # assumed UTC, because the assumption shifts a billing answer's freshness
         # by whatever the website's timezone happens to be.
         raise EntitlementContractError("checked_at_naive")
-    now = datetime.now(UTC)
     if parsed > now + _MAX_CHECKED_AT_SKEW:
         raise EntitlementContractError("checked_at_future")
-    if parsed < now - _MAX_CHECKED_AT_AGE:
+    # INCLUSIVE, both here and above: the contract says "no more than", so a
+    # timestamp exactly at the bound is inside it. A strict comparison would make
+    # the website's own hard maximum unusable at the value it publishes.
+    if parsed < now - max_age:
         raise EntitlementContractError("checked_at_stale")
     return parsed

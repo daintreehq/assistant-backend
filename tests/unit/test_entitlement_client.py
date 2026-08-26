@@ -29,12 +29,16 @@ from structlog.testing import capture_logs
 from daintree_assistant_server.errors import DaintreeError
 from daintree_assistant_server.services.entitlement import (
     ENTITLEMENT_CACHE_MAX_ENTRIES,
+    ENTITLEMENT_CONNECT_TIMEOUT_SECONDS,
     ENTITLEMENT_DENIED_TTL_SECONDS,
     ENTITLEMENT_GRANTED_TTL_SECONDS,
     ENTITLEMENT_RESPONSE_MAX_BYTES,
+    ENTITLEMENT_TIMEOUT_SECONDS,
     Entitlement,
+    EntitlementContractError,
     EntitlementService,
     _CacheEntry,
+    _parse,
 )
 
 _URL = "https://staging.daintree.org/api/assistant/entitlement"
@@ -154,6 +158,24 @@ async def test_a_known_refusal_is_a_verdict_not_an_error(access: str) -> None:
     assert verdict.access == access
 
 
+@pytest.mark.asyncio
+async def test_an_inactive_subscription_may_still_name_its_plan() -> None:
+    """The shape the website actually sends for a lapsed subscription.
+
+    `plan_id` is only REQUIRED alongside `granted`; it is not forbidden beside a
+    refusal, and the website fills it in because a cancelled Pro subscription is
+    still a Pro subscription. Pinned because "granted requires a plan" is easy to
+    over-read as "only granted may have one", which would 503 an ordinary answer.
+    """
+    service, _ = _service(
+        _json_response(_body(access="subscription_inactive", plan_id="pro"))
+    )
+    verdict = await _resolve(service)
+    assert verdict.granted is False
+    assert verdict.access == "subscription_inactive"
+    assert verdict.plan_id == "pro"
+
+
 # --- status mapping --------------------------------------------------------
 
 
@@ -255,19 +277,97 @@ async def test_a_timeout_is_unavailable() -> None:
     with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
     assert exc.value.code == "entitlement_unavailable"
+    # Retryable and a 503, asserted rather than assumed: this is the exact path a
+    # billing outage takes, and the one it must never take instead is a 402.
+    assert exc.value.status_code == 503
+    assert exc.value.retryable is True
 
 
 @pytest.mark.asyncio
-async def test_a_transport_failure_is_not_retried_inside_the_request() -> None:
-    """Both the CLI and this server already own retry ladders.
+@pytest.mark.parametrize(
+    ("fraction_of_budget", "accepted"),
+    [
+        pytest.param(0.65, True, id="inside_the_budget"),
+        pytest.param(1.4, False, id="past_the_budget"),
+    ],
+)
+async def test_an_answer_is_judged_against_the_whole_budget(
+    fraction_of_budget: float, accepted: bool
+) -> None:
+    """The behaviour, at 1/200th scale so it runs in milliseconds.
 
-    A third one nested here would turn one caller-visible failure into N requests
-    against a dependency that is by definition already struggling.
+    Scaled rather than mocked because `asyncio.timeout` owns the loop clock:
+    the service takes an injectable `timeout=`, so a real deadline of 50ms with a
+    transport that really waits gives a genuine cancellation. 0.65 of the budget
+    is the shape that matters — it is where the website's outage fallback lands,
+    and it is what the previous 5-second bound cut off.
     """
-    service, recorder = _service(httpx.ConnectError("refused"))
-    with pytest.raises(DaintreeError):
+    budget = 0.05
+
+    async def _slow(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(budget * fraction_of_budget)
+        return _json_response(_body(source="cache", stale=True))
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(_slow))
+    service = EntitlementService(client, url=_URL, timeout=budget)
+    if accepted:
+        assert (await _resolve(service)).granted is True
+    else:
+        with pytest.raises(DaintreeError) as exc:
+            await _resolve(service)
+        assert exc.value.code == "entitlement_unavailable"
+        assert exc.value.status_code == 503
+        assert exc.value.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_the_deadline_the_service_enforces_is_the_one_it_advertises() -> None:
+    """The scaled test above proves the MECHANISM; this proves the NUMBER.
+
+    Between them they close the gap a constant-only assertion leaves: a service
+    that enforced five seconds while still exporting ten would satisfy either one
+    alone. Here the default-constructed service is driven with no `timeout=`
+    override, and the deadline it actually applies is read off the request it
+    built.
+    """
+    service, recorder = _service(_json_response(_body()))
+    await _resolve(service)
+    (request,) = recorder.requests
+    applied = request.extensions["timeout"]
+    assert applied["connect"] == ENTITLEMENT_CONNECT_TIMEOUT_SECONDS
+    for phase in ("read", "write", "pool"):
+        assert applied[phase] == ENTITLEMENT_TIMEOUT_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_a_host_that_never_answers_is_cut_off_by_our_own_deadline() -> None:
+    """Not the transport's deadline — ours.
+
+    The mock transport has no timeout of its own, so nothing but
+    `asyncio.timeout` in `resolve` can end this. The bound asserted is tight
+    against the injected deadline rather than merely "eventually", which is what
+    distinguishes the wall-clock cut-off from a coincidence.
+    """
+    async def _never(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(30)
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(_never))
+    service = EntitlementService(client, url=_URL, timeout=0.05)
+    started = time.monotonic()
+    with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
-    assert len(recorder.requests) == 1
+    assert exc.value.code == "entitlement_unavailable"
+    assert time.monotonic() - started < 1.0
+
+
+def test_the_budget_is_the_agreed_cross_service_number() -> None:
+    """Ten seconds is coordinated with the website's 8-second hard total, and two
+    seconds of connect sits inside it. Both pinned as literals rather than
+    compared to themselves."""
+    assert ENTITLEMENT_TIMEOUT_SECONDS == 10.0
+    assert ENTITLEMENT_CONNECT_TIMEOUT_SECONDS == 2.0
+    assert ENTITLEMENT_CONNECT_TIMEOUT_SECONDS < ENTITLEMENT_TIMEOUT_SECONDS
 
 
 # --- body validation -------------------------------------------------------
@@ -275,28 +375,103 @@ async def test_a_transport_failure_is_not_retried_inside_the_request() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "payload",
+    "overrides",
     [
-        pytest.param(_body(version=2), id="unknown_version"),
-        pytest.param(_body(version="1"), id="version_wrong_type"),
-        pytest.param(_body(subject=str(uuid4())), id="subject_mismatch"),
-        pytest.param(_body(subject=12345), id="subject_wrong_type"),
-        pytest.param(_body(subject="not-a-uuid"), id="subject_not_a_uuid"),
-        pytest.param(_body(access="maybe"), id="access_outside_the_enum"),
-        pytest.param(_body(plan_id="enterprise"), id="plan_outside_the_enum"),
-        pytest.param(_body(access="granted", plan_id=None), id="granted_without_a_plan"),
-        pytest.param(_body(source="guess"), id="source_outside_the_enum"),
-        pytest.param(_body(stale="yes"), id="stale_wrong_type"),
-        pytest.param(_body(stale=True, source="polar"), id="stale_without_cache"),
-        pytest.param(_body(subscription_status=7), id="status_wrong_type"),
-        pytest.param(_body(subscription_status="x" * 200), id="status_oversized"),
-        pytest.param(_body(checked_at="2026-08-25T12:00:00"), id="checked_at_naive"),
-        pytest.param(_body(checked_at="not a time"), id="checked_at_unparseable"),
-        pytest.param([1, 2, 3], id="not_an_object"),
+        pytest.param({"version": 2}, id="unknown_version"),
+        pytest.param({"version": "1"}, id="version_wrong_type"),
+        pytest.param({"subject": "11111111-2222-3333-4444-555555555555"}, id="subject_mismatch"),
+        pytest.param({"subject": 12345}, id="subject_wrong_type"),
+        pytest.param({"subject": "not-a-uuid"}, id="subject_not_a_uuid"),
+        pytest.param({"access": "maybe"}, id="access_outside_the_enum"),
+        pytest.param({"plan_id": "enterprise"}, id="plan_outside_the_enum"),
+        pytest.param({"access": "granted", "plan_id": None}, id="granted_without_a_plan"),
+        pytest.param(
+            {"source": "cache", "stale": True, "access": "granted", "plan_id": None},
+            id="cached_grant_without_a_plan",
+        ),
+        pytest.param({"source": "guess"}, id="source_outside_the_enum"),
+        pytest.param({"stale": "yes"}, id="stale_wrong_type"),
+        pytest.param({"stale": True, "source": "polar"}, id="stale_without_cache"),
+        pytest.param({"source": "cache", "stale": False}, id="cache_without_stale"),
+        pytest.param(
+            {
+                "source": "cache",
+                "stale": True,
+                "access": "subscription_required",
+                "plan_id": None,
+            },
+            id="cached_denial",
+        ),
+        pytest.param(
+            {
+                "source": "cache",
+                "stale": True,
+                "access": "subscription_inactive",
+                "plan_id": None,
+            },
+            id="cached_inactive",
+        ),
+        pytest.param({"subscription_status": 7}, id="status_wrong_type"),
+        pytest.param({"subscription_status": "x" * 200}, id="status_oversized"),
+        pytest.param({"checked_at": "2026-08-25T12:00:00"}, id="checked_at_naive"),
+        pytest.param({"checked_at": "not a time"}, id="checked_at_unparseable"),
     ],
 )
-async def test_an_unusable_body_is_unavailable_never_a_refusal(payload: Any) -> None:
-    service, _ = _service(_json_response(payload))
+async def test_an_unusable_body_is_unavailable_never_a_refusal(
+    overrides: dict[str, Any],
+) -> None:
+    """The body is built INSIDE the test, not in the parametrize list.
+
+    `_body` stamps `checked_at` with `datetime.now`, and a list comprehension in a
+    decorator runs at COLLECTION time. While the age limit was a day that gap was
+    invisible; now that a live answer expires in five minutes, a slow suite could
+    make one of these rows pass because the timestamp went stale rather than
+    because the rule under test fired — the row would be green with its own rule
+    deleted.
+    """
+    service, _ = _service(_json_response(_body(**overrides)))
+    with pytest.raises(DaintreeError) as exc:
+        await _resolve(service)
+    assert exc.value.code == "entitlement_unavailable"
+    # Retryable, and specifically NOT either subscription refusal: an unusable
+    # body is uncertainty, and uncertainty must never be billed as "you have not
+    # paid".
+    assert exc.value.status_code == 503
+    assert exc.value.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_a_lone_surrogate_in_the_status_is_survived_not_crashed_on() -> None:
+    """`json.loads` accepts `"\ud800"`, and a bare `.encode("utf-8")` on it raises
+    `UnicodeEncodeError` — which is not an `EntitlementContractError`, so it would
+    escape `_parse`'s contract, lose the operator-facing reason, and land in the
+    broad handler as an anonymous failure. The byte count goes through
+    `text_utils.utf8_len`, which exists for exactly this.
+
+    The value is then dropped rather than refused, and that is the right outcome:
+    it is one unprintable character in a diagnostic field, so the sanitizer
+    removes it and the VERDICT — the part that decides whether somebody may work
+    — is unaffected. Refusing the whole body would convert a cosmetic upstream
+    defect into a paid turn that cannot run.
+    """
+    service, _ = _service(_json_response(_body(subscription_status="\ud800")))
+    verdict = await _resolve(service)
+    assert verdict.granted is True
+    assert verdict.subscription_status is None
+
+
+@pytest.mark.asyncio
+async def test_a_status_of_many_surrogates_is_still_bounded() -> None:
+    """The size check must still BIND on a value it cannot encode strictly."""
+    service, _ = _service(_json_response(_body(subscription_status="\ud800" * 100)))
+    with pytest.raises(DaintreeError) as exc:
+        await _resolve(service)
+    assert exc.value.code == "entitlement_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_a_non_object_body_is_unavailable() -> None:
+    service, _ = _service(_json_response([1, 2, 3]))
     with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
     assert exc.value.code == "entitlement_unavailable"
@@ -1123,3 +1298,316 @@ async def test_a_verdict_with_no_status_passes_the_echo_guard_untouched() -> Non
     verdict = await _resolve(service)
     assert verdict.subscription_status is None
     assert verdict.granted is True
+
+
+# --- the freshness table ---------------------------------------------------
+#
+# `(source, stale, access)` is read as ONE closed combination, and these tests
+# drive `_parse` DIRECTLY with an injected clock. Two reasons, both deliberate:
+# a boundary that has to be reached by sleeping is a boundary nothing really
+# tests, and `resolve()` maps every internal fault to the same public 503 — so a
+# test that only asserts `entitlement_unavailable` cannot tell the rule firing
+# from an accidental `KeyError` in the same function.
+
+
+def _parse_body(*, now: datetime | None = None, **overrides: Any) -> Entitlement:
+    """`_parse` on a body, at a chosen instant.
+
+    `checked_at` defaults RELATIVE to the injected clock rather than to wall time,
+    so a test that is not about freshness does not accidentally depend on it —
+    `_body`'s own default is `datetime.now`, which is minutes or hours away from a
+    frozen `now` and would refuse every body here for the wrong reason.
+    """
+    at = now or datetime.now(UTC)
+    overrides.setdefault("checked_at", _stamp(at, timedelta(seconds=1)))
+    return _parse(
+        json.dumps(_body(**overrides)).encode("utf-8"),
+        expected_subject=_SUBJECT,
+        now=at,
+    )
+
+
+def _stamp(now: datetime, age: timedelta) -> str:
+    return (now - age).isoformat().replace("+00:00", "Z")
+
+
+_NOW = datetime(2026, 8, 26, 12, 0, 0, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("source", "stale", "access", "plan_id", "reason"),
+    [
+        # `polar` + stale — all three accesses.
+        pytest.param("polar", True, "granted", "standard", "stale_without_cache", id="polar_stale"),
+        pytest.param(
+            "polar", True, "subscription_required", None, "stale_without_cache",
+            id="polar_stale_required",
+        ),
+        pytest.param(
+            "polar", True, "subscription_inactive", None, "stale_without_cache",
+            id="polar_stale_inactive",
+        ),
+        # `cache` + fresh — all three accesses.
+        pytest.param("cache", False, "granted", "standard", "cache_without_stale", id="cache_fresh"),
+        pytest.param(
+            "cache", False, "subscription_required", None, "cache_without_stale",
+            id="cache_fresh_required",
+        ),
+        pytest.param(
+            "cache", False, "subscription_inactive", None, "cache_without_stale",
+            id="cache_fresh_inactive",
+        ),
+        # `cache` + stale — the two refusing accesses (granted is the valid cell).
+        pytest.param(
+            "cache", True, "subscription_required", None, "cached_denial", id="cached_required"
+        ),
+        pytest.param(
+            "cache", True, "subscription_inactive", None, "cached_denial", id="cached_inactive"
+        ),
+    ],
+)
+def test_every_invalid_combination_names_itself(
+    source: str, stale: bool, access: str, plan_id: str | None, reason: str
+) -> None:
+    """The CLASS and the reason, not the public code.
+
+    `resolve()` collapses a contract error and an unexpected `KeyError` into the
+    same 503, so asserting the status proves the rule exists only by coincidence.
+    The reason is what reaches the log line an operator reads.
+    """
+    with pytest.raises(EntitlementContractError) as exc:
+        _parse_body(
+            now=_NOW,
+            source=source,
+            stale=stale,
+            access=access,
+            plan_id=plan_id,
+            checked_at=_stamp(_NOW, timedelta(seconds=1)),
+        )
+    assert str(exc.value) == reason
+
+
+def test_a_cached_grant_is_the_one_cache_combination_that_survives() -> None:
+    """The website's outage fallback, and the reason the table is not simply
+    "refuse anything cached"."""
+    verdict = _parse_body(
+        now=_NOW,
+        source="cache",
+        stale=True,
+        checked_at=_stamp(_NOW, timedelta(hours=6)),
+    )
+    assert verdict.granted is True
+    assert verdict.source == "cache"
+    assert verdict.stale is True
+
+
+@pytest.mark.asyncio
+async def test_a_cached_denial_is_never_held_in_the_cache() -> None:
+    """"Nothing uncertain is cached" has to cover a malformed 200, not just a 5xx.
+
+    A cached denial is refused as unusable, so there is no verdict to keep — and
+    keeping one would extend the misreading for its whole TTL. Three calls, three
+    requests, empty cache.
+    """
+    body = _body(
+        source="cache",
+        stale=True,
+        access="subscription_required",
+        plan_id=None,
+        checked_at=_stamp(datetime.now(UTC), timedelta(minutes=1)),
+    )
+    service, recorder = _service(_json_response(body))
+    for _ in range(3):
+        with pytest.raises(DaintreeError) as exc:
+            await _resolve(service)
+        assert exc.value.code == "entitlement_unavailable"
+    assert len(recorder.requests) == 3
+    assert service._cache == {}
+
+
+@pytest.mark.asyncio
+async def test_a_cached_denial_purges_a_grant_it_contradicts() -> None:
+    """An unusable answer still INVALIDATES.
+
+    The held grant is not evidence any more — the website has started saying
+    something we cannot read, and continuing to serve the old verdict from memory
+    would let a stale positive outlive the moment we stopped understanding the
+    dependency.
+    """
+    body = _body(
+        source="cache",
+        stale=True,
+        access="subscription_inactive",
+        plan_id=None,
+        checked_at=_stamp(datetime.now(UTC), timedelta(minutes=1)),
+    )
+    service, _ = _service(_json_response(body))
+    key = service._key(user_id=_SUBJECT, oauth_client_id="daintree-assistant")
+    service._cache[key] = _CacheEntry(
+        verdict=Entitlement(
+            access="granted",
+            plan_id="pro",
+            subscription_status="active",
+            source="polar",
+            stale=False,
+            checked_at=datetime.now(UTC),
+        ),
+        # Already expired, so the lookup runs rather than being served from here.
+        expires_at=time.monotonic() - 1,
+    )
+    with pytest.raises(DaintreeError):
+        await _resolve(service)
+    assert key not in service._cache
+
+
+# --- the two age bounds ----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "age",
+    [
+        pytest.param(timedelta(seconds=0), id="just_now"),
+        pytest.param(timedelta(minutes=4, seconds=59), id="inside"),
+        pytest.param(timedelta(minutes=5), id="exactly_at_the_bound"),
+    ],
+)
+def test_a_live_answer_within_five_minutes_is_accepted(age: timedelta) -> None:
+    """Inclusive at the bound: the contract says "no more than five minutes"."""
+    assert _parse_body(now=_NOW, checked_at=_stamp(_NOW, age)).granted is True
+
+
+@pytest.mark.parametrize(
+    "age",
+    [
+        pytest.param(timedelta(minutes=5, microseconds=1), id="one_microsecond_over"),
+        pytest.param(timedelta(minutes=5, seconds=1), id="just_outside"),
+        pytest.param(timedelta(hours=20), id="a_working_day_old"),
+    ],
+)
+def test_a_live_answer_older_than_five_minutes_is_refused(age: timedelta) -> None:
+    """`source: polar` claims the website JUST asked the provider. Past five
+    minutes that sentence is not true, and the answer is a cache that did not say
+    so — twenty hours old was accepted under the single day-long limit this table
+    replaced.
+    """
+    with pytest.raises(EntitlementContractError) as exc:
+        _parse_body(now=_NOW, checked_at=_stamp(_NOW, age))
+    assert str(exc.value) == "checked_at_stale"
+
+
+@pytest.mark.parametrize(
+    "age",
+    [
+        pytest.param(timedelta(hours=23, minutes=59), id="inside"),
+        pytest.param(timedelta(seconds=86_400), id="the_websites_hard_maximum"),
+        pytest.param(timedelta(seconds=86_400 + 299), id="inside_the_margin"),
+        pytest.param(timedelta(seconds=86_400 + 300), id="exactly_at_the_margin"),
+    ],
+)
+def test_a_cached_grant_within_a_day_plus_the_margin_is_accepted(age: timedelta) -> None:
+    """The website's stale-positive maximum is 86,400 seconds exactly, so 86,400
+    must be INSIDE the bound here or its published default races the boundary in
+    transit — which is the defect this margin was agreed to close.
+    """
+    verdict = _parse_body(
+        now=_NOW, source="cache", stale=True, checked_at=_stamp(_NOW, age)
+    )
+    assert verdict.granted is True
+
+
+@pytest.mark.parametrize(
+    "age",
+    [
+        pytest.param(timedelta(seconds=86_400 + 300, microseconds=1), id="one_microsecond_over"),
+        pytest.param(timedelta(seconds=86_400 + 301), id="a_second_over"),
+        pytest.param(timedelta(days=3), id="last_week"),
+    ],
+)
+def test_a_cached_grant_past_the_margin_is_refused(age: timedelta) -> None:
+    with pytest.raises(EntitlementContractError) as exc:
+        _parse_body(now=_NOW, source="cache", stale=True, checked_at=_stamp(_NOW, age))
+    assert str(exc.value) == "checked_at_stale"
+
+
+def test_the_two_bounds_are_genuinely_different_limits() -> None:
+    """A day-old answer is fine as a declared cache hit and refused as a live
+    check. One undifferentiated age limit could not express that, which is why
+    the constants are named for what they mean."""
+    day_old = _stamp(_NOW, timedelta(hours=23))
+    assert _parse_body(
+        now=_NOW, source="cache", stale=True, checked_at=day_old
+    ).granted is True
+    with pytest.raises(EntitlementContractError):
+        _parse_body(now=_NOW, source="polar", stale=False, checked_at=day_old)
+
+
+@pytest.mark.parametrize(
+    ("ahead", "accepted"),
+    [
+        pytest.param(timedelta(minutes=4, seconds=59), True, id="inside"),
+        pytest.param(timedelta(minutes=5), True, id="exactly_at_the_bound"),
+        pytest.param(timedelta(minutes=5, microseconds=1), False, id="one_microsecond_over"),
+        pytest.param(timedelta(minutes=6), False, id="a_minute_over"),
+    ],
+)
+def test_the_future_skew_bound_is_inclusive_at_five_minutes(
+    ahead: timedelta, accepted: bool
+) -> None:
+    """Unchanged by the table, and pinned at the boundary here so an edit to the
+    age bounds cannot quietly widen or tighten the other end.
+
+    Without the exact and one-microsecond cells, flipping the implementation's
+    `>` to `>=`, or widening the allowance to five and a half minutes, passes.
+    """
+    stamp = (_NOW + ahead).isoformat().replace("+00:00", "Z")
+    if accepted:
+        assert _parse_body(now=_NOW, checked_at=stamp).granted is True
+    else:
+        with pytest.raises(EntitlementContractError) as exc:
+            _parse_body(now=_NOW, checked_at=stamp)
+        assert str(exc.value) == "checked_at_future"
+
+
+# --- the status byte cap ---------------------------------------------------
+
+
+def test_the_status_cap_counts_bytes_not_characters() -> None:
+    """The locked number is 64 BYTES, and the sanitizer already CROPS in bytes.
+
+    While the refusal counted characters the two disagreed, and the disagreement
+    had a direction: a 64-character multibyte status is 192 bytes, passed the
+    check, and was then silently shortened to 64 bytes — repairing an
+    over-contract body instead of refusing it, which is the one thing every other
+    rule in `_parse` declines to do.
+    """
+    multibyte = "あ" * 64
+    assert len(multibyte) == 64
+    assert len(multibyte.encode("utf-8")) == 192
+    with pytest.raises(EntitlementContractError) as exc:
+        _parse_body(now=_NOW, subscription_status=multibyte)
+    assert str(exc.value) == "subscription_status"
+
+
+@pytest.mark.parametrize(
+    ("status", "accepted"),
+    [
+        pytest.param("a" * 63, True, id="inside"),
+        pytest.param("a" * 64, True, id="exactly_at_the_cap"),
+        pytest.param("a" * 65, False, id="one_byte_over"),
+        pytest.param("あ" * 21, True, id="multibyte_inside_63_bytes"),
+        pytest.param("あ" * 22, False, id="multibyte_one_char_over_at_66_bytes"),
+    ],
+)
+def test_the_status_cap_is_inclusive_at_sixty_four_bytes(status: str, accepted: bool) -> None:
+    if accepted:
+        verdict = _parse_body(now=_NOW, subscription_status=status)
+        assert verdict.subscription_status == status
+        # Whatever survives is <= 64 bytes, so it is also <= 64 CHARACTERS — which
+        # is what `AccountResponse.subscription_status` bounds. The two layers
+        # cannot disagree about a value that got this far.
+        assert len(verdict.subscription_status or "") <= 64
+    else:
+        with pytest.raises(EntitlementContractError):
+            _parse_body(now=_NOW, subscription_status=status)
+
+

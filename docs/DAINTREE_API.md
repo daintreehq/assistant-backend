@@ -111,7 +111,7 @@ quietly reverting to `off`.
   it**. The mirror of `AUTH_MODE=observe`, and with the same precise promise: the
   status, body and headers a caller receives are exactly what `off` would have
   returned, including on every failure path. It moves no verdict. It does move
-  LATENCY — an uncached lookup is a bounded 5s network call on the turn's
+  LATENCY — an uncached lookup is a bounded 10s network call on the turn's
   first-byte path — so this is a mode to watch timings under, not one that is
   free.
 - **`enforce`** — `access: granted` is required.
@@ -149,6 +149,60 @@ refused, and nothing uncertain is cached at all — so a paid request costs at m
 one lookup and often none. Any refusal purges the entry, so a revoked grant stops
 being honoured at the first refusal rather than at expiry; and because every
 cached entry is at most that old, the bound holds however many instances are warm.
+
+### The deadline, and how old an answer may be
+
+Both numbers are **coordinated with the website**, not chosen locally, and the
+pair only works if both sides hold their half:
+
+| | budget |
+|---|---|
+| Website machine endpoint, total | **8 seconds** — Supabase verification, Polar, its cache fallback and serialization, all of it |
+| This server's call, total | **10 seconds** hard wall-clock, connect bounded at 2 |
+
+The 2-second margin is transport, not slack. It exists because the website's
+outage fallback — answering from its own cached positive when Polar is slow or
+down — is the *last* thing it does inside its budget. A shorter bound here cuts
+the exchange off while the website is still working, on precisely the outage the
+fallback was built for, and the caller gets a 503 for a question that was about
+to be answered. A timeout is always the retryable 503; it is never a 401, a 402
+or a synthetic negative, and there is no retry.
+
+Freshness is a **closed table over `(source, stale, access)`**, not one age
+limit. The same timestamp is fresh evidence on a live answer and an outage
+fallback on a cached one, and a single bound cannot say both:
+
+| `source` | `stale` | `access` | `checked_at` | |
+|---|---|---|---|---|
+| `polar` | `false` | any | **≤ 5 minutes** old | a live provider check |
+| `polar` | `true` | — | — | invalid: a live check cannot be stale |
+| `cache` | `false` | — | — | invalid: the fallback is stale by definition |
+| `cache` | `true` | `granted` | **≤ 86,400s + 5 minutes** | the outage fallback |
+| `cache` | `true` | refused | — | invalid: **never authoritative** |
+
+Bounds are inclusive — "no more than" — so the agreed 86,400-second maximum is
+usable at exactly that value rather than racing its own boundary in transit.
+Future timestamps stay bounded by the same 5-minute skew allowance.
+
+**86,400 is the agreed number, not yet the shipped one.** The website's
+stale-positive grace period is still configurable well past a day, and a
+deployment set that way serves a body this parser refuses — its healthy 200
+becomes a retryable 503 here. The coordinated fix is on the website's side
+(narrow its maximum to 86,400), not a widening here: this bound is the only place
+on this side that reads the age at all, so accepting a week-old grant would make
+the revocation window a week. Until both halves land, a >24h configuration is the
+one shape where they disagree, and it fails toward "retry".
+
+The last row is the one that matters most. A cached *grant* is safe to honour:
+the worst case is somebody working for a few hours after cancelling. A cached
+*refusal* is not its mirror — it is the website reporting what it believed before
+it lost contact with the provider, and honouring it converts "we cannot reach
+Polar" into a 402 telling a paying customer to buy a second plan. Every invalid
+row above resolves to `entitlement_unavailable`.
+
+These bounds govern the **website-to-backend wire body**. This server's own
+60-second grant cache is a separate mechanism: a verdict accepted near a boundary
+can be re-served from it slightly older, because a cache hit is not re-parsed.
 
 A deployment in a binding mode that cannot build a client for the configured URL
 **fails readiness** rather than taking traffic and refusing every turn.
