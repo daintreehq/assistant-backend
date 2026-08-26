@@ -606,9 +606,16 @@ codes in [`DAINTREE_API.md`](DAINTREE_API.md#errors); the CLI branches on
 
 ### Current mapping
 
+The first column is what the provider said; the second is what a caller is told.
+They differ on the first row and only there: an upstream 401 is about the key
+THIS SERVER sent, so forwarding it would tell a caller to re-authenticate over a
+credential they do not hold and cannot replace. 503 says the deployment is not
+currently able to serve, which is the true statement. It is still not retried —
+the code, not the status, is what `deterministicUpstreamCodes` keys on.
+
 | Upstream | Daintree | Code | Retried? |
 |---|---:|---|---|
-| 401 | 401 | `provider_invalid_api_key` | no |
+| 401 | 503 | `provider_invalid_api_key` | no |
 | 402 | 402 | `provider_insufficient_credits` | no |
 | 403 | 403 | `provider_key_forbidden` | no |
 | 404 | 502 | `upstream_request_rejected` | no |

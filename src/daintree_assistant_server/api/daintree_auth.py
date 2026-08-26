@@ -216,7 +216,8 @@ async def verify(
                 "valid": False,
                 "usable": False,
                 "reason": REASON_REJECTED,
-                "detail": "The provider rejected this API key.",
+                "detail": _REASON_DETAIL[REASON_REJECTED],
+                "server_holds_credential": True,
             }
         raise
 
@@ -270,6 +271,19 @@ async def verify(
     out["usable"] = usable
     out["reason"] = reason
     out["detail"] = _REASON_DETAIL[reason]
+    # WHOSE key was probed, said on the wire rather than only in prose.
+    #
+    # Every verdict this route returns is about `TOGETHER_API_KEY` — the
+    # deployment's own credential — and nothing in the response used to say so.
+    # A reader with no other context sees `valid: false` in reply to a request
+    # carrying their bearer, and the available inference is the wrong one. The
+    # field mirrors `/doctor`'s, deliberately under the same name: the two
+    # routes answer the same question about the same key, and a second spelling
+    # would invite a client to believe they are different questions. Constant
+    # by construction — there is no caller-supplied key to probe, and
+    # `ProviderChatRequest.api_key` stays an unused seam rather than a source —
+    # so it is an assertion about the credential model, not a computed value.
+    out["server_holds_credential"] = True
     return out
 
 
@@ -280,11 +294,15 @@ REASON_REJECTED = "provider_rejected"
 REASON_EXHAUSTED = "credits_exhausted"
 
 _REASON_DETAIL = {
-    REASON_OK: "The provider accepted this API key.",
-    REASON_REJECTED: "The provider rejected this API key.",
+    REASON_OK: "The provider accepted this deployment's API key.",
+    REASON_REJECTED: (
+        "The provider rejected this deployment's API key. This is a server "
+        "configuration problem; the caller holds no key to replace."
+    ),
     REASON_EXHAUSTED: (
-        "The provider accepted this API key, but the account has no remaining "
-        "credit. Add credits or use a different key."
+        "The provider accepted this deployment's API key, but the account "
+        "funding it has no remaining credit. Add credits to that provider "
+        "account; the caller holds no key to replace."
     ),
 }
 

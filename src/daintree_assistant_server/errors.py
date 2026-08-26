@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .contracts.errors import (
     TYPE_API,
     TYPE_AUTHENTICATION,
+    TYPE_BILLING,
     TYPE_INVALID_REQUEST,
     TYPE_RATE_LIMIT,
     ErrorDetail,
@@ -397,12 +398,15 @@ def subscription_required(
     """402 — authenticated, and no product grants access.
 
     The login is fine and must be KEPT. A client that treated this as an auth
-    failure would sign the user out on the way to the checkout page.
+    failure would sign the user out on the way to the checkout page — which is
+    why the type is ``billing_error`` rather than ``authentication_error``: the
+    code always said the credential was good, and the type used to say it was
+    not.
     """
     return DaintreeError(
         status_code=402,
         message=message,
-        type=TYPE_AUTHENTICATION,
+        type=TYPE_BILLING,
         code="subscription_required",
     )
 
@@ -420,7 +424,7 @@ def subscription_inactive(
     return DaintreeError(
         status_code=402,
         message=message,
-        type=TYPE_AUTHENTICATION,
+        type=TYPE_BILLING,
         code="subscription_inactive",
     )
 
@@ -543,8 +547,19 @@ def usage_accounting_unavailable(
 # upstream credential and funds every turn from it — so all four are operator
 # faults a caller can do nothing about. That is why the default messages describe
 # a deployment problem rather than telling somebody to rotate a key they do not
-# hold, and it is why `provider_invalid_api_key`'s outward 401 is wrong enough to
-# have its own TODO entry.
+# hold, and why `provider_invalid_api_key` now answers 503 instead of forwarding
+# the upstream's 401 — see its docstring.
+#
+# The STATUSES are deliberately not uniform, and the remaining 402 and 403 are
+# not oversights waiting for the same treatment. Only the 401 actively misled:
+# it is the status that means "authenticate yourself", so a caller reading it
+# had a wrong action available to take. A 402 or a 403 with a code naming the
+# server's provider account tells nobody to go and fix their own credential, and
+# `provider_insufficient_credits` deliberately keeps `authentication_error`
+# rather than joining `billing_error` — that type names the READER's billing
+# state, and this is the deployment's upstream balance. Sending a caller to
+# their own portal over an account they do not own is the same class of mistake
+# the split codes exist to prevent. `TODO.md` records the residual mismatch.
 #
 # None is retryable. Replaying a revoked key, an empty balance or a guardrail
 # denial reaches the same answer, slower; on the streaming path it also burns the
@@ -561,21 +576,28 @@ def provider_invalid_api_key(
     """Upstream 401 — the provider does not recognise the credential WE sent.
 
     The key is the server's own (``TOGETHER_API_KEY``), so this is an operator
-    problem and no caller action can fix it. Deliberately 401 with a code
-    distinct from our own door's 401s, and deliberately carrying no
-    ``WWW-Authenticate``: a challenge here would tell a client to go and refresh
-    a Daintree login because the deployment's provider key is broken. The CLI
-    relies on that, excluding the provider-account codes from ``IsAuth()`` by
-    code rather than by status.
+    problem and no caller action can fix it. It answers **503**, not the 401 the
+    upstream gave us: a status is a statement to the CALLER about the CALLER's
+    request, and inheriting this one made the deployment's broken credential
+    look like the caller's. That was the one 401 on this surface carrying no
+    ``WWW-Authenticate``, because a challenge would have told a client to go and
+    refresh a Daintree login on the strength of a server misconfiguration — a
+    401 that cannot honestly challenge is a sign that it was never a 401.
 
-    The 401 status is inherited from the upstream and is arguably the wrong
-    outward-facing shape for an operator fault — ``TODO.md`` carries that, since
-    changing it is a coordinated change with the CLI's own cost accounting.
+    503 rather than 502 puts it beside ``provider_not_configured``, the existing
+    code for "this deployment's credential situation is wrong". The pair are the
+    same operator fault at two moments: never set, and no longer accepted.
+
+    Not retryable, and that survives the move — waiting does not fix a key. The
+    status must therefore never be the thing a client branches on here, which is
+    the standing rule for this whole envelope (``docs/DAINTREE_API.md``, section
+    "Errors"): the CLI classifies by ``code``, and ``deterministicUpstreamCodes``
+    is consulted before any 5xx-is-retryable arm.
     """
     return DaintreeError(
-        status_code=401,
+        status_code=503,
         message=message,
-        type=TYPE_AUTHENTICATION,
+        type=TYPE_API,
         code="provider_invalid_api_key",
     )
 

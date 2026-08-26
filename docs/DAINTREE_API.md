@@ -378,7 +378,8 @@ nothing to run.
 
 ```json
 { "valid": true, "usable": true, "reason": "ok",
-  "detail": "The provider accepted this API key.",
+  "detail": "The provider accepted this deployment's API key.",
+  "server_holds_credential": true,
   "label": "my-key", "limit": 20, "usage": 4.5, "limit_remaining": 15.5,
   "is_free_tier": false }
 ```
@@ -403,6 +404,13 @@ keep.
 `reason` is the stable machine-readable outcome — branch on it, not on `detail`:
 `ok`, `provider_rejected`, `credits_exhausted`.
 
+`server_holds_credential` is always `true`, and it is on the wire rather than
+only in this document because every verdict here is about `TOGETHER_API_KEY` —
+the deployment's own key — while the request that asked carried the caller's
+bearer. Without it the available inference from `valid: false` is the wrong one.
+`/v1/daintree/doctor` reports the same field under the same name, deliberately:
+the two routes answer the same question about the same key.
+
 `label`, `limit`, `usage`, `limit_remaining` and `is_free_tier` are optional: each is
 echoed only when the provider supplies it with the expected type. `label` is
 upstream-controlled text — it is stripped of control characters, bounded to 120
@@ -410,11 +418,12 @@ characters, and dropped entirely if it contains (or is contained by) the bearer,
 some providers default a key's label to the key itself.
 
 A rejected key is a **200 with `valid: false`** and `reason: "provider_rejected"`,
-deliberately *not* the `401 provider_invalid_api_key` the serving path returns. A rejection is a
-successful answer to the question this endpoint asks, and our own `401` would be wrong
-twice over: the request authenticated fine at our door, and `401` conventionally tells a
-client to re-send the same credential — the useless retry loop this endpoint exists to
-prevent.
+deliberately *not* the `503 provider_invalid_api_key` the serving path returns. A rejection
+is a successful answer to the question this endpoint asks: the probe ran, the provider
+answered, and that verdict is the whole point of the route. Reporting it as an error
+status would also make this endpoint's own availability indistinguishable from its
+finding — which is exactly what "not knowing is never reported as a verdict" below
+refuses to allow in the other direction.
 
 Not knowing is never reported as a verdict. Anything other than a provider verdict
 propagates as the usual error envelope: `429 upstream_rate_limited` (with `Retry-After`),
@@ -1269,13 +1278,22 @@ Stable envelope (request/auth/validation failures before SSE as JSON; generation
 after streaming `meta` as an `error` event):
 
 ```jsonc
-{ "error": { "type": "invalid_request_error" | "authentication_error" | "rate_limit_error" | "api_error",
+{ "error": { "type": "invalid_request_error" | "authentication_error" | "billing_error" | "rate_limit_error" | "api_error",
              "code": "…", "message": "…", "param": "…" } }
 ```
 
 Codes are the contract; **branch on `code`, never on `message` or on the HTTP
-status alone** (502 covers more than one condition). Each row names who can fix
-the problem, because that is the whole reason these are separate codes.
+status alone** (502 covers more than one condition, and `provider_invalid_api_key`
+is a 503 that must never be retried). Each row names who can fix the problem,
+because that is the whole reason these are separate codes.
+
+`billing_error` is the one member outside the OpenAI taxonomy the rest of this
+envelope borrows, which has no billing bucket. It means **authentication
+succeeded and the account is not entitled** — never a reason to clear a
+credential. It carries `subscription_required` and `subscription_inactive`, and
+nothing else: `provider_insufficient_credits` describes the SERVER's upstream
+balance rather than the reader's, so it stays out of a type a client would
+render by opening the reader's own billing portal.
 
 ### Daintree's own failures
 
@@ -1343,7 +1361,10 @@ token was presented; `Bearer error="invalid_token"` for the rest). The 403 does 
 refresh loop that cannot terminate.
 
 **Subscription — authenticated, not entitled.** The login is fine in both cases and must
-be kept; signing the user out on the way to a checkout page is a bug.
+be kept; signing the user out on the way to a checkout page is a bug. Both carry
+`"type": "billing_error"` rather than `authentication_error`, so a consumer that
+reads the type instead of the code reaches the same conclusion the code already
+stated.
 
 | HTTP | Code | Meaning | What a client should do |
 |------|------|---------|--------------------------|
@@ -1379,9 +1400,18 @@ No caller key rides the request, so these describe the DEPLOYMENT's own upstream
 credential — each one is an operator fix, never something the caller can act on.
 Never retried.
 
+The statuses are deliberately not uniform. `provider_invalid_api_key` answers
+**503** rather than forwarding the upstream's 401, because a status is a
+statement to the caller about the caller's request and that one made a server
+misconfiguration look like a bad login — it was also the only 401 on this surface
+carrying no `WWW-Authenticate`, and a 401 that cannot honestly challenge was
+never a 401. 503 puts it beside `provider_not_configured`: the same operator
+fault at two moments, never set and no longer accepted. The 402 and 403 stay as
+they are, because neither status invites a caller to go and fix a credential.
+
 | HTTP | Code | Action |
 |------|------|--------|
-| 401  | `provider_invalid_api_key` | The upstream rejected the server's key. Replace or rotate it. Distinct from `invalid_api_key`: the key travelled fine, the provider refused it. |
+| 503  | `provider_invalid_api_key` | The upstream rejected the server's key. An operator replaces or rotates it. Distinct from `invalid_api_key`: the key travelled fine, the provider refused it. **Not retryable** despite the 5xx — waiting does not fix a key, which is why this row is the sharpest case of the branch-on-`code` rule above. |
 | 402  | `provider_insufficient_credits` | The account cannot fund the call. Add credits or use another key. |
 | 403  | `provider_key_forbidden` | Key model-permissions, spend limit or a provider guardrail. |
 

@@ -62,7 +62,10 @@ async def _fail_with(status: int, message: str = "boom") -> DaintreeError:
 @pytest.mark.parametrize(
     ("status", "expected_status", "code", "retryable"),
     [
-        (401, 401, "provider_invalid_api_key", False),
+        # The one row where the outward status deliberately differs from the
+        # upstream one. The key is the SERVER's, so forwarding a 401 told a
+        # caller to re-authenticate over a credential they do not hold.
+        (401, 503, "provider_invalid_api_key", False),
         (402, 402, "provider_insufficient_credits", False),
         (403, 403, "provider_key_forbidden", False),
         # 404 is NOT a routing dead-end any more. Cerebras hosts one endpoint
@@ -223,22 +226,37 @@ async def test_a_malformed_request_does_surface_the_upstream_reason() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Our 401 vs the provider's 401.
+# Our door vs the provider's rejection.
 # ---------------------------------------------------------------------------
 
 
-def test_our_door_401_and_the_provider_401_are_different_codes() -> None:
+def test_our_door_and_the_provider_are_different_codes_and_now_different_statuses() -> None:
+    """Two "a credential was rejected" answers about two different credentials.
+
+    They used to share a 401 and be told apart only by `code` — which is the
+    contract, and which held. But the provider one describes `TOGETHER_API_KEY`,
+    the server's own, and a 401 is the status that tells a caller to
+    authenticate: it was pointing at a credential the caller does not hold and
+    could not replace. It was also the only 401 on this surface deliberately
+    carrying no `WWW-Authenticate`, and a 401 that must not challenge is a sign
+    it was never a 401.
+
+    Now they differ by status too, so the two are distinguishable even by a
+    consumer doing the thing this envelope tells it not to do.
+    """
     from daintree_assistant_server.errors import (
         invalid_api_key,
         provider_invalid_api_key,
     )
 
     ours, theirs = invalid_api_key(), provider_invalid_api_key()
-    assert ours.status_code == theirs.status_code == 401
+    assert ours.status_code == 401
+    assert theirs.status_code == 503
     assert ours.code == "invalid_api_key"
     assert theirs.code == "provider_invalid_api_key"
-    # Ours tells the client to fix its header; a WWW-Authenticate challenge on the
-    # provider's rejection would wrongly invite re-sending the same credential.
+    # Ours tells the client to fix its header; a challenge on the provider's
+    # rejection would wrongly invite re-sending the same credential — and a 5xx
+    # has no business carrying one at all.
     assert "WWW-Authenticate" in ours.headers
     assert "WWW-Authenticate" not in theirs.headers
 

@@ -30,6 +30,7 @@ import pytest
 from daintree_assistant_server.contracts.errors import (
     TYPE_API,
     TYPE_AUTHENTICATION,
+    TYPE_BILLING,
     TYPE_RATE_LIMIT,
 )
 from daintree_assistant_server.errors import (
@@ -63,8 +64,8 @@ ACCOUNT_ERRORS: list[tuple[Callable[[], DaintreeError], str, int, str, bool]] = 
     (auth_session_revoked, "auth_session_revoked", 401, TYPE_AUTHENTICATION, False),
     (auth_client_not_allowed, "auth_client_not_allowed", 403, TYPE_AUTHENTICATION, False),
     (auth_permission_denied, "auth_permission_denied", 403, TYPE_AUTHENTICATION, False),
-    (subscription_required, "subscription_required", 402, TYPE_AUTHENTICATION, False),
-    (subscription_inactive, "subscription_inactive", 402, TYPE_AUTHENTICATION, False),
+    (subscription_required, "subscription_required", 402, TYPE_BILLING, False),
+    (subscription_inactive, "subscription_inactive", 402, TYPE_BILLING, False),
     (usage_limit_reached, "usage_limit_reached", 429, TYPE_RATE_LIMIT, False),
     (account_rate_limited, "account_rate_limited", 429, TYPE_RATE_LIMIT, True),
     (auth_dependency_unavailable, "auth_dependency_unavailable", 503, TYPE_API, True),
@@ -231,17 +232,25 @@ def test_the_403s_do_not_challenge(factory: Callable[[], DaintreeError]) -> None
 def test_a_provider_credential_failure_never_challenges(
     factory: Callable[[], DaintreeError],
 ) -> None:
-    """The invariant is over ACCOUNT 401s, not over every 401, and this is the
-    difference that makes it worth stating.
+    """None of these may challenge, and none of them is a 401 any more.
 
-    `provider_invalid_api_key` is a 401 about the credential THIS SERVER sends
-    upstream — an operator problem no caller can fix. A `WWW-Authenticate` on it
+    The provider-account codes describe the credential THIS SERVER sends
+    upstream — an operator problem no caller can fix. A `WWW-Authenticate` on one
     would tell a client to refresh its Daintree login because the deployment's
-    Together key is broken. The CLI already relies on this: it excludes the
-    provider-account codes from `IsAuth()` by code, precisely so the shared 401
-    does not read as "sign in again".
+    Together key is broken.
+
+    `provider_invalid_api_key` used to be the sharp case: a 401 that deliberately
+    carried no challenge, which is the one thing a 401 is for. That contradiction
+    is what moved it to 503. The assertion is kept and widened rather than
+    retired with it — the reason a challenge is wrong here is the ownership of
+    the key, not the status, so it would still be wrong if some later change
+    brought a 4xx back to this family.
     """
-    assert "WWW-Authenticate" not in factory().headers
+    error = factory()
+    assert "WWW-Authenticate" not in error.headers
+    assert error.status_code != 401, (
+        "a provider-account failure is never our door refusing a caller credential"
+    )
 
 
 def test_our_door_and_the_provider_are_never_the_same_code() -> None:
@@ -404,3 +413,62 @@ def test_the_cli_and_the_backend_agree_on_every_account_code() -> None:
         f"HTTP status disagreements (cli, ours): {mismatched} — a client branching "
         "on status would take the wrong path for each"
     )
+
+
+def test_the_provider_key_failure_is_an_operator_fault_on_the_wire() -> None:
+    """503, not the upstream's 401.
+
+    A status is a statement to the CALLER about the CALLER's request. This one
+    describes `TOGETHER_API_KEY`, which the caller neither holds nor can replace,
+    so forwarding the provider's 401 pointed a user at a credential that was
+    never in question. 503 says what is actually true: this deployment cannot
+    currently serve. It sits beside `provider_not_configured` — the same operator
+    fault at two moments, never set and no longer accepted.
+    """
+    error = provider_invalid_api_key()
+    assert error.status_code == 503
+    assert error.type == TYPE_API
+    assert error.code == "provider_invalid_api_key"
+
+
+def test_the_operator_5xx_is_still_not_retryable() -> None:
+    """The status moved and the retry posture did not, which is the whole reason
+    this envelope says to branch on `code`.
+
+    Every other 5xx in the taxonomy is retryable, so a client keying on the
+    status class alone would now replay a request that cannot succeed until an
+    operator rotates a key — burning its backoff budget to re-derive the same
+    refusal. The CLI is safe because `deterministicUpstreamCodes` is consulted
+    before any 5xx arm; this asserts the property that makes that necessary.
+    """
+    assert provider_invalid_api_key().retryable is False
+
+
+def test_a_subscription_failure_is_billing_rather_than_authentication() -> None:
+    """Authentication SUCCEEDED in both cases, and the type used to deny it.
+
+    The codes always said the credential was good. A second consumer reading
+    `authentication_error` could reasonably clear that credential and send the
+    user back through sign-in — losing a working login on the way to a checkout
+    page, which is the exact failure the split codes exist to prevent. The CLI
+    branches on `code` and was never exposed to this; the type is now consistent
+    for everything else.
+    """
+    for factory in (subscription_required, subscription_inactive):
+        error = factory()
+        assert error.type == TYPE_BILLING, error.code
+        assert error.status_code == 402
+
+
+def test_the_deployments_own_upstream_balance_is_not_the_callers_billing() -> None:
+    """`provider_insufficient_credits` deliberately stays out of `billing_error`.
+
+    It is a 402 like the subscription codes and it is not the same kind of fact:
+    that type names the READER's billing state, and this one is the DEPLOYMENT's
+    upstream balance. A consumer rendering it as billing would open the caller's
+    own portal over an account they do not own. Pinned so the next person tidying
+    the type column has to read the reason before making all three agree.
+    """
+    error = provider_insufficient_credits()
+    assert error.type != TYPE_BILLING
+    assert error.type == TYPE_AUTHENTICATION

@@ -152,38 +152,55 @@ entry was written for.
 
 ---
 
-## Restatus the provider-account 401, and give billing its own error type
+## Move the CLI onto the restatused provider-account error
 
-**Trigger: when account enforcement ships — these are the same conversation, and
-both need the CLI moved in lockstep.**
+**Trigger: the same release that ships the current backend. The backend half has
+LANDED; this entry is now only the CLI's side of it, and the two must not reach
+users apart.**
 
-Two inconsistencies that were harmless while nothing raised the account family.
-Something does now — the identity codes under `AUTH_MODE=enforce`, the
-subscription ones under `ENTITLEMENT_MODE=enforce` — so this has moved from
-"before something does" to "before either mode reaches anyone real".
+`provider_invalid_api_key` answered HTTP 401 for as long as it forwarded the
+upstream's status. The key is the server's own, so that made an operator fault
+look like a caller credential problem, and it was the one 401 on this surface
+with no `WWW-Authenticate` — a 401 that cannot honestly challenge was never a
+401. It is now **503 / `api_error`**, beside `provider_not_configured`: the same
+operator fault at two moments, never set and no longer accepted. Still not
+retryable, because waiting does not fix a key.
 
-`provider_invalid_api_key` is an HTTP 401 describing the credential THIS SERVER
-sends upstream. The key is the server's own, so it is an operator fault a caller
-cannot act on, and the correct outward shape is a 5xx rather than a 401 that
-carries no `WWW-Authenticate` — which is itself the one 401 on the surface that
-does not challenge. It is safe today because the CLI classifies it by code
-(`IsAuth()` excludes the provider-account codes explicitly), so the missing
-challenge never reads as "sign in again". Changing the status means moving
-`internal/backend/client.go`'s cost accounting in the same release, which is why
-it is not a drive-by edit here. The default messages have already been corrected
-to describe a deployment problem rather than telling the caller to rotate a key
-they do not hold.
-
-Separately, `subscription_required` and `subscription_inactive` are typed
+`subscription_required` and `subscription_inactive` were typed
 `authentication_error` because the OpenAI taxonomy this envelope borrows has no
-billing bucket, and because `provider_insufficient_credits` already sits there.
-Both are states where authentication SUCCEEDED, so the type contradicts the code.
-The CLI is unaffected — it branches on `code` — but a second consumer could
-reasonably read `authentication_error` as licence to clear the credential, which
-is the exact failure the split codes exist to prevent. Adding a `billing_error`
-type means extending the documented type union in both repos at once.
+billing bucket. Both are states where authentication SUCCEEDED, so the type
+contradicted the code. They now carry **`billing_error`**, a new member of the
+documented type union.
+
+**What the CLI still owes — exactly one behavioural line.**
+`internal/backend/client.go`'s `taskMayHaveBilled` has a numeric arm matching 401
+and 403 and returning false. Under a 503 `provider_invalid_api_key` falls through
+to `return true`, so the CLI would start reporting every rejected-server-key task
+as possible unknown spend. The fix is to extend the arm that already keys on
+`CodeProviderInsufficientCredit` to include `CodeProviderInvalidAPIKey` — the
+neighbouring code already has exactly this treatment. Its fixtures move with it
+(`internal/backend/account_test.go`, `internal/backend/cost_test.go`), and
+`internal/backend/errors.go` carries a now-wrong `// 401 upstream` comment.
+
+Everything else in the CLI was verified inert against the pin at the time of the
+change, by reading the source rather than assuming the contract: `isRetriable`
+consults `deterministicUpstreamCodes` before any 5xx-is-retryable arm, `IsAuth()`
+short-circuits on the provider-account codes before looking at a status,
+`AuthRemedy()` gates on 401 so a 503 never reaches it, and `Error.Type` is read
+in exactly one place (`IsRateLimited`) against a different literal. The envelope
+decodes leniently, so the new type is not a wire break.
+
+**One mismatch deliberately left alone.** `provider_insufficient_credits` is a
+402 typed `authentication_error` and does NOT become `billing_error`. That type
+names the READER's billing state; this code is the DEPLOYMENT's upstream
+balance, and a consumer rendering it as a billing problem would send a caller to
+their own portal over an account they do not own — the same class of failure the
+split codes exist to prevent. Its residual type mismatch is real and is the
+lesser of the two evils until the envelope grows a way to say "billing, but not
+yours".
 
 ---
+
 
 ## Refuse `AUTH_MODE=open` in production at the cutover
 
