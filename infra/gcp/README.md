@@ -34,6 +34,60 @@ the build retires this build's tag on every path, including the ones where it
 failed, and why the posture check below happens *before* the candidate exists
 rather than after.
 
+## Which service, and which environment
+
+`cloudbuild.yaml` holds a **closed table** binding each service to the one
+environment it may ever be deployed in:
+
+| `_SERVICE` | `_ENVIRONMENT` |
+|---|---|
+| `daintree-assistant` | `production` |
+| `daintree-assistant-staging` | `staging` |
+
+Both halves of that are refusals. A service the table does not list is refused
+outright, and a listed one deployed under the wrong environment is refused too.
+
+This is not bookkeeping. `_ENVIRONMENT` is a word the caller types, `_SERVICE` is
+independently overridable, and every posture rule in the build — plus the
+application's own private-beta subject gate — keys on that word. Before the
+table, `_SERVICE=daintree-assistant-staging` with `_ENVIRONMENT` simply left
+unset (it defaults to `production`) deployed onto staging while being judged by
+production's rules, which is to say by no rule at all. The deploy service account
+holds project-wide `roles/run.admin`, so "some other service" means every service
+in the project.
+
+**Adding a service is adding a row**, in `cloudbuild.yaml`, in a commit — never a
+substitution on a build somebody fires by hand. If a new deployment needs its own
+posture, this is the file that has to learn about it before it can receive a
+release.
+
+The posture gate below names the production service directly, for the same
+reason: `production runs open/off by decision` is a fact about **one** Cloud Run
+service, not about a word.
+
+**The table only means anything because the value is a name and not a program.**
+Four substitutions — `_SERVICE`, `_REGION`, `_AR_REPO`, `_RUNTIME_SA` — are
+expanded into shell source rather than passed as environment variables, because
+they identify resources inside gcloud arguments in a dozen places. Cloud Build
+expands them before bash parses, so a `_RUNTIME_SA` of
+`x"); SERVICE_STATE=absent; REST=("` closes the flag array, overwrites the answer
+the service probe just computed, and takes the full-traffic first-deploy branch —
+defeating the table, the posture gate and the deploy-shape refusal in one value,
+because all three are ordinary shell below the point where it has already run.
+The first step in the build refuses any of the four that is not a lowercase
+resource name, which is the only alphabet a Cloud Run service, a region, an
+Artifact Registry repository or a service-account id can legally use.
+
+Two of Cloud Build's *own* substitutions reach a script the same way and are the
+ones nobody thinks to check: `$COMMIT_SHA` and `$SHORT_SHA` look
+platform-supplied, and on a trigger they are — but a **manual** build can
+override both, and `--labels=commit-sha=$SHORT_SHA` sits inside the same flag
+array. They are git object names, so the guard holds them to hex.
+
+**A substitution written into a gcloud flag is source code nothing checks** —
+pass it as an environment variable, or add it to that guard. A test enumerates
+both sets and fails on a name that appears in a script and not in the guard.
+
 ## The private rollout, in order
 
 `AUTH_MODE` and `ENTITLEMENT_MODE` are separate axes on purpose: identity says the
@@ -46,8 +100,11 @@ Raise the staging service and leave it private:
 
 ```bash
 gcloud builds triggers run deploy-staging \
-  --substitutions=_ENVIRONMENT=staging,_AUTH_MODE=open
+  --substitutions=_SERVICE=daintree-assistant-staging,_ENVIRONMENT=staging,_AUTH_MODE=open
 ```
+
+Both substitutions, every time: the table above refuses the pair if either half
+is missing or wrong, which is the point of it.
 
 Then walk the identity axis, re-releasing at each step, checking each one with an
 identity token because the service is private:
@@ -90,7 +147,8 @@ Public invocation is attached last, once the deployed revision has been *seen* t
 enforce identity, enforce entitlement, and hold a non-empty gate:
 
 ```bash
-PUBLIC_CUTOVER=daintree-assistant ./infra/gcp/bootstrap.sh
+SERVICE=daintree-assistant-staging \
+  PUBLIC_CUTOVER=daintree-assistant-staging ./infra/gcp/bootstrap.sh
 ```
 
 Typing the service name is the confirmation — an exported variable a shell
@@ -104,7 +162,7 @@ is typed into.
 Revoking is as deliberate as granting, and `bootstrap.sh` will not do it either:
 
 ```bash
-gcloud run services remove-iam-policy-binding daintree-assistant \
+gcloud run services remove-iam-policy-binding daintree-assistant-staging \
   --region=us-central1 --member=allUsers --role=roles/run.invoker
 ```
 
@@ -117,18 +175,27 @@ URL with a different hostname. Neither is "nobody knows the URL": Cloud Run URLs
 are derived from the service name and the project, and the certificate is in the
 public transparency logs.
 
-The build enforces this for staging, and the shape of the rule is worth stating
-because it is narrower than it first looks. `cloudbuild.yaml` reads the service's
-invoker policy before deploying, and refuses a **staging** release onto a publicly
-invokable service unless it enforces both axes and mounts a non-empty gate. It
-does *not* assert that every public deployment must enforce, and that is not an
-oversight: production runs `open`/`off` today as a deliberate product posture, so
-a blanket rule would refuse the release that is currently correct — and a gate
-nobody can ship through is a gate somebody deletes. Staging is different because
-staging *is* the private beta: the subject gate exists only there, `config.py`
-refuses to let production hold a membership list at all, and so "a public staging
-service that does not enforce" has no legitimate reading. Moving production is a
-product decision, and it will arrive as its own rule.
+The build enforces this, and the shape of the rule is worth stating because it is
+narrower than it first looks. `cloudbuild.yaml` reads the service's invoker policy
+before deploying, and refuses a release onto a publicly invokable service — unless
+that service is `daintree-assistant` — until it enforces both axes and mounts a
+non-empty gate. It does *not* assert that every public deployment must enforce,
+and that is not an oversight: production runs `open`/`off` today as a deliberate
+product posture, so a blanket rule would refuse the release that is currently
+correct, and a gate nobody can ship through is a gate somebody deletes.
+
+**The exemption is keyed to the service NAME, not to `_ENVIRONMENT`.** A word the
+caller types cannot be what decides whether the rule applies — that was the
+bypass: `_SERVICE=daintree-assistant-staging` with `_ENVIRONMENT` left at its
+production default walked straight past both this gate and the application's own
+subject gate. The service name is not the caller's to invent, because the table
+above refuses one this file does not know.
+
+Every other service is different because it *is* the private beta: the subject
+gate exists only under `staging`, `config.py` refuses to let production hold a
+membership list at all, and so "a public non-production service that does not
+enforce" has no legitimate reading. Moving production is a product decision, and
+it will arrive as its own rule.
 
 ## What the pipeline guarantees, and what it does not
 
@@ -139,6 +206,26 @@ final step that cannot be skipped retires *this build's own tag* — read from t
 file the deploy wrote, never derived a second time, so it can neither name nor
 delete a concurrent build's candidate — and only then decides whether the build is
 red.
+
+**The markers cannot be forged.** They are the verdict now — `allowFailure` means
+a failed step no longer stops the build, so what a later step believes about an
+earlier one is whatever it finds on disk. They therefore do *not* live in
+`/workspace`, which **is** the repository checkout: a tree carrying
+`stage_deploy_ok` and `skip_smoke` would have walked a failed deploy through the
+smoke and the promotion and out as a green release, and a committed `rc_tag` would
+have aimed the cleanup at whatever name it held. Release state lives on
+`/release`, a build-scoped volume emptied by the first step, and every file under
+it opens with the id of the build that wrote it. Existence is not proof; a file
+this build did not write is simply not release state.
+
+**An unreadable service is a refusal, in every environment.** The build asks once,
+before deploying, whether the service exists and who may invoke it, and
+`absent`/`unreadable` are different answers. The first-deploy path creates the
+service at 100% of traffic behind a `/readyz` check alone — no environment
+readback, no smoke suite — and it used to be selected by a second, boolean
+`describe` in which a denied permission, a transient API error and a genuinely
+missing service were indistinguishable. One flake was enough to put an existing
+public service onto an unsmoked revision and report green.
 
 **Not guaranteed.** Three bounds, each worth knowing before you rely on the gate.
 

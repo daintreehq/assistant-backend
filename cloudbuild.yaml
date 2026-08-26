@@ -31,6 +31,13 @@
 # be skipped, retires this build's tag and only then decides whether the build is
 # red. Cloud Build has no `always()`; this is how one is built out of what it has.
 #
+# Those markers are the VERDICT rather than a log line, so where they live is
+# part of the mechanism: /workspace IS the repository checkout, and a marker
+# there is a file the repo could have carried. Release state lives on
+# `/release`, a build-scoped volume nothing in the tree can write, and every
+# file under it opens with the id of the build that wrote it. Existence is not
+# proof.
+#
 # That smoke is the SAME script an operator runs by hand against a deployed host,
 # invoked with the release's own expectations rather than left to adapt to
 # whatever is there. It is not a second, thinner definition of "working": this
@@ -38,6 +45,11 @@
 # stops matching the one anybody edits.
 
 substitutions:
+  # The Cloud Run service this build deploys onto. NOT a free-form name: the
+  # deploy step holds a closed service -> environment table and refuses a name
+  # this file does not know, because `_ENVIRONMENT` is a string the caller
+  # picks and every posture rule below is keyed on it. See the table in
+  # `deploy-rc` for what to do when a genuinely new service is added.
   _SERVICE: daintree-assistant
   _REGION: us-central1
   _AR_REPO: daintree
@@ -190,6 +202,171 @@ availableSecrets:
 timeout: 1800s
 
 steps:
+  # ---- Refuse a substitution that is not a name ----------------------------
+  #
+  # SIX substitutions are interpolated into SHELL SOURCE rather than passed as
+  # environment variables. Four of them are resource names: `_SERVICE`, `_REGION`, `_AR_REPO` and `_RUNTIME_SA`.
+  # Cloud Build expands them before bash parses, so each one is a fragment of the
+  # program rather than a value inside it — a `_RUNTIME_SA` of
+  # `x"); SERVICE_STATE=absent; REST=("` closes the flag array, overwrites the
+  # answer the service probe computed, and takes the full-traffic first-deploy
+  # branch onto a service that already exists.
+  #
+  # That is not a hypothetical shape of bug. It is how every gate in `deploy-rc`
+  # is bypassed at once — the service/environment table, the public-posture
+  # refusal and the deploy-shape refusal are all ordinary shell below the point
+  # where the injected text has already run — so it is the precondition those
+  # rules are built on rather than a rule beside them.
+  #
+  # They cannot simply become environment variables like everything else: they
+  # appear inside an image tag, a service-account address and a dozen gcloud
+  # flags across four steps, and one of the steps that needs them (`release-gate`)
+  # must keep working when the deploy never ran.
+  #
+  # THE ONE THING THAT MAKES THEM SAFE is that all four are NAMES. Cloud Run
+  # services, Artifact Registry repositories, regions and service-account ids live
+  # in the same narrow alphabet: a lowercase letter, then lowercase letters,
+  # digits and hyphens. No legal value contains a quote, a space, a dollar, a
+  # semicolon or a newline, so refusing everything outside that alphabet costs a
+  # correct release nothing and removes the entire class.
+  #
+  # THE OTHER TWO ARE BUILT-INS, and they are the ones nobody thinks to check.
+  # `$COMMIT_SHA` and `$SHORT_SHA` look platform-supplied, and on a trigger they
+  # are — but Cloud Build lets a MANUAL build override them, and `--labels=
+  # commit-sha=$SHORT_SHA` sits inside the same flag array as `_RUNTIME_SA`. They
+  # are git object names, so they are hex and nothing else. `$PROJECT_ID` and
+  # `$BUILD_ID` are not overridable and are not checked here; `$BUILD_ID` reaches
+  # bash as environment data anyway.
+  #
+  # It runs FIRST, and it has no `allowFailure`, so a bad value stops the build
+  # before any step has parsed it. A check inside `deploy-rc` could not do that:
+  # the interpolation happens before bash reads that step's first line.
+  - id: substitution-guard
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    env:
+      - 'SERVICE=${_SERVICE}'
+      - 'REGION=${_REGION}'
+      - 'AR_REPO=${_AR_REPO}'
+      - 'RUNTIME_SA=${_RUNTIME_SA}'
+      - 'COMMIT_SHA=$COMMIT_SHA'
+      - 'SHORT_SHA=$SHORT_SHA'
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        # Written as a `case` over a character class rather than a `grep -E`,
+        # because grep matches per LINE: a value of "daintree-assistant" followed
+        # by a newline and a payload satisfies `^[a-z0-9-]*$` on its first line
+        # and smuggles the rest past. `case` tests the whole string, and a newline
+        # is outside `[a-z0-9-]` like everything else.
+        #
+        # No `eval`, and no loop over variable NAMES that would need one: this
+        # step's entire purpose is that an operator value is never something bash
+        # parses, and an `eval` in the middle of it is the one construct that
+        # could make that untrue. Four lines written out is the honest cost.
+        check_name() {
+          # 63 is Artifact Registry's own maximum and the longest of the four
+          # limits; Cloud Run stops at 49 and a service-account id at 30, and
+          # those refusals belong to GCP rather than here. This bound exists to
+          # stop an unbounded value, not to restate the API's rules.
+          if [ "$${#2}" -le 63 ]; then
+            case "$$2" in
+              # Any character no name may hold — quote, space, dollar, semicolon,
+              # newline, uppercase, anything. Tested FIRST so it wins.
+              *[!a-z0-9-]*) ;;
+              # Starts with a lowercase letter and, by the arm above, holds
+              # nothing but the alphabet. That is a name.
+              [a-z]*) return 0 ;;
+            esac
+          fi
+          # The VALUE is never echoed. It is the thing we have just decided may be
+          # a program, and a build log outlives the build.
+          echo "ERROR: $$1 must be a resource NAME — a lowercase letter followed by" >&2
+          echo "       lowercase letters, digits or hyphens, at most 62 characters." >&2
+          echo "       These four substitutions are interpolated into shell source," >&2
+          echo "       so a value outside that alphabet is a program rather than a" >&2
+          echo "       name. The value is deliberately not echoed." >&2
+          return 1
+        }
+        # A git object name, and the same reasoning: COMMIT_SHA and SHORT_SHA are
+        # interpolated into an image tag, a build arg and a Cloud Run label, and a
+        # manual build can override both. Lowercase hex is the whole alphabet a
+        # git sha has, so the same `case` settles it — and an empty one is refused
+        # too, because `gcloud builds submit` produces exactly that and it would
+        # tag the image with nothing.
+        check_sha() {
+          if [ "$${#2}" -ge 7 ] && [ "$${#2}" -le 40 ]; then
+            case "$$2" in
+              *[!0-9a-f]*) ;;
+              *) return 0 ;;
+            esac
+          fi
+          echo "ERROR: $$1 must be a git object name — 7 to 40 lowercase hex" >&2
+          echo "       characters. It is interpolated into shell source, an image" >&2
+          echo "       tag and a Cloud Run label, and a manual build can set it." >&2
+          echo "       Fire the trigger rather than 'gcloud builds submit', which" >&2
+          echo "       supplies neither. The value is deliberately not echoed." >&2
+          return 1
+        }
+        # Every one is checked before any is reported, so an operator who got two
+        # wrong learns both in one build.
+        NAMES_OK=1
+        check_name _SERVICE    "$$SERVICE"    || NAMES_OK=0
+        check_name _REGION     "$$REGION"     || NAMES_OK=0
+        check_name _AR_REPO    "$$AR_REPO"    || NAMES_OK=0
+        check_name _RUNTIME_SA "$$RUNTIME_SA" || NAMES_OK=0
+        check_sha  COMMIT_SHA  "$$COMMIT_SHA" || NAMES_OK=0
+        check_sha  SHORT_SHA   "$$SHORT_SHA"  || NAMES_OK=0
+        [ "$$NAMES_OK" -eq 1 ] || exit 1
+        echo "Interpolated substitutions are names; the steps below may quote them."
+
+  # ---- Initialise the release state ---------------------------------------
+  #
+  # /workspace IS the repository checkout, and every step below runs with it
+  # mounted. So a file the repo happened to contain arrives looking exactly like
+  # a file an earlier step wrote — and since `allowFailure` made the stage
+  # markers the only record of what happened, a checkout carrying
+  # `stage_deploy_ok` and `skip_smoke` could walk a FAILED deploy through the
+  # smoke, through the promotion, and out the other side as a green release. A
+  # pre-seeded `rc_tag` could aim the cleanup at another build's candidate.
+  #
+  # `/release` is a build-scoped volume rather than a directory in the tree, so
+  # nothing in the repository can put a file there. This step empties it and
+  # records which build it belongs to; every file written under it opens with
+  # that id and every reader checks it.
+  #
+  # It runs FIRST, ahead of the image build, because an unusable BUILD_ID makes
+  # the whole binding vacuous — a marker stamped with nothing matches a check for
+  # nothing — and that is worth learning in five seconds rather than after a
+  # ten-minute build and push.
+  - id: release-state-init
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    env:
+      - 'BUILD_ID=$BUILD_ID'
+    volumes:
+      - name: release-state
+        path: /release
+    args:
+      - -euo
+      - pipefail
+      - -c
+      - |
+        if [ -z "$$BUILD_ID" ]; then
+          echo "ERROR: BUILD_ID is empty, so release state could not be bound to this" >&2
+          echo "       build — and a marker bound to nothing is one anybody can write." >&2
+          echo "       Fire the trigger rather than 'gcloud builds submit'." >&2
+          exit 1
+        fi
+        # Emptied rather than assumed empty. A Cloud Build volume is per-build
+        # today; this line is what makes that a property of this file instead of
+        # a property of the platform's current behaviour.
+        find /release -mindepth 1 -delete
+        printf '%s\n' "$$BUILD_ID" > /release/build_id
+        echo "Release state initialised for build $$BUILD_ID."
+
   # ---- Materialise Git LFS content ----------------------------------------
   # The runbook selector (runbooks/local/artifacts/selector/**/*.onnx, tokenizer.json,
   # vectors.npz) is stored in Git LFS, and Cloud Build's repository fetch does
@@ -264,6 +441,10 @@ steps:
     # step after it refuses to run without that marker, and the final step — which
     # has no allowFailure — cleans the tag up and then fails the build.
     allowFailure: true
+    volumes:
+      # Release state is not kept in the checkout. See `release-state-init`.
+      - name: release-state
+        path: /release
     # Every operator-supplied value arrives as an ENVIRONMENT VARIABLE, never as
     # text interpolated into the script below. Cloud Build substitutes `${_FOO}`
     # before bash parses, so a substitution written inline is SOURCE CODE: a value
@@ -271,12 +452,25 @@ steps:
     # containing a quote could splice in whatever followed it. Setting them here
     # instead means bash only ever sees `"$$SUPABASE_AUTH_ISSUER"`, an ordinary
     # quoted expansion that cannot be anything but data.
+    #
+    # FOUR NAMES ARE THE EXCEPTION, and stating it is the point: `${_SERVICE}`,
+    # `${_REGION}`, `${_AR_REPO}` and `${_RUNTIME_SA}` are interpolated into the
+    # gcloud arguments below because they identify resources in a dozen places
+    # across four steps. `substitution-guard`, the first step in this file, is what
+    # makes that safe — it refuses any of them that is not a lowercase resource
+    # name, before any step has parsed one. An unadmitted exception is worse than
+    # this one: it is a rule somebody copies the wrong half of.
     env:
       # Cloud Build's own per-build identifier. Not operator input, but it
       # arrives as an environment variable like everything else here — the
       # step's rule is that the script never contains a substituted value,
       # and a rule with an exception is one somebody copies the wrong half of.
       - 'BUILD_ID=$BUILD_ID'
+      # The service NAME, as data. It is interpolated into the gcloud calls below
+      # like every other resource name, but the rule that binds it to an
+      # environment compares it, and a comparison against source text is a
+      # comparison this step cannot be tested on.
+      - 'SERVICE=${_SERVICE}'
       - 'ENVIRONMENT=${_ENVIRONMENT}'
       - 'AUTH_MODE=${_AUTH_MODE}'
       - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
@@ -304,6 +498,46 @@ steps:
       - pipefail
       - -c
       - |
+        # --- release state: read and written only through these ---------------
+        #
+        # `allowFailure` turned these markers into the VERDICT rather than a log
+        # line: a failed step no longer aborts the build, so what a later step
+        # believes about an earlier one is whatever it finds on disk. /workspace IS
+        # the repository checkout, so a marker there is a file the repo could have
+        # carried — and a checkout holding `stage_deploy_ok` and `skip_smoke` would
+        # have walked a failed deploy through the smoke, through the promotion, and
+        # out as a green release.
+        #
+        # /release is a build-scoped volume nothing in the tree can write, emptied
+        # by `release-state-init`, and every file under it opens with the id of the
+        # build that wrote it. So EXISTENCE IS NOT PROOF: a file the repo carried
+        # and a file a concurrent build wrote are both simply not ours, and a
+        # reader that only asked whether the path exists could not tell.
+        #
+        # This block is byte-identical in every step that touches release state,
+        # and tests/unit/test_deployment_wiring.py compares the copies character
+        # for character. Two trust checks that have drifted apart are worse than
+        # one, and the drift is invisible until the day it decides something.
+        stamp() {
+          STAMP_NAME="$$1"; shift
+          {
+            printf '%s\n' "$$BUILD_ID"
+            [ "$$#" -eq 0 ] || printf '%s\n' "$$@"
+          } > "/release/$$STAMP_NAME"
+        }
+        stamped() {
+          STAMP=""
+          [ -s "/release/$$1" ] || return 1
+          IFS= read -r STAMP < "/release/$$1" || :
+          [ "$$STAMP" = "$$BUILD_ID" ] || return 1
+          tail -n +2 "/release/$$1"
+        }
+        if [ -z "$${BUILD_ID:-}" ]; then
+          echo "ERROR: BUILD_ID is empty; release state cannot be bound to this build." >&2
+          exit 1
+        fi
+        # --- end release state helpers ----------------------------------------
+
         IMAGE="${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_SERVICE}:$COMMIT_SHA"
 
         # Signing-key rotation: the PREVIOUS key rides alongside the current one so
@@ -325,6 +559,48 @@ steps:
           *) echo "ERROR: _ENVIRONMENT must be development|test|staging|production, got '$$ENVIRONMENT'." >&2
              exit 1 ;;
         esac
+        # --- which service is this, and what may it be? -----------------------
+        #
+        # `_ENVIRONMENT` is a word the caller chooses and `_SERVICE` is
+        # independently overridable, and until now nothing tied the two together.
+        # Every posture rule in this file — and the application's own private-beta
+        # subject gate — keys on that word, so a manual build with
+        # `_SERVICE=<the staging service>` and `_ENVIRONMENT=production` (or
+        # `development`, or simply left unset, which TAKES the production default)
+        # was judged by production's rules while deploying onto staging. The deploy
+        # identity holds project-wide roles/run.admin, so that is not a narrow
+        # reach.
+        #
+        # The mapping is therefore CLOSED and lives here, in a commit, rather than
+        # in a substitution somebody types once. A service this file does not know
+        # is refused rather than trusted: "some other service" is every service in
+        # the project, and there is no posture rule that knows what it is for.
+        #
+        # ADDING A SERVICE is adding a row below, naming the ONE environment it may
+        # ever be deployed in. There is deliberately no wildcard and no opt-out —
+        # if a new service needs its own rules, this is the file that has to learn
+        # about it before it can receive a release.
+        case "$$SERVICE" in
+          daintree-assistant)         SERVICE_ENVIRONMENT=production ;;
+          daintree-assistant-staging) SERVICE_ENVIRONMENT=staging ;;
+          *)
+            echo "ERROR: _SERVICE='$$SERVICE' is not a service this file knows how to" >&2
+            echo "       deploy, so nothing here knows which posture rules apply to it." >&2
+            echo "       Add a row to the service/environment table in cloudbuild.yaml" >&2
+            echo "       naming the one environment it may be deployed in." >&2
+            exit 1 ;;
+        esac
+        if [ "$$ENVIRONMENT" != "$$SERVICE_ENVIRONMENT" ]; then
+          echo "ERROR: $$SERVICE is the $$SERVICE_ENVIRONMENT service and this build" >&2
+          echo "       declares _ENVIRONMENT=$$ENVIRONMENT." >&2
+          echo "       The posture gate below and the application's own staging subject" >&2
+          echo "       gate both key on that word, so a mismatch is a release judged by" >&2
+          echo "       the wrong rules. _ENVIRONMENT defaults to production, so leaving" >&2
+          echo "       it unset is the likeliest way to arrive here." >&2
+          exit 1
+        fi
+        echo "Deploying $$SERVICE as the $$SERVICE_ENVIRONMENT deployment."
+        # --- end service/environment table ------------------------------------
         case "$$AUTH_MODE" in
           open|observe|enforce) ;;
           *) echo "ERROR: _AUTH_MODE must be open|observe|enforce, got '$$AUTH_MODE'." >&2
@@ -750,6 +1026,12 @@ steps:
         # Recorded through files rather than a nested heredoc: this step's
         # embedded python is written at column zero so YAML hands bash a program
         # python can parse, and a heredoc inside an `if` cannot be.
+        # Kept as a SHELL VARIABLE as well as written to a file, and the variable is
+        # the half that mattered: the branch that chooses between raising a
+        # no-traffic candidate and CREATING the service at full traffic used to ask
+        # `describe` a second time, as a bare boolean, in which a denied permission
+        # and a missing service are the same answer. It is answered once, here, and
+        # read there.
         : > /workspace/iam_err
         SERVICE_STATUS=0
         gcloud run services describe "${_SERVICE}" --region="${_REGION}" \
@@ -757,15 +1039,16 @@ steps:
         if [ "$$SERVICE_STATUS" -eq 0 ]; then
           if gcloud run services get-iam-policy "${_SERVICE}" --region="${_REGION}" \
                --format=json > /workspace/service_iam.json 2>>/workspace/iam_err; then
-            printf 'read' > /workspace/service_iam_state
+            SERVICE_STATE=read
           else
-            printf 'unreadable' > /workspace/service_iam_state
+            SERVICE_STATE=unreadable
           fi
         elif grep -qi 'not found\|NOT_FOUND\|does not exist' /workspace/iam_err 2>/dev/null; then
-          printf 'absent' > /workspace/service_iam_state
+          SERVICE_STATE=absent
         else
-          printf 'unreadable' > /workspace/service_iam_state
+          SERVICE_STATE=unreadable
         fi
+        printf '%s' "$$SERVICE_STATE" > /workspace/service_iam_state
         python3 - <<'PYEOF' > /workspace/service_public
         import json
 
@@ -812,6 +1095,30 @@ steps:
         esac
         echo "Public invocation of ${_SERVICE}: $$SERVICE_PUBLIC."
         #
+        # UNREADABLE IS A REFUSAL, IN EVERY ENVIRONMENT — the second question this
+        # one describe answers, and the one that used to be thrown away.
+        #
+        # It was a staging-only concern, and it should never have been. The branch
+        # further down chooses between raising a no-traffic candidate and CREATING
+        # the service at 100% of traffic behind a /readyz check alone — no
+        # environment readback, no smoke suite — and it re-derived that choice from
+        # a SECOND, boolean `describe` in which a transient API error, a denied
+        # permission and a genuinely missing service all read as "first deploy". So
+        # one flaky call could put an existing, public, serving service straight
+        # onto an unsmoked revision and still report green.
+        #
+        # There is no environment in which guessing is the cheaper mistake, so the
+        # refusal is unconditional and stands ahead of every rule that follows.
+        if [ "$$SERVICE_PUBLIC" = "unknown" ]; then
+          echo "ERROR: could not read ${_SERVICE} or its invoker policy." >&2
+          cat /workspace/iam_err >&2 || true
+          echo "       Absent and unreadable are different answers and only one of them" >&2
+          echo "       is safe: 'unreadable' is not evidence that the service does not" >&2
+          echo "       exist, and reading it as such deploys at full traffic, unsmoked," >&2
+          echo "       onto whatever is already serving there." >&2
+          exit 1
+        fi
+        #
         # WHAT THIS CHECK DOES NOT SEE, stated because an unstated bound is
         # indistinguishable from a bound nobody thought about: `get-iam-policy`
         # on a service returns the SERVICE's own policy, so an invoker role
@@ -824,54 +1131,55 @@ steps:
 
         # THE RULE, and its SCOPE is the part worth reading rather than the rule.
         #
-        # It binds on `staging` and deliberately not on every public deployment.
-        # The two axes are staged independently on purpose (CLAUDE.md), and the
-        # PUBLIC PRODUCTION service runs `open`/`off` today as a deliberate
-        # product posture: the server holds the upstream credential, anonymous
-        # turns are what it is currently for, and readiness accepts that. A
-        # blanket "no public service may fund anonymous work" would refuse the
-        # release that is currently correct, which is a gate nobody can ship
-        # through and therefore a gate somebody deletes.
+        # It exempts ONE SERVICE, and deliberately not every deployment that
+        # declares itself production. The two axes are staged independently on
+        # purpose (CLAUDE.md), and the public PRODUCTION service runs `open`/`off`
+        # today as a deliberate product posture: the server holds the upstream
+        # credential, anonymous turns are what it is currently for, and readiness
+        # accepts that. A blanket "no public service may fund anonymous work" would
+        # refuse the release that is currently correct, which is a gate nobody can
+        # ship through and therefore a gate somebody deletes.
         #
-        # What makes STAGING different is not that it matters less. It is that
-        # `staging` is the PRIVATE BETA — the only deployment the subject gate
+        # THE EXEMPTION IS KEYED TO THE SERVICE NAME, not to the word the caller
+        # typed. `production runs open/off by decision` is a fact about one Cloud
+        # Run service — the one at assistant.daintree.org that this file's defaults
+        # deploy. Keying the exemption on `_ENVIRONMENT` let any build claim it:
+        # `_SERVICE=<the staging service>` with `_ENVIRONMENT` left at its
+        # production default walked straight through. The service name is not the
+        # caller's to invent — the table at the top of this step refuses one this
+        # file does not know — which is what makes it the half worth binding to.
+        #
+        # What makes every OTHER service different is not that it matters less. The
+        # staging one IS the private beta — the only deployment the subject gate
         # exists for, and `config.py` refuses to let production hold a membership
-        # list at all. So "a publicly invokable staging service that does not
+        # list at all. So "a publicly invokable non-production service that does not
         # enforce" has no legitimate reading: it is a private beta that is not
-        # private, funding strangers' turns under a name that says otherwise.
-        # That is a mistake with no correct version of itself, which is exactly
-        # the shape a build is allowed to refuse.
+        # private, funding strangers' turns under a name that says otherwise. That
+        # is a mistake with no correct version of itself, which is exactly the shape
+        # a build is allowed to refuse.
         #
-        # The honest boundary, stated so nobody has to infer it: this gate is
-        # about a deployment whose posture CONTRADICTS its exposure. It is not a
-        # claim that production's posture is right, and moving production is a
-        # product decision that will arrive as its own rule.
-        if [ "$$ENVIRONMENT" = "staging" ] && [ "$$SERVICE_PUBLIC" != "no" ]; then
-          if [ "$$SERVICE_PUBLIC" = "unknown" ]; then
-            # Fail CLOSED, and only where the rule binds. Not knowing whether a
-            # staging service is public costs a re-run; guessing "private" costs
-            # an open funded endpoint that nobody decided to publish. The same
-            # trade the previous-signing-key probe above makes.
-            echo "ERROR: could not read the invoker policy for ${_SERVICE}." >&2
-            cat /workspace/iam_err >&2 || true
-            echo "       A staging release does not proceed without knowing whether" >&2
-            echo "       the service it deploys onto can be invoked by anybody." >&2
-            exit 1
-          fi
+        # The honest boundary, stated so nobody has to infer it: this gate is about
+        # a deployment whose posture CONTRADICTS its exposure. It is not a claim
+        # that production's posture is right, and moving production is a product
+        # decision that will arrive as its own rule.
+        #
+        # `unknown` cannot reach here — it is refused above, unconditionally — so
+        # the comparison below is against a value that is now only `yes` or `no`.
+        PRODUCTION_SERVICE=daintree-assistant
+        if [ "$$SERVICE" != "$$PRODUCTION_SERVICE" ] && [ "$$SERVICE_PUBLIC" != "no" ]; then
           if [ "$$AUTH_MODE" != "enforce" ]; then
-            echo "ERROR: ${_SERVICE} is publicly invokable and this is a staging" >&2
-            echo "       release with _AUTH_MODE=$$AUTH_MODE." >&2
-            echo "       A public staging deployment must enforce identity: below" >&2
-            echo "       enforce there is no subject, so the private-beta subject" >&2
-            echo "       gate cannot decide anything and every turn is funded for" >&2
-            echo "       an anonymous caller." >&2
+            echo "ERROR: ${_SERVICE} is publicly invokable, is not the production" >&2
+            echo "       service, and this release sets _AUTH_MODE=$$AUTH_MODE." >&2
+            echo "       Such a deployment must enforce identity: below enforce there" >&2
+            echo "       is no subject, so the private-beta subject gate cannot decide" >&2
+            echo "       anything and every turn is funded for an anonymous caller." >&2
             echo "       Move the rollout on a PRIVATE service (no allUsers invoker)" >&2
             echo "       and attach public access at cutover — see infra/gcp/README.md." >&2
             exit 1
           fi
           if [ "$$ENTITLEMENT_MODE" != "enforce" ]; then
-            echo "ERROR: ${_SERVICE} is publicly invokable and this is a staging" >&2
-            echo "       release with _ENTITLEMENT_MODE=$$ENTITLEMENT_MODE." >&2
+            echo "ERROR: ${_SERVICE} is publicly invokable, is not the production" >&2
+            echo "       service, and sets _ENTITLEMENT_MODE=$$ENTITLEMENT_MODE." >&2
             echo "       Identity says the token is genuine; entitlement says the" >&2
             echo "       account behind it has paid. A public staging service that" >&2
             echo "       verifies the first and not the second funds every verified" >&2
@@ -884,9 +1192,9 @@ steps:
           # is a rule that survives a refactor as a hole. The SHAPE of the value —
           # host, port, path — is pinned by the validation block above.
           if [ -z "$$(printf '%s' "$$DAINTREE_ENTITLEMENT_URL" | tr -d '[:space:]')" ]; then
-            echo "ERROR: ${_SERVICE} is publicly invokable and this staging release" >&2
-            echo "       sets no _DAINTREE_ENTITLEMENT_URL; there is nowhere to ask" >&2
-            echo "       whether an account has paid." >&2
+            echo "ERROR: ${_SERVICE} is publicly invokable and this release sets no" >&2
+            echo "       _DAINTREE_ENTITLEMENT_URL; there is nowhere to ask whether an" >&2
+            echo "       account has paid." >&2
             exit 1
           fi
         fi
@@ -1099,7 +1407,37 @@ steps:
           --quiet
         )
 
-        if gcloud run services describe "${_SERVICE}" --region="${_REGION}" >/dev/null 2>&1; then
+        # --- first deploy, or a release candidate? ----------------------------
+        #
+        # Answered from the `describe` the posture check above already performed,
+        # never from a second one. This branch decides whether the image is raised
+        # as a no-traffic candidate — tagged, read back, smoked, promoted — or
+        # whether it CREATES the service and takes 100% of traffic behind a
+        # /readyz check alone. It used to decide that with its own
+        # `if gcloud run services describe`, a bare boolean in which a denied
+        # permission, a transient API error and a genuinely missing service are
+        # indistinguishable, so a flake took the full-traffic unsmoked path onto a
+        # service that already existed.
+        #
+        # `unreadable` is refused above rather than here, so by this point the
+        # state is one of two known answers. The `*` arm is not dead code: it also
+        # covers SERVICE_STATE never having been set, which is what a refactor
+        # that moved the posture check out from under this one would look like.
+        # Failing closed on that is the difference between a red build and a
+        # service created at full traffic by accident.
+        case "$${SERVICE_STATE:-}" in
+          read)   DEPLOY_SHAPE=rc ;;
+          absent) DEPLOY_SHAPE=create ;;
+          *)
+            echo "ERROR: the state of ${_SERVICE} is '$${SERVICE_STATE:-unset}', which is" >&2
+            echo "       neither 'read' nor 'absent'. Refusing to guess: the wrong guess" >&2
+            echo "       creates or replaces a live service at full traffic, unsmoked." >&2
+            exit 1 ;;
+        esac
+        echo "Deploy shape: $$DEPLOY_SHAPE."
+        # --- end first deploy or release candidate ----------------------------
+
+        if [ "$$DEPLOY_SHAPE" = "rc" ]; then
           # ONE TAG PER BUILD, and this is what makes everything below refer to
           # this build's own revision rather than to whatever landed last.
           #
@@ -1133,7 +1471,7 @@ steps:
             echo "ERROR: BUILD_ID yielded no DNS-safe characters; refusing to share a tag." >&2
             exit 1
           fi
-          printf '%s' "$$RC_TAG" > /workspace/rc_tag
+          stamp rc_tag "$$RC_TAG"
           echo "Deploying $COMMIT_SHA as a no-traffic '$$RC_TAG' revision."
           gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}" --no-traffic --tag="$$RC_TAG"
           # The NAME as well as the URL, and the name is the load-bearing half:
@@ -1157,9 +1495,11 @@ steps:
         print(row["url"])
         print(row["revisionName"])' \
             > /workspace/rc_meta
-          head -1 /workspace/rc_meta > /workspace/rc_url
-          tail -1 /workspace/rc_meta > /workspace/rc_revision
-          echo "Release candidate: $$(cat /workspace/rc_revision) at $$(cat /workspace/rc_url)"
+          # rc_meta is this step's own scratch; the two values a LATER step reads
+          # are stamped onto the release volume, where the checkout cannot reach.
+          stamp rc_url "$$(head -1 /workspace/rc_meta)"
+          stamp rc_revision "$$(tail -1 /workspace/rc_meta)"
+          echo "Release candidate: $$(stamped rc_revision) at $$(stamped rc_url)"
 
           # WHAT THE REVISION ACTUALLY GOT, compared with what we generated.
           #
@@ -1182,8 +1522,8 @@ steps:
           # secret has no `value` to read. The secret REFERENCES are compared too,
           # and a reference is a name and a version — metadata the payload is
           # never part of.
-          gcloud run revisions describe "$$(cat /workspace/rc_revision)" \
-            --region="${_REGION}" --format=json > /workspace/rc_revision_json
+          gcloud run revisions describe "$$(stamped rc_revision)" \
+            --region="${_REGION}" --format=json > /workspace/revision_readback_json
           python3 - <<'PYEOF' || exit 1
         import json, sys
 
@@ -1191,7 +1531,7 @@ steps:
             wanted = json.load(handle)
         with open("/workspace/secret_refs.json") as handle:
             wanted_refs = json.load(handle)
-        with open("/workspace/rc_revision_json") as handle:
+        with open("/workspace/revision_readback_json") as handle:
             revision = json.load(handle)
 
         containers = revision["spec"]["containers"]
@@ -1331,14 +1671,18 @@ steps:
             exit 1
           fi
           echo "First revision is ready."
-          : > /workspace/skip_smoke
+          stamp skip_smoke
         fi
 
         # The stage marker, written LAST and only on the path that reached here.
         # Every step below reads it, and `release-gate` turns its absence into a
         # failed build. Under `set -e` there is no way to arrive at this line
         # having skipped something above it.
-        : > /workspace/stage_deploy_ok
+        #
+        # Stamped with this build's id onto the release volume, not touched into
+        # the checkout: the marker IS the verdict now, so a file the repository
+        # could have carried must not be able to impersonate one.
+        stamp stage_deploy_ok
 
   # ---- Smoke-test the candidate before it can take traffic -----------------
   - id: smoke
@@ -1348,12 +1692,19 @@ steps:
     # the bottom of the file is reached. A smoke failure is one of the three ways
     # a tagged candidate used to be stranded with a public URL.
     allowFailure: true
+    volumes:
+      # Release state is not kept in the checkout. See `release-state-init`.
+      - name: release-state
+        path: /release
     # The same rule as deploy-rc: every operator-supplied value arrives as an
     # ENVIRONMENT VARIABLE rather than interpolated into the script. Cloud Build
     # substitutes `${_FOO}` before bash parses, so a substitution written inline
     # is source code — and these are the values an operator types by hand when
     # raising a staging revision, which is exactly where a stray quote comes from.
     env:
+      # Release state is bound to the build that wrote it, so every step that
+      # reads a marker has to know which build it is.
+      - 'BUILD_ID=$BUILD_ID'
       - 'RELEASE_SHA=$COMMIT_SHA'
       - 'ENVIRONMENT=${_ENVIRONMENT}'
       - 'AUTH_MODE=${_AUTH_MODE}'
@@ -1386,22 +1737,72 @@ steps:
       - pipefail
       - -c
       - |
+        # --- release state: read and written only through these ---------------
+        #
+        # `allowFailure` turned these markers into the VERDICT rather than a log
+        # line: a failed step no longer aborts the build, so what a later step
+        # believes about an earlier one is whatever it finds on disk. /workspace IS
+        # the repository checkout, so a marker there is a file the repo could have
+        # carried — and a checkout holding `stage_deploy_ok` and `skip_smoke` would
+        # have walked a failed deploy through the smoke, through the promotion, and
+        # out as a green release.
+        #
+        # /release is a build-scoped volume nothing in the tree can write, emptied
+        # by `release-state-init`, and every file under it opens with the id of the
+        # build that wrote it. So EXISTENCE IS NOT PROOF: a file the repo carried
+        # and a file a concurrent build wrote are both simply not ours, and a
+        # reader that only asked whether the path exists could not tell.
+        #
+        # This block is byte-identical in every step that touches release state,
+        # and tests/unit/test_deployment_wiring.py compares the copies character
+        # for character. Two trust checks that have drifted apart are worse than
+        # one, and the drift is invisible until the day it decides something.
+        stamp() {
+          STAMP_NAME="$$1"; shift
+          {
+            printf '%s\n' "$$BUILD_ID"
+            [ "$$#" -eq 0 ] || printf '%s\n' "$$@"
+          } > "/release/$$STAMP_NAME"
+        }
+        stamped() {
+          STAMP=""
+          [ -s "/release/$$1" ] || return 1
+          IFS= read -r STAMP < "/release/$$1" || :
+          [ "$$STAMP" = "$$BUILD_ID" ] || return 1
+          tail -n +2 "/release/$$1"
+        }
+        if [ -z "$${BUILD_ID:-}" ]; then
+          echo "ERROR: BUILD_ID is empty; release state cannot be bound to this build." >&2
+          exit 1
+        fi
+        # --- end release state helpers ----------------------------------------
+
         # The previous stage records success by writing a marker; its failure is
         # not fatal to the build (see deploy-rc's allowFailure) precisely so the
         # cleanup step is reached, which means this step has to decline for
         # itself rather than assume it was only started because things went well.
-        if [ ! -f /workspace/stage_deploy_ok ]; then
+        #
+        # Asked through `stamped`, so the question is "did THIS build's deploy
+        # complete", not "does a path exist". The second question is one the
+        # repository checkout could answer.
+        if ! stamped stage_deploy_ok >/dev/null; then
           echo "ERROR: the candidate deploy did not complete; there is nothing to smoke." >&2
           exit 1
         fi
-        if [ -f /workspace/skip_smoke ]; then
+        if stamped skip_smoke >/dev/null; then
           echo "First deploy: readiness was checked with an identity token in deploy-rc."
           echo "The service is IAM-private until an operator performs the public"
           echo "cutover (infra/gcp/README.md), so there is no anonymous URL to smoke."
-          : > /workspace/stage_smoke_ok
+          stamp stage_smoke_ok
           exit 0
         fi
-        URL="$$(cat /workspace/rc_url)"
+        # Read through the same check. An empty or foreign value would otherwise
+        # send the whole assertion suite at a URL nothing in this build produced.
+        URL=""
+        if ! URL="$$(stamped rc_url)" || [ -z "$$URL" ]; then
+          echo "ERROR: this build recorded no candidate URL to smoke." >&2
+          exit 1
+        fi
 
         # Note /healthz is NOT used here. Google's frontend reserves that path
         # and serves its own HTML 404 for it, so the request never reaches the
@@ -1518,7 +1919,7 @@ steps:
         bash infra/gcp/smoke.sh "$$@"
         echo "Candidate is ready and serving $$RELEASE_SHA in $$ENVIRONMENT" \
              "(auth=$$AUTH_MODE, entitlement=$$ENTITLEMENT_MODE)."
-        : > /workspace/stage_smoke_ok
+        stamp stage_smoke_ok
 
   # ---- Promote to 100% -----------------------------------------------------
   - id: promote
@@ -1529,18 +1930,65 @@ steps:
     # is the least obvious of the stranding paths and the one no operator would
     # think to check.
     allowFailure: true
+    volumes:
+      # Release state is not kept in the checkout. See `release-state-init`.
+      - name: release-state
+        path: /release
+    env:
+      # Release state is bound to the build that wrote it.
+      - 'BUILD_ID=$BUILD_ID'
     args:
       - -euo
       - pipefail
       - -c
       - |
-        if [ ! -f /workspace/stage_smoke_ok ]; then
+        # --- release state: read and written only through these ---------------
+        #
+        # `allowFailure` turned these markers into the VERDICT rather than a log
+        # line: a failed step no longer aborts the build, so what a later step
+        # believes about an earlier one is whatever it finds on disk. /workspace IS
+        # the repository checkout, so a marker there is a file the repo could have
+        # carried — and a checkout holding `stage_deploy_ok` and `skip_smoke` would
+        # have walked a failed deploy through the smoke, through the promotion, and
+        # out as a green release.
+        #
+        # /release is a build-scoped volume nothing in the tree can write, emptied
+        # by `release-state-init`, and every file under it opens with the id of the
+        # build that wrote it. So EXISTENCE IS NOT PROOF: a file the repo carried
+        # and a file a concurrent build wrote are both simply not ours, and a
+        # reader that only asked whether the path exists could not tell.
+        #
+        # This block is byte-identical in every step that touches release state,
+        # and tests/unit/test_deployment_wiring.py compares the copies character
+        # for character. Two trust checks that have drifted apart are worse than
+        # one, and the drift is invisible until the day it decides something.
+        stamp() {
+          STAMP_NAME="$$1"; shift
+          {
+            printf '%s\n' "$$BUILD_ID"
+            [ "$$#" -eq 0 ] || printf '%s\n' "$$@"
+          } > "/release/$$STAMP_NAME"
+        }
+        stamped() {
+          STAMP=""
+          [ -s "/release/$$1" ] || return 1
+          IFS= read -r STAMP < "/release/$$1" || :
+          [ "$$STAMP" = "$$BUILD_ID" ] || return 1
+          tail -n +2 "/release/$$1"
+        }
+        if [ -z "$${BUILD_ID:-}" ]; then
+          echo "ERROR: BUILD_ID is empty; release state cannot be bound to this build." >&2
+          exit 1
+        fi
+        # --- end release state helpers ----------------------------------------
+
+        if ! stamped stage_smoke_ok >/dev/null; then
           echo "ERROR: the candidate was not smoked; refusing to move traffic to it." >&2
           exit 1
         fi
-        if [ -f /workspace/skip_smoke ]; then
+        if stamped skip_smoke >/dev/null; then
           echo "First deploy already carries all traffic."
-          : > /workspace/stage_promote_ok
+          stamp stage_promote_ok
           exit 0
         fi
         # BY NAME, never --to-latest. The smoke proved one specific revision, and
@@ -1552,9 +2000,9 @@ steps:
         #
         # Drops the rc tag in the same call so tags do not accumulate one per
         # release; the previous revision stays available for rollback.
-        REVISION="$$(cat /workspace/rc_revision)"
-        if [ -z "$$REVISION" ]; then
-          echo "ERROR: no candidate revision was recorded; refusing to guess." >&2
+        REVISION=""
+        if ! REVISION="$$(stamped rc_revision)" || [ -z "$$REVISION" ]; then
+          echo "ERROR: this build recorded no candidate revision; refusing to guess." >&2
           exit 1
         fi
         # THIS build's tag, read back from the file the deploy wrote. It used to
@@ -1562,16 +2010,16 @@ steps:
         # promoting A therefore removed the tag build B was about to describe,
         # and B failed on a revision that was perfectly healthy. A tag no other
         # build can name is a tag no other build can delete.
-        RC_TAG="$$(cat /workspace/rc_tag)"
-        if [ -z "$$RC_TAG" ]; then
-          echo "ERROR: no candidate tag was recorded; refusing to guess." >&2
+        RC_TAG=""
+        if ! RC_TAG="$$(stamped rc_tag)" || [ -z "$$RC_TAG" ]; then
+          echo "ERROR: this build recorded no candidate tag; refusing to guess." >&2
           exit 1
         fi
         gcloud run services update-traffic "${_SERVICE}" \
           --region="${_REGION}" --to-revisions="$$REVISION=100" \
           --remove-tags="$$RC_TAG" --quiet
         echo "Promoted $$REVISION ($COMMIT_SHA) to 100% of traffic."
-        : > /workspace/stage_promote_ok
+        stamp stage_promote_ok
 
   # ---- Retire the candidate URL, then render the verdict -------------------
   #
@@ -1599,16 +2047,73 @@ steps:
   # the tag survives. Nothing inside a build can cover that. It is bounded by the
   # timeout and visible in the console, where a stranded tag was previously
   # invisible in every case.
+  #
+  # And the markers are only a verdict because they cannot be forged. They are
+  # stamped with this build's id on a volume the checkout cannot reach, and every
+  # read goes through `stamped` — because once `allowFailure` stopped a failed
+  # step from aborting the build, "the file is there" became the whole of the
+  # evidence, and /workspace is the repository.
   - id: release-gate
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
+    volumes:
+      # Release state is not kept in the checkout. See `release-state-init`.
+      - name: release-state
+        path: /release
+    env:
+      # Release state is bound to the build that wrote it, and this step is the
+      # one that turns it into a verdict.
+      - 'BUILD_ID=$BUILD_ID'
     args:
       - -uo
       - pipefail
       - -c
       - |
+        # --- release state: read and written only through these ---------------
+        #
+        # `allowFailure` turned these markers into the VERDICT rather than a log
+        # line: a failed step no longer aborts the build, so what a later step
+        # believes about an earlier one is whatever it finds on disk. /workspace IS
+        # the repository checkout, so a marker there is a file the repo could have
+        # carried — and a checkout holding `stage_deploy_ok` and `skip_smoke` would
+        # have walked a failed deploy through the smoke, through the promotion, and
+        # out as a green release.
+        #
+        # /release is a build-scoped volume nothing in the tree can write, emptied
+        # by `release-state-init`, and every file under it opens with the id of the
+        # build that wrote it. So EXISTENCE IS NOT PROOF: a file the repo carried
+        # and a file a concurrent build wrote are both simply not ours, and a
+        # reader that only asked whether the path exists could not tell.
+        #
+        # This block is byte-identical in every step that touches release state,
+        # and tests/unit/test_deployment_wiring.py compares the copies character
+        # for character. Two trust checks that have drifted apart are worse than
+        # one, and the drift is invisible until the day it decides something.
+        stamp() {
+          STAMP_NAME="$$1"; shift
+          {
+            printf '%s\n' "$$BUILD_ID"
+            [ "$$#" -eq 0 ] || printf '%s\n' "$$@"
+          } > "/release/$$STAMP_NAME"
+        }
+        stamped() {
+          STAMP=""
+          [ -s "/release/$$1" ] || return 1
+          IFS= read -r STAMP < "/release/$$1" || :
+          [ "$$STAMP" = "$$BUILD_ID" ] || return 1
+          tail -n +2 "/release/$$1"
+        }
+        if [ -z "$${BUILD_ID:-}" ]; then
+          echo "ERROR: BUILD_ID is empty; release state cannot be bound to this build." >&2
+          exit 1
+        fi
+        # --- end release state helpers ----------------------------------------
+
         # No `-e`. This step's whole job is to reach its own last line, so every
-        # fallible command below is guarded explicitly instead.
+        # fallible command below is guarded explicitly instead. (The helper block
+        # above is the one exception, and deliberately so: without a build id
+        # nothing here can be trusted to be ours, and there is no tag we could
+        # safely name.)
         CLEANUP_OK=1
 
         # ONLY the tag this build recorded, read from the file the deploy wrote
@@ -1621,13 +2126,19 @@ steps:
         # An absent or empty file means the deploy never got as far as tagging,
         # so there is nothing to remove and nothing to guess at.
         RC_TAG=""
-        if [ -s /workspace/rc_tag ]; then
+        if [ -e /release/rc_tag ]; then
           # There is no `-e` here, so a failed read would leave RC_TAG empty and
           # the cleanup would silently decide there was nothing to retire — the
           # one outcome this step exists to prevent, arrived at quietly.
-          if ! RC_TAG="$$(cat /workspace/rc_tag)"; then
-            echo "ERROR: a candidate tag was recorded but could not be read." >&2
-            echo "       Check the service's tags by hand before leaving this." >&2
+          #
+          # `stamped` also refuses a tag some OTHER build wrote. That used to be
+          # reachable: the file lived in /workspace, which is the repository
+          # checkout, so a committed `rc_tag` would have aimed this cleanup at
+          # whatever name it contained — on a service where a concurrent build's
+          # candidate is exactly the kind of name that would be worth aiming it at.
+          if ! RC_TAG="$$(stamped rc_tag)"; then
+            echo "ERROR: a candidate tag is recorded but this build did not write it." >&2
+            echo "       Refusing to act on it. Check the service's tags by hand." >&2
             RC_TAG=""
             CLEANUP_OK=0
           fi
@@ -1687,10 +2198,14 @@ steps:
         # The verdict. The three markers are the only record of what happened,
         # because the steps that wrote them were allowed to fail without stopping
         # the build.
+        # Each one is asked whether THIS build wrote it. File existence was the
+        # whole of the test until now, and /workspace is the repository checkout —
+        # so a tree carrying three empty files reported a green release having run
+        # none of it.
         FAILED=""
-        [ -f /workspace/stage_deploy_ok ]  || FAILED="$$FAILED deploy-rc"
-        [ -f /workspace/stage_smoke_ok ]   || FAILED="$$FAILED smoke"
-        [ -f /workspace/stage_promote_ok ] || FAILED="$$FAILED promote"
+        stamped stage_deploy_ok  >/dev/null || FAILED="$$FAILED deploy-rc"
+        stamped stage_smoke_ok   >/dev/null || FAILED="$$FAILED smoke"
+        stamped stage_promote_ok >/dev/null || FAILED="$$FAILED promote"
 
         if [ -n "$$FAILED" ]; then
           echo "ERROR: release failed in:$$FAILED" >&2

@@ -37,6 +37,11 @@ set -euo pipefail
 
 PROJECT="${PROJECT:-daintree-research}"
 REGION="${REGION:-us-central1}"              # Cloud Run + Artifact Registry
+# The Cloud Run service. `cloudbuild.yaml` holds a CLOSED service -> environment
+# table and refuses a name it does not know, so this is not a free-form value:
+# `daintree-assistant` is the production service and `daintree-assistant-staging`
+# is the staging one. A genuinely new service is a row added to that table, in a
+# commit, before it can receive a release — see infra/gcp/README.md.
 SERVICE="${SERVICE:-daintree-assistant}"
 AR_REPO="${AR_REPO:-daintree}"
 RUNTIME_SA="${RUNTIME_SA:-daintree-assistant-run}"
