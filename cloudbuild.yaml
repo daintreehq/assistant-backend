@@ -19,10 +19,16 @@
 #
 # Rollout is two-phase on purpose. A new revision is deployed with NO traffic
 # behind the `candidate` tag and smoke-tested on its own URL; only a revision
-# that answers /readyz gets promoted to 100%. Readiness covers failures that are
-# invisible at build time — a missing or weak secret, a malformed prompt
-# template, an unparseable runbook file — so those turn into a red build instead
-# of a broken production service.
+# that satisfies infra/gcp/smoke.sh gets promoted to 100%. Readiness covers
+# failures that are invisible at build time — a missing or weak secret, a
+# malformed prompt template, an unparseable runbook file — so those turn into a
+# red build instead of a broken production service.
+#
+# That smoke is the SAME script an operator runs by hand against a deployed host,
+# invoked with the release's own expectations rather than left to adapt to
+# whatever is there. It is not a second, thinner definition of "working": this
+# step used to carry one, and a copy that only the build runs is a copy that
+# stops matching the one anybody edits.
 
 substitutions:
   _SERVICE: daintree-assistant
@@ -654,6 +660,17 @@ steps:
   - id: smoke
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
+    # The same rule as deploy-rc: every operator-supplied value arrives as an
+    # ENVIRONMENT VARIABLE rather than interpolated into the script. Cloud Build
+    # substitutes `${_FOO}` before bash parses, so a substitution written inline
+    # is source code — and these are the values an operator types by hand when
+    # raising a staging revision, which is exactly where a stray quote comes from.
+    env:
+      - 'RELEASE_SHA=$COMMIT_SHA'
+      - 'ENVIRONMENT=${_ENVIRONMENT}'
+      - 'AUTH_MODE=${_AUTH_MODE}'
+      - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
+      - 'SUPABASE_OAUTH_CLIENT_ID=${_SUPABASE_OAUTH_CLIENT_ID}'
     args:
       - -euo
       - pipefail
@@ -673,9 +690,12 @@ steps:
         # still fine for Cloud Run's own liveness probe, which talks to the
         # container directly. /readyz is the right external gate regardless: it
         # proves the app is up AND correctly configured.
-
+        #
         # gcloud run deploy already waited for the revision to report Ready, so
-        # this retry is for network flakiness rather than slow startup.
+        # this retry is for network flakiness rather than slow startup. It is the
+        # one thing this step still does itself: infra/gcp/smoke.sh asserts, and
+        # an assertion suite that silently retried would be unable to report a
+        # route that is intermittently unreachable.
         for attempt in 1 2 3 4 5; do
           if curl -fsS --max-time 20 "$$URL/readyz" >/dev/null 2>&1; then
             break
@@ -684,23 +704,46 @@ steps:
           sleep 5
         done
 
-        # The real gate. A 503 fails the build and the candidate never gets
-        # traffic; the reason is deliberately withheld from the response in a
-        # hardened environment, so read the Cloud Run logs for the detail.
-        echo "--- /readyz ---"
-        curl -fsS --max-time 30 "$$URL/readyz"; echo
-
-        # Proves the running container is built from the commit that triggered
-        # this build, rather than a cached or mis-tagged image.
-        echo "--- /version ---"
-        curl -fsS --max-time 20 "$$URL/version"; echo
-        BUILT="$$(curl -fsS --max-time 20 "$$URL/version" \
-          | python3 -c 'import json,sys; print(json.load(sys.stdin).get("build_sha",""))')"
-        if [ "$$BUILT" != "$COMMIT_SHA" ]; then
-          echo "ERROR: serving build_sha=$$BUILT but this build is $COMMIT_SHA"
-          exit 1
+        # ONE definition of what a working deployment is, and it is the one an
+        # operator can run by hand.
+        #
+        # This step used to inline its own curls: a hard `/readyz`, and a
+        # comparison of /version's build_sha against the commit. Two assertions,
+        # against the twenty-odd in infra/gcp/smoke.sh — which checks that the
+        # bodies are JSON at all, that the protocol range is the deliberate 3..3
+        # hard break, that the OAuth manifest is typed and coherent, that no API
+        # route answers with a redirect or an HTML page, that the typed error
+        # envelope and the request-id echo survive, and that the posture is the
+        # one that was asked for. The weaker copy was the one gating production,
+        # and nothing would have made the two converge: the rich script is run by
+        # hand after a release, so a check added there never reached the gate that
+        # could have stopped the release.
+        #
+        # Every expectation below is stated rather than discovered. The script
+        # ADAPTS to a deployment it is not told about — that is what makes it
+        # useful for probing an unknown host — and adapting is precisely wrong
+        # here, where the whole question is whether this revision came up as the
+        # one that was requested.
+        set -- --url "$$URL" \
+               --expect-build-sha "$$RELEASE_SHA" \
+               --expect-env "$$ENVIRONMENT" \
+               --expect-posture "$$AUTH_MODE" \
+               --expect-entitlement "$$ENTITLEMENT_MODE"
+        # Passed only when this deployment configures OAuth at all. Empty is the
+        # shipped default and the state production is in, and the flag refuses a
+        # blank value on purpose — an assertion that silently does not run is
+        # worse than one that was never asked for.
+        if [ -n "$$SUPABASE_OAUTH_CLIENT_ID" ]; then
+          set -- "$$@" --expect-client-id "$$SUPABASE_OAUTH_CLIENT_ID"
         fi
-        echo "Candidate is ready and serving $COMMIT_SHA."
+
+        # `bash` explicitly rather than executing the file, so the gate does not
+        # depend on a mode bit surviving a checkout. Everything the script needs is
+        # already in this image: curl, and the python3 gcloud itself runs on — its
+        # JSON helpers are python3 one-liners, so there is no jq to install.
+        bash infra/gcp/smoke.sh "$$@"
+        echo "Candidate is ready and serving $$RELEASE_SHA in $$ENVIRONMENT" \
+             "(auth=$$AUTH_MODE, entitlement=$$ENTITLEMENT_MODE)."
 
   # ---- Promote to 100% -----------------------------------------------------
   - id: promote

@@ -5,12 +5,6 @@
 #   ./infra/gcp/smoke.sh                     # public endpoints + metadata routes
 #   ./infra/gcp/smoke.sh --full              # ... plus two real model turns
 #
-#   DAINTREE_TOKEN="$(daintree-assistant auth token)" \
-#     ./infra/gcp/smoke.sh --account-token-var DAINTREE_TOKEN
-#                                            # ... plus an authenticated check of
-#                                            # /v1/daintree/account. Takes the NAME
-#                                            # of the variable, never the token.
-#
 #   ./infra/gcp/smoke.sh --url https://assistant.daintree.org
 #                                            # test a specific host instead of the
 #                                            # Cloud Run URL discovered from gcloud
@@ -19,16 +13,45 @@
 #                                            # ... and fail if it reports a
 #                                            # different ENVIRONMENT
 #
-#   ./infra/gcp/smoke.sh --expect-posture enforce
-#                                            # ... and fail unless accounts are
-#                                            # actually being enforced. Without
-#                                            # this every posture check below
-#                                            # ADAPTS to whatever is reported.
+#   ./infra/gcp/smoke.sh --expect-build-sha 4f1c9ae0...
+#                                            # ... and fail unless /version reports
+#                                            # exactly that commit. This is what
+#                                            # makes a run a check of THIS release
+#                                            # rather than of whatever is deployed.
 #
-# NO BEARER TOKEN IS NEEDED. The server holds its own upstream credential
-# (TOGETHER_API_KEY) and funds every turn from it, so the metadata routes answer
-# an anonymous request. That is also why --full is opt-in and everything else
-# here is not: --full spends DAINTREE's money, not the caller's.
+#   ./infra/gcp/smoke.sh --expect-posture enforce --expect-entitlement observe
+#                                            # ... and fail unless the two rollout
+#                                            # axes are in the modes you asked for.
+#                                            # Without these, every posture check
+#                                            # below ADAPTS to whatever is reported.
+#
+#   ./infra/gcp/smoke.sh --expect-client-id 6f0d...apps.example
+#                                            # ... and fail unless the published
+#                                            # OAuth client id is that one.
+#
+# THIS IS THE PRE-PROMOTION GATE, not only a hand-run check. cloudbuild.yaml's
+# `smoke` step calls this script against the no-traffic candidate revision and
+# refuses to promote it on a non-zero exit, so every assertion below is one the
+# release actually has to satisfy. That is deliberate: the step used to inline a
+# weaker copy of two of these checks, and a second definition of what "a working
+# deployment" means is one that drifts from this one silently, in the direction
+# of the copy that nobody runs by hand.
+#
+# NO CREDENTIAL IS NEEDED AND NONE IS ACCEPTED. The server holds its own upstream
+# credential (TOGETHER_API_KEY) and funds every turn from it, so the metadata
+# routes answer an anonymous request. That is also why --full is opt-in and
+# everything else here is not: --full spends DAINTREE's money, not the caller's.
+#
+# There is deliberately no way to hand this script a user's access token. An
+# earlier flag took the NAME of an environment variable holding one, so the
+# authenticated half of /v1/daintree/account could be smoked here — and the usage
+# it documented obtained that value from a CLI subcommand that printed the access
+# token to stdout. The CLI has no such subcommand and must not grow one: access
+# tokens live in that process's memory on purpose, and a facility that prints one
+# for a shell to capture demotes the whole design to a convention, with a CI log
+# the first place the value lands. Authenticated acceptance belongs to the
+# operator cutover runbook, driven through the real CLI, where the credential
+# never leaves the process that obtained it.
 #
 # Every check runs; failures are counted and the script exits non-zero at the end,
 # so one broken route does not hide the rest. Usable as a gate on the exit code.
@@ -41,19 +64,30 @@ SERVICE="${SERVICE:-daintree-assistant}"
 URL=""
 FULL=0
 EXPECT_ENV=""
-# The name of an ENVIRONMENT VARIABLE holding a real account token, never the
-# token itself. A credential passed as an argument lands in shell history, in
-# `ps` output, and in the CI log line that echoes the command — so this script
-# accepts a name to read and never a value to copy. Nothing here ever prints it.
+# The commit the caller believes is deployed. Optional here and MANDATORY in the
+# build, which is the whole reason it exists: /version reporting a build_sha at
+# all proves only that the image was tagged, while comparing it against the
+# commit that triggered the release is what catches a cached image, a mis-tagged
+# push, or a deploy that quietly reused the previous revision.
+EXPECT_BUILD_SHA=""
 # The posture the operator BELIEVES this deployment is in. Optional, and the
 # reason it exists is that every check below derives its expectation from what
-# auth/config reports — so a deployment that shipped `required: false` when it
+# the deployment reports — so a revision that shipped `required: false` when it
 # meant `true` adapts to the anonymous branch and passes every one of them. The
 # script cannot catch that by reading harder; somebody has to state the intent.
 EXPECT_POSTURE=""
-ACCOUNT_TOKEN_VAR=""
-ACCOUNT_TOKEN=""
-ACCOUNT_HEADERS_FILE=""
+# The entitlement axis, stated separately because it IS separate: identity says
+# the token is genuine and entitlement says the account behind it has paid, and
+# merging the two rollouts is how a billing outage starts presenting as a
+# signed-out user. Read from /version, which is the only endpoint that reports
+# this mode at all — no client-facing surface exposes it, by design.
+EXPECT_ENTITLEMENT=""
+# The public OAuth client id this deployment should be publishing. Not a secret
+# (the discovery endpoint hands it to anyone) — the reason to assert it is that
+# it names a SPECIFIC Supabase project, so a staging revision carrying
+# production's id sends its users to sign in against the wrong one, with a
+# manifest whose shape is perfectly valid.
+EXPECT_CLIENT_ID=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -62,29 +96,52 @@ while [ $# -gt 0 ]; do
     --url)  [ $# -gt 1 ] || { echo "--url requires a value" >&2; exit 2; }
             URL="$2"; shift 2 ;;
     --full) FULL=1; shift ;;
-    # Opt-in authenticated check of /v1/daintree/account. Takes the NAME of an
-    # environment variable, e.g.
-    #
-    #   DAINTREE_TOKEN="$(daintree-assistant auth token)" \
-    #     ./infra/gcp/smoke.sh --account-token-var DAINTREE_TOKEN
-    #
-    # Opt-in because this smoke cannot manufacture a user token: obtaining one
-    # needs a real browser sign-in, so the account endpoint otherwise belongs to
-    # the manual cutover rather than to CI.
-    # Assert the deployment is in the auth posture you think it is:
-    #   anonymous — accounts off or optional; requests are served without one
-    #   enforce   — a verified credential is required
+    # Assert the deployment is in the auth posture you think it is. Two
+    # vocabularies, on purpose:
+    #   anonymous — the DOOR a caller meets: accounts off or optional, requests
+    #               served without one. `open` and `observe` are the same door,
+    #               which is the entire point of `observe`.
+    #   open | observe | enforce — the exact MODE the revision came up in, which
+    #               only became answerable when /version began reporting it.
+    # The door spelling is kept because README and .claude/skills/release already
+    # pass it, and because it is still the right question for a hand-run check of
+    # a deployment whose mode you do not know.
     --expect-posture)
             [ $# -gt 1 ] || { echo "--expect-posture requires a value" >&2; exit 2; }
             case "$2" in
-              anonymous|enforce) EXPECT_POSTURE="$2" ;;
-              *) echo "--expect-posture must be anonymous or enforce" >&2; exit 2 ;;
+              anonymous|open|observe|enforce) EXPECT_POSTURE="$2" ;;
+              *) echo "--expect-posture must be anonymous|open|observe|enforce, got '$2'" >&2
+                 exit 2 ;;
             esac
             shift 2 ;;
-    --account-token-var)
-            [ $# -gt 1 ] || { echo "--account-token-var requires a value" >&2; exit 2; }
-            [ -n "$2" ] || { echo "--account-token-var requires a non-empty value" >&2; exit 2; }
-            ACCOUNT_TOKEN_VAR="$2"; shift 2 ;;
+    # The second rollout axis. No client-facing endpoint reports it, so before
+    # /version carried it this was unobservable from outside the control plane —
+    # a billing rollout could only be confirmed by reading the revision's env.
+    --expect-entitlement)
+            [ $# -gt 1 ] || { echo "--expect-entitlement requires a value" >&2; exit 2; }
+            case "$2" in
+              off|observe|enforce) EXPECT_ENTITLEMENT="$2" ;;
+              *) echo "--expect-entitlement must be off|observe|enforce, got '$2'" >&2
+                 exit 2 ;;
+            esac
+            shift 2 ;;
+    --expect-build-sha)
+            [ $# -gt 1 ] || { echo "--expect-build-sha requires a value" >&2; exit 2; }
+            # Blank is refused rather than read as "no expectation", for exactly
+            # the reason --expect-env refuses it: the natural call passes a build
+            # variable, and an unset one there would silently switch off the one
+            # check that separates "this release is live" from "something is
+            # live". A gate asked for by name must never quietly not run — and
+            # this one is the release gate.
+            [ -n "$2" ] || { echo "--expect-build-sha requires a non-empty value" >&2; exit 2; }
+            EXPECT_BUILD_SHA="$2"; shift 2 ;;
+    --expect-client-id)
+            [ $# -gt 1 ] || { echo "--expect-client-id requires a value" >&2; exit 2; }
+            # Blank refused for the same reason as above: the caller passes a
+            # substitution, and an empty one would turn the assertion off rather
+            # than fail the deployment that forgot to set it.
+            [ -n "$2" ] || { echo "--expect-client-id requires a non-empty value" >&2; exit 2; }
+            EXPECT_CLIENT_ID="$2"; shift 2 ;;
     # Assert the deployment reports the environment you think you are pointing
     # at. Optional, because the common use is "check whatever is there" — but a
     # staging URL answering `production` is exactly the mix-up worth catching,
@@ -102,7 +159,12 @@ while [ $# -gt 0 ]; do
               *) echo "--expect-env must be development|test|staging|production, got '$2'" >&2; exit 2 ;;
             esac
             EXPECT_ENV="$2"; shift 2 ;;
-    -h|--help) sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    # The USAGE block at the top of this file, printed verbatim. The range ends
+    # at the last example, deliberately: everything below it is a rationale a
+    # reader wants when editing the script and not when running it. Keep the
+    # number in step with the header — a range that has slipped prints half a
+    # flag's description and silently omits the newest one.
+    -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -263,13 +325,22 @@ else
 fi
 
 # /version is the round trip that confirms a release: the build step bakes
-# COMMIT_SHA in and this reports it back. Three things are checked rather than
+# COMMIT_SHA in and this reports it back. Several things are checked rather than
 # one, because "200" was passing for bodies that could not have come from this
 # service.
 code="$(req "$URL/version")"; load_body
+VERSION_CODE="$code"
 BUILD_SHA="$(jq_field "$BODY" build_sha)"
 PROTO_MIN="$(jq_path "$BODY" protocol.min)"
 PROTO_MAX="$(jq_path "$BODY" protocol.max)"
+# The two rollout axes, as the REVISION states them. This is the only endpoint
+# that reports either: auth/config answers a client's question ("must I hold a
+# credential"), which is `configured and mode == enforce` and so cannot tell
+# `open` from `observe`, and no surface at all has ever reported the entitlement
+# mode. Read here, before the manifest, so the posture section below can compare
+# the mode the revision came up in against the door it describes to clients.
+VERSION_AUTH_MODE="$(jq_path "$BODY" posture.auth)"
+VERSION_ENTITLEMENT_MODE="$(jq_path "$BODY" posture.entitlement)"
 if [ "$code" != "200" ]; then
   fail "/version returned $code" "$BODY"
 elif ! is_json "$BODY"; then
@@ -282,10 +353,32 @@ elif [ -z "$BUILD_SHA" ]; then
   # so /version can no longer identify what is deployed and the release gate that
   # compares it against the commit has nothing to compare.
   fail "/version reports an empty build_sha" "$BODY"
+elif [ -n "$EXPECT_BUILD_SHA" ] && [ "$BUILD_SHA" != "$EXPECT_BUILD_SHA" ]; then
+  # THE release gate. A build_sha that is merely present proves the image carried
+  # a tag; only comparing it against the commit that asked for this deployment
+  # catches a cached layer, a mis-tagged push, or a `gcloud run deploy` that
+  # resolved to the previous image and reported success. Exact string equality —
+  # a prefix match would accept the short sha of a DIFFERENT commit that happens
+  # to share seven characters, which is a collision this repo will eventually see.
+  fail "/version serves build $BUILD_SHA, expected $EXPECT_BUILD_SHA" ""
 elif [ "$PROTO_MIN" != "3" ] || [ "$PROTO_MAX" != "3" ]; then
   fail "/version negotiates protocol $PROTO_MIN..$PROTO_MAX, expected 3..3" "$BODY"
 else
   pass "/version: $(jq_field "$BODY" server_version) build $BUILD_SHA, protocol $PROTO_MIN..$PROTO_MAX"
+fi
+
+# The posture block, checked for PRESENCE separately from the fields above. It is
+# additive to a wire shape older clients already decode, so its absence is not a
+# malformed /version — it is an older build answering, which is precisely the
+# thing a release smoke must not mistake for the release it asked for. Reported
+# as its own failure rather than folded into the chain above, so a missing
+# posture does not mask a wrong build sha or vice versa.
+if [ "$VERSION_CODE" = "200" ]; then
+  if [ -z "$VERSION_AUTH_MODE" ] || [ -z "$VERSION_ENTITLEMENT_MODE" ]; then
+    fail "/version reports no posture block (auth/entitlement modes)" "$BODY"
+  else
+    pass "/version posture: auth=$VERSION_AUTH_MODE, entitlement=$VERSION_ENTITLEMENT_MODE"
+  fi
 fi
 
 # --------------------------------------------------------------------------
@@ -363,6 +456,46 @@ else
   esac
 fi
 
+# Manifest VALUES, not merely its shape. Everything above proves this is A
+# manifest — typed, coherent, decodable. These prove it is THIS deployment's
+# manifest, which is a different question and the one a release gate has to ask:
+# a revision that came up carrying another environment's OAuth configuration
+# publishes a perfectly well-formed body, and every type and coherence check
+# passes while every user is sent to sign in against the wrong project.
+#
+# Both fields exist only when `configured` is true, so both are skipped when it
+# is not — an unconfigured deployment publishing neither is the documented shape
+# and the state production is in today, not a defect.
+if [ "$AUTH_CONFIGURED" = "True" ]; then
+  # A FIXED contract between this server and the CLI rather than a deployment
+  # value: the CLI binds that exact loopback port to receive the authorization
+  # code and refuses a manifest naming anything else. A drifted value here is
+  # every sign-in failing at the last step, AFTER the user has already approved
+  # in the browser — the most expensive place in the flow to fail.
+  REDIRECT_URI="$(jq_field "$BODY" redirect_uri)"
+  if [ "$REDIRECT_URI" = "http://127.0.0.1:42813/oauth/callback" ]; then
+    pass "redirect_uri is the CLI's fixed loopback callback"
+  else
+    fail "redirect_uri is '$REDIRECT_URI', expected http://127.0.0.1:42813/oauth/callback" ""
+  fi
+  if [ -n "$EXPECT_CLIENT_ID" ]; then
+    CLIENT_ID="$(jq_field "$BODY" client_id)"
+    # Printed on a mismatch because it is genuinely not a secret — this endpoint
+    # hands it to every anonymous caller — and because the useful half of this
+    # failure is seeing WHICH project answered.
+    if [ "$CLIENT_ID" = "$EXPECT_CLIENT_ID" ]; then
+      pass "client_id is the expected OAuth client"
+    else
+      fail "auth/config publishes client_id '$CLIENT_ID', expected '$EXPECT_CLIENT_ID'" ""
+    fi
+  fi
+elif [ "$AUTH_CONFIGURED" = "False" ] && [ -n "$EXPECT_CLIENT_ID" ]; then
+  # Asked for a specific client and got a deployment that publishes none. Named
+  # here rather than left to the branch above, which would simply not run and
+  # report a pass count one short of what the caller asked for.
+  fail "--expect-client-id was given but this deployment reports configured=false" ""
+fi
+
 # The browser links, when this deployment publishes any. They are OPTIONAL — a
 # deployment with working sign-in and no subscription page still publishes a
 # usable manifest — so their ABSENCE is not a failure. Their host is: these open
@@ -429,14 +562,58 @@ case "$AUTH_POSTURE" in
     ;;
 esac
 
+# The two answers about the same door, cross-checked against each other. The
+# manifest says what a client must DO (`required`); /version says which MODE the
+# revision came up in. A revision running `enforce` that publishes
+# `required: false` is one where the OAuth configuration did not arrive — a door
+# the operator believes is shut, described to every client as open, with nothing
+# in either answer wrong on its own. Only having both makes it visible.
+if [ "$VERSION_AUTH_MODE" = "enforce" ] && [ "$AUTH_POSTURE" = "anonymous" ]; then
+  fail "AUTH_MODE=enforce but auth/config reports required=false" \
+       "OAuth is not fully configured on this revision, so the door is described as open"
+fi
+
 # The posture the operator asked for, compared against the one reported. Runs
 # before the checks that BRANCH on the posture, so a mismatch is reported as
 # itself rather than as a downstream 401 nobody expected.
 if [ -n "$EXPECT_POSTURE" ]; then
-  if [ "$AUTH_POSTURE" = "$EXPECT_POSTURE" ]; then
-    pass "auth posture is $AUTH_POSTURE, as expected"
+  case "$EXPECT_POSTURE" in
+    anonymous)
+      # The DOOR, derived from the manifest. `open` and `observe` are the same
+      # door and this spelling deliberately does not distinguish them — it is the
+      # right question for a hand-run check of a deployment whose mode you do not
+      # already know, and README and .claude/skills/release both pass it.
+      if [ "$AUTH_POSTURE" = "anonymous" ]; then
+        pass "auth posture is anonymous (AUTH_MODE=${VERSION_AUTH_MODE:-unreported}), as expected"
+      else
+        fail "expected auth posture 'anonymous', deployment reports '$AUTH_POSTURE'" ""
+      fi
+      ;;
+    *)
+      # The exact MODE, and the reason this spelling had to exist: `required`
+      # collapses `open` and `observe` into one value, so a deployment that
+      # shipped `open` when the rollout had moved to `observe` passed every check
+      # this script owned. Nothing observable to a client separates them — that
+      # is what `observe` IS — so the mode has to be reported rather than probed.
+      if [ "$VERSION_AUTH_MODE" = "$EXPECT_POSTURE" ]; then
+        pass "AUTH_MODE is $VERSION_AUTH_MODE, as expected"
+      else
+        fail "expected AUTH_MODE '$EXPECT_POSTURE', /version reports '${VERSION_AUTH_MODE:-<absent>}'" ""
+      fi
+      ;;
+  esac
+fi
+
+# The entitlement axis. Separate from the block above rather than folded into it,
+# because the axes are independently staged on purpose: identity says the token is
+# genuine, entitlement says the account behind it has paid, and a check that
+# asserted them together would be a check that cannot express the rollout states
+# the deployment actually passes through.
+if [ -n "$EXPECT_ENTITLEMENT" ]; then
+  if [ "$VERSION_ENTITLEMENT_MODE" = "$EXPECT_ENTITLEMENT" ]; then
+    pass "ENTITLEMENT_MODE is $VERSION_ENTITLEMENT_MODE, as expected"
   else
-    fail "expected auth posture '$EXPECT_POSTURE', deployment reports '$AUTH_POSTURE'" ""
+    fail "expected ENTITLEMENT_MODE '$EXPECT_ENTITLEMENT', /version reports '${VERSION_ENTITLEMENT_MODE:-<absent>}'" ""
   fi
 fi
 
@@ -488,83 +665,11 @@ case "$AUTH_POSTURE" in
     ;;
 esac
 
-# AUTHENTICATED, and opt-in: this script cannot manufacture a user token, so the
-# rest of the contract belongs to the manual cutover unless somebody supplies one.
-if [ -n "$ACCOUNT_TOKEN_VAR" ]; then
-  # The NAME is validated as a shell identifier before it is expanded. Bash's
-  # indirect expansion evaluates array subscripts, so an unvalidated name is a
-  # command-substitution primitive — `${!x}` where x is `a[$(id)]` runs `id`.
-  # This flag exists to keep a credential out of argv; it must not become a way
-  # to get code in.
-  if ! printf '%s' "$ACCOUNT_TOKEN_VAR" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*$'; then
-    fail "--account-token-var must name a shell variable (letters, digits, _)" ""
-  else
-  # `-` inside the expansion, deliberately: under `set -u` a bare `${!VAR}` on an
-  # unset name ABORTS the script, so the "empty or unset" branch below would be
-  # unreachable and the smoke would die instead of reporting.
-  ACCOUNT_TOKEN="${!ACCOUNT_TOKEN_VAR-}"
-  # xtrace off around the value. Nothing here prints it, but `bash -x` prints
-  # every expansion — including the assignment above and the curl below — so a
-  # run under tracing would defeat the whole point of taking a name.
-  set +x
-  if [ -z "$ACCOUNT_TOKEN" ]; then
-    fail "\$$ACCOUNT_TOKEN_VAR is empty or unset" ""
-  else
-    # The credential goes to curl through a --config file on STDIN rather than in
-    # argv, where `ps` would show it to every user on the machine and a CI runner
-    # would echo it into the build log. `header = "..."` is curl's own config
-    # syntax; the URL and the rest stay ordinary arguments.
-    #
-    # Headers are captured on the SAME GET (`-D`) rather than by a second HEAD
-    # request: this route registers GET only — FastAPI does not synthesise HEAD —
-    # so `curl -I` would answer 405 and the Cache-Control assertion below would
-    # be reading an error page's headers.
-    ACCOUNT_HEADERS_FILE="$(mktemp)"
-    code="$(printf 'header = "Authorization: Bearer %s"\n' "$ACCOUNT_TOKEN" \
-      | curl -sS -o "$BODY_FILE" -D "$ACCOUNT_HEADERS_FILE" -w '%{http_code}' \
-             --max-time "${TIMEOUT:-30}" --config - \
-             -H 'X-Daintree-Protocol: 3' "$URL/v1/daintree/account" 2>/dev/null)"
-    load_body
-    if [ "$code" = "200" ]; then
-      ACCOUNT_VERSION="$(jq_field "$BODY" version)"
-      ACCOUNT_ACCESS="$(jq_field "$BODY" access)"
-      ACCOUNT_HASH="$(jq_field "$BODY" subject_hash)"
-      # `access` and `subject_hash` are the two fields every valid answer has;
-      # `email` and the entitlement fields are legitimately absent. The hash is
-      # checked for SHAPE rather than value — it is the only identifier this
-      # endpoint may return, and a raw subject would not match it.
-      if [ "$ACCOUNT_VERSION" != "1" ]; then
-        fail "/v1/daintree/account reports contract version '$ACCOUNT_VERSION', expected 1" ""
-      elif ! printf '%s' "$ACCOUNT_HASH" | grep -Eq '^[0-9a-f]{16}$'; then
-        fail "/v1/daintree/account returned a subject_hash that is not 16 hex characters" ""
-      else
-        case "$ACCOUNT_ACCESS" in
-          granted|subscription_required|subscription_inactive|unverified)
-            # The verdict is printed; nothing derived from the token is.
-            pass "/v1/daintree/account: version 1, access=$ACCOUNT_ACCESS"
-            ;;
-          *)
-            fail "/v1/daintree/account reports an unknown access value" ""
-            ;;
-        esac
-      fi
-      # A status read must never be cached by anything in front of it. Read from
-      # the headers the GET above already captured — no second request, and no
-      # second place for the credential to travel.
-      CACHE_HEADER="$(grep -i '^cache-control:' "$ACCOUNT_HEADERS_FILE" | tr -d '\r')"
-      if printf '%s' "$CACHE_HEADER" | grep -qi 'private, *no-store'; then
-        pass "/v1/daintree/account is not stored by intermediaries"
-      else
-        fail "/v1/daintree/account did not send Cache-Control: private, no-store" ""
-      fi
-    else
-      # Deliberately does not echo the body: an account error names the account.
-      fail "/v1/daintree/account returned $code for the supplied credential" ""
-    fi
-    rm -f "$ACCOUNT_HEADERS_FILE"
-  fi
-  fi
-fi
+# There is deliberately NO authenticated half here — see the note at the top of
+# this file. The 200 branch of this route needs a real user access token, and the
+# only way a shell could hold one is if something printed it; nothing does, and
+# nothing should. That check lives in the operator cutover runbook, driven through
+# the real CLI, where the credential never leaves the process that obtained it.
 
 # --------------------------------------------------------------------------
 head_ "No API route answers with a redirect or a page"

@@ -212,7 +212,8 @@ push to main → Cloud Build trigger `deploy-main` → cloudbuild.yaml
    build the image (BUILD_SHA = commit sha)
    push to Artifact Registry
    deploy a no-traffic revision behind the `candidate` tag
-   smoke-test it: /readyz and /version == the released commit
+   smoke-test it with infra/gcp/smoke.sh, told what to expect: the released
+     commit, the environment, and both posture modes
      (NOT /healthz: Cloud Run's frontend answers that path itself with an
       HTML 404 before the container sees it — /health is the reachable alias)
    promote to 100%
@@ -237,18 +238,31 @@ re-running it is how you finish setup rather than something to avoid:
 green, merges to `main`, pushes, watches the build, and verifies that the live
 `/version` reports the commit it just shipped.
 
-`infra/gcp/smoke.sh` checks a deployed instance. By default it exercises only
-the free surface — `/health`, `/readyz`, `/version`, and the 401 auth gate.
-Export `OPENROUTER_API_KEY` to add the authenticated routes: the metadata reads,
-the `/auth/verify` sign-in probe (free — a key introspection, not a model call),
-the 426 protocol gate on both content endpoints, request-id echo, and the typed
-error envelope. Pass `--full` to send two real model turns (streaming and
-non-streaming), which spend money on that key:
+`infra/gcp/smoke.sh` checks a deployed instance, and **it is also the
+pre-promotion gate** — `cloudbuild.yaml`'s `smoke` step runs this same script
+against the no-traffic candidate and refuses to promote it on a non-zero exit.
+That is deliberately one definition rather than two: the build step used to inline
+a weaker copy of a couple of these checks, and the copy nobody ran by hand was the
+one gating production.
+
+**It needs no credential and accepts none.** The server holds the upstream key
+(`TOGETHER_API_KEY`) and funds every turn from it, so the metadata reads, the
+`/auth/verify` sign-in probe (free — a key introspection, not a model call), the
+426 protocol gate on both content endpoints, request-id echo and the typed error
+envelope all answer an anonymous request. Pass `--full` to send two real model
+turns (streaming and non-streaming), which spend **Daintree's** money, not yours.
+
+The `--expect-*` flags turn a survey into an assertion. Without them the script
+adapts to whatever it finds, which is what makes it useful against an unknown
+host and exactly wrong as a release gate:
 
 ```bash
 ./infra/gcp/smoke.sh
-OPENROUTER_API_KEY=sk-or-v1-... ./infra/gcp/smoke.sh --full
+./infra/gcp/smoke.sh --full
 ./infra/gcp/smoke.sh --url https://assistant.daintree.org
+./infra/gcp/smoke.sh --url https://assistant.daintree.org \
+  --expect-env staging --expect-posture observe --expect-entitlement off \
+  --expect-build-sha "$(git rev-parse HEAD)"
 ```
 
 `infra/gcp/rollback.sh` moves traffic back when a revision deploys cleanly and is

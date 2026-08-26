@@ -1428,7 +1428,37 @@ changing the already-committed HTTP status. When an exhausted rate limit carried
 | `POST` | `/v1/daintree/tasks` | yes | Named utility-model tasks (server-owned prompts; no client task prompt) |
 | `GET`  | `/healthz` | no | Liveness |
 | `GET`  | `/readyz` | no | Readiness (config, secrets, prompts, catalog, provider) |
-| `GET`  | `/version` | no | Build SHA, version, protocol range |
+| `GET`  | `/version` | no | Build SHA, version, protocol range, deployment posture |
+
+### `GET /version`
+
+```jsonc
+{
+  "server_version": "0.1.0",
+  "build_sha": "4f1c9ae0…",              // the commit this image was built from
+  "protocol": { "min": 3, "max": 3 },
+  "posture": { "auth": "open", "entitlement": "off" }
+}
+```
+
+`posture` reports the two rollout axes — `AUTH_MODE` (`open` | `observe` | `enforce`)
+and `ENTITLEMENT_MODE` (`off` | `observe` | `enforce`) — and it is an **operator** fact
+rather than a client one. A client should keep reading
+[`/v1/daintree/auth/config`](#your-daintree-account): `required` there tells it what it
+must actually do, and it deliberately cannot distinguish `open` from `observe`, because
+nothing a caller can observe distinguishes them either — that indistinguishability is
+what `observe` is for.
+
+It is here because `/version` is already the "what exactly is this revision" endpoint,
+and the pre-promotion smoke (`infra/gcp/smoke.sh`, called by `cloudbuild.yaml`) already
+fetches it: asserting that a candidate came up in the mode the release asked for costs no
+extra request. Before this field, `AUTH_MODE=open` and `AUTH_MODE=observe` were
+indistinguishable from outside and `ENTITLEMENT_MODE` was reported by no endpoint at all,
+so a billing rollout could only be confirmed by reading the Cloud Run control plane.
+
+Nothing beyond those two mode names belongs here. It is a public, unauthenticated status
+route, so an issuer, a client id or any other configuration value would be a deployment's
+settings published for the convenience of whatever wanted to assert them.
 
 ## Versioning
 

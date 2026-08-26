@@ -114,6 +114,44 @@ def test_version(client) -> None:
     )
 
 
+def test_version_reports_the_deployment_posture(client) -> None:
+    """The two rollout axes, and the only endpoint that reports either.
+
+    `/v1/daintree/auth/config` answers a CLIENT's question — "must I hold a
+    credential" — as `configured and auth_mode == "enforce"`, which cannot tell
+    `open` from `observe`; that indistinguishability is the entire point of
+    `observe` and the right answer for a client. It is the wrong answer for the
+    pre-promotion smoke, which has to prove the revision came up in the mode the
+    release asked for. `ENTITLEMENT_MODE` was readable from no endpoint at all.
+
+    Asserted against the settings the app was actually built with rather than
+    against literals, so a default that moves moves this with it.
+    """
+    r = client.get("/version")
+    assert r.status_code == 200
+    settings = client.app.state.settings
+    assert r.json()["posture"] == {
+        "auth": settings.auth_mode,
+        "entitlement": settings.entitlement_mode,
+    }
+
+
+def test_version_never_reports_a_configured_value_beyond_the_two_modes(client) -> None:
+    """A public, unauthenticated status route.
+
+    Cloud Run probes it and anybody can read it, so the standing rule is that
+    nothing lands here to make a check convenient. A mode NAME is one of three
+    fixed words and describes a rollout stage; an issuer, a client id, a URL or a
+    key would be a deployment's configuration published for the convenience of the
+    script that wanted to assert it.
+    """
+    body = client.get("/version").json()
+    assert set(body) == {"server_version", "build_sha", "protocol", "posture"}
+    assert set(body["posture"]) == {"auth", "entitlement"}
+    for value in body["posture"].values():
+        assert value in {"open", "observe", "enforce", "off"}
+
+
 def test_capabilities(client, auth, app) -> None:
     r = client.get("/v1/daintree/capabilities", headers=auth)
     assert r.status_code == 200

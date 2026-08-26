@@ -53,9 +53,36 @@ async def readyz(request: Request) -> JSONResponse:
 
 @router.get("/version")
 async def version(request: Request) -> dict[str, object]:
+    """What exactly this revision is: the build, the protocol range, the posture.
+
+    ``posture`` reports the two rollout axes — ``AUTH_MODE`` and
+    ``ENTITLEMENT_MODE`` — and it is here rather than on the auth manifest for a
+    reason worth stating, because the manifest is the endpoint it looks like it
+    belongs on. ``/v1/daintree/auth/config`` is a CLIENT contract about how to
+    sign in; it answers "must I hold a credential" with ``required``, which is
+    ``configured and auth_mode == "enforce"`` and therefore cannot tell ``open``
+    from ``observe`` — the two are indistinguishable to a caller by design, since
+    ``observe`` changes nothing anybody can see. That is the right answer for a
+    client and the wrong one for the operator who just deployed a revision and
+    needs to know which mode it actually came up in. ``/version`` is already the
+    "what exactly is this" endpoint, the release smoke already fetches it, and an
+    OPERATOR fact costs nothing extra when it rides the request that was going to
+    be made anyway.
+
+    Nothing here is a secret and nothing here is derived from a caller. A mode
+    name is the same three words the deploy substitutions carry, published so the
+    pre-promotion smoke can assert the revision matches what was requested rather
+    than inferring it from a door it cannot see behind. ``ENTITLEMENT_MODE`` was
+    previously readable from no endpoint at all, so a billing rollout could only
+    be confirmed by reading the Cloud Run control plane.
+
+    Additive on the wire: the CLI decodes ``/version`` through ``doJSON`` with no
+    ``DisallowUnknownFields``, so an unknown field is ignored rather than an error.
+    """
     settings = request.app.state.settings
     return {
         "server_version": __version__,
         "build_sha": settings.build_sha,
         "protocol": {"min": PROTOCOL_MIN, "max": PROTOCOL_MAX},
+        "posture": {"auth": settings.auth_mode, "entitlement": settings.entitlement_mode},
     }

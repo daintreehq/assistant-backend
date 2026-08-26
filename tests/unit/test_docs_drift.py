@@ -1784,3 +1784,31 @@ def test_no_document_claims_the_serving_path_spends_a_caller_key() -> None:
         "providers/base.py claims the serving path threads the caller's key. "
         "It threads None; the provider's own configured key pays."
     )
+
+
+def test_the_version_posture_field_is_documented() -> None:
+    """A field a release gate reads has to be described where the wire is.
+
+    `/version` is public, unauthenticated and probed by Cloud Run, so the standing
+    rule is that nothing lands there for convenience. Publishing the two rollout
+    modes was a deliberate exception — the pre-promotion smoke has to prove a
+    candidate came up in the mode the release asked for, and `auth/config` cannot
+    tell `open` from `observe` because nothing a caller can observe does either.
+    An exception recorded only in the code is one that reads as an oversight to
+    the next person, and the next person deletes it.
+
+    Both mode names are derived from `config.py` rather than typed here, so a
+    third mode on either axis fails this until the document names it.
+    """
+    from daintree_assistant_server.config import AuthMode, EntitlementMode
+
+    text = _read(DOC_API)
+    assert '"posture"' in text, (
+        "GET /version publishes a posture block that docs/DAINTREE_API.md never shows"
+    )
+    for setting in ("AUTH_MODE", "ENTITLEMENT_MODE"):
+        assert setting in text, f"the /version posture reports {setting}; the doc omits it"
+    for mode in (*get_args(AuthMode), *get_args(EntitlementMode)):
+        assert f"`{mode}`" in text, (
+            f"{mode!r} is a posture value /version can report and the doc never names it"
+        )

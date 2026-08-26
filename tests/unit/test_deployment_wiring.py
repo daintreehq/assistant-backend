@@ -405,77 +405,223 @@ def test_the_build_never_echoes_the_path_it_refused() -> None:
 # --- the smoke script ---------------------------------------------------------
 
 
-def test_the_smoke_checks_the_account_endpoint() -> None:
+def test_the_smoke_checks_the_account_endpoint_without_a_credential() -> None:
+    """The half of the account contract a gate can actually check.
+
+    The route requires a real principal, so an anonymous request must be refused
+    — which is the endpoint working rather than failing, and is true in every
+    posture. There is deliberately no authenticated half: see
+    `test_the_smoke_has_no_way_to_be_handed_an_access_token`.
+    """
     text = _SMOKE.read_text(encoding="utf-8")
     assert "/v1/daintree/account" in text
-    assert "--account-token-var" in text
+    assert 'head_ "Account status"' in text
 
 
-def test_the_smoke_takes_a_variable_NAME_and_never_a_token() -> None:
-    """A credential passed as an argument lands in shell history, in `ps` output,
-    and in the CI log line that echoes the command.
+def test_the_smoke_has_no_way_to_be_handed_an_access_token() -> None:
+    """The captured-token workflow is gone, and must not come back.
 
-    The flag therefore accepts the NAME of an environment variable to read. This
-    pins that there is no value-taking spelling of it, and that the read is bash's
-    own indirect expansion rather than `eval` — which would re-parse a credential
-    as shell.
+    It took the NAME of an environment variable holding a real access token, and
+    the usage it documented obtained that value from a CLI subcommand printing the
+    token to stdout — a subcommand the CLI does not have (`internal/cli/auth.go`
+    dispatches login, status, logout and disconnect, and nothing else). Access
+    tokens are memory-only inside that process on purpose; a facility that prints
+    one for a shell to capture demotes the design to a convention, and the first
+    place the captured value lands is a CI log.
+
+    Checked as an exact-string absence rather than by reading the account section,
+    because the failure this guards against is somebody re-adding the convenience
+    — anywhere in the file, comments included.
     """
     text = _SMOKE.read_text(encoding="utf-8")
-    assert "--account-token" not in text.replace("--account-token-var", "")
-    # `-` inside the expansion: under `set -u` a bare `${!VAR}` on an unset name
-    # ABORTS, so the "empty or unset" branch would be unreachable and the smoke
-    # would die instead of reporting.
-    assert 'ACCOUNT_TOKEN="${!ACCOUNT_TOKEN_VAR-}"' in text
-    # `eval` would re-parse a credential as shell.
-    assert "eval " not in text
-    # Indirect expansion evaluates array subscripts, so an unvalidated name is a
-    # command-substitution primitive. The identifier check is what stops a flag
-    # that exists to keep a credential OUT of argv becoming a way to get code IN.
-    assert "'^[A-Za-z_][A-Za-z0-9_]*$'" in text
-    # The credential reaches curl through a --config file on stdin, never argv,
-    # where `ps` would show it to every user on the machine.
-    assert "--config -" in text
-    assert 'header = "Authorization: Bearer' in text
-    assert '-H "Authorization: Bearer $ACCOUNT_TOKEN"' not in text
-
-
-def test_the_smoke_reads_cache_headers_from_a_get_not_a_head() -> None:
-    """The account route registers GET only.
-
-    FastAPI does not synthesise HEAD, so `curl -I` answers 405 and a header
-    assertion made against it reads an error page — passing or failing for
-    reasons that have nothing to do with the route under test.
-    """
-    text = _SMOKE.read_text(encoding="utf-8")
-    account_section = text.split("head_ \"Account status\"", 1)[1]
-    assert "curl -sS -I" not in account_section
-    assert "-D \"$ACCOUNT_HEADERS_FILE\"" in account_section
-
-
-def test_the_account_check_is_executable_code_not_only_a_usage_comment() -> None:
-    """Guards against the section being deleted while the flag's documentation
-    survives — which would leave every string-matching assertion above green."""
-    text = _SMOKE.read_text(encoding="utf-8")
-    body = [
-        line for line in text.splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
-    ]
-    joined = "\n".join(body)
-    assert 'head_ "Account status"' in joined
-    assert "/v1/daintree/account" in joined
-    assert 'ACCOUNT_TOKEN_VAR="$2"' in joined
+    for spelling in ("--account-token", "ACCOUNT_TOKEN", "auth token"):
+        assert spelling not in text, f"the captured-token workflow is back ({spelling})"
 
 
 def test_the_smoke_can_assert_a_posture_rather_than_adapting_to_it() -> None:
-    """Every posture check derives its expectation from what auth/config reports.
+    """Every posture check derives its expectation from what the deployment says.
 
-    So a deployment that shipped `required: false` when it meant `true` adapts to
+    So a revision that shipped `required: false` when it meant `true` adapts to
     the anonymous branch and passes all of them. The script cannot catch that by
     reading harder — somebody has to state the intent.
     """
     text = _SMOKE.read_text(encoding="utf-8")
     assert "--expect-posture" in text
-    assert "expected auth posture" in text
+    assert "--expect-entitlement" in text
+    assert "expected AUTH_MODE" in text
+    assert "expected ENTITLEMENT_MODE" in text
+
+
+def test_the_smoke_asserts_the_manifest_values_not_only_its_shape() -> None:
+    """Type and coherence checks cannot see the wrong PROJECT.
+
+    A revision carrying another environment's OAuth configuration publishes a
+    perfectly well-formed manifest. The two values that pin it to this deployment
+    are the public client id — which names a specific Supabase project — and the
+    redirect URI, which is a fixed contract with the CLI rather than a deployment
+    value at all.
+    """
+    from daintree_assistant_server.config import OAUTH_REDIRECT_URI
+
+    text = _SMOKE.read_text(encoding="utf-8")
+    assert "--expect-client-id" in text
+    assert OAUTH_REDIRECT_URI in text, (
+        "the smoke pins a redirect_uri that config.py no longer serves"
+    )
+
+
+def _run_smoke(*args: str) -> subprocess.CompletedProcess[str]:
+    """The real script, on arguments its parser refuses before any network call.
+
+    Only refusals are exercised here. A well-formed invocation would fall through
+    to service discovery and then to HTTP, which a unit test has no business
+    doing — but every case below exits from the argument loop, which runs first.
+    """
+    return subprocess.run(  # noqa: S603 - a script this repo owns, on fixed input
+        ["bash", str(_SMOKE), *args],
+        env={"PATH": os.environ["PATH"]},
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        pytest.param(["--expect-build-sha"], id="build_sha_missing_value"),
+        pytest.param(["--expect-build-sha", ""], id="build_sha_blank"),
+        pytest.param(["--expect-client-id"], id="client_id_missing_value"),
+        pytest.param(["--expect-client-id", ""], id="client_id_blank"),
+        pytest.param(["--expect-entitlement"], id="entitlement_missing_value"),
+        pytest.param(["--expect-entitlement", "on"], id="entitlement_not_a_mode"),
+        pytest.param(["--expect-posture", "yes"], id="posture_not_a_mode"),
+        pytest.param(["--account-token-var", "TOK"], id="the_removed_token_flag"),
+    ],
+)
+def test_the_smoke_refuses_an_expectation_it_cannot_honour(args: list[str]) -> None:
+    """A BLANK value is the case worth executing rather than grepping.
+
+    The natural call passes a build substitution, and an unset one would leave the
+    flag present and the check switched off — the single failure a gate must never
+    have, because the build log then shows the flag being passed. `case` patterns
+    and quoting fail silently in shell, so this runs the real parser rather than
+    asserting on its source.
+    """
+    result = _run_smoke(*args)
+    assert result.returncode == 2, result.stdout + result.stderr
+
+
+# --- the pre-promotion smoke step ---------------------------------------------
+#
+# Nothing read this step before. It is the last gate a bad revision passes through
+# and it inlined its own, weaker copy of two of the assertions in
+# infra/gcp/smoke.sh — so a check added to the rich script never reached the gate
+# that could have stopped a release, and neither half noticed.
+
+
+@pytest.fixture(scope="module")
+def smoke_step(cloudbuild: dict[str, Any]) -> dict[str, Any]:
+    step: dict[str, Any] = next(s for s in cloudbuild["steps"] if s.get("id") == "smoke")
+    return step
+
+
+def test_the_smoke_step_runs_the_shared_script_rather_than_its_own_curls(
+    smoke_step: dict[str, Any],
+) -> None:
+    """ONE definition of what a working deployment is.
+
+    Two definitions drift, and they drift in the direction of the copy nobody
+    runs by hand — which was the copy gating production.
+    """
+    script = "\n".join(smoke_step["args"])
+    assert "infra/gcp/smoke.sh" in script, "the pre-promotion gate has its own definition again"
+
+
+def test_the_smoke_step_states_every_expectation_the_release_asked_for(
+    smoke_step: dict[str, Any],
+) -> None:
+    """The script ADAPTS to a deployment it is not told about.
+
+    That is what makes it useful against an unknown host and exactly wrong here,
+    where the whole question is whether this revision came up as the one that was
+    requested. Each flag below is an expectation that is silent if omitted.
+    """
+    script = "\n".join(smoke_step["args"])
+    for flag in (
+        "--expect-build-sha",
+        "--expect-env",
+        "--expect-posture",
+        "--expect-entitlement",
+        "--expect-client-id",
+    ):
+        assert flag in script, f"the candidate smoke does not assert {flag}"
+
+
+@pytest.mark.parametrize(
+    ("env_name", "substitution"),
+    [
+        ("RELEASE_SHA", "$COMMIT_SHA"),
+        ("ENVIRONMENT", "${_ENVIRONMENT}"),
+        ("AUTH_MODE", "${_AUTH_MODE}"),
+        ("ENTITLEMENT_MODE", "${_ENTITLEMENT_MODE}"),
+        ("SUPABASE_OAUTH_CLIENT_ID", "${_SUPABASE_OAUTH_CLIENT_ID}"),
+    ],
+)
+def test_the_smoke_step_takes_its_expectations_as_environment_not_as_source(
+    smoke_step: dict[str, Any], env_name: str, substitution: str
+) -> None:
+    """Cloud Build substitutes before bash parses, so an inline `${_FOO}` is CODE.
+
+    These are the values an operator types by hand when raising a staging
+    revision, which is exactly where a stray quote — or a `$(…)` — comes from. The
+    deploy step already learned this; the gate that follows it has to as well.
+    """
+    assert f"{env_name}={substitution}" in smoke_step["env"], "not mapped to env"
+    script = "\n".join(smoke_step["args"])
+    assert substitution not in script, f"{substitution} is interpolated into the script"
+
+
+def test_the_smoke_step_still_bails_out_on_the_first_deploy(
+    smoke_step: dict[str, Any],
+) -> None:
+    """The candidate URL needs an invoker binding that does not exist yet.
+
+    deploy-rc checks readiness with an identity token instead and drops the
+    marker; without this bail-out the very first release of a new project fails
+    on a 403 that has nothing to do with the build.
+    """
+    script = "\n".join(smoke_step["args"])
+    assert "/workspace/skip_smoke" in script
+    assert "exit 0" in script
+
+
+def test_the_smoke_step_keeps_the_readiness_warm_up_out_of_the_assertions(
+    smoke_step: dict[str, Any],
+) -> None:
+    """The retry belongs to the step, not to the script.
+
+    `gcloud run deploy` already waited for Ready, so this covers network flakiness
+    — and an assertion suite that silently retried would be unable to report a
+    route that is only intermittently reachable, which is a real deployment fault.
+    """
+    script = "\n".join(smoke_step["args"])
+    assert "readyz not answering yet" in script
+
+
+def test_the_smoke_step_runs_before_the_promotion(cloudbuild: dict[str, Any]) -> None:
+    """Order is the whole value of the gate.
+
+    Cloud Build runs steps in file order unless `waitFor` says otherwise, so a
+    smoke that landed after the traffic shift would report on a revision already
+    serving users.
+    """
+    ids = [s.get("id") for s in cloudbuild["steps"]]
+    assert ids.index("smoke") < ids.index("promote")
+    smoke = next(s for s in cloudbuild["steps"] if s.get("id") == "smoke")
+    assert "waitFor" not in smoke, (
+        "a waitFor on the smoke step can let it run concurrently with the promotion"
+    )
 
 
 def test_the_deploy_actually_consumes_the_generated_env_file() -> None:
@@ -485,19 +631,3 @@ def test_the_deploy_actually_consumes_the_generated_env_file() -> None:
     text = _CLOUDBUILD.read_text(encoding="utf-8")
     assert "/workspace/env_vars.json" in text
     assert "--env-vars-file" in text
-
-
-def test_the_smoke_never_prints_the_token_it_was_given() -> None:
-    """Every line that reports on the authenticated check must be derived from the
-    SHAPE of the answer, never from the credential or the account behind it."""
-    text = _SMOKE.read_text(encoding="utf-8")
-    # `$ACCOUNT_TOKEN_VAR` is the variable's NAME and is safe to print — it is how
-    # "DAINTREE_TOKEN is empty or unset" names the thing the operator forgot to
-    # export. Only a read of the value itself is forbidden, so the boundary
-    # matters: a plain substring check cannot tell the two apart.
-    forbidden = re.compile(r"\$\{?ACCOUNT_TOKEN\}?(?!_VAR)")
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped.startswith(("pass ", "fail ", "echo ")):
-            continue
-        assert not forbidden.search(stripped), line
