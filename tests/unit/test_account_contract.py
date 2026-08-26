@@ -391,16 +391,38 @@ def test_the_status_bound_counts_bytes_not_characters() -> None:
 
 
 def test_a_lone_surrogate_status_is_a_verdict_and_never_an_encoding_crash() -> None:
-    """`utf8_len`, not `.encode` — see its docstring in `text_utils`.
+    """Refused, and refused as a VERDICT rather than as a crash.
 
-    `json.loads` accepts `"\\ud800"` and pydantic passes it straight through, so a
-    bare encode inside a validator raises `UnicodeEncodeError`, which is not a
-    `ValidationError` and would answer 500 where this model should simply decide.
-    The producer measures with the same helper, so both bounds agree here too.
+    Two distinct hazards, and the length check only covers one. `utf8_len`
+    measures with `errors="replace"`, so a lone surrogate is three bytes and sits
+    well under the bound — but the value cannot be encoded, and the response is
+    serialized with a strict UTF-8 encode. Accepting it here would mean this model
+    declaring a body legal that then raises `UnicodeEncodeError` on the way out,
+    which is a 500 for a value we had just approved.
+
+    So the encodability check runs first and refuses on its own terms, and the
+    length check keeps using `utf8_len` rather than a bare `.encode` so that IT
+    cannot raise either. A short surrogate and a long one both come back as
+    validation errors, never as an exception the route has to survive.
     """
-    assert AccountResponse(**_granted("\ud800")).subscription_status == "\ud800"
-    with pytest.raises(ValidationError, match="exceeds 64 UTF-8 bytes"):
+    with pytest.raises(ValidationError, match="not encodable as UTF-8"):
+        AccountResponse(**_granted("\ud800"))
+    with pytest.raises(ValidationError, match="not encodable as UTF-8"):
         AccountResponse(**_granted("\ud800" * 65))
+
+
+def test_an_accepted_status_can_always_be_serialized() -> None:
+    """The guarantee the encodability check exists to make, stated end to end.
+
+    `model_dump` alone would not have caught the surrogate: it hands back the same
+    `str` without encoding it, which is why the old test could pass while the real
+    response path raised. Encoding the dump is what actually proves the body can
+    leave the process.
+    """
+    for status in ("active", "a" * 64, "あ" * 21, "trialing \N{SNOWMAN}"):
+        body = AccountResponse(**_granted(status))
+        payload = body.model_dump(mode="json", exclude_none=True)
+        assert json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
 
 def test_the_status_refusal_names_the_field_and_not_the_value() -> None:

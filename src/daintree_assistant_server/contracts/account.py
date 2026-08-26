@@ -20,7 +20,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
-from ..text_utils import utf8_len
+from ..text_utils import has_lone_surrogate, utf8_len
 
 #: The response shape's version, and — like the auth manifest's — a REAL version
 #: rather than one of the labels CLAUDE.md forbids. It is wire metadata a client
@@ -67,6 +67,20 @@ def _status_fits_the_contract(value: str) -> str:
     could put a bearer in it; a message quoting it would put whatever it holds
     into a log line and a client's error body.
     """
+    if has_lone_surrogate(value):
+        # A LENGTH check alone would let this through, and the guarantee this
+        # function exists to make would not hold. ``utf8_len`` measures with
+        # ``errors="replace"``, so a lone surrogate counts as three bytes and sits
+        # comfortably under the bound — but the value cannot be encoded, and the
+        # response carrying it is serialized with a strict UTF-8 encode. The model
+        # would have accepted a body that then raised ``UnicodeEncodeError`` on the
+        # way out: a 500 for a value this layer had just declared legal.
+        #
+        # The producer already strips one before this is reachable
+        # (``services.entitlement`` sanitizes the field), which is exactly why it
+        # belongs here too — this layer is meant to be a statement that holds on
+        # its own, and a second statement that depends on the first is not one.
+        raise ValueError("subscription_status is not encodable as UTF-8")
     if utf8_len(value) > _MAX_STATUS_BYTES:
         raise ValueError(f"subscription_status exceeds {_MAX_STATUS_BYTES} UTF-8 bytes")
     return value

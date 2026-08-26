@@ -325,7 +325,18 @@ steps:
           # which would be naming its own container.
           case "$$URL" in
             https://*) ;;
-            *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must be an https:// URL, got '$$URL'." >&2
+            *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must be an https:// URL." >&2
+               # The VALUE is deliberately not echoed, and this is the one branch
+               # where that mattered: it fires before the path is inspected, so a
+               # token pasted anywhere into the URL — the likeliest way for a
+               # credential to end up in this variable at all — was printed whole
+               # into a build log that outlives the build. The host and port
+               # branches below still name their fragment, because by then
+               # userinfo, whitespace and backslashes are already refused and
+               # "which site did I actually point at" is the one thing an operator
+               # cannot work out without being told. `_url_shape_problem` in
+               # config.py takes the same position for the same reason: it says
+               # what rule broke and never what broke it.
                exit 1 ;;
           esac
           # Host pinned to daintree.org or a subdomain. Split off the authority and
