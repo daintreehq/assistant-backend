@@ -7,17 +7,27 @@
 # the Cloud Build trigger that fires on every push to main.
 #
 # Idempotent by design — every step checks before it creates, so re-running is
-# how you finish the setup rather than something to avoid. In particular the
-# public-invoker grant at the end needs the Cloud Run service to exist, which
-# only happens once the first build has run. The intended sequence is:
+# how you finish the setup rather than something to avoid. Some steps need the
+# Cloud Run service to exist, which only happens once the first build has run.
+# The intended sequence is:
 #
-#     ./infra/gcp/bootstrap.sh     # everything except the invoker grant
+#     ./infra/gcp/bootstrap.sh     # everything a build needs to run
 #     <release to main>            # the trigger builds and creates the service
-#     ./infra/gcp/bootstrap.sh     # picks up where it left off, grants invoker
+#     ./infra/gcp/bootstrap.sh     # picks up the domain mapping and the rest
+#
+# THE SERVICE IT CREATES IS PRIVATE, and re-running never changes that. This
+# script used to grant `allUsers roles/run.invoker` on every run — which, since
+# the server holds the upstream credential and funds every turn, published an
+# open Daintree-funded model endpoint as a side effect of finishing a setup.
+# Public access is now a cutover, performed once and on purpose, against a
+# revision that has been seen to enforce; see the "Public access" section at the
+# bottom of this file and infra/gcp/README.md.
 #
 # Secret VALUES are generated here and never leave Secret Manager. Re-running
 # will NOT rotate an existing secret: rotating the state signing key would
 # invalidate every outstanding state token, so that is a deliberate manual act.
+# One secret is never given a value here at all — the private-staging subject
+# gate's membership list, which this script creates empty and never reads.
 #
 # What the server needs at runtime is state-signing material PLUS the upstream
 # credential (TOGETHER_API_KEY), which it holds itself and funds every turn from.
@@ -156,6 +166,35 @@ ensure_supplied_secret together-api-key 'tgp_v1_...' gates
 # model that simply chose not to say anything.
 ensure_supplied_secret cerebras-api-key 'csk-...' gates
 
+# The private-staging subject gate's membership list — A SHELL ONLY, and this
+# script must never put a version in it.
+#
+# It is different in kind from every secret above. The two generated ones are
+# random bytes nobody needs to know; the two supplied ones are vendor credentials
+# an operator pastes. This one is a list of SHA-256 digests of the Supabase
+# subject ids of the people admitted to the private beta — so a generator here
+# could only invent members, and a helper that took a subject and hashed it would
+# put a real user id into a shell history and a terminal scrollback on the way to
+# the only place it is supposed to exist. Publishing the list is an operator act
+# performed from the runbook, and this script's whole contribution is the
+# container and the grant.
+#
+# Nothing here reads it back either. `gcloud secrets versions access` returns the
+# payload and appears nowhere in this repo; `has_version` asks only whether one
+# exists.
+if ! gcloud secrets describe staging-allowed-subject-digests \
+     --project="$PROJECT" >/dev/null 2>&1; then
+  gcloud secrets create staging-allowed-subject-digests \
+    --replication-policy=automatic --project="$PROJECT" >/dev/null
+  ok "created secret staging-allowed-subject-digests (empty)"
+fi
+if has_version staging-allowed-subject-digests; then
+  ok "staging-allowed-subject-digests already has a version (left alone)"
+else
+  ok "staging-allowed-subject-digests has no version (not gating unless you deploy"
+  ok "  ENVIRONMENT=staging with AUTH_MODE=enforce — see infra/gcp/README.md)"
+fi
+
 # ---------------------------------------------------------------------------
 say "Runtime service account (what the container runs as)"
 if gcloud iam service-accounts describe "$RUNTIME_SA_EMAIL" --project="$PROJECT" >/dev/null 2>&1; then
@@ -175,7 +214,12 @@ fi
 # needs no IAM change — and a missing grant would present as a revision that
 # starts, passes readiness with the stage off, and then fails the moment somebody
 # turns it on.
-RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key cerebras-api-key"
+# staging-allowed-subject-digests is granted whether or not it has a version, for
+# the same reason cerebras-api-key is: the binding is on the SECRET, so publishing
+# a membership list later needs no IAM change — and a missing grant would present
+# as a private staging revision that fails at startup on a mount it cannot read,
+# which reads as a broken image rather than a missing permission.
+RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key cerebras-api-key staging-allowed-subject-digests"
 for s in $RUNTIME_SECRETS; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUNTIME_SA_EMAIL}" \
@@ -321,24 +365,132 @@ fi
 
 # ---------------------------------------------------------------------------
 say "Public access to the service"
-# Granting allUsers roles/run.invoker is what makes the service reachable at all.
+# THIS SCRIPT NO LONGER GRANTS PUBLIC ACCESS, and the removal is the point of the
+# section rather than a tidy-up inside it.
 #
-# BE CLEAR ABOUT WHAT GUARDS IT RIGHT NOW: nothing does. The app's bearer auth
-# used to be the gate — every request carried the caller's own key — but the
-# server now holds the credential and serves anonymous requests, so a public
-# Cloud Run service is an open, Daintree-funded endpoint. That is the accepted
-# state for this stage; account authentication is what closes it. This step needs the service to exist, so
-# on a first run it is expected to be skipped.
-if gcloud run services describe "$SERVICE" --region="$REGION" --project="$PROJECT" >/dev/null 2>&1; then
-  gcloud run services add-iam-policy-binding "$SERVICE" \
-    --region="$REGION" --project="$PROJECT" \
-    --member=allUsers --role=roles/run.invoker --quiet >/dev/null
+# `allUsers roles/run.invoker` is what makes the service reachable by anybody at
+# all, and it used to be granted here on every run — ungated, unprompted, on a
+# script whose header tells you that re-running it is how you finish the setup.
+# The binding is per-SERVICE, so it also publishes every no-traffic release
+# candidate's `rc-<build>` tag URL. And the app cannot compensate: the server
+# holds the upstream credential and funds every turn from it, so an unenforced
+# public service is an open, Daintree-funded model endpoint that a re-run of a
+# setup script created.
+#
+# Attaching public access is now a CUTOVER — a deliberate, separate operation
+# performed once the deployed revision has been seen to enforce identity, enforce
+# entitlement, and hold a non-empty subject gate. It is done by re-running this
+# script with the service NAMED:
+#
+#     PUBLIC_CUTOVER=daintree-assistant ./infra/gcp/bootstrap.sh
+#
+# Naming the service is the INTENT half of the confirmation, and it is worth
+# being honest about how much that is worth: an exported `PUBLIC_CUTOVER` left
+# over in a shell would satisfy it if it happened to hold this exact name. That
+# is why it is only half. The other half is below and does the real work — the
+# deployed revision's posture is READ BACK before the binding is created, so a
+# cutover aimed at yesterday's revision, or at staging while thinking of
+# production, is refused by what is actually deployed rather than by what was
+# typed.
+#
+# What this section will NOT do in either direction: it never removes an existing
+# public binding. Production carries one today, it predates this rule, and taking
+# it away is an outage — so revoking is as deliberate an act as granting, and it
+# is a command an operator runs rather than a side effect of a setup script.
+PUBLIC_CUTOVER="${PUBLIC_CUTOVER:-}"
+if ! gcloud run services describe "$SERVICE" --region="$REGION" --project="$PROJECT" >/dev/null 2>&1; then
+  ok "service does not exist yet — release to main, then re-run this script"
+else
   URL="$(gcloud run services describe "$SERVICE" --region="$REGION" \
            --project="$PROJECT" --format='value(status.url)')"
-  ok "granted allUsers roles/run.invoker"
   ok "service URL: $URL"
-else
-  ok "service does not exist yet — release to main, then re-run this script"
+  # mktemp rather than a fixed name in /tmp. Two operators bootstrapping two
+  # services on one machine would otherwise read each other's policy — and the
+  # thing this file decides on the strength of that read is whether to publish a
+  # service, which is the last decision that should depend on a shared filename.
+  POLICY_FILE="$(mktemp)"
+  VERSION_FILE="$(mktemp)"
+  trap 'rm -f "$POLICY_FILE" "$VERSION_FILE"' EXIT
+  gcloud run services get-iam-policy "$SERVICE" --region="$REGION" \
+    --project="$PROJECT" --format=json > "$POLICY_FILE"
+  ALREADY_PUBLIC="$(POLICY_FILE="$POLICY_FILE" python3 - <<'PYEOF'
+import json, os
+
+with open(os.environ["POLICY_FILE"]) as handle:
+    policy = json.load(handle)
+members = set()
+for binding in policy.get("bindings", []):
+    if binding.get("role") == "roles/run.invoker":
+        members.update(binding.get("members", []))
+# allAuthenticatedUsers is not "our users" — it is every Google account there is,
+# which for a service that funds its own model calls is the same exposure with a
+# sign-in page in front of it.
+print("yes" if members & {"allUsers", "allAuthenticatedUsers"} else "no")
+PYEOF
+)"
+
+  if [ "$ALREADY_PUBLIC" = "yes" ]; then
+    ok "already publicly invokable — left exactly as it is"
+    ok "  revoking is a deliberate act too:"
+    echo "    gcloud run services remove-iam-policy-binding $SERVICE \\"
+    echo "      --region=$REGION --project=$PROJECT --member=allUsers --role=roles/run.invoker"
+  elif [ "$PUBLIC_CUTOVER" != "$SERVICE" ]; then
+    ok "private (no allUsers invoker) — and this script will not change that"
+    ok "  to attach public access, prove the posture first and then:"
+    echo "    PUBLIC_CUTOVER=$SERVICE ./infra/gcp/bootstrap.sh"
+    ok "  see infra/gcp/README.md for what has to be true before you do"
+  else
+    # THE POSTURE IS PROVED, NOT ASSERTED BY THE OPERATOR. Typing the service
+    # name says "I mean to do this"; it does not say the revision in front of us
+    # is the one that was supposed to receive it, and the two are exactly the
+    # thing that comes apart during a rollout — a cutover run against yesterday's
+    # revision, or against staging while thinking of production.
+    #
+    # /version is read with an IDENTITY TOKEN because the service is still
+    # private at this moment, which is the whole reason the check is possible: it
+    # can be answered before anybody outside can ask anything.
+    ok "cutover requested — checking what the deployed revision actually enforces"
+    curl -sS --max-time 30 \
+      -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+      "$URL/version" > "$VERSION_FILE" || true
+    POSTURE_OK="$(VERSION_FILE="$VERSION_FILE" python3 - <<'PYEOF'
+import json, os
+
+try:
+    with open(os.environ["VERSION_FILE"]) as handle:
+        body = json.load(handle)
+except Exception:
+    print("unreadable")
+    raise SystemExit(0)
+
+posture = body.get("posture") or {}
+gate = posture.get("subject_gate") or {}
+problems = []
+if posture.get("auth") != "enforce":
+    problems.append("AUTH_MODE is %r, not 'enforce'" % posture.get("auth"))
+if posture.get("entitlement") != "enforce":
+    problems.append("ENTITLEMENT_MODE is %r, not 'enforce'" % posture.get("entitlement"))
+if gate.get("enabled") is not True:
+    problems.append("the subject gate is not enabled")
+elif not isinstance(gate.get("entries"), int) or gate.get("entries") < 1:
+    problems.append("the subject gate admits nobody")
+# The LABEL is printed and the membership never is. A count and a name are what
+# an operator needs to recognise the list they published; neither narrows who is
+# on it.
+print("ok" if not problems else "; ".join(problems))
+PYEOF
+)"
+    if [ "$POSTURE_OK" != "ok" ]; then
+      ok "!! refusing the cutover: $POSTURE_OK"
+      ok "   A public service in this posture funds anonymous or ungated work."
+      ok "   Release the enforced, gated revision first, then re-run the cutover."
+      exit 1
+    fi
+    gcloud run services add-iam-policy-binding "$SERVICE" \
+      --region="$REGION" --project="$PROJECT" \
+      --member=allUsers --role=roles/run.invoker --quiet >/dev/null
+    ok "granted allUsers roles/run.invoker after proving enforce/enforce/gated"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

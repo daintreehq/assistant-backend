@@ -41,6 +41,15 @@
 #                                            # another project's endpoints has a
 #                                            # perfectly valid manifest.
 #
+#   ./infra/gcp/smoke.sh --expect-gate-revision beta-3   # or --expect-no-gate
+#                                            # ... and fail unless the private
+#                                            # staging subject gate came up
+#                                            # holding a non-empty membership
+#                                            # under that label. Only the safe
+#                                            # projection is read: enabled, how
+#                                            # many, and the label — never a
+#                                            # member and never "is X admitted".
+#
 # THIS IS THE PRE-PROMOTION GATE, not only a hand-run check. cloudbuild.yaml's
 # `smoke` step calls this script against the no-traffic candidate revision and
 # refuses to promote it on a non-zero exit, so every assertion below is one the
@@ -143,6 +152,24 @@ EXPECT_SCOPES=""
 # for, which is the kind of defect that surfaces as "sign-in is flaky".
 EXPECT_ACCESS_TOKEN_SECONDS=""
 EXPECT_SESSION_MAX_AGE=""
+# The private-staging subject gate, as /version's SAFE projection reports it:
+# whether the gate decides anything, how many subjects it admits, and the
+# operator-chosen label for that membership. Never a member, never a prefix of
+# one, and never an answer to "is this subject admitted" — a public
+# unauthenticated endpoint that could be asked that would be a membership oracle,
+# which is worse than publishing the list because nobody can see it happening.
+#
+# The label is what an operator compares against the list they just published.
+# Asserting it is how "the revision came up holding the membership this release
+# meant" stops being a control-plane question.
+EXPECT_GATE_REVISION=""
+# The other direction, and it needs its own flag for the reason --expect-no-oauth
+# does. Every deployment that is not private staging publishes `enabled: false`
+# with no entries — production, and every staging revision below `enforce`. An
+# empty --expect-gate-revision would read as "no opinion" on exactly the
+# deployment where a gate coming up unexpectedly, or failing to come up, is the
+# whole question.
+EXPECT_NO_GATE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -202,6 +229,19 @@ while [ $# -gt 0 ]; do
     # resolve by precedence.
     --expect-no-oauth)
             EXPECT_NO_OAUTH=1; shift ;;
+    # The subject gate's LABEL. Blank refused like every flag above: the release
+    # passes a substitution, and an unset one would switch off the assertion on
+    # the deployment the gate exists for.
+    --expect-gate-revision)
+            [ $# -gt 1 ] || { echo "--expect-gate-revision requires a value" >&2; exit 2; }
+            [ -n "$2" ] || { echo "--expect-gate-revision requires a non-empty value" >&2; exit 2; }
+            EXPECT_GATE_REVISION="$2"; shift 2 ;;
+    # The deployment must publish NO subject gate. Mutually exclusive with the
+    # flag above, and refused rather than resolved by precedence for the same
+    # reason the OAuth pair is: two contradictory claims about one field mean the
+    # thing that built the arguments has a bug.
+    --expect-no-gate)
+            EXPECT_NO_GATE=1; shift ;;
     # The rest of the manifest. One arm rather than nine copies of the same four
     # lines: written out individually these differ only in a variable name, and a
     # blank-value guard that has to be retyped nine times is one that will be
@@ -249,7 +289,7 @@ while [ $# -gt 0 ]; do
     # reader wants when editing the script and not when running it. Keep the
     # number in step with the header — a range that has slipped prints half a
     # flag's description and silently omits the newest one.
-    -h|--help) sed -n '2,42p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,51p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -260,6 +300,10 @@ done
 # hide it behind a green run.
 if [ "$EXPECT_NO_OAUTH" -eq 1 ] && [ -n "$EXPECT_CLIENT_ID" ]; then
   echo "--expect-no-oauth and --expect-client-id contradict each other" >&2
+  exit 2
+fi
+if [ "$EXPECT_NO_GATE" -eq 1 ] && [ -n "$EXPECT_GATE_REVISION" ]; then
+  echo "--expect-no-gate and --expect-gate-revision contradict each other" >&2
   exit 2
 fi
 
@@ -315,6 +359,13 @@ except Exception:
 # page, is not a degraded API — it is a different service standing where the API
 # should be, and every field check above it silently reads an empty string and
 # reports a mismatch that names the wrong problem.
+# A non-negative integer, and nothing else. `[ x -lt 1 ]` on a non-numeric value
+# is a shell ERROR rather than a false, and without `set -e` that error is
+# indistinguishable from the comparison simply not holding — so a `/version` that
+# reported a string where a count belongs would slide past the branch that was
+# supposed to object to it.
+is_count() { case "${1:-}" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+
 is_json() { printf '%s' "$1" | python3 -c "
 import json,sys
 try:
@@ -435,6 +486,15 @@ PROTO_MAX="$(jq_path "$BODY" protocol.max)"
 # the mode the revision came up in against the door it describes to clients.
 VERSION_AUTH_MODE="$(jq_path "$BODY" posture.auth)"
 VERSION_ENTITLEMENT_MODE="$(jq_path "$BODY" posture.entitlement)"
+# The third axis, and the only one derived from a secret. Exactly three facts are
+# published and exactly three are read: whether the gate decides anything, how
+# many subjects it admits, and the label naming that membership. `enabled` prints
+# the Python repr of a JSON boolean — `True`/`False` — and an EMPTY value means
+# the block is absent, which is an older build answering rather than a gate that
+# is off. The two are distinguished below because they need different sentences.
+VERSION_GATE_ENABLED="$(jq_path "$BODY" posture.subject_gate.enabled)"
+VERSION_GATE_ENTRIES="$(jq_path "$BODY" posture.subject_gate.entries)"
+VERSION_GATE_REVISION="$(jq_path "$BODY" posture.subject_gate.revision)"
 if [ "$code" != "200" ]; then
   fail "/version returned $code" "$BODY"
 elif ! is_json "$BODY"; then
@@ -790,6 +850,58 @@ if [ -n "$EXPECT_ENTITLEMENT" ]; then
   fi
 fi
 
+# The subject gate, checked from the safe projection and nothing else. Three
+# facts, and each one is a different release accident:
+#
+#   enabled  — a private staging revision that came up ungated is a private beta
+#              that admits every verified account, and it looks identical to a
+#              working one from the outside.
+#   entries  — a gate holding an empty list refuses everybody, which readiness
+#              already refuses; a gate reporting entries where none was deployed
+#              means a membership arrived from somewhere this release did not.
+#   revision — the label. It is what ties the running revision to the list an
+#              operator just published, and it is the only one of the three that
+#              can tell `beta-3` from `beta-2` when both have four entries.
+if [ -n "$EXPECT_GATE_REVISION" ]; then
+  if [ -z "$VERSION_GATE_ENABLED" ]; then
+    fail "/version publishes no subject_gate block" \
+         "this build predates the gate, or the projection was removed"
+  elif [ "$VERSION_GATE_ENABLED" != "True" ]; then
+    fail "expected the subject gate to be enabled, /version reports enabled=$VERSION_GATE_ENABLED" \
+         "a private staging deployment that admits every verified account is not private"
+  elif ! is_count "$VERSION_GATE_ENTRIES"; then
+    fail "/version reports a non-numeric subject gate entry count '$VERSION_GATE_ENTRIES'" ""
+  elif [ "$VERSION_GATE_ENTRIES" -lt 1 ]; then
+    fail "the subject gate is enabled with $VERSION_GATE_ENTRIES entries" \
+         "an empty membership refuses everybody, including the testers it was published for"
+  elif [ "$VERSION_GATE_REVISION" != "$EXPECT_GATE_REVISION" ]; then
+    # The label is not a secret and naming both sides is the diagnostic: it is
+    # the release's own substitution on one side and an operator-chosen name on
+    # the other, and neither narrows who is on the list.
+    fail "expected subject gate revision '$EXPECT_GATE_REVISION', /version reports '${VERSION_GATE_REVISION:-<absent>}'" ""
+  else
+    pass "subject gate: enabled, $VERSION_GATE_ENTRIES entries, revision $VERSION_GATE_REVISION"
+  fi
+elif [ "$EXPECT_NO_GATE" -eq 1 ]; then
+  if [ -z "$VERSION_GATE_ENABLED" ]; then
+    fail "/version publishes no subject_gate block" \
+         "this build predates the gate, or the projection was removed"
+  elif [ "$VERSION_GATE_ENABLED" != "False" ]; then
+    fail "a subject gate is enabled on a deployment that should have none" \
+         "the membership secret reached a revision this release did not mount it on"
+  elif ! is_count "$VERSION_GATE_ENTRIES"; then
+    fail "/version reports a non-numeric subject gate entry count '$VERSION_GATE_ENTRIES'" ""
+  elif [ "$VERSION_GATE_ENTRIES" -ne 0 ]; then
+    # Enabled and populated are separate facts: `allowed_subject_digests()`
+    # parses whatever is mounted whether or not the gate decides anything, so a
+    # secret attached to the wrong deployment shows up here and nowhere else.
+    fail "no subject gate was deployed, but /version reports $VERSION_GATE_ENTRIES entries" \
+         "a membership list is mounted on a revision that does not consult it"
+  else
+    pass "no subject gate, as expected (enabled=False, 0 entries)"
+  fi
+fi
+
 # A header that IS present. Under `open` it is not read at all — a CLI still
 # sending its old OpenRouter key must be SERVED, not have that key forwarded to
 # Together and rejected as the caller's own — and under `enforce` the same
@@ -843,6 +955,66 @@ esac
 # only way a shell could hold one is if something printed it; nothing does, and
 # nothing should. That check lives in the operator cutover runbook, driven through
 # the real CLI, where the credential never leaves the process that obtained it.
+
+# --------------------------------------------------------------------------
+head_ "The funded routes, asked anonymously"
+
+# /respond and /tasks are the two routes that SPEND — they open a provider call
+# on Daintree's own credential — and they are the only two the paid-access
+# dependency guards. Every other check in this file reads metadata, so until now
+# a deployment could enforce authentication on everything cheap and serve the
+# expensive pair to anybody, and nothing here would have noticed: the anonymous
+# POSTs this script owned all lived inside the `anonymous` branch, which
+# `enforce` skips wholesale.
+#
+# Only under `enforce`, and that is not squeamishness about coverage. Under the
+# open door these routes answer 200 by design and the request would BILL a turn —
+# `--full` exists precisely so spending is opt-in — so there is no anonymous-mode
+# version of this check to write.
+#
+# THE BODIES ARE VALID ON PURPOSE, and it is the whole difficulty of the check. A
+# `{}` body earns a 400 from schema validation, which is not 200 and not 401 and
+# proves nothing at all about whether a door exists; a naive "did not succeed"
+# assertion would pass against a deployment with no authentication whatever.
+# These are the same payloads the protocol probes below use — bodies this build
+# parses — so a 401 can only have come from the door.
+#
+# And the envelope is read as well as the status, for the same reason. A 401 with
+# `invalid_request` inside it would mean the schema refused the request and the
+# status happened to land on the number this check wanted.
+if [ "$AUTH_POSTURE" = "enforce" ]; then
+  for path in respond tasks; do
+    case "$path" in
+      respond) payload='{"protocol_version":3,"session":{"id":"smoke-anon","turn_id":"t"},"startup":{},"input":{"messages":[{"role":"user","content":"hi"}]}}' ;;
+      tasks)   payload='{"task":"terminal_judge","input":{"question":"q","tail":"t"}}' ;;
+    esac
+    code="$(req -X POST "$URL/v1/daintree/$path" \
+      -H 'content-type: application/json' -d "$payload")"
+    load_body
+    err_code="$(printf '%s' "$BODY" | python3 -c "import json,sys
+print((json.load(sys.stdin).get('error') or {}).get('code',''))" 2>/dev/null)"
+    case "$err_code" in
+      # The auth family, named rather than pattern-matched on a prefix: these are
+      # the three codes `auth.py` raises for a caller who is not signed in, and a
+      # prefix rule would also accept a future `auth_...` code that means
+      # something else entirely.
+      auth_required|auth_token_invalid|auth_token_expired|auth_session_revoked)
+        auth_shaped=1 ;;
+      *) auth_shaped=0 ;;
+    esac
+    if [ "$code" = "401" ] && [ "$auth_shaped" = "1" ]; then
+      pass "/v1/daintree/$path refuses an anonymous caller (401 $err_code) on a valid body"
+    elif [ "$code" = "401" ]; then
+      fail "/v1/daintree/$path returned 401 with code '${err_code:-<none>}', not an auth refusal" \
+           "the body was rejected rather than the caller, so this proves nothing about the door"
+    else
+      fail "/v1/daintree/$path answered $code to an anonymous caller under enforcement" \
+           "this route spends Daintree's upstream credential"
+    fi
+  done
+else
+  echo "  SKIP  this deployment serves anonymous callers; a POST here would bill a turn"
+fi
 
 # --------------------------------------------------------------------------
 head_ "No API route answers with a redirect or a page"

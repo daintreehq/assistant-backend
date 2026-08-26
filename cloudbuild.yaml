@@ -18,11 +18,18 @@
 # the commit that triggered the build.
 #
 # Rollout is two-phase on purpose. A new revision is deployed with NO traffic
-# behind the `candidate` tag and smoke-tested on its own URL; only a revision
-# that satisfies infra/gcp/smoke.sh gets promoted to 100%. Readiness covers
+# behind a per-build `rc-<id>` tag and smoke-tested on its own URL; only a
+# revision that satisfies infra/gcp/smoke.sh gets promoted to 100%. Readiness covers
 # failures that are invisible at build time — a missing or weak secret, a
 # malformed prompt template, an unparseable runbook file — so those turn into a
 # red build instead of a broken production service.
+#
+# That candidate tag gives the revision a URL of its own, and a Cloud Run invoker
+# binding is per-SERVICE — so on a public service the candidate is public too.
+# `deploy-rc`, `smoke` and `promote` therefore declare `allowFailure` and record
+# their success in marker files, and the final `release-gate` step, which cannot
+# be skipped, retires this build's tag and only then decides whether the build is
+# red. Cloud Build has no `always()`; this is how one is built out of what it has.
 #
 # That smoke is the SAME script an operator runs by hand against a deployed host,
 # invoked with the release's own expectations rather than left to adapt to
@@ -87,6 +94,35 @@ substitutions:
   # identity-only rollout: /v1/daintree/account reports `unverified` and no paid
   # route asks.
   _DAINTREE_ENTITLEMENT_URL: ''
+
+  # The private-staging subject gate's membership LABEL — never its membership.
+  # The list itself is a Secret Manager secret (`staging-allowed-subject-digests`,
+  # mounted below only where the gate actually decides something); this is the
+  # operator-chosen name for the version of that list, published on /version so a
+  # release can be confirmed to be holding the list that was just published.
+  #
+  # Required whenever the gate is live (`_ENVIRONMENT=staging` AND
+  # `_AUTH_MODE=enforce`, which is exactly `Settings.staging_subject_gate_enabled`)
+  # and refused everywhere else by the same rule readiness applies. Empty is the
+  # correct value for every deployment that is not a private staging one.
+  _STAGING_SUBJECT_GATE_REVISION: ''
+
+  # Network ingress, declared rather than hardcoded.
+  #
+  # This is the NETWORK layer and it is not the layer that guards this service:
+  # a Cloud Run service reached through a domain mapping is reached from the
+  # public internet, so `all` is what assistant.daintree.org needs, and the thing
+  # that decides whether a stranger may INVOKE it is the IAM invoker binding.
+  # The public-posture gate in deploy-rc is keyed on that binding for exactly
+  # that reason, and `infra/gcp/bootstrap.sh` no longer creates it by accident.
+  #
+  # It is a substitution anyway, because it used to be a literal buried in a
+  # 40-line flag array: a deployment that wants to sit behind a load balancer, or
+  # one that should be reachable only from inside the VPC, is a value to pass on
+  # the trigger rather than a fork of this file. Validated against the closed set
+  # `gcloud run deploy` accepts, so a typo fails here rather than after the image
+  # has been built and pushed.
+  _INGRESS: all
 
   # Public OAuth discovery values. EMPTY by default and never filled in here: the
   # real ones name a specific Supabase project, and a value committed to this file
@@ -221,6 +257,13 @@ steps:
   - id: deploy-rc
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
+    # allowFailure, and it is NOT a relaxation. See the `release-gate` step at the
+    # bottom of this file: a failed step here would otherwise abort the build with
+    # a tagged candidate still carrying a URL, and Cloud Build has no `always()`.
+    # This step's failure is recorded by the ABSENCE of its stage marker, every
+    # step after it refuses to run without that marker, and the final step — which
+    # has no allowFailure — cleans the tag up and then fails the build.
+    allowFailure: true
     # Every operator-supplied value arrives as an ENVIRONMENT VARIABLE, never as
     # text interpolated into the script below. Cloud Build substitutes `${_FOO}`
     # before bash parses, so a substitution written inline is SOURCE CODE: a value
@@ -238,6 +281,8 @@ steps:
       - 'AUTH_MODE=${_AUTH_MODE}'
       - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
       - 'DAINTREE_ENTITLEMENT_URL=${_DAINTREE_ENTITLEMENT_URL}'
+      - 'STAGING_SUBJECT_GATE_REVISION=${_STAGING_SUBJECT_GATE_REVISION}'
+      - 'INGRESS=${_INGRESS}'
       - 'LOG_LEVEL=INFO'
       - 'STATE_SIGNING_KID=${_CURRENT_KID}'
       - 'PREVIOUS_KID=${_PREVIOUS_KID}'
@@ -290,6 +335,46 @@ steps:
           *) echo "ERROR: _ENTITLEMENT_MODE must be off|observe|enforce, got '$$ENTITLEMENT_MODE'." >&2
              exit 1 ;;
         esac
+        # The two values the subject gate added, checked with the enums rather
+        # than beside the gate itself: these are SHAPE questions, they cost
+        # nothing, and the gate block further down spends an API call. Cheap
+        # refusals belong before the expensive ones.
+        #
+        # Ingress is a closed set because `gcloud run deploy` has one, and a typo
+        # here fails AFTER the image has been built and pushed — the most
+        # expensive place in this file to learn a word is misspelled.
+        case "$$INGRESS" in
+          all|internal|internal-and-cloud-load-balancing) ;;
+          *) echo "ERROR: _INGRESS must be all|internal|internal-and-cloud-load-balancing," >&2
+             echo "       got '$$INGRESS'." >&2
+             exit 1 ;;
+        esac
+        # The gate label, matched against the SAME pattern `_gate_revision_problem`
+        # applies in config.py: 1-32 characters, opening with a lowercase letter
+        # or a digit, then lowercase letters, digits, dot, underscore or hyphen.
+        #
+        # This one is not merely a mistyped enum. The label is published verbatim
+        # on a public unauthenticated /version — which answers while the service
+        # is UNREADY, so "readiness would refuse it" is not a reason a bad value
+        # is safe to echo — and the mistake the pattern exists to catch is a
+        # DIGEST, or a subject id, typed into the variable next to the one that
+        # holds them. A 64-character hex string fails the length bound rather
+        # than being published as a membership name.
+        #
+        # Empty passes: a deployment with no gate has no membership to name. The
+        # gate block below is what requires a label where the gate is live.
+        if [ -n "$$STAGING_SUBJECT_GATE_REVISION" ]; then
+          if ! printf '%s' "$$STAGING_SUBJECT_GATE_REVISION" \
+               | grep -Eq '^[a-z0-9][a-z0-9._-]{0,31}$'; then
+            # The VALUE is not echoed, for the reason the rule exists: the thing
+            # most likely to be in this variable wrongly is a subject digest.
+            echo "ERROR: _STAGING_SUBJECT_GATE_REVISION must be 1-32 characters of" >&2
+            echo "       lowercase letters, digits, '.', '_' or '-', starting with a" >&2
+            echo "       letter or digit. It is a LABEL for the membership list and is" >&2
+            echo "       published on /version — never put a digest or a subject in it." >&2
+            exit 1
+          fi
+        fi
         # The operational dials, checked for the same reason as the modes above and
         # with one extra: these WITHHOLD capability from the model. A typo'd
         # `TOOL_PROJECTION_MODE` would be refused by pydantic and fail /readyz, but
@@ -593,7 +678,10 @@ steps:
         # environment so no value is ever pasted into a shell word. `PREVIOUS_KID`
         # is excluded by name: it is this script's own input, delivered to the
         # service as STATE_SIGNING_KID_PREVIOUS above and only when the secret it
-        # names actually exists.
+        # names actually exists. `INGRESS` is excluded for a different reason —
+        # it is a Cloud Run DEPLOY flag and not an application setting, so sending
+        # it would put a name in the revision's environment that `config.py` has
+        # never heard of, which the readback below now refuses.
         #
         # An EMPTY value is omitted rather than sent. `Settings` validates whatever
         # is present in every mode including `open`, and absent is not the same as
@@ -605,6 +693,7 @@ steps:
         NAMES = (
             "ENVIRONMENT", "AUTH_MODE", "LOG_LEVEL",
             "ENTITLEMENT_MODE", "DAINTREE_ENTITLEMENT_URL",
+            "STAGING_SUBJECT_GATE_REVISION",
             "STATE_SIGNING_KID", "STATE_SIGNING_KID_PREVIOUS",
             "SUPABASE_AUTH_ISSUER", "SUPABASE_JWKS_URL",
             "SUPABASE_OAUTH_AUTHORIZE_URL", "SUPABASE_OAUTH_TOKEN_URL",
@@ -634,6 +723,266 @@ steps:
         # instead, which names the actual problem. `bootstrap.sh` gates on a version
         # existing for the same reason.
         SECRET_FLAGS="$$SECRET_FLAGS,CEREBRAS_API_KEY=cerebras-api-key:latest"
+
+        # ---------------------------------------------------------------------
+        # Is this service reachable by a stranger? Asked of the IAM policy rather
+        # than assumed, because every posture rule below is really a rule about
+        # that one fact and nothing else in this file knows it.
+        #
+        # A Cloud Run invoker binding is per-SERVICE, never per-revision. So it
+        # covers the no-traffic candidate this step is about to raise and the
+        # `rc-<build>` tag URL that names it — a tag on a public service is a
+        # public URL, whatever its traffic share. That is why the question is
+        # asked BEFORE the deploy: afterwards it would be a refusal of something
+        # already published, which is not a refusal.
+        #
+        # `allAuthenticatedUsers` counts as public. It is not "our users" — it is
+        # every Google account in existence, which for a service that funds its
+        # own model calls is the same exposure with a sign-in page in front.
+        #
+        # ABSENT and FORBIDDEN are distinguished, the same way the previous
+        # signing key's probe distinguishes them and for a sharper reason: a
+        # describe that fails for any other cause — a denied permission, a
+        # transient API error — is NOT evidence that the service does not exist,
+        # and reading it as such would report an existing public service as
+        # private. That is the one wrong answer this check can give.
+        #
+        # Recorded through files rather than a nested heredoc: this step's
+        # embedded python is written at column zero so YAML hands bash a program
+        # python can parse, and a heredoc inside an `if` cannot be.
+        : > /workspace/iam_err
+        SERVICE_STATUS=0
+        gcloud run services describe "${_SERVICE}" --region="${_REGION}" \
+          --format=json > /workspace/service_json 2>/workspace/iam_err || SERVICE_STATUS=$$?
+        if [ "$$SERVICE_STATUS" -eq 0 ]; then
+          if gcloud run services get-iam-policy "${_SERVICE}" --region="${_REGION}" \
+               --format=json > /workspace/service_iam.json 2>>/workspace/iam_err; then
+            printf 'read' > /workspace/service_iam_state
+          else
+            printf 'unreadable' > /workspace/service_iam_state
+          fi
+        elif grep -qi 'not found\|NOT_FOUND\|does not exist' /workspace/iam_err 2>/dev/null; then
+          printf 'absent' > /workspace/service_iam_state
+        else
+          printf 'unreadable' > /workspace/service_iam_state
+        fi
+        python3 - <<'PYEOF' > /workspace/service_public
+        import json
+
+        with open("/workspace/service_iam_state") as handle:
+            state = handle.read().strip()
+
+        if state == "absent":
+            # No service means no binding. The first-ever deploy creates a
+            # private one — infra/gcp/bootstrap.sh no longer grants public
+            # access as a side effect of being re-run — so this is a fact
+            # rather than a hope.
+            print("no")
+        elif state != "read":
+            print("unknown")
+        else:
+            with open("/workspace/service_iam.json") as handle:
+                policy = json.load(handle)
+            members = set()
+            for binding in policy.get("bindings", []):
+                if binding.get("role") == "roles/run.invoker":
+                    members.update(binding.get("members", []))
+            public = bool(members & {"allUsers", "allAuthenticatedUsers"})
+            # The OTHER way a Cloud Run service becomes reachable by anybody, and
+            # it is not an IAM binding at all: the invoker IAM check can be
+            # switched OFF on the service, after which the policy above decides
+            # nothing. A gate that read only the bindings would call such a
+            # service private and be confidently wrong.
+            with open("/workspace/service_json") as handle:
+                service = json.load(handle)
+            annotations = (service.get("metadata") or {}).get("annotations") or {}
+            if str(
+                annotations.get("run.googleapis.com/invoker-iam-disabled", "")
+            ).lower() == "true":
+                public = True
+            print("yes" if public else "no")
+        PYEOF
+        SERVICE_PUBLIC="$$(cat /workspace/service_public)"
+        # Anything this check did not deliberately produce is UNKNOWN, not "no".
+        # An empty value would otherwise flow into a `!= "no"` comparison and
+        # take a branch nobody chose.
+        case "$$SERVICE_PUBLIC" in
+          yes|no|unknown) ;;
+          *) SERVICE_PUBLIC=unknown ;;
+        esac
+        echo "Public invocation of ${_SERVICE}: $$SERVICE_PUBLIC."
+        #
+        # WHAT THIS CHECK DOES NOT SEE, stated because an unstated bound is
+        # indistinguishable from a bound nobody thought about: `get-iam-policy`
+        # on a service returns the SERVICE's own policy, so an invoker role
+        # inherited from the project, folder or organisation is invisible here.
+        # Reading effective policy needs `resourcemanager.projects.getIamPolicy`,
+        # which the deploy service account deliberately does not hold — and
+        # widening a deploy identity to strengthen a check on the deploy is the
+        # wrong trade. Nothing in this project grants `run.invoker` above the
+        # service, and infra/gcp/README.md says so where an operator will read it.
+
+        # THE RULE, and its SCOPE is the part worth reading rather than the rule.
+        #
+        # It binds on `staging` and deliberately not on every public deployment.
+        # The two axes are staged independently on purpose (CLAUDE.md), and the
+        # PUBLIC PRODUCTION service runs `open`/`off` today as a deliberate
+        # product posture: the server holds the upstream credential, anonymous
+        # turns are what it is currently for, and readiness accepts that. A
+        # blanket "no public service may fund anonymous work" would refuse the
+        # release that is currently correct, which is a gate nobody can ship
+        # through and therefore a gate somebody deletes.
+        #
+        # What makes STAGING different is not that it matters less. It is that
+        # `staging` is the PRIVATE BETA — the only deployment the subject gate
+        # exists for, and `config.py` refuses to let production hold a membership
+        # list at all. So "a publicly invokable staging service that does not
+        # enforce" has no legitimate reading: it is a private beta that is not
+        # private, funding strangers' turns under a name that says otherwise.
+        # That is a mistake with no correct version of itself, which is exactly
+        # the shape a build is allowed to refuse.
+        #
+        # The honest boundary, stated so nobody has to infer it: this gate is
+        # about a deployment whose posture CONTRADICTS its exposure. It is not a
+        # claim that production's posture is right, and moving production is a
+        # product decision that will arrive as its own rule.
+        if [ "$$ENVIRONMENT" = "staging" ] && [ "$$SERVICE_PUBLIC" != "no" ]; then
+          if [ "$$SERVICE_PUBLIC" = "unknown" ]; then
+            # Fail CLOSED, and only where the rule binds. Not knowing whether a
+            # staging service is public costs a re-run; guessing "private" costs
+            # an open funded endpoint that nobody decided to publish. The same
+            # trade the previous-signing-key probe above makes.
+            echo "ERROR: could not read the invoker policy for ${_SERVICE}." >&2
+            cat /workspace/iam_err >&2 || true
+            echo "       A staging release does not proceed without knowing whether" >&2
+            echo "       the service it deploys onto can be invoked by anybody." >&2
+            exit 1
+          fi
+          if [ "$$AUTH_MODE" != "enforce" ]; then
+            echo "ERROR: ${_SERVICE} is publicly invokable and this is a staging" >&2
+            echo "       release with _AUTH_MODE=$$AUTH_MODE." >&2
+            echo "       A public staging deployment must enforce identity: below" >&2
+            echo "       enforce there is no subject, so the private-beta subject" >&2
+            echo "       gate cannot decide anything and every turn is funded for" >&2
+            echo "       an anonymous caller." >&2
+            echo "       Move the rollout on a PRIVATE service (no allUsers invoker)" >&2
+            echo "       and attach public access at cutover — see infra/gcp/README.md." >&2
+            exit 1
+          fi
+          if [ "$$ENTITLEMENT_MODE" != "enforce" ]; then
+            echo "ERROR: ${_SERVICE} is publicly invokable and this is a staging" >&2
+            echo "       release with _ENTITLEMENT_MODE=$$ENTITLEMENT_MODE." >&2
+            echo "       Identity says the token is genuine; entitlement says the" >&2
+            echo "       account behind it has paid. A public staging service that" >&2
+            echo "       verifies the first and not the second funds every verified" >&2
+            echo "       account's turns." >&2
+            exit 1
+          fi
+          # Repeated here rather than relied upon from the cross-field rule above,
+          # because this block is extracted and executed on its own: a rule that
+          # is only correct in the presence of another one two hundred lines away
+          # is a rule that survives a refactor as a hole. The SHAPE of the value —
+          # host, port, path — is pinned by the validation block above.
+          if [ -z "$$(printf '%s' "$$DAINTREE_ENTITLEMENT_URL" | tr -d '[:space:]')" ]; then
+            echo "ERROR: ${_SERVICE} is publicly invokable and this staging release" >&2
+            echo "       sets no _DAINTREE_ENTITLEMENT_URL; there is nowhere to ask" >&2
+            echo "       whether an account has paid." >&2
+            exit 1
+          fi
+        fi
+
+        # The subject gate's secret, mounted on exactly the condition
+        # `Settings.staging_subject_gate_enabled` uses — staging AND enforce —
+        # because that is the condition under which the gate decides anything.
+        #
+        # Mounting it more widely would be worse than useless: readiness parses
+        # whatever is present in every environment, and `subject_gate_problems`
+        # refuses a production deployment that holds a membership list at all.
+        # Mounting it less widely fails readiness on the one deployment that
+        # needs it. There is no third option, which is why the condition is
+        # copied from the property rather than approximated.
+        GATE_SECRET=staging-allowed-subject-digests
+        GATE_REQUIRED=no
+        if [ "$$ENVIRONMENT" = "staging" ] && [ "$$AUTH_MODE" = "enforce" ]; then
+          GATE_REQUIRED=yes
+        fi
+        if [ "$$GATE_REQUIRED" = "yes" ]; then
+          if [ -z "$$STAGING_SUBJECT_GATE_REVISION" ]; then
+            echo "ERROR: _ENVIRONMENT=staging with _AUTH_MODE=enforce requires" >&2
+            echo "       _STAGING_SUBJECT_GATE_REVISION — the label naming which" >&2
+            echo "       membership list this release expects to be holding." >&2
+            echo "       Readiness refuses the revision without it." >&2
+            exit 1
+          fi
+          # METADATA ONLY, and this is the line to read twice. `versions describe`
+          # returns a name, a state and a timestamp; `versions access` returns the
+          # PAYLOAD. Nothing in this file may ever reach for the second one — the
+          # membership list is a set of subject digests, and a build log outlives
+          # the build. The deploy SA holds `secretmanager.viewer`, which can read
+          # this metadata and cannot read a value, so the least-privilege grant
+          # and the rule agree.
+          #
+          # Checked at all because `--set-secrets` fails the deploy on a missing
+          # secret and says so three steps into a gcloud error, while a secret
+          # that exists with no ENABLED version deploys and then fails the
+          # revision at startup. Both are this release's problem and both are
+          # cheaper to learn here.
+          : > /workspace/gate_err
+          # The STATUS is kept as well as the output. `|| true` alone would let a
+          # command that failed while still printing something be judged on what
+          # it printed, and the whole point of this check is that only one exact
+          # answer may proceed.
+          GATE_STATUS=0
+          gcloud secrets versions describe latest \
+            --secret="$$GATE_SECRET" --project="$PROJECT_ID" \
+            --format='value(state)' > /workspace/gate_state 2>/workspace/gate_err \
+            || GATE_STATUS=$$?
+          GATE_STATE=""
+          if [ "$$GATE_STATUS" -eq 0 ]; then
+            GATE_STATE="$$(tr -d '[:space:]' < /workspace/gate_state)"
+          fi
+          if [ "$$GATE_STATE" != "ENABLED" ]; then
+            echo "ERROR: secret $$GATE_SECRET has no ENABLED 'latest' version" >&2
+            echo "       (state: '$${GATE_STATE:-none}'). A private staging" >&2
+            echo "       deployment that admits every verified account is not" >&2
+            echo "       private, so this release stops here." >&2
+            cat /workspace/gate_err >&2 || true
+            echo "       Run infra/gcp/bootstrap.sh to create the secret shell," >&2
+            echo "       then publish a membership list into it." >&2
+            exit 1
+          fi
+          SECRET_FLAGS="$$SECRET_FLAGS,STAGING_ALLOWED_SUBJECT_DIGESTS=$$GATE_SECRET:latest"
+          echo "Subject gate: mounting $$GATE_SECRET:latest as revision '$$STAGING_SUBJECT_GATE_REVISION'."
+        elif [ -n "$$STAGING_SUBJECT_GATE_REVISION" ]; then
+          # A label with no list under it. Refused rather than ignored: it is
+          # published verbatim on /version, so an operator reading the deployment
+          # they just raised would be told it holds a membership named `beta-3`
+          # while every verified account walks through.
+          echo "ERROR: _STAGING_SUBJECT_GATE_REVISION is set, but this deployment" >&2
+          echo "       (_ENVIRONMENT=$$ENVIRONMENT, _AUTH_MODE=$$AUTH_MODE) mounts no" >&2
+          echo "       membership list — the gate only decides anything under" >&2
+          echo "       staging + enforce. A label naming nothing is published on" >&2
+          echo "       /version as though it named something." >&2
+          exit 1
+        fi
+
+        # The secret REFERENCES this build is asking for, recorded the way the
+        # environment is, so the readback below can compare them.
+        #
+        # Names and versions only, which is all a reference IS — the payload is
+        # never in this process. That is what makes "verify the exact secret
+        # reference" a check this file is allowed to perform.
+        SECRET_FLAGS="$$SECRET_FLAGS" python3 - <<'PYEOF' > /workspace/secret_refs.json
+        import json, os
+
+        refs = {}
+        for item in os.environ["SECRET_FLAGS"].split(","):
+            name, _, reference = item.partition("=")
+            secret, _, version = reference.rpartition(":")
+            refs[name] = {"secret": secret, "version": version}
+        json.dump(refs, os.sys.stdout, indent=1, sort_keys=True)
+        PYEOF
+        echo "Deploying with secret references: $$(python3 -c 'import json;print(", ".join(sorted(json.load(open("/workspace/secret_refs.json")))))')"
 
         # --set-* rather than --update-*: the deployed configuration is exactly
         # what this file says. A flag removed here is removed from the service
@@ -737,7 +1086,11 @@ steps:
           --min-instances=1
           --max-instances=10
           --timeout=960
-          --ingress=all
+          # Declared, validated, and NOT the thing that guards this service. See
+          # the `_INGRESS` substitution: a domain-mapped Cloud Run service is
+          # reached from the public internet, so `all` is what the product needs,
+          # and the invoker binding is the lever the posture gate above reads.
+          --ingress="$$INGRESS"
           --startup-probe=httpGet.path=/healthz,httpGet.port=8080,initialDelaySeconds=0,periodSeconds=3,timeoutSeconds=3,failureThreshold=10
           --liveness-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=30,timeoutSeconds=5,failureThreshold=3
           --env-vars-file=/workspace/env_vars.json
@@ -824,9 +1177,11 @@ steps:
           #
           # NON-SECRET ONLY, by construction rather than by filtering: secrets
           # reach the container through --set-secrets as `valueFrom` references,
-          # and this comparison reads `value` and ignores every entry without
+          # and the VALUE comparison reads `value` and ignores every entry without
           # one. So a secret cannot be printed here even by accident, because a
-          # secret has no `value` to read.
+          # secret has no `value` to read. The secret REFERENCES are compared too,
+          # and a reference is a name and a version — metadata the payload is
+          # never part of.
           gcloud run revisions describe "$$(cat /workspace/rc_revision)" \
             --region="${_REGION}" --format=json > /workspace/rc_revision_json
           python3 - <<'PYEOF' || exit 1
@@ -834,6 +1189,8 @@ steps:
 
         with open("/workspace/env_vars.json") as handle:
             wanted = json.load(handle)
+        with open("/workspace/secret_refs.json") as handle:
+            wanted_refs = json.load(handle)
         with open("/workspace/rc_revision_json") as handle:
             revision = json.load(handle)
 
@@ -846,14 +1203,84 @@ steps:
             for entry in container.get("env", [])
             if "value" in entry
         }
+        # The reference side: which secret, at which version, under which name.
+        # No payload is reachable from here — this is the same metadata the
+        # deploy flags carried — which is what makes verifying the subject-gate
+        # reference something this build is allowed to do at all.
+        got_refs = {}
+        for container in containers:
+            for entry in container.get("env", []):
+                ref = (entry.get("valueFrom") or {}).get("secretKeyRef") or {}
+                if not ref:
+                    continue
+                # A cross-project reference arrives as a resource path; the
+                # short name is the half worth comparing, and the deploy only
+                # ever writes short names.
+                got_refs[entry["name"]] = {
+                    "secret": str(ref.get("name") or "").rsplit("/", 1)[-1],
+                    "version": str(ref.get("key") or ""),
+                }
 
         missing = sorted(k for k in wanted if k not in got)
         differing = sorted(k for k in wanted if k in got and got[k] != wanted[k])
-        # Extra names are reported and do NOT fail: Cloud Run and the runtime add
-        # their own (PORT, K_SERVICE), and a release must not break because the
-        # platform grew one. The direction that matters is what we asked for and
-        # did not get.
+
+        # THE ALLOWLIST, CLOSED. Extra names used to be reported and never fail,
+        # on the reasoning that Cloud Run adds its own and a release must not
+        # break because the platform grew one. That reasoning is right about the
+        # PLATFORM's names and wrong about everything else: `--env-vars-file`
+        # replaces the whole environment, so an application control variable this
+        # build did not generate reached the revision some other way — a manual
+        # `gcloud run services update --update-env-vars` that a release was
+        # supposed to wipe, or a deploy that did not take. Checking only that the
+        # requested names are present cannot see either.
+        #
+        # So the platform keeps a namespace and everything outside it fails. The
+        # trade is stated rather than hidden: if Cloud Run introduces a variable
+        # outside these prefixes, this refuses a correct release until the name
+        # is added below. That is the direction to be wrong in — a release that
+        # stops is visible, and an unexplained setting on a funded service is not.
+        PLATFORM_EXACT = {"PORT"}
+        PLATFORM_PREFIXES = ("K_", "CLOUD_RUN_", "GOOGLE_", "GAE_", "CNB_")
         extra = sorted(k for k in got if k not in wanted)
+        unexpected = sorted(
+            k
+            for k in extra
+            if k not in PLATFORM_EXACT and not k.startswith(PLATFORM_PREFIXES)
+        )
+        # The same closure on the reference side. Both directions, and exact on
+        # the version: `latest` and a pinned number are different mounts, and a
+        # reference to the right secret at the wrong version is a revision
+        # holding a membership list nobody published.
+        missing_refs = sorted(k for k in wanted_refs if k not in got_refs)
+        extra_refs = sorted(k for k in got_refs if k not in wanted_refs)
+        differing_refs = sorted(
+            k for k in wanted_refs if k in got_refs and got_refs[k] != wanted_refs[k]
+        )
+
+        if missing_refs or extra_refs or differing_refs:
+            print("ERROR: the deployed revision's secret references are not the ones "
+                  "this build asked for.", file=sys.stderr)
+            if missing_refs:
+                print("  not mounted: %s" % ", ".join(missing_refs), file=sys.stderr)
+            if extra_refs:
+                print("  mounted and never requested: %s" % ", ".join(extra_refs),
+                      file=sys.stderr)
+            for key in differing_refs:
+                # Names and versions, which is the whole of a reference. There is
+                # no payload in this process to leak.
+                print("  %s points at %s:%s, expected %s:%s"
+                      % (key, got_refs[key]["secret"], got_refs[key]["version"],
+                         wanted_refs[key]["secret"], wanted_refs[key]["version"]),
+                      file=sys.stderr)
+            sys.exit(1)
+
+        if unexpected:
+            print("ERROR: the deployed revision carries environment variables this "
+                  "build did not generate.", file=sys.stderr)
+            print("  unexpected: %s" % ", ".join(unexpected), file=sys.stderr)
+            print("  A release replaces the whole environment, so these came from "
+                  "somewhere else.", file=sys.stderr)
+            sys.exit(1)
 
         if missing or differing:
             # NAMES ONLY. Which key disagrees is the whole diagnostic; the values
@@ -865,8 +1292,10 @@ steps:
             if differing:
                 print("  present with a different value: %s" % ", ".join(differing), file=sys.stderr)
             sys.exit(1)
-        print("Revision environment matches the generated release configuration (%d values%s)."
-              % (len(wanted), (", %d platform-supplied" % len(extra)) if extra else ""))
+        print("Revision environment matches the generated release configuration "
+              "(%d values, %d secret references%s)."
+              % (len(wanted), len(wanted_refs),
+                 (", %d platform-supplied" % len(extra)) if extra else ""))
         PYEOF
         else
           # First ever deploy: Cloud Run rejects --no-traffic when there is no
@@ -905,10 +1334,20 @@ steps:
           : > /workspace/skip_smoke
         fi
 
+        # The stage marker, written LAST and only on the path that reached here.
+        # Every step below reads it, and `release-gate` turns its absence into a
+        # failed build. Under `set -e` there is no way to arrive at this line
+        # having skipped something above it.
+        : > /workspace/stage_deploy_ok
+
   # ---- Smoke-test the candidate before it can take traffic -----------------
   - id: smoke
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
+    # See deploy-rc: the failure is recorded rather than fatal, so the cleanup at
+    # the bottom of the file is reached. A smoke failure is one of the three ways
+    # a tagged candidate used to be stranded with a public URL.
+    allowFailure: true
     # The same rule as deploy-rc: every operator-supplied value arrives as an
     # ENVIRONMENT VARIABLE rather than interpolated into the script. Cloud Build
     # substitutes `${_FOO}` before bash parses, so a substitution written inline
@@ -937,15 +1376,29 @@ steps:
       # asserts this literal equals `_OAUTH_SCOPES` in `api/daintree_auth.py`, so
       # the two cannot drift apart silently in either direction.
       - 'EXPECTED_SCOPES=openid,email'
+      # The gate's LABEL, never its membership. The smoke asserts /version's safe
+      # projection — enabled, entry count, label — which is the only way an
+      # operator can confirm the revision in front of them holds the list that
+      # was just published without the endpoint becoming a membership oracle.
+      - 'STAGING_SUBJECT_GATE_REVISION=${_STAGING_SUBJECT_GATE_REVISION}'
     args:
       - -euo
       - pipefail
       - -c
       - |
+        # The previous stage records success by writing a marker; its failure is
+        # not fatal to the build (see deploy-rc's allowFailure) precisely so the
+        # cleanup step is reached, which means this step has to decline for
+        # itself rather than assume it was only started because things went well.
+        if [ ! -f /workspace/stage_deploy_ok ]; then
+          echo "ERROR: the candidate deploy did not complete; there is nothing to smoke." >&2
+          exit 1
+        fi
         if [ -f /workspace/skip_smoke ]; then
           echo "First deploy: readiness was checked with an identity token in deploy-rc."
-          echo "The public smoke needs an invoker binding — run infra/gcp/bootstrap.sh,"
-          echo "then re-release to exercise it."
+          echo "The service is IAM-private until an operator performs the public"
+          echo "cutover (infra/gcp/README.md), so there is no anonymous URL to smoke."
+          : > /workspace/stage_smoke_ok
           exit 0
         fi
         URL="$$(cat /workspace/rc_url)"
@@ -1035,6 +1488,21 @@ steps:
         if [ -n "$$SUPABASE_OAUTH_CLIENT_ID" ]; then
           add_expectation --expect-scopes "$$EXPECTED_SCOPES"
         fi
+        # The subject gate, stated in BOTH directions like the OAuth client above,
+        # and keyed on the same condition the deploy mounts the secret on rather
+        # than on whether a label happens to be set. A label without staging +
+        # enforce is refused before the deploy, so these two branches cover every
+        # release this file can produce.
+        #
+        # `--expect-no-gate` is the one that matters. Production and every
+        # unenforced staging revision publish `enabled: false` with no entries,
+        # and saying so out loud is what turns "the gate did not come up" from an
+        # assertion that silently does not run into a failed release.
+        if [ "$$ENVIRONMENT" = "staging" ] && [ "$$AUTH_MODE" = "enforce" ]; then
+          set -- "$$@" --expect-gate-revision "$$STAGING_SUBJECT_GATE_REVISION"
+        else
+          set -- "$$@" --expect-no-gate
+        fi
         # Unquoted ON PURPOSE, and the only place in these steps where that is
         # true: this is a flag list built above, one word per element, not an
         # operator value. Every value inside it was already refused if empty, so
@@ -1050,18 +1518,29 @@ steps:
         bash infra/gcp/smoke.sh "$$@"
         echo "Candidate is ready and serving $$RELEASE_SHA in $$ENVIRONMENT" \
              "(auth=$$AUTH_MODE, entitlement=$$ENTITLEMENT_MODE)."
+        : > /workspace/stage_smoke_ok
 
   # ---- Promote to 100% -----------------------------------------------------
   - id: promote
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
+    # Recorded rather than fatal, like the two steps above, so `release-gate`
+    # runs. A promotion that fails between the traffic move and the tag removal
+    # is the least obvious of the stranding paths and the one no operator would
+    # think to check.
+    allowFailure: true
     args:
       - -euo
       - pipefail
       - -c
       - |
+        if [ ! -f /workspace/stage_smoke_ok ]; then
+          echo "ERROR: the candidate was not smoked; refusing to move traffic to it." >&2
+          exit 1
+        fi
         if [ -f /workspace/skip_smoke ]; then
           echo "First deploy already carries all traffic."
+          : > /workspace/stage_promote_ok
           exit 0
         fi
         # BY NAME, never --to-latest. The smoke proved one specific revision, and
@@ -1092,3 +1571,143 @@ steps:
           --region="${_REGION}" --to-revisions="$$REVISION=100" \
           --remove-tags="$$RC_TAG" --quiet
         echo "Promoted $$REVISION ($COMMIT_SHA) to 100% of traffic."
+        : > /workspace/stage_promote_ok
+
+  # ---- Retire the candidate URL, then render the verdict -------------------
+  #
+  # THE STEP THAT ALWAYS RUNS, and the reason the three steps above declare
+  # `allowFailure`.
+  #
+  # A release candidate is deployed `--no-traffic --tag=rc-<build>`, which gives
+  # it its own URL — and Cloud Run's invoker binding is per-SERVICE, so on a
+  # public service that URL is public. The tag used to be removed on exactly one
+  # path: the promotion succeeding. A failed deploy, a failed environment
+  # readback, a failed smoke, or a promotion that fell over between the traffic
+  # move and the tag removal each left `rc-<build>` resolving indefinitely, on a
+  # revision that had just been judged unfit to take traffic.
+  #
+  # Cloud Build has no `always()` and a failed step aborts the build, so there was
+  # nowhere to put a cleanup that would actually run. `allowFailure` is what
+  # creates that place: each fallible step records success by writing a marker,
+  # every step declines to run without its predecessor's marker, and this step —
+  # which has NO allowFailure — runs regardless, removes the tag, and then fails
+  # the build if any marker is missing. The build's red/green is unchanged; what
+  # changed is that the tag is gone before it goes red.
+  #
+  # The residual is worth writing down rather than discovering: a build that is
+  # CANCELLED, or that hits the 1800s top-level timeout, kills this step too, and
+  # the tag survives. Nothing inside a build can cover that. It is bounded by the
+  # timeout and visible in the console, where a stranded tag was previously
+  # invisible in every case.
+  - id: release-gate
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -uo
+      - pipefail
+      - -c
+      - |
+        # No `-e`. This step's whole job is to reach its own last line, so every
+        # fallible command below is guarded explicitly instead.
+        CLEANUP_OK=1
+
+        # ONLY the tag this build recorded, read from the file the deploy wrote
+        # and never derived a second time. A tag is a name one build can create
+        # and no other build can guess, so a cleanup that can only name this one
+        # cannot touch a concurrent build's candidate — the property the shared
+        # `candidate` name destroyed, and the reason the promotion above stopped
+        # removing a literal.
+        #
+        # An absent or empty file means the deploy never got as far as tagging,
+        # so there is nothing to remove and nothing to guess at.
+        RC_TAG=""
+        if [ -s /workspace/rc_tag ]; then
+          # There is no `-e` here, so a failed read would leave RC_TAG empty and
+          # the cleanup would silently decide there was nothing to retire — the
+          # one outcome this step exists to prevent, arrived at quietly.
+          if ! RC_TAG="$$(cat /workspace/rc_tag)"; then
+            echo "ERROR: a candidate tag was recorded but could not be read." >&2
+            echo "       Check the service's tags by hand before leaving this." >&2
+            RC_TAG=""
+            CLEANUP_OK=0
+          fi
+        fi
+
+        if [ -n "$$RC_TAG" ]; then
+          # Asked before it is removed, because the successful path has already
+          # removed it inside the promotion's own traffic call and a second
+          # removal would be an error on the one run that went perfectly.
+          HOLDS=no
+          if gcloud run services describe "${_SERVICE}" --region="${_REGION}" \
+               --format=json > /workspace/cleanup_service.json 2>/dev/null; then
+            HOLDS="$$(RC_TAG="$$RC_TAG" python3 -c 'import json,os,sys
+        tag = os.environ["RC_TAG"]
+        rows = json.load(open("/workspace/cleanup_service.json"))["status"]["traffic"]
+        print("yes" if any(r.get("tag") == tag for r in rows) else "no")' 2>/dev/null || echo unknown)"
+          else
+            HOLDS=unknown
+          fi
+
+          if [ "$$HOLDS" = "yes" ]; then
+            echo "Retiring candidate tag $$RC_TAG so its URL stops resolving."
+            # No --to-revisions and no --to-latest: this call removes a tag and
+            # says nothing about the traffic split, so it cannot move traffic
+            # onto or away from anything. Retried, because a stranded public URL
+            # is worth three attempts, and then failed loudly rather than left.
+            REMOVED=0
+            for attempt in 1 2 3; do
+              if gcloud run services update-traffic "${_SERVICE}" \
+                   --region="${_REGION}" --remove-tags="$$RC_TAG" --quiet; then
+                REMOVED=1
+                break
+              fi
+              echo "tag removal failed (attempt $$attempt/3)"
+              sleep 5
+            done
+            if [ "$$REMOVED" -eq 1 ]; then
+              echo "Candidate tag $$RC_TAG removed."
+            else
+              echo "ERROR: could not remove candidate tag $$RC_TAG." >&2
+              echo "       Its URL may still resolve. Remove it by hand:" >&2
+              echo "       gcloud run services update-traffic ${_SERVICE} \\" >&2
+              echo "         --region=${_REGION} --remove-tags=$$RC_TAG" >&2
+              CLEANUP_OK=0
+            fi
+          elif [ "$$HOLDS" = "unknown" ]; then
+            echo "ERROR: could not determine whether $$RC_TAG is still attached." >&2
+            echo "       Check it by hand before leaving this build alone." >&2
+            CLEANUP_OK=0
+          else
+            echo "No candidate tag left attached (the promotion removed it)."
+          fi
+        else
+          echo "No candidate tag was recorded; nothing to retire."
+        fi
+
+        # The verdict. The three markers are the only record of what happened,
+        # because the steps that wrote them were allowed to fail without stopping
+        # the build.
+        FAILED=""
+        [ -f /workspace/stage_deploy_ok ]  || FAILED="$$FAILED deploy-rc"
+        [ -f /workspace/stage_smoke_ok ]   || FAILED="$$FAILED smoke"
+        [ -f /workspace/stage_promote_ok ] || FAILED="$$FAILED promote"
+
+        if [ -n "$$FAILED" ]; then
+          echo "ERROR: release failed in:$$FAILED" >&2
+          echo "       The candidate revision keeps no tag and therefore no URL." >&2
+          # Deliberately NOT "production is untouched". Everything up to and
+          # including the smoke leaves traffic alone, but `promote` can apply the
+          # traffic move server-side and then fail before its marker is written —
+          # so a missing `promote` marker means the outcome is unknown rather
+          # than known-safe, and a sentence claiming otherwise is the one an
+          # operator would act on.
+          echo "       If 'promote' is named above, confirm the traffic split:" >&2
+          echo "       gcloud run services describe ${_SERVICE} --region=${_REGION} \\" >&2
+          echo "         --format='value(status.traffic)'" >&2
+          exit 1
+        fi
+        if [ "$$CLEANUP_OK" -ne 1 ]; then
+          echo "ERROR: the release succeeded but its candidate tag was not retired." >&2
+          exit 1
+        fi
+        echo "Release complete: $COMMIT_SHA is serving, no candidate URL remains."

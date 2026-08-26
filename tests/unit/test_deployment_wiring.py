@@ -14,6 +14,7 @@ damage only surfaces as "we set enforce and it kept serving everybody".
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -1384,3 +1385,989 @@ def test_the_build_and_readiness_agree_about_the_origin_in_every_environment(
         assert build_ok == readiness_ok, (
             f"{environment} / {url}: build says {build_ok}, readiness says {readiness_ok}"
         )
+
+
+# --- the public-posture gate, proved by RUNNING it ---------------------------
+#
+# The rule this block enforces has a SCOPE, and the scope is the part that had to
+# be decided rather than written: it binds on `staging` and deliberately not on
+# every public deployment. The two rollout axes are staged independently on
+# purpose, and the public production service runs `open`/`off` today as a product
+# posture readiness accepts — so a blanket "no public service may fund anonymous
+# work" would refuse the release that is currently correct, which is a gate
+# nobody can ship through and therefore a gate somebody deletes.
+#
+# What makes staging different is not that it matters less. `staging` is the
+# PRIVATE BETA — the only deployment the subject gate exists for, and `config.py`
+# refuses to let production hold a membership list at all — so a publicly
+# invokable staging service that does not enforce has no legitimate reading. The
+# cases below assert both halves: the mistake is refused, and the two correct
+# releases are not.
+
+
+def _posture_gate_script() -> str:
+    """The public-posture gate and the subject-gate mount, as runnable bash.
+
+    Extracted and EXECUTED for the reason every other block here is: this one is
+    a `case`-free chain of string comparisons over five variables and one IAM
+    lookup, and shell is exactly where a rule can be present and wrong. A grep
+    for `allUsers` would pass against a block that reads the policy and then
+    compares the wrong variable.
+    """
+    step = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "deploy-rc"
+    )
+    body: str = step["args"][-1]
+    start = body.index("# Is this service reachable by a stranger?")
+    end = body.index("# The secret REFERENCES this build is asking for", start)
+    block = body[start:end]
+    assert block.strip(), "the posture gate block extracted empty"
+    return (
+        block.replace("$$", "$")
+        .replace("${_SERVICE}", "daintree-assistant")
+        .replace("${_REGION}", "us-central1")
+    )
+
+
+def test_the_posture_gate_actually_runs_before_the_deploy() -> None:
+    """The half `_posture_gate_script` cannot prove by executing anything.
+
+    A refusal that fires after `gcloud run deploy` is not a refusal — the tagged
+    candidate already exists and, on a public service, already has a URL. This is
+    the same paired proof `test_the_validation_actually_runs_before_the_deploy`
+    carries for the entitlement URL.
+    """
+    step = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "deploy-rc"
+    )
+    body: str = step["args"][-1]
+    start = body.index("# Is this service reachable by a stranger?")
+    assert "gcloud run deploy" in body[start:], "the posture gate runs after the deploy"
+    preamble = body[:start]
+    assert "exit 0" not in preamble, "an early successful exit would skip the posture gate"
+    for guard in ("if false", "if [ 1 -eq 0 ]", "if /bin/false"):
+        assert guard not in body, f"the posture gate is wrapped in a guard that never runs: {guard}"
+
+
+#: A `gcloud` that answers the three questions the posture gate asks, and lies
+#: about them on demand. Everything the gate decides comes from these answers, so
+#: the stub is the whole environment the rule is judged in.
+_POSTURE_STUB = """#!/bin/bash
+set -uo pipefail
+case "$*" in
+  *"run services get-iam-policy"*)
+    [ "${IAM_READABLE:-yes}" = "yes" ] || { echo "PERMISSION_DENIED" >&2; exit 1; }
+    if [ "${IAM_PUBLIC:-no}" = "yes" ]; then
+      printf '{"bindings":[{"role":"roles/run.invoker","members":["allUsers"]}]}'
+    else
+      printf '{"bindings":[{"role":"roles/run.invoker","members":["user:someone@example.com"]}]}'
+    fi
+    ;;
+  *"run services describe"*)
+    if [ "${SERVICE_EXISTS:-yes}" != "yes" ]; then
+      echo "ERROR: (gcloud.run.services.describe) Cannot find service: NOT_FOUND" >&2
+      exit 1
+    fi
+    if [ "${DESCRIBE_READABLE:-yes}" != "yes" ]; then
+      echo "ERROR: PERMISSION_DENIED: caller lacks run.services.get" >&2
+      exit 1
+    fi
+    printf '{"metadata":{"annotations":{"run.googleapis.com/invoker-iam-disabled":"%s"}}}' \
+      "${IAM_DISABLED:-false}"
+    ;;
+  *"secrets versions describe"*)
+    [ -n "${GATE_STATE:-}" ] || { echo "NOT_FOUND" >&2; exit 1; }
+    printf '%s\n' "$GATE_STATE"
+    ;;
+esac
+exit 0
+"""
+
+
+def _run_posture_gate(
+    tmp_path: Path,
+    *,
+    environment: str,
+    auth_mode: str = "open",
+    entitlement_mode: str = "off",
+    entitlement_url: str = "",
+    gate_revision: str = "",
+    public: str = "no",
+    service_exists: str = "yes",
+    iam_readable: str = "yes",
+    describe_readable: str = "yes",
+    iam_disabled: str = "false",
+    gate_state: str = "ENABLED",
+) -> subprocess.CompletedProcess[str]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True)
+    stub = bin_dir / "gcloud"
+    stub.write_text(_POSTURE_STUB, encoding="utf-8")
+    stub.chmod(0o755)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True)
+    script = _posture_gate_script().replace("/workspace", str(workspace))
+    # The refusals must fire under the step's real shell options, or a block that
+    # only refuses because an unset variable aborted it would read as correct.
+    script = "set -euo pipefail\n" + script
+    return subprocess.run(  # noqa: S603 - a script this repo owns, on fixed input
+        ["bash", "-c", script],
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "PROJECT_ID": "daintree-research",
+            "ENVIRONMENT": environment,
+            "AUTH_MODE": auth_mode,
+            "ENTITLEMENT_MODE": entitlement_mode,
+            "DAINTREE_ENTITLEMENT_URL": entitlement_url,
+            "STAGING_SUBJECT_GATE_REVISION": gate_revision,
+            "SECRET_FLAGS": "TOGETHER_API_KEY=together-api-key:latest",
+            "IAM_PUBLIC": public,
+            "SERVICE_EXISTS": service_exists,
+            "IAM_READABLE": iam_readable,
+            "DESCRIBE_READABLE": describe_readable,
+            "IAM_DISABLED": iam_disabled,
+            "GATE_STATE": gate_state,
+        },
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+
+_STAGING_URL = "https://staging.daintree.org/api/assistant/entitlement"
+
+
+def test_a_public_staging_service_is_refused_an_unenforced_release(tmp_path: Path) -> None:
+    """The mistake with no correct version of itself.
+
+    A staging service anybody can invoke, deployed with the door open, is a
+    private beta that is not private — and because the server holds the upstream
+    credential, every turn it serves is funded by Daintree for a stranger. There
+    is no rollout step this is, which is what makes it a build refusal rather
+    than an operator's judgement.
+    """
+    result = _run_posture_gate(tmp_path, environment="staging", auth_mode="open", public="yes")
+    assert result.returncode != 0
+    assert "publicly invokable" in result.stderr
+
+
+def test_a_public_staging_service_is_refused_an_unenforced_entitlement(
+    tmp_path: Path,
+) -> None:
+    """The second axis, refused on its own.
+
+    Identity says the token is genuine; entitlement says the account behind it has
+    paid. A public staging service that checks the first and not the second funds
+    every verified account's turns, which is a smaller hole than the anonymous one
+    and the same shape.
+    """
+    result = _run_posture_gate(
+        tmp_path,
+        environment="staging",
+        auth_mode="enforce",
+        entitlement_mode="observe",
+        entitlement_url=_STAGING_URL,
+        gate_revision="beta-1",
+        public="yes",
+    )
+    assert result.returncode != 0
+    assert "_ENTITLEMENT_MODE" in result.stderr
+
+
+def test_a_public_staging_service_is_refused_without_an_entitlement_url(
+    tmp_path: Path,
+) -> None:
+    """Enforcing a lookup with nowhere to send it.
+
+    Repeated inside this block rather than left to the cross-field rule two
+    hundred lines above, because the block is extracted and executed alone: a rule
+    that is only correct in the presence of a distant one survives a refactor as a
+    hole.
+    """
+    result = _run_posture_gate(
+        tmp_path,
+        environment="staging",
+        auth_mode="enforce",
+        entitlement_mode="enforce",
+        entitlement_url="",
+        gate_revision="beta-1",
+        public="yes",
+    )
+    assert result.returncode != 0
+    assert "_DAINTREE_ENTITLEMENT_URL" in result.stderr
+
+
+def test_a_public_staging_service_is_refused_without_a_published_membership(
+    tmp_path: Path,
+) -> None:
+    """The gate secret, checked by METADATA before the deploy mounts it.
+
+    A secret that exists with no enabled version deploys cleanly and then fails
+    the revision at startup, which reads as a broken image rather than as a list
+    nobody published.
+    """
+    result = _run_posture_gate(
+        tmp_path,
+        environment="staging",
+        auth_mode="enforce",
+        entitlement_mode="enforce",
+        entitlement_url=_STAGING_URL,
+        gate_revision="beta-1",
+        public="yes",
+        gate_state="DISABLED",
+    )
+    assert result.returncode != 0
+    assert "staging-allowed-subject-digests" in result.stderr
+
+
+def test_an_unreadable_invoker_policy_stops_a_staging_release(tmp_path: Path) -> None:
+    """Fail CLOSED, and only where the rule binds.
+
+    Not knowing whether a staging service is public costs a re-run. Guessing
+    "private" costs an open funded endpoint nobody decided to publish.
+    """
+    result = _run_posture_gate(
+        tmp_path, environment="staging", auth_mode="open", iam_readable="no"
+    )
+    assert result.returncode != 0
+    assert "invoker policy" in result.stderr
+
+
+def test_a_describe_that_fails_for_any_other_reason_is_not_read_as_absent(
+    tmp_path: Path,
+) -> None:
+    """ABSENT and FORBIDDEN are different answers, and only one of them is safe.
+
+    A describe that fails on a denied permission or a transient API error is not
+    evidence that the service does not exist — and reading it as such would
+    report an EXISTING PUBLIC service as private, which is the one wrong answer
+    this check is able to give. The previous-signing-key probe above draws the
+    same distinction for the same reason.
+    """
+    result = _run_posture_gate(
+        tmp_path, environment="staging", auth_mode="open", describe_readable="no"
+    )
+    assert result.returncode != 0
+    assert "invoker policy" in result.stderr
+
+
+def test_a_service_with_the_iam_check_switched_off_counts_as_public(
+    tmp_path: Path,
+) -> None:
+    """The other way a Cloud Run service becomes reachable by anybody.
+
+    It is not a binding at all: the invoker IAM check can be turned OFF on the
+    service, after which the policy says nothing about who may call it. A gate
+    that read only the bindings would call this service private and be
+    confidently wrong — the worst shape a safety check can take.
+    """
+    result = _run_posture_gate(
+        tmp_path,
+        environment="staging",
+        auth_mode="open",
+        public="no",
+        iam_disabled="true",
+    )
+    assert result.returncode != 0
+    assert "publicly invokable" in result.stderr
+
+
+def test_an_unreadable_gate_secret_is_not_read_as_enabled(tmp_path: Path) -> None:
+    """The status is kept as well as the output.
+
+    Discarding it would judge a command that FAILED on whatever it managed to
+    print, and the whole point of this check is that exactly one answer proceeds.
+    """
+    result = _run_posture_gate(
+        tmp_path,
+        environment="staging",
+        auth_mode="enforce",
+        entitlement_mode="enforce",
+        entitlement_url=_STAGING_URL,
+        gate_revision="beta-1",
+        gate_state="",
+    )
+    assert result.returncode != 0
+    assert "staging-allowed-subject-digests" in result.stderr
+
+
+def test_a_private_staging_rollout_step_is_not_refused(tmp_path: Path) -> None:
+    """The rollout the document actually prescribes.
+
+    Identity and gate behaviour are proven on an IAM-PRIVATE service at `open`,
+    then `observe`, then `enforce`, and public invocation is attached at the end.
+    A gate that refused the unenforced steps of that sequence would make the
+    sequence unrunnable and force the whole cutover into one release.
+    """
+    result = _run_posture_gate(
+        tmp_path, environment="staging", auth_mode="observe", public="no"
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_currently_correct_production_release_is_not_refused(tmp_path: Path) -> None:
+    """THE case that decides the scope of the whole rule.
+
+    Production is public, runs `AUTH_MODE=open` and `ENTITLEMENT_MODE=off`, and is
+    the deployment this file ships on every push to `main`. Refusing it would be
+    refusing the release that is currently correct — and the axes are staged
+    independently on purpose, so "public implies enforce" is not a rule this repo
+    holds. Moving production is a product decision that will arrive as its own
+    rule, not as a side effect of a staging safety check.
+    """
+    result = _run_posture_gate(
+        tmp_path, environment="production", auth_mode="open", public="yes"
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_a_fully_enforced_public_staging_release_is_accepted(tmp_path: Path) -> None:
+    """The destination. If this failed, the cutover could never be released."""
+    result = _run_posture_gate(
+        tmp_path,
+        environment="staging",
+        auth_mode="enforce",
+        entitlement_mode="enforce",
+        entitlement_url=_STAGING_URL,
+        gate_revision="beta-1",
+        public="yes",
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_gate_secret_is_mounted_on_exactly_the_condition_it_decides_on(
+    tmp_path: Path,
+) -> None:
+    """staging AND enforce — the same two conditions as
+    `Settings.staging_subject_gate_enabled`.
+
+    Mounting it more widely is refused by readiness (production may not hold a
+    membership list at all); mounting it less widely fails readiness on the one
+    deployment that needs it. There is no third option, which is why the condition
+    is copied from the property rather than approximated.
+    """
+    mounted = _run_posture_gate(
+        tmp_path / "on",
+        environment="staging",
+        auth_mode="enforce",
+        entitlement_mode="enforce",
+        entitlement_url=_STAGING_URL,
+        gate_revision="beta-1",
+    )
+    assert mounted.returncode == 0, mounted.stderr
+    assert "staging-allowed-subject-digests:latest" in mounted.stdout
+
+    not_mounted = _run_posture_gate(
+        tmp_path / "off", environment="production", auth_mode="open"
+    )
+    assert not_mounted.returncode == 0, not_mounted.stderr
+    assert "staging-allowed-subject-digests" not in not_mounted.stdout
+
+
+def test_a_private_staging_enforce_release_needs_a_membership_label(
+    tmp_path: Path,
+) -> None:
+    """Readiness refuses the revision without it, so the build says so first."""
+    result = _run_posture_gate(
+        tmp_path,
+        environment="staging",
+        auth_mode="enforce",
+        entitlement_mode="enforce",
+        entitlement_url=_STAGING_URL,
+        gate_revision="",
+    )
+    assert result.returncode != 0
+    assert "_STAGING_SUBJECT_GATE_REVISION" in result.stderr
+
+
+def test_a_label_naming_no_membership_is_refused(tmp_path: Path) -> None:
+    """It is published verbatim on /version.
+
+    So an operator reading the deployment they just raised would be told it holds
+    a membership called `beta-3` while every verified account walks through.
+    """
+    result = _run_posture_gate(
+        tmp_path, environment="production", auth_mode="open", gate_revision="beta-3"
+    )
+    assert result.returncode != 0
+    assert "_STAGING_SUBJECT_GATE_REVISION" in result.stderr
+
+
+def test_the_build_never_reads_a_secret_value() -> None:
+    """`versions describe` returns metadata; `versions access` returns the payload.
+
+    The membership list is a set of subject digests and a build log outlives the
+    build, so the second command may not appear in the deployment surfaces at all.
+    The deploy SA holds `secretmanager.viewer`, which cannot read a value — the
+    least-privilege grant and this rule are two statements of one decision, and a
+    gate on the text is what keeps them agreeing.
+    """
+    for path in (_CLOUDBUILD, _ROOT / "infra" / "gcp" / "bootstrap.sh", _SMOKE):
+        # Comments excluded, because all three files EXPLAIN the rule by naming
+        # the command it forbids — and a gate that cannot tell an explanation
+        # from an instruction forces the explanation out, which is how the next
+        # author learns the rule by breaking it.
+        offending = [
+            line
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if "versions access" in line and not line.lstrip().startswith("#")
+        ]
+        assert not offending, (
+            f"{path.name} reads a secret's payload; only metadata may be read "
+            f"here: {offending}"
+        )
+
+
+# --- candidate isolation: the tag is retired on EVERY path -------------------
+#
+# A release candidate is deployed `--no-traffic --tag=rc-<build>`, which gives it
+# a URL of its own — and a Cloud Run invoker binding is per-SERVICE, so on a
+# public service that URL is public. The tag used to be removed on exactly one
+# path: the promotion succeeding. A failed deploy, a failed environment readback,
+# a failed smoke, or a promotion that fell over between the traffic move and the
+# tag removal each left `rc-<build>` resolving indefinitely — on a revision that
+# had just been judged unfit to take traffic.
+#
+# Cloud Build has no `always()` and a failed step aborts the build, so there was
+# nowhere to put a cleanup that would run. `allowFailure` is what creates that
+# place, and these tests hold the whole mechanism: the three fallible steps
+# declare it, the final step does not, each step declines without its
+# predecessor's marker, and the cleanup can only ever name this build's own tag.
+
+
+def test_the_three_fallible_steps_record_rather_than_abort(
+    cloudbuild: dict[str, Any],
+) -> None:
+    """`allowFailure` here is not a relaxation; it is what makes cleanup reachable.
+
+    Without it the build stops at the failing step with the tag still attached.
+    The build's red/green is unchanged, because `release-gate` fails on a missing
+    marker — what changed is that the tag is gone before it goes red.
+    """
+    steps = {s["id"]: s for s in cloudbuild["steps"]}
+    for name in ("deploy-rc", "smoke", "promote"):
+        assert steps[name].get("allowFailure") is True, (
+            f"{name} aborts the build on failure, so the cleanup below it never runs"
+        )
+    assert steps["release-gate"].get("allowFailure") is not True, (
+        "the step that renders the verdict must be able to fail the build"
+    )
+    assert cloudbuild["steps"][-1]["id"] == "release-gate", (
+        "the cleanup must be last, or a step after it would run with the "
+        "candidate already retired"
+    )
+
+
+@pytest.mark.parametrize(
+    ("step_id", "marker"),
+    [("smoke", "stage_deploy_ok"), ("promote", "stage_smoke_ok")],
+)
+def test_a_step_declines_without_its_predecessors_marker(
+    cloudbuild: dict[str, Any], step_id: str, marker: str
+) -> None:
+    """`allowFailure` means a step now runs after its predecessor failed.
+
+    So each one has to decline for itself. Without this, a failed deploy would be
+    followed by a smoke against a stale URL and then by a promotion of a revision
+    no smoke ever saw — which is worse than the leak this mechanism was added to
+    close.
+    """
+    step = next(s for s in cloudbuild["steps"] if s.get("id") == step_id)
+    script = "\n".join(step["args"])
+    assert f"/workspace/{marker}" in script, f"{step_id} runs whatever happened before it"
+
+
+#: A `gcloud` for the cleanup step: it reports whichever traffic rows the test
+#: sets up, and records every tag anybody asks it to remove.
+_CLEANUP_STUB = """#!/bin/bash
+set -uo pipefail
+case "$*" in
+  *"run services describe"*"--format=json"*)
+    [ "${DESCRIBE_OK:-yes}" = "yes" ] || exit 1
+    cat "$TRAFFIC_JSON"
+    ;;
+  *"run services update-traffic"*)
+    for arg in "$@"; do
+      case "$arg" in
+        --remove-tags=*) echo "${arg#--remove-tags=}" >> "$REMOVED_LOG" ;;
+        --to-revisions=*|--to-latest) echo "TRAFFIC-MOVED:$arg" >> "$REMOVED_LOG" ;;
+      esac
+    done
+    ;;
+esac
+exit 0
+"""
+
+
+def _run_cleanup(
+    tmp_path: Path,
+    *,
+    rc_tag: str | None,
+    attached_tags: list[str],
+    markers: tuple[str, ...] = ("stage_deploy_ok", "stage_smoke_ok", "stage_promote_ok"),
+    describe_ok: str = "yes",
+) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True)
+    stub = bin_dir / "gcloud"
+    stub.write_text(_CLEANUP_STUB, encoding="utf-8")
+    stub.chmod(0o755)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True)
+    if rc_tag is not None:
+        (workspace / "rc_tag").write_text(rc_tag, encoding="utf-8")
+    for marker in markers:
+        (workspace / marker).write_text("", encoding="utf-8")
+
+    traffic = tmp_path / "traffic.json"
+    traffic.write_text(
+        json.dumps(
+            {
+                "status": {
+                    "traffic": [
+                        {"tag": tag, "revisionName": f"svc-{tag}", "url": f"https://{tag}"}
+                        for tag in attached_tags
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    removed_log = tmp_path / "removed"
+    removed_log.write_text("", encoding="utf-8")
+
+    step = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "release-gate"
+    )
+    script = (
+        step["args"][-1]
+        .replace("$$", "$")
+        .replace("${_SERVICE}", "daintree-assistant")
+        .replace("${_REGION}", "us-central1")
+        .replace("$COMMIT_SHA", "abc123")
+        .replace("/workspace", str(workspace))
+    )
+    result = subprocess.run(  # noqa: S603 - a script this repo owns, on fixed input
+        ["bash", "-c", script],
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "TRAFFIC_JSON": str(traffic),
+            "REMOVED_LOG": str(removed_log),
+            "DESCRIBE_OK": describe_ok,
+        },
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    removed = [
+        line for line in removed_log.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
+    return result, removed
+
+
+def test_a_failed_release_retires_its_own_candidate_tag(tmp_path: Path) -> None:
+    """The leak, closed. The build still goes red — but not with a live URL on a
+    revision that failed its own smoke."""
+    result, removed = _run_cleanup(
+        tmp_path,
+        rc_tag="rc-111111112222",
+        attached_tags=["rc-111111112222"],
+        markers=("stage_deploy_ok",),
+    )
+    assert result.returncode != 0, "a failed release must still fail the build"
+    assert removed == ["rc-111111112222"]
+    assert "smoke" in result.stderr and "promote" in result.stderr
+
+
+def test_the_cleanup_cannot_touch_a_concurrent_builds_tag(tmp_path: Path) -> None:
+    """The invariant the per-build tag exists for, asserted on the cleanup too.
+
+    Promotion once removed a shared `candidate` tag and took a sibling build's
+    candidate down with it. A cleanup that guessed at a name, or removed every
+    `rc-` tag it found, would put that back — and would do it on the failure path,
+    where a second build is most likely to be running.
+    """
+    result, removed = _run_cleanup(
+        tmp_path,
+        rc_tag="rc-111111112222",
+        attached_tags=["rc-99999999aaaa"],
+        markers=("stage_deploy_ok",),
+    )
+    assert result.returncode != 0
+    assert removed == [], f"the cleanup removed a tag that is not ours: {removed}"
+
+
+def test_the_cleanup_never_moves_traffic(tmp_path: Path) -> None:
+    """`--remove-tags` alone says nothing about the split.
+
+    A cleanup that reached for `--to-revisions` or `--to-latest` would be
+    promoting or rolling back on the failure path, which is a decision this step
+    is emphatically not making.
+    """
+    _, removed = _run_cleanup(
+        tmp_path, rc_tag="rc-111111112222", attached_tags=["rc-111111112222"]
+    )
+    assert not any(entry.startswith("TRAFFIC-MOVED") for entry in removed), removed
+
+
+def test_a_successful_release_leaves_the_promotions_own_cleanup_alone(
+    tmp_path: Path,
+) -> None:
+    """The promotion removes the tag inside its traffic call, so on the happy path
+    there is nothing attached — and a second removal would be an error on the one
+    run that went perfectly."""
+    result, removed = _run_cleanup(
+        tmp_path, rc_tag="rc-111111112222", attached_tags=[]
+    )
+    assert result.returncode == 0, result.stderr
+    assert removed == []
+
+
+def test_a_build_that_never_tagged_anything_guesses_at_no_name(tmp_path: Path) -> None:
+    """A deploy that failed before tagging wrote no file.
+
+    Reaching for a default here is how the shared `candidate` name came back last
+    time: there is nothing to clean up, and inventing something to clean up is a
+    way to delete somebody else's.
+    """
+    result, removed = _run_cleanup(
+        tmp_path, rc_tag=None, attached_tags=["rc-99999999aaaa"], markers=()
+    )
+    assert result.returncode != 0
+    assert removed == []
+
+
+def test_a_cleanup_that_cannot_confirm_the_tag_fails_the_build(tmp_path: Path) -> None:
+    """A successful release whose tag might still be attached is not a success.
+
+    The candidate URL is the thing being retired; "we could not tell" leaves it
+    resolving, and a green build is exactly the report that stops anybody looking.
+    """
+    result, _ = _run_cleanup(
+        tmp_path,
+        rc_tag="rc-111111112222",
+        attached_tags=["rc-111111112222"],
+        describe_ok="no",
+    )
+    assert result.returncode != 0
+    assert "could not determine" in result.stderr
+
+
+# --- the environment readback, run rather than read --------------------------
+
+
+def _readback_program() -> str:
+    """The revision readback's python, as a runnable program.
+
+    Executed rather than grepped for the same reason the shell blocks are: this
+    one now decides two things that used to be reported and ignored — an
+    unexpected application variable, and a secret reference that is not the one
+    the deploy asked for — and "reports it" and "fails on it" differ by one line
+    that a substring assertion cannot see.
+    """
+    step = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "deploy-rc"
+    )
+    body: str = step["args"][-1]
+    segment = body[body.index("gcloud run revisions describe") :]
+    opener = segment.index("<<'PYEOF'")
+    start = segment.index("\n", opener) + 1
+    end = segment.index("\nPYEOF", start)
+    program = segment[start:end]
+    assert program.strip(), "the readback program extracted empty"
+    return program.replace("$$", "$")
+
+
+def _run_readback(
+    tmp_path: Path,
+    *,
+    wanted: dict[str, str],
+    refs: dict[str, dict[str, str]],
+    revision_env: list[dict[str, Any]],
+) -> subprocess.CompletedProcess[str]:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True)
+    (workspace / "env_vars.json").write_text(json.dumps(wanted), encoding="utf-8")
+    (workspace / "secret_refs.json").write_text(json.dumps(refs), encoding="utf-8")
+    (workspace / "rc_revision_json").write_text(
+        json.dumps({"spec": {"containers": [{"env": revision_env}]}}), encoding="utf-8"
+    )
+    program = _readback_program().replace("/workspace", str(workspace))
+    script = tmp_path / "readback.py"
+    script.write_text(program, encoding="utf-8")
+    return subprocess.run(  # noqa: S603 - a program this repo owns, on fixed input
+        ["python3", str(script)],
+        env={"PATH": os.environ["PATH"]},
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+
+_GATE_REF = {"secret": "staging-allowed-subject-digests", "version": "latest"}
+
+
+def _coherent_revision() -> tuple[dict[str, str], dict[str, dict[str, str]], list[dict[str, Any]]]:
+    wanted = {"AUTH_MODE": "enforce", "ENVIRONMENT": "staging"}
+    refs = {"STAGING_ALLOWED_SUBJECT_DIGESTS": dict(_GATE_REF)}
+    env: list[dict[str, Any]] = [
+        {"name": "AUTH_MODE", "value": "enforce"},
+        {"name": "ENVIRONMENT", "value": "staging"},
+        {"name": "PORT", "value": "8080"},
+        {"name": "K_SERVICE", "value": "daintree-assistant"},
+        {
+            "name": "STAGING_ALLOWED_SUBJECT_DIGESTS",
+            "valueFrom": {
+                "secretKeyRef": {"name": "staging-allowed-subject-digests", "key": "latest"}
+            },
+        },
+    ]
+    return wanted, refs, env
+
+
+def test_the_readback_accepts_the_revision_the_build_generated(tmp_path: Path) -> None:
+    """Platform names ride along and must not fail a release."""
+    wanted, refs, env = _coherent_revision()
+    result = _run_readback(tmp_path, wanted=wanted, refs=refs, revision_env=env)
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_readback_refuses_an_application_variable_nobody_deployed(
+    tmp_path: Path,
+) -> None:
+    """The allowlist, closed in the direction that was open.
+
+    `--env-vars-file` replaces the whole environment, so an application control
+    variable this build did not generate reached the revision some other way — a
+    manual `--update-env-vars` a release was meant to wipe, or a deploy that did
+    not take. Checking only that the requested names are PRESENT cannot see
+    either, and this one is `AUTH_MODE`'s neighbourhood: the setting most worth
+    smuggling in is the one that decides whether there is a door.
+    """
+    wanted, refs, env = _coherent_revision()
+    env.append({"name": "ENTITLEMENT_MODE", "value": "off"})
+    result = _run_readback(tmp_path, wanted=wanted, refs=refs, revision_env=env)
+    assert result.returncode != 0
+    assert "ENTITLEMENT_MODE" in result.stderr
+
+
+def test_the_readback_refuses_a_secret_reference_nobody_asked_for(
+    tmp_path: Path,
+) -> None:
+    """A membership list mounted on a revision this release did not mount it on."""
+    wanted, refs, env = _coherent_revision()
+    refs.pop("STAGING_ALLOWED_SUBJECT_DIGESTS")
+    result = _run_readback(tmp_path, wanted=wanted, refs=refs, revision_env=env)
+    assert result.returncode != 0
+    assert "never requested" in result.stderr
+
+
+def test_the_readback_refuses_a_missing_gate_reference(tmp_path: Path) -> None:
+    """The inverse, and the one a private staging release turns on: the deploy
+    asked for the membership list and the revision came up without it."""
+    wanted, refs, env = _coherent_revision()
+    env = [entry for entry in env if entry["name"] != "STAGING_ALLOWED_SUBJECT_DIGESTS"]
+    result = _run_readback(tmp_path, wanted=wanted, refs=refs, revision_env=env)
+    assert result.returncode != 0
+    assert "not mounted" in result.stderr
+
+
+def test_the_readback_refuses_the_right_secret_at_the_wrong_version(
+    tmp_path: Path,
+) -> None:
+    """`latest` and a pinned number are different mounts.
+
+    A reference to the right secret at the wrong version is a revision holding a
+    membership nobody published — and it is the failure that looks most like
+    success, because the name in the console is correct.
+    """
+    wanted, refs, env = _coherent_revision()
+    env[-1]["valueFrom"]["secretKeyRef"]["key"] = "3"
+    result = _run_readback(tmp_path, wanted=wanted, refs=refs, revision_env=env)
+    assert result.returncode != 0
+    assert "staging-allowed-subject-digests:3" in result.stderr
+
+
+def test_the_readback_still_never_reads_a_secret_value(tmp_path: Path) -> None:
+    """A `value` beside a `valueFrom` would be a payload, and nothing may print it.
+
+    Cloud Run does not produce that shape, which is exactly why it is worth
+    asserting: the comparison's safety rests on `value` and `valueFrom` being
+    disjoint, and this is the case that would break it silently.
+    """
+    wanted, refs, env = _coherent_revision()
+    env[-1]["value"] = "a-real-membership-list"
+    result = _run_readback(tmp_path, wanted=wanted, refs=refs, revision_env=env)
+    assert "a-real-membership-list" not in (result.stdout + result.stderr)
+
+
+# --- ingress and the gate label are declared, mapped and passed --------------
+
+
+def _shape_validation_script() -> str:
+    """The ingress enum and the membership-label pattern, extracted the same way.
+
+    They sit with the other enums rather than beside the gate itself: these are
+    SHAPE questions that cost nothing, and the gate block spends an API call.
+    Cheap refusals belong before expensive ones — and, like every other block
+    here, a `case` pattern and a `grep -E` are present-and-wrong in ways only
+    running them can settle.
+    """
+    step = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "deploy-rc"
+    )
+    body: str = step["args"][-1]
+    start = body.index("# The two values the subject gate added")
+    end = body.index("# The operational dials, checked for the same reason", start)
+    block = body[start:end]
+    assert block.strip(), "the shape validation block extracted empty"
+    return block.replace("$$", "$")
+
+
+def _validate_shapes(**values: str) -> subprocess.CompletedProcess[str]:
+    env = {
+        "PATH": os.environ["PATH"],
+        "INGRESS": "all",
+        "STAGING_SUBJECT_GATE_REVISION": "",
+    }
+    env.update(values)
+    return subprocess.run(  # noqa: S603 - a script this repo owns, run on fixed input
+        ["bash", "-c", _shape_validation_script()],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
+def test_ingress_is_no_longer_a_literal_in_the_flag_array(
+    cloudbuild: dict[str, Any], deploy_step: dict[str, Any]
+) -> None:
+    """`--ingress=all` sat unconditional inside the flag array used by BOTH the
+    no-traffic candidate deploy and the first-ever full-traffic one.
+
+    It is the network layer rather than the layer that guards this service — the
+    invoker binding is that, and the posture gate reads it — but a hardcoded
+    value cannot be moved for a deployment that should sit behind a load balancer
+    or inside a VPC without forking this file.
+    """
+    script = "\n".join(deploy_step["args"])
+    assert "--ingress=all" not in script, "ingress is still hardcoded"
+    assert '--ingress="$$INGRESS"' in script, "ingress does not come from the substitution"
+    assert "INGRESS=${_INGRESS}" in deploy_step["env"], "not mapped to env"
+    assert cloudbuild["substitutions"]["_INGRESS"] == "all", (
+        "the default must be what a domain-mapped public product needs, or this "
+        "change moves a deployment"
+    )
+
+
+def test_ingress_is_not_sent_to_the_application(deploy_step: dict[str, Any]) -> None:
+    """It is a Cloud Run deploy flag, not a setting `config.py` has ever heard of.
+
+    Sending it would put an unknown name in the revision's environment, which the
+    closed allowlist in the readback now refuses — so this would present as every
+    release failing its own readback.
+    """
+    script = "\n".join(deploy_step["args"])
+    names = re.search(r"NAMES = \((.*?)\)", script, re.S)
+    assert names is not None
+    assert '"INGRESS"' not in names.group(1)
+
+
+@pytest.mark.parametrize(
+    "value", ["all", "internal", "internal-and-cloud-load-balancing"]
+)
+def test_the_build_accepts_every_ingress_cloud_run_accepts(value: str) -> None:
+    result = _validate_shapes(INGRESS=value)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("value", ["", "public", "ALL", "internal-and-load-balancing"])
+def test_the_build_refuses_an_ingress_cloud_run_would_reject(value: str) -> None:
+    """A typo here fails AFTER the image is built and pushed, which is the most
+    expensive place in this file to learn a word is misspelled. The empty string
+    is in the list on purpose: every other dial reads blank as "take the default",
+    and this one has no default to take — `gcloud run deploy --ingress=` is an
+    error, not an omission."""
+    result = _validate_shapes(INGRESS=value)
+    assert result.returncode != 0
+
+
+@pytest.mark.parametrize("value", ["beta-1", "b", "beta.3_rc", "0"])
+def test_the_build_accepts_a_well_formed_membership_label(value: str) -> None:
+    result = _validate_shapes(STAGING_SUBJECT_GATE_REVISION=value)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    ("value", "why"),
+    [
+        pytest.param("Beta-1", "uppercase", id="uppercase"),
+        pytest.param("-beta", "leading hyphen", id="leading_punctuation"),
+        pytest.param("beta 1", "whitespace", id="whitespace"),
+        pytest.param("a" * 33, "past the length bound", id="too_long"),
+        pytest.param("0" * 64, "a subject digest in the label variable", id="a_digest"),
+    ],
+)
+def test_the_build_refuses_a_membership_label_that_is_not_one(value: str, why: str) -> None:
+    """The last case is the one the rule exists for.
+
+    The label is published verbatim on a public unauthenticated /version — which
+    answers while the service is UNREADY, so "readiness would refuse it" is not a
+    reason a bad value is safe to echo. A digest typed into the variable next to
+    the one that holds them would otherwise be published by the mistake that made
+    it unsafe. It fails the length bound rather than being named as a digest,
+    which is the same refusal for a smaller reason and the honest one to make.
+    """
+    result = _validate_shapes(STAGING_SUBJECT_GATE_REVISION=value)
+    assert result.returncode != 0, why
+    assert value not in result.stderr, "the refusal echoes the value it refused"
+
+
+def test_the_membership_label_is_declared_mapped_and_passed(
+    cloudbuild: dict[str, Any], deploy_step: dict[str, Any]
+) -> None:
+    """All three places, or the label is declared, mapped and never applied — and
+    a private staging revision fails readiness on a value the operator set."""
+    assert cloudbuild["substitutions"]["_STAGING_SUBJECT_GATE_REVISION"] == ""
+    assert (
+        "STAGING_SUBJECT_GATE_REVISION=${_STAGING_SUBJECT_GATE_REVISION}"
+        in deploy_step["env"]
+    )
+    script = "\n".join(deploy_step["args"])
+    names = re.search(r"NAMES = \((.*?)\)", script, re.S)
+    assert names is not None
+    assert '"STAGING_SUBJECT_GATE_REVISION"' in names.group(1)
+
+
+def test_the_release_states_the_gate_expectation_in_both_directions(
+    smoke_step: dict[str, Any],
+) -> None:
+    """An assertion that silently does not run is worse than one never asked for.
+
+    Production and every staging revision below `enforce` publish `enabled:
+    false`, and saying so out loud is what turns "the gate did not come up" from
+    a branch that quietly skips into a failed release. Keyed on the same two
+    conditions the deploy mounts the secret on, not on whether a label happens to
+    be set — a label without staging + enforce is already refused before the
+    deploy.
+    """
+    script = "\n".join(smoke_step["args"])
+    assert "--expect-gate-revision" in script
+    assert "--expect-no-gate" in script
+    assert "STAGING_SUBJECT_GATE_REVISION=${_STAGING_SUBJECT_GATE_REVISION}" in (
+        smoke_step["env"]
+    )
+    smoke_text = _SMOKE.read_text(encoding="utf-8")
+    for flag in ("--expect-gate-revision", "--expect-no-gate"):
+        assert flag in smoke_text, f"{flag} is passed by the build and unknown to the script"

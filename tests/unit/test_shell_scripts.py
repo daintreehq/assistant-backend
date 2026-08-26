@@ -212,3 +212,113 @@ def test_the_helper_analyzer_diagnoses_a_known_bad_script(tmp_path) -> None:
         encoding="utf-8",
     )
     test_no_script_calls_a_log_helper_it_never_defines(good)
+
+
+# ---------------------------------------------------------------------------
+# Publishing the service is a CUTOVER, not a side effect of finishing a setup.
+#
+# `bootstrap.sh` used to grant `allUsers roles/run.invoker` on every run —
+# ungated, unprompted, on a script whose own header says re-running it is how you
+# finish the setup. Since the server holds the upstream credential and funds
+# every turn from it, that published an open Daintree-funded model endpoint. The
+# binding is per-SERVICE, so it also published every no-traffic release
+# candidate's tag URL.
+#
+# These are static checks because CI runs no GCP project and never will. They are
+# worth having anyway: what they assert is an ORDER, and an order is exactly what
+# a well-meaning edit reverses.
+# ---------------------------------------------------------------------------
+
+BOOTSTRAP = REPO_ROOT / "infra" / "gcp" / "bootstrap.sh"
+
+
+def _command_lines(text: str) -> list[tuple[int, str]]:
+    """Lines that run something, rather than comment or print it.
+
+    `echo`/`printf`/`ok` are excluded because this file DOCUMENTS the commands it
+    declines to run — an operator is shown the revoke command and the cutover
+    invocation — and a scanner that could not tell an instruction from an
+    example would force the documentation out.
+    """
+    lines = []
+    for number, raw in enumerate(text.splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith(("echo ", "printf ", "ok ", "say ")):
+            continue
+        lines.append((number, raw))
+    return lines
+
+
+def test_bootstrap_does_not_publish_the_service_as_a_side_effect() -> None:
+    """The grant must sit behind the named cutover AND behind a posture check.
+
+    Typing the service name says "I mean to do this". It does not say the
+    revision in front of us is the one that was supposed to receive it, and those
+    two come apart during exactly the rollout this exists for — a cutover run
+    against yesterday's revision, or against staging while thinking of
+    production. So the posture is read back from the deployment before the
+    binding is created.
+    """
+    text = BOOTSTRAP.read_text(encoding="utf-8")
+    grants = [
+        (number, line)
+        for number, line in _command_lines(text)
+        if "--member=allUsers" in line
+    ]
+    assert len(grants) == 1, (
+        f"expected exactly one allUsers grant in bootstrap.sh, found {len(grants)}"
+    )
+    grant_line = grants[0][0]
+    preceding = "\n".join(text.splitlines()[: grant_line - 1])
+    assert 'PUBLIC_CUTOVER" != "$SERVICE"' in preceding, (
+        "the public grant is not behind the named-cutover confirmation"
+    )
+    assert "POSTURE_OK" in preceding, (
+        "the public grant does not read the deployed revision's posture first"
+    )
+    assert 'POSTURE_OK" != "ok"' in preceding, (
+        "the posture is read and never acted on before the grant"
+    )
+
+
+def test_bootstrap_never_writes_or_reads_the_membership_list() -> None:
+    """The gate secret is a list of digests of real user ids.
+
+    A generator here could only invent members, and a helper that took a subject
+    and hashed it would put a real user id into a shell history and a terminal
+    scrollback on the way to the only place it is supposed to exist. This script
+    creates the container and grants the read; publishing is an operator act.
+    """
+    text = BOOTSTRAP.read_text(encoding="utf-8")
+    assert "gcloud secrets create staging-allowed-subject-digests" in text, (
+        "bootstrap no longer creates the gate secret's shell"
+    )
+    for forbidden in (
+        "versions add staging-allowed-subject-digests",
+        "versions access",
+        "sha256sum",
+        "shasum",
+    ):
+        offending = [
+            line for _, line in _command_lines(text) if forbidden in line
+        ]
+        assert not offending, (
+            f"bootstrap.sh {forbidden!r}: it must neither synthesize nor read a "
+            f"subject or a digest ({offending})"
+        )
+
+
+def test_the_command_scanner_can_tell_an_instruction_from_an_example() -> None:
+    """Negative control for the two checks above.
+
+    Both scan for command lines and both pass over the real file, which proves
+    nothing until the scanner is shown distinguishing the two cases it exists to
+    separate — a printed revoke recipe, which must be allowed, and an actual
+    binding, which must be found.
+    """
+    printed = 'echo "  gcloud run services add-iam-policy-binding --member=allUsers"\n'
+    run = "gcloud run services add-iam-policy-binding --member=allUsers\n"
+    assert not [line for _, line in _command_lines(printed) if "allUsers" in line]
+    assert [line for _, line in _command_lines(run) if "allUsers" in line]

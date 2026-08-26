@@ -72,6 +72,22 @@ def _healthy_deployment() -> dict[str, Any]:
         "subscribe_url": "https://staging.daintree.org/subscribe",
         "access_token_seconds": ACCESS_TOKEN_SECONDS,
         "session_max_age_seconds": SESSION_MAX_AGE,
+        # The subject gate's SAFE projection — the only three facts /version
+        # publishes about it. A deployment at `open` has no gate: it decides
+        # nothing below `enforce`, because there is no subject to test.
+        "gate_enabled": False,
+        "gate_entries": 0,
+        "gate_revision": "",
+        # Whether the two FUNDED routes refuse an anonymous caller. A field
+        # rather than a constant, because the mutation that matters is a
+        # deployment that enforces everywhere cheap and serves the expensive
+        # pair to anybody — which is not a malformed deployment, just a wrong
+        # one, and looks identical from every other check in the script.
+        "funded_routes_refuse_anonymous": True,
+        # And how it refuses. A 401 carrying `invalid_request` means the SCHEMA
+        # rejected the body, which is what makes a naive "not 200" assertion
+        # vacuous: it would pass against a deployment with no door at all.
+        "anonymous_refusal_code": "auth_required",
     }
 
 
@@ -143,7 +159,15 @@ class _Handler(BaseHTTPRequestHandler):
                 {
                     "build_sha": d["build_sha"],
                     "protocol": {"min": 3, "max": 3},
-                    "posture": {"auth": d["auth_mode"], "entitlement": d["entitlement_mode"]},
+                    "posture": {
+                        "auth": d["auth_mode"],
+                        "entitlement": d["entitlement_mode"],
+                        "subject_gate": {
+                            "enabled": d["gate_enabled"],
+                            "entries": d["gate_entries"],
+                            "revision": d["gate_revision"],
+                        },
+                    },
                 },
             )
         elif path == "/v1/daintree/auth/config":
@@ -168,11 +192,23 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(404, {"error": {"code": "not_found"}})
 
     def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler's spelling
+        d = self.deployment
         path = self.path.split("?")[0]
         length = int(self.headers.get("content-length") or 0)
         raw = self.rfile.read(length) if length else b"{}"
         if self.headers.get("X-Daintree-Protocol") == "999":
             self._send(426, {"error": {"code": "unsupported_daintree_protocol"}})
+            return
+        # The two routes that SPEND. Under enforcement an anonymous caller must
+        # be refused BY THE DOOR — and the code says which: `auth_required` is a
+        # refusal, `invalid_request` is the schema objecting to the body, and
+        # only the first proves anything about authentication.
+        funded = path in ("/v1/daintree/respond", "/v1/daintree/tasks")
+        if funded and self._enforcing() and not self.headers.get("Authorization"):
+            if d["funded_routes_refuse_anonymous"]:
+                self._send(401, {"error": {"code": d["anonymous_refusal_code"]}})
+            else:
+                self._send(200, {"ok": True})
             return
         if path == "/v1/daintree/auth/verify":
             self._send(
@@ -212,8 +248,49 @@ def _serve(deployment: dict[str, Any]) -> Iterator[str]:
         server.server_close()
 
 
+def _expectation_args(intended: dict[str, Any]) -> list[str]:
+    """The flags `cloudbuild.yaml` would pass for the deployment it MEANT to make.
+
+    Derived from an INTENDED deployment rather than from the one actually
+    serving, which is the whole distinction the script is built on: expectations
+    are stated by the release, never discovered from the host. A mutation below
+    changes what is served and leaves this alone, so the gate is asked exactly
+    the question a release asks it.
+    """
+    args = [
+        "--expect-build-sha", intended["build_sha"],
+        "--expect-env", intended["environment"],
+        "--expect-posture", intended["auth_mode"],
+        "--expect-entitlement", intended["entitlement_mode"],
+    ]
+    if intended["configured"]:
+        args += [
+            "--expect-client-id", intended["client_id"],
+            "--expect-issuer", intended["issuer"],
+            "--expect-authorize-url", intended["authorization_endpoint"],
+            "--expect-token-url", intended["token_endpoint"],
+            "--expect-jwks-url", intended["jwks_uri"],
+            "--expect-scopes", ",".join(intended["scopes"]),
+            "--expect-account-url", intended["account_url"],
+            "--expect-subscribe-url", intended["subscribe_url"],
+            "--expect-access-token-seconds", str(intended["access_token_seconds"]),
+            "--expect-session-max-age", str(intended["session_max_age_seconds"]),
+        ]
+    else:
+        args.append("--expect-no-oauth")
+    # Both directions, like the OAuth pair: an unstated gate expectation is an
+    # assertion that silently does not run on the one deployment the gate is for.
+    if intended["gate_enabled"]:
+        args += ["--expect-gate-revision", intended["gate_revision"]]
+    else:
+        args.append("--expect-no-gate")
+    return args
+
+
 def _run_smoke_against(
-    deployment: dict[str, Any], *extra: str
+    deployment: dict[str, Any],
+    *extra: str,
+    intended: dict[str, Any] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """The real script, against a live fixture, with the release's expectations.
 
@@ -229,34 +306,7 @@ def _run_smoke_against(
             str(_SMOKE),
             "--url",
             url,
-            "--expect-build-sha",
-            BUILD_SHA,
-            "--expect-env",
-            "staging",
-            "--expect-posture",
-            "open",
-            "--expect-entitlement",
-            "off",
-            "--expect-client-id",
-            CLIENT_ID,
-            "--expect-issuer",
-            ISSUER,
-            "--expect-authorize-url",
-            f"{ISSUER}/authorize",
-            "--expect-token-url",
-            f"{ISSUER}/token",
-            "--expect-jwks-url",
-            f"{ISSUER}/.well-known/jwks.json",
-            "--expect-scopes",
-            "openid,email",
-            "--expect-account-url",
-            "https://staging.daintree.org/account",
-            "--expect-subscribe-url",
-            "https://staging.daintree.org/subscribe",
-            "--expect-access-token-seconds",
-            str(ACCESS_TOKEN_SECONDS),
-            "--expect-session-max-age",
-            str(SESSION_MAX_AGE),
+            *_expectation_args(intended or _healthy_deployment()),
             *extra,
         ]
         return subprocess.run(  # noqa: S603 - a script this repo owns, on fixed input
@@ -373,24 +423,100 @@ def test_a_deployment_with_no_oauth_passes_when_that_is_what_was_asked_for() -> 
     """
     deployment = _healthy_deployment()
     deployment["configured"] = False
-    gen = _serve(deployment)
-    url = next(gen)
-    try:
-        result = subprocess.run(  # noqa: S603 - a script this repo owns, on fixed input
-            [
-                "bash", str(_SMOKE), "--url", url,
-                "--expect-build-sha", BUILD_SHA,
-                "--expect-env", "staging",
-                "--expect-posture", "open",
-                "--expect-entitlement", "off",
-                "--expect-no-oauth",
-            ],
-            env={"PATH": os.environ["PATH"]},
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-    finally:
-        for _ in gen:
-            break
+    result = _run_smoke_against(deployment, intended=deployment)
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+
+
+# --- the enforcing deployment, which is where the funded routes are guarded ---
+#
+# Everything above runs against the anonymous door, because that is the posture
+# every deployment is in today. It leaves the enforcing half — the one the whole
+# staging rollout is heading for — checked by nothing, and the hole is specific:
+# under `enforce` the script skipped its entire content section, so the only
+# routes that SPEND Daintree's credential were never asked anything at all.
+
+
+def _enforcing_deployment() -> dict[str, Any]:
+    """A private staging deployment as it is supposed to come up: identity
+    enforced, entitlement enforced, a non-empty subject gate under a label."""
+    deployment = _healthy_deployment()
+    deployment.update(
+        {
+            "auth_mode": "enforce",
+            "entitlement_mode": "enforce",
+            "gate_enabled": True,
+            "gate_entries": 4,
+            "gate_revision": "beta-1",
+        }
+    )
+    return deployment
+
+
+def test_an_enforcing_deployment_passes_the_whole_gate() -> None:
+    """The accepting half of the posture the rollout ends in.
+
+    If this fails the gate refuses the cutover release, which blocks the rollout
+    rather than a bad deployment.
+    """
+    result = _run_smoke_against(
+        _enforcing_deployment(), intended=_enforcing_deployment()
+    )
+    assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    assert "FAIL" not in result.stdout, result.stdout
+
+
+#: One field wrong on an ENFORCING deployment. Each is a release accident the
+#: anonymous fixture above structurally cannot reach.
+_ENFORCING_MUTATIONS = [
+    pytest.param(
+        {"funded_routes_refuse_anonymous": False},
+        id="the_routes_that_spend_serve_anybody",
+    ),
+    pytest.param(
+        {"anonymous_refusal_code": "invalid_request"},
+        id="the_body_was_rejected_rather_than_the_caller",
+    ),
+    pytest.param({"gate_enabled": False}, id="the_private_beta_came_up_ungated"),
+    pytest.param({"gate_entries": 0}, id="the_gate_admits_nobody"),
+    pytest.param({"gate_revision": "beta-0"}, id="an_older_membership_list"),
+]
+
+
+@pytest.mark.parametrize("mutation", _ENFORCING_MUTATIONS)
+def test_the_gate_refuses_an_enforcing_deployment_that_is_wrong_in_one_field(
+    mutation: dict[str, Any],
+) -> None:
+    """The first two are the pair that makes the funded-route check worth having.
+
+    `funded_routes_refuse_anonymous: False` is a deployment that enforces on
+    everything cheap and serves `/respond` and `/tasks` to anybody — typed,
+    coherent, and an open Daintree-funded model endpoint.
+
+    `anonymous_refusal_code: invalid_request` is the subtler one and the reason
+    the bodies the script sends are valid: a 401 that came from schema validation
+    would satisfy any "did not succeed" assertion while proving nothing about
+    whether a door exists at all.
+    """
+    deployment = _enforcing_deployment()
+    deployment.update(mutation)
+    result = _run_smoke_against(deployment, intended=_enforcing_deployment())
+    assert result.returncode != 0, (
+        f"the gate accepted an enforcing deployment with {mutation}\n"
+        f"stdout:\n{result.stdout}"
+    )
+    assert "FAIL" in result.stdout
+
+
+def test_an_unexpected_gate_on_an_anonymous_deployment_is_refused() -> None:
+    """The other direction, and it is not symmetric noise.
+
+    `allowed_subject_digests()` parses whatever is mounted whether or not the
+    gate decides anything, so a membership secret attached to the wrong
+    deployment shows up in the entry count and nowhere else. Production may not
+    hold one at all.
+    """
+    deployment = _healthy_deployment()
+    deployment["gate_entries"] = 4
+    result = _run_smoke_against(deployment)
+    assert result.returncode != 0
+    assert "FAIL" in result.stdout
