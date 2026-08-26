@@ -698,6 +698,13 @@ async def test_an_over_age_cache_recovers_once_the_issuer_does() -> None:
     path made the one call able to clear the condition the one call the condition
     prevented. From the outside that is indistinguishable from the outage that
     caused it — every request answers `auth_dependency_unavailable`, forever.
+
+    THE BOUND NEVER MOVES HERE, and that is what makes this a regression test
+    rather than a description. An earlier version of it raised
+    `max_stale_seconds` before the recovery step, which left the cache no longer
+    over-age — so the ordinary soft-stale refresh path handled it and the old,
+    broken implementation passed too. Age is advanced by pushing `_fetched_at`
+    into the past instead, which is the only thing that happens in production.
     """
     private, jwk = _rsa_key("k1")
     calls: list[int] = []
@@ -710,39 +717,45 @@ async def test_an_over_age_cache_recovers_once_the_issuer_does() -> None:
         return httpx.Response(200, json={"keys": [jwk]})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    # `max_stale_seconds=0.0` puts the cache over its bound the instant it is
-    # filled, which is the only way to reach this path without waiting a day.
     cache = JwksCache(
-        url=JWKS_URL, client=client, ttl_seconds=0.0, min_refresh_seconds=0.0,
-        max_stale_seconds=0.0,
+        url=JWKS_URL, client=client, ttl_seconds=3600.0, min_refresh_seconds=0.0,
+        max_stale_seconds=3600.0,
     )
     verifier = SupabaseTokenVerifier(
         issuer=ISSUER, allowed_client_ids=frozenset({CLIENT_ID}), jwks=cache
     )
     token = _sign(private, _claims(), kid="k1")
     assert await verifier.verify(token)
+    assert len(calls) == 1
 
+    # A day of failed refreshes, compressed: the key set is now older than the
+    # deployment will honour, and the issuer is down.
+    cache._fetched_at = time.monotonic() - 7200.0
     healthy[0] = False
     with pytest.raises(TokenError) as exc:
         await verifier.verify(token)
     assert exc.value.code == "auth_dependency_unavailable"
-    during_outage = len(calls)
+    assert len(calls) == 2, (
+        "an over-age cache did not even attempt a refresh — this is the defect"
+    )
 
-    # The issuer comes back. Nothing else changes — no restart, no new object.
+    # The issuer comes back. Nothing else changes: same process, same cache
+    # object, same bound.
     healthy[0] = True
-    cache.max_stale_seconds = 3600.0
-    assert await verifier.verify(token), "an over-age cache never asked again"
-    assert len(calls) > during_outage, "recovery served a key without re-fetching"
+    assert await verifier.verify(token), "an over-age cache never recovered"
+    assert len(calls) == 3
 
 
 @pytest.mark.asyncio
 async def test_an_over_age_cache_keeps_asking_rather_than_giving_up() -> None:
-    """Each request past the bound attempts a refresh; none of them is answered
-    from the keys already held.
+    """Each request past the bound attempts a refresh, for as long as it lasts.
 
-    The rate limiter still applies — `min_refresh_seconds` is what stops this
-    becoming an amplifier pointed at a provider that is already struggling — so
-    the assertion is that asking HAPPENS, not that it happens every time.
+    "Recovers eventually" is not the same promise as "asks every time it is
+    allowed to", and only the second one bounds how long an outage outlives
+    itself. With the anti-amplification window open, three refused requests must
+    produce three attempts — an implementation that asked once and then gave up
+    would satisfy a weaker assertion while reintroducing the original defect for
+    every request after the first.
     """
     private, jwk = _rsa_key("k1")
     calls: list[int] = []
@@ -753,30 +766,38 @@ async def test_an_over_age_cache_keeps_asking_rather_than_giving_up() -> None:
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     cache = JwksCache(
-        url=JWKS_URL, client=client, ttl_seconds=0.0, min_refresh_seconds=0.0,
-        max_stale_seconds=0.0,
+        url=JWKS_URL, client=client, ttl_seconds=3600.0, min_refresh_seconds=0.0,
+        max_stale_seconds=3600.0,
     )
     verifier = SupabaseTokenVerifier(
         issuer=ISSUER, allowed_client_ids=frozenset({CLIENT_ID}), jwks=cache
     )
     token = _sign(private, _claims(), kid="k1")
     assert await verifier.verify(token)
+    cache._fetched_at = time.monotonic() - 7200.0
     for _ in range(3):
         with pytest.raises(TokenError) as exc:
             await verifier.verify(token)
         assert exc.value.code == "auth_dependency_unavailable"
-    assert len(calls) > 1, "the over-age cache stopped consulting the issuer"
+    assert len(calls) == 4, (
+        f"expected one attempt per over-age request, saw {len(calls) - 1} for 3 requests"
+    )
 
 
 @pytest.mark.asyncio
-async def test_an_over_age_key_is_never_served_even_when_it_is_the_right_one() -> None:
-    """The bound is enforced at the point of USE.
+async def test_a_suppressed_refresh_does_not_license_serving_the_held_key() -> None:
+    """A guard against the NAIVE fix, which is the tempting one.
 
-    `k1` is in hand, matches the token, and would verify. It is simply older than
-    the deployment is willing to trust, and a refresh that was suppressed by the
-    anti-amplification window earns no new permission to honour it — which is the
-    case a naive "attempt a refresh, then return whatever we have" rewrite gets
-    wrong, because the key is present on both sides of the failed attempt.
+    "Attempt a refresh, then return whatever we have" reads as obviously correct
+    and is not: the key is present on both sides of a refresh that never reached
+    the network, so the rewrite that forgets to re-check the age serves a key the
+    deployment has already decided it will not honour. `k1` here is in hand,
+    matches the token, and would verify — it is simply too old, and a refresh the
+    anti-amplification window swallowed earns no new permission to use it.
+
+    This one does not distinguish the new code from the old (the old code refused
+    before it could reach a refresh at all); it distinguishes the new code from a
+    plausible wrong version of itself.
     """
     private, jwk = _rsa_key("k1")
     calls: list[int] = []
@@ -787,18 +808,19 @@ async def test_an_over_age_key_is_never_served_even_when_it_is_the_right_one() -
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     cache = JwksCache(
-        url=JWKS_URL, client=client, ttl_seconds=0.0,
-        # An hour-long window: the second request's refresh is suppressed before
-        # it reaches the network, so the ONLY thing standing between the caller
-        # and a stale key is the age check on the return path.
+        url=JWKS_URL, client=client, ttl_seconds=3600.0,
+        # An hour-long window, so the second request's refresh is suppressed
+        # before it reaches the network and the ONLY thing between the caller and
+        # a stale key is the age check on the return path.
         min_refresh_seconds=3600.0,
-        max_stale_seconds=0.0,
+        max_stale_seconds=3600.0,
     )
     verifier = SupabaseTokenVerifier(
         issuer=ISSUER, allowed_client_ids=frozenset({CLIENT_ID}), jwks=cache
     )
     token = _sign(private, _claims(), kid="k1")
     assert await verifier.verify(token)
+    cache._fetched_at = time.monotonic() - 7200.0
     with pytest.raises(TokenError) as exc:
         await verifier.verify(token)
     assert exc.value.code == "auth_dependency_unavailable"
@@ -826,7 +848,7 @@ async def test_a_recovered_over_age_cache_reports_an_unknown_kid_as_a_token_verd
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     cache = JwksCache(
-        url=JWKS_URL, client=client, ttl_seconds=0.0, min_refresh_seconds=0.0,
+        url=JWKS_URL, client=client, ttl_seconds=3600.0, min_refresh_seconds=0.0,
         max_stale_seconds=3600.0,
     )
     verifier = SupabaseTokenVerifier(
@@ -835,10 +857,45 @@ async def test_a_recovered_over_age_cache_reports_an_unknown_kid_as_a_token_verd
     token = _sign(private_old, _claims(), kid="old")
     assert await verifier.verify(token)
     # Over the bound, and the successful refresh drops the key this token names.
-    cache.max_stale_seconds = 0.0
+    cache._fetched_at = time.monotonic() - 7200.0
     with pytest.raises(TokenError) as exc:
         await verifier.verify(token)
     assert exc.value.code == "auth_token_invalid"
+
+
+@pytest.mark.asyncio
+async def test_the_recovered_key_is_the_new_one_not_the_expired_reference() -> None:
+    """Same `kid`, different key material: no pre-refresh key escapes.
+
+    A caller that captured the key before waiting on the lock, or a branch that
+    returned the reference it read on the way in, would verify against the key
+    the issuer has just retired — which is the precise credential the hard bound
+    exists to stop honouring, now handed out by the recovery path meant to
+    enforce it.
+    """
+    private_old, jwk_old = _rsa_key("k1")
+    private_new, jwk_new = _rsa_key("k1")
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(200, json={"keys": [jwk_old if len(calls) == 1 else jwk_new]})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    cache = JwksCache(
+        url=JWKS_URL, client=client, ttl_seconds=3600.0, min_refresh_seconds=0.0,
+        max_stale_seconds=3600.0,
+    )
+    verifier = SupabaseTokenVerifier(
+        issuer=ISSUER, allowed_client_ids=frozenset({CLIENT_ID}), jwks=cache
+    )
+    assert await verifier.verify(_sign(private_old, _claims(), kid="k1"))
+    cache._fetched_at = time.monotonic() - 7200.0
+    # Signed by the key the issuer now publishes.
+    assert await verifier.verify(_sign(private_new, _claims(), kid="k1"))
+    # And the retired one no longer verifies anything.
+    with pytest.raises(TokenError):
+        await verifier.verify(_sign(private_old, _claims(), kid="k1"))
 
 
 @pytest.mark.asyncio
@@ -846,20 +903,27 @@ async def test_concurrent_callers_recover_an_over_age_cache_with_one_refresh() -
     """Five requests arrive against a cache past its bound. One fetch, five
     successes.
 
-    The single-flight lock already existed for the rotation path; this asserts the
-    over-age path goes through it rather than around it. Without the re-check
+    The single-flight lock already existed for the rotation path; this asserts
+    the over-age path goes through it rather than around it. Without the re-check
     inside the lock the four queued callers would each refresh again, and with a
     realistic `min_refresh_seconds` all four would then be refused for a key the
     first caller had just put in place — the same wrong-verdict failure the lock
     was introduced to remove.
+
+    The handler SUSPENDS, as the rotation test's does. A synchronous fixture lets
+    the first gathered task run the whole refresh before the others are scheduled,
+    so the callers never overlap and an implementation with no in-lock re-check
+    passes — the test would be asserting against a sequence it accidentally
+    serialised.
     """
     import asyncio
 
     private, jwk = _rsa_key("k1")
     calls: list[int] = []
 
-    def handler(request: httpx.Request) -> httpx.Response:
+    async def handler(request: httpx.Request) -> httpx.Response:
         calls.append(1)
+        await asyncio.sleep(0.05)
         return httpx.Response(200, json={"keys": [jwk]})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -875,10 +939,34 @@ async def test_concurrent_callers_recover_an_over_age_cache_with_one_refresh() -
     assert len(calls) == 1
 
     # Push the one successful fetch back past the hard bound without touching
-    # anything else, so the next callers meet an over-age cache and a provider
-    # that will answer.
+    # anything else, and reopen the refresh window so a recovery is permitted.
     cache._fetched_at = time.monotonic() - 7200.0
     cache._last_attempt_at = 0.0
     results = await asyncio.gather(*(verifier.verify(token) for _ in range(5)))
     assert all(results)
     assert len(calls) == 2, f"expected exactly one recovery fetch, saw {len(calls) - 1}"
+
+
+@pytest.mark.asyncio
+async def test_a_cold_cache_failure_under_load_releases_the_lock_for_everyone() -> None:
+    """`_refresh` RAISES rather than returns when there is nothing cached, and it
+    does so holding the single-flight lock.
+
+    An exception escaping a held lock is the shape of bug that turns one failed
+    fetch into a permanently wedged process — every subsequent caller waits on a
+    lock nobody will release, and the symptom is a hang rather than an error.
+    `async with` releases on the exception; this pins it, and pins that every
+    waiter gets the dependency error rather than a verdict about their token.
+    """
+    import asyncio
+
+    verifier, calls = _verifier(status=503, min_refresh_seconds=0.0)
+    private, _ = _rsa_key("k1")
+    token = _sign(private, _claims(), kid="k1")
+    outcomes = await asyncio.gather(
+        *(verifier.verify(token) for _ in range(5)), return_exceptions=True
+    )
+    assert len(outcomes) == 5
+    for outcome in outcomes:
+        assert isinstance(outcome, TokenError)
+        assert outcome.code == "auth_dependency_unavailable"
