@@ -62,7 +62,6 @@ from ..errors import (
     DaintreeError,
     account_rate_limited,
     auth_client_not_allowed,
-    auth_permission_denied,
     auth_session_revoked,
     entitlement_unavailable,
 )
@@ -192,6 +191,22 @@ class EntitlementContractError(Exception):
     dependency rather than a verdict about the caller. Every caller maps it to
     ``entitlement_unavailable``; keeping it a distinct type is what stops a future
     edit from mapping it to something about the account instead.
+    """
+
+
+class EntitlementGateDrift(EntitlementContractError):
+    """The website refused a subject this server's own gate had already admitted.
+
+    A subclass rather than a ``reason`` string on the parent, because the two say
+    different things to whoever is paged. The parent means the dependency answered
+    something we could not read — a malformed body, an HTML error page, a status
+    outside the contract. This one means the body was perfectly readable and we
+    declined it anyway: both sides enforce the same private-staging subject
+    allowlist, ours admitted this caller, theirs did not, so the two deployed
+    configurations disagree. Nothing about the request is wrong and no retry ladder
+    will fix it — an operator has to reconcile the two sets — which is exactly why
+    it wants its own event to alert on rather than one more line in the pile of
+    ordinary dependency noise.
     """
 
 
@@ -370,6 +385,22 @@ class EntitlementService:
             # cache bug that would matter here.
             self._invalidate(key)
             raise
+        except EntitlementGateDrift as exc:
+            # Ordered ABOVE its own base class, or the branch below would swallow
+            # it and the divergence would arrive as ordinary dependency noise.
+            self._invalidate(key)
+            logger.warning(
+                "entitlement_gate_drift",
+                request_id=request_id,
+                subject_hash=subject_hash,
+                # Same discipline as every other event here: a NAME for what
+                # happened, never a byte the website chose. The operator's next
+                # move is to compare the two configured allowlists, and no part of
+                # either belongs in a log line.
+                reason=str(exc),
+                duration_ms=round((time.monotonic() - started) * 1000),
+            )
+            unavailable = entitlement_unavailable()
         except EntitlementContractError as exc:
             self._invalidate(key)
             logger.warning(
@@ -499,14 +530,67 @@ class EntitlementService:
                 # behind a signature that still verifies is gone.
                 raise auth_session_revoked()
             if status == 403:
-                # The endpoint may name the narrower reason itself; honour it
-                # rather than telling somebody their OAuth client is unregistered
-                # when it is.
+                # The endpoint may name the narrower reason itself, and the two
+                # reasons it can name have stopped meaning the same kind of thing.
+                #
+                # `auth_permission_denied` from HERE can no longer be a fact about
+                # the caller. This server holds its own copy of the private-staging
+                # subject allowlist and `auth.py` refuses a non-member locally,
+                # before the principal is built and long before this request is
+                # opened — so a subject that reached this call was already approved
+                # by our copy of the set. The website enforcing the SAME contract
+                # and disagreeing therefore says one thing only: the two deployed
+                # configurations have drifted apart. That is a server
+                # misconfiguration, and telling the caller they need operator
+                # approval is both wrong and non-retryable — they would sit on a
+                # dead 403 for as long as an operator took to notice. It resolves
+                # to the retryable 503 instead, and the divergence is logged where
+                # the operator can see it.
+                #
+                # A 403 that does NOT name that code stays `auth_client_not_allowed`:
+                # the website genuinely refusing this OAuth client is real,
+                # actionable and nothing to do with the subject gate.
+                #
+                # The remap is unconditional while the LOCAL gate only runs under
+                # staging, so outside that posture "drift" is the wrong word for
+                # it — but not the wrong answer. A deployment whose own gate is
+                # inert has no way to tell the caller anything useful about a
+                # subject refusal it cannot reproduce, and the retryable 503 is
+                # the honest shape of not knowing.
                 if await _error_code_of(response) == "auth_permission_denied":
-                    raise auth_permission_denied()
+                    raise EntitlementGateDrift("permission_denied_403")
                 raise auth_client_not_allowed()
             if status == 429:
-                raise account_rate_limited(retry_after=_retry_after(response))
+                # Two very different throttles arrive with this status, and only
+                # one of them is about the account.
+                #
+                # The website deliberately rate-limiting an account publishes
+                # `account_rate_limited` in our envelope, and that is passed
+                # through unchanged — it is the only producer of that code in this
+                # server, and the CLI already knows what to do with it.
+                #
+                # Anything else is an edge throttle: a CDN or pre-function firewall
+                # limit that never reached the website's own code and answers with
+                # its own opaque body. That one counts requests by SOURCE IP, and
+                # this server runs on Cloud Run, so the address it is counting is
+                # the backend's shared egress IP rather than any caller's.
+                # Reporting it as `account_rate_limited` tells an innocent user
+                # they are making too many requests when what actually happened is
+                # that every user of this instance shares one address. It is a
+                # dependency we could not reach, which is what the retryable 503
+                # means.
+                #
+                # No `Retry-After` rides that 503, deliberately. The edge's value
+                # is real but it applies to the whole instance, so passing it on
+                # would hand every caller behind this server the same wake-up time
+                # and synchronise the herd against a dependency already refusing
+                # it — precisely the failure the taxonomy's own note in
+                # `errors.py` says a server-supplied delay causes. The account
+                # branch keeps its header because that value is scoped to one
+                # account, so there is no herd to synchronise.
+                if await _error_code_of(response) == "account_rate_limited":
+                    raise account_rate_limited(retry_after=_retry_after(response))
+                raise EntitlementContractError("edge_throttle_429")
             if status != 200:
                 raise EntitlementContractError(f"status_{status}")
 
@@ -542,10 +626,9 @@ async def _error_code_of(response: httpx.Response) -> str | None:
 def _retry_after(response: httpx.Response) -> str | None:
     """A ``Retry-After`` we are willing to pass on, or nothing.
 
-    Only the delta-seconds form, only when it is plausible. An HTTP-date is
-    ignored rather than converted: the conversion needs a trusted clock on both
-    ends, and the fallback — the client's own jittered backoff — is better than a
-    wrong number presented as authoritative.
+    Both legal forms, and only when the result is plausible. An implausible one
+    is dropped rather than clamped: the fallback — the client's own jittered
+    backoff — is better than a wrong number presented as authoritative.
     """
     raw = response.headers.get("retry-after")
     if raw is None:
@@ -561,9 +644,12 @@ def _retry_after(response: httpx.Response) -> str | None:
             # limit. Neither is a delay we can act on.
             return None
     else:
-        # The other legal form. Converted here rather than ignored, because a
-        # CDN in front of the website will send this one and dropping it would
-        # mean discarding the only real recovery estimate available.
+        # The other legal form. Converted here rather than ignored, because the
+        # website may answer in it and dropping it would mean discarding the only
+        # real recovery estimate available. Note the caller: only the ACCOUNT
+        # throttle reaches this function now, so the CDN this rationale used to
+        # name is no longer among the producers — an opaque edge delay is about
+        # the whole instance and is discarded with the status it arrived on.
         try:
             when = parsedate_to_datetime(value)
         except (TypeError, ValueError):

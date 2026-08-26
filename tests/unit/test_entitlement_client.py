@@ -203,18 +203,66 @@ async def test_a_403_means_the_oauth_client_is_not_accepted() -> None:
 
 
 @pytest.mark.asyncio
-async def test_a_403_may_name_the_narrower_reason_itself() -> None:
+async def test_a_403_naming_permission_denied_is_configuration_drift_not_a_verdict() -> None:
+    """The one thing that answer can no longer mean is something about the caller.
+
+    This server holds its own copy of the private-staging subject allowlist and
+    `auth.py` refuses a non-member before the lookup is ever opened, so a subject
+    that reached the website was already approved here. The website enforcing the
+    same contract and disagreeing therefore says the two deployed configurations
+    have drifted — an operator's problem, and one the caller could do nothing about
+    if we passed the non-retryable 403 through.
+    """
     service, _ = _service(
         _json_response({"error": {"code": "auth_permission_denied"}}, status=403)
     )
     with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
-    assert exc.value.code == "auth_permission_denied"
+    assert exc.value.code == "entitlement_unavailable"
+    assert exc.value.status_code == 503
+    assert exc.value.retryable is True
+    # The credential survives: nothing here challenges it or asks for a new one.
+    assert "WWW-Authenticate" not in exc.value.headers
 
 
 @pytest.mark.asyncio
-async def test_a_429_is_rate_limiting_and_passes_a_plausible_retry_after() -> None:
-    service, _ = _service(httpx.Response(429, headers={"retry-after": "30"}))
+async def test_gate_drift_is_logged_as_itself_with_nothing_from_the_body() -> None:
+    """An operator has to be able to alert on the divergence specifically.
+
+    It gets its own event rather than joining the ordinary dependency noise —
+    nothing retries its way out of two configurations disagreeing. And it carries
+    a NAME for what happened, never a byte the website chose.
+    """
+    hostile = "subject 8f14e45f is not on the staging allowlist"
+    service, _ = _service(
+        _json_response(
+            {"error": {"code": "auth_permission_denied", "message": hostile}},
+            status=403,
+        )
+    )
+    with capture_logs() as logs, pytest.raises(DaintreeError):
+        await _resolve(service)
+    (record,) = [line for line in logs if line["event"] == "entitlement_gate_drift"]
+    assert record["reason"] == "permission_denied_403"
+    assert record["request_id"] == "req-1"
+    assert hostile not in json.dumps(logs)
+
+
+@pytest.mark.asyncio
+async def test_a_429_naming_the_account_is_rate_limiting_and_passes_a_retry_after() -> None:
+    """The website deliberately throttling one account, passed through as itself.
+
+    This is the only producer of `account_rate_limited` in the server, and its
+    `Retry-After` is scoped to one account — so there is no herd to synchronise by
+    honouring it.
+    """
+    service, _ = _service(
+        _json_response(
+            {"error": {"code": "account_rate_limited"}},
+            status=429,
+            **{"retry-after": "30"},
+        )
+    )
     with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
     assert exc.value.code == "account_rate_limited"
@@ -229,10 +277,61 @@ async def test_an_implausible_retry_after_is_dropped_rather_than_clamped(value: 
     A number we do not believe is not evidence of a better one, so the client's
     own jittered backoff is left in charge.
     """
-    service, _ = _service(httpx.Response(429, headers={"retry-after": value}))
+    service, _ = _service(
+        _json_response(
+            {"error": {"code": "account_rate_limited"}},
+            status=429,
+            **{"retry-after": value},
+        )
+    )
     with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
+    assert exc.value.code == "account_rate_limited"
     assert "Retry-After" not in exc.value.headers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(429, headers={"retry-after": "30"}),
+        httpx.Response(429, content=b"<html>Too Many Requests</html>"),
+        _json_response({"error": {"code": "rate_limited"}}, status=429),
+        _json_response({"message": "slow down"}, status=429),
+    ],
+    ids=["bare", "html", "foreign-code", "no-envelope"],
+)
+async def test_an_opaque_429_is_an_edge_throttle_and_not_the_caller_s_fault(
+    response: httpx.Response,
+) -> None:
+    """An edge limit counts requests by SOURCE ADDRESS, and ours is shared.
+
+    A CDN or pre-function firewall throttle never reaches the website's own code,
+    so it answers with its own opaque body. This server runs on Cloud Run, so the
+    address being counted is one egress IP shared by every caller on the instance —
+    reporting it as `account_rate_limited` would tell an innocent user they are
+    sending too many requests. Its `Retry-After` is dropped for the mirror-image
+    reason: it applies to the whole instance, so honouring it would wake every
+    caller behind this server at the same second.
+    """
+    service, _ = _service(response)
+    with pytest.raises(DaintreeError) as exc:
+        await _resolve(service)
+    assert exc.value.code == "entitlement_unavailable"
+    assert exc.value.status_code == 503
+    assert exc.value.retryable is True
+    assert "Retry-After" not in exc.value.headers
+    assert "WWW-Authenticate" not in exc.value.headers
+
+
+@pytest.mark.asyncio
+async def test_an_edge_throttle_is_logged_without_the_edge_s_body() -> None:
+    hostile = "your IP 203.0.113.7 exceeded the limit"
+    service, _ = _service(httpx.Response(429, content=hostile.encode("utf-8")))
+    with capture_logs() as logs, pytest.raises(DaintreeError):
+        await _resolve(service)
+    assert any(line.get("reason") == "edge_throttle_429" for line in logs), logs
+    assert hostile not in json.dumps(logs)
 
 
 @pytest.mark.asyncio
@@ -1027,10 +1126,21 @@ async def test_a_slow_drip_response_is_bounded_by_wall_clock() -> None:
 
 @pytest.mark.asyncio
 async def test_an_http_date_retry_after_is_converted() -> None:
-    """A CDN in front of the website sends this form; dropping it would discard
-    the only real recovery estimate available."""
+    """The website may send this form; dropping it would discard the only real
+    recovery estimate available.
+
+    Carried on the ACCOUNT throttle, which is the only 429 whose delay is passed
+    on at all — an opaque edge throttle's delay is about the whole instance and is
+    dropped with the status.
+    """
     when = format_datetime(datetime.now(UTC) + timedelta(seconds=45), usegmt=True)
-    service, _ = _service(httpx.Response(429, headers={"retry-after": when}))
+    service, _ = _service(
+        _json_response(
+            {"error": {"code": "account_rate_limited"}},
+            status=429,
+            **{"retry-after": when},
+        )
+    )
     with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
     assert 30 <= int(exc.value.headers["Retry-After"]) <= 50
@@ -1039,9 +1149,16 @@ async def test_an_http_date_retry_after_is_converted() -> None:
 @pytest.mark.asyncio
 async def test_an_http_date_far_in_the_future_is_dropped() -> None:
     when = format_datetime(datetime.now(UTC) + timedelta(days=2), usegmt=True)
-    service, _ = _service(httpx.Response(429, headers={"retry-after": when}))
+    service, _ = _service(
+        _json_response(
+            {"error": {"code": "account_rate_limited"}},
+            status=429,
+            **{"retry-after": when},
+        )
+    )
     with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
+    assert exc.value.code == "account_rate_limited"
     assert "Retry-After" not in exc.value.headers
 
 
@@ -1176,10 +1293,32 @@ async def test_a_retry_after_we_cannot_read_is_dropped(value: str) -> None:
     (Unicode digits — "٣٠" — satisfy `isdigit()` too, and are not testable here:
     an HTTP header cannot carry them, so that branch is unreachable over the
     wire and the guard is belt-and-braces rather than a live path.)
+
+    Carried on the account throttle, the only 429 whose delay is read at all.
     """
-    service, _ = _service(httpx.Response(429, headers={"retry-after": value}))
+    service, _ = _service(
+        _json_response(
+            {"error": {"code": "account_rate_limited"}},
+            status=429,
+            **{"retry-after": value},
+        )
+    )
     with pytest.raises(DaintreeError) as exc:
         await _resolve(service)
+    assert exc.value.code == "account_rate_limited"
+    assert "Retry-After" not in exc.value.headers
+
+
+@pytest.mark.asyncio
+async def test_an_account_throttle_without_a_retry_after_is_still_a_throttle() -> None:
+    """The header is optional, and its absence says nothing about the verdict —
+    the client's own backoff takes over."""
+    service, _ = _service(
+        _json_response({"error": {"code": "account_rate_limited"}}, status=429)
+    )
+    with pytest.raises(DaintreeError) as exc:
+        await _resolve(service)
+    assert exc.value.code == "account_rate_limited"
     assert "Retry-After" not in exc.value.headers
 
 

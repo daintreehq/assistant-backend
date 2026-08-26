@@ -316,6 +316,135 @@ def test_a_revoked_session_is_reported_as_itself(
     assert fake_provider.requests == []
 
 
+def _json_website(payload: Any, status: int, **headers: str) -> _Website:
+    return _Website(
+        httpx.Response(
+            status,
+            content=json.dumps(payload).encode("utf-8"),
+            headers={"content-type": "application/json", **headers},
+        )
+    )
+
+
+def _drifted_403() -> _Website:
+    """The website refusing a subject this server's own gate already admitted."""
+    return _json_website({"error": {"code": "auth_permission_denied"}}, 403)
+
+
+def _edge_429() -> _Website:
+    """A CDN limit that never reached the website's code, counting a shared IP."""
+    return _Website(
+        httpx.Response(
+            429,
+            headers={"retry-after": "60", "content-type": "text/html"},
+            content=b"<html>Too Many Requests</html>",
+        )
+    )
+
+
+@pytest.mark.parametrize("path,body", [
+    ("/v1/daintree/respond", _respond_body()),
+    ("/v1/daintree/tasks", _task_body()),
+])
+@pytest.mark.parametrize("website_factory", [
+    pytest.param(_drifted_403, id="gate_drift"),
+    pytest.param(_edge_429, id="edge_throttle"),
+])
+def test_a_drifted_gate_and_an_edge_throttle_are_retryable_503s(
+    make_client: Any,
+    signing_key: Any,
+    fake_provider: Any,
+    path: str,
+    body: dict[str, Any],
+    website_factory: Any,
+) -> None:
+    """Neither is a fact about the caller, so neither may be reported as one.
+
+    The subject allowlist is enforced on BOTH sides and this server's copy refused
+    a non-member before the lookup opened, so a website `auth_permission_denied`
+    can only mean the two configurations disagree. An opaque edge 429 counts
+    requests against this server's shared Cloud Run egress address, not the
+    caller's. Telling the user either one is a non-retryable dead end about
+    something they did not do.
+    """
+    private, jwk = signing_key
+    website = website_factory()
+    client, _ = make_client("enforce", jwk, website)
+    response = _post(client, path, private, body)
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "entitlement_unavailable"
+    # The credential survives: no challenge, no logout signal, and no delay that
+    # would wake every caller behind this instance at the same second.
+    assert "WWW-Authenticate" not in response.headers
+    assert "Retry-After" not in response.headers
+    # And nothing was spent deciding it.
+    assert website.calls == 1
+    assert fake_provider.requests == []
+    assert fake_provider.stream_requests == []
+
+
+@pytest.mark.parametrize("website_factory", [
+    pytest.param(_drifted_403, id="gate_drift"),
+    pytest.param(_edge_429, id="edge_throttle"),
+])
+def test_a_drifted_gate_and_an_edge_throttle_never_open_a_stream(
+    make_client: Any, signing_key: Any, fake_provider: Any, website_factory: Any
+) -> None:
+    """The refusal lands before the SSE response is committed, as for every other
+    verdict — a 503 the reader can retry, not a stream that opens and apologises."""
+    private, jwk = signing_key
+    client, _ = make_client("enforce", jwk, website_factory())
+    body = _respond_body()
+    body["generation"] = {"stream": True}
+    response = client.post(
+        "/v1/daintree/respond",
+        json=body,
+        headers={"Authorization": f"Bearer {_token(private)}"},
+    )
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "entitlement_unavailable"
+    assert "text/event-stream" not in response.headers.get("content-type", "")
+    assert fake_provider.stream_requests == []
+    assert fake_provider.requests == []
+
+
+@pytest.mark.parametrize("path,body", [
+    ("/v1/daintree/respond", _respond_body()),
+    ("/v1/daintree/tasks", _task_body()),
+])
+def test_a_403_that_names_no_code_still_refuses_the_oauth_client(
+    make_client: Any, signing_key: Any, fake_provider: Any, path: str, body: dict[str, Any]
+) -> None:
+    """The remap is narrow on purpose. A website that genuinely does not accept
+    this OAuth client is telling us something real and actionable, and burying it
+    in the retryable 503 would leave a client retrying forever against a pairing
+    that will never be accepted."""
+    private, jwk = signing_key
+    client, _ = make_client("enforce", jwk, _Website(httpx.Response(403)))
+    response = _post(client, path, private, body)
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "auth_client_not_allowed"
+    assert fake_provider.requests == []
+
+
+def test_the_website_throttling_an_account_is_still_reported_as_itself(
+    make_client: Any, signing_key: Any, fake_provider: Any
+) -> None:
+    """The other half of the 429 split, and the reason it is a split at all: this
+    is the only producer of `account_rate_limited` in the server, and its delay is
+    scoped to one account rather than to a shared address."""
+    private, jwk = signing_key
+    website = _json_website(
+        {"error": {"code": "account_rate_limited"}}, 429, **{"retry-after": "45"}
+    )
+    client, _ = make_client("enforce", jwk, website)
+    response = _post(client, "/v1/daintree/respond", private, _respond_body())
+    assert response.status_code == 429
+    assert response.json()["error"]["code"] == "account_rate_limited"
+    assert response.headers["Retry-After"] == "45"
+    assert fake_provider.requests == []
+
+
 def test_enforce_without_a_client_fails_closed(
     make_client: Any, signing_key: Any, fake_provider: Any
 ) -> None:

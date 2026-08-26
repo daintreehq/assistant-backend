@@ -165,14 +165,37 @@ opens and then apologises. Under `enforce`:
 | no plan | `402 subscription_required` — open the `subscribe_url` from `/v1/daintree/auth/config` |
 | plan not currently granting | `402 subscription_inactive` — open the `account_url`; **not** an invitation to buy a second plan |
 | the billing authority refused the token | `401 auth_session_revoked` |
-| the billing authority refused the OAuth client | `403 auth_client_not_allowed` or `auth_permission_denied` |
-| too many requests | `429 account_rate_limited` |
+| the billing authority refused the OAuth client | `403 auth_client_not_allowed` |
+| the billing authority rate-limited this account | `429 account_rate_limited` |
 | we could not decide | `503 entitlement_unavailable`, retryable |
 
 **Uncertainty is never a verdict.** An outage, a timeout, a malformed answer and a
 contradictory one all resolve to `entitlement_unavailable`, and none of them is
 ever reported as "you have not paid". A paying customer told to buy a second plan
 during a billing outage is the failure this whole taxonomy exists to prevent.
+
+**Two answers that look like verdicts are treated as uncertainty as well**, and
+both are deliberate. A `403` from the billing authority naming
+`auth_permission_denied` is reported as `503 entitlement_unavailable`, not passed
+through: this server holds its own copy of the private-staging subject allowlist
+and refuses a non-member locally, before any lookup is opened, so a subject that
+reached the billing authority at all was already approved on this side. The two
+deployed configurations disagreeing is the only thing that answer can mean — a
+server misconfiguration an operator has to reconcile, and one no caller could act
+on if we told them about it. A `403` that does **not** name that code stays
+`403 auth_client_not_allowed`, because the billing authority refusing this OAuth
+client is real and actionable.
+
+A `429` is split the same way. One that names `account_rate_limited` in the
+Daintree error envelope is the billing authority throttling this account, and it
+is passed through, carrying its `Retry-After` when that header is one we can read and believe — the delta-seconds or HTTP-date forms, resolving to no
+more than five minutes. An opaque `429` — a CDN or edge firewall
+limit that never reached the website's own code — becomes
+`503 entitlement_unavailable` with no `Retry-After`, because an edge limit counts
+requests by source address and this server's address is one shared egress IP for
+every caller on the instance. Reporting it as `account_rate_limited` would tell an
+innocent user they are sending too many requests, and passing its delay on would
+wake every caller behind the instance at the same second.
 
 Verdicts are cached per instance for at most 60 seconds once granted and 15 once
 refused, and nothing uncertain is cached at all — so a paid request costs at most
@@ -524,10 +547,13 @@ literal is the only thing that catches that.
 Failures are reported as themselves rather than flattened into `unverified`:
 `401 auth_session_revoked` when the billing authority refuses a token that
 verified locally (it performs a fresh session check this server cannot),
-`403 auth_client_not_allowed` or `auth_permission_denied` when it refuses the
-OAuth client, `429 account_rate_limited`, and `503 entitlement_unavailable` for
-any outage, timeout or unreadable answer — including a deployment that has a URL
-configured but could not build a client for it. **An outage is never reported as
+`403 auth_client_not_allowed` when it refuses the OAuth client,
+`429 account_rate_limited` when it throttles the account itself, and
+`503 entitlement_unavailable` for any outage, timeout or unreadable answer —
+including a deployment that has a URL configured but could not build a client for
+it, a `403` naming `auth_permission_denied` (subject-allowlist drift between the
+two deployments, which this server's own gate has already ruled out as a fact
+about the caller), and an opaque edge `429` carrying no Daintree envelope. **An outage is never reported as
 "no subscription."**
 
 Every response — success and failure alike — is `Cache-Control: private, no-store`.

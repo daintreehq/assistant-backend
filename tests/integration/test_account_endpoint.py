@@ -416,13 +416,37 @@ def test_the_raw_subject_never_reaches_the_response_or_the_log(
 # --- the cases the first pass missed ----------------------------------------
 
 
+def _envelope(code: str, status: int, **headers: str) -> httpx.Response:
+    """A website answer that names its own error code in the Daintree envelope."""
+    return httpx.Response(
+        status,
+        content=json.dumps({"error": {"code": code}}).encode("utf-8"),
+        headers={"content-type": "application/json", **headers},
+    )
+
+
 @pytest.mark.parametrize(
     "entitlement,expected_status",
     [
         pytest.param(httpx.Response(401), 401, id="revoked"),
         pytest.param(httpx.Response(403), 403, id="client_not_allowed"),
-        pytest.param(httpx.Response(429, headers={"retry-after": "30"}), 429, id="rate_limited"),
+        pytest.param(
+            _envelope("account_rate_limited", 429, **{"retry-after": "30"}),
+            429,
+            id="rate_limited",
+        ),
         pytest.param(httpx.Response(503), 503, id="unavailable"),
+        # Neither of these is a fact about the caller. The website refusing a
+        # subject this server's own staging gate already admitted means the two
+        # configured allowlists have drifted; an opaque 429 with no Daintree
+        # envelope is an edge limit counting this server's shared egress address.
+        # Both are retryable dependency uncertainty.
+        pytest.param(_envelope("auth_permission_denied", 403), 503, id="gate_drift"),
+        pytest.param(
+            httpx.Response(429, headers={"retry-after": "60"}, content=b"<html>429</html>"),
+            503,
+            id="edge_throttle",
+        ),
     ],
 )
 def test_every_response_carries_the_cache_policy(
@@ -454,7 +478,9 @@ def test_a_rate_limit_preserves_its_retry_after_alongside_the_cache_policy(
 ) -> None:
     """The cache header is MERGED, not assigned — an error's own headers matter."""
     private, jwk = signing_key
-    client = make_client("enforce", jwk, httpx.Response(429, headers={"retry-after": "30"}))
+    client = make_client(
+        "enforce", jwk, _envelope("account_rate_limited", 429, **{"retry-after": "30"})
+    )
     response = client.get(
         "/v1/daintree/account",
         headers={"Authorization": f"Bearer {_token(private)}"},
@@ -462,6 +488,48 @@ def test_a_rate_limit_preserves_its_retry_after_alongside_the_cache_policy(
     assert response.headers["retry-after"] == "30"
     assert response.headers["cache-control"] == "private, no-store"
     assert _json(response)["error"]["code"] == "account_rate_limited"
+
+
+def test_a_drifted_gate_is_retryable_uncertainty_rather_than_an_identity_verdict(
+    make_client: Any, signing_key: Any
+) -> None:
+    """`/account` is where somebody looks to find out what is wrong, so it is the
+    worst place to answer with a verdict that is not true.
+
+    This server's own copy of the staging subject allowlist refused every
+    non-member before the lookup opened, so the website disagreeing can only be
+    configuration drift — and the credential must survive it untouched.
+    """
+    private, jwk = signing_key
+    client = make_client("enforce", jwk, _envelope("auth_permission_denied", 403))
+    response = client.get(
+        "/v1/daintree/account",
+        headers={"Authorization": f"Bearer {_token(private)}"},
+    )
+    assert response.status_code == 503
+    assert _json(response)["error"]["code"] == "entitlement_unavailable"
+    assert "www-authenticate" not in response.headers
+
+
+def test_an_edge_throttle_does_not_borrow_the_caller_s_name_or_its_delay(
+    make_client: Any, signing_key: Any
+) -> None:
+    """The address an edge limit counts is this server's shared Cloud Run egress
+    IP, so the delay it hands back is about the whole instance. Passing it on
+    would wake every caller behind this server at the same second."""
+    private, jwk = signing_key
+    client = make_client(
+        "enforce",
+        jwk,
+        httpx.Response(429, headers={"retry-after": "60"}, content=b"<html>429</html>"),
+    )
+    response = client.get(
+        "/v1/daintree/account",
+        headers={"Authorization": f"Bearer {_token(private)}"},
+    )
+    assert response.status_code == 503
+    assert _json(response)["error"]["code"] == "entitlement_unavailable"
+    assert "retry-after" not in response.headers
 
 
 def test_an_unready_service_still_answers(make_client: Any, signing_key: Any) -> None:
