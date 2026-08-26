@@ -79,11 +79,14 @@ code enforces:
   a cached JWKS (`services/supabase_auth.py`) rather than against its own shape —
   and the rest of the server did not move, which is what the seam was for. What
   remains a rollout decision is which mode a deployment runs; the shipped default
-  is `open`. What is NOT coming is the thing the old sentence left room for: an
-  account never maps to a credential of the caller's. It is an ENTITLEMENT to
-  spend Daintree's key, checked on a second and independently staged axis
-  (`ENTITLEMENT_MODE`, shipped `off`), so identity landing does not put a caller
-  key back on the request.
+  is `open`. What identity landing did NOT do is the thing the old sentence left
+  room for: an account does not map to a credential of the caller's. It is an
+  ENTITLEMENT to spend Daintree's key, checked on a second and independently
+  staged axis (`ENTITLEMENT_MODE`, shipped `off`). The present tense is
+  deliberate — `ProviderChatRequest.api_key` is kept alive and tested precisely
+  as the field a per-account credential would occupy, so "never" would
+  contradict a seam this codebase maintains on purpose. What is true today is
+  that nothing on the serving path fills it.
 
 ## 2a. The ACCOUNT credential
 
@@ -139,7 +142,7 @@ exception.
 | ~~Extraction~~ *(retired)* | ~~`Authorization: Bearer <token>` as a PROVIDER key~~ — a bearer is an account credential now, never a model one | `auth.py` |
 | ~~Structural validation~~ *(retired)* | ~~printable non-space ASCII, ≤ 4096 bytes~~ — the shape a bearer must have now lives in `services/bearer.py`, and it is stricter | `auth.py` |
 | ~~In-process form~~ *(retired)* | ~~`SecretStr` on a frozen `Principal`~~ — `Principal` holds an identity and no credential of any kind | `auth.Principal` |
-| Propagation | the SERVER's key, threaded as `ProviderChatRequest.api_key` to every provider call. `ProviderChatRequest.api_key` stays live and tested as the field an account-mapped credential will occupy | `providers/base.py` |
+| Propagation | the SERVER's key, installed ONCE as the provider's default when the container is built — the serving path sends no per-call key, so `/respond` passes none. `ProviderChatRequest.api_key` stays live and tested as the field a per-account credential would occupy, and `_resolve_key` prefers it over the default when one IS present; benchmarks and live tests are its only callers today | `providers/base.py`, `main._build_provider` |
 | Header construction | a fresh per-call header dict; the shared `httpx` client's own headers are never mutated, so concurrent calls carrying different keys cannot bleed into one another | `openrouter._headers` |
 | Malformed value | rejected in `_resolve_key` **before** httpx sees it — h11's `LocalProtocolError` embeds the offending header value verbatim and httpcore logs it at DEBUG, so the permissive path would leak the key into logs | `openrouter._resolve_key` |
 | Upstream error bodies | the credential is scrubbed out; if it is still recoverable after scrubbing (a doubly-encoded echo) the whole diagnostic is dropped | `openrouter._extract_upstream_error`, `_still_reveals` |
@@ -185,9 +188,13 @@ section is retired (§2), because rejecting a malformed bearer only ever warned 
 caller that the credential they meant to spend was not going to be spent.
 
 The probe still earns its place for the same reason it always did, one owner
-further along: without it, a serving credential that is expired, revoked, or
-simply never set first surfaces on a tester's first real turn — as an upstream 401
-that reads like their fault rather than the deployment's. The CLI calls it from
+further along: without it, a serving credential that is expired or revoked first
+surfaces on a tester's first real turn — as an upstream 401 that reads like their
+fault rather than the deployment's. Note the boundary, because the two failures
+are not the same: a credential never SET does not reach that state at all —
+`missing_secrets()` reports it, the instance stays unready, and `require_ready`
+answers 503 before any provider call is opened. Readiness checks PRESENCE; only
+the probe checks that the value still works. The CLI calls it from
 `doctor` (`cli/internal/backend/verify.go`), which is where an operator asks the
 question before a user does.
 

@@ -537,8 +537,14 @@ def usage_accounting_unavailable(
 # These four used to collapse into one 502 ``upstream_error``, which meant a
 # tester with an exhausted balance was told their credentials were rejected and
 # reasonably concluded their key was wrong. They are four different problems with
-# four different fixes, and the caller — who owns the key and pays the bill — is
-# the only one who can apply any of them.
+# four different fixes, and naming which one happened is the whole value.
+#
+# The OWNER of that key is this deployment, not the caller — the server holds the
+# upstream credential and funds every turn from it — so all four are operator
+# faults a caller can do nothing about. That is why the default messages describe
+# a deployment problem rather than telling somebody to rotate a key they do not
+# hold, and it is why `provider_invalid_api_key`'s outward 401 is wrong enough to
+# have its own TODO entry.
 #
 # None is retryable. Replaying a revoked key, an empty balance or a guardrail
 # denial reaches the same answer, slower; on the streaming path it also burns the

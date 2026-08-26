@@ -290,8 +290,10 @@ applied while leaving the service unhealthy is the worst outcome: the operator
 believes they have recovered and stops looking.
 
 The deployment mounts state-signing material (`STATE_SIGNING_KEY_CURRENT`,
-`STATE_SALT`) and the upstream credential (`TOGETHER_API_KEY`), which funds every
-turn. In production (`ENVIRONMENT=production`) the service fails readiness if a
+`STATE_SALT`) and both upstream credentials — `TOGETHER_API_KEY`, which funds
+every turn, and `CEREBRAS_API_KEY`, which funds the fast-response preamble. Four
+Secret Manager secrets, all server-owned; `bootstrap.sh` creates and grants all
+four. In production (`ENVIRONMENT=production`) the service fails readiness if a
 secret is weak or default (the packaged `STATE_SALT`, a signing key under 32
 characters), or if `TOGETHER_BASE_URL` is not the real `https://api.together.xyz`
 origin — the server key rides every request to that origin, so a typo'd or

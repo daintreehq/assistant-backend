@@ -20,7 +20,8 @@ The three modes are three different jobs, not three settings of one:
     nothing, denies nothing, and a request with no token — or a bad one — is
     served exactly as ``open`` would serve it. It exists to produce evidence
     against real traffic before anyone's request depends on the answer, in the
-    same shape the fast-response stage's ``shadow`` mode does.
+    same shape the fast-response stage's ``shadow`` mode HAD, before that stage went
+    single-mode and the mode was deleted.
 
 ``enforce``
     A verified credential is required. Failures are the account error family.
@@ -34,8 +35,11 @@ when it was minted".
 The entitlement lookup narrows that second gap where it runs, as a side effect
 rather than as a revocation check: ``services/entitlement.py`` maps a 401 from
 the website's endpoint — which is specified to perform a fresh Supabase user
-check — to ``auth_session_revoked``, which this module then dispatches like any
-other account failure. So the revocation window is the verdict cache's TTL on the
+check — to ``auth_session_revoked``. That error is raised and returned by the
+entitlement path itself (``api/paid_access.py`` and the account endpoint simply
+let it propagate); this module's own dispatch table covers ``TokenError`` from
+local JWT verification, which is a different failure with the same vocabulary.
+So the revocation window is the verdict cache's TTL on the
 routes that ask, and ``exp`` on the ones that do not. All three remain separate
 questions with separate failure modes, and merging any of them here is how an
 outage in one starts presenting as a verdict about another.

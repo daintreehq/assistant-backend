@@ -1,7 +1,10 @@
 """The doctor endpoint — one call that answers "why isn't this working?".
 
 An internal tester who hits a problem has three suspects and no way to tell them
-apart: their key, their build, or ours. Each is diagnosable, but only by asking
+apart: their build, this deployment's configuration, or the upstream we spend
+against. (Their KEY is no longer one of them — the server holds the upstream
+credential now — which is exactly why the provider section below reports on OUR
+key rather than asking about theirs.) Each is diagnosable, but only by asking
 three different endpoints and knowing which questions to ask. This asks all of
 them and returns one bundle a tester can paste into a support channel.
 
@@ -17,7 +20,7 @@ than failing the whole call.
 **It is safe to paste in public.** The bundle is assembled from an explicit
 allowlist of non-sensitive facts, never by serializing settings. It carries no
 prompt text, no runbook bodies, no tool schemas, no conversation content, and
-nothing derived from the caller's key — not even a prefix or a length. What it
+nothing derived from the serving key — not even a prefix or a length. What it
 does carry about the key is a verdict (``valid``/``usable``) obtained by asking
 the provider, which costs no tokens.
 
@@ -56,7 +59,8 @@ async def doctor(
 
     Deliberately NOT gated on ``require_ready`` — see the module docstring.
     Always 200 when the request authenticated: every finding, including "the
-    server is not ready" and "your key was rejected", is a successful diagnosis.
+    server is not ready" and "the deployment's upstream key was rejected", is a
+    successful diagnosis.
     Modelling those as HTTP errors would force the caller to distinguish a
     verdict from a failure to reach us out of status codes that mean both.
     """

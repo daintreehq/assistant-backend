@@ -70,8 +70,11 @@ dispatches on `AUTH_MODE`, a bearer is verified locally against a cached JWKS
 manifest a client needs in order to obtain one, and the CLI signs in through it.
 Entitlement is a second, independently staged axis on top of that
 (`ENTITLEMENT_MODE`, `services/entitlement.py`). Built is not the same as
-required: the shipped modes are `open` and `off`, so every deployment still
-serves anonymous requests and §7a is where the posture is decided. It is still
+required: the shipped DEFAULTS are `open` and `off`, so a deployment that has not
+been told otherwise still serves anonymous requests, and §7a is where the posture
+is decided. (A deployment can select `enforce` — the substitutions are per-trigger
+— so what the defaults establish is where a deployment STARTS, not where every one
+of them is.) It is still
 not a blocker — but for the opposite reason to everything left in the list above,
 where the work does not exist rather than merely being switched off.
 

@@ -1595,7 +1595,7 @@ class Settings(BaseSettings):
 
         Every entry here fails CLOSED — a misconfigured trace plane records
         nothing rather than recording the wrong thing to the wrong place. The
-        content gate is the one that matters most: there is no account model yet
+        content gate is the one that matters most: there is no CONSENT record
         and therefore no consent to rely on, so a hardened deployment asking for
         full content capture is refused outright rather than trusted.
         """
