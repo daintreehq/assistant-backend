@@ -108,6 +108,30 @@ substitutions:
   _AUTH_ACCESS_TOKEN_SECONDS: ''
   _AUTH_SESSION_MAX_AGE_SECONDS: ''
 
+  # The OPERATIONAL dials — the handful of settings CLAUDE.md carves out from the
+  # "one hardcoded optimum" rule because their right value is whatever production
+  # says this week, rather than a benchmarked answer.
+  #
+  # They are substitutions for a reason that is easy to miss and expensive to
+  # discover: the deploy below hands Cloud Run an `--env-vars-file`, which REPLACES
+  # the service's whole environment. That is deliberate — a flag removed from this
+  # file is removed from the service — but it also means an emergency
+  # `gcloud run services update --update-env-vars TOOL_PROJECTION_MODE=disabled`
+  # survives only until the next push to `main`, and then reverts in silence. A
+  # rollback lever that a routine release undoes is not a rollback lever.
+  # `.env.example` documents exactly that procedure, so the fix is to make the
+  # value settable HERE, where a release preserves it.
+  #
+  # EMPTY means "take config.py's default" — the Python filter below omits blank
+  # values rather than sending them — so the defaults here change nothing about
+  # what production runs today. Set them on the trigger to change a posture:
+  #   gcloud builds triggers run deploy-main \
+  #     --substitutions=_TOOL_PROJECTION_MODE=disabled
+  _TOOL_PROJECTION_MODE: ''
+  _TOOL_PROJECTION_ROLLOUT_PERCENT: ''
+  _MAIN_OUTPUT_LINT_ENABLED: ''
+  _EXPOSE_DEBUG_SELECTOR_REASON: ''
+
 options:
   logging: CLOUD_LOGGING_ONLY
   machineType: E2_HIGHCPU_8
@@ -221,6 +245,10 @@ steps:
       - 'DAINTREE_SUBSCRIBE_URL=${_DAINTREE_SUBSCRIBE_URL}'
       - 'AUTH_ACCESS_TOKEN_SECONDS=${_AUTH_ACCESS_TOKEN_SECONDS}'
       - 'AUTH_SESSION_MAX_AGE_SECONDS=${_AUTH_SESSION_MAX_AGE_SECONDS}'
+      - 'TOOL_PROJECTION_MODE=${_TOOL_PROJECTION_MODE}'
+      - 'TOOL_PROJECTION_ROLLOUT_PERCENT=${_TOOL_PROJECTION_ROLLOUT_PERCENT}'
+      - 'MAIN_OUTPUT_LINT_ENABLED=${_MAIN_OUTPUT_LINT_ENABLED}'
+      - 'EXPOSE_DEBUG_SELECTOR_REASON=${_EXPOSE_DEBUG_SELECTOR_REASON}'
     args:
       - -euo
       - pipefail
@@ -255,6 +283,43 @@ steps:
         case "$$ENTITLEMENT_MODE" in
           off|observe|enforce) ;;
           *) echo "ERROR: _ENTITLEMENT_MODE must be off|observe|enforce, got '$$ENTITLEMENT_MODE'." >&2
+             exit 1 ;;
+        esac
+        # The operational dials, checked for the same reason as the modes above and
+        # with one extra: these WITHHOLD capability from the model. A typo'd
+        # `TOOL_PROJECTION_MODE` would be refused by pydantic and fail /readyz, but
+        # the empty string is the value that means "use the default" and is
+        # therefore the one spelling that must pass here.
+        case "$$TOOL_PROJECTION_MODE" in
+          ''|disabled|shadow|enforced) ;;
+          *) echo "ERROR: _TOOL_PROJECTION_MODE must be disabled|shadow|enforced, got '$$TOOL_PROJECTION_MODE'." >&2
+             exit 1 ;;
+        esac
+        # A percentage, and the range matters more than the type: `enforced` at a
+        # value this check let through as 1000 is every session at once, which is
+        # the staged rollout's whole point defeated by a stray keystroke.
+        case "$$TOOL_PROJECTION_ROLLOUT_PERCENT" in
+          ''|0|100) ;;
+          [1-9]|[1-9][0-9]) ;;
+          *) echo "ERROR: _TOOL_PROJECTION_ROLLOUT_PERCENT must be 0-100, got '$$TOOL_PROJECTION_ROLLOUT_PERCENT'." >&2
+             exit 1 ;;
+        esac
+        # Booleans. Restricted to the two spellings a reader would write rather
+        # than every form pydantic accepts: `_MAIN_OUTPUT_LINT_ENABLED=no` parses
+        # fine and is a value nothing in this repo's documentation ever suggests.
+        #
+        # Written out twice rather than looped over an `eval` of the variable name:
+        # this step's whole design is that an operator-supplied value is only ever
+        # an ordinary quoted expansion, never something bash parses, and an `eval`
+        # in the middle of it is the one construct that could make that untrue.
+        case "$$MAIN_OUTPUT_LINT_ENABLED" in
+          ''|true|false) ;;
+          *) echo "ERROR: _MAIN_OUTPUT_LINT_ENABLED must be true|false, got '$$MAIN_OUTPUT_LINT_ENABLED'." >&2
+             exit 1 ;;
+        esac
+        case "$$EXPOSE_DEBUG_SELECTOR_REASON" in
+          ''|true|false) ;;
+          *) echo "ERROR: _EXPOSE_DEBUG_SELECTOR_REASON must be true|false, got '$$EXPOSE_DEBUG_SELECTOR_REASON'." >&2
              exit 1 ;;
         esac
         # The cross-field rule, checked here for the same reason the enums are:
@@ -477,6 +542,8 @@ steps:
             "SUPABASE_OAUTH_CLIENT_ID",
             "DAINTREE_ACCOUNT_URL", "DAINTREE_SUBSCRIBE_URL",
             "AUTH_ACCESS_TOKEN_SECONDS", "AUTH_SESSION_MAX_AGE_SECONDS",
+            "TOOL_PROJECTION_MODE", "TOOL_PROJECTION_ROLLOUT_PERCENT",
+            "MAIN_OUTPUT_LINT_ENABLED", "EXPOSE_DEBUG_SELECTOR_REASON",
         )
         env = {n: os.environ[n] for n in NAMES if os.environ.get(n, "").strip()}
         json.dump(env, os.sys.stdout, indent=1, sort_keys=True)

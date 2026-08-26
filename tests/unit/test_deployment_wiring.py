@@ -684,3 +684,147 @@ def test_the_deploy_actually_consumes_the_generated_env_file() -> None:
     text = _CLOUDBUILD.read_text(encoding="utf-8")
     assert "/workspace/env_vars.json" in text
     assert "--env-vars-file" in text
+
+
+#: The settings CLAUDE.md carves out of the "one hardcoded optimum" rule — the
+#: ones whose right value is whatever production says this week. Paired with the
+#: environment variable each must arrive as.
+_OPERATIONAL_DIALS = (
+    ("_TOOL_PROJECTION_MODE", "TOOL_PROJECTION_MODE"),
+    ("_TOOL_PROJECTION_ROLLOUT_PERCENT", "TOOL_PROJECTION_ROLLOUT_PERCENT"),
+    ("_MAIN_OUTPUT_LINT_ENABLED", "MAIN_OUTPUT_LINT_ENABLED"),
+    ("_EXPOSE_DEBUG_SELECTOR_REASON", "EXPOSE_DEBUG_SELECTOR_REASON"),
+)
+
+
+@pytest.mark.parametrize("substitution,env_name", _OPERATIONAL_DIALS)
+def test_every_operational_dial_survives_a_release(
+    cloudbuild: dict[str, Any],
+    deploy_step: dict[str, Any],
+    substitution: str,
+    env_name: str,
+) -> None:
+    """A rollback lever a routine release undoes is not a rollback lever.
+
+    `TOOL_PROJECTION_MODE` gates a behaviour that WITHHOLDS tools from the model,
+    and `.env.example` tells an operator to roll it back by updating the Cloud Run
+    service's environment — a config-only revision, no deploy. That advice was
+    true for exactly as long as nobody pushed to `main`: the deploy hands Cloud
+    Run an `--env-vars-file`, which REPLACES the whole environment, so a manual
+    `--update-env-vars` was silently reverted by the next release and the
+    projection came back on with nothing to show it had.
+
+    So the dial has to be settable in the file that does the replacing. Same three
+    places as an account setting: declared, mapped, passed.
+    """
+    assert substitution in cloudbuild["substitutions"], "not declared"
+    assert f"{env_name}=${{{substitution}}}" in deploy_step["env"], "not mapped to env"
+    script = "\n".join(deploy_step["args"])
+    names = re.search(r"NAMES = \((.*?)\)", script, re.S)
+    assert names is not None, "the NAMES tuple moved; this gate is now blind"
+    assert f'"{env_name}"' in names.group(1), "declared and mapped but never passed"
+
+
+@pytest.mark.parametrize("substitution,_env", _OPERATIONAL_DIALS)
+def test_an_operational_dial_defaults_to_taking_the_shipped_value(
+    cloudbuild: dict[str, Any], substitution: str, _env: str
+) -> None:
+    """Empty, so adding these changed no deployment.
+
+    The Python filter that builds the env file drops blank values, so an empty
+    substitution means the variable is never sent and `config.py`'s own default
+    is what the revision comes up with. Writing `shadow` here instead would be
+    the same value today and a second place to remember on the day it moves.
+    """
+    assert cloudbuild["substitutions"][substitution] == "", (
+        f"{substitution} pins a value that config.py should be deciding"
+    )
+
+
+def _dial_validation_script() -> str:
+    """The dial checks, extracted the same way and for the same reason.
+
+    Grepping for a `case` pattern proves the text is there. It does not prove the
+    pattern matches — `[1-9][0-9]` and `[1-9]|[0-9]` differ by one character and
+    by the whole rule — so this block is executed against real values below.
+    """
+    step = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "deploy-rc"
+    )
+    body: str = step["args"][-1]
+    start = body.index("# The operational dials, checked for the same reason")
+    end = body.index("# The cross-field rule", start)
+    block = body[start:end]
+    assert block.strip(), "the dial validation block extracted empty"
+    return block.replace("$$", "$")
+
+
+def _validate_dials(**values: str) -> subprocess.CompletedProcess[str]:
+    env = {
+        "PATH": os.environ["PATH"],
+        "TOOL_PROJECTION_MODE": "",
+        "TOOL_PROJECTION_ROLLOUT_PERCENT": "",
+        "MAIN_OUTPUT_LINT_ENABLED": "",
+        "EXPOSE_DEBUG_SELECTOR_REASON": "",
+    }
+    env.update(values)
+    return subprocess.run(  # noqa: S603 - a script this repo owns, run on fixed input
+        ["bash", "-c", _dial_validation_script()],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        pytest.param({}, id="all_empty_take_the_defaults"),
+        pytest.param({"TOOL_PROJECTION_MODE": "disabled"}, id="the_rollback"),
+        pytest.param({"TOOL_PROJECTION_MODE": "enforced"}, id="the_destination"),
+        pytest.param({"TOOL_PROJECTION_ROLLOUT_PERCENT": "0"}, id="halt_but_keep_measuring"),
+        pytest.param({"TOOL_PROJECTION_ROLLOUT_PERCENT": "1"}, id="first_stage"),
+        pytest.param({"TOOL_PROJECTION_ROLLOUT_PERCENT": "25"}, id="mid_stage"),
+        pytest.param({"TOOL_PROJECTION_ROLLOUT_PERCENT": "100"}, id="every_session"),
+        pytest.param({"MAIN_OUTPUT_LINT_ENABLED": "false"}, id="lint_off"),
+        pytest.param({"EXPOSE_DEBUG_SELECTOR_REASON": "true"}, id="debug_on"),
+    ],
+)
+def test_the_build_accepts_every_dial_setting_an_operator_would_use(
+    values: dict[str, str],
+) -> None:
+    """Each of these is a step in a documented procedure. Refusing one would send
+    an operator to edit the file during the incident the dial exists for."""
+    result = _validate_dials(**values)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        pytest.param({"TOOL_PROJECTION_MODE": "enabled"}, id="mode_plausible_wrong_word"),
+        pytest.param({"TOOL_PROJECTION_MODE": "Shadow"}, id="mode_wrong_case"),
+        pytest.param({"TOOL_PROJECTION_ROLLOUT_PERCENT": "1000"}, id="percent_stray_zero"),
+        pytest.param({"TOOL_PROJECTION_ROLLOUT_PERCENT": "-1"}, id="percent_negative"),
+        pytest.param({"TOOL_PROJECTION_ROLLOUT_PERCENT": "50%"}, id="percent_with_sign"),
+        pytest.param({"MAIN_OUTPUT_LINT_ENABLED": "no"}, id="bool_pydantic_would_take_it"),
+        pytest.param({"EXPOSE_DEBUG_SELECTOR_REASON": "1"}, id="bool_numeric"),
+    ],
+)
+def test_the_build_refuses_a_dial_value_that_would_deploy_something_else(
+    values: dict[str, str],
+) -> None:
+    """`1000` is the one that matters: `enforced` at a percentage this let through
+    is every session at once, which is the staged rollout defeated by a keystroke.
+
+    `no` and `1` are the other shape — pydantic accepts both, so readiness would
+    pass and the revision would come up with a posture nothing in this repo's
+    documentation describes.
+    """
+    result = _validate_dials(**values)
+    assert result.returncode != 0, (
+        f"accepted {values}, which reaches the revision as a value nothing checked"
+    )
