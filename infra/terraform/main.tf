@@ -3,9 +3,11 @@
 #
 # `cloudbuild.yaml` is the deployment — pushing to `main` builds, deploys a
 # no-traffic candidate, smokes it and promotes it. This module cannot express the
-# posture that pipeline enforces: AUTH_MODE, ENTITLEMENT_MODE,
-# DAINTREE_ENTITLEMENT_URL, the Supabase issuer/JWKS/OAuth client and the subject
-# gate are all absent here. It sets exactly one literal env var (ENVIRONMENT) and
+# posture that pipeline carries: AUTH_MODE, ENTITLEMENT_MODE,
+# DAINTREE_ENTITLEMENT_URL and the Supabase issuer/JWKS/OAuth client are all
+# absent here, as is the private-staging subject gate — which the pipeline does
+# not mount yet either, so that one is a gap on both sides rather than a thing
+# this file is merely missing. It sets exactly one literal env var (ENVIRONMENT) and
 # mounts four secrets, so a service built from this file comes up calling itself
 # a real deployment while the application falls back to AUTH_MODE=open — an
 # anonymous, Daintree-funded model endpoint. That is the defect the gate below
@@ -169,9 +171,13 @@ resource "google_cloud_run_v2_service" "service" {
         path. allow_unauthenticated must stay false and ingress must be
         INGRESS_TRAFFIC_INTERNAL_ONLY or INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER.
 
-        A publicly invokable service needs AUTH_MODE=enforce, ENTITLEMENT_MODE=enforce
-        and DAINTREE_ENTITLEMENT_URL, none of which this module can set. Deploy via
-        cloudbuild.yaml instead.
+        What a publicly invokable service needs depends on what it is for, and this
+        module can express none of it: AUTH_MODE, ENTITLEMENT_MODE and
+        DAINTREE_ENTITLEMENT_URL are all absent here, so whatever you build answers
+        anonymously. (Those two modes are staged on INDEPENDENT axes and the public
+        production service deliberately runs open/off today; private staging is the
+        posture that needs both enforced. Either way the choice is made in
+        cloudbuild.yaml, not here.) Deploy via cloudbuild.yaml instead.
       EOT
     }
 

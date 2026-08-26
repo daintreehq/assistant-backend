@@ -379,10 +379,16 @@ def auth_permission_denied(
     accepted sends whoever reads the log looking for a configuration error that
     does not exist.
 
-    Unreachable today: every allowlisted client holds the whole permission set, so
-    only a second client with a narrower grant can produce this. Defined now
-    because the alternative was to let the wrong code be correct-by-accident until
-    that client existed.
+    Two things reach it, and only one of them is about a client. The private-staging
+    subject gate (``auth.py``, under ``ENVIRONMENT=staging`` with
+    ``AUTH_MODE=enforce``) refuses a verified identity the operator never approved —
+    a question about a PERSON, which is why the remedy is operator approval rather
+    than signing in again or buying a plan. ``require_permission`` asks the other
+    question, about what an OAuth CLIENT may do, and is still unreachable: every
+    allowlisted client holds the whole permission set, so only a second client with
+    a narrower grant would produce it. That half was defined ahead of its caller
+    because the alternative was letting the wrong code be correct-by-accident until
+    such a client existed.
     """
     return DaintreeError(
         status_code=403,

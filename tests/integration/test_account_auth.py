@@ -11,7 +11,9 @@ on in front of real traffic.
 from __future__ import annotations
 
 import json
+import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -21,6 +23,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 
+import daintree_assistant_server.api
 from daintree_assistant_server.config import Settings
 from daintree_assistant_server.main import create_app
 from daintree_assistant_server.services.supabase_auth import (
@@ -500,6 +503,123 @@ def _member_list() -> str:
     from daintree_assistant_server.auth import subject_digest
 
     return subject_digest(str(GATE_SUBJECT)) + "\n"
+
+
+#: EVERY route that resolves an identity, with a body where one is required. The
+#: gate's whole security claim is that ``authenticate()`` is the single chokepoint
+#: through which a `Principal` is built — so a route added later that verifies a
+#: token by some other means would be a hole no test above would notice, because
+#: they all drive `/capabilities` and the two funded routes. This table is the
+#: cheapest thing that fails when that happens.
+#:
+#: `/doctor` and `/auth/verify` earn their place twice over: both reach the
+#: provider, and both are excluded from the paid-access gate because their key
+#: probe is tokenless and spends nothing. "Spends nothing" is a reason to skip
+#: BILLING, never a reason to skip identity.
+GATED_ROUTES = [
+    ("GET", "/v1/daintree/capabilities", None),
+    ("GET", "/v1/daintree/runbooks", None),
+    ("GET", "/v1/daintree/account", None),
+    ("POST", "/v1/daintree/runbooks/resolve", {"input": {"messages": []}}),
+    ("POST", "/v1/daintree/auth/verify", {}),
+    ("POST", "/v1/daintree/doctor", {}),
+    ("POST", "/v1/daintree/respond", _respond_body()),
+    ("POST", "/v1/daintree/tasks", _task_body()),
+]
+
+
+@pytest.mark.parametrize("method,path,body", GATED_ROUTES)
+def test_no_authenticated_route_admits_a_subject_nobody_approved(
+    make_gate_client: Any, signing_key: Any, method: str, path: str, body: Any
+) -> None:
+    """The invariant the whole gate rests on, stated once over the whole surface.
+
+    A refusal that holds on the two expensive routes and nowhere else is not a
+    private deployment — it is a public one with an expensive wing. Ungated does
+    not mean free: `/runbooks/resolve` runs the local classifier, `/doctor` and
+    `/auth/verify` reach the provider through its tokenless probe, and every one of
+    them tells a caller something about a deployment they were not invited to.
+
+    Deliberately parametrized over the ROUTE TABLE rather than asserting a
+    property of `authenticate()`. The chokepoint argument is a claim about
+    wiring — that nothing else builds a `Principal` — and wiring is exactly what a
+    unit test of the chokepoint cannot see.
+    """
+    private, jwk = signing_key
+    client = make_gate_client(jwk, digests=_member_list())
+    headers = {"Authorization": f"Bearer {_token(private, sub=str(STRANGER))}"}
+    response = (
+        client.get(path, headers=headers)
+        if method == "GET"
+        else client.post(path, json=body, headers=headers)
+    )
+    assert response.status_code == 403, f"{method} {path} admitted an unapproved subject"
+    assert response.json()["error"]["code"] == "auth_permission_denied", f"{method} {path}"
+    # No challenge: a refresh mints another token with exactly the same authority,
+    # so inviting one would loop a client that cannot win.
+    assert "WWW-Authenticate" not in response.headers, f"{method} {path}"
+
+
+#: Routes that deliberately answer without an identity, each with the reason it
+#: has to. Anything not here and not in ``GATED_ROUTES`` is unclassified, which is
+#: the state this pairing exists to make impossible.
+#:
+#: ``POST /v1/daintree/runbooks/reload`` is deliberately absent from both: it is
+#: not declared with a decorator here, it is mounted only when a runbook overlay
+#: directory is configured, and readiness refuses an overlay in a hardened
+#: environment — so it cannot coexist with a gate that only runs in ``staging``.
+UNAUTHENTICATED_ROUTES = {
+    "/": "a browser or link previewer hitting the bare origin, which has no client",
+    "/healthz": "Cloud Run's own liveness probe, which carries no credential",
+    "/health": "the externally reachable twin of /healthz — Google reserves /healthz",
+    "/readyz": "the release gate probes it before a candidate can take traffic",
+    "/version": "the release gate compares build_sha against the commit it deployed",
+    "/v1/daintree/auth/config": "how a signed-out client learns where to sign in",
+}
+
+
+def test_every_api_route_is_classified_as_gated_or_deliberately_public() -> None:
+    """The table above is hand-written, and a hand-written list of routes is wrong
+    the moment somebody adds one.
+
+    Read against the SOURCE rather than the built app on purpose. FastAPI resolves
+    included routers lazily here — ``app.routes`` holds `_IncludedRouter` objects
+    with no ``path`` until a request is served — so walking the app finds nothing
+    and a test written that way passes by discovering zero routes, which is the
+    exact failure it was supposed to catch. The decorators are the honest source.
+    """
+    api = Path(daintree_assistant_server.api.__file__).parent
+    decorator = re.compile(r"@router\.(get|post|put|patch|delete|api_route)\(\s*\"([^\"]+)\"")
+    declared: set[str] = set()
+    for module in sorted(api.glob("*.py")):
+        declared |= {
+            path for _, path in decorator.findall(module.read_text(encoding="utf-8"))
+        }
+    assert declared, "no @router decorators found — this scan has stopped scanning"
+
+    classified = {path for _, path, _ in GATED_ROUTES} | set(UNAUTHENTICATED_ROUTES)
+    unclassified = declared - classified
+    assert not unclassified, (
+        "these API routes are in neither GATED_ROUTES nor UNAUTHENTICATED_ROUTES, so "
+        "nothing says whether the staging subject gate refuses an unapproved caller "
+        "on them:\n  " + "\n  ".join(sorted(unclassified))
+    )
+    stale = classified - declared
+    assert not stale, (
+        "these paths are classified but no longer exist, so their assertions are "
+        "testing nothing:\n  " + "\n  ".join(sorted(stale))
+    )
+
+
+def test_the_route_classification_scan_would_notice_a_new_route() -> None:
+    """The negative control. The scan above is a regex over source text, and a
+    regex that has quietly stopped matching reports a clean bill of health."""
+    decorator = re.compile(r"@router\.(get|post|put|patch|delete|api_route)\(\s*\"([^\"]+)\"")
+    found = decorator.findall('@router.post("/v1/daintree/newly-added")\n')
+    assert found == [("post", "/v1/daintree/newly-added")]
+    assert "/v1/daintree/newly-added" not in (
+        {path for _, path, _ in GATED_ROUTES} | set(UNAUTHENTICATED_ROUTES)
+    )
 
 
 def test_the_gate_admits_the_subject_the_operator_named(

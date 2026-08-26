@@ -375,7 +375,7 @@ def test_no_default_combination_publishes_a_provider_funded_service() -> None:
     )
 
 
-def test_an_acknowledged_apply_still_cannot_publish_the_service() -> None:
+def test_an_acknowledged_apply_creates_no_public_binding() -> None:
     """The second and third preconditions, and the reason the first is not enough.
 
     An acknowledgement variable is a thing operators set. What it buys has to stay
@@ -383,6 +383,16 @@ def test_an_acknowledged_apply_still_cannot_publish_the_service() -> None:
     condition, because either alone is sufficient exposure: the IAM binding
     removes Google's gate, public ingress removes the network one, and this module
     has no application gate to fall back on.
+
+    Note what this does NOT claim, because the earlier name for it did. These
+    preconditions read this module's own INPUTS; they cannot see the world. An
+    acknowledged apply aimed at a service that already carries an external load
+    balancer and an `allUsers` binding made somewhere else — `infra/gcp/bootstrap.sh`
+    makes exactly such a binding — still updates a service the public can reach,
+    and Terraform cannot revoke what it does not manage. `environment = "staging"`
+    is likewise an application label and not proof that the project or service is
+    not the production one. What is actually guaranteed is narrower and still worth
+    having: nothing here CREATES a public binding or public ingress.
 
     Ingress is matched as an ALLOWLIST. A `!= "INGRESS_TRAFFIC_ALL"` denylist reads
     as equivalent and is not: the provider accepts an empty ingress string, omits
