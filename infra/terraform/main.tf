@@ -1,9 +1,19 @@
-# Skeleton Terraform for the Daintree Assistant Server on Cloud Run.
+# DEPRECATED: this is not how the Daintree Assistant Server is deployed, and an
+# apply from here fails at plan time unless it is explicitly acknowledged.
 #
-# This is an illustrative skeleton, not an applied configuration. It shows the
-# recommended topology (Cloud Run v2 + external Application Load Balancer +
-# Secret Manager). Secret VALUES are never stored in Terraform state — only
-# references to Secret Manager versions.
+# `cloudbuild.yaml` is the deployment — pushing to `main` builds, deploys a
+# no-traffic candidate, smokes it and promotes it. This module cannot express the
+# posture that pipeline enforces: AUTH_MODE, ENTITLEMENT_MODE,
+# DAINTREE_ENTITLEMENT_URL, the Supabase issuer/JWKS/OAuth client and the subject
+# gate are all absent here. It sets exactly one literal env var (ENVIRONMENT) and
+# mounts four secrets, so a service built from this file comes up calling itself
+# a real deployment while the application falls back to AUTH_MODE=open — an
+# anonymous, Daintree-funded model endpoint. That is the defect the gate below
+# exists to stop; the file is kept as a TOPOLOGY SKETCH (Cloud Run v2 + external
+# Application Load Balancer + Secret Manager, with secret VALUES never in
+# Terraform state), not as a second way to ship.
+#
+# See README.md, and infra/gcp/ for the scripts that support the real path.
 
 terraform {
   required_version = ">= 1.5.0"
@@ -111,12 +121,90 @@ resource "google_cloud_run_v2_service" "service" {
     # below this value. Keep the two coupled; Cloud Run's own ceiling is 3600s.
     timeout = "1800s"
   }
+
+  # The gate. `precondition` is evaluated during PLAN, so an unacknowledged apply
+  # is refused before Terraform proposes a single resource — a variable default,
+  # not a runtime check the operator discovers from a 503 afterwards. There is no
+  # terraform binary in CI and no gate exercises this module's safety properties,
+  # which is precisely why the refusal has to live in the file an operator runs
+  # rather than in prose beside it.
+  lifecycle {
+    precondition {
+      condition     = var.acknowledge_unsupported_terraform_path
+      error_message = <<-EOT
+        This Terraform path is DEPRECATED and unsupported. Deploy via cloudbuild.yaml
+        (push to main); infra/gcp/ holds the supporting scripts.
+
+        This module cannot express the posture a served deployment requires: it sets
+        no AUTH_MODE, no ENTITLEMENT_MODE, no DAINTREE_ENTITLEMENT_URL, no Supabase
+        issuer/JWKS/OAuth client and no subject gate, so the application falls back
+        to AUTH_MODE=open and serves anonymous requests funded by Daintree's own
+        Together key.
+
+        If you understand that and want the private skeleton anyway, set
+        acknowledge_unsupported_terraform_path = true. The remaining preconditions
+        still refuse a public or production apply -- but note what they do NOT
+        change: whatever you build mounts the server's own TOGETHER_API_KEY and
+        runs AUTH_MODE=open, so every request that reaches it is anonymous and
+        billed to Daintree. The gates restrict reachability, not the bill.
+      EOT
+    }
+
+    # Acknowledgement buys a PRIVATE skeleton, never a published one. Both levers
+    # are checked together because either one alone is enough to expose the
+    # service: allUsers on run.invoker removes the IAM gate, public ingress
+    # removes the network one, and this module has no application gate to fall
+    # back on.
+    #
+    # Ingress is an ALLOWLIST rather than a `!= "INGRESS_TRAFFIC_ALL"`. The
+    # provider accepts an empty ingress string and omits the field from the create
+    # request, so the API's own default — all ingress — is what the service gets:
+    # a public service produced by a value a denylist reads as harmless.
+    precondition {
+      # Deliberately one line, long as it is: this expression IS the safety
+      # property, and tests/unit/test_infra_drift.py compares it verbatim.
+      condition     = !var.allow_unauthenticated && contains(["INGRESS_TRAFFIC_INTERNAL_ONLY", "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"], var.ingress)
+      error_message = <<-EOT
+        Refusing to publish a provider-funded service from the deprecated Terraform
+        path. allow_unauthenticated must stay false and ingress must be
+        INGRESS_TRAFFIC_INTERNAL_ONLY or INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER.
+
+        A publicly invokable service needs AUTH_MODE=enforce, ENTITLEMENT_MODE=enforce
+        and DAINTREE_ENTITLEMENT_URL, none of which this module can set. Deploy via
+        cloudbuild.yaml instead.
+      EOT
+    }
+
+    # ENVIRONMENT is refused here rather than in a `validation` block on the
+    # variable so that `terraform destroy` still works for whoever already applied
+    # one: variable validation is an error on every operation, while a resource
+    # precondition is downgraded to a warning during destroy planning.
+    precondition {
+      condition     = contains(["development", "test", "staging"], var.environment)
+      error_message = <<-EOT
+        This path may not build the production service — cloudbuild.yaml does, and it
+        is the only place the production posture (AUTH_MODE, ENTITLEMENT_MODE,
+        DAINTREE_ENTITLEMENT_URL, the Supabase client) is expressed at all.
+
+        ENVIRONMENT must be development, test or staging. Note that "staging" is
+        hardened by the application exactly as "production" is, so it costs nothing
+        in strictness.
+      EOT
+    }
+  }
 }
 
-# Staging: make the direct *.run.app URL reachable with NO credential at all —
-# the application does not read one (see auth.py) and this removes the IAM one.
-# Set allow_unauthenticated = false once the service sits behind the load
-# balancer / IAP and Google IAM gates invocation.
+# Kept only so the refusal above has a resource to name. It is unreachable in
+# practice: `allow_unauthenticated` defaults false, and the precondition on the
+# service refuses true, so this binding never has an instance. Granting allUsers
+# roles/run.invoker would remove the only gate this module can place in front of
+# the service — the application's own posture is AUTH_MODE, which lives in
+# cloudbuild.yaml — leaving an anonymous request served and billed to us.
+#
+# Note what `count = 0` does NOT say: it declines to create THIS binding, and
+# asserts nothing about an allUsers grant made elsewhere. infra/gcp/bootstrap.sh
+# makes exactly such a grant. Terraform cannot revoke a binding it does not
+# manage, so a service that was public before is still public after.
 resource "google_cloud_run_v2_service_iam_member" "invoker" {
   count    = var.allow_unauthenticated ? 1 : 0
   name     = google_cloud_run_v2_service.service.name
@@ -125,10 +213,11 @@ resource "google_cloud_run_v2_service_iam_member" "invoker" {
   member   = "allUsers"
 }
 
-# PRODUCTION EDGE (deferred): for assistant.daintree.org, set
-# ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER", allow_unauthenticated =
-# false, and add a global external Application Load Balancer — global IP, a
-# serverless NEG targeting this service, backend service, URL map, HTTPS proxy,
-# a Google-managed certificate for var.domain, a forwarding rule, a DNS A
-# record, and optionally Cloud Armor. Do NOT enable CDN caching on authenticated
-# routes. See infra/terraform/README.md.
+# PRODUCTION EDGE: NOT from here. assistant.daintree.org is served by the
+# cloudbuild.yaml pipeline, and the `environment` variable in this module refuses
+# "production" outright. The topology a production edge needs, recorded because
+# the sketch is the only thing this file is still good for: a global external
+# Application Load Balancer — global IP, a serverless NEG targeting this service,
+# backend service, URL map, HTTPS proxy, a Google-managed certificate for
+# var.domain, a forwarding rule, a DNS A record, and optionally Cloud Armor. Do
+# NOT enable CDN caching on authenticated routes. See infra/terraform/README.md.

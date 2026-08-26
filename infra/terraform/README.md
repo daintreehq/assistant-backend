@@ -1,91 +1,91 @@
-# Cloud Run infrastructure
+# Cloud Run infrastructure (Terraform) — DEPRECATED, UNSUPPORTED
 
-Two deployment modes. The defaults are **staging-first** so you can smoke-test
-the real service before building the production edge.
+**Do not deploy this service from Terraform.** Nothing here is applied, nothing
+in CI exercises it, and an apply fails at plan time on purpose.
 
-## Prerequisites (both modes)
+**The deployment is `cloudbuild.yaml`.** Pushing to `main` builds the image,
+deploys a no-traffic revision tagged `candidate`, smokes `/readyz`, asserts
+`/version` reports the released commit, and only then promotes it to 100%. A bad
+revision fails the build and never takes traffic. `infra/gcp/` holds the
+supporting scripts: `bootstrap.sh` for the one-time project setup, `smoke.sh` to
+check a live deployment, `rollback.sh` to move traffic back.
 
-Create the Secret Manager secrets referenced by `var.secret_ids` (values managed
-out-of-band; never in Terraform state):
+## Why this path is refused rather than fixed
 
-```bash
-for s in state-signing-key-current state-salt together-api-key; do
-  gcloud secrets create "$s" --replication-policy=automatic 2>/dev/null || true
-done
-# state-signing material can be GENERATED:
-printf '%s' "$(openssl rand -hex 32)" | gcloud secrets versions add state-signing-key-current --data-file=-
-printf '%s' "$(openssl rand -hex 16)" | gcloud secrets versions add state-salt --data-file=-
-# the upstream credential cannot be — supply the real Together key:
-printf '%s' 'tgp_v1_...' | gcloud secrets versions add together-api-key --data-file=-
-```
+This module sets **one** literal environment variable — `ENVIRONMENT` — and
+mounts four secrets. It sets no `AUTH_MODE`, no `ENTITLEMENT_MODE`, no
+`DAINTREE_ENTITLEMENT_URL`, no Supabase issuer/JWKS/OAuth client, no subject
+gate, and none of the operational dials. `cloudbuild.yaml` is the authoritative
+list of what a real deployment passes.
 
-**The server holds the upstream credential.** `TOGETHER_API_KEY` funds every turn
-and is in `Settings.missing_secrets()`, so a deployment without it answers
-`/readyz` with 503 and never serves a request. Callers supply no key of their own
-and `auth.py` ignores the `Authorization` header entirely — **the door is open**
-(see `docs/KEY_HANDLING.md`); an inbound bearer is not what protects this service.
+That gap is not merely incomplete, it is actively unsafe. The application, given
+no `AUTH_MODE`, falls back to its default of `open` — under which the
+`Authorization` header is never read for authentication and every request is the
+same anonymous principal, funded by the server's own Together key. Until this
+change the module's defaults then published exactly that: `ingress =
+"INGRESS_TRAFFIC_ALL"`, an `allUsers` grant of `roles/run.invoker`, and
+`environment = "production"`. A `terraform apply` with no `-var` at all produced
+an anonymous, provider-funded model endpoint that announced itself as production.
 
-`STATE_SALT` must be a real (non-default) value — production readiness fails
-otherwise (see `Settings.weak_secrets`), as does a `TOGETHER_BASE_URL` that is not
-the `https://api.together.xyz` origin (the server's key is forwarded to it).
+Bringing it to parity would mean maintaining a second full copy of the posture
+rules `cloudbuild.yaml` already enforces — a copy nothing runs, no test drives,
+and no deploy would ever notice going wrong. It would drift, silently. It already
+had: the prose in these files described a caller-funded credential model that the
+server stopped implementing.
 
-Build and push the image to Artifact Registry, then pass it as `var.image` (by
-immutable digest).
+## What is left here, and what it is for
 
-## Staging (default)
+`main.tf`, `variables.tf` and `outputs.tf` are a **topology sketch** — Cloud Run
+v2 + external Application Load Balancer + Secret Manager, with secret values
+never in Terraform state. Read them for the shape. They are safe to leave on disk
+because three `precondition` blocks on the Cloud Run service refuse the plan: one
+unless the deprecation is explicitly acknowledged, one unless both reachability
+levers (`allow_unauthenticated` and `ingress`) are private, and one unless
+`environment` is something other than `production`. Every default is already the
+safe value, so the refusals are what stops someone overriding them, not what
+supplies them.
 
-`ingress = "INGRESS_TRAFFIC_ALL"` and `allow_unauthenticated = true`: the direct
-`https://<service>-<hash>-<region>.run.app` URL is reachable.
+**Acknowledging the first gate does not make this a supported path.** It reduces
+the blast radius of an apply; it changes nothing about the credential model.
+Whatever it builds still mounts the server's own `TOGETHER_API_KEY` and still
+runs `AUTH_MODE=open`, so every request that reaches it is anonymous and billed
+to Daintree. The gates restrict who can reach the service. Nothing here can make
+a request to it cost the caller anything.
 
-**There is no gate.** `auth.py` ignores the `Authorization` header, so every
-request becomes the same anonymous principal and is funded by the server's own
-Together key. That combination is acceptable only for a URL that is not handed
-around: there is no per-caller rate limit or spend control in the application, so
-the only thing bounding spend is Cloud Run's max-instance count and whatever
-budget alerts the provider account carries. Set those, and prefer restricted
-ingress or IAM the moment this URL leaves a small internal group.
+There is no `terraform apply` recipe in this file any more, and no smoke-test
+`curl` — a `POST /v1/daintree/respond` is billed to the server's own key, and a
+document that hands an operator both a way to publish an anonymous endpoint and a
+way to spend against it is the thing that had to go.
 
-```bash
-terraform apply \
-  -var project_id=PROJECT \
-  -var image=REGION-docker.pkg.dev/PROJECT/REPO/daintree-assistant@sha256:...
-```
+## Facts a real deployment still depends on
 
-Smoke test against the `service_uri` output. **No bearer is needed** — none is
-read — and the turn is billed to the SERVER's Together key, so the last command
-below costs real money:
+Kept here because they are the reasoning behind the secret list this module does
+carry, and they remain true wherever the service is deployed from:
 
-```bash
-URL=$(terraform output -raw service_uri)
-# Not /healthz: Google's frontend reserves that path and answers it itself, so
-# the request never reaches the container. /readyz is the stronger check anyway.
-curl -s "$URL/readyz"                                    # {"status":"ready", ...}
-curl -s -o /dev/null -w '%{http_code}' "$URL/v1/daintree/capabilities"   # 200 — the door is open
-curl -s -X POST "$URL/v1/daintree/respond" \
-  -H 'content-type: application/json' \
-  -d '{"protocol_version":3,"session":{"id":"s","turn_id":"t"},"startup":{},
-       "input":{"messages":[{"role":"user","content":"hello"}]}}'
-# streaming: add "generation":{"stream":true} and watch for `event: meta` then `event: delta`/`event: done`.
-```
+- **The server holds the upstream credential.** `TOGETHER_API_KEY` funds every
+  turn and is in `Settings.missing_secrets()`, so a deployment without it answers
+  `/readyz` with 503 and never serves a request. Callers supply no key of their
+  own; an account is an entitlement to spend Daintree's key, never a mapping to
+  one of the caller's (`docs/KEY_HANDLING.md`).
+- **`auth.py` dispatches on `AUTH_MODE`**, and `open` is only the shipped
+  default. `observe` verifies a credential that is present without changing any
+  verdict; `enforce` requires one. An environment that sets none of them gets
+  `open`, which is why a deployment tool that cannot set it has no business
+  publishing a service.
+- **`STATE_SALT` must be a real (non-default) value** — readiness fails otherwise
+  in any hardened environment (`Settings.weak_secrets`), as does a
+  `TOGETHER_BASE_URL` that is not the `https://api.together.xyz` origin, because
+  the server's own key is forwarded there.
+- **Do not probe `/healthz` externally.** Google's frontend reserves that path
+  and answers it itself, so the request never reaches the container. `/readyz` is
+  the stronger check anyway.
 
-`infra/gcp/smoke.sh` runs all of the above against a live deployment.
+## The production edge (assistant.daintree.org)
 
-This is **not** the production-domain deployment — call it staging.
-
-## Production (assistant.daintree.org) — deferred edge
-
-Set `ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"` and
-`allow_unauthenticated = false`, then add the external HTTPS edge (not yet in
-this config):
-
-1. Global external Application Load Balancer (reserved global IP).
-2. Serverless NEG targeting the Cloud Run service + backend service + URL map +
-   target HTTPS proxy + global forwarding rule.
-3. Google-managed certificate for `var.domain`.
-4. DNS `A` record → the forwarding-rule IP.
-5. **No** CDN caching on authenticated routes.
-6. Optional Cloud Armor (rate limiting / IP policy).
-7. Keep Cloud Run ingress restricted to load-balancer traffic.
-
-Smoke-test the same endpoints through `https://assistant.daintree.org` once DNS
-and the certificate are active.
+Not built from here, and this module refuses `environment = "production"`. The
+shape, for reference: a global external Application Load Balancer with a reserved
+global IP, a serverless NEG targeting the Cloud Run service, backend service, URL
+map, target HTTPS proxy and global forwarding rule; a Google-managed certificate
+for the domain; a DNS `A` record to the forwarding-rule IP; Cloud Run ingress
+restricted to load-balancer traffic; optionally Cloud Armor. No CDN caching on
+authenticated routes.
