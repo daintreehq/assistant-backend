@@ -168,27 +168,54 @@ class JwksCache:
         token; one that was suppressed or failed says only that we could not
         check, and reporting those alike would tell a client its credential was
         bad on the strength of our own outage.
+
+        Crossing the HARD bound is a reason to distrust the keys we hold, not a
+        reason to stop asking for new ones. Those two rules were one for as long
+        as this method answered the over-age case before the refresh path, and
+        the result was that an over-age cache could never recover: `_fetched_at`
+        moves only inside :meth:`_refresh`, so the one call able to clear the
+        condition was the one call the condition prevented. A provider that came
+        back healthy stayed locked out until somebody restarted the process,
+        which is not a failure mode an operator can diagnose from the outside —
+        every request answers `auth_dependency_unavailable`, exactly as it does
+        during the outage that caused it.
         """
-        if self._too_stale_to_trust():
-            raise TokenError(
-                "auth_dependency_unavailable",
-                "the signing keys have not been refreshed within the trusted window",
-            )
+        # Read here and re-read twice below. Every `return` on this path is
+        # guarded by it, so an over-age key is never served no matter which
+        # branch reaches the caller — the bound is enforced at the point of USE
+        # rather than by refusing to enter the function.
+        over_age = self._too_stale_to_trust()
         key = self._keys.get(kid)
-        if key is not None and not self._stale():
+        if key is not None and not over_age and not self._stale():
             return key
         async with self._lock:
             # Re-checked INSIDE the lock. Whoever held it may have just fetched
             # the very key this caller is waiting for, and without this second
             # look every queued request would go on to refresh again — or be
-            # refused by the rate limiter for a key that is now present.
+            # refused by the rate limiter for a key that is now present. The age
+            # is re-read with it: a caller that queued while the cache was over
+            # its bound must see the recovery that whoever held the lock just
+            # performed, rather than acting on the reading it took outside.
+            over_age = self._too_stale_to_trust()
             key = self._keys.get(kid)
-            if key is not None and not self._stale():
+            if key is not None and not over_age and not self._stale():
                 return key
             refreshed = await self._refresh()
+            # `refreshed`, not the clock, is what clears the bound here. A
+            # successful fetch replaced the key set moments ago, so it is fresh
+            # BY CONSTRUCTION, and re-reading the age would instead ask whether
+            # the keys we just received are already too old — which at a max age
+            # of zero they trivially are. That reading turns a deployment that
+            # trusts keys briefly into one that cannot verify anything at all,
+            # rejecting its own fetch on the way out of the call that made it.
+            over_age = not refreshed and self._too_stale_to_trust()
             key = self._keys.get(kid)
-        if key is not None:
+        if key is not None and not over_age:
             return key
+        # Still over its bound means the refresh did not happen: it failed, or
+        # the anti-amplification window suppressed it. A key with this id may
+        # well be sitting in `_keys` — it is simply too old to honour, and the
+        # guard above is the branch that says so instead of serving it.
         if refreshed:
             # We asked the issuer and it does not publish this key. That is a
             # statement about the TOKEN.
