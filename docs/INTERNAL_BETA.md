@@ -37,14 +37,14 @@ is not a description of today's build, so every line carries a status:
 | 1 | ~~**OpenRouter is the sole provider.**~~ *(superseded twice — the executor is Together (`config.EXECUTOR_MODEL`), and an eligible turn ALSO reaches Cerebras for the preamble (`config.FAST_RESPONSE_MODEL`). Both receive prompt content; see `docs/PROVIDER_POLICY.md` §1.)* | — |
 | 2 | ~~**The tester supplies an OpenRouter key**, and it is theirs.~~ *(superseded — no caller key exists)* | — |
 | 3 | ~~**That key is the HTTP bearer** and funds every upstream call the turn makes.~~ *(superseded — the server's key funds every call)* | — |
-| 4 | **The serving backend holds no shared model credential** — not as a fallback, not as a default, not for "just the selector". | ✅ `main._build_provider(api_key=None)` |
+| 4 | ~~**The serving backend holds no shared model credential** — not as a fallback, not as a default, not for "just the selector".~~ *(superseded — the INVERSE is now the invariant, and it is the one in §6: `main._build_provider` passes `settings.serving_api_key`, and `missing_secrets()` gates `/readyz` on its presence. The shared credential is not a fallback that crept in; it is the whole funding model.)* | — |
 | 5 | **The primary model stays pinned**, and is not a floating alias. | ✅ `config.EXECUTOR_MODEL` |
 | 6 | **The backend owns** prompts, the runbook catalog and bodies, automatic runbook selection, prompt assembly, and the utility-task prompts. | ✅ |
 | 7 | **The CLI owns** the visible conversation, local state, permissions and tool execution. | ✅ |
 | 8 | **The backend is stateless across instances**, apart from process-local caches; runbook state travels in a signed, opaque token. | ✅ `state/codec.py` |
 | 9 | **Prompt dumping is off in staging and production** — it writes full prompts to disk, and an enabled dir fails `/readyz`. (Runbook learning was the other entry here; it has been removed entirely.) | ✅ `Settings.local_only_problems` |
 | 10 | **Tester prompt and tool content is never logged.** | ✅ with one exception — see §5 |
-| 11 | **A caller can confirm the backend can actually serve before the first model call.** | ✅ `/auth/verify` probes the credential this request would spend — the caller's if they sent one, the SERVER's otherwise, which is every request today — with a tokenless model listing, and reports `usable` and a stable `reason` separately from `valid`. An inconclusive probe (provider unreachable) is reported as unknown, never as invalid |
+| 11 | **A caller can confirm the backend can actually serve before the first model call.** | ✅ `/auth/verify` probes the SERVER's own credential — the only one there is, since callers supply none and the handler has no branch that could read one — with a tokenless model listing, and reports `usable` and a stable `reason` separately from `valid`. It answers "can this deployment serve me?", never anything about the caller. An inconclusive probe (provider unreachable) is reported as unknown, never as invalid |
 | 12 | **Failures identify their owner**: Daintree, the upstream provider, account credits, key permissions, rate limiting, or malformed input. | ✅ distinct codes — see [`DAINTREE_API.md`](DAINTREE_API.md#errors) |
 | 13 | **A release can be rolled back** to the immediately previous Cloud Run revision. | ◐ `infra/gcp/rollback.sh` exists (`--dry-run`, `--list`, `--to <revision>`), refuses every case where guessing would be worse than stopping, and fails closed unless it can confirm the target is serving. Its selection logic is tested offline against a fake `gcloud`; **moving real traffic has never been rehearsed**, so this is not ✅ until a drill has been run |
 
@@ -52,7 +52,6 @@ is not a description of today's build, so every line carries a status:
 
 Not blockers. Do not delay the beta for any of them:
 
-- Daintree-owned login accounts
 - Daintree-issued API keys or subscription keys
 - billing metering, invoices, spend ledgers
 - tenant databases, team administration, admin console
@@ -62,8 +61,19 @@ Not blockers. Do not delay the beta for any of them:
   training-trace store exists and is off by default — see section 9)
 - a public third-party developer API
 
-These belong *after* the OpenRouter-key-only beta has proved the assistant
-experience.
+These belong *after* the beta has proved the assistant experience.
+
+**One entry left this list by being finished rather than by being dropped.**
+Daintree-owned login accounts used to head it. They exist now: `auth.py`
+dispatches on `AUTH_MODE`, a bearer is verified locally against a cached JWKS
+(`services/supabase_auth.py`), `GET /v1/daintree/auth/config` publishes the OAuth
+manifest a client needs in order to obtain one, and the CLI signs in through it.
+Entitlement is a second, independently staged axis on top of that
+(`ENTITLEMENT_MODE`, `services/entitlement.py`). Built is not the same as
+required: the shipped modes are `open` and `off`, so every deployment still
+serves anonymous requests and §7a is where the posture is decided. It is still
+not a blocker — but for the opposite reason to everything left in the list above,
+where the work does not exist rather than merely being switched off.
 
 ## 4. Deliberately not defended
 
@@ -217,9 +227,15 @@ All three are built and tested; `open` is what every deployment runs today, whic
 is why a client still sending an old OpenRouter key is served rather than having
 that key forwarded upstream and rejected as theirs. `enforce` establishes that a
 token is genuine and unexpired — not, on its own, that the session behind it still
-exists, which needs a lookup this service cannot yet make. Where the entitlement
-lookup runs it narrows that window as a side effect, by translating the website's
-own 401 into `auth_session_revoked`.
+exists, because nothing reaches back into a minted JWT to ask. The entitlement
+lookup closes most of that gap where it runs, as a side effect rather than as a
+revocation check: the website's endpoint is specified to perform a fresh Supabase
+user check, and `services/entitlement.py` maps its 401 to `auth_session_revoked`.
+So on the routes that ask — `/respond` and `/tasks` under a non-`off`
+`ENTITLEMENT_MODE`, and `/v1/daintree/account` wherever a URL is configured — the
+revocation window is the verdict cache's TTL rather than `exp`. An identity-only
+deployment (`enforce` with `ENTITLEMENT_MODE=off`) keeps the full window, which is
+one more reason the two axes are staged separately.
 
 The staged rollout for `assistant.daintree.org` is `ENVIRONMENT=staging` with
 browser account and payment links on `staging.daintree.org`, starting at `open` or

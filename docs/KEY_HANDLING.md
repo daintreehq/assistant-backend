@@ -73,10 +73,17 @@ code enforces:
   benchmarks and live tests are its only callers — and it is kept live precisely
   so per-account credentials become a *value* flowing through existing plumbing
   rather than new plumbing.
-- **This is a stage, not a destination.** Account authentication and sign-in are
-  being built next, and `auth.py` is the seam they land in: `authenticate` starts
-  reading the header again, validating it against an account store rather than
-  against its own shape, and the rest of the server does not move.
+- **The seam has been filled; what is still staged is the posture.** Account
+  authentication is built and tested. `authenticate` reads the header again under
+  `observe` and `enforce`, and validates it by verifying a real signature against
+  a cached JWKS (`services/supabase_auth.py`) rather than against its own shape —
+  and the rest of the server did not move, which is what the seam was for. What
+  remains a rollout decision is which mode a deployment runs; the shipped default
+  is `open`. What is NOT coming is the thing the old sentence left room for: an
+  account never maps to a credential of the caller's. It is an ENTITLEMENT to
+  spend Daintree's key, checked on a second and independently staged axis
+  (`ENTITLEMENT_MODE`, shipped `off`), so identity landing does not put a caller
+  key back on the request.
 
 ## 2a. The ACCOUNT credential
 
@@ -170,10 +177,19 @@ cite it as coverage for this list.)
 
 ## 4. Verification
 
-`POST /v1/daintree/auth/verify` is the only honest answer to "is my key usable?".
-Daintree's own auth is **structural** — a well-formed string that no provider ever
-issued passes it — so without this probe a bad key first surfaces at the first
-real turn, long after the user thought they had signed in.
+`POST /v1/daintree/auth/verify` is the only honest answer to "can this deployment
+actually serve me?", and the key it asks about is **the SERVER's** —
+`settings.serving_api_key`, the credential that funds every turn. There is no
+caller key for it to be about: the structural check that used to stand behind this
+section is retired (§2), because rejecting a malformed bearer only ever warned a
+caller that the credential they meant to spend was not going to be spent.
+
+The probe still earns its place for the same reason it always did, one owner
+further along: without it, a serving credential that is expired, revoked, or
+simply never set first surfaces on a tester's first real turn — as an upstream 401
+that reads like their fault rather than the deployment's. The CLI calls it from
+`doctor` (`cli/internal/backend/verify.go`), which is where an operator asks the
+question before a user does.
 
 The probe is `GET /models` against Together: the cheapest authenticated call
 endpoint, which answers for the credential rather than for a model and runs no
@@ -192,7 +208,7 @@ question, not a request failure.
 | `usable` | always | the key is **not known to be exhausted** — see the caveat below |
 | `reason` | always | the stable machine-readable outcome: `ok`, `provider_rejected`, `credits_exhausted` |
 | `detail` | always | human-readable verdict — prose, never branch on it |
-| `label` | when the provider reports one | a safe echo so the user can confirm they pasted the key they meant to. Dropped entirely if it contains the bearer — some providers default a key's label to the key itself |
+| `label` | when the provider reports one | the provider's own name for the credential, so an operator can tell WHICH server key answered — nobody pastes a key any more, so this identifies a deployment's credential rather than confirming someone's typing. Dropped entirely if it contains the key — some providers default a label to the key itself |
 | `limit`, `usage`, `limit_remaining` | when numeric | lets the client warn about an exhausted key, which otherwise reads as a broken sign-in |
 | `is_free_tier` | when boolean | |
 

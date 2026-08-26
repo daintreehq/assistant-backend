@@ -31,9 +31,13 @@ server's ``TOGETHER_API_KEY``, which funds every turn. Same probe, same verdict
 shape, and still the only honest answer available before a real turn: it costs
 no tokens (a model listing, not a generation).
 
-It is deliberately kept rather than deleted while the door is open. Account
-authentication is being built next, and this is where a caller learns their
-credential works — a question that returns, not one that went away.
+It is deliberately kept rather than deleted, and account authentication landing
+did not make it redundant — it made the two questions in this module visibly
+different. The endpoint above answers "how do I sign in here?" about the CALLER's
+credential; this one answers "can this deployment reach its provider at all?"
+about the SERVER's. A signed-in caller can still be served by a deployment whose
+``TOGETHER_API_KEY`` is expired, and no amount of identity verification would say
+so. The CLI's ``doctor`` is what asks.
 """
 
 from __future__ import annotations
@@ -216,9 +220,12 @@ async def verify(
             }
         raise
 
-    # Echo only non-sensitive, decision-useful fields. `label` helps a user confirm they
-    # pasted the key they meant to; the limit fields let the CLI warn about an exhausted
-    # key, which reads as a broken sign-in otherwise. Never echo the key itself.
+    # Echo only non-sensitive, decision-useful fields. `label` is the provider's own
+    # name for the credential, which tells an operator WHICH server key answered — the
+    # probed key is `settings.serving_api_key`, so nobody is confirming their own
+    # typing here. The limit fields let the CLI warn about an exhausted key, which
+    # otherwise surfaces as an unrelated failure on the first real turn. Never echo the
+    # key itself.
     #
     # Together returns none of them — its probe answers with a model listing. The
     # label/budget branches stay because they cost nothing to keep and are exactly

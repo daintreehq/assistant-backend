@@ -214,12 +214,28 @@ def upstream_timeout(message: str = "The upstream model provider timed out.") ->
 # rollout decision — the shipped default is `open`, which reads no header at all —
 # so "reachable" and "reached" are different questions here.
 #
-# The ENTITLEMENT half is not emitted by anything: subscription state, usage
-# accounting and the Polar outbox need a database and a Redis this service does
-# not have. `auth_session_revoked` is in the same position for a different reason
-# — nothing can reach back into a minted JWT to ask whether its session still
-# exists, so `enforce` today means "a genuine, unexpired token" and not "a live
-# session" (`TODO.md`).
+# The ENTITLEMENT half is emitted now as well, and by far less machinery than
+# that took: Daintree does not hold subscription state, the WEBSITE does. So
+# `services/entitlement.py` makes one bounded GET to `DAINTREE_ENTITLEMENT_URL`
+# carrying the CALLER's own bearer and caches the verdict in process, and the
+# database, the Redis and the Polar outbox an earlier plan wanted turned out to be
+# for storing an answer somebody else already owns. `api/paid_access.py` dispatches
+# `subscription_required` and `subscription_inactive` from that verdict, and both
+# it and `api/daintree_account.py` raise `entitlement_unavailable` for every
+# uncertainty — the one translation this taxonomy refuses to make is an outage into
+# a verdict.
+#
+# `auth_session_revoked` is emitted too, from `services/entitlement.py`, but as a
+# SIDE EFFECT rather than as a revocation check, and only on the strength of the
+# WEBSITE's half of the contract: nothing here reaches back into a minted JWT, and
+# what makes the code reachable is that the website's endpoint performs a fresh
+# Supabase user check whose 401 maps to this. So `enforce` ALONE still means "a
+# genuine, unexpired token" rather than "a live session"; it is the entitlement
+# lookup that narrows the window, on the routes that make it.
+#
+# One is still defined and unreachable: `usage_limit_reached`. Nothing decrements
+# a quota, because numeric plan allowances are an undecided product question
+# (`TODO.md`) — a turn is ATTRIBUTED, not metered.
 #
 # All of them are defined here regardless, so the taxonomy, the documentation and
 # the CLI's handling agree before anything depends on them. That is not

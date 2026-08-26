@@ -70,10 +70,13 @@ DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
 # Run locally. `./dev` exports .env into the environment (so a curl in the same
 # terminal agrees with the server), warns about missing secrets, and turns on
-# console logs. Two required env vars, BOTH server-owned: STATE_SIGNING_KEY_CURRENT
-# and TOGETHER_API_KEY — the server holds the upstream credential now, so a missing
-# key fails /readyz rather than surfacing as a caller-looking 401 on the first turn.
-cp .env.example .env   # then set both
+# console logs. Three required env vars, ALL server-owned: STATE_SIGNING_KEY_CURRENT,
+# TOGETHER_API_KEY and CEREBRAS_API_KEY — the server holds every upstream credential
+# now, so a missing key fails /readyz rather than surfacing as a caller-looking 401 on
+# the first turn. The Cerebras one gates readiness for a different reason: the
+# fast-response stage has no off switch, so without it that stage fails open on every
+# eligible turn, which is indistinguishable from a model choosing to say nothing.
+cp .env.example .env   # then set all three
 ./dev
 uvicorn daintree_assistant_server.main:app --reload --port 8473
 ```
@@ -663,9 +666,11 @@ can read a log line.
 - **Off by default, and FULL-CONTENT capture is refused outright in
   production/staging.** (`metadata` mode — the trace skeleton with no content —
   is permitted anywhere, and is what a production deployment would run if it ran
-  anything.) There is no account
-  model yet, so there is nobody who could have consented; `Settings.trace_problems()`
-  fails readiness rather than capturing.
+  anything.) There is no consent record to check: the account model exists, but
+  `AccountContext` carries a pseudonymous subject hash, a client and a plan, and
+  nothing that records agreement to have a turn kept for training — and under the
+  shipped `AUTH_MODE=open` there is no subject at all. `Settings.trace_problems()`
+  therefore fails readiness rather than capturing.
 - **Identity never reaches storage.** Session and turn ids are HMACed under a dedicated
   `TRACE_IDENTITY_KEY` (never the state-signing key), and `tracing/scrub.py` strips the
   raw ids and the signed state token from the captured request at the CAPTURE boundary.

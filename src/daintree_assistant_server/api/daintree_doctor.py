@@ -94,9 +94,11 @@ async def _provider_section(
 
     ``verify_key`` is a tokenless model-listing call: no generation, no spend. The
     distinction between "rejected" and "we could not ask" is preserved — a network
-    failure reports ``key_valid: null``, never ``false``, because telling a tester
-    the key is bad when we simply could not reach the provider sends them to
-    re-paste a credential that was fine.
+    failure reports ``key_valid: null``, never ``false``, because the key is the
+    SERVER's and a tester has no way to act on a verdict about it — reporting
+    ``false`` on an unreachable provider would send someone hunting a credential
+    problem that is not theirs and was not there, when the honest answer is that
+    we could not ask.
 
     ``upstream_model`` is named here and nowhere public: the respond and task
     surfaces both say ``daintree-assistant``, and this is the operator's view. No

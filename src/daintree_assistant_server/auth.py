@@ -27,11 +27,18 @@ The three modes are three different jobs, not three settings of one:
 
 **Identity is not entitlement.** A verified token establishes who is calling. It
 does not establish that they have paid, and it does not establish that their
-session still exists — that second one needs a lookup this service cannot yet
-make, so ``enforce`` today means "a genuine, unexpired token from a session that
-existed when it was minted" (``TODO.md``). Both are separate questions with
-separate failure modes, and merging any of them here is how an outage in one
-starts presenting as a verdict about another.
+session still exists — nothing here reaches back into a minted JWT to ask, so
+``enforce`` ALONE means "a genuine, unexpired token from a session that existed
+when it was minted".
+
+The entitlement lookup narrows that second gap where it runs, as a side effect
+rather than as a revocation check: ``services/entitlement.py`` maps a 401 from
+the website's endpoint — which is specified to perform a fresh Supabase user
+check — to ``auth_session_revoked``, which this module then dispatches like any
+other account failure. So the revocation window is the verdict cache's TTL on the
+routes that ask, and ``exp`` on the ones that do not. All three remain separate
+questions with separate failure modes, and merging any of them here is how an
+outage in one starts presenting as a verdict about another.
 """
 
 from __future__ import annotations

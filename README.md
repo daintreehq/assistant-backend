@@ -162,7 +162,8 @@ than as a first-turn upstream 401 that reads like the caller's fault.
 
 ```bash
 # Copy the env scaffold; it binds HOST/PORT from .env (default 127.0.0.1:8473).
-cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT and TOGETHER_API_KEY
+cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT, TOGETHER_API_KEY
+                       # and CEREBRAS_API_KEY
 ./dev                  # exports .env, then runs the server
 ```
 
@@ -225,7 +226,7 @@ red build instead of an outage. The commit SHA is the only version this system
 has (see CLAUDE.md, "Versioning"): it tags the image, is baked in as
 `BUILD_SHA`, and is what `/version` reports back.
 
-One-time GCP setup — Artifact Registry, the two Secret Manager secrets, the
+One-time GCP setup — Artifact Registry, the four Secret Manager secrets, the
 runtime and build service accounts, the GitHub connection, the trigger, and the
 custom domain mapping — lives in `infra/gcp/bootstrap.sh`. It is idempotent, so
 re-running it is how you finish setup rather than something to avoid:
