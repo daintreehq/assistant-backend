@@ -1318,6 +1318,22 @@ def test_the_build_and_readiness_agree_about_the_origin_in_every_environment(
     having while it agrees with the door it stands in for — and a shell `case`
     and a Python set are exactly the pair that drifts silently, because each one
     looks obviously right on its own.
+
+    TWO ASYMMETRIES ARE DELIBERATE and are excluded from the sweep rather than
+    quietly passing it, because an exclusion nobody wrote down is indistinguishable
+    from a case nobody thought of:
+
+    * `http://` on a loopback literal. Readiness allows it outside a hardened
+      environment so a developer can run the website locally; the build refuses
+      every `http://` URL, because a Cloud Run revision naming a loopback address
+      is naming its own container.
+    * `https://[::1]/...`, for the same underlying reason. The shell splits the
+      authority on the first colon, which yields `[` for an IPv6 literal and
+      refuses it — a limitation that predates this rule, since the suffix rule it
+      replaces rejected the same value. Teaching the shell to parse IPv6 would buy
+      nothing: the only URLs it can ever see are the ones a deploy sets, and a
+      loopback destination is never one of them. The build being the stricter side
+      fails closed, which is the right direction for the check to be wrong in.
     """
     from daintree_assistant_server.config import Settings
 
