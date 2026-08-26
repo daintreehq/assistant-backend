@@ -14,6 +14,7 @@ algorithm against literals derived from the Go source
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -27,10 +28,42 @@ def test_the_hash_is_sixteen_lowercase_hex_characters() -> None:
     assert re.fullmatch(r"[0-9a-f]{16}", value)
 
 
+def test_the_literal_cross_service_vector() -> None:
+    """The vector three repositories must all produce, asserted as a LITERAL.
+
+    This is the test the whole file is for, and the recomputation below is not a
+    substitute for it: a check that derives its expectation from the same
+    algorithm it is checking agrees with itself no matter what the algorithm is.
+    Change the prefix, change the truncation, drop the domain separator entirely —
+    that test stays green while every other implementation stops matching.
+
+    Nothing would fail, either. Two correct hashes of the same subject simply
+    never compare equal, and support correlation quietly stops working: somebody
+    reads the id their CLI printed, searches the logs, and finds nothing.
+    """
+    assert subject_hash("8f14e45f-ea8b-4c1d-9b2a-0000feedface") == "b4c864ea44cbb4a1"
+
+
+def test_the_literal_vector_is_the_one_the_fixtures_publish() -> None:
+    """The same pair, in the directory the CLI copies from.
+
+    Pinned in both places and cross-checked here, so the fixtures cannot drift
+    into describing a hash this server does not compute.
+    """
+    manifest = json.loads(
+        (Path(__file__).resolve().parents[1] / "fixtures" / "contract" / "manifest.json")
+        .read_text("utf-8")
+    )
+    assert manifest["subject_hash"] == subject_hash(manifest["subject"])
+    assert manifest["subject_hash"] == "b4c864ea44cbb4a1"
+
+
 def test_the_algorithm_matches_the_cli_byte_for_byte() -> None:
-    """Recomputed here from the Go definition rather than trusting our own helper.
+    """Recomputed from the Go definition, as a SECOND opinion on the literal.
 
     ``hex.EncodeToString(sha256("daintree-assistant-subject:"+subject)[:8])``.
+    Its value is that it names the construction in a form a reader can check
+    against the Go source; the literal above is what actually holds the line.
     """
     subject = "8f14e45f-ea8b-4c1d-9b2a-0000feedface"
     expected = hashlib.sha256(

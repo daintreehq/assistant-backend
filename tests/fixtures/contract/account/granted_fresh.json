@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "email": "person@example.com",
+  "subject_hash": "b4c864ea44cbb4a1",
+  "access": "granted",
+  "plan_id": "standard",
+  "subscription_status": "active",
+  "entitlement_source": "polar",
+  "entitlement_stale": false,
+  "checked_at": "2026-08-26T12:00:00Z"
+}

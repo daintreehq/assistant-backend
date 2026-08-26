@@ -1,0 +1,146 @@
+{
+  "reference_instant": "2026-08-26T12:00:00Z",
+  "subject": "8f14e45f-ea8b-4c1d-9b2a-0000feedface",
+  "subject_hash": "b4c864ea44cbb4a1",
+  "account_contract_version": 1,
+  "entitlement_contract_version": 1,
+  "account": [
+    {
+      "file": "account/unverified.json",
+      "valid": true,
+      "note": "The identity-only shape. Every entitlement field is ABSENT because no lookup happened - not null, not defaulted, absent."
+    },
+    {
+      "file": "account/unverified_with_email.json",
+      "valid": true,
+      "note": "email is optional and display-only; its presence does not make the answer a lookup."
+    },
+    {
+      "file": "account/granted_fresh.json",
+      "valid": true,
+      "note": "A live grant. entitlement_stale is false BECAUSE a lookup happened and was fresh."
+    },
+    {
+      "file": "account/granted_stale_cache.json",
+      "valid": true,
+      "note": "The website's outage fallback, reported honestly: cache + stale, with the age visible to the user."
+    },
+    {
+      "file": "account/subscription_required.json",
+      "valid": true,
+      "note": "No plan. A 200 here and a typed 402 only when it stops paid work."
+    },
+    {
+      "file": "account/subscription_inactive.json",
+      "valid": true,
+      "note": "plan_id is present on a REFUSAL: a lapsed Pro subscription is still Pro. Only `granted` REQUIRES a plan; no access value forbids one."
+    },
+    {
+      "file": "account/invalid_malformed_hash.json",
+      "valid": false,
+      "reason": "String should match pattern",
+      "note": "subject_hash is exactly 16 lowercase hex characters on this authenticated route."
+    },
+    {
+      "file": "account/invalid_unverified_carries_a_lookup.json",
+      "valid": false,
+      "reason": "cannot carry entitlement fields",
+      "note": "`unverified` means nothing was asked, so it cannot report an answer."
+    },
+    {
+      "file": "account/invalid_granted_without_plan.json",
+      "valid": false,
+      "reason": "requires a plan_id",
+      "note": "Access to something unnamed cannot later be attributed or capped."
+    },
+    {
+      "file": "account/invalid_checked_without_a_timestamp.json",
+      "valid": false,
+      "reason": "requires checked_at",
+      "note": "A lookup that happened has a time it happened at. The backend must not fabricate one, so it must not omit one either."
+    },
+    {
+      "file": "account/invalid_naive_timestamp.json",
+      "valid": false,
+      "reason": "should have timezone info",
+      "note": "No offset. The client would read it in whatever zone it assumes, silently shifting how fresh a billing answer looks."
+    },
+    {
+      "file": "account/invalid_stale_polar.json",
+      "valid": false,
+      "reason": "only valid with entitlement_source 'cache'",
+      "note": "A live provider check cannot be stale."
+    },
+    {
+      "file": "account/invalid_cached_denial.json",
+      "valid": false,
+      "reason": "may only report 'granted'",
+      "note": "A cache-sourced refusal is never authoritative. The entitlement client refuses this body upstream, so the route cannot build it - the response model mirrors the rule so both layers agree."
+    }
+  ],
+  "entitlement": [
+    {
+      "file": "entitlement/granted_polar.json",
+      "outcome": "granted",
+      "note": "The ordinary live grant."
+    },
+    {
+      "file": "entitlement/granted_cache_stale.json",
+      "outcome": "granted",
+      "note": "The outage fallback, 18 hours old and well inside the cached-grant bound."
+    },
+    {
+      "file": "entitlement/granted_cache_at_the_bound.json",
+      "outcome": "granted",
+      "note": "Exactly 86400 + 300 seconds before the reference instant. Bounds are INCLUSIVE, so the website's published maximum is usable at the value it publishes."
+    },
+    {
+      "file": "entitlement/subscription_required.json",
+      "outcome": "subscription_required",
+      "note": "A verdict, not an error."
+    },
+    {
+      "file": "entitlement/subscription_inactive.json",
+      "outcome": "subscription_inactive",
+      "note": "The real website shape for a lapsed subscription: it names the plan."
+    },
+    {
+      "file": "entitlement/invalid_stale_polar.json",
+      "outcome": "entitlement_unavailable",
+      "reason": "stale_without_cache"
+    },
+    {
+      "file": "entitlement/invalid_cache_fresh.json",
+      "outcome": "entitlement_unavailable",
+      "reason": "cache_without_stale"
+    },
+    {
+      "file": "entitlement/invalid_cached_denial.json",
+      "outcome": "entitlement_unavailable",
+      "reason": "cached_denial",
+      "note": "THE row that matters. A stale negative must never become a 402 telling a paying customer to buy a second plan during an outage."
+    },
+    {
+      "file": "entitlement/invalid_granted_without_plan.json",
+      "outcome": "entitlement_unavailable",
+      "reason": "granted_without_plan"
+    },
+    {
+      "file": "entitlement/invalid_naive_timestamp.json",
+      "outcome": "entitlement_unavailable",
+      "reason": "checked_at"
+    },
+    {
+      "file": "entitlement/invalid_polar_expired.json",
+      "outcome": "entitlement_unavailable",
+      "reason": "checked_at_stale",
+      "note": "An hour old and claiming to be live. Accepted under the single day-long limit this table replaced."
+    },
+    {
+      "file": "entitlement/invalid_cached_grant_expired.json",
+      "outcome": "entitlement_unavailable",
+      "reason": "checked_at_stale",
+      "note": "Two days old. An expired stale positive is a DEPENDENCY failure, never a missing subscription."
+    }
+  ]
+}

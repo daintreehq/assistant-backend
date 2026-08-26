@@ -78,11 +78,20 @@ class AccountResponse(BaseModel):
         The entitlement client validates the WEBSITE's contract; this validates
         ours, and the locked brief asks for exactly that separation — strict
         limits on the response even though the data came from a dependency we
-        already checked. Two rules, each of which would otherwise be a sentence
-        the client cannot make sense of:
+        already checked.
 
-        ``unverified`` means no lookup happened, so it cannot carry a lookup's
-        results; and ``granted`` without a plan is access to something unnamed.
+        **It mirrors the client's whole closed table rather than a subset**, and
+        the reason is worth stating because the alternative looks tidier. Rules
+        that only half-agree drift: a later edit to one side produces a shape that
+        one layer calls legal and the other refuses, and the disagreement surfaces
+        as an intermittent 500 rather than as a contract failure. Every shape
+        rejected below is already unreachable through this route — the client
+        refuses those bodies before a verdict exists — so mirroring costs nothing
+        and buys a second, independent statement of the same contract.
+
+        Order is load-bearing in one place: the missing-plan check runs before the
+        completeness checks, so a bare ``granted`` still reports the specific
+        thing wrong with it rather than the first field it happens to be missing.
         """
         entitlement_fields = (
             self.plan_id,
@@ -91,8 +100,38 @@ class AccountResponse(BaseModel):
             self.entitlement_stale,
             self.checked_at,
         )
-        if self.access == "unverified" and any(f is not None for f in entitlement_fields):
-            raise ValueError("access 'unverified' cannot carry entitlement fields")
+        if self.access == "unverified":
+            # Nothing was asked, so nothing may be reported. A `plan_id: null`
+            # beside `entitlement_stale: false` is three claims, none of them made.
+            if any(f is not None for f in entitlement_fields):
+                raise ValueError("access 'unverified' cannot carry entitlement fields")
+            return self
+
         if self.access == "granted" and self.plan_id is None:
             raise ValueError("access 'granted' requires a plan_id")
+
+        # A lookup HAPPENED, so it has a source and a time it happened at. Absent
+        # is not a weaker version of either — a client cannot tell "we checked and
+        # will not say when" from "we did not check", and those are the two answers
+        # this endpoint exists to keep apart.
+        if self.checked_at is None:
+            raise ValueError(f"access '{self.access}' requires checked_at")
+        if self.entitlement_source is None:
+            raise ValueError(f"access '{self.access}' requires an entitlement_source")
+        if self.entitlement_stale is None:
+            raise ValueError(f"access '{self.access}' requires entitlement_stale")
+
+        # The same closed table the entitlement client reads, stated in this
+        # layer's vocabulary. `cache` and `stale` are one fact: the website's
+        # fallback is what it serves when it could not reach the provider.
+        if self.entitlement_stale and self.entitlement_source != "cache":
+            raise ValueError("entitlement_stale is only valid with entitlement_source 'cache'")
+        if self.entitlement_source == "cache" and not self.entitlement_stale:
+            raise ValueError("entitlement_source 'cache' is always stale")
+        if self.entitlement_source == "cache" and self.access != "granted":
+            # A cached GRANT is safe to report. A cached REFUSAL is the website
+            # saying what it believed before it lost the provider, and putting it
+            # on somebody's account page as a settled fact is the same mistake as
+            # billing them for it.
+            raise ValueError("a cache-sourced entitlement may only report 'granted'")
         return self

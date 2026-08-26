@@ -413,7 +413,7 @@ exit.
   "subscription_status": "active",
   "entitlement_source": "polar",
   "entitlement_stale": false,
-  "checked_at": "2026-08-25T12:00:00Z"
+  "checked_at": "2026-08-26T11:59:30Z"
 }
 ```
 
@@ -441,6 +441,46 @@ subject is never returned. When `access` is `unverified` the entitlement-only
 fields are **absent** rather than null — a `plan_id: null` beside
 `entitlement_stale: false` would read as "we checked, you have nothing, and that
 answer is fresh", which is three claims none of which were made.
+
+#### Which fields a response carries
+
+The two shapes are not "one with optional extras". They answer different
+questions, and the field set is what tells them apart:
+
+| | `unverified` | every other `access` |
+|---|---|---|
+| `version`, `subject_hash`, `access` | required | required |
+| `email` | optional | optional |
+| `checked_at` | **absent** | **required**, timezone-aware RFC 3339 |
+| `entitlement_source` | **absent** | **required**, `polar` or `cache` |
+| `entitlement_stale` | **absent** | **required** |
+| `plan_id` | **absent** | required when `granted`; permitted otherwise |
+| `subscription_status` | **absent** | optional, at most 64 bytes |
+
+The 64-byte bound on `subscription_status` is enforced where the website's body is
+validated, in the same unit the sanitizer crops in. The response model carries a
+looser 64-CHARACTER guard behind it, which cannot bind on a value that got that
+far: at most 64 UTF-8 bytes is at most 64 characters.
+
+`plan_id` is the row that reads wrong at a glance: only `granted` *requires* one,
+and no value *forbids* one. A lapsed Pro subscription is still Pro, so
+`subscription_inactive` normally names its plan.
+
+`entitlement_source` and `entitlement_stale` obey the same closed table as the
+[freshness rules](#the-deadline-and-how-old-an-answer-may-be) above — `cache`
+always carries `stale: true`, `polar` never does, and a cache-sourced answer may
+only report `granted`. A client can treat the two as one fact.
+
+**A server must never fabricate the required fields to make a response look
+complete.** No lookup happened means `unverified` with the fields absent; a
+`checked_at` invented for an answer nobody asked for is a lie about freshness, and
+a client that trusted it would show a billing state as verified when it never was.
+
+The literal bytes of every shape above — valid and invalid — are in
+`tests/fixtures/contract/`, with a manifest saying which is which. **Clients copy
+those files rather than writing their own fixtures from this prose.** This section
+was read correctly and incompatibly by two implementations already; a shared
+literal is the only thing that catches that.
 
 Failures are reported as themselves rather than flattened into `unverified`:
 `401 auth_session_revoked` when the billing authority refuses a token that
