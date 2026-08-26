@@ -2908,24 +2908,19 @@ def test_the_two_releases_this_repo_actually_performs_are_accepted(
     ("service", "environment", "why"),
     [
         pytest.param(
-            _STAGING_SERVICE, "production", "is the staging service", id="staging_as_prod"
+            _STAGING_SERVICE, "production", "may be deployed as", id="staging_as_prod"
         ),
         # The default. `_ENVIRONMENT` is `production` unless somebody sets it, so
         # this is what "I forgot the flag" looks like, and it is the substitution
         # combination that walked past both gates.
-        pytest.param(_STAGING_SERVICE, "", "is the staging service", id="staging_unset"),
-        pytest.param(
-            _PRODUCTION_SERVICE, "staging", "is the production service", id="prod_as_staging"
-        ),
+        pytest.param(_STAGING_SERVICE, "", "may be deployed as", id="staging_unset"),
         pytest.param(
             _PRODUCTION_SERVICE,
             "development",
-            "is the production service",
+            "may be deployed as",
             id="prod_as_development",
         ),
-        pytest.param(
-            _PRODUCTION_SERVICE, "test", "is the production service", id="prod_as_test"
-        ),
+        pytest.param(_PRODUCTION_SERVICE, "test", "may be deployed as", id="prod_as_test"),
     ],
 )
 def test_a_service_deployed_under_the_wrong_environment_is_refused(
@@ -2936,6 +2931,20 @@ def test_a_service_deployed_under_the_wrong_environment_is_refused(
     result = _run_service_table(service=service, environment=environment)
     assert result.returncode != 0
     assert why in result.stderr
+
+
+def test_the_one_real_service_may_be_released_as_staging() -> None:
+    """The row that has to say two words, and why.
+
+    There is ONE Cloud Run service. `assistant.daintree.org` resolves to it, it
+    runs as `production` today, and the private-staging rollout this pipeline was
+    hardened for moves THAT service to `staging`. An earlier version of the table
+    pinned it to `production` alone — which closed the substitution hole and, in
+    the same stroke, refused the only release anybody was actually trying to make
+    and left the posture gate below as dead code for every real build.
+    """
+    result = _run_service_table(service=_PRODUCTION_SERVICE, environment="staging")
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize(
@@ -2977,11 +2986,56 @@ def test_the_production_exemption_is_keyed_to_the_production_service(
     assert "publicly invokable" in result.stderr
 
 
-def test_the_posture_gate_names_the_production_service_rather_than_a_mode() -> None:
-    """The gate reads a name it holds, not a word it was handed."""
+def test_the_production_service_released_as_staging_is_gated_not_exempt(
+    tmp_path: Path,
+) -> None:
+    """The deployment this entire hardening batch exists to make safe.
+
+    `daintree-assistant` is the production service AND the machine the private
+    staging rollout runs on. Exempting it by name meant the one release anybody
+    was going to make was the one release nothing checked. Declaring `staging` is
+    asking to be judged by staging's rules, and this proves it gets them.
+    """
+    result = _run_posture_gate(
+        tmp_path,
+        environment="staging",
+        service=_PRODUCTION_SERVICE,
+        auth_mode="open",
+        public="yes",
+    )
+    assert result.returncode != 0
+    assert "publicly invokable" in result.stderr
+
+
+def test_the_currently_correct_production_release_is_still_exempt(
+    tmp_path: Path,
+) -> None:
+    """The other half, and the reason the exemption survives at all: production is
+    public and `open` by a standing product decision, so a gate that refused it
+    would fail the very next release and be deleted rather than fixed."""
+    result = _run_posture_gate(
+        tmp_path,
+        environment="production",
+        service=_PRODUCTION_SERVICE,
+        auth_mode="open",
+        public="yes",
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_posture_gate_exemption_is_the_pair_not_the_service_alone() -> None:
+    """The gate reads a name it holds AND the word it was handed — both.
+
+    Either half alone is a known-bad design. The service alone exempts the only
+    service there is, so the gate never fires. The word alone lets a caller type
+    `production` at a public staging service and walk past, which is the hole
+    this whole block exists to close.
+    """
     script = _posture_gate_script()
     assert "PRODUCTION_SERVICE=daintree-assistant" in script
-    assert '"$SERVICE" != "$PRODUCTION_SERVICE"' in script
+    assert '"$SERVICE" = "$PRODUCTION_SERVICE"' in script
+    assert '"$ENVIRONMENT" = "production"' in script
+    assert '"$IS_PRODUCTION_RELEASE" != "yes"' in script
 
 
 # --- absent and unreadable are different answers, everywhere ------------------

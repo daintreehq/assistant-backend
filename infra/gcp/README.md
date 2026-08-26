@@ -36,16 +36,33 @@ rather than after.
 
 ## Which service, and which environment
 
-`cloudbuild.yaml` holds a **closed table** binding each service to the one
-environment it may ever be deployed in:
+`cloudbuild.yaml` holds a **closed table** binding each service to the
+environments it may be deployed in:
 
 | `_SERVICE` | `_ENVIRONMENT` |
 |---|---|
-| `daintree-assistant` | `production` |
+| `daintree-assistant` | `production` or `staging` |
 | `daintree-assistant-staging` | `staging` |
 
 Both halves of that are refusals. A service the table does not list is refused
-outright, and a listed one deployed under the wrong environment is refused too.
+outright, and a listed one deployed under an environment it does not name is
+refused too.
+
+**The first row names two words, and that is a fact about today rather than a
+loophole.** There is one Cloud Run service; `assistant.daintree.org` resolves to
+it; it runs as `production` now, and the private-staging rollout moves *that*
+service to `staging`. A row pinning it to `production` alone would refuse the
+only release anybody is trying to make. The second row exists so the split has
+somewhere to go the day production and staging stop being the same machine —
+until then nothing uses it.
+
+Because one service can name two environments, **the posture gate's exemption is
+the PAIR, not the service**: `daintree-assistant` running as `production` is
+exempt (that public/`open` posture is a standing product decision); the same
+service declaring `staging` is asking to be judged by staging's rules and gets
+them, so a public staging revision must be enforce/enforce/gated. Keyed on the
+service alone the gate would never fire on the only service there is; keyed on
+the caller's word alone it is the bypass described below.
 
 This is not bookkeeping. `_ENVIRONMENT` is a word the caller types, `_SERVICE` is
 independently overridable, and every posture rule in the build — plus the
@@ -96,15 +113,28 @@ two rollouts is how a billing outage starts presenting as a signed-out user. So
 they are moved one at a time — but every step below `enforce`/`enforce` happens on
 a service **nobody outside can invoke**.
 
-Raise the staging service and leave it private:
+Raise the staging deployment and leave it private. Today that is the one real
+service, `daintree-assistant`, declared as `staging`:
 
 ```bash
 gcloud builds triggers run deploy-staging \
-  --substitutions=_SERVICE=daintree-assistant-staging,_ENVIRONMENT=staging,_AUTH_MODE=open
+  --substitutions=_SERVICE=daintree-assistant,_ENVIRONMENT=staging,_AUTH_MODE=open
 ```
 
-Both substitutions, every time: the table above refuses the pair if either half
-is missing or wrong, which is the point of it.
+Both substitutions, every time: `_ENVIRONMENT` defaults to `production`, and
+leaving it unset does not merely skip a label — it asks for the production
+exemption on a service you are trying to gate. State it.
+
+**"Leave it private" is a real precondition, not a figure of speech.** The
+posture gate refuses a *publicly invokable* deployment that is not enforcing, so
+an already-public service cannot walk the `open` → `observe` steps below. Remove
+the `allUsers` invoker binding before starting the walk, and re-attach it at
+cutover:
+
+```bash
+gcloud run services remove-iam-policy-binding daintree-assistant \
+  --region=us-central1 --member=allUsers --role=roles/run.invoker
+```
 
 Then walk the identity axis, re-releasing at each step, checking each one with an
 identity token because the service is private:
@@ -147,8 +177,8 @@ Public invocation is attached last, once the deployed revision has been *seen* t
 enforce identity, enforce entitlement, and hold a non-empty gate:
 
 ```bash
-SERVICE=daintree-assistant-staging \
-  PUBLIC_CUTOVER=daintree-assistant-staging ./infra/gcp/bootstrap.sh
+SERVICE=daintree-assistant \
+  PUBLIC_CUTOVER=daintree-assistant ./infra/gcp/bootstrap.sh
 ```
 
 Typing the service name is the confirmation — an exported variable a shell
@@ -162,7 +192,7 @@ is typed into.
 Revoking is as deliberate as granting, and `bootstrap.sh` will not do it either:
 
 ```bash
-gcloud run services remove-iam-policy-binding daintree-assistant-staging \
+gcloud run services remove-iam-policy-binding daintree-assistant \
   --region=us-central1 --member=allUsers --role=roles/run.invoker
 ```
 

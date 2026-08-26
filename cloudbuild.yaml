@@ -580,8 +580,16 @@ steps:
         # ever be deployed in. There is deliberately no wildcard and no opt-out —
         # if a new service needs its own rules, this is the file that has to learn
         # about it before it can receive a release.
+        # `daintree-assistant` names TWO environments, and that is a statement
+        # about today rather than a loophole. There is one service, it is what
+        # assistant.daintree.org resolves to, it currently runs as `production`,
+        # and the private-staging rollout moves THAT service to `staging` — so a
+        # table pinning it to one word would refuse the release this pipeline
+        # exists to perform. The second row exists so the split has somewhere to
+        # go the day production and staging stop being the same machine; until
+        # then it is unused and deliberately kept.
         case "$$SERVICE" in
-          daintree-assistant)         SERVICE_ENVIRONMENT=production ;;
+          daintree-assistant)         SERVICE_ENVIRONMENT="production staging" ;;
           daintree-assistant-staging) SERVICE_ENVIRONMENT=staging ;;
           *)
             echo "ERROR: _SERVICE='$$SERVICE' is not a service this file knows how to" >&2
@@ -590,9 +598,13 @@ steps:
             echo "       naming the one environment it may be deployed in." >&2
             exit 1 ;;
         esac
-        if [ "$$ENVIRONMENT" != "$$SERVICE_ENVIRONMENT" ]; then
-          echo "ERROR: $$SERVICE is the $$SERVICE_ENVIRONMENT service and this build" >&2
-          echo "       declares _ENVIRONMENT=$$ENVIRONMENT." >&2
+        ENVIRONMENT_ALLOWED=no
+        for candidate in $$SERVICE_ENVIRONMENT; do
+          if [ "$$ENVIRONMENT" = "$$candidate" ]; then ENVIRONMENT_ALLOWED=yes; fi
+        done
+        if [ "$$ENVIRONMENT_ALLOWED" != "yes" ]; then
+          echo "ERROR: $$SERVICE may be deployed as [$$SERVICE_ENVIRONMENT] and this" >&2
+          echo "       build declares _ENVIRONMENT=$$ENVIRONMENT." >&2
           echo "       The posture gate below and the application's own staging subject" >&2
           echo "       gate both key on that word, so a mismatch is a release judged by" >&2
           echo "       the wrong rules. _ENVIRONMENT defaults to production, so leaving" >&2
@@ -1165,11 +1177,25 @@ steps:
         #
         # `unknown` cannot reach here — it is refused above, unconditionally — so
         # the comparison below is against a value that is now only `yes` or `no`.
+        # The exemption is the PAIR, not the service. Keying it on the service
+        # alone was the first attempt and it was worse than the hole it closed:
+        # `daintree-assistant` is the only service there is, so exempting it by
+        # name made this gate dead code for every real release AND refused the
+        # private-staging rollout — the one deployment the gate was written for.
+        # Keying it on the declared word alone was the hole: a caller could type
+        # `production` at a public staging service and walk past. The pair is
+        # neither. Production is exempt because its public/`open` posture is a
+        # standing product decision; that same service declaring `staging` is
+        # asking to be judged by staging's rules, and gets them.
         PRODUCTION_SERVICE=daintree-assistant
-        if [ "$$SERVICE" != "$$PRODUCTION_SERVICE" ] && [ "$$SERVICE_PUBLIC" != "no" ]; then
+        IS_PRODUCTION_RELEASE=no
+        if [ "$$SERVICE" = "$$PRODUCTION_SERVICE" ] && [ "$$ENVIRONMENT" = "production" ]; then
+          IS_PRODUCTION_RELEASE=yes
+        fi
+        if [ "$$IS_PRODUCTION_RELEASE" != "yes" ] && [ "$$SERVICE_PUBLIC" != "no" ]; then
           if [ "$$AUTH_MODE" != "enforce" ]; then
-            echo "ERROR: ${_SERVICE} is publicly invokable, is not the production" >&2
-            echo "       service, and this release sets _AUTH_MODE=$$AUTH_MODE." >&2
+            echo "ERROR: ${_SERVICE} is publicly invokable, is not a production" >&2
+            echo "       release, and this build sets _AUTH_MODE=$$AUTH_MODE." >&2
             echo "       Such a deployment must enforce identity: below enforce there" >&2
             echo "       is no subject, so the private-beta subject gate cannot decide" >&2
             echo "       anything and every turn is funded for an anonymous caller." >&2
@@ -1178,8 +1204,8 @@ steps:
             exit 1
           fi
           if [ "$$ENTITLEMENT_MODE" != "enforce" ]; then
-            echo "ERROR: ${_SERVICE} is publicly invokable, is not the production" >&2
-            echo "       service, and sets _ENTITLEMENT_MODE=$$ENTITLEMENT_MODE." >&2
+            echo "ERROR: ${_SERVICE} is publicly invokable, is not a production" >&2
+            echo "       release, and sets _ENTITLEMENT_MODE=$$ENTITLEMENT_MODE." >&2
             echo "       Identity says the token is genuine; entitlement says the" >&2
             echo "       account behind it has paid. A public staging service that" >&2
             echo "       verifies the first and not the second funds every verified" >&2
