@@ -1320,10 +1320,21 @@ them is reachable, and that is a rollout state rather than a gap in the contract
 the CLI already recognises all twelve, so the taxonomy agrees on both sides before
 either side switches its half on.
 
-Two remain unreachable for a reason other than posture. `auth_permission_denied`
-needs a second OAuth client with a narrower grant, and there is only one;
-`usage_limit_reached` needs numeric plan allowances, which are a product decision
-nobody has made — this server records what a turn cost and enforces no quota.
+One remains unreachable for a reason other than posture: `usage_limit_reached`
+needs numeric plan allowances, which are a product decision nobody has made —
+this server records what a turn cost and enforces no quota.
+
+`auth_permission_denied` has a producer now, and it is not the one this paragraph
+used to anticipate. A second OAuth client with a narrower grant still does not
+exist, so the permission check on the route is still inert. What reaches the code
+instead is the **private-staging subject gate**: a deployment running
+`ENVIRONMENT=staging` with `AUTH_MODE=enforce` holds an operator-written list of
+the subjects it was opened to, and a verified identity that is not on it is
+refused here — after every JWT and OAuth-client check, and before the entitlement
+lookup or any provider call. The remedy is unchanged and is why the code fits: the
+credential is genuine and must be KEPT, refreshing mints another token refused in
+exactly the same way, and what is missing is an operator's approval rather than a
+login or a plan.
 
 The "what a client should do" column describes the correct handling, not a survey of what
 any client has built: the CLI carries a typed remedy for each of the five identity codes,
@@ -1341,14 +1352,16 @@ not one code.
 | 401 | `auth_token_expired` | The credential verified and is past its expiry. | Refresh once, then replay — but only while nothing has been shown to the user. |
 | 401 | `auth_session_revoked` | The signature is fine; the session is gone (logout, grant revocation, security action). | Delete the local credential. Refreshing cannot succeed — the session that would authorize it no longer exists. |
 | 403 | `auth_client_not_allowed` | A valid, current token from an OAuth client this deployment does not accept. | Report the mismatch. **Never refresh** — every refresh mints another token wrong in the same way. |
-| 403 | `auth_permission_denied` | A credential this deployment DOES accept, for an operation it may not perform. | Report it. Never refresh, for the same reason — a new token carries the same authority. |
+| 403 | `auth_permission_denied` | A credential this deployment DOES accept, for an operation it may not perform — today, a verified subject a private staging deployment was not opened to. | Report it, and say it is an operator approval rather than a sign-in or a plan. Never refresh, for the same reason — a new token carries the same authority. |
 
 The two 403s differ in their message rather than their remedy, and the split is worth the
 extra code: telling someone their OAuth client is not accepted, when it is, sends whoever
-reads that log hunting a configuration error that does not exist. `auth_permission_denied`
-is unreachable today — every allowlisted client holds the whole permission set — and is
-defined now so the wrong code cannot be correct-by-accident until a narrower client
-exists.
+reads that log hunting a configuration error that does not exist. The other half of
+`auth_permission_denied`'s original purpose is still pending — every allowlisted client
+holds the whole permission set, so the per-route permission check cannot yet refuse
+anybody — and the code was defined ahead of that so the wrong one could not become
+correct-by-accident in the meantime. The staging subject gate is what makes it
+reachable today.
 
 Which specific check failed is deliberately not on the wire: `auth_token_invalid` covers
 all of them. Narrating the reason to an unauthenticated caller would make the endpoint an
@@ -1467,13 +1480,17 @@ changing the already-committed HTTP status. When an exhausted rate limit carried
   "server_version": "0.1.0",
   "build_sha": "4f1c9ae0…",              // the commit this image was built from
   "protocol": { "min": 3, "max": 3 },
-  "posture": { "auth": "open", "entitlement": "off" }
+  "posture": {
+    "auth": "open",
+    "entitlement": "off",
+    "subject_gate": { "enabled": false, "entries": 0, "revision": "" }
+  }
 }
 ```
 
 `posture` reports the two rollout axes — `AUTH_MODE` (`open` | `observe` | `enforce`)
-and `ENTITLEMENT_MODE` (`off` | `observe` | `enforce`) — and it is an **operator** fact
-rather than a client one. A client should keep reading
+and `ENTITLEMENT_MODE` (`off` | `observe` | `enforce`) — plus the private-staging
+subject gate, and it is an **operator** fact rather than a client one. A client should keep reading
 [`/v1/daintree/auth/config`](#your-daintree-account): `required` there tells it what it
 must actually do, and it deliberately cannot distinguish `open` from `observe`, because
 nothing a caller can observe distinguishes them either — that indistinguishability is
@@ -1486,9 +1503,31 @@ extra request. Before this field, `AUTH_MODE=open` and `AUTH_MODE=observe` were
 indistinguishable from outside and `ENTITLEMENT_MODE` was reported by no endpoint at all,
 so a billing rollout could only be confirmed by reading the Cloud Run control plane.
 
-Nothing beyond those two mode names belongs here. It is a public, unauthenticated status
-route, so an issuer, a client id or any other configuration value would be a deployment's
-settings published for the convenience of whatever wanted to assert them.
+`subject_gate` describes the private-staging subject allowlist (see
+[`auth_permission_denied`](#your-daintree-account)) and publishes exactly three facts:
+`enabled` — whether the gate decides anything, which is true only under
+`ENVIRONMENT=staging` with `AUTH_MODE=enforce`; `entries` — how many subjects it admits;
+and `revision` — the operator's own label for that membership, `STAGING_SUBJECT_GATE_REVISION`.
+Together they answer the only question a deploy has: does the revision now serving
+traffic hold the list that was just published?
+
+`revision` appears only once it has validated (1-32 characters of
+`[a-z0-9][a-z0-9._-]*`); anything else reads as `""`. That matters because `/version`
+answers while the service is UNREADY — deliberately, since a revision that failed to
+come up is exactly the one an operator needs to identify — so a value typed into the
+wrong variable must not be published by the very mistake that made it unsafe. The check
+is syntactic: that the label carries no subject or digest material is an operator
+contract, not something the server can verify.
+
+Nothing else about the gate appears here or anywhere else on the wire. No entry, no
+prefix or suffix of one, no hash of the set, and no way to ask whether a given subject is
+in it — a public endpoint that could answer that would be a membership oracle, which is
+worse than publishing the list because nobody would notice it being read. `entries` and
+`revision` are counts and names; neither narrows who is on it.
+
+Nothing beyond those belongs here. It is a public, unauthenticated status route, so an
+issuer, a client id or any other configuration value would be a deployment's settings
+published for the convenience of whatever wanted to assert them.
 
 ## Versioning
 

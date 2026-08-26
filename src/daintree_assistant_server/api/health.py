@@ -76,6 +76,24 @@ async def version(request: Request) -> dict[str, object]:
     previously readable from no endpoint at all, so a billing rollout could only
     be confirmed by reading the Cloud Run control plane.
 
+    ``subject_gate`` is the third axis and the one that needs its bounds stated,
+    because it is the only one derived from a SECRET. Exactly three facts are
+    published: whether the gate decides anything, how many subjects it admits, and
+    the operator-chosen label for that membership. No entry, no prefix or suffix
+    of one, no hash of the set, and no answer to "is this subject in it" — a
+    public unauthenticated endpoint that could be asked about membership would be
+    a membership oracle, which is worse than publishing the list, because it
+    cannot be noticed. The count and the label are what an operator needs to
+    confirm that the revision in front of them holds the list they just published,
+    and neither narrows who is on it.
+
+    The label is published only once it has VALIDATED, and an unvalidated one
+    reads as absent. This route answers while the service is unready on purpose,
+    so "readiness would have refused that label" is not a reason it is safe to
+    echo — the deployment whose label is wrong is precisely the one being read
+    here, and a digest typed into the wrong variable would otherwise be published
+    by the mistake that made it unsafe.
+
     Additive on the wire: the CLI decodes ``/version`` through ``doJSON`` with no
     ``DisallowUnknownFields``, so an unknown field is ignored rather than an error.
     """
@@ -84,5 +102,13 @@ async def version(request: Request) -> dict[str, object]:
         "server_version": __version__,
         "build_sha": settings.build_sha,
         "protocol": {"min": PROTOCOL_MIN, "max": PROTOCOL_MAX},
-        "posture": {"auth": settings.auth_mode, "entitlement": settings.entitlement_mode},
+        "posture": {
+            "auth": settings.auth_mode,
+            "entitlement": settings.entitlement_mode,
+            "subject_gate": {
+                "enabled": settings.staging_subject_gate_enabled,
+                "entries": len(settings.allowed_subject_digests()),
+                "revision": settings.published_gate_revision,
+            },
+        },
     }

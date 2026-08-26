@@ -264,7 +264,16 @@ def test_enforce_is_the_one_posture_that_reports_required(fake_provider: Any) ->
     readiness, which is why the assertion beside it used to be phrased as a
     permanent truth about the build rather than a fact about one deployment.
     """
-    enforcing = _configured_settings(ENVIRONMENT="staging", AUTH_MODE="enforce")
+    # Staging plus enforcement is also the one posture the private-staging subject
+    # gate runs in, and an incomplete gate fails readiness — so a complete one is
+    # part of what this deployment shape now means. The digest is an obviously
+    # synthetic value; membership is not what this test is about.
+    enforcing = _configured_settings(
+        ENVIRONMENT="staging",
+        AUTH_MODE="enforce",
+        STAGING_ALLOWED_SUBJECT_DIGESTS="a" * 64,
+        STAGING_SUBJECT_GATE_REVISION="beta-01",
+    )
     with _client(enforcing, fake_provider) as client:
         assert client.app.state.ready is True, getattr(
             client.app.state, "ready_error", None

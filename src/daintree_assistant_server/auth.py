@@ -26,6 +26,16 @@ The three modes are three different jobs, not three settings of one:
 ``enforce``
     A verified credential is required. Failures are the account error family.
 
+**Genuine is not the same as invited.** Website signup is public and deliberate,
+so ``enforce`` alone admits every verified account of the allowlisted OAuth
+client. A private staging deployment needs the second question, and
+``STAGING_ALLOWED_SUBJECT_DIGESTS`` answers it: under ``ENVIRONMENT=staging`` with
+``AUTH_MODE=enforce``, a subject the operator did not name is refused with
+``auth_permission_denied`` before the entitlement lookup opens and before any
+provider call is funded. It is a membership test on a SUBJECT, not a permission on
+an OAuth client — ``require_permission`` below answers the other question — and it
+is inert in every other environment.
+
 **Identity is not entitlement.** A verified token establishes who is calling. It
 does not establish that they have paid, and it does not establish that their
 session still exists — nothing here reaches back into a minted JWT to ask, so
@@ -123,6 +133,26 @@ def subject_hash(subject: str) -> str:
         return ""
     digest = hashlib.sha256((_SUBJECT_HASH_PREFIX + subject).encode("utf-8")).digest()
     return digest[:_SUBJECT_HASH_BYTES].hex()
+
+
+def subject_digest(subject: str) -> str:
+    """The FULL digest of a canonical subject — the private-staging gate's key.
+
+    Same domain separator and same hash as :func:`subject_hash`, untruncated. The
+    two are not interchangeable and neither may stand in for the other: the
+    16-character one is a support correlation id, printed in logs and by the CLI
+    and therefore public by design, while this one is the value an operator writes
+    into ``STAGING_ALLOWED_SUBJECT_DIGESTS``. Gating on the short one would mean
+    membership was decided by a value already published everywhere.
+
+    ``subject`` must ALREADY be canonical — ``str(claims.user_id)``, the ``UUID``
+    object's own lowercase hyphenated spelling, never the raw ``sub`` string.
+    ``_require_uuid`` compares against ``value.lower()``, so an uppercase-hex
+    token is accepted as canonical while spelling itself differently; hashing what
+    arrived would produce two digests for one account, and the gate would admit or
+    refuse the same person depending on how their token was minted.
+    """
+    return hashlib.sha256((_SUBJECT_HASH_PREFIX + subject).encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -277,6 +307,53 @@ async def authenticate(request: Request) -> Principal:
         # without anyone deciding to turn it on.
         logger.info("auth_observed", result="verified")
         return ANONYMOUS
+
+    # The private-staging membership gate. Placed HERE, after every JWT and
+    # OAuth-client check and before the principal exists, because everything
+    # downstream of this line spends something: `api/paid_access.py` resolves
+    # entitlement against the website with the caller's bearer, and past that the
+    # turn opens a provider call funded by Daintree's own key. A refusal that
+    # arrives here costs a signature verification and nothing else, and there is
+    # nothing yet to undo.
+    #
+    # It is deliberately NOT a permission. `require_permission` asks what an OAuth
+    # CLIENT may do and every allowlisted client holds the whole set; this asks
+    # whether this deployment was opened to this PERSON, which is a question about
+    # a subject and has no answer in the token.
+    #
+    # `str(claims.user_id)` and never the raw `sub` string: `_require_uuid`
+    # compares the claim against `value.lower()`, so an uppercase-hex spelling is
+    # accepted as canonical while hashing to a different digest, and the gate would
+    # admit or refuse one account depending on how its token was minted.
+    #
+    # Fails closed by construction: `allowed_subject_digests` returns an empty set
+    # for a list that does not parse, and nothing is a member of it. Readiness has
+    # already refused such a deployment — this is the same answer given a second
+    # time, where a wiring mistake still cannot open the door. The short-circuit
+    # is what keeps every other deployment from hashing a subject and parsing a
+    # list it has no use for.
+    if (
+        settings.staging_subject_gate_enabled
+        and subject_digest(str(claims.user_id)) not in settings.allowed_subject_digests()
+    ):
+        # The 16-character support hash and nothing else. The raw subject never
+        # leaves the principal, and the full digest is the gate's own key —
+        # logging it would publish a membership token to every log reader.
+        #
+        # The revision goes through `published_gate_revision` rather than being
+        # read off the settings: this route is reachable while the service is
+        # unready, so a label that failed validation — a digest or a subject id
+        # typed into the wrong variable — would otherwise be written into a log
+        # line by exactly the mistake that made it unsafe.
+        logger.warning(
+            "auth_subject_not_allowed",
+            subject_hash=subject_hash(str(claims.user_id)),
+            gate_revision=settings.published_gate_revision,
+        )
+        # No message override. The factory's default says a credential this
+        # deployment accepts may not do this, which is exactly true, and the
+        # message is the only field on this error a value could ride out on.
+        raise auth_permission_denied()
 
     return Principal(
         permissions=ASSISTANT_PERMISSIONS,

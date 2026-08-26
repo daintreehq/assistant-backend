@@ -9,6 +9,7 @@ process fails *readiness* — not import — when a secret is absent.
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from ipaddress import ip_address
 from typing import ClassVar, Literal
@@ -443,6 +444,195 @@ _CLIENT_ID_CHARS = frozenset(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~"
 )
 _MAX_CLIENT_ID_LENGTH = 200
+
+
+# ---- The private-staging subject gate -------------------------------------
+#
+# `AUTH_MODE=enforce` proves a token is genuine. It does not prove that whoever
+# holds it was ever meant to be here: public signup on the website is deliberate,
+# so under enforcement alone every verified account of the one allowlisted OAuth
+# client reaches the entitlement lookup and, past it, work funded by the server's
+# own key. That is the correct posture for the product and the wrong posture for
+# a private staging deployment, whose whole premise is that the operator names
+# the people who may in.
+#
+# So `STAGING_ALLOWED_SUBJECT_DIGESTS` carries an explicit membership list, one
+# full SHA-256 digest of a canonical subject per line. Digests rather than
+# subjects because the value lives in Secret Manager, in a deploy substitution
+# and in an operator's clipboard, and none of those is a place to keep a real
+# account identifier — a digest names an account to the gate and to nothing else.
+#
+# The bounds below exist so that a value which is nearly right is REFUSED rather
+# than silently reinterpreted. An allowlist that quietly drops the line it could
+# not parse is an allowlist that locks out the person it was edited to admit, and
+# nothing about the deployment would look wrong.
+_SUBJECT_DIGEST_LENGTH = 64
+_SUBJECT_DIGEST_CHARS = frozenset("0123456789abcdef")
+
+#: 1 is a real deployment (one operator); 64 is far past any private staging
+#: cohort. Crossing it means the wrong value was pasted, not a busy beta.
+_MAX_SUBJECT_GATE_ENTRIES = 64
+
+#: The largest legal list, exactly: 64 entries of 64 characters, each followed by
+#: its LF. Checked against the RAW BYTES and BEFORE decoding, which is the whole
+#: reason it is a byte count rather than a character count — a multi-megabyte
+#: value should be refused by its size, not decoded first so that its size can be
+#: measured in characters.
+_MAX_SUBJECT_GATE_BYTES = _MAX_SUBJECT_GATE_ENTRIES * (_SUBJECT_DIGEST_LENGTH + 1)
+
+#: The membership label. It is not a version of anything (see CLAUDE.md) — it is
+#: a name for WHICH list is loaded, so an operator reading `/version` can tell
+#: whether the revision in front of them has the membership they just published.
+#:
+#: It is echoed on a public unauthenticated endpoint, so the charset is narrow —
+#: but be precise about what that buys. It is SYNTACTIC safety: no whitespace, no
+#: markup, no control characters, nothing that changes the shape of a log line or
+#: a JSON body. It is NOT semantic: 32 lowercase-hex characters are a legal label
+#: and also the first half of a digest, and a de-hyphenated UUID fits too. That
+#: the value carries no subject material is an operator contract, stated where an
+#: operator reads it (`.env.example`), and no validator here can enforce it.
+_MAX_GATE_REVISION_LENGTH = 32
+_GATE_REVISION_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789._-")
+_GATE_REVISION_LEADING_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789")
+
+
+def parse_subject_digests(value: str) -> tuple[frozenset[str], str | None]:
+    """The gate's membership list, or the one sentence explaining why there is none.
+
+    Returns ``(entries, problem)``; a problem always comes with an EMPTY set, so
+    every caller that ignores the problem still fails closed. That pairing is
+    deliberate rather than tidy — readiness reads the problem and refuses to come
+    up, while the door reads only the set, and the door must not be the place
+    where a parse failure is first noticed.
+
+    The byte ceiling is applied to the bytes the environment actually carried,
+    before any of them are decoded. ``os.environ`` has already decoded once, under
+    the filesystem encoding and ``surrogateescape``; ``os.fsencode`` is that
+    decode's exact inverse, so it recovers the original bytes whatever the locale
+    is — including the ones that were never valid UTF-8, which then fail the
+    strict decode below rather than surviving as lone surrogates all the way into
+    a digest comparison. Hardcoding UTF-8 for the round trip would be right only
+    where the filesystem encoding already is UTF-8, which is true of the runtime
+    image and is not a property worth depending on silently.
+
+    Nothing here is trimmed, normalised or lowercased. A digest is a lookup key:
+    accepting two spellings of one entry means the gate's membership depends on
+    which spelling the operator happened to paste, and repairing the input is how
+    a value that was validated stops being the value that is used.
+    """
+    if not value:
+        return frozenset(), (
+            "STAGING_ALLOWED_SUBJECT_DIGESTS is empty (a gate with no members "
+            "would refuse every account, including the operator's)"
+        )
+    try:
+        raw = os.fsencode(value)
+    except UnicodeEncodeError:
+        return frozenset(), "STAGING_ALLOWED_SUBJECT_DIGESTS is not valid UTF-8"
+    if len(raw) > _MAX_SUBJECT_GATE_BYTES:
+        return frozenset(), (
+            f"STAGING_ALLOWED_SUBJECT_DIGESTS is {len(raw)} bytes, which is past the "
+            f"largest legal list ({_MAX_SUBJECT_GATE_BYTES} bytes: "
+            f"{_MAX_SUBJECT_GATE_ENTRIES} entries and their separators)"
+        )
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return frozenset(), "STAGING_ALLOWED_SUBJECT_DIGESTS is not valid UTF-8"
+
+    if text.startswith("\ufeff"):
+        # A BOM is what a Windows editor writes and what a `gcloud` paste keeps.
+        # It would otherwise be a stray character on the FIRST entry only, so the
+        # gate would admit everyone but the person at the top of the list.
+        return frozenset(), (
+            "STAGING_ALLOWED_SUBJECT_DIGESTS starts with a byte-order mark "
+            "(save it as UTF-8 without a BOM)"
+        )
+    if "\r" in text:
+        return frozenset(), (
+            "STAGING_ALLOWED_SUBJECT_DIGESTS contains a carriage return "
+            "(entries are separated by a single LF, never CR or CRLF)"
+        )
+
+    # Exactly one optional terminal LF. A second one is a blank final entry and is
+    # reported as such below, rather than absorbed.
+    body = text[:-1] if text.endswith("\n") else text
+    entries = body.split("\n")
+
+    # Before any per-entry work, and deliberately not folded into the byte
+    # ceiling: the two bounds catch different mistakes. A list of 65 full digests
+    # is over the byte ceiling anyway, but a list of 5,000 short lines is small on
+    # the wire and is still not an allowlist anybody wrote by hand.
+    if len(entries) > _MAX_SUBJECT_GATE_ENTRIES:
+        return frozenset(), (
+            f"STAGING_ALLOWED_SUBJECT_DIGESTS has {len(entries)} entries, past the "
+            f"maximum of {_MAX_SUBJECT_GATE_ENTRIES}"
+        )
+
+    seen: set[str] = set()
+    for index, entry in enumerate(entries, start=1):
+        if not entry:
+            return frozenset(), (
+                f"STAGING_ALLOWED_SUBJECT_DIGESTS line {index} is blank "
+                "(every line must be one digest)"
+            )
+        if entry != entry.strip() or any(character.isspace() for character in entry):
+            return frozenset(), (
+                f"STAGING_ALLOWED_SUBJECT_DIGESTS line {index} contains whitespace "
+                "(a digest is 64 hex characters and nothing else)"
+            )
+        if len(entry) != _SUBJECT_DIGEST_LENGTH:
+            return frozenset(), (
+                f"STAGING_ALLOWED_SUBJECT_DIGESTS line {index} is {len(entry)} "
+                f"characters, not {_SUBJECT_DIGEST_LENGTH}"
+            )
+        if not set(entry) <= _SUBJECT_DIGEST_CHARS:
+            lowered = entry.lower()
+            if set(lowered) <= _SUBJECT_DIGEST_CHARS:
+                # Its own message because it is the likely paste, and because
+                # lowercasing it here would be the exact repair this parser must
+                # not make — see the docstring.
+                return frozenset(), (
+                    f"STAGING_ALLOWED_SUBJECT_DIGESTS line {index} is uppercase "
+                    "(digests are lowercase hexadecimal)"
+                )
+            return frozenset(), (
+                f"STAGING_ALLOWED_SUBJECT_DIGESTS line {index} is not hexadecimal"
+            )
+        if entry in seen:
+            # Not harmless: a duplicate means the list an operator counted is not
+            # the list the gate holds, and the count is the only thing anyone can
+            # see about it.
+            return frozenset(), (
+                f"STAGING_ALLOWED_SUBJECT_DIGESTS line {index} repeats an earlier entry"
+            )
+        seen.add(entry)
+
+    return frozenset(seen), None
+
+
+def _gate_revision_problem(value: str) -> str | None:
+    """Everything wrong with the membership label itself.
+
+    Rejects rather than trims, for the reason ``_client_id_problems`` does: this
+    string is published verbatim on ``/version``, so validating one value and
+    publishing another is how a space reaches an operator's diff.
+    """
+    if value != value.strip():
+        return "STAGING_SUBJECT_GATE_REVISION must not have leading or trailing whitespace"
+    if not value or len(value) > _MAX_GATE_REVISION_LENGTH:
+        return (
+            f"STAGING_SUBJECT_GATE_REVISION must be 1-{_MAX_GATE_REVISION_LENGTH} "
+            "characters"
+        )
+    if value[0] not in _GATE_REVISION_LEADING_CHARS:
+        return "STAGING_SUBJECT_GATE_REVISION must start with a lowercase letter or a digit"
+    if not set(value) <= _GATE_REVISION_CHARS:
+        return (
+            "STAGING_SUBJECT_GATE_REVISION may hold only lowercase letters, digits, "
+            "and . _ -"
+        )
+    return None
 
 
 def _host_allowed(host: str, suffixes: tuple[str, ...]) -> bool:
@@ -996,6 +1186,26 @@ class Settings(BaseSettings):
     entitlement_mode: EntitlementMode = Field(default="off", alias="ENTITLEMENT_MODE")
     daintree_entitlement_url: str = Field(default="", alias="DAINTREE_ENTITLEMENT_URL")
 
+    # ---- Private-staging subject gate -----------------------------------
+    #
+    # See `parse_subject_digests` above for what the value must look like and
+    # `subject_gate_problems` below for when it is required. In short: under
+    # ENVIRONMENT=staging with AUTH_MODE=enforce, only the subjects named here may
+    # reach entitlement resolution or funded provider work.
+    #
+    # A `SecretStr` even though a digest is one-way, because the LIST is the
+    # sensitive thing rather than any entry: it enumerates a private cohort, and
+    # the whole point of the type is that nothing prints it by accident.
+    staging_allowed_subject_digests: SecretStr = Field(
+        default=SecretStr(""), alias="STAGING_ALLOWED_SUBJECT_DIGESTS"
+    )
+    #: The one part of the gate that is safe to publish, and the only way an
+    #: operator can tell which membership a running revision holds. Not a version
+    #: number (CLAUDE.md): a name for the list, changed when the list changes.
+    staging_subject_gate_revision: str = Field(
+        default="", alias="STAGING_SUBJECT_GATE_REVISION"
+    )
+
     # ---- Policy ---------------------------------------------------------
     allow_remote_image_urls: bool = Field(default=False, alias="ALLOW_REMOTE_IMAGE_URLS")
     expose_debug_selector_reason: bool = Field(default=False, alias="EXPOSE_DEBUG_SELECTOR_REASON")
@@ -1196,6 +1406,7 @@ class Settings(BaseSettings):
         problems.extend(self.fast_response_problems())
         problems.extend(self.auth_problems())
         problems.extend(self.entitlement_problems())
+        problems.extend(self.subject_gate_problems())
         return problems
 
     #: The values that must be present for a manifest to be publishable. Ordered
@@ -1624,6 +1835,129 @@ class Settings(BaseSettings):
                         "origin alone still lets a mistyped route receive the "
                         "caller's forwarded bearer"
                     )
+        return problems
+
+    @property
+    def staging_subject_gate_enabled(self) -> bool:
+        """Whether the private-staging subject allowlist actually decides anything.
+
+        Two conditions, and both are load-bearing.
+
+        ``ENVIRONMENT=staging`` because that is the only deployment the list
+        describes. ``AUTH_MODE=enforce`` because below it there is no subject to
+        test: ``open`` never reads the header and ``observe`` verifies and then
+        discards, so every request is the anonymous principal. A gate above an
+        unenforced door could only ever refuse everyone or nobody, and the honest
+        spelling of that is "off".
+
+        Production is deliberately absent, and it is not an oversight — see
+        :meth:`subject_gate_problems`, which refuses to let a production
+        deployment hold this value at all.
+        """
+        return self.environment == "staging" and self.auth_mode == "enforce"
+
+    @property
+    def published_gate_revision(self) -> str:
+        """The membership label, but only once it is known to be well formed.
+
+        ``/version`` answers while the service is UNREADY — deliberately, because
+        the endpoint exists so an operator can see what a revision that failed to
+        come up actually is. So "readiness refuses a malformed label" is not on
+        its own a reason the label is safe to echo: the very deployment whose
+        label is wrong is the one whose ``/version`` is being read. A value typed
+        into the wrong variable — a digest, a subject id, a sentence — would
+        otherwise be published verbatim on a public unauthenticated route, and
+        logged beside every refusal, by exactly the mistake that made it unsafe.
+
+        An unvalidated label reads as absent instead. That is the honest
+        projection: the deployment has no usable membership name.
+        """
+        if _gate_revision_problem(self.staging_subject_gate_revision) is not None:
+            return ""
+        return self.staging_subject_gate_revision
+
+    def allowed_subject_digests(self) -> frozenset[str]:
+        """The gate's membership, or an empty set.
+
+        Empty is a REFUSAL of everybody rather than a licence for anybody: the
+        door tests membership, so an unparseable list admits no one. Readiness has
+        already refused a staging deployment whose list does not parse, so the
+        door should never see one — this is the second half of the same answer,
+        placed where a wiring mistake still fails closed.
+
+        Parsed per call rather than cached. The list is at most 64 short strings
+        and ``Settings`` is frozen, so a cache would be a second copy of secret
+        material bought to save a few microseconds on a path that is already about
+        to verify an RSA signature.
+        """
+        entries, _ = parse_subject_digests(
+            self.staging_allowed_subject_digests.get_secret_value()
+        )
+        return entries
+
+    def subject_gate_problems(self) -> list[str]:
+        """The private-staging subject gate, as a readiness verdict.
+
+        Three rules, and the third is the one this brief had to decide.
+
+        **Where the gate is enabled, it must be complete.** A missing, empty or
+        malformed list, or a missing or malformed revision, fails readiness. It
+        does NOT degrade to "no gate": an operator who asked for a private
+        deployment and silently got a public one has no way to discover that, and
+        the revision would take traffic looking exactly like a working one — the
+        same reasoning :meth:`entitlement_problems` gives for never demoting to
+        ``off``.
+
+        **Whatever is set is validated everywhere**, including where the gate is
+        inert. A malformed list in development is the value that will be promoted,
+        and finding out at promotion is finding out during a rollout.
+
+        **Production may not hold this value at all.** The doc that specified the
+        gate scopes it to private staging and says no production default may
+        silently inherit a staging list. Refusing readiness is the only reading of
+        that with no silent half: production neither enforces a list it was handed
+        (which would be a private-beta gate nobody decided to ship) nor ignores one
+        (which would leave an operator believing production was gated when it was
+        not). Both of those are decisions made by accident; this one has to be
+        made on purpose, and when it is, it will be a different setting with its
+        own name.
+        """
+        problems: list[str] = []
+        configured = self.staging_allowed_subject_digests.get_secret_value()
+
+        if self.environment == "production" and configured:
+            problems.append(
+                "STAGING_ALLOWED_SUBJECT_DIGESTS must be unset in production "
+                "(the subject gate is a private-staging feature and production "
+                "would neither enforce nor inherit it)"
+            )
+            return problems
+
+        if configured:
+            _, problem = parse_subject_digests(configured)
+            if problem:
+                problems.append(problem)
+
+        if not self.staging_subject_gate_enabled:
+            # The revision names a list. With no gate deciding anything there is
+            # nothing for it to name, so an unset one is correct rather than
+            # missing — but a value that IS set is still checked, because it is
+            # published on `/version` in every environment.
+            if self.staging_subject_gate_revision:
+                revision_problem = _gate_revision_problem(self.staging_subject_gate_revision)
+                if revision_problem:
+                    problems.append(revision_problem)
+            return problems
+
+        if not configured:
+            problems.append(
+                "ENVIRONMENT=staging with AUTH_MODE=enforce requires "
+                "STAGING_ALLOWED_SUBJECT_DIGESTS (a private staging deployment "
+                "that admits every verified account is not private)"
+            )
+        revision_problem = _gate_revision_problem(self.staging_subject_gate_revision)
+        if revision_problem:
+            problems.append(revision_problem)
         return problems
 
     @property

@@ -115,7 +115,7 @@ def test_version(client) -> None:
 
 
 def test_version_reports_the_deployment_posture(client) -> None:
-    """The two rollout axes, and the only endpoint that reports either.
+    """The rollout axes, and the only endpoint that reports any of them.
 
     `/v1/daintree/auth/config` answers a CLIENT's question — "must I hold a
     credential" — as `configured and auth_mode == "enforce"`, which cannot tell
@@ -133,10 +133,15 @@ def test_version_reports_the_deployment_posture(client) -> None:
     assert r.json()["posture"] == {
         "auth": settings.auth_mode,
         "entitlement": settings.entitlement_mode,
+        "subject_gate": {
+            "enabled": settings.staging_subject_gate_enabled,
+            "entries": len(settings.allowed_subject_digests()),
+            "revision": settings.staging_subject_gate_revision,
+        },
     }
 
 
-def test_version_never_reports_a_configured_value_beyond_the_two_modes(client) -> None:
+def test_version_never_reports_a_configured_value_beyond_the_posture(client) -> None:
     """A public, unauthenticated status route.
 
     Cloud Run probes it and anybody can read it, so the standing rule is that
@@ -144,12 +149,24 @@ def test_version_never_reports_a_configured_value_beyond_the_two_modes(client) -
     fixed words and describes a rollout stage; an issuer, a client id, a URL or a
     key would be a deployment's configuration published for the convenience of the
     script that wanted to assert it.
+
+    The subject gate is the one entry derived from a SECRET, so it is bounded
+    harder than the modes are: a boolean, a COUNT, and an operator-chosen label
+    from a narrow charset. Never an entry, never a prefix or suffix of one, never
+    a hash of the set, and never an answer to "is this subject in it" — a public
+    endpoint that could be asked that would be a membership oracle, which is worse
+    than publishing the list because nobody would notice it being read.
     """
     body = client.get("/version").json()
     assert set(body) == {"server_version", "build_sha", "protocol", "posture"}
-    assert set(body["posture"]) == {"auth", "entitlement"}
-    for value in body["posture"].values():
-        assert value in {"open", "observe", "enforce", "off"}
+    assert set(body["posture"]) == {"auth", "entitlement", "subject_gate"}
+    for key in ("auth", "entitlement"):
+        assert body["posture"][key] in {"open", "observe", "enforce", "off"}
+    gate = body["posture"]["subject_gate"]
+    assert set(gate) == {"enabled", "entries", "revision"}
+    assert isinstance(gate["enabled"], bool)
+    assert isinstance(gate["entries"], int)
+    assert isinstance(gate["revision"], str)
 
 
 def test_capabilities(client, auth, app) -> None:
