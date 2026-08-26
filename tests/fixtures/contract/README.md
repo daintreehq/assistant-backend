@@ -27,16 +27,31 @@ does not.
 
 `manifest.json` also fixes the **reference instant** — `2026-08-26T12:00:00Z`. Every
 `checked_at` in `entitlement/` is a literal offset from it, which is what lets the age
-boundaries be asserted at the second without a test ever sleeping. Parse those fixtures
-with `now` pinned to that instant, never with wall-clock time.
+bounds be asserted at the second without a test ever sleeping.
+
+There are two legitimate ways to consume those offsets, and they prove different things:
+
+- **Pin `now` to the reference instant.** Exact, so this is the only way to assert a
+  boundary — `granted_cache_at_the_bound.json` is precisely `86400 + 300` seconds old, and
+  only a frozen clock can show that it is *inside* an inclusive bound. Unit tests do this.
+- **Re-apply the offset to wall-clock time.** Lets the real freshness code run unpatched,
+  at the cost of a small cushion so a valid fixture cannot be tipped over its bound by the
+  milliseconds between stamping and parsing. Approximate, so it proves outcomes and never
+  boundaries. The integration suite does this and says so.
+
+What no consumer should do is read `checked_at` as an absolute time — by the time anyone
+runs these, the reference instant is in the past and every fixture would read as expired.
 
 ## Consumers
 
 - `tests/unit/test_account_contract.py` — the response model against `account/`. Every
   valid file must parse and re-emit the same fields; every invalid one must be refused for
   the rule the manifest names.
-- `tests/integration/test_account_contract_boundary.py` — the real route and the real
-  entitlement client, driven end to end from both directories.
+- `tests/integration/test_account_contract_boundary.py` — the real route, the real
+  entitlement client and the real paid-access gate, driven end to end. It consumes every
+  `entitlement/` body and compares the result against the `account/` bodies for the shapes
+  a route can actually produce; the invalid `account/` files stay at model level, because
+  the point of them is that no route can build one.
 - **the CLI** (`github.com/daintreehq/assistant`) — *intended* consumer, and not yet a
   real one. The CLI is meant to copy `account/` byte-for-byte as its own decode fixtures,
   so that a drift in either repository shows up as a diff rather than as a runtime
