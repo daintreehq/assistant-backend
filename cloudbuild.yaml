@@ -334,8 +334,18 @@ steps:
           # `https://evil.example/daintree.org`, the two spellings anybody
           # attacking this would reach for. This splitting is NOT URL parsing —
           # the rules above are what remove the characters it cannot handle.
-          AUTHORITY="$${URL#https://}"; AUTHORITY="$${AUTHORITY%%/*}"
+          REST="$${URL#https://}"
+          AUTHORITY="$${REST%%/*}"
           HOST="$${AUTHORITY%%:*}"; PORT="$${AUTHORITY#$$HOST}"; PORT="$${PORT#:}"
+          # The path, kept rather than discarded. The authority split above throws
+          # away everything after the host, which is how a build could ship a URL
+          # pinned to the right SITE and pointed at the wrong ROUTE. Called
+          # URLPATH and never PATH: reusing the shell's own PATH here would break
+          # every command that runs after this block.
+          case "$$REST" in
+            */*) URLPATH="/$${REST#*/}" ;;
+            *) URLPATH="" ;;
+          esac
           case "$$HOST" in
             daintree.org|*.daintree.org) ;;
             *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must point at daintree.org or a" >&2
@@ -357,6 +367,22 @@ steps:
               exit 1
             fi
           fi
+          # Pinned to the one route on the website that is supposed to receive a
+          # forwarded bearer. The host rule above answers "is this us"; this one
+          # answers "is this the endpoint", and only both together describe a
+          # destination. Exact equality against the literal, so a sibling route, a
+          # doubled slash, a percent-escape, a case change and a trailing slash all
+          # fail without a rule apiece — matching `_ENTITLEMENT_PATH` in config.py,
+          # which refuses the trailing-slash spelling rather than rewriting it.
+          # The offending path is not echoed: a `@` is already refused above, but
+          # this branch is one line away from a value an operator pasted a token
+          # into, and the literal we require says everything the message needs to.
+          case "$$URLPATH" in
+            /api/assistant/entitlement) ;;
+            *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must name exactly the path" >&2
+               echo "       /api/assistant/entitlement (no trailing slash)." >&2
+               exit 1 ;;
+          esac
         fi
 
         # together-api-key is REQUIRED, not optional like the previous signing key:

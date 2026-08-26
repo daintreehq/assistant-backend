@@ -195,7 +195,7 @@ def _validate_url(value: str) -> subprocess.CompletedProcess[str]:
     [
         pytest.param("https://staging.daintree.org/api/assistant/entitlement", id="staging"),
         pytest.param("https://daintree.org/api/assistant/entitlement", id="apex"),
-        pytest.param("https://www.daintree.org/x", id="another_subdomain"),
+        pytest.param("https://www.daintree.org/api/assistant/entitlement", id="another_subdomain"),
         pytest.param("", id="unset"),
     ],
 )
@@ -246,6 +246,62 @@ def test_the_build_accepts_an_entitlement_url_it_should_not_block(url: str) -> N
         ),
         pytest.param("https://daintree.org:99999/api", "out of range", id="port_out_of_range"),
         pytest.param("https://daintree.org:0/api", "out of range", id="port_zero"),
+        # The route itself. Every case below is on an ALLOWED host and would have
+        # shipped before this rule existed — which is the point of them: the host
+        # check cannot tell a billing endpoint from a form handler, a logging
+        # route or a preview deployment on the same site, and the caller's bearer
+        # is attached to whichever one is written here.
+        pytest.param(
+            "https://staging.daintree.org/", "exactly the path", id="path_root"
+        ),
+        pytest.param(
+            "https://staging.daintree.org", "exactly the path", id="path_absent"
+        ),
+        pytest.param(
+            "https://staging.daintree.org/api/assistant/entitlements",
+            "exactly the path",
+            id="path_sibling_plural",
+        ),
+        pytest.param(
+            "https://staging.daintree.org/api/assistant/account",
+            "exactly the path",
+            id="path_sibling_route",
+        ),
+        pytest.param(
+            "https://staging.daintree.org/api/assistant/entitlementX",
+            "exactly the path",
+            id="path_suffix_glued",
+        ),
+        pytest.param(
+            "https://staging.daintree.org/x/api/assistant/entitlement",
+            "exactly the path",
+            id="path_prefixed",
+        ),
+        pytest.param(
+            "https://staging.daintree.org/api//assistant/entitlement",
+            "exactly the path",
+            id="path_double_slash",
+        ),
+        pytest.param(
+            "https://staging.daintree.org/api/assistant/%65ntitlement",
+            "exactly the path",
+            id="path_percent_encoded",
+        ),
+        pytest.param(
+            "https://staging.daintree.org/api/%2e%2e/api/assistant/entitlement",
+            "exactly the path",
+            id="path_encoded_dot_segments",
+        ),
+        pytest.param(
+            "https://staging.daintree.org/api/assistant/entitlement/",
+            "exactly the path",
+            id="path_trailing_slash",
+        ),
+        pytest.param(
+            "https://staging.daintree.org/API/assistant/entitlement",
+            "exactly the path",
+            id="path_upper_case",
+        ),
     ],
 )
 def test_the_build_refuses_an_entitlement_url_it_must_not_forward_a_bearer_to(
@@ -285,6 +341,18 @@ def test_the_build_refuses_a_sample_of_what_readiness_refuses() -> None:
         "https://daintree.org.evil.example/api",
         "https://daintree.org:not-a-port/api",
         "   ",
+        # The route, on a host both halves allow — so the ONLY thing that can
+        # refuse these is the path rule, in each half independently.
+        "https://staging.daintree.org/",
+        "https://staging.daintree.org",
+        "https://staging.daintree.org/api/assistant/entitlements",
+        "https://staging.daintree.org/api/assistant/entitlementX",
+        "https://staging.daintree.org/x/api/assistant/entitlement",
+        "https://staging.daintree.org/api//assistant/entitlement",
+        "https://staging.daintree.org/api/assistant/%65ntitlement",
+        "https://staging.daintree.org/api/%2e%2e/api/assistant/entitlement",
+        "https://staging.daintree.org/api/assistant/entitlement/",
+        "https://staging.daintree.org/API/assistant/entitlement",
     ):
         settings = Settings(
             TOGETHER_API_KEY="tgp_v1_test-key",
@@ -294,6 +362,44 @@ def test_the_build_refuses_a_sample_of_what_readiness_refuses() -> None:
         )
         assert settings.entitlement_problems(), f"readiness accepts {url}"
         assert _validate_url(url).returncode == 1, f"the build accepts {url}"
+
+
+def test_the_build_and_readiness_agree_on_the_one_url_that_should_ship() -> None:
+    """The other direction, and the one a refusal-only suite cannot show.
+
+    A path rule that is wrong in the STRICT direction fails closed and is caught
+    by whoever tries to deploy — but only if somebody tries. Both halves have to
+    accept the canonical spelling, and each half is checked here against its own
+    implementation rather than against a shared constant, so a typo in either one
+    is a failure rather than a matching pair of mistakes.
+    """
+    from daintree_assistant_server.config import Settings
+
+    url = "https://staging.daintree.org/api/assistant/entitlement"
+    settings = Settings(
+        TOGETHER_API_KEY="tgp_v1_test-key",
+        STATE_SIGNING_KEY_CURRENT="test-signing-key",
+        ENVIRONMENT="staging",
+        DAINTREE_ENTITLEMENT_URL=url,
+    )
+    assert settings.entitlement_problems() == []
+    result = _validate_url(url)
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_build_never_echoes_the_path_it_refused() -> None:
+    """The refusal one line above a credential.
+
+    An operator who pastes a bearer into this variable produces a value whose
+    PATH can carry it, and the build's stderr is a CI log a great many people can
+    read. The `@` branch above catches the classic `https://token@host/` spelling
+    before anything echoes, and this branch must not reopen the hole from the
+    other side — so it names the route we require and nothing the operator wrote.
+    """
+    result = _validate_url("https://staging.daintree.org/api/assistant/sekrit-token-value")
+    assert result.returncode == 1
+    assert "sekrit-token-value" not in result.stderr
+    assert "sekrit-token-value" not in result.stdout
 
 
 # --- the smoke script ---------------------------------------------------------

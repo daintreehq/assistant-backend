@@ -195,3 +195,113 @@ def test_a_url_ending_in_a_bare_question_mark_is_still_refused() -> None:
         DAINTREE_ENTITLEMENT_URL=f"{_STAGING_URL}?"
     ).entitlement_problems()
     assert any("query string or fragment" in p for p in problems)
+
+
+# --- the route, not just the origin -----------------------------------------
+#
+# The host rule answers "is this us". It cannot answer "is this the endpoint that
+# is supposed to receive a forwarded bearer", and every path on every
+# `daintree.org` subdomain is a place the caller's Supabase access token can be
+# delivered: a form handler, a logging route, a preview deployment, something
+# added next month. `services/entitlement.py` stores the configured value verbatim
+# and hands it to `build_request` with nothing appended or normalised, so the
+# string validated here IS the request line.
+
+
+def test_the_canonical_staging_url_is_accepted() -> None:
+    """The spelling every fixture in this repo and the website's own contract use.
+
+    Stated as its own test rather than left implicit in the mode matrix: a path
+    rule that is wrong in the strict direction refuses the one URL that should
+    ship, and nothing else in this file would say so.
+    """
+    assert _settings(DAINTREE_ENTITLEMENT_URL=_STAGING_URL).entitlement_problems() == []
+
+
+def test_the_canonical_loopback_url_is_accepted() -> None:
+    """The carve-out relaxes host and scheme, and only those.
+
+    A developer running the website locally still serves it at the same route, so
+    there is nothing for the path rule to be lenient about.
+    """
+    settings = _settings(
+        DAINTREE_ENTITLEMENT_URL="http://127.0.0.1:5173/api/assistant/entitlement"
+    )
+    assert settings.entitlement_problems() == []
+
+
+@pytest.mark.parametrize(
+    ("path", "why"),
+    [
+        pytest.param("/", "the site root", id="root"),
+        pytest.param("", "no path at all", id="bare_host"),
+        pytest.param("/api/assistant/entitlements", "a plural sibling", id="sibling_plural"),
+        pytest.param("/api/assistant/account", "a different route", id="sibling_route"),
+        pytest.param("/api/assistant/entitlementX", "a glued suffix", id="suffix_glued"),
+        pytest.param("/x/api/assistant/entitlement", "a prefixed mount", id="prefixed"),
+        pytest.param("/api//assistant/entitlement", "a doubled slash", id="double_slash"),
+        pytest.param("/api/assistant/entitlement/", "a trailing slash", id="trailing_slash"),
+        pytest.param("/API/assistant/entitlement", "a case change", id="upper_case"),
+    ],
+)
+def test_only_the_exact_route_is_accepted_on_an_allowed_host(path: str, why: str) -> None:
+    """Every one of these is on `staging.daintree.org` and passed before this rule.
+
+    Exact equality is what makes the list this short: no case here needs a rule of
+    its own, and none of them can be argued into matching.
+    """
+    problems = _settings(
+        DAINTREE_ENTITLEMENT_URL=f"https://staging.daintree.org{path}"
+    ).entitlement_problems()
+    assert any("must name exactly the path" in p for p in problems), why
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        pytest.param("/api/assistant/%65ntitlement", id="encoded_letter"),
+        pytest.param("/api/%2e%2e/api/assistant/entitlement", id="encoded_dot_segments"),
+        pytest.param("/api%2fassistant/entitlement", id="encoded_slash"),
+    ],
+)
+def test_a_percent_escape_in_the_path_is_refused_on_its_own_terms(path: str) -> None:
+    """Refused as an ENCODING, before equality is even asked.
+
+    Decoding and then comparing would mean betting that our reading of an escape
+    matches the website's router; not decoding would accept a string that arrives
+    there as the right route by a spelling this contract never agreed to. A fixed
+    literal route never needs one, so refusing costs nothing.
+    """
+    problems = _settings(
+        DAINTREE_ENTITLEMENT_URL=f"https://staging.daintree.org{path}"
+    ).entitlement_problems()
+    assert any("must not percent-encode" in p for p in problems)
+
+
+def test_the_loopback_carve_out_does_not_relax_the_route() -> None:
+    """The carve-out is about there being no network to intercept.
+
+    That is an argument about the host and the scheme. It says nothing about
+    which route is being called, and a local website pointed at the wrong one is
+    how a wrong value gets copied into a staging deployment.
+    """
+    problems = _settings(
+        DAINTREE_ENTITLEMENT_URL="http://127.0.0.1:5173/api"
+    ).entitlement_problems()
+    assert any("must name exactly the path" in p for p in problems)
+
+
+def test_the_route_refusal_never_echoes_the_url_or_the_path() -> None:
+    """These strings reach the startup log and, outside production, a readiness body.
+
+    The value most likely to be malformed is one with a credential pasted into it,
+    and a path is somewhere a token fits. Naming the route we require says
+    everything an operator needs; repeating what they wrote adds only the risk.
+    """
+    secret = "sekrit-token-value"
+    url = f"https://staging.daintree.org/api/assistant/{secret}"
+    problems = _settings(DAINTREE_ENTITLEMENT_URL=url).entitlement_problems()
+    assert problems
+    for problem in problems:
+        assert secret not in problem
+        assert url not in problem

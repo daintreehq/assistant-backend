@@ -381,6 +381,25 @@ def _is_private_host(host: str) -> bool:
 _ALLOWED_ISSUER_SUFFIXES = ("supabase.co", "daintree.org")
 _ALLOWED_LINK_SUFFIXES = ("daintree.org",)
 
+#: The one route on the website that this server may forward a caller's bearer to,
+#: written out in full because a HOST is not a destination.
+#:
+#: `_ALLOWED_LINK_SUFFIXES` pins the origin, and for an account LINK — a page a
+#: user opens in their own browser, already carrying their own session — that is
+#: the whole question. The entitlement call is not that. It attaches the CALLER's
+#: Supabase access token to a request this server originates, so every path on
+#: every `daintree.org` subdomain is a place that credential can be delivered:
+#: a form handler, a logging endpoint, a preview deployment, a route somebody adds
+#: next month. Origin-only pinning answers "is it us" and leaves "is it the route
+#: that is supposed to receive this" unasked.
+#:
+#: Exactly one spelling, and the trailing-slash variant is REFUSED rather than
+#: normalised. Rewriting it would mean this server silently changing a
+#: security-relevant destination on an operator's behalf — and the two spellings
+#: are genuinely different requests to the far end, so the only honest answer to
+#: an ambiguous one is to make somebody write down which they meant.
+_ENTITLEMENT_PATH = "/api/assistant/entitlement"
+
 #: An OAuth client id goes into a URL query string and, on the client, into a
 #: credential-store account key. Both bounds mirror the CLI's.
 _CLIENT_ID_CHARS = frozenset(
@@ -1473,6 +1492,54 @@ class Settings(BaseSettings):
                         "DAINTREE_ENTITLEMENT_URL must point at a Daintree site "
                         f"({_ALLOWED_LINK_SUFFIXES[0]} or a subdomain) — this call "
                         "forwards the caller's account credential"
+                    )
+                # And the PATH, which the host rule above cannot stand in for. A
+                # host answers "is this us"; only the path answers "is this the
+                # route that is supposed to receive the caller's bearer". The
+                # configured value IS the request line — `services/entitlement.py`
+                # stores it verbatim and hands it to `build_request` with nothing
+                # appended, joined or normalised — so whatever is written here is
+                # exactly where the credential goes.
+                #
+                # Checked LAST so the earlier refusals keep naming the sharper
+                # mistake: `https://daintree.com/api/assistant/entitlement` is a
+                # wrong-site problem, not a path problem, and being told about the
+                # path would send an operator looking in the wrong place.
+                #
+                # This rule also binds the loopback carve-out, deliberately. That
+                # carve-out exists so a developer can run the website locally; it
+                # relaxes the HOST and the SCHEME because there is no network to
+                # intercept, and neither of those reasons says anything about which
+                # route is being called. A local website must still serve this at
+                # `http://127.0.0.1:<port>/api/assistant/entitlement`.
+                path = urlsplit(url).path
+                if "%" in path:
+                    # Refused outright rather than decoded and compared, for the
+                    # same reason the OAuth endpoint paths above refuse one: every
+                    # way of HANDLING an escape here diverges from somebody. If we
+                    # decode, `/api/%2f/../assistant/entitlement` can be argued into
+                    # matching while the far end routes it somewhere else; if we do
+                    # not, an escape that decodes to the right route is accepted as
+                    # a spelling this contract never agreed to. There is no legal
+                    # reason for one in a fixed, literal route, so refusing costs
+                    # nothing and cannot be argued with.
+                    problems.append(
+                        "DAINTREE_ENTITLEMENT_URL must not percent-encode anything "
+                        f"in its path (the route is the literal {_ENTITLEMENT_PATH})"
+                    )
+                elif path != _ENTITLEMENT_PATH:
+                    # Exact equality, and every near-miss falls out of it without a
+                    # rule of its own: a sibling route, a prefix or suffix glued to
+                    # the last segment, a doubled slash, a different case, a
+                    # trailing slash. Nothing here echoes the offending path — this
+                    # string reaches the startup log and, outside production, a
+                    # readiness response, and the value most likely to be malformed
+                    # is one with a credential pasted into it.
+                    problems.append(
+                        "DAINTREE_ENTITLEMENT_URL must name exactly the path "
+                        f"{_ENTITLEMENT_PATH} (no trailing slash) — pinning the "
+                        "origin alone still lets a mistyped route receive the "
+                        "caller's forwarded bearer"
                     )
         return problems
 

@@ -105,6 +105,36 @@ every request resolves to the anonymous principal, which has no account to ask
 about. A configuration that does not satisfy that fails readiness rather than
 quietly reverting to `off`.
 
+### The route
+
+Daintree holds no subscription state. The verdict comes from the website, over one
+bounded `GET` to a single agreed endpoint:
+
+```text
+GET {origin}/api/assistant/entitlement
+Authorization: Bearer <the caller's own Supabase access token>
+```
+
+`DAINTREE_ENTITLEMENT_URL` is that whole URL, and both halves of it are pinned.
+The **origin** must be `daintree.org` or a subdomain (outside staging and
+production a literal loopback origin is accepted, so a local website is
+developable). The **path** must be exactly `/api/assistant/entitlement`, with no
+trailing slash, no query string, no fragment and no userinfo.
+
+The path is pinned for a sharper reason than tidiness: this is the one request in
+the system that forwards the *caller's* credential rather than one of Daintree's,
+so the URL names a place that credential is delivered. An origin rule answers "is
+this us" and leaves "is this the endpoint that is supposed to receive this"
+unasked — and every other route on the same site, present or future, is an answer
+to the first question and not the second.
+
+There is exactly one accepted spelling, and every near miss — a trailing slash, a
+doubled slash, a different case, a percent-escape anywhere in the path — is
+**refused rather than normalised**. Rewriting one would mean silently changing a
+security-relevant destination on an operator's behalf. Both the server's readiness
+check and the deploy pipeline apply the rule, so a wrong route fails the build
+rather than shipping and forwarding.
+
 - **`off`** — paid routes never ask. Nothing is looked up and a turn's first byte
   pays nothing for the question.
 - **`observe`** — paid routes resolve the verdict, record it, and **never refuse on
@@ -511,7 +541,10 @@ endpoint once `/v1/daintree/auth/config` reports `required: true`, which is the
 field that exists for exactly this.
 
 Entitlement is resolved whenever `DAINTREE_ENTITLEMENT_URL` is configured and a
-client for it was built, **including while `ENTITLEMENT_MODE` is `off`**. The mode
+client for it was built — that value being an allowed Daintree origin plus the
+exact path `/api/assistant/entitlement`, see [Account
+entitlement](#account-entitlement) — **including while `ENTITLEMENT_MODE` is
+`off`**. The mode
 decides whether a verdict may refuse a turn, not whether one can be obtained — so
 the whole contract is exercisable against the real website before it can deny
 anybody.
