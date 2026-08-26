@@ -16,9 +16,11 @@ receives.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+
+from ..text_utils import utf8_len
 
 #: The response shape's version, and — like the auth manifest's — a REAL version
 #: rather than one of the labels CLAUDE.md forbids. It is wire metadata a client
@@ -29,6 +31,49 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 #: TYPE carries the contract: a build that meant to emit a different version would
 #: fail to type-check rather than serialize one.
 ACCOUNT_CONTRACT_VERSION = 1
+
+#: The same number `services.entitlement._MAX_STATUS_BYTES` refuses at, restated
+#: rather than imported: this layer states OUR contract and that one states the
+#: WEBSITE's, and an import would make them one statement wearing two names — the
+#: exact collapse the module docstring above says this layer exists to prevent.
+#: Restated as a CONSTANT and not as a literal so the two are greppable together.
+_MAX_STATUS_BYTES = 64
+
+
+def _status_fits_the_contract(value: str) -> str:
+    """Refuse a ``subscription_status`` wider than the contract's 64 UTF-8 BYTES.
+
+    Pydantic's ``max_length`` counts CHARACTERS, and this contract is written in
+    bytes — so ``max_length=64`` was a second statement of a DIFFERENT contract,
+    admitting 64 CJK characters at 192 bytes. There is no character bound beside
+    this one because 64 bytes already implies 64 characters: one statement, in the
+    unit the contract is written in.
+
+    **Nothing reaches this today, and that is the point.** The one construction
+    site (``api/daintree_account.py``) is fed from an already-validated
+    ``Entitlement``, so the producer's identical refusal binds first and no live
+    request can arrive here over the bound. This is the second, independent
+    statement the module docstring asks for — insurance against a later change on
+    either side, not a repair to a reachable defect.
+
+    ``utf8_len``, never a bare ``.encode``: an unpaired surrogate makes that raise
+    ``UnicodeEncodeError``, which is not a ``ValidationError`` and would leave the
+    route answering 500 to something this model is supposed to simply refuse. The
+    producer uses the same helper for the same reason, so the two bounds agree on
+    every input rather than only on the encodable ones.
+
+    The value is NOT echoed. It is opaque display text the website chose, and
+    ``services.entitlement._without_echoed_secrets`` exists because that website
+    could put a bearer in it; a message quoting it would put whatever it holds
+    into a log line and a client's error body.
+    """
+    if utf8_len(value) > _MAX_STATUS_BYTES:
+        raise ValueError(f"subscription_status exceeds {_MAX_STATUS_BYTES} UTF-8 bytes")
+    return value
+
+
+#: Opaque display data. Bounded, never branched on.
+SubscriptionStatus = Annotated[str, AfterValidator(_status_fits_the_contract)]
 
 
 class AccountResponse(BaseModel):
@@ -61,7 +106,7 @@ class AccountResponse(BaseModel):
     access: Literal["granted", "subscription_required", "subscription_inactive", "unverified"]
 
     plan_id: Literal["standard", "pro"] | None = None
-    subscription_status: str | None = Field(default=None, max_length=64)
+    subscription_status: SubscriptionStatus | None = None
     entitlement_source: Literal["polar", "cache"] | None = None
     #: Absent rather than false when no lookup happened. A bare ``false`` would
     #: read as "we checked, and the answer is fresh".

@@ -339,3 +339,82 @@ def test_a_false_stale_flag_survives_exclude_none() -> None:
     ).model_dump(mode="json", exclude_none=True)
     assert dumped["entitlement_stale"] is False
     assert dumped["checked_at"] == "2026-08-26T12:00:00Z"
+
+
+def _granted(status: str) -> dict[str, Any]:
+    """A complete `granted` body, varying only the field under test.
+
+    Complete because the model validator runs after the field validators: a body
+    missing `checked_at` would fail for a reason that has nothing to do with the
+    status, and the test would pass while proving nothing.
+    """
+    return {
+        "subject_hash": _HASH,
+        "access": "granted",
+        "plan_id": "standard",
+        "subscription_status": status,
+        "entitlement_source": "polar",
+        "entitlement_stale": False,
+        "checked_at": datetime(2026, 8, 26, 12, 0, 0, tzinfo=UTC),
+    }
+
+
+def test_the_status_bound_is_inclusive_at_sixty_four_bytes() -> None:
+    """The agreed maximum is USABLE, not the first refused value.
+
+    Same posture as the entitlement client's own bounds: a limit that refuses at
+    exactly its stated number leaves a producer racing its own boundary.
+    """
+    body = AccountResponse(**_granted("a" * 64))
+    assert body.subscription_status == "a" * 64
+    assert body.model_dump(mode="json", exclude_none=True)["subscription_status"] == "a" * 64
+
+    with pytest.raises(ValidationError, match="exceeds 64 UTF-8 bytes"):
+        AccountResponse(**_granted("a" * 65))
+
+
+def test_the_status_bound_counts_bytes_not_characters() -> None:
+    """The whole point of the change, and the case the old bound let through.
+
+    22 CJK characters are 66 UTF-8 bytes and 22 characters, so `max_length=64`
+    admitted them while the producer — which measures the unit the cross-service
+    contract is written in — refuses them. Two layers stating the same contract
+    have to state the SAME contract.
+    """
+    over = "あ" * 22
+    assert len(over) <= 64 and len(over.encode("utf-8")) == 66
+    with pytest.raises(ValidationError, match="exceeds 64 UTF-8 bytes"):
+        AccountResponse(**_granted(over))
+
+    under = "あ" * 21  # 63 bytes
+    assert AccountResponse(**_granted(under)).subscription_status == under
+
+
+def test_a_lone_surrogate_status_is_a_verdict_and_never_an_encoding_crash() -> None:
+    """`utf8_len`, not `.encode` — see its docstring in `text_utils`.
+
+    `json.loads` accepts `"\\ud800"` and pydantic passes it straight through, so a
+    bare encode inside a validator raises `UnicodeEncodeError`, which is not a
+    `ValidationError` and would answer 500 where this model should simply decide.
+    The producer measures with the same helper, so both bounds agree here too.
+    """
+    assert AccountResponse(**_granted("\ud800")).subscription_status == "\ud800"
+    with pytest.raises(ValidationError, match="exceeds 64 UTF-8 bytes"):
+        AccountResponse(**_granted("\ud800" * 65))
+
+
+def test_the_status_refusal_names_the_field_and_not_the_value() -> None:
+    """The message says what rule broke, never what broke it.
+
+    This field is free-form text the WEBSITE chose, and
+    `services.entitlement._without_echoed_secrets` exists because that website
+    could echo a bearer into it — so the message we author must not carry it into
+    a log line. (Pydantic's error envelope still records `input` for a local
+    caller; what this pins is the sentence, which is the part that propagates.)
+    """
+    secret = "sk-live-" + "9" * 60
+    with pytest.raises(ValidationError) as exc:
+        AccountResponse(**_granted(secret))
+    message = exc.value.errors()[0]["msg"]
+    assert "subscription_status exceeds 64 UTF-8 bytes" in message
+    assert secret not in message
