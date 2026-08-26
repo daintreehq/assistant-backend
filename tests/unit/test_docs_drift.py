@@ -1812,3 +1812,49 @@ def test_the_version_posture_field_is_documented() -> None:
         assert f"`{mode}`" in text, (
             f"{mode!r} is a posture value /version can report and the doc never names it"
         )
+
+
+def test_every_setting_is_named_in_env_example() -> None:
+    """A setting absent from `.env.example` is a setting nobody knows exists.
+
+    This file is the only enumeration of the configuration surface a reader ever
+    sees — `Settings` is 1,600 lines of prose-heavy source, and Cloud Run's own
+    env list names only the dozen values the release trigger passes. So the gate
+    is coverage, not commentary: every field must appear as an assignment, live
+    for the ones a deployment sets and commented for the ones whose defaults are
+    the answer.
+
+    It was 57 of 100 when this was written, and the missing 43 were not the
+    obscure half — they included `MAIN_OUTPUT_LINT_ENABLED`, which CLAUDE.md
+    names as one of exactly three switches whose right value is "whatever
+    production says this week", and `UPSTREAM_CONNECT_TIMEOUT_SECONDS`, which
+    sat outside a section headed "Timeouts (seconds)" that a reader would
+    reasonably take as complete.
+
+    Derived from `model_fields` rather than a hardcoded list, so a new setting
+    fails this in the commit that adds it. The alias is what is matched, because
+    the alias is what an operator types: two fields are spelled `DAINTREE_*` in
+    the environment and something shorter on the object.
+    """
+    assigned = set(re.findall(r"^#?\s*([A-Z][A-Z0-9_]+)=", _read(ENV_EXAMPLE), re.M))
+    aliases = {
+        str(field.alias or name.upper()) for name, field in Settings.model_fields.items()
+    }
+
+    undocumented = sorted(aliases - assigned)
+    assert not undocumented, (
+        f"{len(undocumented)} settings are absent from .env.example: "
+        f"{', '.join(undocumented)}. Add each one to the section it belongs to — "
+        "commented out, with its default, if it is not a knob a deployment turns."
+    )
+
+    # And the other direction, which is the failure that outlives a deletion: a
+    # removed setting leaves a line an operator can still copy into `.env`, where
+    # `extra='ignore'` swallows it in silence. There is no way to discover that
+    # the value is doing nothing.
+    stray = sorted(assigned - aliases)
+    assert not stray, (
+        f".env.example offers settings that no longer exist: {', '.join(stray)}. "
+        "Pydantic ignores unknown keys, so a reader who copies one gets no error "
+        "and no effect."
+    )
