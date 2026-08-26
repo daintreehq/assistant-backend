@@ -305,3 +305,140 @@ def test_the_route_refusal_never_echoes_the_url_or_the_path() -> None:
     for problem in problems:
         assert secret not in problem
         assert url not in problem
+
+
+# ---------------------------------------------------------------------------
+# The approved origin, where the environment makes it a boundary.
+#
+# The path rule answers "is this the route" and the suffix rule answers "is this
+# us", and between them they still leave every daintree.org subdomain a place a
+# caller's Supabase access token can be delivered. The set of subdomains is not
+# fixed — a preview deployment, a marketing host, something stood up next month —
+# and a suffix rule cannot tell any of them from the website, because being a
+# subdomain is the only thing it knows how to check.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("environment", "url"),
+    [
+        pytest.param("staging", _STAGING_URL, id="staging_website"),
+        pytest.param(
+            "production", "https://daintree.org/api/assistant/entitlement", id="production_apex"
+        ),
+        pytest.param(
+            "production",
+            "https://www.daintree.org/api/assistant/entitlement",
+            id="production_www",
+        ),
+        pytest.param(
+            "staging",
+            "https://staging.daintree.org:443/api/assistant/entitlement",
+            id="the_default_port_written_out",
+        ),
+    ],
+)
+def test_an_approved_origin_is_accepted(environment: str, url: str) -> None:
+    """The destinations each hardened environment is supposed to have.
+
+    The explicit `:443` matters more than it looks: the comparison is over
+    ORIGINS with the default port filled in, so the two spellings are one value.
+    A string comparison would accept `https://x` and refuse `https://x:443`,
+    which is a rule disagreeing with itself about the same destination.
+    """
+    settings = _settings(ENVIRONMENT=environment, DAINTREE_ENTITLEMENT_URL=url)
+    assert settings.entitlement_problems() == []
+
+
+@pytest.mark.parametrize(
+    ("environment", "url", "why"),
+    [
+        pytest.param(
+            "staging",
+            "https://preview-42.daintree.org/api/assistant/entitlement",
+            "a preview deployment is a subdomain and is not the website",
+            id="a_preview_host",
+        ),
+        pytest.param(
+            "staging",
+            "https://daintree.org/api/assistant/entitlement",
+            "the apex is not the staging website",
+            id="staging_given_the_apex",
+        ),
+        pytest.param(
+            "production",
+            _STAGING_URL,
+            "production must not ask staging about a subscription",
+            id="production_given_staging",
+        ),
+        pytest.param(
+            "staging",
+            "https://staging.daintree.org:8443/api/assistant/entitlement",
+            "an approved host on an unapproved port is a different service",
+            id="an_unapproved_port",
+        ),
+    ],
+)
+def test_an_unapproved_origin_fails_readiness(environment: str, url: str, why: str) -> None:
+    """Every one of these satisfies the suffix rule and the path rule.
+
+    That is what makes them worth a test: nothing about them is malformed, and
+    the only thing wrong is which host receives a credential that belongs to
+    somebody else.
+    """
+    problems = _settings(
+        ENVIRONMENT=environment, DAINTREE_ENTITLEMENT_URL=url
+    ).entitlement_problems()
+    assert any("approved" in p for p in problems), why
+
+
+def test_the_environment_decides_the_rule_not_the_hostname() -> None:
+    """One URL, two verdicts, and the declared environment is the only difference.
+
+    Inferring the environment from the value being validated would let the value
+    choose which rules it is judged by, which is not a check at all.
+    """
+    accepted = _settings(
+        ENVIRONMENT="staging", DAINTREE_ENTITLEMENT_URL=_STAGING_URL
+    ).entitlement_problems()
+    refused = _settings(
+        ENVIRONMENT="production", DAINTREE_ENTITLEMENT_URL=_STAGING_URL
+    ).entitlement_problems()
+    assert accepted == []
+    assert refused != []
+
+
+@pytest.mark.parametrize("environment", ["development", "test"])
+def test_an_unhardened_environment_keeps_the_suffix_rule(environment: str) -> None:
+    """Absent from the approved table, not empty in it — and the difference is
+    the whole behaviour.
+
+    Absent means "fall through to the suffix rule and the loopback carve-out",
+    which is what lets somebody run the website locally against a subdomain of
+    their choosing. An empty entry would mean "no origin is approved" and refuse
+    every value, turning a development convenience into an unusable one.
+    """
+    for url in (
+        "https://anything.daintree.org/api/assistant/entitlement",
+        "http://127.0.0.1:5173/api/assistant/entitlement",
+    ):
+        settings = _settings(ENVIRONMENT=environment, DAINTREE_ENTITLEMENT_URL=url)
+        assert settings.entitlement_problems() == [], url
+
+
+def test_a_bad_origin_fails_readiness_rather_than_being_ignored() -> None:
+    """The rule this whole file exists to hold, applied to the new check.
+
+    An unapproved destination is refused at the door rather than quietly demoted
+    to `off`. An operator who asked for enforcement and got an open till has no
+    way to find out, and a destination that is silently dropped is worse still:
+    the mode binds, every lookup fails, and nothing says why.
+    """
+    settings = _settings(
+        ENVIRONMENT="staging",
+        ENTITLEMENT_MODE="enforce",
+        DAINTREE_ENTITLEMENT_URL="https://preview-42.daintree.org/api/assistant/entitlement",
+        **_ENFORCED_AUTH,
+    )
+    assert settings.entitlement_mode == "enforce"
+    assert settings.entitlement_problems() != []

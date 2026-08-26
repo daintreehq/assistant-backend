@@ -202,6 +202,30 @@ yours".
 ---
 
 
+## Confirm the approved PRODUCTION entitlement origin
+
+**Trigger: the first time production is given a `DAINTREE_ENTITLEMENT_URL`. It
+has none today, so nothing rests on this yet.**
+
+`_APPROVED_ENTITLEMENT_ORIGINS` in `config.py` enumerates the website origins a
+hardened deployment may forward a caller's Supabase access token to. Staging's
+entry is the one every fixture, `.env.example` and `cloudbuild.yaml` already use
+and is certain. Production's — the apex and `www` — is an inference, not a
+confirmed fact about a deployed production website.
+
+The failure mode if it is wrong is deliberate and cheap: readiness refuses the
+value and names the approved set, at the moment somebody first configures
+production. That is the right way round. The alternative was leaving the suffix
+rule in place, which accepts whatever is typed, including a preview deployment.
+
+Confirm the real origin with whoever owns the website deployment and correct the
+tuple — the shell mirror in `cloudbuild.yaml` moves with it, and
+`test_the_build_and_readiness_agree_about_the_origin_in_every_environment` fails
+if only one of the two is edited.
+
+---
+
+
 ## Refuse `AUTH_MODE=open` in production at the cutover
 
 **Trigger: the release that sets production to `enforce`. Not the release that

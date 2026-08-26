@@ -400,6 +400,43 @@ _ALLOWED_LINK_SUFFIXES = ("daintree.org",)
 #: an ambiguous one is to make somebody write down which they meant.
 _ENTITLEMENT_PATH = "/api/assistant/entitlement"
 
+#: The website ORIGINS a hardened deployment may forward a caller's bearer to,
+#: keyed by ``ENVIRONMENT``.
+#:
+#: `_ALLOWED_LINK_SUFFIXES` answers "is it us" and `_ENTITLEMENT_PATH` answers
+#: "is it the route". Together they still leave every `daintree.org` subdomain a
+#: place a caller's Supabase access token can be delivered, and the set of those
+#: is not fixed: a preview deployment, a marketing host, a service somebody
+#: stands up next month. A suffix rule cannot tell any of them from the website,
+#: because being a subdomain is the only thing it knows how to check.
+#:
+#: So in the environments where that matters the origin is ENUMERATED rather than
+#: pattern-matched. The port rides along for free: these are full origins with
+#: the default made explicit, so `https://staging.daintree.org:8443/...` is a
+#: different origin and is refused without needing a rule of its own.
+#:
+#: Keyed on ``ENVIRONMENT`` and never inferred from the hostname. Deriving the
+#: environment from the value being validated would let the value choose which
+#: rules it is judged by, which is not a check.
+#:
+#: `development` and `test` are deliberately ABSENT rather than empty, and the
+#: difference is load-bearing: absent means "fall through to the suffix rule and
+#: the loopback carve-out", which is what makes a locally-run website
+#: developable. An empty tuple would mean "no origin is approved" and refuse
+#: everything.
+#:
+#: **The production entries are the apex and `www`, and they have not been
+#: confirmed against a deployed production website.** Production ships with no
+#: entitlement URL at all today, so nothing currently rests on them; the failure
+#: mode if they are wrong is a readiness refusal naming the approved set, at the
+#: moment somebody first configures production, which is loud and one line to
+#: fix. That is the right way round — the alternative is a suffix rule that
+#: accepts whatever is typed.
+_APPROVED_ENTITLEMENT_ORIGINS: dict[str, tuple[str, ...]] = {
+    "staging": ("https://staging.daintree.org",),
+    "production": ("https://daintree.org", "https://www.daintree.org"),
+}
+
 #: An OAuth client id goes into a URL query string and, on the client, into a
 #: credential-store account key. Both bounds mirror the CLI's.
 _CLIENT_ID_CHARS = frozenset(
@@ -419,6 +456,22 @@ def _host_allowed(host: str, suffixes: tuple[str, ...]) -> bool:
     cleaned = host.lower().strip("[]")
     cleaned = cleaned[:-1] if cleaned.endswith(".") else cleaned
     return any(cleaned == suffix or cleaned.endswith("." + suffix) for suffix in suffixes)
+
+
+def _normalised_origin(origin: tuple[str, str, int] | None) -> tuple[str, str, int] | None:
+    """``origin`` with one trailing dot removed from the host.
+
+    `urlsplit` already lowercases a hostname, so case needs nothing here. The dot
+    does: it is the root label, `example.org.` and `example.org` resolve
+    identically, and an enumerated origin comparison that refused the dotted
+    spelling would be stricter than the resolver — and stricter than
+    :func:`_host_allowed`, which strips it for exactly this reason and which this
+    comparison replaces for hardened environments.
+    """
+    if origin is None:
+        return None
+    scheme, host, port = origin
+    return (scheme, host[:-1] if host.endswith(".") else host, port)
 
 
 def _is_under_path(child: str, parent: str) -> bool:
@@ -1485,9 +1538,39 @@ class Settings(BaseSettings):
                 origin = _origin_of(url)
                 assert origin is not None  # _auth_url_problem returned None
                 host = origin[1]
-                if not _host_allowed(host, _ALLOWED_LINK_SUFFIXES) and not (
+                approved = _APPROVED_ENTITLEMENT_ORIGINS.get(self.environment)
+                if approved is not None:
+                    # An enumerated origin, compared as an origin rather than as
+                    # a hostname: the port is part of it, so a non-default one is
+                    # refused here without a rule of its own. Both sides go
+                    # through `_origin_of`, so `https://x` and `https://x:443`
+                    # are the same approved value rather than one accepted
+                    # spelling and one rejected synonym.
+                    # Both sides normalised the way `_host_allowed` already
+                    # normalises: lowercased by `urlsplit`, and ONE trailing dot
+                    # stripped because `staging.daintree.org.` and
+                    # `staging.daintree.org` are the same name to DNS. An
+                    # enumerated rule that refused the dotted spelling would be
+                    # stricter than the resolver and disagree with the suffix
+                    # rule it replaces about the same host.
+                    permitted = {
+                        _normalised_origin(_origin_of(value)) for value in approved
+                    }
+                    if _normalised_origin(origin) not in permitted:
+                        problems.append(
+                            "DAINTREE_ENTITLEMENT_URL must be one of the approved "
+                            f"{self.environment} website origins "
+                            f"({', '.join(approved)}) — this call forwards the "
+                            "caller's account credential, so every other host "
+                            "under daintree.org is a place it could be delivered"
+                        )
+                elif not _host_allowed(host, _ALLOWED_LINK_SUFFIXES) and not (
                     not self.is_hardened and _is_loopback_literal(host)
                 ):
+                    # Development and test only. The suffix rule and the loopback
+                    # carve-out are what make a locally-run website developable,
+                    # and neither environment is a boundary anything is trusted
+                    # across.
                     problems.append(
                         "DAINTREE_ENTITLEMENT_URL must point at a Daintree site "
                         f"({_ALLOWED_LINK_SUFFIXES[0]} or a subdomain) — this call "

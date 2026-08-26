@@ -424,6 +424,15 @@ steps:
           REST="$${URL#https://}"
           AUTHORITY="$${REST%%/*}"
           HOST="$${AUTHORITY%%:*}"; PORT="$${AUTHORITY#$$HOST}"; PORT="$${PORT#:}"
+          # Normalised the way `config.py` normalises, and for the same two
+          # reasons. A URL parser lowercases a hostname, so `STAGING.DAINTREE.ORG`
+          # reaches the far end as `staging.daintree.org` and readiness accepts
+          # it — a byte comparison here would refuse a value the door allows, and
+          # the build would be rejecting a correct release. One trailing dot goes
+          # for the same reason `_host_allowed` drops it: it is the root label,
+          # and `x.daintree.org.` resolves to `x.daintree.org`.
+          HOST="$$(printf '%s' "$$HOST" | tr '[:upper:]' '[:lower:]')"
+          HOST="$${HOST%.}"
           # The path, kept rather than discarded. The authority split above throws
           # away everything after the host, which is how a build could ship a URL
           # pinned to the right SITE and pointed at the wrong ROUTE. Called
@@ -433,13 +442,54 @@ steps:
             */*) URLPATH="/$${REST#*/}" ;;
             *) URLPATH="" ;;
           esac
-          case "$$HOST" in
-            daintree.org|*.daintree.org) ;;
-            *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must point at daintree.org or a" >&2
-               echo "       subdomain (this call forwards the caller's account" >&2
-               echo "       credential); got host '$$HOST'." >&2
-               exit 1 ;;
+          #
+          # In a hardened environment the origin is ENUMERATED rather than
+          # suffix-matched, mirroring `_APPROVED_ENTITLEMENT_ORIGINS` in
+          # config.py. Being a subdomain of daintree.org is the only thing a
+          # suffix rule knows how to check, and the set of those is not fixed —
+          # a preview deployment, a marketing host, something stood up next
+          # month — while this request carries the caller's Supabase access
+          # token. `development` and `test` keep the suffix rule, which is what
+          # makes a locally-run website developable.
+          #
+          # Keyed on the environment the operator DECLARED, never on the host
+          # being checked: deriving one from the other would let the value pick
+          # which rules it is judged by.
+          case "$$ENVIRONMENT" in
+            staging)    APPROVED_HOSTS="staging.daintree.org" ;;
+            production) APPROVED_HOSTS="daintree.org www.daintree.org" ;;
+            *)          APPROVED_HOSTS="" ;;
           esac
+          if [ -n "$$APPROVED_HOSTS" ]; then
+            HOST_OK=0
+            for APPROVED in $$APPROVED_HOSTS; do
+              [ "$$HOST" = "$$APPROVED" ] && HOST_OK=1
+            done
+            if [ "$$HOST_OK" -ne 1 ]; then
+              echo "ERROR: _DAINTREE_ENTITLEMENT_URL must be one of the approved" >&2
+              echo "       $$ENVIRONMENT website hosts ($$APPROVED_HOSTS); got '$$HOST'." >&2
+              echo "       This call forwards the caller's account credential, so" >&2
+              echo "       every other host under daintree.org is a place it could" >&2
+              echo "       be delivered." >&2
+              exit 1
+            fi
+            # The port, pinned with the origin rather than merely range-checked
+            # above: an approved host on an unapproved port is a different
+            # service, and readiness compares full origins.
+            if [ -n "$$PORT" ] && [ "$$PORT" != "443" ]; then
+              echo "ERROR: _DAINTREE_ENTITLEMENT_URL must use the default https port" >&2
+              echo "       in $$ENVIRONMENT; got port '$$PORT'." >&2
+              exit 1
+            fi
+          else
+            case "$$HOST" in
+              daintree.org|*.daintree.org) ;;
+              *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must point at daintree.org or a" >&2
+                 echo "       subdomain (this call forwards the caller's account" >&2
+                 echo "       credential); got host '$$HOST'." >&2
+                 exit 1 ;;
+            esac
+          fi
           # A port, if one is written, must be a real one. Everything after the
           # first colon was being discarded, so `daintree.org:not-a-port` matched
           # the host rule and shipped a URL readiness then refuses.

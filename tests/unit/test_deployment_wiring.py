@@ -180,10 +180,22 @@ def test_the_validation_actually_runs_before_the_deploy() -> None:
         assert guard not in body, f"the validation is wrapped in a guard that never runs: {guard}"
 
 
-def _validate_url(value: str) -> subprocess.CompletedProcess[str]:
+def _validate_url(value: str, environment: str = "") -> subprocess.CompletedProcess[str]:
+    """The block, on one URL, in one declared environment.
+
+    `environment` defaults to empty rather than to a real value on purpose: the
+    block reads `$ENVIRONMENT` to choose between the enumerated origin rule and
+    the suffix rule, and every case that predates that split is about the suffix
+    rule. An empty value takes the same branch `development` does, so those cases
+    keep asserting exactly what they always asserted.
+    """
     return subprocess.run(  # noqa: S603 - a script this repo owns, run on fixed input
         ["bash", "-c", _validation_script()],
-        env={"PATH": os.environ["PATH"], "DAINTREE_ENTITLEMENT_URL": value},
+        env={
+            "PATH": os.environ["PATH"],
+            "DAINTREE_ENTITLEMENT_URL": value,
+            "ENVIRONMENT": environment,
+        },
         capture_output=True,
         text=True,
         timeout=30,
@@ -1200,3 +1212,143 @@ def test_the_environment_readback_can_never_print_a_secret() -> None:
     assert "got[k]" not in readback.split("ERROR:")[-1], (
         "the failure message reads a value out of the deployed environment"
     )
+
+
+# --- the entitlement origin is enumerated where it matters -------------------
+
+
+@pytest.mark.parametrize(
+    ("environment", "url"),
+    [
+        pytest.param(
+            "staging",
+            "https://staging.daintree.org/api/assistant/entitlement",
+            id="staging_website",
+        ),
+        pytest.param(
+            "production", "https://daintree.org/api/assistant/entitlement", id="production_apex"
+        ),
+        pytest.param(
+            "production",
+            "https://www.daintree.org/api/assistant/entitlement",
+            id="production_www",
+        ),
+        pytest.param(
+            "staging",
+            "https://staging.daintree.org:443/api/assistant/entitlement",
+            id="the_default_port_written_out",
+        ),
+        pytest.param(
+            "development",
+            "https://anything.daintree.org/api/assistant/entitlement",
+            id="development_keeps_the_suffix_rule",
+        ),
+    ],
+)
+def test_the_build_accepts_an_approved_entitlement_origin(environment: str, url: str) -> None:
+    """Each of these is a destination this environment is supposed to have.
+
+    The default port written out is here because it is the spelling most likely
+    to be rejected by an origin comparison done on strings: `https://x` and
+    `https://x:443` are the same origin, and refusing one of them would be a
+    check disagreeing with itself.
+
+    The loopback carve-out is deliberately NOT in this list. Readiness allows it
+    outside a hardened environment so a developer running the website locally can
+    work; the build refuses `http://` in every environment, because a Cloud Run
+    revision naming a loopback address is naming its own container. That
+    asymmetry predates this rule and is the one place the build is stricter than
+    the door it stands in for.
+    """
+    result = _validate_url(url, environment)
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    ("environment", "url", "why"),
+    [
+        pytest.param(
+            "staging",
+            "https://preview-42.daintree.org/api/assistant/entitlement",
+            "a preview deployment is a subdomain and is not the website",
+            id="staging_preview_host",
+        ),
+        pytest.param(
+            "staging",
+            "https://daintree.org/api/assistant/entitlement",
+            "the apex is not the staging website",
+            id="staging_given_the_apex",
+        ),
+        pytest.param(
+            "production",
+            "https://staging.daintree.org/api/assistant/entitlement",
+            "production must not ask staging about a subscription",
+            id="production_given_staging",
+        ),
+        pytest.param(
+            "staging",
+            "https://staging.daintree.org:8443/api/assistant/entitlement",
+            "an approved host on an unapproved port is a different service",
+            id="an_unapproved_port",
+        ),
+    ],
+)
+def test_the_build_refuses_an_unapproved_entitlement_origin(
+    environment: str, url: str, why: str
+) -> None:
+    """Every one of these passes the suffix rule, which is the point.
+
+    Being a subdomain of daintree.org is the only thing that rule knows how to
+    check, and the set of subdomains is not fixed — while this request carries
+    the caller's Supabase access token to whatever it names.
+    """
+    result = _validate_url(url, environment)
+    assert result.returncode != 0, why
+
+
+@pytest.mark.parametrize("environment", ["staging", "production", "development", "test"])
+def test_the_build_and_readiness_agree_about_the_origin_in_every_environment(
+    environment: str,
+) -> None:
+    """Two implementations of one rule, in two languages, checked against each
+    other in every environment rather than in the one somebody happened to try.
+
+    The build check exists to name the mistake at the moment it is made rather
+    than three steps later as a 503 on a candidate revision. It is only worth
+    having while it agrees with the door it stands in for — and a shell `case`
+    and a Python set are exactly the pair that drifts silently, because each one
+    looks obviously right on its own.
+    """
+    from daintree_assistant_server.config import Settings
+
+    candidates = [
+        "https://staging.daintree.org/api/assistant/entitlement",
+        "https://daintree.org/api/assistant/entitlement",
+        "https://www.daintree.org/api/assistant/entitlement",
+        "https://preview-42.daintree.org/api/assistant/entitlement",
+        "https://staging.daintree.org:8443/api/assistant/entitlement",
+        "https://staging.daintree.org:443/api/assistant/entitlement",
+        # The two spellings a URL parser normalises and a byte comparison does
+        # not. Both found a real divergence: uppercase was accepted by readiness
+        # (urlsplit lowercases) and refused by the shell, and the trailing dot
+        # was accepted by the suffix rule this replaces. A check that is stricter
+        # than the door it stands in for rejects correct releases.
+        "https://STAGING.DAINTREE.ORG/api/assistant/entitlement",
+        "https://staging.daintree.org./api/assistant/entitlement",
+        "https://EVIL.example/api/assistant/entitlement",
+    ]
+    for url in candidates:
+        build_ok = _validate_url(url, environment).returncode == 0
+        settings = Settings(  # type: ignore[call-arg]
+            STATE_SIGNING_KEY_CURRENT="sk",
+            TOGETHER_API_KEY="sk-test",
+            CEREBRAS_API_KEY="csk-test",
+            ENVIRONMENT=environment,
+            DAINTREE_ENTITLEMENT_URL=url,
+        )
+        readiness_ok = not [
+            p for p in settings.entitlement_problems() if "DAINTREE_ENTITLEMENT_URL" in p
+        ]
+        assert build_ok == readiness_ok, (
+            f"{environment} / {url}: build says {build_ok}, readiness says {readiness_ok}"
+        )
