@@ -229,6 +229,11 @@ steps:
     # instead means bash only ever sees `"$$SUPABASE_AUTH_ISSUER"`, an ordinary
     # quoted expansion that cannot be anything but data.
     env:
+      # Cloud Build's own per-build identifier. Not operator input, but it
+      # arrives as an environment variable like everything else here — the
+      # step's rule is that the script never contains a substituted value,
+      # and a rule with an exception is one somebody copies the wrong half of.
+      - 'BUILD_ID=$BUILD_ID'
       - 'ENVIRONMENT=${_ENVIRONMENT}'
       - 'AUTH_MODE=${_AUTH_MODE}'
       - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
@@ -678,21 +683,62 @@ steps:
         )
 
         if gcloud run services describe "${_SERVICE}" --region="${_REGION}" >/dev/null 2>&1; then
-          # The tag must be at least 3 characters and a valid DNS label —
-          # Cloud Run rejects a 2-character tag like "rc" outright.
-          echo "Deploying $COMMIT_SHA as a no-traffic 'candidate' revision."
-          gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}" --no-traffic --tag=candidate
-          # The NAME as well as the URL, and the name is the load-bearing half.
-          # `candidate` is a single shared tag, so it names whichever revision was
-          # deployed most recently — and promotion used to say `--to-latest`, which
-          # resolves at promotion time rather than at smoke time. Two overlapping
-          # builds were enough to break the whole point of this pipeline: build A
-          # smokes revision A, build B lands revision B behind the same tag, and
-          # A's promotion then sends 100% of traffic to a revision nothing tested.
-          # Pinning the name here means the thing that was proved is the thing that
-          # is promoted, whatever else has happened in between.
+          # ONE TAG PER BUILD, and this is what makes everything below refer to
+          # this build's own revision rather than to whatever landed last.
+          #
+          # `candidate` was a single shared name. Recording the revision by
+          # NAME already fixed the promotion — the smoke and the promotion now
+          # agree about which revision they mean — but the recording itself read
+          # that shared tag, so the window simply moved earlier: build B can
+          # retag between A's deploy and A's describe, and A then records B. The
+          # smoke's build-SHA assertion catches the mismatched case loudly, which
+          # is why this was a spurious red build rather than a bad promotion, but
+          # a gate whose correctness rests on another assertion firing is not a
+          # gate. Worse, the promotion drops the tag it used, so A's promote
+          # deleted the tag B was still relying on and took B down with it.
+          #
+          # Derived from BUILD_ID rather than COMMIT_SHA: two builds of the SAME
+          # commit are exactly the overlapping pair this has to separate, and
+          # they share a commit sha.
+          #
+          # A Cloud Run tag must be a valid DNS label and at least 3 characters,
+          # and it becomes part of a hostname label alongside the service name,
+          # so it is bounded rather than used whole. Sanitised rather than
+          # trusted: `tr -cd` keeps only characters that are legal, and the `rc-`
+          # prefix guarantees the leading character is a letter whatever the id
+          # begins with.
+          RC_TAG="rc-$$(printf '%s' "$$BUILD_ID" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9' | cut -c1-12)"
+          # Refused rather than defaulted. Falling back to a shared name here
+          # would reintroduce the exact collision this exists to remove, at the
+          # one moment nobody is watching — and an empty BUILD_ID means something
+          # is wrong with the build environment, not with this release.
+          if [ "$$RC_TAG" = "rc-" ]; then
+            echo "ERROR: BUILD_ID yielded no DNS-safe characters; refusing to share a tag." >&2
+            exit 1
+          fi
+          printf '%s' "$$RC_TAG" > /workspace/rc_tag
+          echo "Deploying $COMMIT_SHA as a no-traffic '$$RC_TAG' revision."
+          gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}" --no-traffic --tag="$$RC_TAG"
+          # The NAME as well as the URL, and the name is the load-bearing half:
+          # the promotion names it rather than resolving `--to-latest` at its own
+          # moment. Both are read from the row carrying THIS build's tag, which
+          # no other build can create, move or remove.
+          #
+          # RC_TAG reaches python3 as an environment variable, never as text
+          # spliced into the program — the same rule the operator substitutions
+          # follow at the top of this step. `sys.exit` on a missing row rather
+          # than an unhandled StopIteration: the tag is ours alone, so its
+          # absence means the deploy did not do what it reported, and that
+          # deserves a sentence rather than a traceback.
           gcloud run services describe "${_SERVICE}" --region="${_REGION}" --format=json \
-            | python3 -c 'import json,sys; t=next(t for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="candidate"); print(t["url"]); print(t["revisionName"])' \
+            | RC_TAG="$$RC_TAG" python3 -c 'import json,os,sys
+        tag = os.environ["RC_TAG"]
+        rows = json.load(sys.stdin)["status"]["traffic"]
+        row = next((r for r in rows if r.get("tag") == tag), None)
+        if row is None:
+            sys.exit("no traffic row carries tag %s; the candidate deploy did not take" % tag)
+        print(row["url"])
+        print(row["revisionName"])' \
             > /workspace/rc_meta
           head -1 /workspace/rc_meta > /workspace/rc_url
           tail -1 /workspace/rc_meta > /workspace/rc_revision
@@ -856,7 +902,17 @@ steps:
           echo "ERROR: no candidate revision was recorded; refusing to guess." >&2
           exit 1
         fi
+        # THIS build's tag, read back from the file the deploy wrote. It used to
+        # be the literal `candidate`, which every concurrent build also carried:
+        # promoting A therefore removed the tag build B was about to describe,
+        # and B failed on a revision that was perfectly healthy. A tag no other
+        # build can name is a tag no other build can delete.
+        RC_TAG="$$(cat /workspace/rc_tag)"
+        if [ -z "$$RC_TAG" ]; then
+          echo "ERROR: no candidate tag was recorded; refusing to guess." >&2
+          exit 1
+        fi
         gcloud run services update-traffic "${_SERVICE}" \
           --region="${_REGION}" --to-revisions="$$REVISION=100" \
-          --remove-tags=candidate --quiet
+          --remove-tags="$$RC_TAG" --quiet
         echo "Promoted $$REVISION ($COMMIT_SHA) to 100% of traffic."

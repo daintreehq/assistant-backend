@@ -212,7 +212,9 @@ step in the release path.
 push to main → Cloud Build trigger `deploy-main` → cloudbuild.yaml
    build the image (BUILD_SHA = commit sha)
    push to Artifact Registry
-   deploy a no-traffic revision behind the `candidate` tag
+   deploy a no-traffic revision behind a tag unique to this build
+     (derived from the Cloud Build id, so two overlapping releases can
+      never record, smoke, promote or delete each other's revision)
    smoke-test it with infra/gcp/smoke.sh, told what to expect: the released
      commit, the environment, and both posture modes
      (NOT /healthz: Cloud Run's frontend answers that path itself with an

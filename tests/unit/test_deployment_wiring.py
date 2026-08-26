@@ -828,3 +828,236 @@ def test_the_build_refuses_a_dial_value_that_would_deploy_something_else(
     assert result.returncode != 0, (
         f"accepted {values}, which reaches the revision as a value nothing checked"
     )
+
+
+# --- one candidate tag per build, proved by RUNNING the recording -------------
+
+
+def _rc_recording_script() -> str:
+    """The tag derivation and metadata recording, as runnable bash.
+
+    Extracted and EXECUTED for the same reason the entitlement validation is.
+    The property under test is a race between two builds, and no substring
+    assertion can settle it: the old code contained the string `--tag=candidate`
+    and the string `rc_revision`, which is everything a grep could ask for, and
+    it still recorded whichever revision happened to hold the shared tag when the
+    describe ran.
+
+    `FLAGS` is supplied by the harness — it is assembled far above this block and
+    carries nothing this test is about.
+    """
+    step = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "deploy-rc"
+    )
+    body: str = step["args"][-1]
+    start = body.index('RC_TAG="rc-')
+    end = body.index('echo "Release candidate:', start)
+    end = body.index("\n", end)
+    block = body[start:end]
+    assert block.strip(), "the recording block extracted empty"
+    return (
+        "FLAGS=()\n"
+        + block.replace("$$", "$")
+        .replace("${_SERVICE}", "daintree-assistant")
+        .replace("${_REGION}", "us-central1")
+        .replace("$COMMIT_SHA", "abc123")
+    )
+
+
+#: A `gcloud` that behaves like the real one in the ways this test needs, and
+#: races like a real overlapping build.
+#:
+#: `describe` is where the window is: the stub lands a SECOND build's revision
+#: between our deploy and our describe, which is precisely the interleaving the
+#: shared `candidate` tag could not survive.
+#:
+#: The interloper's row is emitted FIRST, ahead of ours, on purpose. A recording
+#: that reached for `traffic[0]`, or for the newest row, or for anything other
+#: than the row carrying our own tag, would read as correct against a state where
+#: ours happened to come first — so the fixture puts ours where a careless
+#: implementation will not find it.
+_GCLOUD_STUB = """#!/bin/bash
+set -euo pipefail
+STATE="$TRAFFIC_STATE"
+row() { printf '{"tag": "%s", "url": "https://%s---svc.run.app", "revisionName": "svc-%s"}' "$1" "$1" "$1"; }
+case "$*" in
+  *"run deploy"*)
+    for arg in "$@"; do
+      case "$arg" in
+        --tag=*) MINE="${arg#--tag=}" ;;
+      esac
+    done
+    # A tag names ONE revision: deploying under a tag another revision already
+    # holds MOVES it rather than adding a second row. That is the mechanism the
+    # shared name fell foul of, so the stub models it rather than appending.
+    if [ -f "$STATE" ]; then
+      grep -v "\\"tag\\": \\"$MINE\\"" "$STATE" > "$STATE.tmp" || true
+      mv "$STATE.tmp" "$STATE"
+    fi
+    row "$MINE" >> "$STATE"
+    echo >> "$STATE"
+    ;;
+  *"run services describe"*"--format=json"*)
+    # The overlapping build lands here, between our deploy and our describe.
+    printf '{"status": {"traffic": ['
+    { row "$INTERLOPER"; echo; cat "$STATE"; } | grep -v '^$' | paste -sd, -
+    printf ']}}'
+    ;;
+  *"run services describe"*)
+    ;;
+esac
+"""
+
+
+def _run_rc_recording(
+    *, build_id: str, interloper: str, tmp_path: Path
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(parents=True)
+    stub = bin_dir / "gcloud"
+    stub.write_text(_GCLOUD_STUB, encoding="utf-8")
+    stub.chmod(0o755)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True)
+    script = _rc_recording_script().replace("/workspace", str(workspace))
+    result = subprocess.run(  # noqa: S603 - a script this repo owns, on fixed input
+        ["bash", "-c", script],
+        env={
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "BUILD_ID": build_id,
+            "INTERLOPER": interloper,
+            "TRAFFIC_STATE": str(tmp_path / "traffic"),
+        },
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return result, workspace
+
+
+def test_a_concurrent_build_cannot_make_us_record_its_revision(tmp_path: Path) -> None:
+    """The race, reproduced and closed.
+
+    A second build lands its own revision between our deploy and our describe.
+    Under the shared `candidate` tag that was enough to make us record, smoke and
+    promote a revision we never deployed; the smoke's build-SHA assertion turned
+    most of those into a spurious red build rather than a bad promotion, but a
+    gate whose correctness depends on a different assertion firing is not a gate.
+
+    With a tag only this build can name, the interloper's row is simply not ours.
+
+    This proves the FILTER: our own row is found among foreign ones wherever it
+    sits. Two other tests carry the rest of the property — uniqueness, so no
+    other build can hold our tag, and a guard against the literal `candidate`
+    coming back, which is how the filter would end up correct and pointed at a
+    shared name again.
+    """
+    result, workspace = _run_rc_recording(
+        build_id="11111111-2222-3333-4444-555555555555",
+        interloper="rc-99999999aaaa",
+        tmp_path=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    revision = (workspace / "rc_revision").read_text(encoding="utf-8").strip()
+    url = (workspace / "rc_url").read_text(encoding="utf-8").strip()
+    tag = (workspace / "rc_tag").read_text(encoding="utf-8").strip()
+    assert tag == "rc-111111112222"
+    assert revision == "svc-rc-111111112222", (
+        f"recorded {revision!r} — a concurrent build's revision, not our own"
+    )
+    assert "99999999" not in revision and "99999999" not in url
+
+
+def test_two_builds_derive_two_different_tags(tmp_path: Path) -> None:
+    """Derived from BUILD_ID, never from the commit.
+
+    Two builds of the SAME commit are exactly the overlapping pair this has to
+    separate — a re-run of a failed release, a retry after a flake — and they
+    share a commit sha. A tag derived from `COMMIT_SHA` would collide on the one
+    case the mechanism exists for.
+    """
+    tags = set()
+    for i, build_id in enumerate(
+        ("aaaaaaaa-1111-2222-3333-444444444444", "bbbbbbbb-1111-2222-3333-444444444444")
+    ):
+        result, workspace = _run_rc_recording(
+            build_id=build_id, interloper="rc-none", tmp_path=tmp_path / f"run{i}"
+        )
+        assert result.returncode == 0, result.stderr
+        tags.add((workspace / "rc_tag").read_text(encoding="utf-8").strip())
+    assert len(tags) == 2, f"two builds shared one tag: {tags}"
+
+
+def test_the_derived_tag_is_a_legal_cloud_run_tag(tmp_path: Path) -> None:
+    """Cloud Run rejects a tag that is not a DNS label, and it rejects one under
+    three characters outright.
+
+    The tag also becomes part of a hostname label beside the service name, so it
+    is bounded rather than used whole. `BUILD_ID` is a UUID today; the derivation
+    sanitises rather than trusts that, because a tag that fails validation fails
+    the deploy AFTER the image has been built and pushed.
+    """
+    result, workspace = _run_rc_recording(
+        build_id="AAAA-BBBB-cccc-dddd-eeee-ffff-0000-1111",
+        interloper="rc-none",
+        tmp_path=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    tag = (workspace / "rc_tag").read_text(encoding="utf-8").strip()
+    assert re.fullmatch(r"[a-z][a-z0-9-]{2,62}", tag), tag
+    assert tag.islower()
+    assert len(tag) <= 15, f"tag {tag!r} is longer than the derivation bounds it to"
+
+
+def test_a_build_with_no_usable_id_refuses_rather_than_sharing_a_name(
+    tmp_path: Path,
+) -> None:
+    """Falling back to a shared name would reintroduce the collision at the one
+    moment nobody is watching.
+
+    An unusable `BUILD_ID` means something is wrong with the build environment,
+    not with this release, and the honest response is to stop.
+    """
+    result, _ = _run_rc_recording(build_id="!!!!", interloper="rc-none", tmp_path=tmp_path)
+    assert result.returncode != 0
+    assert "refusing to share a tag" in result.stderr
+
+
+def test_the_promotion_removes_only_this_builds_tag(cloudbuild: dict[str, Any]) -> None:
+    """Cleanup used to be `--remove-tags=candidate`, which every concurrent build
+    also carried.
+
+    So promoting A deleted the tag B was about to describe, and B failed on a
+    revision that was perfectly healthy — the pipeline taking down its own
+    sibling. The tag comes from the file the deploy wrote, like the revision name
+    beside it.
+    """
+    promote = next(s for s in cloudbuild["steps"] if s.get("id") == "promote")
+    script = "\n".join(
+        line
+        for line in "\n".join(promote["args"]).splitlines()
+        if not line.lstrip().startswith("#")
+    )
+    assert "--remove-tags=candidate" not in script, (
+        "the promotion removes a shared tag that other builds are relying on"
+    )
+    assert "rc_tag" in script, (
+        "the promotion must remove the tag recorded by its own deploy step"
+    )
+    assert "--remove-tags=" in script
+
+
+def test_no_step_still_names_the_shared_candidate_tag(cloudbuild: dict[str, Any]) -> None:
+    """A single leftover `--tag=candidate` or `tag=="candidate"` puts the whole
+    race back, and it would not fail any other test here — the new tag would be
+    written, and then ignored."""
+    for step in cloudbuild["steps"]:
+        script = "\n".join(
+            line
+            for line in "\n".join(step.get("args", [])).splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        assert "--tag=candidate" not in script, step.get("id")
+        assert '"candidate"' not in script, step.get("id")
