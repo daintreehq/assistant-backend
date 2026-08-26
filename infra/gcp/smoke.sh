@@ -88,6 +88,14 @@ EXPECT_ENTITLEMENT=""
 # production's id sends its users to sign in against the wrong one, with a
 # manifest whose shape is perfectly valid.
 EXPECT_CLIENT_ID=""
+# The OTHER half of the client-id expectation, and it needs its own flag rather
+# than an empty value. An empty `--expect-client-id` means "do not inspect the
+# id", which is the correct reading for a hand-run probe and precisely the wrong
+# one for a release gate: production ships with no OAuth client configured, so
+# passing its empty substitution asserted nothing at all, and a candidate that
+# published a real-but-unintended client would have passed every other check.
+# "Must be absent" is a claim, so it gets said out loud.
+EXPECT_NO_OAUTH=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -142,6 +150,11 @@ while [ $# -gt 0 ]; do
             # than fail the deployment that forgot to set it.
             [ -n "$2" ] || { echo "--expect-client-id requires a non-empty value" >&2; exit 2; }
             EXPECT_CLIENT_ID="$2"; shift 2 ;;
+    # The deployment must publish NO OAuth client. Mutually exclusive with the
+    # flag above: asking for both is a caller contradiction, not something to
+    # resolve by precedence.
+    --expect-no-oauth)
+            EXPECT_NO_OAUTH=1; shift ;;
     # Assert the deployment reports the environment you think you are pointing
     # at. Optional, because the common use is "check whatever is there" — but a
     # staging URL answering `production` is exactly the mix-up worth catching,
@@ -168,6 +181,15 @@ while [ $# -gt 0 ]; do
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+# Refused rather than resolved by precedence. Both flags are claims about the same
+# field, and a caller who made two contradictory ones has a bug in the thing that
+# built the arguments — silently honouring whichever the code checks first would
+# hide it behind a green run.
+if [ "$EXPECT_NO_OAUTH" -eq 1 ] && [ -n "$EXPECT_CLIENT_ID" ]; then
+  echo "--expect-no-oauth and --expect-client-id contradict each other" >&2
+  exit 2
+fi
 
 if [ -z "$URL" ]; then
   URL="$(gcloud run services describe "$SERVICE" --region="$REGION" \
@@ -494,6 +516,15 @@ elif [ "$AUTH_CONFIGURED" = "False" ] && [ -n "$EXPECT_CLIENT_ID" ]; then
   # here rather than left to the branch above, which would simply not run and
   # report a pass count one short of what the caller asked for.
   fail "--expect-client-id was given but this deployment reports configured=false" ""
+fi
+
+# The reverse claim, asserted rather than assumed from an absent flag.
+if [ "$EXPECT_NO_OAUTH" -eq 1 ]; then
+  if [ "$AUTH_CONFIGURED" = "True" ]; then
+    fail "--expect-no-oauth was given but this deployment publishes an OAuth client" ""
+  else
+    pass "auth/config publishes no OAuth client, as expected"
+  fi
 fi
 
 # The browser links, when this deployment publishes any. They are OPTIONAL — a

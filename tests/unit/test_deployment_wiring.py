@@ -535,7 +535,20 @@ def test_the_smoke_step_runs_the_shared_script_rather_than_its_own_curls(
     runs by hand — which was the copy gating production.
     """
     script = "\n".join(smoke_step["args"])
-    assert "infra/gcp/smoke.sh" in script, "the pre-promotion gate has its own definition again"
+    # The INVOCATION, not a mention. Several comments in this step name the script
+    # while explaining why it is used, so a substring test would keep passing after
+    # somebody deleted the one line that actually runs it and left the prose behind.
+    assert re.search(r"^\s*bash\s+infra/gcp/smoke\.sh\b", script, re.MULTILINE), (
+        "the pre-promotion gate no longer executes infra/gcp/smoke.sh"
+    )
+    # And it must not have grown a second definition beside it. `curl` survives
+    # only in the readiness warm-up, which is deliberately this step's own.
+    assertions = [
+        line
+        for line in script.splitlines()
+        if "curl" in line and not line.lstrip().startswith("#") and "readyz" not in line
+    ]
+    assert not assertions, f"the gate is inlining its own checks again: {assertions}"
 
 
 def test_the_smoke_step_states_every_expectation_the_release_asked_for(
@@ -609,6 +622,38 @@ def test_the_smoke_step_keeps_the_readiness_warm_up_out_of_the_assertions(
     assert "readyz not answering yet" in script
 
 
+def test_the_promotion_names_the_revision_the_smoke_proved(cloudbuild: dict[str, Any]) -> None:
+    """`--to-latest` re-resolves; the gate proved one specific revision.
+
+    `candidate` is a single shared tag, so two overlapping builds are enough:
+    build A smokes revision A, build B lands revision B behind the same tag, and
+    A's promotion then hands 100% of traffic to a revision nothing tested. Ordering
+    the steps cannot fix that — the race is between BUILDS, not between steps — so
+    the promotion has to name what the deploy recorded.
+    """
+    promote = next(s for s in cloudbuild["steps"] if s.get("id") == "promote")
+    # CODE only. The step explains at length why it does not say `--to-latest`, so
+    # a check over the raw text would be tripped by the comment that documents the
+    # rule — the mirror of the vacuous-substring problem, failing where it should
+    # pass instead of passing where it should fail.
+    script = "\n".join(
+        line
+        for line in "\n".join(promote["args"]).splitlines()
+        if not line.lstrip().startswith("#")
+    )
+    assert "--to-latest" not in script, (
+        "the promotion resolves 'latest' at promotion time instead of promoting the "
+        "revision the smoke actually proved"
+    )
+    assert "--to-revisions" in script and "rc_revision" in script, (
+        "the promotion must promote the revision name recorded by the deploy step"
+    )
+    deploy = next(s for s in cloudbuild["steps"] if s.get("id") == "deploy-rc")
+    assert "rc_revision" in "\n".join(deploy["args"]), (
+        "the deploy step must record the candidate revision name for the promotion"
+    )
+
+
 def test_the_smoke_step_runs_before_the_promotion(cloudbuild: dict[str, Any]) -> None:
     """Order is the whole value of the gate.
 
@@ -621,6 +666,14 @@ def test_the_smoke_step_runs_before_the_promotion(cloudbuild: dict[str, Any]) ->
     smoke = next(s for s in cloudbuild["steps"] if s.get("id") == "smoke")
     assert "waitFor" not in smoke, (
         "a waitFor on the smoke step can let it run concurrently with the promotion"
+    )
+    # File order only holds while NEITHER step overrides it. A `waitFor` naming an
+    # earlier step is how promotion would start before the smoke finished — and it
+    # would leave the index comparison above still passing, which is exactly the
+    # kind of green this gate must not produce.
+    promote = next(s for s in cloudbuild["steps"] if s.get("id") == "promote")
+    assert "waitFor" not in promote, (
+        "a waitFor on the promotion can let it overtake the smoke that gates it"
     )
 
 

@@ -615,10 +615,21 @@ steps:
           # Cloud Run rejects a 2-character tag like "rc" outright.
           echo "Deploying $COMMIT_SHA as a no-traffic 'candidate' revision."
           gcloud run deploy "${_SERVICE}" "$${FLAGS[@]}" --no-traffic --tag=candidate
+          # The NAME as well as the URL, and the name is the load-bearing half.
+          # `candidate` is a single shared tag, so it names whichever revision was
+          # deployed most recently — and promotion used to say `--to-latest`, which
+          # resolves at promotion time rather than at smoke time. Two overlapping
+          # builds were enough to break the whole point of this pipeline: build A
+          # smokes revision A, build B lands revision B behind the same tag, and
+          # A's promotion then sends 100% of traffic to a revision nothing tested.
+          # Pinning the name here means the thing that was proved is the thing that
+          # is promoted, whatever else has happened in between.
           gcloud run services describe "${_SERVICE}" --region="${_REGION}" --format=json \
-            | python3 -c 'import json,sys; print(next(t["url"] for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="candidate"))' \
-            > /workspace/rc_url
-          echo "Release candidate URL: $$(cat /workspace/rc_url)"
+            | python3 -c 'import json,sys; t=next(t for t in json.load(sys.stdin)["status"]["traffic"] if t.get("tag")=="candidate"); print(t["url"]); print(t["revisionName"])' \
+            > /workspace/rc_meta
+          head -1 /workspace/rc_meta > /workspace/rc_url
+          tail -1 /workspace/rc_meta > /workspace/rc_revision
+          echo "Release candidate: $$(cat /workspace/rc_revision) at $$(cat /workspace/rc_url)"
         else
           # First ever deploy: Cloud Run rejects --no-traffic when there is no
           # prior revision to keep serving, so this revision takes 100% the moment
@@ -733,8 +744,14 @@ steps:
         # shipped default and the state production is in, and the flag refuses a
         # blank value on purpose — an assertion that silently does not run is
         # worse than one that was never asked for.
+        # Both directions are stated. An empty substitution used to mean the flag
+        # was simply omitted, which reads as "no opinion" — so production, whose
+        # shipped state is no OAuth client at all, asserted nothing about the one
+        # field most likely to be wrong on a misrouted candidate.
         if [ -n "$$SUPABASE_OAUTH_CLIENT_ID" ]; then
           set -- "$$@" --expect-client-id "$$SUPABASE_OAUTH_CLIENT_ID"
+        else
+          set -- "$$@" --expect-no-oauth
         fi
 
         # `bash` explicitly rather than executing the file, so the gate does not
@@ -758,8 +775,21 @@ steps:
           echo "First deploy already carries all traffic."
           exit 0
         fi
+        # BY NAME, never --to-latest. The smoke proved one specific revision, and
+        # --to-latest re-resolves at this moment instead of naming what was proved
+        # — so an overlapping build that landed its own revision in between would
+        # have this step promote something no smoke ever saw. Reading the name back
+        # from the file the deploy wrote is what makes the two halves refer to the
+        # same thing.
+        #
         # Drops the rc tag in the same call so tags do not accumulate one per
         # release; the previous revision stays available for rollback.
+        REVISION="$$(cat /workspace/rc_revision)"
+        if [ -z "$$REVISION" ]; then
+          echo "ERROR: no candidate revision was recorded; refusing to guess." >&2
+          exit 1
+        fi
         gcloud run services update-traffic "${_SERVICE}" \
-          --region="${_REGION}" --to-latest --remove-tags=candidate --quiet
-        echo "Promoted $COMMIT_SHA to 100% of traffic."
+          --region="${_REGION}" --to-revisions="$$REVISION=100" \
+          --remove-tags=candidate --quiet
+        echo "Promoted $$REVISION ($COMMIT_SHA) to 100% of traffic."

@@ -249,7 +249,10 @@ one gating production.
 (`TOGETHER_API_KEY`) and funds every turn from it, so the metadata reads, the
 `/auth/verify` sign-in probe (free — a key introspection, not a model call), the
 426 protocol gate on both content endpoints, request-id echo and the typed error
-envelope all answer an anonymous request. Pass `--full` to send two real model
+envelope answer an anonymous request — under `AUTH_MODE=enforce` the checks that
+need a signed-in caller are reported as skipped rather than guessed at, because
+this script has no way to obtain a user token and deliberately none to be handed
+one. Pass `--full` to send two real model
 turns (streaming and non-streaming), which spend **Daintree's** money, not yours.
 
 The `--expect-*` flags turn a survey into an assertion. Without them the script

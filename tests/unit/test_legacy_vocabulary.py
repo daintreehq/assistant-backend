@@ -36,6 +36,10 @@ _ALLOWED_LINES: dict[str, tuple[str, ...]] = {
     "CLAUDE.md": (".claude/skills",),
     "README.md": (".claude/skills",),
     "cloudbuild.yaml": (".claude/skills",),
+    # Same reason as the three above: the smoke script's comments cite the release
+    # automation by path when explaining why a flag spelling has to keep working
+    # for the callers that already pass it. The path is Claude Code's, not ours.
+    "infra/gcp/smoke.sh": (".claude/skills",),
     "pyproject.toml": (".claude skill",),
     # The two CLI tool names that run AHEAD of the pinned submodule, plus the
     # comment block explaining why. See the fixture header.
