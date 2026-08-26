@@ -29,6 +29,18 @@
 #                                            # ... and fail unless the published
 #                                            # OAuth client id is that one.
 #
+#   ./infra/gcp/smoke.sh --expect-issuer https://abc.supabase.co/auth/v1 \
+#                        --expect-authorize-url ... --expect-token-url ... \
+#                        --expect-jwks-url ... --expect-scopes openid,email \
+#                        --expect-account-url ... --expect-subscribe-url ... \
+#                        --expect-access-token-seconds 3600 \
+#                        --expect-session-max-age 604800
+#                                            # ... and fail unless every other
+#                                            # published manifest field is
+#                                            # exactly this. A revision carrying
+#                                            # another project's endpoints has a
+#                                            # perfectly valid manifest.
+#
 # THIS IS THE PRE-PROMOTION GATE, not only a hand-run check. cloudbuild.yaml's
 # `smoke` step calls this script against the no-traffic candidate revision and
 # refuses to promote it on a non-zero exit, so every assertion below is one the
@@ -96,6 +108,41 @@ EXPECT_CLIENT_ID=""
 # published a real-but-unintended client would have passed every other check.
 # "Must be absent" is a claim, so it gets said out loud.
 EXPECT_NO_OAUTH=0
+# The REST of the manifest, one expectation per published field.
+#
+# The client id was asserted first because it names a Supabase project, and that
+# left every other field of the same manifest checked for shape and not for
+# value: a candidate carrying another environment's issuer, token endpoint or
+# JWKS URL publishes a body that is typed, coherent and completely wrong, and
+# `configured=true` with the right client id is not evidence that the endpoints
+# beside it belong to the same project. A wrong `jwks_uri` in particular fails
+# LATER than a wrong client id and much less legibly — sign-in completes, and
+# then every verification fails against keys from somewhere else.
+#
+# All optional, all refusing a blank value for the reason the flags above do:
+# the natural call passes a deployment substitution, and an unset one there would
+# silently switch the assertion off.
+EXPECT_ISSUER=""
+EXPECT_AUTHORIZE_URL=""
+EXPECT_TOKEN_URL=""
+EXPECT_JWKS_URL=""
+# The two browser links. Their HOST is already checked unconditionally below —
+# a link pointing anywhere but Daintree is a phishing page with the product
+# vouching for it — but a staging revision publishing production's account page
+# passes that check, which is the mix-up a release gate exists to catch.
+EXPECT_ACCOUNT_URL=""
+EXPECT_SUBSCRIBE_URL=""
+# Comma-separated. These are hardcoded in the server rather than configured, so
+# the assertion is not catching a mistyped deployment value — it is catching a
+# revision built from something other than the source this release believes it
+# shipped, and it holds the published set still while the CLI is written against
+# it.
+EXPECT_SCOPES=""
+# The session policy a client schedules its refresh from. A wrong value here is
+# invisible until tokens start expiring earlier or later than the client plans
+# for, which is the kind of defect that surfaces as "sign-in is flaky".
+EXPECT_ACCESS_TOKEN_SECONDS=""
+EXPECT_SESSION_MAX_AGE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -155,6 +202,31 @@ while [ $# -gt 0 ]; do
     # resolve by precedence.
     --expect-no-oauth)
             EXPECT_NO_OAUTH=1; shift ;;
+    # The rest of the manifest. One arm rather than nine copies of the same four
+    # lines: written out individually these differ only in a variable name, and a
+    # blank-value guard that has to be retyped nine times is one that will be
+    # forgotten on the tenth. `read -r` into the named variable keeps the value
+    # out of `eval`, which is the one construct that could turn a caller's
+    # argument into something this script parses rather than stores.
+    --expect-issuer|--expect-authorize-url|--expect-token-url|--expect-jwks-url|\
+    --expect-account-url|--expect-subscribe-url|--expect-scopes|\
+    --expect-access-token-seconds|--expect-session-max-age)
+            [ $# -gt 1 ] || { echo "$1 requires a value" >&2; exit 2; }
+            [ -n "$2" ] || { echo "$1 requires a non-empty value" >&2; exit 2; }
+            case "$1" in
+              --expect-issuer)         EXPECT_ISSUER="$2" ;;
+              --expect-authorize-url)  EXPECT_AUTHORIZE_URL="$2" ;;
+              --expect-token-url)      EXPECT_TOKEN_URL="$2" ;;
+              --expect-jwks-url)       EXPECT_JWKS_URL="$2" ;;
+              --expect-account-url)    EXPECT_ACCOUNT_URL="$2" ;;
+              --expect-subscribe-url)  EXPECT_SUBSCRIBE_URL="$2" ;;
+              --expect-scopes)         EXPECT_SCOPES="$2" ;;
+              --expect-access-token-seconds)
+                                       EXPECT_ACCESS_TOKEN_SECONDS="$2" ;;
+              --expect-session-max-age)
+                                       EXPECT_SESSION_MAX_AGE="$2" ;;
+            esac
+            shift 2 ;;
     # Assert the deployment reports the environment you think you are pointing
     # at. Optional, because the common use is "check whatever is there" — but a
     # staging URL answering `production` is exactly the mix-up worth catching,
@@ -177,7 +249,7 @@ while [ $# -gt 0 ]; do
     # reader wants when editing the script and not when running it. Keep the
     # number in step with the header — a range that has slipped prints half a
     # flag's description and silently omits the newest one.
-    -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,42p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -511,7 +583,77 @@ if [ "$AUTH_CONFIGURED" = "True" ]; then
       fail "auth/config publishes client_id '$CLIENT_ID', expected '$EXPECT_CLIENT_ID'" ""
     fi
   fi
-elif [ "$AUTH_CONFIGURED" = "False" ] && [ -n "$EXPECT_CLIENT_ID" ]; then
+  # The rest of the manifest, VALUE by value.
+  #
+  # Driven off one table rather than nine near-identical blocks: every row is the
+  # same comparison, and nine hand-written copies is nine chances to compare the
+  # wrong variable against the right field — a mistake that reads as a passing
+  # check. The table is `flag-ish name | manifest field | expected value`, and a
+  # row with no expected value is simply not asserted, so a hand-run probe that
+  # states nothing still runs everything else.
+  #
+  # `session_policy` is nested, so it goes through `jq_path`; the rest are
+  # top-level and go through `jq_field`. That split is why the table carries a
+  # dotted path rather than a bare key.
+  while IFS='|' read -r LABEL FIELD WANT; do
+    [ -n "$WANT" ] || continue
+    case "$FIELD" in
+      *.*) GOT="$(jq_path "$BODY" "$FIELD")" ;;
+      *)   GOT="$(jq_field "$BODY" "$FIELD")" ;;
+    esac
+    if [ "$GOT" = "$WANT" ]; then
+      pass "$LABEL is the expected value"
+    else
+      # Printed on a mismatch: none of these is a secret — this endpoint hands
+      # every one of them to any anonymous caller — and the useful half of the
+      # failure is seeing WHICH project or environment answered.
+      fail "auth/config publishes $LABEL '$GOT', expected '$WANT'" ""
+    fi
+  done <<EOF
+issuer|issuer|$EXPECT_ISSUER
+authorization_endpoint|authorization_endpoint|$EXPECT_AUTHORIZE_URL
+token_endpoint|token_endpoint|$EXPECT_TOKEN_URL
+jwks_uri|jwks_uri|$EXPECT_JWKS_URL
+account_url|account_url|$EXPECT_ACCOUNT_URL
+subscribe_url|subscribe_url|$EXPECT_SUBSCRIBE_URL
+access_token_seconds|session_policy.access_token_seconds|$EXPECT_ACCESS_TOKEN_SECONDS
+session_max_age_seconds|session_policy.session_max_age_seconds|$EXPECT_SESSION_MAX_AGE
+EOF
+
+  # Scopes are a LIST, so they are compared as one rather than through the table
+  # above. Order is part of the expectation: the manifest publishes a fixed
+  # sequence and a client may reasonably send it back verbatim, so a set
+  # comparison would call a reordering equal when the bytes a user consents to
+  # have changed.
+  if [ -n "$EXPECT_SCOPES" ]; then
+    GOT_SCOPES="$(printf '%s' "$BODY" | EXPECT_SCOPES="$EXPECT_SCOPES" python3 -c "
+import json,sys
+try:
+    v = json.load(sys.stdin).get('scopes')
+except Exception:
+    v = None
+print(','.join(v) if isinstance(v, list) and all(isinstance(x, str) for x in v) else '')" 2>/dev/null)"
+    if [ "$GOT_SCOPES" = "$EXPECT_SCOPES" ]; then
+      pass "scopes are the expected set, in the expected order"
+    else
+      fail "auth/config publishes scopes '$GOT_SCOPES', expected '$EXPECT_SCOPES'" ""
+    fi
+  fi
+elif [ "$AUTH_CONFIGURED" = "False" ]; then
+  # Asked about a manifest this deployment does not publish. Named rather than
+  # left to a branch that simply does not run, which would report a pass count
+  # short of what the caller asked for and look like success.
+  for STATED in "$EXPECT_ISSUER" "$EXPECT_AUTHORIZE_URL" "$EXPECT_TOKEN_URL" \
+                "$EXPECT_JWKS_URL" "$EXPECT_ACCOUNT_URL" "$EXPECT_SUBSCRIBE_URL" \
+                "$EXPECT_SCOPES" "$EXPECT_ACCESS_TOKEN_SECONDS" "$EXPECT_SESSION_MAX_AGE"; do
+    if [ -n "$STATED" ]; then
+      fail "a manifest expectation was given but this deployment reports configured=false" ""
+      break
+    fi
+  done
+fi
+
+if [ "$AUTH_CONFIGURED" = "False" ] && [ -n "$EXPECT_CLIENT_ID" ]; then
   # Asked for a specific client and got a deployment that publishes none. Named
   # here rather than left to the branch above, which would simply not run and
   # report a pass count one short of what the caller asked for.

@@ -1061,3 +1061,142 @@ def test_no_step_still_names_the_shared_candidate_tag(cloudbuild: dict[str, Any]
         )
         assert "--tag=candidate" not in script, step.get("id")
         assert '"candidate"' not in script, step.get("id")
+
+
+# --- the smoke step states the WHOLE manifest -------------------------------
+
+
+#: Every manifest field the release asserts, paired with the deploy substitution
+#: that supplies it. `scopes` is absent on purpose: it is hardcoded in the server
+#: rather than deployed, and has its own test below.
+_MANIFEST_EXPECTATIONS = (
+    ("--expect-issuer", "SUPABASE_AUTH_ISSUER"),
+    ("--expect-authorize-url", "SUPABASE_OAUTH_AUTHORIZE_URL"),
+    ("--expect-token-url", "SUPABASE_OAUTH_TOKEN_URL"),
+    ("--expect-jwks-url", "SUPABASE_JWKS_URL"),
+    ("--expect-account-url", "DAINTREE_ACCOUNT_URL"),
+    ("--expect-subscribe-url", "DAINTREE_SUBSCRIBE_URL"),
+    ("--expect-access-token-seconds", "AUTH_ACCESS_TOKEN_SECONDS"),
+    ("--expect-session-max-age", "AUTH_SESSION_MAX_AGE_SECONDS"),
+)
+
+
+@pytest.mark.parametrize("flag,env_name", _MANIFEST_EXPECTATIONS)
+def test_the_release_states_every_manifest_value_it_deployed(
+    flag: str, env_name: str, cloudbuild: dict[str, Any]
+) -> None:
+    """The deploy proves what Cloud Run was ASKED for; only the manifest proves
+    what the revision came up holding.
+
+    The client id was asserted first because it names a Supabase project, which
+    left every field beside it checked for shape and not for value — and a
+    candidate carrying another project's issuer, token endpoint or JWKS URL
+    publishes a body that is typed, coherent and entirely wrong. `configured=true`
+    with the right client id is not evidence about the endpoints next to it.
+    """
+    smoke = next(s for s in cloudbuild["steps"] if s.get("id") == "smoke")
+    env = {entry.split("=", 1)[0] for entry in smoke.get("env", [])}
+    assert env_name in env, f"the smoke step never receives {env_name}"
+    script = "\n".join(smoke["args"])
+    assert flag in script, f"the release never states {flag}"
+    assert f'"$${env_name}"' in script, (
+        f"{flag} is passed, but not from {env_name} — the assertion would be about "
+        "a value this deployment did not set"
+    )
+
+
+def test_every_manifest_expectation_is_a_flag_the_smoke_accepts() -> None:
+    """A flag the release passes and the script does not know is `exit 2` on
+    every deploy — and a flag the script grew that the release never passes is an
+    assertion nobody runs. Checked in both directions for that reason."""
+    smoke_text = _SMOKE.read_text(encoding="utf-8")
+    build_text = _CLOUDBUILD.read_text(encoding="utf-8")
+    for flag, _ in _MANIFEST_EXPECTATIONS:
+        assert flag in smoke_text, f"{flag} is passed by the build and unknown to the script"
+    assert "--expect-scopes" in smoke_text and "--expect-scopes" in build_text
+
+
+def test_the_released_scopes_are_the_scopes_the_server_publishes() -> None:
+    """The one expectation that is not a deployment value.
+
+    `_OAUTH_SCOPES` is hardcoded — Supabase supports the standard set and no
+    application-defined ones, so there is nothing a per-environment value could
+    express. That makes the released expectation a literal, and a literal beside
+    a constant is exactly the pair that drifts: a scope added to the code and not
+    to the release fails every deploy, and one added to the release and not the
+    code fails nothing until somebody wonders why the assertion never fires.
+    """
+    from daintree_assistant_server.api.daintree_auth import _OAUTH_SCOPES
+
+    text = _CLOUDBUILD.read_text(encoding="utf-8")
+    expected = ",".join(_OAUTH_SCOPES)
+    assert f"EXPECTED_SCOPES={expected}" in text, (
+        f"the release expects scopes that are not {expected!r} — the literal in "
+        "cloudbuild.yaml and _OAUTH_SCOPES in api/daintree_auth.py have drifted"
+    )
+
+
+def test_the_scopes_expectation_rides_with_the_oauth_client() -> None:
+    """A deployment publishing no OAuth client publishes no scopes either.
+
+    Stating them unconditionally would hand the script a flag whose value is
+    correct and whose field is absent, and production — which ships with no OAuth
+    client — would fail its own release gate.
+    """
+    text = _CLOUDBUILD.read_text(encoding="utf-8")
+    index = text.index("--expect-scopes")
+    preceding = text[:index]
+    assert 'if [ -n "$$SUPABASE_OAUTH_CLIENT_ID" ]; then' in preceding
+
+
+def test_the_deploy_reads_the_revisions_environment_back() -> None:
+    """The gap between "what we asked Cloud Run for" and "what the revision has".
+
+    A stale env-vars file, a flag dropped from FLAGS, a value the platform
+    refused and silently omitted, or a revision that is simply not the one just
+    deployed all live in that gap, and every one of them yields a candidate that
+    passes its own health check.
+    """
+    deploy = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "deploy-rc"
+    )
+    body: str = deploy["args"][-1]
+    assert "gcloud run revisions describe" in body
+    assert "/workspace/rc_revision" in body, (
+        "the environment must be read back from the revision this build recorded, "
+        "not from the service, or it describes whatever is serving"
+    )
+    # Read back by revision, and compared against the file the build generated.
+    readback = body[body.index("gcloud run revisions describe") :]
+    assert "/workspace/env_vars.json" in readback
+
+
+def test_the_environment_readback_can_never_print_a_secret() -> None:
+    """By construction rather than by filtering.
+
+    Secrets reach the container through `--set-secrets` as `valueFrom`
+    references, so the comparison reads `value` and an entry without one is
+    skipped — a secret has no value here to print even by accident. The failure
+    message names KEYS only for the same reason the URL validator does: one of
+    these values is a URL an operator may have pasted a credential into.
+    """
+    deploy = next(
+        s
+        for s in yaml.safe_load(_CLOUDBUILD.read_text(encoding="utf-8"))["steps"]
+        if s.get("id") == "deploy-rc"
+    )
+    body: str = deploy["args"][-1]
+    readback = body[body.index("gcloud run revisions describe") :]
+    assert '"value" in entry' in readback, (
+        "the readback must skip entries with no literal value, which is what "
+        "excludes every secret reference"
+    )
+    assert "valueFrom" in readback, "the reason for the filter is not written down"
+    # The diagnostics join key names. A formatter interpolating a value would
+    # show up as one of these dictionaries being indexed in the message.
+    assert 'join(missing)' in readback or '", ".join(missing)' in readback
+    assert "got[k]" not in readback.split("ERROR:")[-1], (
+        "the failure message reads a value out of the deployed environment"
+    )

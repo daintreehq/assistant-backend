@@ -743,6 +743,67 @@ steps:
           head -1 /workspace/rc_meta > /workspace/rc_url
           tail -1 /workspace/rc_meta > /workspace/rc_revision
           echo "Release candidate: $$(cat /workspace/rc_revision) at $$(cat /workspace/rc_url)"
+
+          # WHAT THE REVISION ACTUALLY GOT, compared with what we generated.
+          #
+          # Everything above proves what this build ASKED Cloud Run for. The
+          # application's own projections prove what the process believes it is
+          # holding. Neither answers the question in between: did this revision
+          # come up with the environment this release built for it. A stale
+          # --env-vars-file, a flag dropped from FLAGS, a value Cloud Run refused
+          # and silently omitted, or a revision that is simply not the one we
+          # just deployed all live in that gap, and every one of them produces a
+          # candidate that passes its own health check.
+          #
+          # Read back BY REVISION NAME rather than off the service, so this is
+          # the same revision the smoke and the promotion refer to.
+          #
+          # NON-SECRET ONLY, by construction rather than by filtering: secrets
+          # reach the container through --set-secrets as `valueFrom` references,
+          # and this comparison reads `value` and ignores every entry without
+          # one. So a secret cannot be printed here even by accident, because a
+          # secret has no `value` to read.
+          gcloud run revisions describe "$$(cat /workspace/rc_revision)" \
+            --region="${_REGION}" --format=json > /workspace/rc_revision_json
+          python3 - <<'PYEOF' || exit 1
+        import json, sys
+
+        with open("/workspace/env_vars.json") as handle:
+            wanted = json.load(handle)
+        with open("/workspace/rc_revision_json") as handle:
+            revision = json.load(handle)
+
+        containers = revision["spec"]["containers"]
+        # A literal value only. An entry carrying `valueFrom` is a secret
+        # reference, and its VALUE is not present here and must never be.
+        got = {
+            entry["name"]: entry["value"]
+            for container in containers
+            for entry in container.get("env", [])
+            if "value" in entry
+        }
+
+        missing = sorted(k for k in wanted if k not in got)
+        differing = sorted(k for k in wanted if k in got and got[k] != wanted[k])
+        # Extra names are reported and do NOT fail: Cloud Run and the runtime add
+        # their own (PORT, K_SERVICE), and a release must not break because the
+        # platform grew one. The direction that matters is what we asked for and
+        # did not get.
+        extra = sorted(k for k in got if k not in wanted)
+
+        if missing or differing:
+            # NAMES ONLY. Which key disagrees is the whole diagnostic; the values
+            # are configuration this file already declines to echo, and one of
+            # them is a URL an operator may have pasted a credential into.
+            print("ERROR: the deployed revision's environment is not the one this build generated.", file=sys.stderr)
+            if missing:
+                print("  absent from the revision: %s" % ", ".join(missing), file=sys.stderr)
+            if differing:
+                print("  present with a different value: %s" % ", ".join(differing), file=sys.stderr)
+            sys.exit(1)
+        print("Revision environment matches the generated release configuration (%d values%s)."
+              % (len(wanted), (", %d platform-supplied" % len(extra)) if extra else ""))
+        PYEOF
         else
           # First ever deploy: Cloud Run rejects --no-traffic when there is no
           # prior revision to keep serving, so this revision takes 100% the moment
@@ -795,6 +856,23 @@ steps:
       - 'AUTH_MODE=${_AUTH_MODE}'
       - 'ENTITLEMENT_MODE=${_ENTITLEMENT_MODE}'
       - 'SUPABASE_OAUTH_CLIENT_ID=${_SUPABASE_OAUTH_CLIENT_ID}'
+      # The rest of the manifest this release is supposed to publish. Same
+      # values the deploy step sent, asserted back out of the running revision:
+      # the deploy proves what we ASKED Cloud Run for, and only reading the
+      # published manifest proves what the process actually came up holding.
+      - 'SUPABASE_AUTH_ISSUER=${_SUPABASE_AUTH_ISSUER}'
+      - 'SUPABASE_OAUTH_AUTHORIZE_URL=${_SUPABASE_OAUTH_AUTHORIZE_URL}'
+      - 'SUPABASE_OAUTH_TOKEN_URL=${_SUPABASE_OAUTH_TOKEN_URL}'
+      - 'SUPABASE_JWKS_URL=${_SUPABASE_JWKS_URL}'
+      - 'DAINTREE_ACCOUNT_URL=${_DAINTREE_ACCOUNT_URL}'
+      - 'DAINTREE_SUBSCRIBE_URL=${_DAINTREE_SUBSCRIBE_URL}'
+      - 'AUTH_ACCESS_TOKEN_SECONDS=${_AUTH_ACCESS_TOKEN_SECONDS}'
+      - 'AUTH_SESSION_MAX_AGE_SECONDS=${_AUTH_SESSION_MAX_AGE_SECONDS}'
+      # Hardcoded in the server, so this is not a deployment value being checked
+      # back — it is the published set held still. `tests/unit/test_deployment_wiring.py`
+      # asserts this literal equals `_OAUTH_SCOPES` in `api/daintree_auth.py`, so
+      # the two cannot drift apart silently in either direction.
+      - 'EXPECTED_SCOPES=openid,email'
     args:
       - -euo
       - pipefail
@@ -866,6 +944,40 @@ steps:
         else
           set -- "$$@" --expect-no-oauth
         fi
+
+        # The rest of the manifest, each stated only when this deployment
+        # configures it. Empty means "this deployment has no such value", not
+        # "do not check" — an unconfigured deployment publishes no manifest body
+        # at all, and the `--expect-no-oauth` branch above is what asserts that.
+        # Adding a flag with an empty value here would instead trip the script's
+        # own blank-value refusal and fail the release for a field production is
+        # correct not to have.
+        add_expectation() {
+          [ -n "$$2" ] || return 0
+          EXPECTATIONS="$$EXPECTATIONS $$1 $$2"
+        }
+        EXPECTATIONS=""
+        add_expectation --expect-issuer "$$SUPABASE_AUTH_ISSUER"
+        add_expectation --expect-authorize-url "$$SUPABASE_OAUTH_AUTHORIZE_URL"
+        add_expectation --expect-token-url "$$SUPABASE_OAUTH_TOKEN_URL"
+        add_expectation --expect-jwks-url "$$SUPABASE_JWKS_URL"
+        add_expectation --expect-account-url "$$DAINTREE_ACCOUNT_URL"
+        add_expectation --expect-subscribe-url "$$DAINTREE_SUBSCRIBE_URL"
+        add_expectation --expect-access-token-seconds "$$AUTH_ACCESS_TOKEN_SECONDS"
+        add_expectation --expect-session-max-age "$$AUTH_SESSION_MAX_AGE_SECONDS"
+        # Scopes ride with the OAuth manifest: a deployment publishing no client
+        # publishes no scopes either, so the expectation follows the client id
+        # rather than standing on its own.
+        if [ -n "$$SUPABASE_OAUTH_CLIENT_ID" ]; then
+          add_expectation --expect-scopes "$$EXPECTED_SCOPES"
+        fi
+        # Unquoted ON PURPOSE, and the only place in these steps where that is
+        # true: this is a flag list built above, one word per element, not an
+        # operator value. Every value inside it was already refused if empty, so
+        # word splitting cannot silently drop a flag's argument and shift the
+        # rest — the script would see a flag where a value belongs and exit 2.
+        # shellcheck disable=SC2086
+        set -- "$$@" $$EXPECTATIONS
 
         # `bash` explicitly rather than executing the file, so the gate does not
         # depend on a mode bit surviving a checkout. Everything the script needs is
