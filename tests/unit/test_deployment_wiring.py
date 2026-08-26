@@ -1352,6 +1352,22 @@ def test_the_build_and_readiness_agree_about_the_origin_in_every_environment(
         "https://STAGING.DAINTREE.ORG/api/assistant/entitlement",
         "https://staging.daintree.org./api/assistant/entitlement",
         "https://EVIL.example/api/assistant/entitlement",
+        # Two more the sweep did not originally carry, each of which WAS a real
+        # divergence: an uppercase SCHEME (a URL scheme is case-insensitive and
+        # `urlsplit` lowercases it) and a zero-padded port (`0443` is port 443 to
+        # every parser that will handle this URL). The build refused both, which
+        # is a release failing over a legal spelling rather than a bad value
+        # getting through — the harmless direction, and still a broken release.
+        "HTTPS://staging.daintree.org/api/assistant/entitlement",
+        "HTTPS://daintree.org/api/assistant/entitlement",
+        "https://staging.daintree.org:0443/api/assistant/entitlement",
+        "https://daintree.org:0443/api/assistant/entitlement",
+        "https://staging.daintree.org.:443/api/assistant/entitlement",
+        "https://staging.daintree.org:80/api/assistant/entitlement",
+        "https://daintree.org:notaport/api/assistant/entitlement",
+        "https://user@staging.daintree.org/api/assistant/entitlement",
+        "https://staging.daintree.org../api/assistant/entitlement",
+        "https://staging.daintree.org/api/assistant/entitlements",
     ]
     for url in candidates:
         build_ok = _validate_url(url, environment).returncode == 0

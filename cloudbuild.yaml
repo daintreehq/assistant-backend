@@ -399,8 +399,13 @@ steps:
           # https only. The loopback exemption the config allows is for a developer
           # running a local website; it can never be right for a Cloud Run revision,
           # which would be naming its own container.
-          case "$$URL" in
-            https://*) ;;
+          # Compared case-INSENSITIVELY. A URL scheme is case-insensitive and
+          # `urlsplit` lowercases it, so readiness accepts `HTTPS://` — and a
+          # byte comparison here would fail the release over a legal spelling,
+          # which is the build refusing a deployment that would have worked.
+          SCHEME="$$(printf '%s' "$${URL%%://*}" | tr '[:upper:]' '[:lower:]')"
+          case "$$SCHEME" in
+            https) ;;
             *) echo "ERROR: _DAINTREE_ENTITLEMENT_URL must be an https:// URL." >&2
                # The VALUE is deliberately not echoed, and this is the one branch
                # where that mattered: it fires before the path is inspected, so a
@@ -421,7 +426,7 @@ steps:
           # `https://evil.example/daintree.org`, the two spellings anybody
           # attacking this would reach for. This splitting is NOT URL parsing —
           # the rules above are what remove the characters it cannot handle.
-          REST="$${URL#https://}"
+          REST="$${URL#*://}"
           AUTHORITY="$${REST%%/*}"
           HOST="$${AUTHORITY%%:*}"; PORT="$${AUTHORITY#$$HOST}"; PORT="$${PORT#:}"
           # Normalised the way `config.py` normalises, and for the same two
@@ -473,14 +478,9 @@ steps:
               echo "       be delivered." >&2
               exit 1
             fi
-            # The port, pinned with the origin rather than merely range-checked
-            # above: an approved host on an unapproved port is a different
-            # service, and readiness compares full origins.
-            if [ -n "$$PORT" ] && [ "$$PORT" != "443" ]; then
-              echo "ERROR: _DAINTREE_ENTITLEMENT_URL must use the default https port" >&2
-              echo "       in $$ENVIRONMENT; got port '$$PORT'." >&2
-              exit 1
-            fi
+            # The port is pinned too, but BELOW, after the numeric check —
+            # comparing it here would mean comparing a value not yet known to be
+            # a number.
           else
             case "$$HOST" in
               daintree.org|*.daintree.org) ;;
@@ -501,6 +501,20 @@ steps:
             esac
             if [ "$$PORT" -lt 1 ] || [ "$$PORT" -gt 65535 ]; then
               echo "ERROR: _DAINTREE_ENTITLEMENT_URL port '$$PORT' is out of range." >&2
+              exit 1
+            fi
+            # And in a hardened environment it must be the scheme default, because
+            # an approved host on an unapproved port is a different service and
+            # readiness compares whole origins.
+            #
+            # Compared ARITHMETICALLY, and that is why it waited for the check
+            # above rather than sitting beside the host rule: `0443` is port 443
+            # to every parser that will handle this URL, including the one
+            # readiness uses, and a string comparison refuses it. The build
+            # rejecting a legal spelling is a release that fails for no reason.
+            if [ -n "$$APPROVED_HOSTS" ] && [ "$$PORT" -ne 443 ]; then
+              echo "ERROR: _DAINTREE_ENTITLEMENT_URL must use the default https port" >&2
+              echo "       in $$ENVIRONMENT; got port '$$PORT'." >&2
               exit 1
             fi
           fi
