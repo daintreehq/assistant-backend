@@ -159,6 +159,23 @@ build is not seen. The cutover check in `bootstrap.sh` is the complementary half
 one guards the release against the exposure, the other guards the exposure against
 the release.
 
+**Complementary is not coordinated, and the gap between them is a real race.** Each
+reads the other's state once, and neither holds a lock, so this interleaving passes
+both checks and publishes an open staging service:
+
+1. an `open`/`observe` staging build reads the IAM policy, finds the service private,
+   and is permitted;
+2. a cutover reads the *currently serving* revision — still the previous, enforced
+   one — and approves;
+3. the build promotes its open revision to 100%;
+4. the cutover grants `allUsers`.
+
+Nothing here is misconfigured; the two operations are simply not ordered against each
+other. Until one of them takes a lock, **do not run a cutover while a release to the
+same service is in flight** — wait for the build to finish and re-read
+`/version`'s posture before granting the invoker binding. That is an operator rule,
+not something either script currently enforces.
+
 Check the tags on the service after a cancelled release:
 
 ```bash
