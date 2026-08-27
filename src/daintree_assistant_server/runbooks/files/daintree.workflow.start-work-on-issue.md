@@ -137,7 +137,7 @@ Procedure:
    `queue.resolve {"id": "<inbox id>"}` (the wake-up note prints the id); do NOT call
    `watcher.cancel` on that finished watch — it already stopped itself and the call is
    refused as "already ended". An agent stopped on a question (`agentState "waiting"`,
-   `waitingReason "question"`) is the leave-OPEN case — answer it with
+   `waitingReason "question"` or `"approval"`) is the leave-OPEN case — answer it with
    terminal.sendCommand. Abandoning a STILL-ACTIVE watch (you got what you needed early,
    or the task was dropped) is the one real cancel: `watcher.cancel {"id":
    "<watcherId>"}`, said plainly, noting you can re-attach later.

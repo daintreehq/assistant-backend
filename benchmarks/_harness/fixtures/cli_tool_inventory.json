@@ -3,7 +3,7 @@
   "type": "function",
   "function": {
    "name": "agentTask__spawnForEdits",
-   "description": "Spawn a visible Daintree agent in a worktree. Use mode:\"edit\" (default) to make code changes, or mode:\"explore\" for a read-only investigation (the agent is told not to touch files). This is the ONLY way to spawn an agent \u2014 never hand-roll a raw agent.launch via daintree.call. The CLI never edits files itself. To supervise the agent, set the FLAT fields watch:true and watchGoal:\"\u2026\" (top-level scalars) \u2014 do NOT nest them under a \"watcher\" key.",
+   "description": "Spawn a visible Daintree agent in a worktree. Use mode:\"edit\" (default) to make code changes, or mode:\"explore\" for a read-only investigation (the agent is told not to touch files). This is the ONLY way to spawn an agent \u2014 never hand-roll a raw agent.launch via daintree.call. The CLI never edits files itself. To supervise the agent, set the FLAT fields watch:true and watchGoal:\"\u2026\" (top-level scalars) \u2014 do NOT nest them under a \"watcher\" key. An omitted worktreeId means the worktree this turn started in, and that stays fixed for the whole turn.",
    "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -78,7 +78,7 @@
       "type": "object"
      },
      "worktreeId": {
-      "description": "Worktree to run the agent in. Usually OMIT it \u2014 Daintree uses the active worktree. The id is a PATH (\"/Users/you/Projects/app\"); a branch name is accepted only as a fallback, and an unresolvable value is rejected with the available list.",
+      "description": "Worktree to run the agent in. OMIT it to use the worktree this turn started in; pass one only to send the agent ELSEWHERE. The id is a PATH (\"/Users/you/Projects/app\"); a branch name is accepted only as a fallback, and an unresolvable value is rejected with the available list.",
       "type": "string"
      }
     },

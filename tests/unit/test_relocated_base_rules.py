@@ -46,7 +46,13 @@ RELOCATED_RULES: list[tuple[str, str, str]] = [
     ("a small-model read result is a leaf", "is a LEAF", "daintree.foundation"),
     ("agent state vocabulary", "directing | completed | exited", "daintree.foundation"),
     ('"completed" is transient', "transient flash", "daintree.foundation"),
-    ("waitingReason question means blocked", 'waitingReason "question"', "daintree.foundation"),
+    # The claim widened from question-only to all three blocking reasons when the CLI
+    # started reporting them (approval and error used to be scored as FINISHED), so each
+    # gets its own probe rather than one that a later tidy could satisfy with any of them.
+    ("waitingReason question means blocked", '"question" = BLOCKED', "daintree.foundation"),
+    ("waitingReason approval means blocked", '"approval" = BLOCKED', "daintree.foundation"),
+    ("waitingReason error means stopped", '"error" = STOPPED', "daintree.foundation"),
+    ("no blocking reason clears by waiting", "none clears by waiting", "daintree.foundation"),
     ("calls dispatch in emission order", "dispatch in emission order", "daintree.foundation"),
     ("small-model reads dispatch concurrently", "dispatches CONCURRENTLY", "daintree.foundation"),
     ("an id minted this reply waits a turn", "waits for the NEXT turn", "daintree.foundation"),
