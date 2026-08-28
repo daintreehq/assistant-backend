@@ -4,7 +4,8 @@ Answers the question a latency number cannot: does the typing rate read as a
 natural response, and how much of the dead time does it actually cover?
 
     python -m benchmarks.executor_window.simulate
-    python -m benchmarks.executor_window.simulate --window 1.26 --runbook daintree.ci.diagnose-and-fix
+    python -m benchmarks.executor_window.simulate --runbook daintree.ci.diagnose-and-fix
+    python -m benchmarks.executor_window.simulate --window 1.26
 
 The default window is the MEASURED median from `bench.py` — request-in to the
 executor's first delta of any kind. Everything here is arithmetic over that
