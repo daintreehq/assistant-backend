@@ -211,7 +211,7 @@ def test_capabilities(client, auth, app) -> None:
     assert "join_separator" not in fast
     # ...and it never names the provider or the model behind it.
     rendered = json.dumps(fast).lower()
-    for internal in ("cerebras", "gemma", "gpt-oss", "deepseek", "together"):
+    for internal in ("cerebras", "gemma", "gpt-oss", "glm", "zai", "baseten"):
         assert internal not in rendered
     # Hardcoded posture, not config. Asserted as a literal rather than against the
     # constant on purpose: this field is a wire contract the CLI gates its thinking UI
@@ -606,7 +606,7 @@ def test_a_deployment_without_the_upstream_key_is_not_ready() -> None:
     from daintree_assistant_server.main import create_app
 
     settings = Settings(**{
-        "ENVIRONMENT": "development", "TOGETHER_API_KEY": "",
+        "ENVIRONMENT": "development", "BASETEN_API_KEY": "",
         "STATE_SIGNING_KEY_CURRENT": "sk", "STATE_SALT": "x",
     })
     app = create_app(settings=settings)  # real lifespan (no injected provider)
@@ -627,7 +627,7 @@ def test_prod_boots_ready_with_only_server_owned_secrets() -> None:
 
     settings = Settings(
         ENVIRONMENT="production",
-        TOGETHER_API_KEY="sk-server-owned",
+        BASETEN_API_KEY="sk-server-owned",
         CEREBRAS_API_KEY="csk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",
@@ -656,7 +656,7 @@ def test_prod_not_ready_when_prompt_dumping_is_enabled(fake_provider) -> None:
 
     settings = Settings(
         ENVIRONMENT="production",
-        TOGETHER_API_KEY="sk-server-owned",
+        BASETEN_API_KEY="sk-server-owned",
         CEREBRAS_API_KEY="csk-server-owned",
         STATE_SIGNING_KEY_CURRENT="s" * 48,
         STATE_SALT="a-real-salt-value",

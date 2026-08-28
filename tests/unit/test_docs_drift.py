@@ -29,23 +29,25 @@ from daintree_assistant_server import main as main_module
 from daintree_assistant_server.config import (
     EXECUTOR_KEY_ENV,
     EXECUTOR_MODEL,
+    EXECUTOR_REASONING_EFFORT,
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
     PUBLIC_MODEL_ID,
     Settings,
 )
 from daintree_assistant_server.errors import DaintreeError
-from daintree_assistant_server.providers.together import TogetherProvider
+from daintree_assistant_server.providers.baseten import BasetenProvider
 from daintree_assistant_server.services.task_runner import TaskRunner
 
 #: The adapter production builds. Named rather than inlined so the credential
 #: test below asserts the class as well as the key.
-_SERVING_PROVIDER_CLASS = TogetherProvider
+_SERVING_PROVIDER_CLASS = BasetenProvider
 
 #: Where the host publishes its data-handling position. Written out rather than
 #: derived from the API origin, because they are genuinely different domains:
-#: Together serves from `api.together.xyz` and publishes at `together.ai`.
-_POLICY_DOMAIN = "together.ai"
+#: Baseten serves from `inference.baseten.co` and publishes policy at
+#: `baseten.co`.
+_POLICY_DOMAIN = "baseten.co"
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src" / "daintree_assistant_server"
@@ -207,16 +209,16 @@ def test_provider_policy_names_the_upstream_whose_policy_this_now_is() -> None:
 
     That makes WHICH HOST a privacy fact. This test used to assert the literal
     string "cerebras", which meant it kept passing after the host moved to
-    Together and actively required the stale name to stay — a drift gate holding
+    a new host and actively required the stale name to stay — a drift gate holding
     the drift in place. It follows the serving constants now.
     """
     text = _read(DOC_PROVIDER).lower()
-    assert "together" in text, (
-        "docs/PROVIDER_POLICY.md does not name Together, the host whose published "
+    assert "baseten" in text, (
+        "docs/PROVIDER_POLICY.md does not name Baseten, the host whose published "
         "policy the privacy claim rests on."
     )
     assert _POLICY_DOMAIN in text, (
-        "docs/PROVIDER_POLICY.md must link Together's own authoritative "
+        "docs/PROVIDER_POLICY.md must link Baseten's own authoritative "
         "data-handling page. The privacy claim rests on it, so a reader has to be "
         "able to reach it."
     )
@@ -233,14 +235,37 @@ def test_provider_policy_states_the_privacy_posture_explicitly() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_the_non_thinking_posture_is_documented() -> None:
+def test_the_thinking_posture_is_documented() -> None:
+    """The posture INVERTED with the serving model, and the doc must carry it.
+
+    This gate used to require the sentence "nothing in this server thinks", which
+    was true of DeepSeek V4 Flash — a model that reasons by default and can be
+    held down with `reasoning: {"enabled": false}`. GLM-5.3-Flash cannot be held
+    down at all: reasoning is always on, `none` is rejected, and an OMITTED
+    `reasoning_effort` means `high`. So the old sentence is not merely stale, it
+    is backwards, and a reader who believed it would think an omitted field was
+    the cheap default when it is the most expensive one available.
+    """
     assert INTERACTIVE_THINKING_ENABLED is False, (
-        "Interactive thinking was re-enabled. docs/PROVIDER_POLICY.md section 2, "
-        ".env.example and CLAUDE.md all state that nothing in this server thinks; "
-        "update them in this commit."
+        "The flag flipped. On this host it means 'request the floor', not 'no "
+        "reasoning occurs' — if it is now True, docs/PROVIDER_POLICY.md section 2 "
+        "and .env.example describe a posture that no longer holds; update them in "
+        "this commit."
+    )
+    assert EXECUTOR_REASONING_EFFORT == "low", (
+        "The pinned effort moved off the floor. That is a cost and latency change "
+        "on every turn and every utility task, so docs/PROVIDER_POLICY.md section "
+        "2 must be rewritten with it."
     )
     text = _read(DOC_PROVIDER).lower()
-    assert "nothing in this server thinks" in text
+    assert "cannot be run non-thinking" in text, (
+        "docs/PROVIDER_POLICY.md section 2 no longer states that the serving "
+        "model cannot be run non-thinking, which is the whole posture."
+    )
+    assert "reasoning_effort" in text, (
+        "docs/PROVIDER_POLICY.md must name the field that actually controls this; "
+        "it is the only control the host exposes."
+    )
 
 
 @pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
@@ -273,23 +298,31 @@ def test_no_document_claims_the_interactive_surface_thinks(path: Path) -> None:
         )
 
 
-def test_nothing_is_documented_as_thinking() -> None:
-    """There is no thinking surface left at all, and the doc has to say so.
+@pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
+def test_no_document_claims_a_hard_zero_on_reasoning(path: Path) -> None:
+    """The retired absolute must not come back anywhere in the prose.
 
-    Runbook learning was the one exception — it ran after the response, so its
-    latency never reached a user — and it has been removed. A doc that still
-    carves out an exception sends a reader looking for a thinking budget that
-    nothing spends.
+    "Nothing in this server thinks" was accurate for two model generations and is
+    now false, so it is the single most likely sentence to be copied forward from
+    an older revision. It is forbidden by exact string rather than by shape,
+    because the accurate copy still discusses thinking at length and a
+    shape-matcher would fire on that.
+
+    The two stale runbook-learning carve-outs are kept in the same guard: the
+    sentence they qualified was written before the runbook rename, so forbidding
+    only the newer wording would let the original claim return.
     """
-    text = _read(DOC_PROVIDER).lower()
-    assert "nothing in this server thinks" in text
-    # BOTH spellings. The sentence this guards was written before the runbook rename,
-    # so forbidding only the new wording would let the original stale claim return.
+    text = _read(path).lower()
     for stale in (
+        "nothing in this server thinks",
         "runbook learning is the one surface that still thinks",
         "skill learning is the one surface that still thinks",
     ):
-        assert stale not in text
+        assert stale not in text, (
+            f"{path.name} says {stale!r}. The serving model reasons "
+            "unconditionally and the server pins the `low` floor; see "
+            "docs/PROVIDER_POLICY.md section 2."
+        )
 
 
 # The stale posture survived in *source comments* too — `config.py` justified the
@@ -479,7 +512,7 @@ def test_the_open_door_is_still_the_default_posture() -> None:
     """
     from daintree_assistant_server.config import Settings
 
-    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, TOGETHER_API_KEY="k")
+    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, BASETEN_API_KEY="k")
     assert settings.auth_mode == "open"
     text = _read(SRC_ROOT / "auth.py")
     assert 'if mode == "open"' in text and "return ANONYMOUS" in text, (

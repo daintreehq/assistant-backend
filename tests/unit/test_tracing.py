@@ -471,7 +471,7 @@ def test_full_content_capture_is_refused_in_a_hardened_environment() -> None:
     """There is no account model, so there is nobody who has consented."""
     settings = Settings(
         STATE_SIGNING_KEY_CURRENT="x" * 32,
-        TOGETHER_API_KEY="k",
+        BASETEN_API_KEY="k",
         ENVIRONMENT="production",
         TRACE_CAPTURE_MODE="full_internal",
         TRACE_IDENTITY_KEY="y" * 32,
@@ -486,7 +486,7 @@ def test_full_content_capture_is_refused_in_a_hardened_environment() -> None:
 def test_content_capture_requires_a_dedicated_identity_key() -> None:
     settings = Settings(
         STATE_SIGNING_KEY_CURRENT="x" * 32,
-        TOGETHER_API_KEY="k",
+        BASETEN_API_KEY="k",
         TRACE_CAPTURE_MODE="full_internal",
     )
     assert any("TRACE_IDENTITY_KEY" in p for p in settings.trace_problems())
@@ -497,7 +497,7 @@ def test_filesystem_traces_are_forbidden_in_a_hardened_environment() -> None:
     instance, and is not access-controlled."""
     settings = Settings(
         STATE_SIGNING_KEY_CURRENT="x" * 32,
-        TOGETHER_API_KEY="k",
+        BASETEN_API_KEY="k",
         ENVIRONMENT="staging",
         TRACE_CAPTURE_MODE="metadata",
         TRACE_SINK="filesystem",
@@ -509,7 +509,7 @@ def test_filesystem_traces_are_forbidden_in_a_hardened_environment() -> None:
 def test_a_gcs_sink_without_a_bucket_fails_readiness() -> None:
     settings = Settings(
         STATE_SIGNING_KEY_CURRENT="x" * 32,
-        TOGETHER_API_KEY="k",
+        BASETEN_API_KEY="k",
         TRACE_CAPTURE_MODE="metadata",
         TRACE_SINK="gcs",
     )
@@ -518,7 +518,7 @@ def test_a_gcs_sink_without_a_bucket_fails_readiness() -> None:
 
 def test_the_default_deployment_traces_nothing() -> None:
     """A service with no consent model records nothing unless told to."""
-    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, TOGETHER_API_KEY="k")
+    settings = Settings(STATE_SIGNING_KEY_CURRENT="x" * 32, BASETEN_API_KEY="k")
     assert settings.trace_capture_mode == "off"
     assert settings.trace_problems() == []
     assert decide(mode=settings.trace_capture_mode, is_hardened=False).enabled is False
@@ -704,7 +704,7 @@ def test_scrubbing_removes_server_identity_and_nothing_else() -> None:
 def _settings(**overrides: Any) -> Settings:
     base: dict[str, Any] = {
         "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-        "TOGETHER_API_KEY": "k",
+        "BASETEN_API_KEY": "k",
     }
     base.update(overrides)
     return Settings(**base)

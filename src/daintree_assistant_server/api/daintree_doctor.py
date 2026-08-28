@@ -40,7 +40,12 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
-from ..config import EXECUTOR_MODEL, INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
+from ..config import (
+    EXECUTOR_MODEL,
+    EXECUTOR_PROVIDER,
+    INTERACTIVE_THINKING_ENABLED,
+    PUBLIC_MODEL_ID,
+)
 from ..errors import DaintreeError
 from ..observability import get_logger
 from ..prompts.loader import MAIN_PROMPT_VERSION
@@ -110,7 +115,7 @@ async def _provider_section(
     three that could carry userinfo.
     """
     section: dict[str, Any] = {
-        "name": "together",
+        "name": EXECUTOR_PROVIDER,
         "model": PUBLIC_MODEL_ID,
         "upstream_model": EXECUTOR_MODEL,
         "thinking_enabled": INTERACTIVE_THINKING_ENABLED,

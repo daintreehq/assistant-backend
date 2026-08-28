@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="with --live: measure prefix reuse across a runbook topic shift (paid)",
     )
-    run.add_argument("--env-file", help="path to a .env with TOGETHER_API_KEY")
+    run.add_argument("--env-file", help="path to a .env with BASETEN_API_KEY")
     run.add_argument("--out", help="explicit output JSON path")
     run.add_argument("--no-save", action="store_true")
     run.set_defaults(func=_cmd_run)

@@ -77,7 +77,7 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     # sort: the call that sat on that path (the upstream runbook selector) was
     # replaced by the LOCAL two-stage selector, whose release facts are asserted
     # below instead.
-    assert identity["provider"] == "together"  # type: ignore[index]
+    assert identity["provider"] == "baseten"  # type: ignore[index]
 
 
 def test_the_selector_block_describes_the_shipped_artifact() -> None:

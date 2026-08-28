@@ -904,7 +904,7 @@ class OpenRouterProvider:
 
         The dump lives HERE rather than at the end of ``_build_body`` so it
         records what actually goes on the wire: a subclass that adjusts the body
-        (``TogetherProvider`` swaps the thinking switch) would otherwise be
+        (``BasetenProvider`` swaps the thinking switch) would otherwise be
         invisible to the one tool built for answering "what did we send?".
         """
         body = self._build_body(request, stream=stream)

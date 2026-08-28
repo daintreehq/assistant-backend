@@ -41,7 +41,7 @@ _MANIFEST_ENV = (
 def _settings(**overrides: object) -> Settings:
     base: dict[str, object] = {
         "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-        "TOGETHER_API_KEY": "sk-server-owned",
+        "BASETEN_API_KEY": "sk-server-owned",
         "CEREBRAS_API_KEY": "csk-server-owned",
     }
     base.update(overrides)

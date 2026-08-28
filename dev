@@ -45,14 +45,14 @@ fi
 # it is a developer watching a healthy-looking process answer 503 with nothing on
 # screen to say why.
 #
-# All three are SERVER-owned. TOGETHER_API_KEY funds every turn — a request no
+# All three are SERVER-owned. BASETEN_API_KEY funds every turn — a request no
 # longer brings its own key, so there is nothing to fall back on without it.
 # CEREBRAS_API_KEY funds the fast-response preamble, which has no off switch: it
 # runs on every eligible streaming turn, so a missing key fails that stage open
 # every time, which looks exactly like a model that chose to say nothing.
 missing=()
 [[ -z "${STATE_SIGNING_KEY_CURRENT:-}" ]] && missing+=("STATE_SIGNING_KEY_CURRENT")
-[[ -z "${TOGETHER_API_KEY:-}" ]] && missing+=("TOGETHER_API_KEY")
+[[ -z "${BASETEN_API_KEY:-}" ]] && missing+=("BASETEN_API_KEY")
 [[ -z "${CEREBRAS_API_KEY:-}" ]] && missing+=("CEREBRAS_API_KEY")
 if (( ${#missing[@]} )); then
   echo "⚠  Missing: ${missing[*]} — server will boot but /readyz will be 503." >&2
@@ -68,6 +68,6 @@ export DAINTREE_LOG_CONSOLE="${DAINTREE_LOG_CONSOLE:-1}"
 echo "▶ Daintree Assistant Server"
 echo "  python: $PY   logs: console (DAINTREE_LOG_CONSOLE=$DAINTREE_LOG_CONSOLE)"
 # Presence only — never the value.
-echo "  upstream: together   key: $([[ -n "${TOGETHER_API_KEY:-}" ]] && echo set || echo MISSING)"
+echo "  upstream: baseten    key: $([[ -n "${BASETEN_API_KEY:-}" ]] && echo set || echo MISSING)"
 
 exec "$PY" -m daintree_assistant_server

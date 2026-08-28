@@ -20,11 +20,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ---- THE serving identity — one host, one model, both hardcoded -----------
 #
-# Together AI serves `deepseek-ai/DeepSeek-V4-Flash-0731`, and it serves
-# everything: the main completion and every utility task. Together is a model
-# HOST rather than a router, so one endpoint serves the weights and there is
-# nothing to select between. Runbook selection makes no upstream call at all — it
-# is the local ONNX classifier in `runbooks/local/`.
+# Baseten's Model APIs serve `zai-org/GLM-5.3-Flash`, and it serves everything:
+# the main completion and every utility task. Baseten is a model HOST rather
+# than a router, so one endpoint serves the weights and there is nothing to
+# select between. Runbook selection makes no upstream call at all — it is the
+# local ONNX classifier in `runbooks/local/`.
 #
 # This was briefly a two-mode registry (`modes.py`), with a `pro` tier on
 # Cerebras. That is gone: Cerebras's pricing structure could not be made to work
@@ -32,38 +32,65 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # over one entry was a lie about the shape of the thing. Git history has it, and
 # a genuine second tier would land there again rather than as a flag here.
 #
-# **The host is the latency decision, not the model.** These are the same weights
-# `context_compact` reached through OpenRouter for months. OpenRouter is a router
-# and this server sends it no routing preferences (there is no `provider` block
-# and policy.py is gone), so its endpoint choice is whatever the default is that
-# minute. Replaying the 62 real utility-task payloads: Together p50 1100ms / p90
-# 1702ms against OpenRouter's 3414ms / 6013ms — same model, same prompts, 3.1x.
-EXECUTOR_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
+# **The host is a latency decision and the model is a capability one, and this
+# move changed BOTH at once** — which is the thing to remember when reading a
+# benchmark taken before it. The previous identity was
+# `deepseek-ai/DeepSeek-V4-Flash-0731` on Together, itself chosen for host
+# latency (the 62 real utility-task payloads replayed at Together p50 1100ms /
+# p90 1702ms against OpenRouter's 3414ms / 6013ms on the SAME weights, 3.1x).
+# Every latency and cost figure recorded anywhere in this repo predating this
+# change describes those weights on that host, so none of them carry over
+# unre-measured. Git history has the whole of it.
+EXECUTOR_MODEL = "zai-org/GLM-5.3-Flash"
 
 #: The credential, base URL and production origin for that one host. Named as
 #: constants rather than inlined so readiness messages, the doctor route and the
 #: tests that pin the credential model all read the same three strings.
-EXECUTOR_KEY_ENV = "TOGETHER_API_KEY"
-EXECUTOR_URL_ENV = "TOGETHER_BASE_URL"
-EXECUTOR_ORIGIN = "api.together.xyz"
+EXECUTOR_KEY_ENV = "BASETEN_API_KEY"
+EXECUTOR_URL_ENV = "BASETEN_BASE_URL"
+EXECUTOR_ORIGIN = "inference.baseten.co"
 
 #: The alias returned to clients. The product promise is Daintree, not a
-#: permanent contract with Together or DeepSeek.
+#: permanent contract with Baseten or Z.ai.
 PUBLIC_MODEL_ID = "daintree-assistant"
 
 #: The serving model's input context window, in tokens. Hardcoded beside the
 #: model id for the same reason the model is: it is a property of the weights we
 #: chose, not an operational dial.
 #:
-#: **UNVERIFIED against the live host.** DeepSeek publishes this figure for V4
-#: Flash and Together serves those weights, but `tests/live/` is empty and
-#: nothing here has asked the API what it will actually accept (`TODO.md`). That
-#: is precisely why `services/context_budget.py` refuses a turn only when the
-#: INPUT alone clears the whole window rather than at the reservation boundary:
-#: an unverified ceiling may bound a paid turn, so it is allowed to bound only
-#: the ones no reading of it could rescue. Verify it with the live suite, then
-#: the budgeter can tighten.
-EXECUTOR_CONTEXT_TOKENS = 131_072
+#: **The HOST publishes this one, and it was read from there** — Baseten's
+#: `/v1/models` listing carries `context_length: 1048576` for this model, which
+#: is strictly better evidence than the previous entry had (DeepSeek's published
+#: figure for weights served elsewhere, with nothing here having asked). It is
+#: still not a probe of what the endpoint will actually ACCEPT — `tests/live/`
+#: is still empty (`TODO.md`) — so `services/context_budget.py` keeps refusing a
+#: turn only when the INPUT alone clears the whole window rather than at the
+#: reservation boundary: a ceiling we did not test against may bound a paid
+#: turn, so it is allowed to bound only the ones no reading of it could rescue.
+#:
+#: Note this is an EIGHTFOLD increase over the 131,072 that stood here for
+#: DeepSeek V4 Flash. Nothing in the budgeter scales with it, so the practical
+#: effect is that `exceeds_window` becomes very nearly unreachable and the
+#: upstream's own length rejection becomes the real limit — which is the same
+#: code either way (`_CONTEXT_LENGTH_MARKERS`).
+EXECUTOR_CONTEXT_TOKENS = 1_048_576
+
+#: The `reasoning_effort` sent on every executor call.
+#:
+#: **This model cannot be run non-thinking**, which is new and inverts the rule
+#: the rest of this file was written under. GLM-5.3-Flash reasons
+#: unconditionally: Baseten lists it "always enabled", there is no `none`, and
+#: an ABSENT field means `high`. So unlike DeepSeek — where the unified
+#: `reasoning: {"enabled": false}` genuinely reached zero reasoning tokens —
+#: there is no off switch to hold down here, only a floor to sit on.
+#:
+#: `low` is that floor, and it is close enough to off to be worth the move:
+#: measured over 6 trials on one proof-and-verify prompt, `low` reasoned on 1 of
+#: 6 (median 0, the one non-zero trial costing 16 tokens) against the absent
+#: field's 6 of 6 (median 479.5, spread 161-2519). Passed to the adapter at
+#: construction (`main.py`) rather than read by it, so the product decision
+#: stays here beside the model id and the adapter keeps its one job.
+EXECUTOR_REASONING_EFFORT = "low"
 
 # ---------------------------------------------------------------------------
 # The FAST-RESPONSE role. A second internal provider, NOT a second product.
@@ -95,7 +122,7 @@ FAST_RESPONSE_URL_ENV = "CEREBRAS_BASE_URL"
 FAST_RESPONSE_ORIGIN = "api.cerebras.ai"
 #: The host name, for traces and metrics. Never reaches a client.
 FAST_RESPONSE_PROVIDER = "cerebras"
-EXECUTOR_PROVIDER = "together"
+EXECUTOR_PROVIDER = "baseten"
 
 #: Why this model and not the 31B Gemma that used to sit here: the stage no
 #: longer writes a considered opening the executor continues from. It writes one
@@ -109,6 +136,7 @@ EXECUTOR_PROVIDER = "together"
 __all__ = [
     "EXECUTOR_CONTEXT_TOKENS",
     "EXECUTOR_MODEL",
+    "EXECUTOR_REASONING_EFFORT",
     "FAST_RESPONSE_MODEL",
     "FAST_RESPONSE_REASONING_EFFORT",
     "PUBLIC_MODEL_ID",
@@ -136,22 +164,38 @@ DOCS_RUNBOOK_ID = "daintree.docs.answer-usage-question"
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
 # There is one optimum and the server ships it.
 #
-# NOTHING IN THIS SERVER THINKS, and that is a flag genuinely held down rather
-# than a property of the model. DeepSeek V4 Flash reasons whenever the field is
-# absent, so every call sends the unified `reasoning: {"enabled": false}` object,
-# which Together honours — measured, `reasoning_tokens` leaves the usage block
-# entirely. Forgetting it therefore COSTS something: 366 reasoning tokens and
-# ~3.5s of an 11.5s wall-clock deciding how to answer "Hello!" (measured
-# 2026-08-08, turn_2c1bbc09, on the same weights).
+# **THIS FLAG NO LONGER MEANS "NO REASONING HAPPENS", AND THAT CHANGED WITH THE
+# HOST.** It used to be literally true: DeepSeek V4 Flash reasons whenever the
+# field is absent, so every call sent `reasoning: {"enabled": false}`, which
+# Together honoured — measured, `reasoning_tokens` left the usage block
+# entirely. GLM-5.3-Flash has no such switch (see EXECUTOR_REASONING_EFFORT
+# above): it reasons unconditionally, and the cheapest posture available is the
+# `low` floor rather than off.
 #
-# Runbook learning used to be the one exception — it ran fire-and-forget after the
-# response, so its latency never reached a user. It has been removed, so there is
-# no thinking surface left at all.
+# So what `False` means HERE is now "ask this host for the least reasoning it
+# will do", and `providers/baseten.py` is what translates it — a request
+# carrying `thinking_disabled=True` is sent at the floor, not with the field
+# omitted, because omission on this host buys `high`. In practice the floor is
+# very close to the old posture (1 of 6 trials reasoned at all, median 0
+# tokens), which is why the flag keeps its name and its value rather than being
+# renamed for a difference that does not show up in a usage block.
+#
+# What it does NOT do any more is guarantee a zero. `/doctor` and
+# `/v1/daintree/capabilities` publish it as `thinking_enabled: false`, and that
+# now reads as a statement about what the server REQUESTS rather than about what
+# the model does. Worth revisiting if a caller ever gates on it.
+#
+# Runbook learning used to be the one deliberate exception — it ran
+# fire-and-forget after the response, so its latency never reached a user. It
+# has been removed.
 INTERACTIVE_THINKING_ENABLED = False
 # The tier the interactive surface would send if that posture were ever flipped
-# back on. Kept beside the flag rather than inlined at the one call site that
-# reads it (services/task_runner.py) so the pair stays legible as a single
-# decision — and so flipping the flag does not also require choosing a tier.
+# back on — i.e. if the server ever wanted MORE than the floor. Kept beside the
+# flag rather than inlined at the one call site that reads it
+# (services/task_runner.py) so the pair stays legible as a single decision — and
+# so flipping the flag does not also require choosing a tier. On this host the
+# accepted values are `low` | `high` | `max`; `high` is also what an omitted
+# field would have bought.
 INTERACTIVE_REASONING_EFFORT = "high"
 
 # The development default salt; rejected in production by weak_secrets().
@@ -164,7 +208,7 @@ def _origin_problem(*, value: str, expected_host: str, env_name: str) -> str | N
 
     Extracted from the single-provider version so both providers get the SAME
     check rather than a copy each. The strictness is deliberate on every clause:
-    a non-443 port is a different origin; userinfo (``https://x@api.together.xyz``)
+    a non-443 port is a different origin; userinfo (``https://x@inference.baseten.co``)
     still reaches the host but credentials do not belong in this URL in any form;
     and a malformed port must fail readiness rather than the first request.
     """
@@ -838,18 +882,18 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", alias="HOST")
     port: int = Field(default=8080, alias="PORT")
 
-    # ---- Upstream provider (Together AI, OpenAI-compatible) --------------
+    # ---- Upstream provider (Baseten Model APIs, OpenAI-compatible) -------
     # The model is hardcoded (see EXECUTOR_MODEL above). Only the key and base URL
     # come from the environment.
-    together_base_url: str = Field(
-        default="https://api.together.xyz/v1", alias="TOGETHER_BASE_URL"
+    baseten_base_url: str = Field(
+        default="https://inference.baseten.co/v1", alias="BASETEN_BASE_URL"
     )
     # THE server's upstream credential, and the only one there is. Daintree funds
     # every turn from this key: callers no longer supply their own (see auth.py),
     # so this is required for the server to answer anything and is gated by
     # ``missing_secrets``. Local dev reads it from .env; Cloud Run injects it from
     # Secret Manager.
-    together_api_key: SecretStr = Field(default=SecretStr(""), alias="TOGETHER_API_KEY")
+    baseten_api_key: SecretStr = Field(default=SecretStr(""), alias="BASETEN_API_KEY")
 
     # ---- Second provider (OpenRouter) — OPTIONAL, and deliberately not gating.
     # Funds the ONE utility task that does not run on the serving model: context
@@ -858,14 +902,14 @@ class Settings(BaseSettings):
     # history (see OPENROUTER_COMPACTION_MODEL in services/task_runner.py).
     #
     # It is absent from ``missing_secrets`` ON PURPOSE, and that is the whole
-    # difference between the two credentials. Without TOGETHER_API_KEY nothing
+    # difference between the two credentials. Without BASETEN_API_KEY nothing
     # can be answered at all, so its absence must fail readiness. Without this
     # one everything still works except a single task that nothing on the serving
     # path calls yet — so a deployment that never sets it is a correct
     # deployment, not a broken one. Gating readiness on it would take the whole
     # server down over a feature it is not using.
     #
-    # There is no OPENROUTER_BASE_URL to match ``together_base_url``: that one
+    # There is no OPENROUTER_BASE_URL to match ``baseten_base_url``: that one
     # exists so tests and local proxies can redirect the credential-bearing
     # serving path, and ``weak_secrets`` pins it back to the real origin in
     # production. This provider is constructed against its module default and
@@ -1032,7 +1076,7 @@ class Settings(BaseSettings):
     # forced tool call.
 
     # ---- Retries --------------------------------------------------------
-    # ONE HOP ONLY: backend -> Together. Applies to every upstream call (main
+    # ONE HOP ONLY: backend -> Baseten. Applies to every upstream call (main
     # completion, stream open, selector, utility tasks): retries transient
     # failures only while no model output or replay-unsafe side effect has been
     # exposed. Streaming metadata may already be public during an open/prefetch
@@ -1340,19 +1384,19 @@ class Settings(BaseSettings):
     @property
     def serving_api_key(self) -> SecretStr:
         """The credential that funds every turn."""
-        return self.together_api_key
+        return self.baseten_api_key
 
     @property
     def serving_base_url(self) -> str:
         """The origin the serving credential is sent to."""
-        return self.together_base_url
+        return self.baseten_base_url
 
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty.
 
         All three entries are SERVER-owned, which is the whole shape of the
         credential model: Daintree holds every upstream key and callers hold none
-        (see auth.py). ``TOGETHER_API_KEY`` is required for the server to answer
+        (see auth.py). ``BASETEN_API_KEY`` is required for the server to answer
         anything at all, and its absence must fail READINESS rather than surface a
         turn later as an upstream 401 that reads like the caller's fault. There is
         still no INBOUND key to configure: account authentication is OAuth, and

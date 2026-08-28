@@ -27,7 +27,7 @@ and only failed minutes later, mid-task.
 
 The credential moved to the server, so the question moved with it. What this
 endpoint verifies now is **the key this request would actually spend** — the
-server's ``TOGETHER_API_KEY``, which funds every turn. Same probe, same verdict
+server's ``BASETEN_API_KEY``, which funds every turn. Same probe, same verdict
 shape, and still the only honest answer available before a real turn: it costs
 no tokens (a model listing, not a generation).
 
@@ -36,7 +36,7 @@ did not make it redundant — it made the two questions in this module visibly
 different. The endpoint above answers "how do I sign in here?" about the CALLER's
 credential; this one answers "can this deployment reach its provider at all?"
 about the SERVER's. A signed-in caller can still be served by a deployment whose
-``TOGETHER_API_KEY`` is expired, and no amount of identity verification would say
+``BASETEN_API_KEY`` is expired, and no amount of identity verification would say
 so. The CLI's ``doctor`` is what asks.
 """
 
@@ -228,14 +228,14 @@ async def verify(
     # otherwise surfaces as an unrelated failure on the first real turn. Never echo the
     # key itself.
     #
-    # Together returns none of them — its probe answers with a model listing. The
+    # Baseten returns none of them — its probe answers with a model listing. The
     # label/budget branches stay because they cost nothing to keep and are exactly
     # what an account-mapped credential will want to report; `_usability` below is
     # already written to treat their absence as "not known to be exhausted" rather
     # than a failure.
     #
     # WHAT IS DELIBERATELY NOT ECHOED: the model listing itself. It was the one
-    # field Together actually populates, and it was answering a question nobody
+    # field Baseten actually populates, and it was answering a question nobody
     # asks any more. Under caller-supplied keys the list described what YOUR key
     # could reach, so it was yours to see; the key is the server's now, the serving
     # model is hardcoded, and no caller chooses from that list — the CLI's own
@@ -273,7 +273,7 @@ async def verify(
     out["detail"] = _REASON_DETAIL[reason]
     # WHOSE key was probed, said on the wire rather than only in prose.
     #
-    # Every verdict this route returns is about `TOGETHER_API_KEY` — the
+    # Every verdict this route returns is about `BASETEN_API_KEY` — the
     # deployment's own credential — and nothing in the response used to say so.
     # A reader with no other context sees `valid: false` in reply to a request
     # carrying their bearer, and the available inference is the wrong one. The

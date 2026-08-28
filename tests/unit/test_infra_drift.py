@@ -5,7 +5,7 @@ the docs/ tree. It has never looked at `infra/`, and that is where the most
 dangerous staleness was found: the Terraform config still described the
 caller-funded OpenRouter contract that `auth.py` stopped implementing, told an
 operator `/v1/daintree/capabilities` answers 401 when the door is open, and — the
-executable half — omitted `TOGETHER_API_KEY` from the secrets it mounts, so a
+executable half — omitted `BASETEN_API_KEY` from the secrets it mounts, so a
 deployment built from it could never pass `/readyz`.
 
 Prose that is merely out of date is a nuisance. Prose an operator FOLLOWS during
@@ -64,7 +64,7 @@ def _required_secret_env_names() -> set[str]:
     key had.
     """
     empty = Settings(  # type: ignore[call-arg]
-        TOGETHER_API_KEY="", STATE_SIGNING_KEY_CURRENT="", ENVIRONMENT="production"
+        BASETEN_API_KEY="", STATE_SIGNING_KEY_CURRENT="", ENVIRONMENT="production"
     )
     names = set(empty.missing_secrets())
     # `weak_secrets` reports prose, so the env var names are recovered from it by
@@ -78,7 +78,7 @@ def _required_secret_env_names() -> set[str]:
         names.update(alias for alias in aliases if alias in problem)
     # The serving base URL is pinned by origin, not supplied as a secret — it is
     # a plain env var with a working default, so it is not this map's business.
-    names.discard("TOGETHER_BASE_URL")
+    names.discard("BASETEN_BASE_URL")
     return names
 
 
@@ -364,7 +364,7 @@ def test_no_default_combination_publishes_a_provider_funded_service() -> None:
     # further softening of a production default and would in fact switch every one
     # of those checks off, which is why this asks `Settings` rather than a literal.
     hardened = Settings(  # type: ignore[call-arg]
-        TOGETHER_API_KEY="",
+        BASETEN_API_KEY="",
         STATE_SIGNING_KEY_CURRENT="",
         ENVIRONMENT=environment,
     ).is_hardened

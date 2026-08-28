@@ -58,7 +58,11 @@ BANDS: dict[str, float] = {
 
 def capture() -> dict[str, Any]:
     sys.path.insert(0, str(REPO_ROOT / "src"))
-    from daintree_assistant_server.config import EXECUTOR_MODEL, PUBLIC_MODEL_ID
+    from daintree_assistant_server.config import (
+        EXECUTOR_MODEL,
+        EXECUTOR_PROVIDER,
+        PUBLIC_MODEL_ID,
+    )
     from daintree_assistant_server.prompts.loader import PromptLoader
     from daintree_assistant_server.runbooks.catalog import load_catalog
     from daintree_assistant_server.runbooks.local.documents import routing_revision
@@ -87,7 +91,7 @@ def capture() -> dict[str, Any]:
             # a router, so the endpoint-selection posture an older baseline
             # recorded (privacy mode, sort axis, denylist) has no subject and is
             # gone rather than reported as a constant.
-            "provider": "together",
+            "provider": EXECUTOR_PROVIDER,
         },
         "selector": {
             # Selection is LOCAL and two-stage: these describe the shipped

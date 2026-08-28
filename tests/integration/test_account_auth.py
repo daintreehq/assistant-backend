@@ -73,7 +73,7 @@ def _token(private: Any, **overrides: Any) -> str:
 
 def _app(mode: str, jwk: dict[str, Any] | None, provider: Any, selector: Any) -> Any:
     settings = Settings(
-        TOGETHER_API_KEY="tgp_v1_test-key",
+        BASETEN_API_KEY="tgp_v1_test-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         STATE_SIGNING_KID="k1",
         STATE_SALT="test-salt",
@@ -455,7 +455,7 @@ def make_gate_client(app: Any, fake_provider: Any) -> Any:
     ) -> TestClient:
         settings = Settings(
             ENVIRONMENT="staging",
-            TOGETHER_API_KEY="tgp_v1_test-key",
+            BASETEN_API_KEY="tgp_v1_test-key",
             CEREBRAS_API_KEY="csk-test-key",
             STATE_SIGNING_KEY_CURRENT="test-signing-key",
             STATE_SIGNING_KID="k1",

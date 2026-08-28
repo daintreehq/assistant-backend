@@ -21,7 +21,7 @@ There are **two internal provider ROLES**, and exactly one public product.
 
 | Role | Host | Model | When it is called |
 |---|---|---|---|
-| **executor** | Together AI (`https://api.together.xyz/v1`) | `deepseek-ai/DeepSeek-V4-Flash-0731` | every turn, and every utility task |
+| **executor** | Baseten Model APIs (`https://inference.baseten.co/v1`) | `zai-org/GLM-5.3-Flash` | every turn, and every utility task |
 | **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gpt-oss-120b` | every eligible streaming turn, CONCURRENTLY with the executor |
 
 A caller cannot choose between them and is never told which answered. The public
@@ -38,7 +38,7 @@ last three messages (cropped to a shared budget) and up to three selected runboo
 bodies. (Narrower than it was:
 the stage no longer sends the conversation history or the tool inventory.)
 Cerebras is not a cache or an infrastructure service in this design; it reads
-prompt content, and section 4 applies to it exactly as it applies to Together.
+prompt content, and section 4 applies to it exactly as it applies to Baseten.
 
 **The executor host is a model host, not a router**: one
 endpoint serves the model, and there is nothing to select between.
@@ -53,8 +53,8 @@ neutered** (git history has the previous revision).
 
 | Call | Model | Source of truth |
 |---|---|---|
-| Main completion | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.EXECUTOR_MODEL` |
-| Utility tasks | `deepseek-ai/DeepSeek-V4-Flash-0731` | `config.EXECUTOR_MODEL` |
+| Main completion | `zai-org/GLM-5.3-Flash` | `config.EXECUTOR_MODEL` |
+| Utility tasks | `zai-org/GLM-5.3-Flash` | `config.EXECUTOR_MODEL` |
 | Runbook selection | — local two-stage ONNX selector, no upstream call | `runbooks/local/setwise.py` |
 
 **A second product mode briefly lived here** — a `pro` tier on Cerebras serving
@@ -66,16 +66,19 @@ that host all went with it rather than being kept warm. Git history has the
 whole change. A genuine second tier lands there again as a deliberate piece of
 work, not as a flag.
 
-**The host is the latency decision, not the model.** These are the same weights
-`context_compact` reached through OpenRouter for months. OpenRouter is a router
-and this server sends it no routing preferences (there is no `provider` block —
-see above), so its endpoint choice is whatever the default is that minute.
-Replaying the 62 real utility-task payloads against both: Together p50 1100ms /
-p90 1702ms, OpenRouter p50 3414ms / p90 6013ms. Nothing about the model changed.
+**The host and the model moved together, and no earlier number survives that.**
+The previous identity was `deepseek-ai/DeepSeek-V4-Flash-0731` on Together, which
+was itself a pure HOST decision — the same weights `context_compact` reached
+through OpenRouter for months, replayed over 62 real utility-task payloads at
+Together p50 1100ms / p90 1702ms against OpenRouter's p50 3414ms / p90 6013ms.
+This change is not like that one: different weights on a different host, so every
+latency, cost and quality figure recorded anywhere in this repo predating it
+describes a system that no longer exists. Treat them as history, not as a
+baseline, and re-measure before citing one.
 
 `config.EXECUTOR_MODEL` names the model and `config.EXECUTOR_ORIGIN` the host the
 credential is sent to; `main._build_provider` builds the adapter, readiness gates
-`TOGETHER_API_KEY`, and `weak_secrets` pins the origin in production.
+`BASETEN_API_KEY`, and `weak_secrets` pins the origin in production.
 
 The id is **hardcoded** — a product decision, not deployment config. There is no
 environment override, and there must not be one: every prompt and benchmark in
@@ -87,7 +90,7 @@ this repository is calibrated against this exact model. Changing it is §9.
 > "selector latency" and "selector cost" below describe a path that no longer
 > exists on any route.
 
-**Every credential is the server's.** `TOGETHER_API_KEY` funds every turn and
+**Every credential is the server's.** `BASETEN_API_KEY` funds every turn and
 `CEREBRAS_API_KEY` funds the preamble stage; callers supply none of their own —
 see [`KEY_HANDLING.md`](KEY_HANDLING.md). This inverted with the move off
 caller-supplied keys and it is the fact most likely to be misremembered from
@@ -102,60 +105,93 @@ client never sees a real model id" without qualifying it.
 
 ## 2. Thinking posture
 
-**Nothing in this server thinks — and that is a flag genuinely held down, not a
-property of the model.**
+**THE SERVING MODEL CANNOT BE RUN NON-THINKING, and this section used to say
+the opposite.** It is the single biggest behavioural change in the move to
+GLM-5.3-Flash, and the sentence that stood here for the previous model — "nothing
+in this server thinks" — is now false.
 
-DeepSeek V4 Flash reasons by default when the field is absent, so every call
-sends the unified `reasoning: {"enabled": false}` object. Together honours it —
-measured: `reasoning_tokens` drops out of the usage block entirely.
+The previous model, DeepSeek V4 Flash, reasoned by default and could be held
+down: every call sent `reasoning: {"enabled": false}`, and Together honoured it,
+measured, with `reasoning_tokens` dropping out of the usage block entirely.
+GLM-5.3-Flash offers no equivalent. Baseten lists its reasoning as **always
+enabled**, `none` is not an accepted effort, and an **absent `reasoning_effort`
+means `high`** — so omitting the field is the most expensive posture available
+rather than the cheapest.
+
+What the server does instead is pin the floor. `config.EXECUTOR_REASONING_EFFORT`
+is `low`, injected into the adapter at construction, and `providers/baseten.py`
+sends it on **every** call — including the ones the code marks
+`thinking_disabled`, because for this host that flag can only mean "as little as
+possible", never "none".
 
 | Surface | Thinking | How |
 |---|---|---|
-| Main completion | off | `reasoning: {"enabled": false}`; `INTERACTIVE_THINKING_ENABLED = False` |
-| Utility tasks | off | same |
+| Main completion | floor | `reasoning_effort: "low"` — no off switch exists |
+| Utility tasks | floor | same |
+| Forced tool calls | floor | `thinking_disabled=True` clamps to the floor |
 | Runbook selector | n/a | local classifier, no model call |
 
-Runbook learning used to be the one exception — it ran fire-and-forget after the
-response, so its latency never reached a user, and "read a whole transcript and
-write a runbook" was genuinely worth reasoning about. It has been removed, so no
-call in this system sets `reasoning_effort` at all.
+Measured on the live API over 6 trials of one proof-and-verify prompt: with the
+field **absent**, the model reasoned on 6 of 6 (median 479.5 reasoning tokens,
+spread 161–2519); at `low`, on 1 of 6 (median 0, the single non-zero trial
+costing 16 tokens). So the floor is close to the old posture in practice, but it
+is a floor and not a zero, and it is not guaranteed to stay near zero on harder
+prompts.
 
-`INTERACTIVE_THINKING_ENABLED` stays in the code as the decision record and the
-switch a reasoning posture would flip; `INTERACTIVE_REASONING_EFFORT` sits beside
-it so flipping the flag does not also require choosing a tier.
+**The unified `reasoning` object is never sent.** Baseten accepts unknown
+top-level fields silently — a made-up field answers 200, and so does an `enabled`
+value that is not a boolean — so the parent adapter's `{"enabled": false}` cannot
+be distinguished from something the host is discarding, however it happens to
+measure. `reasoning_effort` is the documented control and the only one used.
 
-**This one is not pinned live.** There is no live contract suite (see §8), so
-"Together honours the disable" rests on a measurement taken by hand rather than
-on a test that would notice it stopping. A model or host that quietly began
-reasoning would announce itself as a latency and cost regression, not as a
-failure. `TODO.md` carries the suite.
+`INTERACTIVE_THINKING_ENABLED` stays `False` in the code, but **its meaning
+changed with the host**: it now records that the server asks for the least
+reasoning available, not that no reasoning occurs. `/doctor` and
+`/v1/daintree/capabilities` still publish it as `thinking_enabled: false`, which
+should be read as a statement about what is REQUESTED. A caller that gates on it
+expecting a hard zero would be wrong.
+
+**None of this is pinned live.** There is no live contract suite (see §8), so the
+numbers above rest on measurements taken by hand rather than on a test that would
+notice the floor moving. `TODO.md` carries the suite.
 
 ## 3. Wire shape — what a request carries, and what it must never carry
 
-**Together is not a router: one endpoint serves the model.** So there is no
+**Baseten is not a router: one endpoint serves the model.** So there is no
 endpoint-selection policy and no caller-facing `routing` block — a request
 carries the model, the messages, and the parameters the call actually needs, and
 nothing about where it should go.
 
-The adapter is `providers/together.py`: the OpenRouter one with three class
-attributes changed (base URL, key-probe path, no attribution headers) plus a
-key-record decoder, because Together's `/models` answers a bare JSON array where
-OpenRouter's `/key` answers `{"data": {...}}`. Same body, same SSE parsing, same
-error mapping.
+The adapter is `providers/baseten.py`: the OpenRouter one with three class
+attributes changed (base URL, key-probe path, no attribution headers), plus a
+key-record decoder and the thinking posture above. The decoder exists because
+Baseten's `/models` answers OpenAI's `{"object": "list", "data": [...]}` — a LIST
+under `data` — where OpenRouter's `/key` answers a MAPPING under the same name,
+so the parent's decoder would reject every valid key. Same body otherwise, same
+SSE parsing, same error mapping.
+
+**`reasoning_content` is Baseten's own spelling**, in the non-streaming `message`
+and in the streaming `delta` alike, and it is already the name everything above
+the provider boundary uses. So the parent's inbound rename is a harmless no-op
+here, and its OUTBOUND rename is undone: a replayed assistant chain-of-thought is
+sent as `reasoning_content`, the name the host reads.
 
 **A table of four host-specific wire rules used to sit here.** They were
 Cerebras's — `max_completion_tokens` never `max_tokens`, no `reasoning` object,
 no `provider` block, no `session_id`, and flat error bodies — and every one of
-them is the OPPOSITE of, or absent from, what Together wants. They are deleted
+them is the OPPOSITE of, or absent from, what Baseten wants. They are deleted
 rather than kept as a switch-back note, because a reader who half-remembered one
 would send a request this host rejects. Git history has them.
 
 ### 3a. Cache affinity — computed, and NOT sent
 
-Together caches prompt prefixes **automatically**, scoped to the organization and
-matched on the literal prompt prefix. Nothing has to be configured, and there is
-no endpoint to steer traffic toward — the mechanism an earlier adapter's
-sticky-key machinery existed to drive is simply built in here.
+Baseten caches prompt prefixes **automatically**, matched on the literal prompt
+prefix and billed at a separate `input_cache_read` rate. Nothing has to be
+configured, and there is no endpoint to steer traffic toward — the mechanism an
+earlier adapter's sticky-key machinery existed to drive is simply built in here.
+(Reuse is observable: a repeated session measured `cached_tokens` rising from 0
+to 9,216 across a tool-continuation round. The cache's SCOPE — per key, per
+organization — is not documented here and has not been verified.)
 
 **The server computes an affinity key and the adapter does not send it.** That
 is the honest state, and this section previously claimed the opposite. Every
@@ -190,7 +226,7 @@ storing it.
 
 Nothing is sent to *ask* for prefix caching (§3a), so what a request carries says
 nothing about what it got. The only signal is the count the host reports back,
-and Together documents it in **two places**, saying which one appears depends on
+and hosts document it in **two places**, saying which one appears depends on
 the model:
 
 | Shape | Where | Example |
@@ -227,16 +263,21 @@ handles both so that the answer is a log query rather than an outage.
 > **Do not repeat any of it, anywhere, as a statement about the current
 > deployment.** That includes the summary in `README.md`.
 >
-> **There are TWO hosts to verify now, not one.** Together receives every turn;
+> **There are TWO hosts to verify now, not one.** Baseten receives every turn;
 > Cerebras receives an eligible turn's prompt content when the fast-response
 > stage is enabled (§1). An earlier revision of this warning said Cerebras "is
 > gone" and told a reader to DELETE its policy material — that instruction is
 > withdrawn, and §4a is live rather than historical.
 >
-> Closing this means reading <https://www.together.ai/privacy>,
-> <https://www.together.ai/terms-of-service>, <https://trust.cerebras.ai> and
+> Closing this means reading <https://www.baseten.co/privacy-policy/>,
+> <https://www.baseten.co/terms-and-conditions/>, <https://trust.cerebras.ai> and
 > <https://cerebras.ai/privacy-policy>, and writing what each actually commits to
 > for the tier we run on. Tracked in `TODO.md`.
+>
+> **The executor host CHANGED, so this is not merely still-unverified — it is
+> unverified about a different company.** Any reading previously done against
+> Together AI's terms says nothing about Baseten's, and the model vendor behind
+> the weights changed too (Z.ai rather than DeepSeek). Start over.
 
 **What the promise WAS, and why its basis moved.** Under OpenRouter the
 no-training floor was something this server *enforced* per request, by sending
@@ -246,7 +287,7 @@ what Daintree can say rests entirely on the serving host's own published policy
 — which makes WHICH HOST a privacy fact, not just an operational one, and is
 exactly why a host change invalidates this section rather than merely dating it.
 
-> **The intended shape of the promise** (unverified for Together, see above):
+> **The intended shape of the promise** (unverified for Baseten, see above):
 > a no-training guarantee, deliberately NOT a no-retention guarantee.
 
 ---
@@ -256,7 +297,7 @@ exactly why a host change invalidates this section rather than merely dating it.
 **This host serves Daintree requests again** (the fast-response role, section 1),
 so this section is live rather than historical. What has NOT changed is that the
 position below is published-and-unverified in exactly the way section 4 describes
-for Together: nothing here has been confirmed against the account tier actually in
+for Baseten: nothing here has been confirmed against the account tier actually in
 use, and this code cannot confirm it. Verify both hosts before external testing.
 
 **Cerebras publishes a stronger position than the copy below claims** — no
@@ -309,12 +350,12 @@ not a stacking bug, and neither may be "fixed" by assuming the other does not
 exist.
 
 ```
-  CLI  ──(hop 1: CLI → backend)──►  backend  ──(hop 2: backend → Together)──►  model
+  CLI  ──(hop 1: CLI → backend)──►  backend  ──(hop 2: backend → Baseten)──►  model
         cli/internal/backend/retry.go          providers/retry.py
         ≤10 attempts / 2-minute window         MAX_UPSTREAM_RETRIES = 1
 ```
 
-### Hop 2 — backend → Together (`MAX_UPSTREAM_RETRIES`, default 1)
+### Hop 2 — backend → Baseten (`MAX_UPSTREAM_RETRIES`, default 1)
 
 Applies to every **model** call: main completion, stream open, and utility
 tasks. It does **not** apply to the
@@ -500,11 +541,17 @@ this as written.
 
 ## 5c. Cost reporting — built for a number that may not arrive
 
-> **Whether Together reports a billed cost is UNVERIFIED.** The adapter parses
-> `usage.cost` if it is there; nothing in this repository measures whether it is.
-> That is not a regression to route around: the rules below were written so that
-> "we do not know what this cost" is a first-class answer, and a client that
-> implemented them correctly behaves correctly either way. Confirming it needs
+> **Baseten does NOT report a billed cost — measured, not assumed.** `usage`
+> carries no `cost` field on either the streaming or the non-streaming path, so
+> `ProviderUsage.cost` is `None` on every turn and every `cost_usd` below is
+> null in practice. This is the one capability lost in the move off Together,
+> which did report it. It is not a regression to route around: the rules below
+> were written so that "we do not know what this cost" is a first-class answer,
+> and a client that implemented them correctly behaves correctly either way.
+> Per-token pricing IS published in Baseten's `/models` listing (`prompt`,
+> `completion`, `input_cache_read`), so a computed figure is possible — and
+> deliberately not done, because that would be this server inventing a number the
+> host declined to state. Historical note: confirming the old behaviour needed
 > the live contract suite `TODO.md` carries.
 
 Two failure modes are unacceptable and stay unacceptable: reporting a cost we did
@@ -668,10 +715,10 @@ upstream bodies are never echoed".
 ## 7. Readiness is *configuration* readiness, not provider readiness
 
 `/readyz` validates the server's own secrets, the prompt files, the runbook catalog
-and provider-object construction. `TOGETHER_API_KEY` being **present** is part of
+and provider-object construction. `BASETEN_API_KEY` being **present** is part of
 that (`missing_secrets`) — without it nothing can be answered at all, and
 discovering that on the first turn surfaces as an upstream 401 that reads like the
-caller's fault. But presence is not validity: `/readyz` **cannot** prove Together
+caller's fault. But presence is not validity: `/readyz` **cannot** prove Baseten
 is reachable or that the key works, and it deliberately does not try. A readiness
 probe that made a network call to a third party would fail this service for their
 outage.
@@ -727,11 +774,15 @@ candidate pass is not the same artifact as one authored to describe the incumben
 
 Two things beyond quality have to be re-decided when the model moves:
 
-- **Thinking posture.** Nothing thinks because `reasoning: {"enabled": false}` is
-  sent on every call, not because the model cannot reason — DeepSeek V4 Flash
-  reasons by default. A replacement therefore inherits a posture that is actively
-  held rather than absent, and the question is whether the disable still works on
-  it and is still spelled the same way (§2). Nothing checks that today.
+- **Thinking posture.** This is the item the last model change actually broke,
+  so treat it as the worked example. The posture was never absent — it was
+  actively held, by sending `reasoning: {"enabled": false}` to a model that
+  reasons by default. The incoming model, GLM-5.3-Flash, could not honour that at
+  all: reasoning is always on, `none` is rejected, and an omitted field means
+  `high`, so the inherited posture silently became the most expensive one
+  available rather than failing loudly. A replacement must be asked three
+  questions, not one: can reasoning be turned off, what does OMITTING the field
+  buy, and what is the field called (§2). Nothing checks any of that today.
 - **Prompt budgets.** The per-file budget tests and `benchmarks/baseline.json`
   are sized against this model's context window and this model's behaviour under
   the current prompts.

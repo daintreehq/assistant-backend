@@ -192,7 +192,7 @@ def test_the_bundle_states_who_holds_the_credential(client, auth) -> None:
     What the bundle reports instead is who is paying.
     """
     body = client.post(URL, headers=auth).json()
-    assert body["provider"]["name"] == "together"
+    assert body["provider"]["name"] == "baseten"
     assert body["provider"]["server_holds_credential"] is True
     assert "privacy_mode" not in body["provider"]
 

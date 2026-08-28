@@ -56,7 +56,7 @@ def _fixture_catalog() -> Catalog:
 
 
 def _settings() -> Settings:
-    return Settings(TOGETHER_API_KEY="tgp_v1_test", STATE_SIGNING_KEY_CURRENT="s")
+    return Settings(BASETEN_API_KEY="tgp_v1_test", STATE_SIGNING_KEY_CURRENT="s")
 
 
 def _startup_payload() -> dict[str, object]:

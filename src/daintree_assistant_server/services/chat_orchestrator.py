@@ -23,6 +23,7 @@ from .. import PROTOCOL_VERSION, __version__
 from ..config import (
     DOCS_RUNBOOK_ID,
     EXECUTOR_MODEL,
+    EXECUTOR_PROVIDER,
     FAST_RESPONSE_MODEL,
     FAST_RESPONSE_PROVIDER,
     PUBLIC_MODEL_ID,
@@ -958,7 +959,7 @@ class ChatOrchestrator:
                 ModelInvocationTrace(
                     invocation_id=f"inv_{request_id}_0",
                     stage="executor",
-                    provider="together",
+                    provider=EXECUTOR_PROVIDER,
                     model=prepared.provider_request.model,
                     started_at="",
                     finish_reason=drafted.finish_reason,
@@ -974,7 +975,7 @@ class ChatOrchestrator:
             ModelInvocationTrace(
                 invocation_id=f"inv_{request_id}_final",
                 stage="executor",
-                provider="together",
+                provider=EXECUTOR_PROVIDER,
                 model=prepared.provider_request.model,
                 started_at="",
                 finish_reason=result.finish_reason,

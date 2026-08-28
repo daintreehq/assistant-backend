@@ -581,7 +581,7 @@ def provider_invalid_api_key(
 ) -> DaintreeError:
     """Upstream 401 — the provider does not recognise the credential WE sent.
 
-    The key is the server's own (``TOGETHER_API_KEY``), so this is an operator
+    The key is the server's own (``BASETEN_API_KEY``), so this is an operator
     problem and no caller action can fix it. It answers **503**, not the 401 the
     upstream gave us: a status is a statement to the CALLER about the CALLER's
     request, and inheriting this one made the deployment's broken credential

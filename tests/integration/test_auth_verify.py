@@ -237,7 +237,7 @@ def test_verify_does_not_publish_the_upstream_model_inventory(
     struct has never had a field for it, so nothing loses anything.
     """
     fake_provider.verify_key_result = {
-        "models": ["deepseek-ai/DeepSeek-V4-Flash-0731", "some/other-model"]
+        "models": ["zai-org/GLM-5.3-Flash", "some/other-model"]
     }
 
     r = client.post("/v1/daintree/auth/verify")

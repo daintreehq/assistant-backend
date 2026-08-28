@@ -20,7 +20,7 @@ never spend):
 
 | Env var | Role | Missing means |
 |---|---|---|
-| `TOGETHER_API_KEY` (`config.EXECUTOR_KEY_ENV`) | funds every turn | `/readyz` fails — nothing can be answered |
+| `BASETEN_API_KEY` (`config.EXECUTOR_KEY_ENV`) | funds every turn | `/readyz` fails — nothing can be answered |
 | `CEREBRAS_API_KEY` (`config.FAST_RESPONSE_KEY_ENV`) | funds the preamble stage, which runs on every eligible turn | `/readyz` fails — the stage has no off switch, so a missing key fails it open on every turn |
 | `TRACE_IDENTITY_KEY` | pseudonymises trace identity — spends nothing | nothing, while trace capture is off; `/readyz` fails if it is on |
 
@@ -53,7 +53,7 @@ code enforces:
   written this way. A CLI mid-migration may still be sending the OpenRouter key
   it used to authenticate with. A door that *read* that header would carry the
   key on the principal, thread it to every provider call, and forward it to
-  Together — which rejects a credential it never issued. The caller would see
+  Baseten — which rejects a credential it never issued. The caller would see
   `provider_invalid_api_key`: an error blaming their key for a header they were
   right to still be sending. Refusing to look at it is what makes an old client
   work rather than fail confusingly.
@@ -198,7 +198,7 @@ the probe checks that the value still works. The CLI calls it from
 `doctor` (`cli/internal/backend/verify.go`), which is where an operator asks the
 question before a user does.
 
-The probe is `GET /models` against Together: the cheapest authenticated call
+The probe is `GET /models` against Baseten: the cheapest authenticated call
 endpoint, which answers for the credential rather than for a model and runs no
 inference. It has a short, hardcoded 10s read budget, deliberately *not*
 inheriting the main model's budget — a user is watching a sign-in spinner. It is

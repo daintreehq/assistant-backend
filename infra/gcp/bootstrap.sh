@@ -30,7 +30,7 @@
 # gate's membership list, which this script creates empty and never reads.
 #
 # What the server needs at runtime is state-signing material PLUS the upstream
-# credential (TOGETHER_API_KEY), which it holds itself and funds every turn from.
+# credential (BASETEN_API_KEY), which it holds itself and funds every turn from.
 # Callers supply no key of their own (see README.md and docs/KEY_HANDLING.md).
 
 set -euo pipefail
@@ -141,7 +141,7 @@ gen_salt() { openssl rand -hex 16; }
 ensure_secret state-signing-key-current gen_key
 ensure_secret state-salt gen_salt
 
-# The upstream credential gets a shell and it GATES: together-api-key funds every
+# The upstream credential gets a shell and it GATES: baseten-api-key funds every
 # turn, the deploy mounts it unconditionally, and a missing version has to stop
 # the deploy here rather than surface as a red /readyz two steps later.
 ensure_supplied_secret() {
@@ -161,7 +161,7 @@ ensure_supplied_secret() {
     ok "$name has no version (not gating)"
   fi
 }
-ensure_supplied_secret together-api-key 'tgp_v1_...' gates
+ensure_supplied_secret baseten-api-key '<Baseten API key>' gates
 
 # The FAST-RESPONSE credential, and it GATES now. The stage lost its off switch:
 # it runs on every eligible turn of every deployment, the deploy mounts this
@@ -211,7 +211,7 @@ else
 fi
 # Scoped per-secret rather than project-wide: this identity can read exactly the
 # secrets it mounts and nothing else in the project.
-# together-api-key appears here because the deploy mounts it: without the grant,
+# baseten-api-key appears here because the deploy mounts it: without the grant,
 # the runtime identity cannot read the key that funds every turn, and the
 # revision fails at startup.
 # cerebras-api-key is granted whether or not it has a version yet: the binding is
@@ -224,7 +224,7 @@ fi
 # a membership list later needs no IAM change — and a missing grant would present
 # as a private staging revision that fails at startup on a mount it cannot read,
 # which reads as a broken image rather than a missing permission.
-RUNTIME_SECRETS="state-signing-key-current state-salt together-api-key cerebras-api-key staging-allowed-subject-digests"
+RUNTIME_SECRETS="state-signing-key-current state-salt baseten-api-key cerebras-api-key staging-allowed-subject-digests"
 for s in $RUNTIME_SECRETS; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUNTIME_SA_EMAIL}" \

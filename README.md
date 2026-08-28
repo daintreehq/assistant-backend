@@ -5,7 +5,7 @@ boundary off the local CLI: the server owns the permanent system prompt, the
 runbook catalog and bodies, automatic runbook selection, prompt assembly, and the
 small-model utility prompts. The CLI keeps local state and local tool execution.
 
-**The server holds the upstream credential** (`TOGETHER_API_KEY`) and funds every
+**The server holds the upstream credential** (`BASETEN_API_KEY`) and funds every
 turn from it, so a request needs no API key of its own. Account authentication is
 built and switched OFF: `AUTH_MODE` selects `open` (the shipped default, under
 which the `Authorization` header is not read for authentication at all), `observe`
@@ -29,8 +29,8 @@ as their own response block, and streaming uses named SSE events (`meta`/`status
 `compaction`/`done`/`error`). The full contract is in [`docs/DAINTREE_API.md`](docs/DAINTREE_API.md).
 
 - **Runtime:** Python 3.12+, FastAPI, async `httpx`
-- **Upstream:** two internal provider ROLES behind one public model, neither of them selectable by a caller. The **executor** is Together AI (OpenAI-format API spoken *internally*, behind a provider abstraction) — `deepseek-ai/DeepSeek-V4-Flash-0731` for the main completion and every utility task. A **fast-response** stage on Cerebras (`gpt-oss-120b`) writes two or three visible sentences saying what the request is taken to MEAN, running CONCURRENTLY with the executor on every eligible streaming turn and dropped unshown if the answer starts first. It is best-effort — a Cerebras outage costs the sentences, never the turn — and the executor's request is byte-identical either way. Both hosts receive prompt content on an eligible turn.
-- **Selection:** runbook selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Together is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference — and pinning the host is what makes it fast, since the same weights via OpenRouter's default routing measured 3.1x slower (p50 3414ms against 1100ms). **Data handling is currently UNVERIFIED for BOTH hosts** — nobody has read Together's or Cerebras's terms for the account tiers actually in use, so state nothing about how either one retains, trains on, or deletes what it is sent ([`docs/PROVIDER_POLICY.md` §4](docs/PROVIDER_POLICY.md))
+- **Upstream:** two internal provider ROLES behind one public model, neither of them selectable by a caller. The **executor** is Baseten's Model APIs (OpenAI-format API spoken *internally*, behind a provider abstraction) — `zai-org/GLM-5.3-Flash` for the main completion and every utility task. It **cannot be run non-thinking** — reasoning is always on and an omitted `reasoning_effort` means `high` — so every call pins the `low` floor ([`docs/PROVIDER_POLICY.md` §2](docs/PROVIDER_POLICY.md)). A **fast-response** stage on Cerebras (`gpt-oss-120b`) writes two or three visible sentences saying what the request is taken to MEAN, running CONCURRENTLY with the executor on every eligible streaming turn and dropped unshown if the answer starts first. It is best-effort — a Cerebras outage costs the sentences, never the turn — and the executor's request is byte-identical either way. Both hosts receive prompt content on an eligible turn.
+- **Selection:** runbook selection is LOCAL, an in-process two-stage ONNX selector making no upstream call. Baseten is a model *host*, not a router: one endpoint per model, so there is no endpoint-selection policy and no per-request routing preference. (The host-latency argument that pinned the PREVIOUS executor — the same weights via OpenRouter's default routing measured 3.1x slower, p50 3414ms against 1100ms — was about DeepSeek V4 Flash on Together and has not been re-run for this host.) **Data handling is currently UNVERIFIED for BOTH hosts** — nobody has read Baseten's or Cerebras's terms for the account tiers actually in use, so state nothing about how either one retains, trains on, or deletes what it is sent ([`docs/PROVIDER_POLICY.md` §4](docs/PROVIDER_POLICY.md))
 - **Traces:** a restricted training-trace plane (`tracing/`) can store *exact* turn content — messages, tool arguments, the reply — for later model development. It is **off by default** and full-content capture is refused outright in production and staging. Operational logs stay metadata-only and are a separate plane entirely ([`docs/INTERNAL_BETA.md` §9](docs/INTERNAL_BETA.md))
 - **Target:** Google Cloud Run (stateless; signed state token carries the active runbooks)
 
@@ -96,7 +96,7 @@ proof that the whole corpus is accurate.
 src/daintree_assistant_server/
   api/            # FastAPI routers (chat, models, capabilities, runbooks, tasks, health)
   contracts/      # Pydantic wire models (OpenAI subset, extension, tasks, errors)
-  providers/      # ChatProvider protocol + Together/OpenRouter adapters + SSE parser
+  providers/      # ChatProvider protocol + Baseten/OpenRouter/Cerebras adapters + SSE parser
   prompts/        # Server-owned prompt text (.md / .md.j2) + loader
   runbooks/         # Runbook models, loader, catalog + CatalogManager, selector, load events
   state/          # Signed runbook-state token codec
@@ -121,8 +121,9 @@ mypy src/
 DAINTREE_UPDATE_GOLDEN=1 pytest tests/golden/
 
 # Live provider-contract tests: NONE ship today. The suite that existed pinned
-# the Cerebras wire and was deleted with that adapter, so what Together accepts,
-# what it 400s, and whether it reports cost are unpinned (see TODO.md).
+# the Cerebras wire and was deleted with that adapter, so what Baseten accepts
+# and what it 400s are unpinned (see TODO.md). One thing IS now known by hand:
+# Baseten reports no `usage.cost` at all, so every cost figure is null.
 ```
 
 CI (`.github/workflows/ci.yml`) runs ruff + `mypy --strict` + pytest on every
@@ -135,7 +136,7 @@ Set this (see `.env.example` for the full list):
 
 ```bash
 export STATE_SIGNING_KEY_CURRENT=...      # HMAC key for state tokens
-export TOGETHER_API_KEY=...               # the upstream credential; funds every turn
+export BASETEN_API_KEY=...               # the upstream credential; funds every turn
 export CEREBRAS_API_KEY=...               # the fast-response stage, which has no off switch
 ```
 
@@ -154,7 +155,7 @@ header IS read for redaction in every mode, so a mis-pasted credential cannot be
 logged back to you.)
 
 Missing required secrets do not crash the process — they fail **readiness**
-(`/readyz` returns 503) so liveness stays green. `TOGETHER_API_KEY` is gated
+(`/readyz` returns 503) so liveness stays green. `BASETEN_API_KEY` is gated
 there precisely so its absence surfaces as "this deployment is not ready" rather
 than as a first-turn upstream 401 that reads like the caller's fault.
 
@@ -162,7 +163,7 @@ than as a first-turn upstream 401 that reads like the caller's fault.
 
 ```bash
 # Copy the env scaffold; it binds HOST/PORT from .env (default 127.0.0.1:8473).
-cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT, TOGETHER_API_KEY
+cp .env.example .env   # then set STATE_SIGNING_KEY_CURRENT, BASETEN_API_KEY
                        # and CEREBRAS_API_KEY
 ./dev                  # exports .env, then runs the server
 ```
@@ -249,7 +250,7 @@ a weaker copy of a couple of these checks, and the copy nobody ran by hand was t
 one gating production.
 
 **It needs no credential and accepts none.** The server holds the upstream key
-(`TOGETHER_API_KEY`) and funds every turn from it, so the metadata reads, the
+(`BASETEN_API_KEY`) and funds every turn from it, so the metadata reads, the
 `/auth/verify` sign-in probe (free — a key introspection, not a model call), the
 426 protocol gate on both content endpoints, request-id echo and the typed error
 envelope answer an anonymous request — under `AUTH_MODE=enforce` the checks that
@@ -292,12 +293,12 @@ applied while leaving the service unhealthy is the worst outcome: the operator
 believes they have recovered and stops looking.
 
 The deployment mounts state-signing material (`STATE_SIGNING_KEY_CURRENT`,
-`STATE_SALT`) and both upstream credentials — `TOGETHER_API_KEY`, which funds
+`STATE_SALT`) and both upstream credentials — `BASETEN_API_KEY`, which funds
 every turn, and `CEREBRAS_API_KEY`, which funds the fast-response preamble. Four
 Secret Manager secrets, all server-owned; `bootstrap.sh` creates and grants all
 four. In production (`ENVIRONMENT=production`) the service fails readiness if a
 secret is weak or default (the packaged `STATE_SALT`, a signing key under 32
-characters), or if `TOGETHER_BASE_URL` is not the real `https://api.together.xyz`
+characters), or if `BASETEN_BASE_URL` is not the real `https://inference.baseten.co`
 origin — the server key rides every request to that origin, so a typo'd or
 plain-http host would leak the one credential all of Daintree runs on.
 

@@ -18,9 +18,9 @@ from typing import Any, Literal, Protocol, runtime_checkable
 
 from pydantic import SecretStr
 
-# Where a usage record's cached-token count was read from. Together documents
-# BOTH shapes and says which one appears depends on the model, so the parser
-# reads both and this records which one actually arrived — the only way to tell
+# Where a usage record's cached-token count was read from. Serving hosts
+# document BOTH shapes and which one appears depends on the model, so the
+# parser reads both and this records which one actually arrived — the only way to tell
 # "this host nests it" from "this host reports no reuse", which are the same
 # ``cached_tokens=None`` otherwise. Diagnostic only; nothing branches on it.
 CachedTokenSource = Literal["nested", "flat"]
@@ -113,7 +113,7 @@ class ProviderUsage:
     def from_wire(cls, usage: dict[str, Any] | None) -> ProviderUsage:
         if not usage:
             return cls()
-        # CACHED TOKENS ARRIVE IN ONE OF TWO PLACES. Together documents the count
+        # CACHED TOKENS ARRIVE IN ONE OF TWO PLACES. Hosts document the count
         # nested under `prompt_tokens_details` for some models and at the top
         # level for others, so reading only the nested one reports zero reuse on
         # half the catalogue — and a cache metric that under-reports is worse than
@@ -204,7 +204,7 @@ class ProviderChatRequest:
     timeout: float | None = None
     # The upstream credential for THIS call. **The serving path no longer sets
     # it**: ``auth.py`` ignores the ``Authorization`` header entirely and the
-    # server funds every turn from its own ``TOGETHER_API_KEY``, so the
+    # server funds every turn from its own ``BASETEN_API_KEY``, so the
     # orchestrator threads ``None`` and the provider's configured default is what
     # actually pays. The field stays live and tested as the slot an
     # account-mapped credential will occupy once account authentication lands

@@ -60,7 +60,7 @@ see; `enforce` requires one. All three are built and tested
 (`tests/integration/test_account_auth.py`), and the question this entry used to
 pose — whether an authenticated caller spends Daintree's key or brings their own —
 is answered: an account is an ENTITLEMENT. `Principal` carries an identity and no
-credential, and the server funds every turn from `TOGETHER_API_KEY` regardless.
+credential, and the server funds every turn from `BASETEN_API_KEY` regardless.
 
 What is left on THIS side is not code — but two entries below are, and they are
 sequenced into the list:
@@ -539,12 +539,20 @@ Doing (3) alone is what created the contradiction in the first place.
 **Trigger: the next selector retrain, if calibration is added to it.** Not
 scheduled on its own.
 
-The serving model is non-thinking on every call. The wanted behaviour is that it
-reasons when routing is weak — no runbook, or one the classifier is unsure of —
-and stays fast when a runbook matches cleanly, so quality is bought only where it is
-needed. The MECHANISM is nearly free: DeepSeek V4 Flash reasons unless told not
-to, `ProviderChatRequest.thinking_disabled` already exists, and it is decided per
-request. What is missing is a trustworthy input.
+The serving model runs at its reasoning FLOOR on every call. The wanted behaviour
+is that it reasons harder when routing is weak — no runbook, or one the classifier
+is unsure of — and stays at the floor when a runbook matches cleanly, so quality is
+bought only where it is needed.
+
+**The move to GLM-5.3-Flash changed the shape of this, and mostly in its favour.**
+The mechanism used to be "stop sending the disable"; it is now "raise
+`reasoning_effort` from `low` to `high` or `max`", which is a graded dial rather
+than a binary and is exactly what a confidence signal would want to drive.
+`config.EXECUTOR_REASONING_EFFORT` sets the floor and the adapter already sends the
+field on every call, so the plumbing is a per-request override away. Note the
+default cuts the other way now: an omitted field means `high`, so the risk of a
+bug here is an accidentally EXPENSIVE server rather than an accidentally dumb one.
+What is still missing is a trustworthy input.
 
 `SelectionDecision.confidence` is not it, and that is measured rather than
 suspected — see "Selector confidence cannot gate reasoning" in
@@ -616,7 +624,7 @@ added beside it.
 
 ---
 
-## Re-establish the privacy claim against Together
+## Re-establish the privacy claim against Baseten
 
 **Trigger: before any external statement about data handling.** Blocking for that,
 not for engineering.
@@ -626,17 +634,22 @@ the server ENFORCED it per request (`data_collection: "deny"` plus endpoint
 filtering). A single host has no such lever, so the claim now rests entirely on the
 host's published policy — which makes the identity of the host a privacy fact.
 
+**The executor host has now changed TWICE since this entry was written, so any
+reading already done is void.** It was Cerebras, then Together AI, and is now
+Baseten (with Z.ai's weights rather than DeepSeek's) — a different company's terms
+each time. Notes taken against Together say nothing about Baseten.
+
 The section was written when Cerebras was the sole serving host and still cites
 Cerebras's trust centre. That is no longer the whole picture rather than simply
-wrong: Together now answers every executor/utility turn, and Cerebras has RETURNED
+wrong: Baseten now answers every executor/utility turn, and Cerebras has RETURNED
 in a narrower role — it writes the fast-response preamble on eligible streaming
 turns (`FAST_RESPONSE_MODEL`), on every eligible turn. Nobody has read either host's terms
 and rewritten this section, so it stays marked unverified rather than re-vendored:
 swapping in a confident guarantee nobody had checked would be the worst possible
 form of this document to be wrong.
 
-To close it: read <https://www.together.ai/privacy> and
-<https://www.together.ai/terms-of-service>, and do the same for Cerebras's current
+To close it: read <https://www.baseten.co/privacy-policy/> and
+<https://www.baseten.co/terms-and-conditions/>, and do the same for Cerebras's current
 terms (not the old trust-centre citation — re-read it, since the relationship
 changed). State what each host actually commits to (training, retention, caching,
 sub-processors) for the content it actually receives, and say plainly which parts
@@ -822,11 +835,23 @@ evidence, reconciliation over a small state ledger — but nothing has tested th
 
 **Trigger: with the live provider-contract suite below.**
 
-`config.EXECUTOR_CONTEXT_TOKENS` is 131,072 — the published figure for DeepSeek V4
-Flash, never asked of Together. That gap is why `exceeds_window` refuses only
-when the input alone clears the whole window rather than at the reservation
-boundary: an unverified ceiling is allowed to fail a paid turn only in the cases
-no reading of it could rescue.
+**Partly closed by the move to Baseten.** `config.EXECUTOR_CONTEXT_TOKENS` is now
+1,048,576, and unlike the previous entry that figure was READ FROM THE HOST —
+Baseten's `/v1/models` publishes `context_length` (and `max_completion_tokens`:
+131,072) for this model. That is strictly better evidence than the old value had
+(DeepSeek's published figure for weights served elsewhere, never asked of
+Together).
+
+What remains open is the same thing as before: nobody has asked the endpoint what
+it will actually ACCEPT. So `exceeds_window` still refuses only when the input
+alone clears the whole window rather than at the reservation boundary — an
+untested ceiling is allowed to fail a paid turn only in the cases no reading of it
+could rescue.
+
+Note the eightfold increase makes the local refusal nearly unreachable: at this
+window the estimate has to clear ~5.2 MB of text, against an 8 MiB body cap. The
+band is real but narrow, and `tests/integration/test_chat_api.py::_oversized_messages`
+asserts it has not closed.
 
 Verify it and two things follow: the budgeter can tighten to the reservation
 boundary and start catching turns that will fail rather than only turns that
@@ -835,8 +860,11 @@ a measurement (send a known payload, read the upstream's own `prompt_tokens`, an
 the difference is the template's real cost).
 
 Related and unpinned in the same way: `_CONTEXT_LENGTH_MARKERS` in
-`providers/openrouter.py` matches Together's length-rejection prose by guess. One
-deliberately oversized live request settles what that host actually says.
+`providers/openrouter.py` matches the host's length-rejection prose by guess, and
+those markers were written for Together's wording, not Baseten's. One deliberately
+oversized live request settles what this host actually says — and with the window
+now at 1M tokens, the upstream's own rejection is the limit that will fire in
+practice, which makes matching its prose more load-bearing than before, not less.
 
 ---
 
@@ -935,7 +963,10 @@ Owed, in the order the risk runs:
    with them versus 0 in 3 without. A larger sample after reverting everything
    shows the leak at **1 in 8 turns on the same request with no intervention
    present**, so it is a pre-existing, intermittent DeepSeek behaviour that the
-   small samples happened to straddle. It is a real bug — see the separate entry
+   small samples happened to straddle. **That measurement is now about a model
+   that no longer serves** — the executor is GLM-5.3-Flash on Baseten, and whether
+   it leaks tool-call syntax at all, let alone at 1 in 8, is unmeasured. Re-run
+   before treating the rate as current. It is a real bug — see the separate entry
    below — but it is not a reason those attempts failed, and it must not be used
    to argue against retrying this class of fix.
 
@@ -1007,7 +1038,7 @@ training export is taken seriously.**
 
 `ModelInvocationTrace.wire_request_ref` is defined and always `None`.
 `request_ref` holds the NORMALIZED `ProviderChatRequest`, which is not what the
-provider saw: the adapter renames `max_tokens`, Together adds its `reasoning`
+provider saw: the adapter renames `max_tokens`, Baseten adds its `reasoning_effort`
 object, Cerebras uses `max_completion_tokens`, and `cache_session_id` is dropped.
 A replay built from the normalized form is confidently wrong about the request.
 
@@ -1044,15 +1075,18 @@ before the next model or host change.**
 which parameters were accepted, which were rejected with a 400, the flat error
 body, and that the serving model reported zero reasoning tokens — and it was
 deleted with that adapter, correctly: every one of those rules was the opposite
-of, or absent from, what Together wants.
+of, or absent from, what Baseten wants.
 
 Nothing replaced it, so these are now remembered rather than checked:
 
-- that `reasoning: {"enabled": false}` actually suppresses reasoning on
-  DeepSeek V4 Flash (§2 of the provider policy asserts it, from a hand
-  measurement);
-- whether Together reports a billed `cost`, which decides whether every
-  cost field in a response is populated or absent (§5c);
+- that `reasoning_effort: "low"` holds GLM-5.3-Flash near zero reasoning. Hand
+  measurement says 1 of 6 trials on one prompt (§2 of the provider policy); it is
+  a FLOOR rather than an off switch, so unlike the old `{"enabled": false}` claim
+  this one can drift upward on harder prompts without anything breaking;
+- **answered by hand, still unpinned:** Baseten reports NO billed `cost` on either
+  the streaming or the non-streaming path, so every cost field in a response is
+  absent (§5c). A suite should hold that, since a host quietly starting to report
+  it would silently change what the accounting chain publishes;
 - which of the two documented cached-token shapes the serving model reports
   — nested under `prompt_tokens_details` or flat at the top level. The parser
   reads both and stamps `cached_tokens_source` on every record, so the live

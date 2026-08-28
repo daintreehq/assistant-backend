@@ -9,6 +9,7 @@ import pytest
 from conftest import meta_of, parse_sse, respond_body
 from fakes import FakeProvider, make_result, make_text_chunks, selection_result
 
+from daintree_assistant_server.config import EXECUTOR_CONTEXT_TOKENS
 from daintree_assistant_server.errors import upstream_error
 from daintree_assistant_server.runbooks.decision import SelectionDecision
 from daintree_assistant_server.services.chat_orchestrator import resolve_active_runbooks
@@ -1271,17 +1272,57 @@ def test_duplicate_and_unknown_pins_report_one_warning_each(
 # --------------------------------------------------------------------------
 
 
+def _oversized_messages() -> list[dict[str, str]]:
+    """A transcript that cannot fit the serving model's context window.
+
+    SIZED FROM THE WINDOW, never hardcoded. This used to be one 1 MB message,
+    which cleared the old 131,072-token window comfortably; the window moved to
+    1,048,576 with the serving model and that same message now sits well inside
+    it, so both assertions below went quiet rather than red. Deriving the size
+    means the next model move cannot repeat that.
+
+    `exceeds_window` fires at input > window * 1.25 on a chars/4 estimate, so the
+    turn needs ~5.2 MB of text. It has to be SPLIT across messages —
+    `cap_message_text` is 1 MiB each — while the whole body still clears
+    `max_request_bytes` (8 MiB). That band is narrow enough to be worth naming: a
+    window much larger than today's would put this refusal out of reach behind
+    the body cap entirely, leaving only the upstream's own length rejection
+    (which maps to the same code). The assert below is what would say so.
+    """
+    per_message = 900_000
+    blocks = -(-(int(EXECUTOR_CONTEXT_TOKENS * 1.25 * 4) + per_message) // per_message)
+    assert blocks * per_message < 8 * 1024 * 1024, (
+        "the refusal is no longer reachable under the body cap — see the docstring"
+    )
+    messages = [
+        {"role": "user" if i % 2 == 0 else "assistant", "content": "word " * (per_message // 5)}
+        for i in range(blocks)
+    ]
+    messages.append({"role": "user", "content": "and finally, what do you make of it?"})
+    return messages
+
+
 def test_an_oversized_turn_is_refused_before_the_upstream_is_called(
     client, auth, fake_provider
 ) -> None:
     """Not merely "an error happens": the provider must be untouched. The whole
     value of catching this locally is the call that never gets paid for."""
     fake_provider.selection_result = selection_result([])
-    # Well under the 8 MiB body cap and the 1 MiB per-message cap, and still far
-    # past any context window — which is exactly the gap this check closes.
-    huge = "word " * 200_000
+    # SIZED FROM THE WINDOW, never hardcoded. This payload used to be one 1 MB
+    # message, which cleared the old 131,072-token window comfortably; the window
+    # moved to 1,048,576 with the serving model and that same message now sits
+    # well inside it, so the assertion went quiet rather than red. Deriving the
+    # size means the next model move cannot repeat that.
+    #
+    # `exceeds_window` fires at input > window * 1.25 on a chars/4 estimate, so
+    # the turn needs ~5.2 MB of text. It has to be SPLIT across messages —
+    # `cap_message_text` is 1 MiB each — while the whole body still clears
+    # `max_request_bytes` (8 MiB). That is a narrow band, and worth naming: a
+    # window much larger than today's would put the refusal out of reach behind
+    # the body cap entirely, leaving only the upstream's own length rejection
+    # (which maps to the same code).
     r = client.post(URL, headers=auth, json=respond_body(
-        [{"role": "user", "content": huge}], session_id="ctx1", turn_id="t1",
+        _oversized_messages(), session_id="ctx1", turn_id="t1",
     ))
     assert r.status_code == 413, r.text
     body = r.json()
@@ -1334,7 +1375,7 @@ def test_an_oversized_streaming_turn_ends_with_a_terminal_error_event(
     only be reported in band — as a terminal `error`, never a fabricated `done`."""
     fake_provider.selection_result = selection_result([])
     r = client.post(URL, headers=auth, json=respond_body(
-        [{"role": "user", "content": "word " * 200_000}],
+        _oversized_messages(),
         session_id="ctx3", turn_id="t1", generation={"stream": True},
     ))
     events = parse_sse(r.text)

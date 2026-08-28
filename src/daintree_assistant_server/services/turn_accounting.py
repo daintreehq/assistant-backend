@@ -243,7 +243,7 @@ def log_turn_usage(
         # Raw values, not the `or 0` projections above: those cannot express
         # "unreported", and the ratio is the field that has to.
         cache_ratio=cache_ratio(usage.prompt_tokens, usage.cached_tokens),
-        # WHICH of the two documented shapes the count came out of — Together
+        # WHICH of the two documented shapes the count came out of — the host
         # nests it for some models and puts it at the top level for others, and
         # `providers/base.py` reads both. Logged because the two failure modes it
         # separates look identical from `cached_tokens` alone: `None` here with a

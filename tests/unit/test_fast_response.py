@@ -52,7 +52,7 @@ assert FOUNDATION is not None
 def _settings(**overrides: Any) -> Settings:
     base: dict[str, Any] = {
         "STATE_SIGNING_KEY_CURRENT": "x" * 32,
-        "TOGETHER_API_KEY": "k",
+        "BASETEN_API_KEY": "k",
         "CEREBRAS_API_KEY": "c",
     }
     base.update(overrides)

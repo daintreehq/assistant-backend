@@ -1,17 +1,17 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:e071adbd329b4f90f7ed61da13ff332d861e9a69e188c14101fd36f9ef9b5d88",
+    "revision": "sha256:243b8ea54d395ada9ac35bca4be7a34083cb75c4fec2c787e04266a2b731f5e9",
     "runbooks": 39
   },
   "identity": {
-    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
-    "provider": "together",
+    "model": "zai-org/GLM-5.3-Flash",
+    "provider": "baseten",
     "public_model": "daintree-assistant"
   },
   "prompt": {
     "base_prompt_bytes": 25267,
-    "runbook_body_bytes_total": 292104,
+    "runbook_body_bytes_total": 294309,
     "subagent_prompt_bytes": 5552
   },
   "selector": {
@@ -25,6 +25,6 @@
   "tools": {
     "count": 96,
     "names_sha256": "7dcd09107bfe7782eae59072ca84fb50043adee54542b4545ef7e3efce7ba577",
-    "tool_inventory_bytes": 119169
+    "tool_inventory_bytes": 119303
   }
 }

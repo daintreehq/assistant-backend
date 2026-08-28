@@ -893,7 +893,7 @@ def test_request_validation_refuses_a_transcript_that_reuses_an_open_id() -> Non
             {"role": "assistant", "content": None, "tool_calls": [call]},
         ]},
     })
-    settings = Settings(TOGETHER_API_KEY="sk", STATE_SIGNING_KEY_CURRENT="s")
+    settings = Settings(BASETEN_API_KEY="sk", STATE_SIGNING_KEY_CURRENT="s")
     with pytest.raises(DaintreeError) as exc:
         validate_respond_request(request, settings)
     assert exc.value.code == "unresolved_tool_calls"

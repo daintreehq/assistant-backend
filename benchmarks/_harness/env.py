@@ -1,7 +1,7 @@
 """Settings + live-provider bootstrap, shared by every suite that talks to a model.
 
 Reads the repo-root ``.env`` (the same file production uses) unless an explicit
-path is given, so a live run uses the real ``TOGETHER_API_KEY``. Deterministic
+path is given, so a live run uses the real ``BASETEN_API_KEY``. Deterministic
 suites call ``build_settings`` too (they need caps, model ids, and the state
 keys) but never construct a provider.
 """
@@ -16,13 +16,13 @@ from pydantic import SecretStr
 
 from daintree_assistant_server.config import EXECUTOR_KEY_ENV, Settings
 from daintree_assistant_server.providers.base import ChatProvider, ProviderChatRequest
-from daintree_assistant_server.providers.together import TogetherProvider
+from daintree_assistant_server.providers.baseten import BasetenProvider
 
 #: The adapter production builds. Benchmarks MUST build the same one: a suite
 #: that measured wire bytes or latency through a different adapter is reporting
 #: a number about nothing, and the failure is silent because every adapter here
 #: answers the same calls.
-_SERVING_PROVIDER_CLASS = TogetherProvider
+_SERVING_PROVIDER_CLASS = BasetenProvider
 
 ROOT = Path(__file__).resolve().parents[2]
 

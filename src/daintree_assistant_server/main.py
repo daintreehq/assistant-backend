@@ -32,7 +32,7 @@ from .api import (
     health,
     root,
 )
-from .config import Settings, get_settings
+from .config import EXECUTOR_REASONING_EFFORT, Settings, get_settings
 from .errors import register_exception_handlers, request_too_large
 from .observability import (
     bind_request_context,
@@ -43,9 +43,9 @@ from .observability import (
 )
 from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
+from .providers.baseten import BasetenProvider
 from .providers.cerebras import CerebrasProvider
 from .providers.openrouter import OpenRouterProvider
-from .providers.together import TogetherProvider
 from .runbooks.catalog import Catalog, CatalogManager, default_runbooks_dir, load_catalog
 from .runbooks.local.paths_local import selector_artifact_dir
 from .runbooks.local.runtime import InferencePool
@@ -417,12 +417,14 @@ def _build_trace_recorder(
 
 
 def _build_provider(settings: Settings) -> ChatProvider:
-    """The serving adapter: Together, holding the server's own credential.
+    """The serving adapter: Baseten, holding the server's own credential.
 
-    The OpenAI-shape adapter, pointed at Together. Same body, same SSE, same
-    unified `reasoning` object (measured — Together honours `{"enabled": false}`),
-    so the vendor difference from OpenRouter is three class attributes rather
-    than a third parsing implementation. See providers/together.py.
+    The OpenAI-shape adapter, pointed at Baseten's Model APIs. Same SSE, same
+    `max_tokens` spelling, same tool-call chunks as the OpenRouter parent — the
+    vendor difference is the key-probe shape and the THINKING POSTURE, which is
+    the one place this host is not interchangeable: GLM-5.3-Flash cannot be run
+    non-thinking, so the adapter sends `reasoning_effort` where the parent sends
+    a `reasoning` object. See providers/baseten.py.
     """
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(
@@ -433,7 +435,7 @@ def _build_provider(settings: Settings) -> ChatProvider:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    return TogetherProvider(
+    return BasetenProvider(
         client,
         # THE server credential. Daintree funds every turn from this key: callers
         # supply none of their own (see auth.py), so a provider built without one
@@ -441,6 +443,10 @@ def _build_provider(settings: Settings) -> ChatProvider:
         # it rather than letting the first turn discover the gap.
         api_key=settings.serving_api_key,
         base_url=settings.serving_base_url,
+        # The floor this model exposes; there is no "off" on these weights. The
+        # decision lives beside the model id in `config` and is injected here so
+        # the adapter does not reach back into settings for it.
+        reasoning_effort=EXECUTOR_REASONING_EFFORT,
         default_timeout=settings.main_timeout_seconds,
         dump_dir=settings.dump_upstream_dir,
     )

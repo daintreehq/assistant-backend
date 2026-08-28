@@ -112,7 +112,7 @@ def test_every_field_the_cli_decodes_is_a_field_we_publish() -> None:
     assert nested, "parsed no fields out of SessionPolicy"
 
     settings = Settings(
-        TOGETHER_API_KEY="tgp_v1_test-key",
+        BASETEN_API_KEY="tgp_v1_test-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         SUPABASE_AUTH_ISSUER="https://abcdefghij.supabase.co/auth/v1",
         SUPABASE_JWKS_URL="https://abcdefghij.supabase.co/auth/v1/.well-known/jwks.json",

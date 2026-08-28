@@ -63,7 +63,7 @@ python -m benchmarks.runbook_selection.bench compare results/a.json results/b.js
 ```
 
 Only `run` costs money. `local`, `list`, `coverage`, `report`, and `compare` are
-offline and free — they work with `TOGETHER_API_KEY=` blanked. `report` reads
+offline and free — they work with `BASETEN_API_KEY=` blanked. `report` reads
 which suite wrote the artifact and regrades it under that suite's gate, so a
 saved local run and a saved paid run are not graded against each other's
 thresholds.

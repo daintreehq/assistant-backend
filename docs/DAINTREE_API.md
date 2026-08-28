@@ -5,15 +5,15 @@ OpenAI-compatible. There is exactly one client (the Daintree Assistant CLI), whi
 the server fully controls, so the wire contract is purpose-built rather than
 shaped around a third-party schema.
 
-The upstream provider is Together AI — its OpenAI-compatible wire shape is spoken
-*internally*, behind a provider abstraction; the main model is
-`deepseek-ai/DeepSeek-V4-Flash-0731`, named once in `config.EXECUTOR_MODEL`. Together
+The upstream provider is Baseten's Model APIs — its OpenAI-compatible wire shape is
+spoken *internally*, behind a provider abstraction; the main model is
+`zai-org/GLM-5.3-Flash`, named once in `config.EXECUTOR_MODEL`. Baseten
 is a model HOST, not a router: one endpoint serves each model, so there is no
 endpoint-selection policy, no fallback pool and no caller-facing routing preference.
 All of that is invisible to `/v1/daintree/respond`, which never reports a real model
 id (only the public `daintree-assistant` family). `/v1/daintree/tasks` deliberately
 reports the real upstream model a task profile is configured to use — every profile
-today runs on Together's `EXECUTOR_MODEL` — and the operator-facing `/v1/daintree/doctor`
+today runs on Baseten's `EXECUTOR_MODEL` — and the operator-facing `/v1/daintree/doctor`
 reports it too.
 
 ## Principles
@@ -37,7 +37,7 @@ reports it too.
 ## Authentication
 
 **The credential model is inverted from what an early tester will remember.** The
-SERVER holds the upstream credential (`TOGETHER_API_KEY`) and funds every turn from it.
+SERVER holds the upstream credential (`BASETEN_API_KEY`) and funds every turn from it.
 Callers supply no key of their own.
 
 There is no inbound API key to configure. Account authentication is OAuth, and under
@@ -428,7 +428,7 @@ keep.
 `ok`, `provider_rejected`, `credits_exhausted`.
 
 `server_holds_credential` is always `true`, and it is on the wire rather than
-only in this document because every verdict here is about `TOGETHER_API_KEY` —
+only in this document because every verdict here is about `BASETEN_API_KEY` —
 the deployment's own key — while the request that asked carried the caller's
 bearer. Without it the available inference from `valid: false` is the wrong one.
 `/v1/daintree/doctor` reports the same field under the same name, deliberately:
@@ -1255,32 +1255,30 @@ A host has no such pool, so every one of them was deleted rather than neutered, 
 the `upstream_no_compliant_provider` branch of the error taxonomy. Git history has the
 previous revision if that shape is ever needed again.
 
-Reasoning is controlled by the unified `reasoning` object, sent explicitly on every call:
-`{"enabled": false}` turns thinking off, `{"effort": "<tier>"}` turns it on at a tier.
-DeepSeek V4 Flash thinks when the field is ABSENT, so the explicit directive is what keeps a
-non-thinking call actually non-thinking — measured, `{"enabled": false}` drops
-`reasoning_tokens` out of the usage block entirely. Runbook selection sends nothing at all: it
-is local and makes no upstream call.
+Reasoning is controlled by `reasoning_effort`, sent explicitly on every call at the
+`low` floor. The unified `reasoning` object is **not** sent: it is not a parameter this
+host documents, and Baseten accepts unknown fields silently, so it could not be relied
+on. Runbook selection sends nothing at all: it is local and makes no upstream call.
 
 The thinking posture is **hardcoded — a product decision like the model ids, not
-configuration**. **The whole interactive surface is non-thinking**: the main `/respond` call,
-every utility task, and the selector all send `{"enabled": false}`. This workload does not
-need a chain-of-thought — the main model routes a request onto a runbook and emits tool
-calls, and the utility tasks are bounded extractions and classifications over text the client
-already gathered — while reasoning cost seconds of first-byte latency (a measured greeting
-turn spent 366 reasoning tokens and ~3.5s of an 11.5s wall-clock).
+configuration**. **It is a FLOOR, not an off switch, and that changed with the serving
+model.** The previous model (DeepSeek V4 Flash) reasoned by default and could be held at
+zero with `{"enabled": false}`. GLM-5.3-Flash cannot: reasoning is always on, `none` is
+rejected, and an ABSENT `reasoning_effort` means `high` — so omitting the field buys the
+most expensive posture rather than the cheapest. The main `/respond` call, every utility
+task and every forced tool call therefore send `reasoning_effort: "low"`.
 
-There is **no middle tier to retreat to**: measured over 5 samples each on a fixed prompt,
-`low` and `high` produced statistically identical chain-of-thought (mean 662 vs 656 reasoning
-tokens), so the only real step below `high` is off — which is the posture taken. Runbook
-selection is not part of this decision at all any more: it runs locally and makes no upstream
-call, so it has no thinking posture to set. (Historically it did, and it reached "off" first
-on its own first-byte argument.)
+The workload still does not want a chain-of-thought — the main model routes a request onto
+a runbook and emits tool calls, and the utility tasks are bounded extractions and
+classifications over text the client already gathered — and reasoning costs first-byte
+latency. The floor gets close: measured over 6 trials on one prompt, the field absent
+reasoned on 6 of 6 (median 479.5 reasoning tokens), while `low` reasoned on 1 of 6
+(median 0, the one non-zero trial costing 16 tokens). Close is not zero, and there is no
+lower setting to reach for.
 
-**Nothing thinks, and on Together that is a flag genuinely held down.** DeepSeek V4 Flash
-reasons whenever the field is absent, so every call sends `reasoning: {"enabled": false}` —
-measured, that drops `reasoning_tokens` out of the usage block entirely — a flag genuinely
-held down, not a property of the model.
+Runbook selection is not part of this decision at all any more: it runs locally and makes
+no upstream call, so it has no thinking posture to set. (Historically it did, and it
+reached "off" first on its own first-byte argument.)
 
 `/respond` advertises the posture as `respond.thinking_enabled` on `/v1/daintree/capabilities`
 (currently `false`), which is what a client should gate any thinking UI on. Because

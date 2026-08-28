@@ -64,11 +64,11 @@ def settings(tmp_path: Any) -> Settings:
     return Settings(
         # The provider credential, EXPLICITLY. Leaving it out meant it fell
         # through to whatever `.env` held — so a developer with a real
-        # TOGETHER_API_KEY ran the redaction tests against their live secret and
+        # BASETEN_API_KEY ran the redaction tests against their live secret and
         # CI, having no `.env`, ran them against the empty string, where
         # `assert key not in body` is unsatisfiable rather than merely weak.
         # A sentinel here makes both environments run the same test.
-        TOGETHER_API_KEY="tgp_v1_test-key",
+        BASETEN_API_KEY="tgp_v1_test-key",
         # Required for readiness since the fast-response stage lost its off
         # switch — the same reasoning as the executor key above, and a sentinel
         # rather than a real key for the same redaction reason.
