@@ -4,7 +4,7 @@ and immediate metadata streaming.
 It coordinates state verification, the runbook selector, the prompt assembler, and
 the provider, producing a native Daintree response (non-streaming body, or a
 named-event SSE stream) with runbooks as a first-class block. The protocol is
-Daintree-owned — not OpenAI-compatible — though DeepSeek is still spoken in the
+Daintree-owned — not OpenAI-compatible — though the OpenAI wire is still spoken in the
 OpenAI wire shape *upstream*, behind the provider abstraction.
 """
 
@@ -1812,7 +1812,7 @@ class ChatOrchestrator:
         # tools array actually is.
         #
         # Normalized, not the provider's wire body — and the difference is real:
-        # the adapter renames `max_tokens`, adds Together's `reasoning` object and
+        # the adapter renames `max_tokens`, adds Baseten's `reasoning_effort` and
         # drops `cache_session_id` on the way out (`providers/openrouter.py`).
         # Capturing the wire body needs an observer hook on the provider boundary
         # (`ProviderRequestObserver`), which does not exist yet; `TODO.md` carries

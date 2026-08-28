@@ -22,7 +22,7 @@ There are **two internal provider ROLES**, and exactly one public product.
 | Role | Host | Model | When it is called |
 |---|---|---|---|
 | **executor** | Baseten Model APIs (`https://inference.baseten.co/v1`) | `zai-org/GLM-5.3-Flash` | every turn, and every utility task |
-| **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gpt-oss-120b` | every eligible streaming turn, CONCURRENTLY with the executor |
+| **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gpt-oss-120b` | **NEVER — the stage is OFF** (`config.FAST_RESPONSE_ENABLED`) |
 
 A caller cannot choose between them and is never told which answered. The public
 model id stays `daintree-assistant`; the backend composes the two calls behind it.
@@ -38,7 +38,11 @@ last three messages (cropped to a shared budget) and up to three selected runboo
 bodies. (Narrower than it was:
 the stage no longer sends the conversation history or the tool inventory.)
 Cerebras is not a cache or an infrastructure service in this design; it reads
-prompt content, and section 4 applies to it exactly as it applies to Baseten.
+prompt content, and section 4 applies to it exactly as it applies to Baseten —
+**whenever the stage is on. It is currently OFF**, so today Cerebras receives
+nothing at all and Baseten is the only host that sees prompt content. Do not
+read that as the stage being removed: it is one constant away from running
+again, and section 4a stays live for that reason.
 
 **The executor host is a model host, not a router**: one
 endpoint serves the model, and there is nothing to select between.
@@ -263,7 +267,11 @@ handles both so that the answer is a log query rather than an outage.
 > **Do not repeat any of it, anywhere, as a statement about the current
 > deployment.** That includes the summary in `README.md`.
 >
-> **There are TWO hosts to verify now, not one.** Baseten receives every turn;
+> **There are TWO hosts to verify, though only one is receiving traffic.**
+> Baseten receives every turn; Cerebras receives nothing while
+> `FAST_RESPONSE_ENABLED` is False, and would again the moment it is not —
+> so its terms still have to be read before that flag moves, not after.
+> Historically:
 > Cerebras receives an eligible turn's prompt content when the fast-response
 > stage is enabled (§1). An earlier revision of this warning said Cerebras "is
 > gone" and told a reader to DELETE its policy material — that instruction is

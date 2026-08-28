@@ -1123,12 +1123,23 @@ elif (v, u, r) == (False, False, 'provider_rejected'):
     print('REJECTED')
 else:
     print('INCONSISTENT')" 2>/dev/null)"
+    # BOTH bad verdicts FAIL the gate, and that inverted when the credential model
+    # did. These used to pass with the note "a true verdict about the key, not a
+    # broken deployment" — which was correct while the CALLER supplied the key: a
+    # rejection was then that caller's problem and said nothing about the
+    # revision. The server owns the key now and funds every turn from it, so a
+    # key the provider will not accept IS a broken deployment, and one with no
+    # credit is a deployment that cannot answer a single request.
+    #
+    # This is the exact shape a credential RENAME produces — the old vendor's key
+    # pasted into the new secret. It verifies as well-formed, `/readyz` only
+    # checks that the secret is non-empty, and every real turn then fails as
+    # `provider_invalid_api_key`. Passing here is what would let that reach 100%
+    # of traffic.
     case "${verdict:-MALFORMED}" in
       OK)        pass "/v1/daintree/auth/verify: valid, usable, reason=ok" ;;
-      # A true verdict about the key, not a broken deployment — so not a smoke
-      # failure. Surfaced loudly because it explains the --full turns failing.
-      EXHAUSTED) pass "/v1/daintree/auth/verify: key recognised, NO CREDIT REMAINING" ;;
-      REJECTED)  pass "/v1/daintree/auth/verify: key REJECTED by the provider" ;;
+      EXHAUSTED) fail "/v1/daintree/auth/verify: the server's key has NO CREDIT REMAINING — this revision cannot answer any turn. Remedy is billing, not the build." "$BODY" ;;
+      REJECTED)  fail "/v1/daintree/auth/verify: the server's key was REJECTED by the provider — check the ${EXECUTOR_KEY_ENV:-BASETEN_API_KEY} secret holds a key for THIS vendor." "$BODY" ;;
       *)         fail "/v1/daintree/auth/verify returned an inconsistent verdict" "$BODY" ;;
     esac
   else

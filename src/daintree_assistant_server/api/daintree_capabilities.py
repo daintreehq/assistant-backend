@@ -91,13 +91,26 @@ async def capabilities(
                 "at_most_one_per_turn": True,
                 "never_after_first_delta": True,
             },
-            # The main call's thinking posture is hardcoded OFF (a product decision,
-            # like the model ids — see INTERACTIVE_THINKING_ENABLED in config.py), so
-            # responses do not carry reasoning_content and the stream emits no
-            # status:{phase:"thinking"} event. Read from the constant rather than
-            # restated as a literal: this field is what the CLI gates its thinking UI
-            # on, and a hand-maintained copy would drift the moment the posture moves.
+            # WHAT THE SERVER REQUESTS — NOT a promise that no reasoning occurs.
+            # That distinction is new, and the old comment here got it wrong: it
+            # said responses "do not carry reasoning_content and the stream emits
+            # no status:{phase:'thinking'} event". The serving model
+            # (`zai-org/GLM-5.3-Flash`) reasons unconditionally — there is no
+            # `none` effort and the server pins the `low` floor — so a reply CAN
+            # carry `reasoning_content` and a stream CAN emit a thinking phase,
+            # measured at roughly one low-effort call in six.
+            #
+            # A client must therefore treat this as "do not present a thinking UI
+            # as a feature", never as "reasoning_content will be absent". Parsing
+            # it must stay unconditional; `reasoning_available` states that
+            # explicitly so the guarantee is not inferred from the flag beside it.
+            # Read from the constant rather than restated as a literal: this is
+            # what the CLI gates its thinking UI on, and a hand-maintained copy
+            # would drift the moment the posture moves.
             "thinking_enabled": INTERACTIVE_THINKING_ENABLED,
+            # The serving model cannot be run non-thinking, so reasoning output is
+            # always possible regardless of the flag above.
+            "reasoning_available": True,
             "multimodal_images": {
                 "data_urls": True,
                 "remote_urls": settings.allow_remote_image_urls,

@@ -142,11 +142,34 @@ class BasetenProvider(OpenRouterProvider):
         # spells it `reasoning_content` in its own responses, so the rewrite is
         # undone rather than the field dropped — the chain-of-thought that
         # produced a tool-call turn is replayed under the name the host reads.
-        for message in body.get("messages", []):
-            if isinstance(message, dict) and "reasoning" in message:
-                cot = message.pop("reasoning")
-                if message.get("reasoning_content") is None:
-                    message["reasoning_content"] = cot
+        #
+        # COPY-ON-WRITE, matching the parent, and not merely for symmetry. The
+        # parent passes rows it did not rewrite through BY REFERENCE, so a row
+        # arriving with a raw `reasoning` key is the caller's own dict — popping
+        # in place would mutate `request.messages`, which every retry, the
+        # bare-intent re-roll and both response paths go on to read. Today's
+        # assembler only ever emits `reasoning_content` (it builds each wire row
+        # key by key), so no such row is reachable in production; this keeps
+        # `_build_body` a pure function of its input anyway, because that is the
+        # property the rest of the pipeline is entitled to assume.
+        # `body["messages"]` is always the list `_rewrite_messages` just returned,
+        # so it is indexed rather than defensively type-checked — a guard here
+        # would be an unreachable branch pretending to be care.
+        # Every row here is a mapping: the parent's `_rewrite_messages` calls
+        # `.get()` on each one before this runs, so a non-dict row has already
+        # raised. Re-checking would be an unreachable branch pretending to be care.
+        messages = body["messages"]
+        for index, message in enumerate(messages):
+            if "reasoning" not in message:
+                continue
+            rebuilt = {k: v for k, v in message.items() if k != "reasoning"}
+            # An existing `reasoning_content` WINS. A row carrying both is
+            # malformed input rather than something the parent produces, and
+            # overwriting the canonical field with the other one would resolve the
+            # contradiction in favour of the spelling we were trying to leave.
+            if rebuilt.get("reasoning_content") is None:
+                rebuilt["reasoning_content"] = message["reasoning"]
+            messages[index] = rebuilt
 
         return body
 

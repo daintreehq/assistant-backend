@@ -14,7 +14,7 @@ from typing import Any
 import httpx
 from pydantic import SecretStr
 
-from daintree_assistant_server.config import EXECUTOR_KEY_ENV, Settings
+from daintree_assistant_server.config import EXECUTOR_KEY_ENV, EXECUTOR_REASONING_EFFORT, Settings
 from daintree_assistant_server.providers.base import ChatProvider, ProviderChatRequest
 from daintree_assistant_server.providers.baseten import BasetenProvider
 
@@ -108,6 +108,12 @@ def build_provider_body(
         None,  # type: ignore[arg-type]  # _build_body never touches the client
         api_key=SecretStr(""),  # no network: _build_body never builds a header
         base_url=settings.serving_base_url,
+        # Passed EXPLICITLY, exactly as `main._build_provider` does. The adapter's
+        # own default happens to match today, so omitting it would measure the
+        # right bytes by coincidence and go on doing so until the two diverged —
+        # at which point the benchmark would silently be pricing a body production
+        # does not send.
+        reasoning_effort=EXECUTOR_REASONING_EFFORT,
     )
     return provider._build_body(request, stream=stream)
 

@@ -27,6 +27,8 @@ once on the previous host: the parent requires ``{"data": {...}}`` (OpenRouter's
 
 from __future__ import annotations
 
+import copy
+
 import httpx
 import pytest
 from pydantic import SecretStr
@@ -68,13 +70,22 @@ def _provider(handler: object, **kwargs: object) -> BasetenProvider:
     )
 
 
-def _body(provider: BasetenProvider, **kwargs: object) -> dict[str, object]:
+def _body(
+    provider: BasetenProvider, *, stream: bool = False, **kwargs: object
+) -> dict[str, object]:
     request = ProviderChatRequest(
         model=EXECUTOR_MODEL,
         messages=[{"role": "user", "content": "hi"}],
         **kwargs,  # type: ignore[arg-type]
     )
-    return provider._build_body(request, stream=False)  # noqa: SLF001
+    return provider._build_body(request, stream=stream)  # noqa: SLF001
+
+
+#: Both wire shapes. The posture must not depend on which one a turn takes: an
+#: edit that sent the effort only on the non-streaming path would pass every
+#: assertion written against `stream=False` while every ORDINARY turn — which is
+#: streaming — silently ran at Baseten's `high` default.
+_STREAM = [pytest.param(False, id="non_streaming"), pytest.param(True, id="streaming")]
 
 
 # ---------------------------------------------------------------------------
@@ -82,46 +93,61 @@ def _body(provider: BasetenProvider, **kwargs: object) -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
-def test_the_unified_reasoning_object_is_never_sent() -> None:
+@pytest.mark.parametrize("stream", _STREAM)
+@pytest.mark.parametrize("disabled", [True, False])
+def test_the_unified_reasoning_object_is_never_sent(stream: bool, disabled: bool) -> None:
     """The parent's switch does not work here and must not be inherited.
 
     Baseten accepts unknown top-level fields silently, so sending it would not
     error — it would simply be a body claiming a posture the host never applied,
     which is indistinguishable from working until the bill arrives.
     """
-    for kwargs in ({"thinking_disabled": True}, {"thinking_disabled": False}):
-        assert "reasoning" not in _body(_provider(_never_called), **kwargs)
+    body = _body(_provider(_never_called), stream=stream, thinking_disabled=disabled)
+    assert "reasoning" not in body
 
 
-def test_the_floor_is_sent_rather_than_the_field_being_omitted() -> None:
+#: Every meaningful (thinking_disabled, reasoning_effort) a caller produces, and
+#: the effort each must put on the wire. There is no row whose answer is "send
+#: nothing": omission is `high` on this host, so an absent field is never right.
+_POSTURES = [
+    # `task_runner` and `prompt_assembler` under the shipped posture, and
+    # `structured_tool_call`, which rebuilds its sub-request this way.
+    pytest.param(True, None, "low", id="disabled_no_effort__the_shipped_posture"),
+    # `thinking_disabled` wins: a forced tool call wants one object back cheaply.
+    pytest.param(True, "max", "low", id="disabled_beats_an_explicit_effort"),
+    # A caller asking for more than the floor is honoured, not clamped.
+    pytest.param(False, "max", "max", id="an_explicit_effort_survives"),
+    pytest.param(False, "high", "high", id="the_interactive_tier_survives"),
+    # The gap Codex found: enabled-but-unspecified must still not omit the field.
+    pytest.param(False, None, "low", id="enabled_but_unspecified_falls_to_the_floor"),
+]
+
+
+@pytest.mark.parametrize("stream", _STREAM)
+@pytest.mark.parametrize("disabled,requested,expected", _POSTURES)
+def test_the_effort_sent_for_every_posture(
+    stream: bool, disabled: bool, requested: str | None, expected: str
+) -> None:
     """An ABSENT ``reasoning_effort`` means ``high`` on this host, not "off".
 
-    This is the whole inversion. The literal reading of ``thinking_disabled`` —
-    send no reasoning field — buys the most expensive posture available, so the
-    adapter must send the floor explicitly instead.
+    That is the whole inversion, and why this is a table rather than one case:
+    the literal reading of ``thinking_disabled`` — send no reasoning field —
+    buys the most expensive posture available on every row.
     """
+    body = _body(
+        _provider(_never_called),
+        stream=stream,
+        thinking_disabled=disabled,
+        reasoning_effort=requested,
+    )
+    assert body["reasoning_effort"] == expected
+
+
+def test_the_shipped_posture_is_the_configured_floor() -> None:
+    """Ties the table above to the constant the container actually injects."""
+    assert EXECUTOR_REASONING_EFFORT == "low"
     body = _body(_provider(_never_called), thinking_disabled=True)
-    assert body["reasoning_effort"] == EXECUTOR_REASONING_EFFORT == "low"
-
-
-def test_an_explicit_effort_survives_when_thinking_is_not_disabled() -> None:
-    """A caller asking for more than the floor is honoured, not clamped."""
-    body = _body(
-        _provider(_never_called), thinking_disabled=False, reasoning_effort="max"
-    )
-    assert body["reasoning_effort"] == "max"
-
-
-def test_a_disabled_request_is_clamped_to_the_floor_even_with_an_effort_set() -> None:
-    """``thinking_disabled`` wins: the forced-tool-call path pins both together.
-
-    ``structured_tool_call`` rebuilds its sub-request with ``thinking_disabled=
-    True``, and those calls want one object back as cheaply as possible.
-    """
-    body = _body(
-        _provider(_never_called), thinking_disabled=True, reasoning_effort="max"
-    )
-    assert body["reasoning_effort"] == "low"
+    assert body["reasoning_effort"] == EXECUTOR_REASONING_EFFORT
 
 
 def test_the_configured_effort_is_injected_rather_than_hardcoded() -> None:
@@ -149,6 +175,56 @@ def test_replayed_chain_of_thought_keeps_this_host_s_own_spelling() -> None:
     messages = provider._build_body(request, stream=False)["messages"]  # noqa: SLF001
     assert messages[1]["reasoning_content"] == "a sum"
     assert "reasoning" not in messages[1]
+
+
+def test_building_a_body_does_not_mutate_the_request() -> None:
+    """`_build_body` must be a pure function of its input.
+
+    The parent passes rows it did not rewrite through BY REFERENCE, so an undo
+    that popped `reasoning` in place would edit the caller's own dict — and every
+    retry, the bare-intent re-roll and both response paths read that same prepared
+    request afterwards. Today's assembler never emits a raw `reasoning` key so
+    this is unreachable in production; it is pinned because the aliasing is
+    invisible until something downstream reads a request it did not write.
+    """
+    provider = _provider(_never_called)
+    messages = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "4", "reasoning": "a sum"},
+    ]
+    request = ProviderChatRequest(model=EXECUTOR_MODEL, messages=messages)
+    before = copy.deepcopy(messages)
+
+    body = provider._build_body(request, stream=False)  # noqa: SLF001
+
+    assert messages == before, "_build_body mutated the caller's messages"
+    # ...and the body still carries the host's own spelling.
+    assert body["messages"][1]["reasoning_content"] == "a sum"
+    assert "reasoning" not in body["messages"][1]
+
+
+def test_an_existing_reasoning_content_is_not_overwritten_by_a_raw_reasoning() -> None:
+    """A row carrying BOTH keys keeps the canonical one.
+
+    Malformed input rather than anything the parent produces, but the tie has to
+    break somewhere — and breaking it toward the raw `reasoning` would resolve the
+    contradiction in favour of the spelling this adapter exists to undo.
+    """
+    provider = _provider(_never_called)
+    request = ProviderChatRequest(
+        model=EXECUTOR_MODEL,
+        messages=[
+            {
+                "role": "assistant",
+                "content": "4",
+                "reasoning": "the raw one",
+                "reasoning_content": "the canonical one",
+            }
+        ],
+    )
+    row = provider._build_body(request, stream=False)["messages"][0]  # noqa: SLF001
+    assert row["reasoning_content"] == "the canonical one"
+    assert "reasoning" not in row
 
 
 # ---------------------------------------------------------------------------

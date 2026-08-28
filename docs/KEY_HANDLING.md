@@ -21,7 +21,7 @@ never spend):
 | Env var | Role | Missing means |
 |---|---|---|
 | `BASETEN_API_KEY` (`config.EXECUTOR_KEY_ENV`) | funds every turn | `/readyz` fails — nothing can be answered |
-| `CEREBRAS_API_KEY` (`config.FAST_RESPONSE_KEY_ENV`) | funds the preamble stage, which runs on every eligible turn | `/readyz` fails — the stage has no off switch, so a missing key fails it open on every turn |
+| `CEREBRAS_API_KEY` (`config.FAST_RESPONSE_KEY_ENV`) | nothing today — the preamble stage is OFF (`config.FAST_RESPONSE_ENABLED`) | nothing; a deployment without it is complete |
 | `TRACE_IDENTITY_KEY` | pseudonymises trace identity — spends nothing | nothing, while trace capture is off; `/readyz` fails if it is on |
 
 `TRACE_IDENTITY_KEY` is deliberately NOT the state-signing key and not the state

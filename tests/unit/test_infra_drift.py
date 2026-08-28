@@ -102,6 +102,76 @@ def test_terraform_mounts_every_secret_that_gates_readiness() -> None:
         )
 
 
+def test_cloudbuild_mounts_every_secret_that_gates_readiness() -> None:
+    """The gate that matters most, and the one that was missing.
+
+    `cloudbuild.yaml` — not the Terraform — is what actually deploys this service
+    (push to main). The test above compares the required set against the
+    Terraform's `secret_ids`, which the release path does not read, so dropping a
+    secret from Cloud Build's own `SECRET_FLAGS` left every unit test green.
+
+    The deployment READBACK tests do not close this either: they derive their
+    expected secret references FROM `SECRET_FLAGS`, so an omission is
+    self-consistent and passes them. Only a comparison against the settings'
+    required set can see it.
+
+    Concretely: deleting `BASETEN_API_KEY=baseten-api-key:latest` here deploys a
+    revision with no upstream credential. It fails `/readyz`, so the release
+    would at least not promote — but it would fail in Cloud Build minutes after a
+    push, rather than in the PR that caused it.
+    """
+    text = _read(REPO_ROOT / "cloudbuild.yaml")
+    # The BASE assignment plus every `SECRET_FLAGS="$$SECRET_FLAGS,..."` append —
+    # a required secret may legitimately be added conditionally (the previous
+    # signing key, the staging subject gate), so all of them count.
+    flags = " ".join(re.findall(r'SECRET_FLAGS="([^"]*)"', text))
+    assert flags, "no SECRET_FLAGS assignment found in cloudbuild.yaml"
+    for name in _required_secret_env_names():
+        assert f"{name}=" in flags, (
+            f"{name} fails readiness when unset (Settings.missing_secrets / "
+            f"weak_secrets) but cloudbuild.yaml never mounts it. The deployed "
+            f"revision would answer /readyz with 503 forever, and no other test "
+            f"in this repo would notice — the readback tests derive their "
+            f"expectations from SECRET_FLAGS itself."
+        )
+
+
+def test_bootstrap_provisions_every_secret_that_gates_readiness() -> None:
+    """The other half: Cloud Build MOUNTS them, bootstrap CREATES them.
+
+    A secret mounted but never provisioned fails the deploy at the Cloud Run
+    step, which is loud but late — and on a fresh project it is the whole
+    rollout. Both bootstrap surfaces are checked, because they are separately
+    maintained lists and either alone is insufficient: `ensure_supplied_secret`
+    creates the resource, `RUNTIME_SECRETS` grants the runtime service account
+    access to it. A secret in the first but not the second deploys and then
+    cannot be read.
+    """
+    text = _read(INFRA / "gcp" / "bootstrap.sh")
+    runtime = re.search(r'RUNTIME_SECRETS="([^"]*)"', text)
+    assert runtime, "RUNTIME_SECRETS could not be located in bootstrap.sh"
+    for name in _required_secret_env_names():
+        # `BASETEN_API_KEY` -> `baseten-api-key`, the Secret Manager convention
+        # this repo uses throughout.
+        secret_id = name.lower().replace("_", "-")
+        # Either helper counts: `ensure_secret` GENERATES the value (the signing
+        # key, the salt), `ensure_supplied_secret` creates an empty shell for a
+        # vendor credential a human must paste in. Both end with the resource
+        # existing, which is what the deploy needs.
+        created = (
+            f"ensure_secret {secret_id}" in text
+            or f"ensure_supplied_secret {secret_id}" in text
+        )
+        assert created, (
+            f"{name} gates readiness but bootstrap.sh never creates {secret_id}."
+        )
+        assert secret_id in runtime.group(1), (
+            f"{name} gates readiness and is created, but {secret_id} is missing "
+            f"from RUNTIME_SECRETS — the runtime service account cannot read it, "
+            f"so the revision fails to start."
+        )
+
+
 def test_the_service_actually_mounts_the_secret_map() -> None:
     """The test above proves the map CONTAINS the right keys. It would still pass
     if `main.tf` stopped reading the map at all, which is the other half of the

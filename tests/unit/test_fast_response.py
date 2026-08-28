@@ -915,22 +915,69 @@ def test_no_fast_provider_is_built_without_a_credential() -> None:
     assert _build_fast_response_provider(_settings(CEREBRAS_API_KEY="")) is None
 
 
-def test_the_fast_provider_is_built_when_configured() -> None:
+def test_the_stage_is_off_and_builds_no_provider() -> None:
+    """THE off switch, asserted where it takes effect.
+
+    `FAST_RESPONSE_ENABLED` is a hardcoded product decision, not an env var — a
+    `.env` carrying the retired `FAST_RESPONSE_MODE` or
+    `FAST_RESPONSE_ROLLOUT_PERCENT` changes nothing, which is why the constant
+    has to be pinned somewhere that fails loudly.
+
+    Both halves matter. The constant alone would not catch a builder that ignored
+    it, and a `None` alone would not distinguish "off" from "no credential".
+    """
+    from daintree_assistant_server.config import FAST_RESPONSE_ENABLED
     from daintree_assistant_server.main import _build_fast_response_provider
 
-    provider = _build_fast_response_provider(_settings())
+    assert FAST_RESPONSE_ENABLED is False
+    # Settings that WOULD build a provider if the stage were on — so this asserts
+    # the flag, not an absent credential.
+    assert _build_fast_response_provider(_settings()) is None
+
+
+def test_the_fast_provider_is_built_when_the_stage_is_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Kept alive behind the flag rather than deleted with the stage.
+
+    The stage is off by a one-word decision that is expected to be revisited, so
+    the construction it turns off still has to be known-good. Deleting this would
+    make re-enabling an untested change.
+    """
+    from daintree_assistant_server import main
+
+    monkeypatch.setattr(main, "FAST_RESPONSE_ENABLED", True)
+    provider = main._build_fast_response_provider(_settings())
     assert isinstance(provider, CerebrasProvider)
 
 
-def test_the_fast_provider_gets_its_own_connection_pool() -> None:
+def test_no_provider_is_built_without_a_credential_even_when_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The stage must degrade to None, not raise, on a keyless deployment.
+
+    `CEREBRAS_API_KEY` left `missing_secrets()` when the stage was switched off,
+    so readiness no longer catches its absence — which makes this the only thing
+    standing between a keyless deployment and a container that fails to build.
+    """
+    from daintree_assistant_server import main
+
+    monkeypatch.setattr(main, "FAST_RESPONSE_ENABLED", True)
+    assert main._build_fast_response_provider(_settings(CEREBRAS_API_KEY="")) is None
+
+
+def test_the_fast_provider_gets_its_own_connection_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Never the executor's. The two hosts have opposite latency profiles, and a
     three-second preamble call must not queue behind a long-lived streaming
     completion holding a pooled connection."""
-    from daintree_assistant_server.main import _build_fast_response_provider, _build_provider
+    from daintree_assistant_server import main
 
+    monkeypatch.setattr(main, "FAST_RESPONSE_ENABLED", True)
     settings = _settings()
-    fast = _build_fast_response_provider(settings)
-    executor = _build_provider(settings)
+    fast = main._build_fast_response_provider(settings)
+    executor = main._build_provider(settings)
     assert fast is not None
     assert fast._client is not executor._client  # type: ignore[attr-defined]
 

@@ -1026,9 +1026,12 @@ upstream wait lands in `first_output_ms` rather than being split on a guess.
 `selection_ms` is the LOCAL classifier (~10ms); tens of milliseconds there is
 normal, seconds is not.
 
-`thinking_ms` is absent on every normal turn: the whole interactive surface is
-non-thinking ([`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) §2). Seeing it means that
-posture changed.
+`thinking_ms` is usually absent, but it is no longer a guarantee. The interactive
+surface runs at the reasoning FLOOR rather than off — the serving model cannot be
+run non-thinking ([`PROVIDER_POLICY.md`](PROVIDER_POLICY.md) §2) — so a turn that
+reasons a little is normal and reports it. Roughly one low-effort call in six did
+so when measured. A LARGE `thinking_ms` is the signal worth acting on; its mere
+presence is not.
 
 ---
 
@@ -1281,17 +1284,25 @@ no upstream call, so it has no thinking posture to set. (Historically it did, an
 reached "off" first on its own first-byte argument.)
 
 `/respond` advertises the posture as `respond.thinking_enabled` on `/v1/daintree/capabilities`
-(currently `false`), which is what a client should gate any thinking UI on. Because
+(currently `false`), which is what a client should gate any thinking UI on — but **not** a
+promise that `reasoning_content` will be absent. It says what the server REQUESTS; the model
+reasons anyway at the floor, so a client must parse `reasoning_content` unconditionally.
+`respond.reasoning_available` is `true` and states exactly that. Because
 `max_tokens` is shared by reasoning + visible output, a small-output **thinking** call adds
 `THINKING_HEADROOM_TOKENS` to its tight cap so the chain-of-thought can't starve the answer
-into a length truncation. Under the current posture there is no such call: a non-thinking
-utility task deliberately does *not* get that slack, since it would raise the visible-output
-ceiling above the cap its profile set. The main `/respond` call instead runs on its own flat
-budget (`MAIN_DEFAULT_MAX_TOKENS` == `MAIN_MAX_TOKENS_CEILING`).
+into a length truncation. No call requests that tier today, so no call gets that slack —
+handing it to a task that is not deliberately thinking would raise its visible-output ceiling
+above the cap its profile set. But the floor is not zero, and reasoning tokens come out of the
+same budget, so a utility task's cap carries a much smaller `EXECUTOR_REASONING_ALLOWANCE_TOKENS`
+instead: enough to give the profile back the visible budget it intended, nowhere near the
+thinking headroom. The main `/respond` call instead runs on its own flat budget
+(`MAIN_DEFAULT_MAX_TOKENS` == `MAIN_MAX_TOKENS_CEILING`).
 
-Thinking is independently forced off for any request that pins a `tool_choice` (thinking + a
-forced tool choice is rejected by the model) — that guard is enforced separately from the posture, so it holds if the posture ever
-flips back. When thinking is enabled, the model returns its chain-of-thought as
+A request that pins a `tool_choice` is independently clamped to the floor (thinking + a
+forced tool choice was rejected by the previous serving model) — that guard is enforced
+separately from the posture, so it holds if the posture ever rises above the floor. Note
+"clamped", not "off": there is no off on this model, and the adapter sends the floor rather
+than omitting the field, because an omitted `reasoning_effort` means `high` here. When thinking is enabled, the model returns its chain-of-thought as
 `reasoning_content`; the client stores it on the assistant turn and replays it verbatim on any
 turn that performed tool calls, so the model can continue that reasoning. That round-trip stays
 in the contract. Thinking mode ignores `temperature`/`top_p`/penalties.

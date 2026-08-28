@@ -10,7 +10,7 @@ Run from the repo root (venv active, BASETEN_API_KEY in .env or the env):
     python -m benchmarks.utility_tasks.bench report results/<run>.json
     python -m benchmarks.utility_tasks.bench compare results/a.json results/b.json
 
-Makes REAL, paid DeepSeek API calls (cases x trials per variant).
+Makes REAL, paid calls to the serving model (cases x trials per variant).
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="benchmarks.utility_tasks.bench")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    run = sub.add_parser("run", help="run the benchmark against live DeepSeek")
+    run = sub.add_parser("run", help="run the benchmark against the live serving model")
     run.add_argument("--variant", action="append",
                      help="prompt variant (repeatable; default: baseline)")
     run.add_argument("--trials", type=int, default=3, help="trials per case (default 3)")

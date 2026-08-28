@@ -32,7 +32,12 @@ from .api import (
     health,
     root,
 )
-from .config import EXECUTOR_REASONING_EFFORT, Settings, get_settings
+from .config import (
+    EXECUTOR_REASONING_EFFORT,
+    FAST_RESPONSE_ENABLED,
+    Settings,
+    get_settings,
+)
 from .errors import register_exception_handlers, request_too_large
 from .observability import (
     bind_request_context,
@@ -339,21 +344,37 @@ def _build_docs_client() -> tuple[httpx.AsyncClient, DocsMcpClient]:
 
 
 def _build_fast_response_provider(settings: Settings) -> ChatProvider | None:
-    """The Cerebras adapter, or None when there is no credential.
+    """``None`` — THE FAST-RESPONSE STAGE IS OFF, deliberately and in code.
 
-    None only ever means "no credential", and readiness refuses that outright —
-    the stage has no off switch. The None path stays because `build_container` is
-    also called directly by tests and benchmarks, which never probe readiness.
+    **This is the off switch, and it is a code change on purpose.** The stage
+    once had `off`/`shadow`/`visible` modes and a rollout percentage; those were
+    deleted because which model writes a preamble is a product decision rather
+    than an operational dial. That reasoning still holds, so turning the stage
+    off is an edit here rather than an env var — and `FAST_RESPONSE_MODE` /
+    `FAST_RESPONSE_ROLLOUT_PERCENT` are NOT read by `Settings`. A `.env` carrying
+    them changes nothing, which is worse than an error because it looks like it
+    worked.
 
-    Its own httpx client, not the executor's. The two hosts have opposite latency
-    profiles and opposite lifetimes — a three-second preamble call must never
-    queue behind a long-lived streaming completion holding a pooled connection,
-    which is the same reasoning that gives the docs MCP its own pool.
+    **Why it is off.** The stage buys a visible line while the reader waits, and
+    that is worth something only in proportion to the wait. On the previous
+    executor the gap was seconds; on `zai-org/GLM-5.3-Flash` via Baseten first
+    output arrives fast enough that a preamble announcing work that has already
+    started is noise — it delays the real answer to say something that stops
+    being true almost immediately. The stage's own design already agreed with
+    this: `PreambleGate` discards a line that loses the race to the executor's
+    first visible byte. This just stops paying for the race.
+
+    Nothing else is torn out. `FastResponseService.available` reads False off
+    this `None`, and every eligibility check downstream already handles that —
+    the same path tests and benchmarks have always taken. Restoring the stage is
+    reverting this function.
     """
+    if not FAST_RESPONSE_ENABLED:
+        return None
     if not settings.cerebras_api_key.get_secret_value():
-        # Readiness already refuses this (`Settings.fast_response_problems`), but
-        # `build_container` is also called directly by tests and benchmarks, which
-        # never probe readiness. Failing to None here keeps those paths honest.
+        # A credential is no longer required (`missing_secrets` dropped it with the
+        # stage), so this is now an ordinary absence rather than something
+        # readiness would have caught first.
         return None
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(

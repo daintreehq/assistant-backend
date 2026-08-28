@@ -78,6 +78,12 @@ def _healthy_deployment() -> dict[str, Any]:
         "gate_enabled": False,
         "gate_entries": 0,
         "gate_revision": "",
+        # The verdict `/auth/verify` returns about the SERVER's own upstream key.
+        # A promotion gate: the server funds every turn from this credential, so
+        # anything but `ok` means the revision cannot serve.
+        "key_valid": True,
+        "key_usable": True,
+        "key_reason": "ok",
         # Whether the two FUNDED routes refuse an anonymous caller. A field
         # rather than a constant, because the mutation that matters is a
         # deployment that enforces everywhere cheap and serves the expensive
@@ -211,13 +217,16 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, {"ok": True})
             return
         if path == "/v1/daintree/auth/verify":
+            # Driven by the fixture, not hardcoded: the verdict about the SERVER's
+            # own key is a promotion gate now, so the refusing verdicts need to be
+            # reachable from a mutation.
             self._send(
                 200,
                 {
-                    "valid": True,
-                    "usable": True,
-                    "reason": "ok",
-                    "detail": "The provider accepted this deployment's API key.",
+                    "valid": d["key_valid"],
+                    "usable": d["key_usable"],
+                    "reason": d["key_reason"],
+                    "detail": "A verdict about this deployment's own API key.",
                     "server_holds_credential": True,
                 },
             )
@@ -374,6 +383,18 @@ _MUTATIONS = [
     pytest.param(
         {"redirect_uri": "http://127.0.0.1:9999/oauth/callback"},
         id="the_cli_callback_drifted",
+    ),
+    # The credential-rename accident, and the reason these two are gates at all:
+    # the old vendor's key pasted into the newly-named secret verifies as
+    # well-formed, passes `/readyz` (which only checks the secret is non-empty),
+    # and then fails every real turn as `provider_invalid_api_key`.
+    pytest.param(
+        {"key_valid": False, "key_usable": False, "key_reason": "provider_rejected"},
+        id="the_servers_own_key_is_rejected_by_the_provider",
+    ),
+    pytest.param(
+        {"key_valid": True, "key_usable": False, "key_reason": "credits_exhausted"},
+        id="the_servers_own_key_has_no_credit_left",
     ),
 ]
 

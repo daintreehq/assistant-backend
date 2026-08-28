@@ -16,6 +16,7 @@ import json
 
 import pytest
 
+from daintree_assistant_server.config import EXECUTOR_PROVIDER
 from tools.baseline import BANDS, BASELINE_PATH, capture, compare
 
 
@@ -77,7 +78,12 @@ def test_the_identity_block_records_the_pinned_posture() -> None:
     # sort: the call that sat on that path (the upstream runbook selector) was
     # replaced by the LOCAL two-stage selector, whose release facts are asserted
     # below instead.
-    assert identity["provider"] == "baseten"  # type: ignore[index]
+    # BOTH: the literal catches the constant being changed to a wrong label, and
+    # the constant catches the committed baseline going stale. `capture()` derives
+    # the field from `EXECUTOR_PROVIDER`, so asserting only the JSON would let a
+    # renamed constant flow through capture unnoticed while every test stayed
+    # green — and the provider name reaches the doctor route and the trace record.
+    assert identity["provider"] == EXECUTOR_PROVIDER == "baseten"  # type: ignore[index]
 
 
 def test_the_selector_block_describes_the_shipped_artifact() -> None:

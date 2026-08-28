@@ -1,4 +1,12 @@
-"""Exact wire serialization + the DeepSeek-cacheable-region model.
+"""Exact wire serialization + the cacheable-region model.
+
+**The region model was derived from DeepSeek V4 Flash's chat template and has NOT
+been re-derived for the current serving model** (`zai-org/GLM-5.3-Flash` on
+Baseten). The exact-serialization half below is host-agnostic and still exact;
+the ordering assumption in :func:`cacheable_region_bytes` is a proxy that was
+true of the previous model. Prefix caching is still literal-prefix matched, so
+the metric remains directionally useful — but re-derive it from the current
+model's template before treating an absolute number as meaningful (`TODO.md`).
 
 The flagship cost/cache benchmark's core number is "what fraction of the request
 stays byte-identical turn-over-turn". That must be computed over the SAME bytes

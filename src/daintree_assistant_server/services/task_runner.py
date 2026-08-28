@@ -18,6 +18,7 @@ from pydantic import BaseModel, SecretStr, ValidationError
 
 from ..config import (
     EXECUTOR_MODEL,
+    EXECUTOR_REASONING_ALLOWANCE_TOKENS,
     INTERACTIVE_REASONING_EFFORT,
     INTERACTIVE_THINKING_ENABLED,
     Settings,
@@ -624,7 +625,7 @@ def _affinity_key(task_id: str) -> str:
 # exists so ONE task can reach a cheaper model, and the type is what stops it
 # growing into the endpoint-selection policy that was deliberately deleted in the
 # move off OpenRouter. Adding a third value should feel like a decision.
-#: "serving" is the one host this server talks to — Together, on EXECUTOR_MODEL.
+#: "serving" is the one host this server talks to — Baseten, on EXECUTOR_MODEL.
 #: The profile does not care which vendor that is, only that it is the one
 #: funding ordinary turns.
 ProviderId = Literal["serving", "openrouter"]
@@ -652,7 +653,7 @@ class TaskProfile:
     # building an HTTP client. `TaskRunner` resolves the name to an instance.
     #
     # Defaulting both together keeps every profile on the one serving identity:
-    # Together, on the one hardcoded model.
+    # Baseten, on the one hardcoded model.
     provider_id: ProviderId = "serving"
     model: str = EXECUTOR_MODEL
     # Appended to the generic repair instruction so the retry re-anchors on this
@@ -711,12 +712,15 @@ def build_profiles(catalog_manager: CatalogManager | None = None) -> dict[str, T
                 # well under a hundredth of a cent per call.
                 max_output_tokens=4000, timeout_seconds=heavy_timeout,
                 sensitive_fields=frozenset({"transcript"}),
-                # No provider override any more. This task ran on DeepSeek V4
+                # No provider override any more. This task once ran on DeepSeek V4
                 # Flash via OpenRouter because the serving model was Gemma and
-                # compaction wanted something cheaper per input token. The
-                # serving model IS DeepSeek V4 Flash now — same weights, better
-                # host (see config.EXECUTOR_ORIGIN) — so the override would only
-                # buy a slower endpoint and a second credential.
+                # compaction wanted something cheaper per input token. Then the
+                # serving model BECAME DeepSeek V4 Flash and the override bought
+                # only a slower endpoint and a second credential, so it went. The
+                # serving model has since moved again (GLM-5.3-Flash on Baseten,
+                # config.EXECUTOR_MODEL); the conclusion is unchanged but the
+                # premise is no longer "same weights", so if compaction ever gets
+                # expensive here, re-measure rather than assuming it cannot be.
                 repair_hint="Return a single JSON object with exactly these keys: "
                 "original_ask, agents, terminals, decisions, blockers, next_actions, "
                 "preserved_ids. Each entry of agents is an object with agent_id, "
@@ -1144,8 +1148,18 @@ class TaskRunner:
         # its visible-output ceiling above the cap its profile deliberately set.
         thinking_enabled = INTERACTIVE_THINKING_ENABLED
         reasoning_effort = INTERACTIVE_REASONING_EFFORT if thinking_enabled else None
+        # The `else` branch is no longer zero, and that changed with the serving
+        # model. It used to be right: a NON-thinking task spent its whole cap on
+        # visible output, so adding slack would only have raised the ceiling its
+        # profile deliberately set. GLM-5.3-Flash has no off switch — the floor
+        # still reasons sometimes — so without a small allowance a 300-token JSON
+        # profile silently has less than 300 for its answer, and a truncation
+        # spends the one repair retry against the same cap. See
+        # EXECUTOR_REASONING_ALLOWANCE_TOKENS on why it is 64 and not more.
         max_tokens = profile.max_output_tokens + (
-            self.settings.thinking_headroom_tokens if thinking_enabled else 0
+            self.settings.thinking_headroom_tokens
+            if thinking_enabled
+            else EXECUTOR_REASONING_ALLOWANCE_TOKENS
         )
         provider_request = ProviderChatRequest(
             model=model,

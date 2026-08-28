@@ -13,6 +13,7 @@ from daintree_assistant_server.config import (
     EXECUTOR_KEY_ENV,
     EXECUTOR_ORIGIN,
     EXECUTOR_URL_ENV,
+    FAST_RESPONSE_ENABLED,
     FAST_RESPONSE_KEY_ENV,
     Settings,
 )
@@ -29,20 +30,22 @@ def _settings(**overrides: object) -> Settings:
 
 
 def test_missing_secrets_reports_every_server_owned_secret() -> None:
-    # All three are the SERVER's own material, which is the whole shape of the
-    # current credential model: Daintree holds every upstream key and callers hold
-    # none. The SERVING key must fail READINESS — without it nothing can be
-    # answered, and discovering that on the first turn surfaces as an upstream 401
-    # that reads like the caller's fault. The fast-response key joined them when
-    # that stage lost its off switch: it now runs on every eligible turn, so a
-    # missing key is the feature failing open silently on all of them.
+    # BOTH are the SERVER's own material, which is the whole shape of the current
+    # credential model: Daintree holds every upstream key and callers hold none.
+    # The SERVING key must fail READINESS — without it nothing can be answered,
+    # and discovering that on the first turn surfaces as an upstream 401 that
+    # reads like the caller's fault.
+    #
+    # The fast-response key is deliberately NOT here. It was required only while
+    # that stage had no off switch, when a missing key meant failing open on every
+    # eligible turn. `FAST_RESPONSE_ENABLED` is False, so the stage opens no call
+    # and the key funds nothing — see the test below.
     s = Settings(  # type: ignore[arg-type]
         **{EXECUTOR_KEY_ENV: "", FAST_RESPONSE_KEY_ENV: "", "STATE_SIGNING_KEY_CURRENT": ""}
     )
     assert s.missing_secrets() == [
         "STATE_SIGNING_KEY_CURRENT",
         EXECUTOR_KEY_ENV,
-        FAST_RESPONSE_KEY_ENV,
     ]
 
 
@@ -57,10 +60,21 @@ def test_missing_upstream_key_alone_still_fails_readiness() -> None:
     assert s.missing_secrets() == [EXECUTOR_KEY_ENV]
 
 
-def test_missing_fast_response_key_alone_still_fails_readiness() -> None:
-    """A weaker requirement than the executor key — the turn still answers — but
-    not a soft one. Failing open silently on every turn is indistinguishable from
-    a model that chose not to answer, which is the failure nobody notices."""
+def test_a_deployment_without_the_fast_response_key_is_complete() -> None:
+    """The inverse of what this test asserted while the stage was always on.
+
+    It used to fail readiness, because a missing key then meant the stage failed
+    open on every eligible turn — indistinguishable from a model that chose not
+    to answer, which is the failure nobody notices. `FAST_RESPONSE_ENABLED` is
+    False now, so no call is ever opened and the credential funds nothing.
+    Demanding it would fail readiness on a deployment that is in fact complete,
+    which is the mirror-image mistake.
+    """
+    assert FAST_RESPONSE_ENABLED is False, (
+        "The stage was re-enabled. It now runs on every eligible turn again, so "
+        "CEREBRAS_API_KEY must go back into missing_secrets() in this commit — "
+        "otherwise the stage fails open silently wherever the key is absent."
+    )
     s = Settings(  # type: ignore[arg-type]
         **{
             EXECUTOR_KEY_ENV: "sk-test",
@@ -68,7 +82,7 @@ def test_missing_fast_response_key_alone_still_fails_readiness() -> None:
             "STATE_SIGNING_KEY_CURRENT": "sk",
         }
     )
-    assert s.missing_secrets() == [FAST_RESPONSE_KEY_ENV]
+    assert s.missing_secrets() == []
 
 
 def test_missing_secrets_empty_when_present() -> None:
@@ -109,12 +123,26 @@ def test_the_serving_identity_is_pinned_to_literals() -> None:
     matters: it is where the server's own upstream credential is sent on every
     request.
     """
-    from daintree_assistant_server.config import EXECUTOR_MODEL
+    from daintree_assistant_server.config import (
+        EXECUTOR_CONTEXT_TOKENS,
+        EXECUTOR_MODEL,
+        EXECUTOR_REASONING_EFFORT,
+    )
 
     assert EXECUTOR_KEY_ENV == "BASETEN_API_KEY"
     assert EXECUTOR_URL_ENV == "BASETEN_BASE_URL"
     assert EXECUTOR_ORIGIN == "inference.baseten.co"
     assert EXECUTOR_MODEL == "zai-org/GLM-5.3-Flash"
+    # Pinned INDEPENDENTLY of anything that derives from it. The oversized-turn
+    # tests size their payload FROM this constant, so they stay green if it
+    # reverts — they would simply be testing a smaller window without saying so.
+    # This literal is what notices. Read from the host: Baseten's `/v1/models`
+    # publishes `context_length: 1048576` for these weights.
+    assert EXECUTOR_CONTEXT_TOKENS == 1_048_576
+    # The floor, and the most expensive constant in the file to get wrong: this
+    # model has no "off", and an ABSENT `reasoning_effort` means `high` on every
+    # turn and every utility task.
+    assert EXECUTOR_REASONING_EFFORT == "low"
 
 
 def test_production_rejects_a_valid_https_origin_that_is_not_the_serving_host() -> None:

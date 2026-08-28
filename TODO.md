@@ -624,6 +624,43 @@ added beside it.
 
 ---
 
+## Retire the old upstream secret and its IAM grant
+
+**Trigger: after the Baseten rollback window closes.**
+
+`infra/gcp/bootstrap.sh` is additive by design, so an UPGRADED project still
+carries what the previous executor needed: a `together-api-key` secret holding a
+live Together credential, and a runtime-service-account accessor binding on it.
+Neither is referenced any more — `cloudbuild.yaml` mounts `baseten-api-key` — so
+the script's claim at the top of its IAM section that the runtime account can read
+"exactly the secrets it mounts" is currently false on such a project.
+
+Nothing breaks while it sits there; it is a live vendor credential readable by the
+service for no reason, which is the kind of thing that is only ever noticed by an
+audit. To close it: revoke the binding, then disable (not delete) the secret
+versions, then delete the secret once a rollback to Together is off the table.
+
+Related, and cheap to fix in the same pass: `has_version()` accepts a version in
+ANY state, so a secret whose only version is DISABLED reports as ready and then
+fails at the Cloud Run mount. Filter on `state: ENABLED`.
+
+---
+
+## Re-derive the prompt-cache region model for the current serving model
+
+**Trigger: before citing an absolute cache-region number again.**
+
+`benchmarks/_harness/wire.py::cacheable_region_bytes` models the serialization
+ORDER of DeepSeek V4 Flash's chat template — [all system messages] → [tools] →
+[conversation] — which is what made the assembly-order work measurable. The
+serving model is `zai-org/GLM-5.3-Flash` now and its template has not been
+checked against that assumption.
+
+The exact-serialization half of that module is host-agnostic and still exact, and
+prefix caching is still literal-prefix matched, so the metric stays directionally
+useful and the assembly-order rules it justified are still sound. What is no
+longer safe is quoting a cache-region byte count as a fact about production.
+
 ## Re-establish the privacy claim against Baseten
 
 **Trigger: before any external statement about data handling.** Blocking for that,

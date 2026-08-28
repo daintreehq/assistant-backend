@@ -817,8 +817,9 @@ class PromptAssembler:
         # the model continue the reasoning that produced those calls instead of
         # re-deriving it. On a completed final-answer turn (no tool_calls) replaying it
         # is pure prompt cost, so it is dropped. When forwarded it is the model's own
-        # output, never transformed; the provider adapter renames the field to
-        # OpenRouter's `reasoning` on the way out.
+        # output, never transformed; what the field is CALLED on the wire is the
+        # adapter's business — OpenRouter wants `reasoning`, and the Baseten adapter
+        # undoes that rename because `reasoning_content` is its host's own spelling.
         if msg.role == "assistant" and msg.tool_calls and msg.reasoning_content is not None:
             wire["reasoning_content"] = msg.reasoning_content
         return wire

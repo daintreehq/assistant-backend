@@ -537,7 +537,27 @@ few runbooks survive `executable_with`, so most of their turns are runbook-less 
 exactly the shape where a core tuned for the ASSISTANT base prompt is the wrong
 core.
 
-## The fast-response stage (always on)
+## The fast-response stage (BUILT, and currently OFF)
+
+**READ THIS FIRST: the stage does not run.** `config.FAST_RESPONSE_ENABLED` is
+`False`, so `_build_fast_response_provider` returns None,
+`FastResponseService.available` is False, and no preamble is ever generated or
+emitted. Everything below describes the mechanism as it behaves when the flag is
+True — it is all still wired, and re-enabling is that one word.
+
+**Why it is off.** The preamble buys a visible line while the reader waits, worth
+exactly as much as the wait is long. On the previous executor that gap was
+seconds; on GLM-5.3-Flash via Baseten the first bytes arrive fast enough that a
+line announcing work already underway is noise, and it delays the real answer to
+say something that stops being true almost at once. The stage's own design
+already conceded the principle — `PreambleGate` discards a line that loses the
+race to the executor's first visible byte. This stops paying to enter the race.
+
+Two consequences that are easy to miss: **`CEREBRAS_API_KEY` is no longer
+required** (it left `missing_secrets()` with the stage — see "Config &
+readiness"), and **Cerebras now receives no prompt content at all**, so the
+two-hosts framing in `docs/PROVIDER_POLICY.md` §4 is about a stage that is
+dormant rather than one that is running.
 
 An eligible streaming turn can open with ONE short visible **preamble** line —
 "what is about to happen", in the user's terms — written by `gpt-oss-120b` on
@@ -651,12 +671,17 @@ the selector ran — selection reruns for reasons that are not a new instruction
 a sub-agent, on a background wake, on a non-streaming request, or with no runbook
 loaded.
 
-**There is ONE deployment shape.** No `off`/`shadow`/`visible`, no rollout
-percentage, no per-session cohort. Those existed to land the feature carefully and
-that decision is made; keeping them would leave the product's shape configurable
-in exactly the way this file's own rule forbids — which model, which posture,
-which prompt are benchmarked decisions, not operational dials. Turning the stage
-off is a code change, which is the honest description of what it would be. What
+**There is ONE deployment shape, and the switch is a CONSTANT rather than an env
+var.** No `off`/`shadow`/`visible`, no rollout percentage, no per-session cohort:
+those existed to land the feature carefully and that decision is made. Keeping
+them would leave the product's shape configurable in exactly the way this file's
+own rule forbids — which model, which posture, which prompt are benchmarked
+decisions, not operational dials. Turning the stage off is a code change, which
+is the honest description of what it is, and
+`config.FAST_RESPONSE_ENABLED` is where it happens. **`FAST_RESPONSE_MODE` and
+`FAST_RESPONSE_ROLLOUT_PERCENT` are NOT read by `Settings`** — a `.env` carrying
+them changes nothing, which is worse than an error because it looks like it
+worked. What
 DOES remain is the turn-shape eligibility above, which is about whether a preamble
 makes sense at all.
 
@@ -739,7 +764,7 @@ Output posture: **structural defects** (cycle, duplicate/unknown node id, moving
 
 `config.py` `Settings` is parsed once, immutable, env-driven (`.env`). The model is **hardcoded** (`config.EXECUTOR_MODEL`, `config.PUBLIC_MODEL_ID`) — a product decision, not config — and so is the **thinking posture**: `INTERACTIVE_THINKING_ENABLED = False` plus `EXECUTOR_REASONING_EFFORT = "low"`. **That flag no longer means what its name says.** It used to be literally true that nothing here thought — DeepSeek V4 Flash reasons by default and the unified `reasoning: {"enabled": false}` switched it off, measured. GLM-5.3-Flash has no such switch: reasoning is always on, `none` is rejected, and an OMITTED `reasoning_effort` means `high`, so omission is the *expensive* choice. `False` now means "ask this host for the least reasoning it will do", and `providers/baseten.py` translates it to the `low` floor — including on paths that set `thinking_disabled`, because for this model that can only mean "as little as possible". Measured: absent, the model reasoned on 6 of 6 trials (median 479.5 tokens); at `low`, 1 of 6 (median 0). `/doctor` and `/v1/daintree/capabilities` still publish `thinking_enabled: false`, which now describes what is REQUESTED rather than a guaranteed zero. The server ships **one optimum** and there are deliberately no env toggles for PRODUCT decisions — which model, which posture, which prompt, which runbooks: things with one right answer we have already benchmarked. That rule is about quality, not about operations, and the handful of env-driven booleans beside it (`MAIN_OUTPUT_LINT_ENABLED`, `EXPOSE_DEBUG_SELECTOR_REASON`, `TOOL_PROJECTION_MODE`) are the other kind: switches whose right value is whatever production says this week. `TOOL_PROJECTION_MODE` is the sharpest case — it gates a behaviour that WITHHOLDS capability from the model, so being able to answer "turn it off" in the time Cloud Run takes to roll a config-only revision is the point of it existing (see "Runbook-aware tool projection" below).
 
-The environment supplies three ALWAYS-REQUIRED secrets, **all server-owned**: `STATE_SIGNING_KEY_CURRENT`, `BASETEN_API_KEY` and `CEREBRAS_API_KEY`. All three are in `missing_secrets()` — the executor key gates readiness because without it nothing can be answered at all, and discovering that on the first turn surfaces as an upstream 401 that reads like the caller's fault; the Cerebras key gates it because the fast-response stage has no off switch, so a missing key fails that stage open on every turn, which is indistinguishable from a model choosing to say nothing. There is **no inbound API key** to configure — account authentication is OAuth, not a shared key, and its settings (issuer, JWKS, client id) are public configuration rather than secrets, which is why they gate readiness through `auth_problems()` rather than `missing_secrets()`. `DAINTREE_ENTITLEMENT_URL` is in the same category and for a sharper reason: the CALLER's own bearer authenticates that lookup, so there is no Daintree credential in the billing path at all — it gates readiness through `entitlement_problems()`. Secrets are `SecretStr`. Missing required secrets — and, in a hardened environment (`production`/`staging`), weak/default ones, including a serving base URL that is not the real origin (`config.EXECUTOR_ORIGIN`), because the server key is forwarded there — **fail readiness** (`/readyz` → 503) rather than crashing the process; liveness (`/healthz`) stays green. A FOURTH secret is required CONDITIONALLY and is deliberately not in `missing_secrets()`: `STAGING_ALLOWED_SUBJECT_DIGESTS` is demanded only under `ENVIRONMENT=staging` with `AUTH_MODE=enforce`, and refused outright in production, so it gates readiness through `subject_gate_problems()` instead — `missing_secrets()` means "this deployment cannot serve a request without it", which is not what a posture-scoped membership list is. `local_only_problems()` is the aggregator for all of these; it adds two development-only checks of its own: prompt dumping must be off in production, and so must `DAINTREE_RUNBOOKS_OVERLAY_DIR` — a scratch directory of runbook files merged over the packaged catalog so a runbook can be authored against a running server (`POST /v1/daintree/runbooks/reload` rebuilds it live; that route is mounted only when the overlay is configured and the environment is not hardened). `main.py` builds the immutable service `Container` and validates it during lifespan startup; a malformed prompt or runbook prevents readiness without taking down liveness.
+The environment supplies two ALWAYS-REQUIRED secrets, **both server-owned**: `STATE_SIGNING_KEY_CURRENT` and `BASETEN_API_KEY`. Both are in `missing_secrets()` — the executor key gates readiness because without it nothing can be answered at all, and discovering that on the first turn surfaces as an upstream 401 that reads like the caller's fault. **`CEREBRAS_API_KEY` used to be the third and no longer gates anything**: it was required only while the fast-response stage had no off switch, when a missing key failed that stage open on every turn (indistinguishable from a model choosing to say nothing). With `FAST_RESPONSE_ENABLED` False the stage opens no call, so demanding the key would fail readiness on a deployment that is in fact complete. It is still mounted and still created by bootstrap, because re-enabling the stage should not also be a secrets rollout. There is **no inbound API key** to configure — account authentication is OAuth, not a shared key, and its settings (issuer, JWKS, client id) are public configuration rather than secrets, which is why they gate readiness through `auth_problems()` rather than `missing_secrets()`. `DAINTREE_ENTITLEMENT_URL` is in the same category and for a sharper reason: the CALLER's own bearer authenticates that lookup, so there is no Daintree credential in the billing path at all — it gates readiness through `entitlement_problems()`. Secrets are `SecretStr`. Missing required secrets — and, in a hardened environment (`production`/`staging`), weak/default ones, including a serving base URL that is not the real origin (`config.EXECUTOR_ORIGIN`), because the server key is forwarded there — **fail readiness** (`/readyz` → 503) rather than crashing the process; liveness (`/healthz`) stays green. A FOURTH secret is required CONDITIONALLY and is deliberately not in `missing_secrets()`: `STAGING_ALLOWED_SUBJECT_DIGESTS` is demanded only under `ENVIRONMENT=staging` with `AUTH_MODE=enforce`, and refused outright in production, so it gates readiness through `subject_gate_problems()` instead — `missing_secrets()` means "this deployment cannot serve a request without it", which is not what a posture-scoped membership list is. `local_only_problems()` is the aggregator for all of these; it adds two development-only checks of its own: prompt dumping must be off in production, and so must `DAINTREE_RUNBOOKS_OVERLAY_DIR` — a scratch directory of runbook files merged over the packaged catalog so a runbook can be authored against a running server (`POST /v1/daintree/runbooks/reload` rebuilds it live; that route is mounted only when the overlay is configured and the environment is not hardened). `main.py` builds the immutable service `Container` and validates it during lifespan startup; a malformed prompt or runbook prevents readiness without taking down liveness.
 
 ## Conventions
 

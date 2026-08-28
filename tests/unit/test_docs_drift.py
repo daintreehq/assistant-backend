@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import get_args
 
 import pytest
+from pydantic import SecretStr
 
 from daintree_assistant_server import PROTOCOL_MAX, PROTOCOL_MIN
 from daintree_assistant_server import main as main_module
@@ -36,6 +37,7 @@ from daintree_assistant_server.config import (
     Settings,
 )
 from daintree_assistant_server.errors import DaintreeError
+from daintree_assistant_server.providers.base import ProviderChatRequest
 from daintree_assistant_server.providers.baseten import BasetenProvider
 from daintree_assistant_server.services.task_runner import TaskRunner
 
@@ -269,12 +271,23 @@ def test_the_thinking_posture_is_documented() -> None:
 
 
 @pytest.mark.parametrize("path", PROSE_FILES, ids=lambda p: p.name)
-def test_no_document_claims_the_interactive_surface_thinks(path: Path) -> None:
-    """The exact drift the review caught: `.env.example` said main/utility/gate
-    run thinking-high long after the interactive surface was turned off.
+def test_no_document_claims_the_interactive_surface_runs_a_thinking_TIER(
+    path: Path,
+) -> None:
+    """Narrowed, because what it forbids became partly TRUE.
 
-    Matched on the shape of the stale sentence rather than the word "thinking",
-    which the accurate copy also uses.
+    The original drift was `.env.example` claiming main/utility/gate run
+    thinking-high long after the surface was turned off. The surface now reasons
+    again — at the `low` FLOOR, which it cannot avoid — so "these surfaces think"
+    is no longer simply false. What is still false, and still expensive, is a
+    claim that they run a deliberate thinking TIER: that would tell a reader the
+    4,000-token headroom applies and that `high` is in play, when the server pins
+    the floor and budgets ~64 tokens for it.
+
+    So the pattern still keys on the word "thinking" following a surface name,
+    which the accurate copy avoids — it says "floor", "low", or
+    "reasoning_effort" instead. A hard-zero claim is a different failure and is
+    caught by `test_no_document_claims_a_hard_zero_on_reasoning`.
     """
     stale = re.compile(
         r"\b(?:main|utility|selector)\b[^.\n]{0,70}"
@@ -632,28 +645,47 @@ def test_provider_policy_describes_a_single_host_upstream() -> None:
     )
 
 
-def test_no_reasoning_effort_is_sent_by_anything() -> None:
-    """The tier constant survives the removal; nothing sends it.
+def test_reasoning_effort_is_sent_by_everything_and_the_doc_says_so() -> None:
+    """The INVERSE of what this gate asserted for two model generations.
 
-    ``INTERACTIVE_REASONING_EFFORT`` is the value the interactive surface WOULD
-    use if ``INTERACTIVE_THINKING_ENABLED`` were flipped back on, kept beside the
-    flag so that decision does not also require choosing a tier. With the flag
-    off and runbook learning gone, no call in the system sets ``reasoning_effort``
-    at all — which is what the doc's thinking table now says.
+    It used to be called ``test_no_reasoning_effort_is_sent_by_anything`` and
+    required §2 to name ``reasoning: {"enabled": false}`` as the thing that
+    switches reasoning off. Every clause of that is now wrong: the unified object
+    is never sent, ``reasoning_effort`` IS sent on every single call, and there is
+    no "off" to switch to. It kept passing purely because the rewritten §2 still
+    mentions the retired object as history — a gate held in place by the very
+    text that superseded it, which is why it is replaced rather than adjusted.
 
-    The doc assertion moved with the host. It used to check that §2 called the
-    posture a property of the MODEL ("no reasoning mode"), which was Cerebras's
-    situation; on Together it is a flag genuinely held down, and a doc still
-    claiming the model cannot reason would be describing the wrong mechanism —
-    the one where forgetting to send the disable object costs nothing.
+    ``INTERACTIVE_REASONING_EFFORT`` still survives as the tier the interactive
+    surface would request if it ever wanted MORE than the floor.
     """
     assert INTERACTIVE_THINKING_ENABLED is False
-    assert INTERACTIVE_REASONING_EFFORT  # still defined, still unsent
+    assert INTERACTIVE_REASONING_EFFORT  # the tier above the floor, still unused
+    assert EXECUTOR_REASONING_EFFORT == "low"
+
+    # The BEHAVIOURAL anchor, not just prose: the adapter must put the floor on
+    # the wire rather than omitting the field, on a request that asks for nothing.
+    provider = BasetenProvider(
+        None,  # type: ignore[arg-type]  # _build_body never touches the client
+        api_key=SecretStr(""),
+        reasoning_effort=EXECUTOR_REASONING_EFFORT,
+    )
+    body = provider._build_body(  # noqa: SLF001
+        ProviderChatRequest(
+            model=EXECUTOR_MODEL, messages=[{"role": "user", "content": "hi"}]
+        ),
+        stream=False,
+    )
+    assert body["reasoning_effort"] == "low", (
+        "the adapter stopped sending the floor. An ABSENT reasoning_effort means "
+        "`high` on this host, so this is a silent cost increase on every turn."
+    )
+    assert "reasoning" not in body
+
     text = _read(DOC_PROVIDER).lower()
-    assert 'reasoning: {"enabled": false}' in text, (
-        "docs/PROVIDER_POLICY.md §2 no longer names the object that actually "
-        "switches reasoning off. The serving model reasons by DEFAULT, so the "
-        "posture is a flag held down, not a property of the model."
+    assert "reasoning_effort" in text, (
+        "docs/PROVIDER_POLICY.md §2 no longer names the field that actually "
+        "controls reasoning here — the only control this host exposes."
     )
 
 

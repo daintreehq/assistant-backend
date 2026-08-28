@@ -92,6 +92,27 @@ EXECUTOR_CONTEXT_TOKENS = 1_048_576
 #: stays here beside the model id and the adapter keeps its one job.
 EXECUTOR_REASONING_EFFORT = "low"
 
+#: Completion-token allowance for the reasoning the serving model emits ANYWAY.
+#:
+#: Not a thinking budget — `thinking_headroom_tokens` (4,000) is that, and it is
+#: still added only when the interactive posture is deliberately switched on.
+#: This is the much smaller correction for a fact that has no off switch: reasoning
+#: tokens are generated tokens and share `max_tokens` with the visible answer, so
+#: on this model a profile's cap is no longer entirely the profile's to spend.
+#:
+#: It exists because the tightest utility profiles cap output at 300 tokens. Before
+#: the move, a non-thinking task genuinely got all 300; now any reasoning comes out
+#: of them, and a JSON task truncated at `finish_reason=length` burns its one
+#: repair retry on the same cap and can fail twice. Adding this back to the cap
+#: restores the visible budget the profile intended rather than enlarging it.
+#:
+#: 64 rather than something rounder: the most reasoning observed at the `low` floor
+#: across every probe was 16 tokens, so this is ~4x the measured worst case while
+#: adding only a fifth to the smallest cap. Raise it if a `length` truncation is
+#: ever actually seen on a utility task; do not raise it speculatively, because
+#: every token here IS also available to visible output.
+EXECUTOR_REASONING_ALLOWANCE_TOKENS = 64
+
 # ---------------------------------------------------------------------------
 # The FAST-RESPONSE role. A second internal provider, NOT a second product.
 # ---------------------------------------------------------------------------
@@ -117,6 +138,35 @@ FAST_RESPONSE_MODEL = "gpt-oss-120b"
 #: whose whole value is arriving before the executor does. `low` is the floor
 #: Cerebras exposes; there is no "off".
 FAST_RESPONSE_REASONING_EFFORT = "low"
+#: Whether the fast-response stage runs at all. **It does not.**
+#:
+#: Hardcoded here rather than exposed as an env var for the same reason the model
+#: ids are: which model writes a preamble, and whether one is written, are product
+#: decisions with one right answer. The stage USED to carry `off`/`shadow`/
+#: `visible` modes and a rollout percentage; those were deleted once it shipped,
+#: and reintroducing them as a `.env` switch is exactly what that deletion was
+#: rejecting. Turning the stage off is a code change, which is the honest
+#: description of what it is.
+#:
+#: **Why off.** The preamble buys a visible line while the reader waits, and it is
+#: worth precisely as much as the wait is long. On the previous executor that gap
+#: was seconds. On `zai-org/GLM-5.3-Flash` via Baseten the executor's first bytes
+#: arrive fast enough that a line announcing work which has already started reads
+#: as noise, and it delays the real answer to say something that stops being true
+#: almost at once. The stage's own design already conceded the principle —
+#: `PreambleGate` throws away a line that loses the race to the executor's first
+#: visible byte. Setting this False stops paying to enter the race.
+#:
+#: Nothing is torn out: `_build_fast_response_provider` returns None,
+#: `FastResponseService.available` reads False off that, and every eligibility
+#: check downstream already handles it (tests and benchmarks have always taken
+#: that path). Flip this to True to restore the stage.
+#:
+#: Note `CEREBRAS_API_KEY` is consequently NO LONGER REQUIRED — see
+#: `missing_secrets()`, whose entry for it existed only because the stage could
+#: not be switched off.
+FAST_RESPONSE_ENABLED = False
+
 FAST_RESPONSE_KEY_ENV = "CEREBRAS_API_KEY"
 FAST_RESPONSE_URL_ENV = "CEREBRAS_BASE_URL"
 FAST_RESPONSE_ORIGIN = "api.cerebras.ai"
@@ -136,7 +186,9 @@ EXECUTOR_PROVIDER = "baseten"
 __all__ = [
     "EXECUTOR_CONTEXT_TOKENS",
     "EXECUTOR_MODEL",
+    "EXECUTOR_REASONING_ALLOWANCE_TOKENS",
     "EXECUTOR_REASONING_EFFORT",
+    "FAST_RESPONSE_ENABLED",
     "FAST_RESPONSE_MODEL",
     "FAST_RESPONSE_REASONING_EFFORT",
     "PUBLIC_MODEL_ID",
@@ -1418,8 +1470,13 @@ class Settings(BaseSettings):
             missing.append("STATE_SIGNING_KEY_CURRENT")
         if not self.serving_api_key.get_secret_value():
             missing.append(EXECUTOR_KEY_ENV)
-        if not self.cerebras_api_key.get_secret_value():
-            missing.append(FAST_RESPONSE_KEY_ENV)
+        # CEREBRAS_API_KEY is deliberately NOT here any more. It was added when the
+        # fast-response stage lost its off switch — a missing key then meant the
+        # stage failed open on every eligible turn, indistinguishable from a model
+        # choosing to say nothing. `FAST_RESPONSE_ENABLED` is False now, so the
+        # stage never opens a call and the key funds nothing. Requiring a
+        # credential for a code path that cannot execute fails readiness on a
+        # deployment that is, in fact, complete.
         return missing
 
     def local_only_problems(self) -> list[str]:

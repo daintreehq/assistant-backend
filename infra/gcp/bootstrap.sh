@@ -163,13 +163,16 @@ ensure_supplied_secret() {
 }
 ensure_supplied_secret baseten-api-key '<Baseten API key>' gates
 
-# The FAST-RESPONSE credential, and it GATES now. The stage lost its off switch:
-# it runs on every eligible turn of every deployment, the deploy mounts this
-# secret unconditionally, and readiness (`Settings.missing_secrets`) refuses a
-# revision without it. That refusal is the point — a missing key would otherwise
-# fail the stage open on every single turn, which is indistinguishable from a
-# model that simply chose not to say anything.
-ensure_supplied_secret cerebras-api-key 'csk-...' gates
+# The FAST-RESPONSE credential, and it NO LONGER GATES. It did while the stage
+# ran on every eligible turn with no off switch — a missing key then failed the
+# stage open everywhere, indistinguishable from a model choosing to say nothing.
+# `config.FAST_RESPONSE_ENABLED` is False now, so no call is ever opened, the key
+# funds nothing, and `Settings.missing_secrets` no longer asks for it.
+#
+# The shell is still created and still mounted: the stage is off by a one-word
+# decision that is expected to be revisited, and a project missing the resource
+# entirely would make re-enabling it a two-step rollout. A version is optional.
+ensure_supplied_secret cerebras-api-key 'csk-...' optional
 
 # The private-staging subject gate's membership list — A SHELL ONLY, and this
 # script must never put a version in it.
