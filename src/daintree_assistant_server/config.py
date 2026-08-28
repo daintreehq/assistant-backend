@@ -279,7 +279,19 @@ RUNBOOK_CONFIRMATION_THRESHOLD = 0.95
 #: a benchmarked product decision, not an operational dial. Re-measure after a
 #: host or model change — every number above describes GLM-5.3-Flash on Baseten
 #: with a warm prefix cache, and nothing else.
-CONFIRMATION_PACING_SECONDS = 0.9
+CONFIRMATION_PACING_SECONDS = 1.0
+
+#: A deliberate beat before the first word.
+#:
+#: Without it the first frame lands ~20ms after `meta`, which reads as the text
+#: having been sitting there rather than as something arriving. A short pause
+#: first, then typing, is what makes it feel like the system started working —
+#: and it costs nothing, because the executor is already prefilling underneath.
+#:
+#: Inside the budget above, not added to it: the first word lands at the lead-in
+#: and the last at the lead-in plus the pacing, so the whole thing is bounded by
+#: `CONFIRMATION_LEAD_IN_SECONDS + CONFIRMATION_PACING_SECONDS`.
+CONFIRMATION_LEAD_IN_SECONDS = 0.2
 
 #: Below this many words, pacing is pointless — the whole string lands in one
 #: event. A two-word fragment typed over 0.9s reads as a stall rather than as

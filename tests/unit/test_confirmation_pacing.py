@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from daintree_assistant_server.config import (
+    CONFIRMATION_LEAD_IN_SECONDS,
     CONFIRMATION_MIN_PACED_WORDS,
     CONFIRMATION_PACING_SECONDS,
 )
@@ -101,20 +102,29 @@ async def test_typing_finishes_inside_the_budget(orchestrator: Any) -> None:
     await _collect(orchestrator, TEXT)
     elapsed = time.perf_counter() - start
 
-    assert elapsed <= CONFIRMATION_PACING_SECONDS + 0.5
-    assert elapsed >= CONFIRMATION_PACING_SECONDS * 0.5, (
+    budget = CONFIRMATION_LEAD_IN_SECONDS + CONFIRMATION_PACING_SECONDS
+    assert elapsed <= budget + 0.5
+    assert elapsed >= budget * 0.5, (
         "it should actually pace, not dump everything at once"
     )
 
 
 @pytest.mark.asyncio
 async def test_a_short_confirmation_is_not_paced(orchestrator: Any) -> None:
-    """Under the floor, typing reads as a stall rather than as typing."""
+    """Under the floor, typing reads as a stall rather than as typing.
+
+    The LEAD-IN still applies — that beat is about the text reading as having
+    arrived, which is true whether or not it then types — so the bound here is
+    the lead-in, not zero. What must not happen is the pacing budget being spent.
+    """
     short = " ".join(["word"] * (CONFIRMATION_MIN_PACED_WORDS - 1))
     start = time.perf_counter()
     frames = await _collect(orchestrator, short)
-    assert frames == [short]
-    assert time.perf_counter() - start < 0.2
+    elapsed = time.perf_counter() - start
+
+    assert frames == [short], "one frame, whole text"
+    assert elapsed < CONFIRMATION_LEAD_IN_SECONDS + 0.3
+    assert elapsed < CONFIRMATION_PACING_SECONDS, "the pacing budget must not be spent"
 
 
 @pytest.mark.asyncio

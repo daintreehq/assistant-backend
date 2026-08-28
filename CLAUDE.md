@@ -310,7 +310,8 @@ event, inheriting that event's display-only contract in the CLI rather than need
 second one.
 
 **It is TYPED OUT, word by word, and the ordering that makes that safe is the whole
-trick.** The text is paced over `config.CONFIRMATION_PACING_SECONDS` (0.9s) so it
+trick.** A beat first (`config.CONFIRMATION_LEAD_IN_SECONDS`, 0.2s), then the words
+over `config.CONFIRMATION_PACING_SECONDS` (1.0s), so the text
 occupies the slot reasoning and an opening sentence used to. Pacing costs wall-clock, so
 the executor's open is started FIRST and the words fill the gap it opens — emitted
 before it, as the first revision did, every turn showing one would be delayed by the
@@ -323,12 +324,12 @@ the reader looking at the last word alone. And the executor is the real bound: t
 moment it has output the remaining text is flushed in one event, so a confirmation is
 never why an answer is late. That backstop is what lets the budget be tuned tight.
 
-**0.9s is measured, not chosen** (`benchmarks/executor_window`, which re-derives it).
+**The 1.2s total is measured against, not chosen** (`benchmarks/executor_window`).
 Over 24 clean trials — spaced 3s, because back-to-back calls failed 6 of 9 and a
 throttled sample reads as a slow model — the executor's first delta of ANY kind
 (content, reasoning or tool calls) arrived at p50 1.26s, p90 1.52s, min 0.98s. `0.8 ×
-p90` is 1.22s, so the sub-second cap binds — and it must: a 1.0s budget would have
-overrun the fastest turn observed. Note this is NOT the `latency` suite's `ttft_s`,
+p90` is 1.22s. The 1.2s total sits on the median and runs past the fastest turns
+by design: overrunning is free, because the executor's arrival flushes the rest. Note this is NOT the `latency` suite's `ttft_s`,
 which is first VISIBLE content and does not exist on the tool-calling turns where
 confirmations actually fire.
 

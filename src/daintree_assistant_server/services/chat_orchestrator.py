@@ -21,6 +21,7 @@ from pydantic import SecretStr
 
 from .. import PROTOCOL_VERSION, __version__
 from ..config import (
+    CONFIRMATION_LEAD_IN_SECONDS,
     CONFIRMATION_MIN_PACED_WORDS,
     CONFIRMATION_PACING_SECONDS,
     DOCS_RUNBOOK_ID,
@@ -2070,6 +2071,14 @@ class ChatOrchestrator:
                 "preamble",
                 StreamPreamble(id=event_id, content=content).model_dump(),
             )
+
+        # A beat before the first word. The executor is already prefilling, so
+        # this is dead time either way — spending it here is what makes the text
+        # read as arriving rather than as having been there all along.
+        if CONFIRMATION_LEAD_IN_SECONDS > 0 and not (
+            open_task is not None and open_task.done()
+        ):
+            await asyncio.sleep(CONFIRMATION_LEAD_IN_SECONDS)
 
         words = text.split()
         # Below the floor, or with pacing switched off, the whole string lands in
