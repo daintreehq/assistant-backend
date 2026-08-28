@@ -286,10 +286,10 @@ CONFIRMATION_PACING_ENABLED = False
 #:
 #:     p50 1.26s    p90 1.52s    min 0.98s    max 1.58s
 #:
-#: 0.8 x p90 is 1.22s, so the SUB-SECOND CAP is what binds, and it has to: the
-#: fastest turn observed left only 0.98s, and a budget at 1.0s would have
-#: overrun it. 0.9 leaves ~80ms against that fastest observation and ~360ms
-#: against the median.
+#: 0.8 x p90 is 1.22s, and 1.0 is what ships. Together with the 0.2s lead-in the
+#: text finishes at 1.20s — just inside the 1.26s median, and past the 0.98s
+#: fastest turn observed. Overrunning that fastest case is deliberate rather than
+#: an oversight; see the paragraph below.
 #:
 #: **Overrunning is survivable, which is what lets this be tuned tight rather
 #: than timid.** The executor's open is started BEFORE the pacing begins, so the

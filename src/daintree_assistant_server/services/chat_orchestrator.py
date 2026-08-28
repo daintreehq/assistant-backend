@@ -2073,13 +2073,32 @@ class ChatOrchestrator:
                 StreamPreamble(id=event_id, content=content).model_dump(),
             )
 
+        async def wait(seconds: float) -> bool:
+            """Sleep, unless the executor gets there first. True if it did.
+
+            RACED, not polled. Checking `done()` and then sleeping unconditionally
+            makes readiness wait out the rest of the current interval — up to the
+            whole lead-in, or a third of a second at the four-word minimum — which
+            is exactly the delay this whole design is arranged to avoid. Waiting
+            on the task itself means the timer is abandoned the moment it
+            completes.
+            """
+            if open_task is None:
+                await asyncio.sleep(seconds)
+                return False
+            if open_task.done():
+                return True
+            # `asyncio.wait` never cancels or consumes the task, so the caller
+            # still awaits it for the stream and its exceptions.
+            await asyncio.wait({open_task}, timeout=seconds)
+            return open_task.done()
+
         # A beat before the first word. The executor is already prefilling, so
         # this is dead time either way — spending it here is what makes the text
         # read as arriving rather than as having been there all along.
-        if CONFIRMATION_LEAD_IN_SECONDS > 0 and not (
-            open_task is not None and open_task.done()
-        ):
-            await asyncio.sleep(CONFIRMATION_LEAD_IN_SECONDS)
+        ready = False
+        if CONFIRMATION_LEAD_IN_SECONDS > 0:
+            ready = await wait(CONFIRMATION_LEAD_IN_SECONDS)
 
         words = text.split()
         # Whole-string delivery: pacing switched off (the shipped CLI keeps only
@@ -2099,12 +2118,12 @@ class ChatOrchestrator:
             shown = words[0]
             yield frame(shown)
             for word in words[1:]:
-                if open_task is not None and open_task.done():
+                if ready:
                     # The executor got there first. Finish the sentence in one
                     # event rather than racing it word by word — from here on,
                     # every wait is a wait the reader is paying for the answer.
                     break
-                await asyncio.sleep(delay)
+                ready = await wait(delay)
                 shown = f"{shown} {word}"
                 yield frame(shown)
             if shown != text:
@@ -2120,6 +2139,7 @@ class ChatOrchestrator:
                 "words": len(words),
                 "paced": (
                     CONFIRMATION_PACING_ENABLED
+                    and CONFIRMATION_PACING_SECONDS > 0
                     and len(words) >= CONFIRMATION_MIN_PACED_WORDS
                 ),
             },

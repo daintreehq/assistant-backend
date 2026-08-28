@@ -6,7 +6,11 @@ from fastapi import APIRouter, Depends, Request
 
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import PERMISSION_RUNBOOKS_READ, Principal, require_permission
-from ..config import INTERACTIVE_THINKING_ENABLED, PUBLIC_MODEL_ID
+from ..config import (
+    CONFIRMATION_PACING_ENABLED,
+    INTERACTIVE_THINKING_ENABLED,
+    PUBLIC_MODEL_ID,
+)
 from ..contracts.daintree_api import COMPACTION_BLOCK_NAME
 from ..services.docs_events import DOCS_SEARCH_WIRE_NAME
 from .deps import require_ready
@@ -73,11 +77,20 @@ async def capabilities(
                 "enabled": True,
                 "streaming_only": True,
                 "event": "preamble",
-                # DISPLAY-ONLY. The client renders it and NEVER commits it to
-                # conversation history — not on `done`, not on `error`. The
-                # executor runs concurrently and never sees the line, so a
-                # committed preamble becomes, on the next turn, an assistant turn
-                # the model has no memory of writing.
+                # DISPLAY-ONLY as far as THIS server is concerned: the executor
+                # runs concurrently, never sees the line, and its request is
+                # byte-identical whether one was sent. So the line is not part of
+                # the answer and nothing here depends on a client keeping it.
+                #
+                # **The shipped CLI does commit it**, joined onto the front of the
+                # assistant message on `done` (`internal/backend/client.go`). That
+                # is a client-side product decision — it shows the user one bubble
+                # and records what they read — and this field does not describe
+                # it. What `commit: never` states is the SERVER's requirement:
+                # nothing here needs the text back, and a client that drops it
+                # loses nothing. A client that keeps it is choosing to record its
+                # own screen, and owns the consequence that the next turn carries
+                # a sentence the model did not write.
                 #
                 # This REPLACES `same_assistant_message` / `join_separator`, which
                 # advertised the opposite and are deliberately gone rather than
@@ -95,7 +108,16 @@ async def capabilities(
                 # The server races this stage against the executor and DROPS the
                 # line if the answer starts first, so a client never has to handle
                 # one arriving mid-answer.
-                "at_most_one_per_turn": True,
+                #
+                # ONE per turn today, and the flag says so because it is currently
+                # true — a confirmation is delivered whole in a single event. It
+                # becomes FALSE the moment `config.CONFIRMATION_PACING_ENABLED` is
+                # turned on, which types the text out across a run of events, so
+                # this value is computed from that constant rather than written as
+                # a literal. A client reading it as a permanent guarantee would
+                # break on the turn pacing lands; reading it per-connection is
+                # exactly what it is for.
+                "at_most_one_per_turn": not CONFIRMATION_PACING_ENABLED,
                 "never_after_first_delta": True,
             },
             # WHAT THE SERVER REQUESTS — NOT a promise that no reasoning occurs.

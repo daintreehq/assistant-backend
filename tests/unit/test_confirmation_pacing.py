@@ -180,3 +180,36 @@ async def test_the_shipped_config_delivers_the_whole_text(
     frames = await _collect(orchestrator, TEXT)
 
     assert frames == [TEXT], "one frame, whole text — never a prefix"
+
+
+@pytest.mark.asyncio
+async def test_readiness_cancels_the_timer_rather_than_waiting_it_out(
+    orchestrator: Any,
+) -> None:
+    """The flush must RACE the sleep, not be checked before it.
+
+    Checking `open_task.done()` and then sleeping unconditionally means an
+    executor that becomes ready mid-interval waits out the rest of it — the whole
+    0.2s lead-in, or a third of a second at the four-word minimum. That is
+    precisely the delay the concurrent design exists to avoid, and it is
+    invisible to every other test here because the text still arrives complete.
+
+    Here the executor becomes ready a little way into the lead-in. The
+    confirmation must finish almost immediately after, not at the end of the
+    budget.
+    """
+    loop = asyncio.get_running_loop()
+    open_task: asyncio.Future[None] = loop.create_future()
+    loop.call_later(0.05, lambda: open_task.set_result(None))
+
+    start = time.perf_counter()
+    frames = await _collect(orchestrator, TEXT, open_task=open_task)
+    elapsed = time.perf_counter() - start
+
+    assert frames[-1] == TEXT, "the whole text still reaches the reader"
+    # Well INSIDE the lead-in: racing finishes just after 0.05s, while a
+    # pre-check plus an unconditional sleep finishes at the full 0.2s.
+    assert elapsed < CONFIRMATION_LEAD_IN_SECONDS * 0.6, (
+        f"took {elapsed:.3f}s — readiness at 0.05s should abandon the timer, not "
+        f"wait out the {CONFIRMATION_LEAD_IN_SECONDS}s lead-in"
+    )
