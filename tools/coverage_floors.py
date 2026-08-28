@@ -137,7 +137,7 @@ FLOORS: dict[str, int] = {
     # rejected output must resolve to "no preamble" and leave the turn alone. An
     # uncovered branch here is a path that could raise into a real request.
     "src/daintree_assistant_server/services/fast_response.py": 91,
-    # The runbook opener gate, which REPLACED the stage above. On this list for a
+    # The runbook confirmation gate, which REPLACED the stage above. On this list for a
     # reason neither security nor reliability: it is the one module whose output
     # is shown to a user VERBATIM, chosen before any model has read anything. A
     # regression is a wrong sentence on a real person's screen, and its rules are
@@ -145,7 +145,7 @@ FLOORS: dict[str, int] = {
     # runner-up is spent unheard" are each one branch. It runs inline on the
     # first-byte path and must never raise, so an uncovered arm is also a path
     # that could take a turn down.
-    "src/daintree_assistant_server/runbooks/openers.py": 100,
+    "src/daintree_assistant_server/runbooks/confirmations.py": 100,
     "src/daintree_assistant_server/state/codec.py": 93,
     # The TRAINING-TRACE plane. It belongs on this list for the same reason the
     # state codec does: it is the code that decides what user content is written

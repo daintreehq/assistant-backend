@@ -14,7 +14,7 @@ whenToUse: >-
   (daintree.workflow.start-work-on-issue for one issue,
   daintree.edits.spawn-visible-agent for one new agent, or
   daintree.orchestration.fan-out-work for injecting context across parallel agents).
-opener: "Context bundle — deliberate selection, not a whole folder swept in"
+confirmation: "Curating a context bundle. The aim is one reference file covering the area asked about, with the selection settled from what the code actually shows rather than guessed at."
 risk: system
 requiredTools:
   - worktree.list

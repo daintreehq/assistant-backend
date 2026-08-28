@@ -21,19 +21,27 @@ RISK_VALUES: frozenset[str] = frozenset(
 
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
-#: Hard ceiling on an opener, in characters.
+#: Hard ceiling on a confirmation, in characters.
 #:
-#: 80 is one line on a narrow terminal, and the bound is the POINT rather than a
-#: guard rail. An earlier revision allowed 400 — two or three sentences — and the
-#: 37 openers written to it averaged 350 characters and 62.6 words. That is about
-#: fifteen seconds of reading dropped into the one second before the answer
-#: starts: the real reply interrupts the reader mid-paragraph, which makes a fast
-#: turn feel slower than no opener at all.
+#: 240 is two sentences, and the number is triangulated rather than chosen. Three
+#: revisions of this catalog bracketed it:
 #:
-#: `tests/unit/test_prompt_budgets.py` also holds a 12-WORD ceiling, which is the
-#: bound that actually bites — 80 characters of short words is still too much to
-#: glance at.
-OPENER_MAX_CHARS = 80
+#: * A 140-char one-line ANNOUNCEMENT ("I'll take a look at the failing check").
+#:   Too thin to say anything, and it duplicated the executor's own opening.
+#: * A 400-char comprehension PARAGRAPH. Measured at 62.6 words and 350
+#:   characters on average — about fifteen seconds of reading in a window that is
+#:   often one second, so the answer arrived mid-paragraph.
+#: * An 80-char CAPTION. Scannable, but too compressed to state a goal; it read
+#:   as cryptic.
+#:
+#: The research settles it at a two-part form (`docs/RUNBOOK_CONFIRMATIONS.md`):
+#: a lead clause that lands inside a 500ms glance, then one sentence of scope
+#: that the rest of the window absorbs. UX-writing practice puts those at 2-4 and
+#: 4-8 words for a TRANSIENT status line; this one PERSISTS in the transcript and
+#: the window runs 0.5-5s depending on prompt-cache warmth, so the second half
+#: can carry a real sentence. `tests/unit/test_prompt_budgets.py` also holds a
+#: 38-word ceiling and a two-sentence shape, which are what actually bite.
+CONFIRMATION_MAX_CHARS = 240
 
 
 class RunbookMeta(BaseModel):
@@ -61,7 +69,7 @@ class RunbookMeta(BaseModel):
     # That reviewer signal is the whole value — do not delete it as dead.
     risk: str = "read"
     required_tools: list[str] = Field(default_factory=list, alias="requiredTools")
-    # The OPENER: a one-line caption shown the instant a user hits Enter, the
+    # The CONFIRMATION: a one-line caption shown the instant a user hits Enter, the
     # first time this runbook is loaded with real confidence. It replaces the
     # Cerebras fast-preamble stage — same slot on screen, same display-only
     # contract — with authored text instead of a second model call.
@@ -78,7 +86,7 @@ class RunbookMeta(BaseModel):
     # **It may not announce, because the executor already does.** The executor
     # opens its own reply with "I'll start by reading the current state…" —
     # measured, and unchanged by three separate attempts to prompt it out of
-    # doing so. An opener that also announces is not a slightly worse opener; it
+    # doing so. A confirmation that also announces is not a slightly worse confirmation; it
     # is a visible duplicate of the line rendering directly beneath it (the CLI
     # joins the two into one bubble), and a reply meant to feel fast reads as
     # padded. Naming the activity as a NOUN PHRASE is what says what is happening
@@ -101,33 +109,33 @@ class RunbookMeta(BaseModel):
     # learns their request was ROUTED, and into which mode. That is actionable —
     # a wrong caption is legibly wrong and they can interrupt at once, where a
     # vague paragraph would have hidden the misroute. This matters because the
-    # 0.90 threshold is not certainty; see `config.RUNBOOK_OPENER_THRESHOLD`.
+    # 0.90 threshold is not certainty; see `config.RUNBOOK_CONFIRMATION_THRESHOLD`.
     #
     # Optional. A domain foundation is paired in without a score and the
     # server-pinned documentation runbook is hidden from the selector, so neither
-    # can ever be shown — an opener on either is dead text, and the tests say so
+    # can ever be shown — a confirmation on either is dead text, and the tests say so
     # in both directions.
     #
     # NOT a selector signal. `selector_view()` does not expose it and
     # `runbooks/local/documents.py` builds its embedding document from
-    # title/summary/whenToUse only, so adding or editing an opener changes no
+    # title/summary/whenToUse only, so adding or editing a confirmation changes no
     # vector and needs no retrain. It DOES enter `content_hash_of` (it is
     # frontmatter), so an edit busts `catalog_revision` — which is correct: a
     # client holding state from before the edit should re-select.
-    opener: str | None = Field(default=None, max_length=OPENER_MAX_CHARS)
+    confirmation: str | None = Field(default=None, max_length=CONFIRMATION_MAX_CHARS)
 
-    @field_validator("opener")
+    @field_validator("confirmation")
     @classmethod
     def _check_opener(cls, v: str | None) -> str | None:
         """One line of plain text, or nothing at all.
 
-        A newline is rejected rather than collapsed: the opener is emitted as a
+        A newline is rejected rather than collapsed: the confirmation is emitted as a
         single ``preamble`` event and a multi-line one would render as a block of
         server-authored text sitting above an answer that has not started. One
         caption on one line is the shape.
 
         An empty-after-strip value is rejected rather than silently becoming
-        ``None`` — ``opener: ""`` in frontmatter is a mistake, and the failure a
+        ``None`` — ``confirmation: ""`` in frontmatter is a mistake, and the failure a
         mistake deserves is a load error, not a runbook that quietly never
         announces.
         """
@@ -135,9 +143,9 @@ class RunbookMeta(BaseModel):
             return None
         text = v.strip()
         if not text:
-            raise ValueError("opener must not be blank; omit the key instead")
+            raise ValueError("confirmation must not be blank; omit the key instead")
         if "\n" in text or "\r" in text:
-            raise ValueError("opener must be a single line")
+            raise ValueError("confirmation must be a single line")
         return text
 
     @field_validator("id")
@@ -236,8 +244,8 @@ class Runbook:
         return self.meta.risk
 
     @property
-    def opener(self) -> str | None:
-        return self.meta.opener
+    def confirmation(self) -> str | None:
+        return self.meta.confirmation
 
     def selector_view(self) -> dict[str, object]:
         """The bounded metadata the selector is allowed to see.

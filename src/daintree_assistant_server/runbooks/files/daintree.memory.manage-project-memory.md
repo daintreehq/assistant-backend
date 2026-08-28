@@ -3,7 +3,7 @@ id: daintree.memory.manage-project-memory
 title: Manage project memory
 summary: Save, recall, correct, pin and forget durable project facts — without hoarding, duplicating, or storing secrets.
 whenToUse: Use when the user asks you to remember something ("remember that we use pnpm", "always run the linter first"), asks what was decided before ("what did we agree about the API shape?", "do you remember why we dropped X?"), wants a saved fact corrected or removed ("forget that", "that's not true any more"), or wants to review, pin or unpin what is stored. Also when you are about to save a fact and should check for an existing one first. Do not use for state that only matters inside this session — a terminal id, a step counter, an in-flight plan (that is the scratch store, per daintree.foundation) — for "where were we?" across sessions (use daintree.orchestration.status-and-resume), or to look something up in the project's CODE rather than in memory (use daintree.explore.repository).
-opener: "Project memory — durable decisions, not this session's working state"
+confirmation: "Managing what this project remembers. The goal is durable decisions and conventions kept accurate and findable later, which is why a correction replaces the old fact rather than sitting beside it."
 risk: local
 requiredTools:
   - memory.recall

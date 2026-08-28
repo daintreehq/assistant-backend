@@ -3,7 +3,7 @@ id: daintree.orchestration.supervise-fleet
 title: Supervise a running agent fleet
 summary: Triage every agent already running — finished, working, waiting, failed, unsupervised — in one state-only sweep, act on each class, and report what still needs the user.
 whenToUse: Use when agents are ALREADY running and the user wants the fleet swept and acted on — "how's everyone doing?", "anything need me?", "is anyone stuck?", "catch me up on the agents". Also for adopting a running-but-unsupervised agent, "show me the next one" navigation, and arming terminals for the user's typed input. Do not use for a plain state read with no action (daintree.foundation), for answering agents that are ASKING (daintree.agents.answer-waiting-agent), for rescuing one broken or hung agent (daintree.agents.recover-agent), for handing out new work (daintree.orchestration.fan-out-work), for "where were we" across sessions (daintree.orchestration.status-and-resume), for proving one agent's work landed (daintree.orchestration.verify-agent-work), for watching past this turn (daintree.orchestration.watch-outcome), or for retitling tabs (daintree.terminals.rename).
-opener: "Fleet triage — working, waiting, finished, failed, or unwatched"
+confirmation: "Checking in on the agents already running. The aim is to say where each one stands and which few need the user, rather than to form a view on the work itself."
 risk: terminal
 requiredTools:
   - context.snapshot

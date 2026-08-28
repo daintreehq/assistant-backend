@@ -3,7 +3,7 @@ id: daintree.agents.recover-agent
 title: Recover a broken agent or spawn
 summary: Triage an agent that went wrong — read the durable spawn saga, tell a hang from a bad id, and adopt an unsupervised agent instead of restarting it.
 whenToUse: Use when something has gone WRONG with an agent or its spawn — "my agent is stuck", "it has been sitting there for ages", "did that agent even start?", "the spawn failed", "nothing happened when you launched it", "that terminal id does not work", "this agent has no watcher on it", "there is an agent running from earlier that nobody is watching", "is it hung or just slow?". Covers a launch that returned no terminalId or an ambiguous result, a hung or unresponsive agent, a stale or mistyped terminal id, and adopting an orphaned or unsupervised agent. Do not use when the agent is healthy and merely ASKING something — answer it with daintree.agents.answer-waiting-agent; for routine triage of a fleet where nothing is broken use daintree.orchestration.supervise-fleet or daintree.orchestration.status-and-resume; to start fresh work use daintree.edits.spawn-visible-agent.
-opener: "Agent recovery — restoring supervision, not restarting the work"
+confirmation: "Recovering an agent that has gone wrong. The aim is to identify which failure this actually is before acting, since a hang, a stale terminal id and a spawn that never landed need different moves."
 risk: terminal
 requiredTools:
   - context.snapshot

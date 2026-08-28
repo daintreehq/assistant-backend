@@ -273,7 +273,7 @@ Runbooks are Markdown procedures that become task-specific operating instruction
 | `summary` | yes | selector signal |
 | `whenToUse` | yes | the *primary* selector signal (camelCase key → `when_to_use`) |
 | `foundation` | no | `true` marks a domain **foundation** runbook; admission pairs it with the specific workflow runbook(s) the selector picks (default `false`) |
-| `opener` | no* | the one-line CAPTION shown the instant the user hits Enter, the first time this runbook loads with real confidence — `<task mode> — <one boundary>`, 6–12 words. **Required in practice** for every selectable runbook (see "Runbook openers" below and `docs/RUNBOOK_OPENERS.md`) |
+| `confirmation` | no* | the TWO SENTENCES shown the instant the user hits Enter, the first time this runbook loads with real confidence — a gerund lead then a scope sentence, at most 38 words. **Required in practice** for every selectable runbook (see "Runbook confirmations" below and `docs/RUNBOOK_CONFIRMATIONS.md`) |
 | `risk` | no | enum: `read local ui terminal project external git system` — **descriptive, not policy** (see below) |
 | `requiredTools` | no | camelCase key → `required_tools` |
 
@@ -281,80 +281,94 @@ Runbooks are Markdown procedures that become task-specific operating instruction
 
 **Pipeline:** `loader.py` parses/validates (strict — a malformed runbook fails `/readyz`, not a request) → `catalog.py` builds the **immutable** catalog and a deterministic `revision` hash → the selector sees only `Runbook.selector_view()`, the public `/runbooks` endpoint sees only `public_view()`, and **neither ever exposes the body** except via injection into the main prompt for active runbooks. Selection is automatic and server-side: the guarantee that `runbook.find`/`runbook.load` are never *offered* is enforced at the request boundary by the reserved-tool-names check in `services/validation.py` (`RESERVED_TOOL_NAMES`, which also covers the `runbook__find`/`runbook__load` wire spellings and the `daintree_internal__` prefix), and the base prompt separately tells the model it does not find, load, or manage runbooks itself (`main/base/30-runbooks.md` — it never names the tools).
 
-### Runbook openers — the cheap replacement for the fast-response stage
+### Runbook confirmations — the cheap replacement for the fast-response stage
 
-Every selectable runbook carries an `opener`: **a one-line caption shown the instant the
-user hits Enter**, the first time that runbook loads in a conversation with real
-confidence. `docs/RUNBOOK_OPENERS.md` is the authoring reference and the thing to read
-before writing one.
+Every selectable runbook carries a `confirmation`: **the two sentences shown the instant
+the user hits Enter**, the first time that runbook loads in a conversation with real
+confidence. `docs/RUNBOOK_CONFIRMATIONS.md` is the authoring reference, carries the
+research it is built on, and is the thing to read before writing one.
 
 ```
-Failure diagnosis — the exact error matters more than the visible symptom
+Diagnosing a failing check. The aim is to get from the symptom to the actual error
+output before proposing anything, since a check name says what failed and not why.
 ```
+
+**The pattern has a name and it is not "announcement".** In spoken-dialogue-systems and
+VUI design this is an **implicit confirmation** — reflecting the parsed intent and
+proceeding, as opposed to an *explicit* confirmation that halts to ask "did you mean X?".
+In Clark & Schaefer's grounding theory it is a **demonstration** of understanding at Level
+3 (meaning). Worth the precision, because "acknowledgement" is a real term in that same
+taxonomy for something WEAKER — a continuer like "OK", evidence at Levels 1–2 that the
+signal was received. A spinner is an acknowledgement; this claims to have understood the
+meaning. That is also the failure mode: a demonstration of the WRONG understanding is
+worse than an acknowledgement that claimed nothing.
 
 **It replaces the Cerebras preamble stage with authored text and a dict lookup.** No call,
 no credential, no second host, no race — so it is emitted with `meta`, *before* the
 executor has opened, which is earlier than the stage it replaces could ever reach.
-`runbooks/openers.py` holds the gate; it is pure, total, and runs inline on the
+`runbooks/confirmations.py` holds the gate; it is pure, total, and runs inline on the
 first-byte path. It rides the existing `preamble` SSE event, inheriting that event's
 display-only contract in the CLI rather than needing a second one.
 
-**It is a RECEIPT, not a sentence,** and the shape — `<task mode> — <one stable boundary>`,
-six to twelve words, noun-led — is forced by two constraints found the expensive way:
+**The form is a lead sentence then a scope sentence**, and the three constraints on it are
+each a revision that failed:
 
-* **It may not announce, because the executor announces anyway.** `main/base/40-communication.md`
-  already forbids an opening orienting clause and names `I'll start by` among the banned
-  openings — and the executor opens with one regardless, measured. The rule is in the
-  prompt and is not obeyed; three FURTHER attempts to prompt it out were built, measured
-  and reverted for changing nothing. The CLI joins the opener and the answer into ONE
-  bubble, so an announcing opener sits directly above the same announcement. That partial
-  also DESCRIBES the opener to the model ("a short caption naming this kind of work is
-  usually already on the user's screen"), so changing the opener's shape means editing it —
-  it said "two or three sentences" while the fast stage produced them.
-* **It may not be prose, because there is no time to read prose.** A revision of this
-  catalog authored these as two-or-three-sentence comprehension paragraphs, in the register
-  the retired stage's own prompt taught. Measured: 62.6 words and 350 characters on
-  average — about fifteen seconds of reading dropped into a one-second window, so the
-  answer arrives mid-paragraph and interrupts the reader. `OPENER_MAX_CHARS` is 80 and the
-  12-word ceiling in `test_prompt_budgets.py` is the one that bites.
+* **It may not announce, because the executor announces anyway.**
+  `main/base/40-communication.md` already forbids an opening orienting clause and names
+  `I'll start by` among the banned openings — and the executor opens with one regardless,
+  measured; three further attempts to prompt it out were built, measured and reverted for
+  changing nothing. The CLI joins the confirmation and the answer into ONE bubble. The
+  gerund lead is what says *what is happening* without competing for that register — and
+  research on anthropomorphic cues adds a second reason: after "I", a failure reads as
+  incompetence rather than as a routing boundary.
+* **It may not be a paragraph.** A revision authored these as two-or-three-sentence
+  comprehension essays: 62.6 words and 350 characters on average, about fifteen seconds of
+  reading in a window that is often one second, so the answer arrived mid-paragraph.
+* **It may not be a caption either.** The next revision cut to 12 words; scannable, but too
+  compressed to state a goal, and it read as cryptic. `CONFIRMATION_MAX_CHARS` is 240 and
+  the 38-word / two-sentence shape in `test_prompt_budgets.py` is what bites.
 
-**Consistency across the catalog is a feature, not repetition to be avoided.** Thirty-seven
-differently-shaped pseudo-insights read as canned text pretending to be bespoke; thirty-seven
-identically-shaped captions read as product UI, and a heavy user starting ten conversations a
-day recognises a caption instead of re-reading it. `test_openers_are_noun_led_captions` and
-`test_opener_task_modes_are_distinct` hold the template.
+**State the GOAL, never the OUTCOME.** "The aim is to…" is the house phrasing. Under
+expectation-disconfirmation theory the penalty for a stated goal the result then misses is
+worse than having stated no goal at all — so a confirmation says what the work is directed
+at, never what it will have achieved. `test_confirmations_state_a_goal_not_an_outcome`
+holds it. The same logic bounds negative scope: a non-goal is a claim, and it is the most
+common way one of these becomes FALSE for a legitimate variant of the request, so it is
+used only where it resolves a confusion a reader plausibly has.
 
 What it buys is the only information available at that instant: the request was **routed,
-and into which mode**. That is actionable — a wrong caption is legibly wrong and the user
-can interrupt at once, where a vague paragraph hides the misroute.
+and into which kind of work** — actionable, because a confirmation naming the wrong kind
+is visibly wrong and the reader can interrupt rather than wait out the wrong answer (Lee &
+See 2004 on calibrated trust).
 
-**Three gate rules, each because the simpler version is wrong** (all in `openers.py`):
+**Three gate rules, each because the simpler version is wrong** (all in `confirmations.py`):
 
-* **A score floor** (`config.RUNBOOK_OPENER_THRESHOLD`, 0.90 — far above the 0.65
-  admission floor). Admission is recall-biased on purpose; announcing at that bar would
-  caption a turn on the strength of a coin flip. The value is measured, and the
+* **A score floor** (`config.RUNBOOK_CONFIRMATION_THRESHOLD`, 0.95 — far above the 0.65
+  admission floor). Admission is recall-biased on purpose; confirming at that bar would put
+  a confident sentence in front of the user on a coin flip. The value is measured, and the
   measurement's own finding is that **the knob is weak**: the head saturates near 1.0 for
-  right and wrong picks alike (median 1.000 for required runbooks, 0.964 for non-required),
-  so everything above 0.90 buys a wrong caption by spending a right one — ~11% of captions
-  name a runbook the case did not require. What contains that is the caption being SHORT
-  enough to check at a glance, not the threshold. Raising the constant is the wrong response
-  to a bad opener.
-* **Once per runbook per conversation.** The announced set rides the signed state token
+  right and wrong picks alike (median 1.000 for required runbooks, 0.964 for non-required).
+  0.95 is the last value that costs nothing; 0.99 buys five fewer wrong by spending three
+  right ones. What contains the residual is the TEXT, not the threshold.
+* **Once per runbook per conversation.** The set rides the signed state token
   (`StatePayload.announced_runbooks`), because Cloud Run holds no session state and an
-  instance-local set would re-announce whenever a round landed elsewhere.
-* **A near-miss is NOT written off.** A runbook loaded *below* the floor keeps its opener
-  for a later turn that actually commits to the topic. When several clear the floor, one
-  speaks and **the rest are spent** — the runner-up describes the same turn, so the
-  alternative to suppressing it is repeating it.
+  instance-local set would re-confirm whenever a round landed elsewhere.
+* **A near-miss is NOT written off.** A runbook scored *below* the floor keeps its
+  confirmation for a later turn that commits — and eligibility is the SCORED ACTIVE set
+  rather than the newly-loaded one, because a runbook admitted at 0.80 stays active and
+  would otherwise never become eligible again. When several clear the floor, one speaks and
+  **the rest are spent** — the runner-up describes the same turn, so the alternative to
+  suppressing it is repeating it.
 
 A runbook with no score can never speak, which is what silently exempts a paired domain
 foundation and the server-pinned docs runbook without this module knowing how either got
-into the set. Sub-agents never announce (nobody is reading), and neither does the
-non-streaming path (there is no gap to fill).
+into the set. Sub-agents never confirm (nobody is reading), and neither does the
+non-streaming path — which must also not SPEND the confirmation, or the next streaming turn
+goes quiet about a runbook the user was never told about.
 
 **To add a runbook:**
 1. Create `runbooks/files/<id>.md` (it is auto-discovered, sorted by id — no registration).
-   **Write its `opener`** — `docs/RUNBOOK_OPENERS.md` first; `test_every_user_facing_runbook_has_an_opener`
+   **Write its `confirmation`** — `docs/RUNBOOK_CONFIRMATIONS.md` first; `test_every_user_facing_runbook_has_an_opener`
    fails a runbook that ships without one, because the only symptom otherwise is the
    product going quiet for that one kind of request.
 2. Run `pytest tests/unit` (~5s, no API calls). A new runbook trips more than the loader/catalog tests: `test_prompt_budgets.py` (body size ceilings, no pipe tables, a Report-back line), `test_runbook_catalog_hygiene.py` (every `requiredTools` name exists in the CLI tool-registry snapshot at `tests/fixtures/cli_tool_names.txt` — its header has the regeneration recipe against the pinned `cli/` submodule), and `test_prompt_budgets.py`'s house-style sweep over the packaged catalog. Do **not** try to narrow this with `pytest -k`: the obvious concern-named filter (`-k "catalog or budget or house"`) matches no loader test name or module and silently deselects all 14 of them. Run the directory, or list the files without a filter.

@@ -1,4 +1,4 @@
-"""The runbook opener gate — what speaks, what is written off, what stays quiet.
+"""The runbook confirmation gate — what speaks, what is written off, what stays quiet.
 
 The mechanism replaces the Cerebras fast-preamble stage, so the properties worth
 pinning are the ones that made that stage safe: the line is shown at most once,
@@ -11,24 +11,24 @@ from __future__ import annotations
 import pytest
 
 from daintree_assistant_server.runbooks.catalog import Catalog
-from daintree_assistant_server.runbooks.models import Runbook, RunbookMeta
-from daintree_assistant_server.runbooks.openers import (
+from daintree_assistant_server.runbooks.confirmations import (
     CAP_ANNOUNCED_RUNBOOKS,
     choose_opener,
     fold_announced,
 )
+from daintree_assistant_server.runbooks.models import Runbook, RunbookMeta
 
 THRESHOLD = 0.90
 
 
-def _runbook(rid: str, *, opener: str | None = None, foundation: bool = False) -> Runbook:
+def _runbook(rid: str, *, confirmation: str | None = None, foundation: bool = False) -> Runbook:
     return Runbook(
         meta=RunbookMeta(
             id=rid,
             title=rid,
             summary="s",
             whenToUse="w",
-            opener=opener,
+            confirmation=confirmation,
             foundation=foundation,
         ),
         body="body\n\nReport back.\n",
@@ -54,7 +54,7 @@ def _choose(**kwargs: object):  # type: ignore[no-untyped-def]
 
 
 def test_a_confident_first_load_speaks() -> None:
-    catalog = _catalog(_runbook("a.one", opener="I'll take a look."))
+    catalog = _catalog(_runbook("a.one", confirmation="I'll take a look."))
     decision = _choose(
         scored_active_ids=["a.one"], scores={"a.one": 0.97}, catalog=catalog
     )
@@ -70,7 +70,7 @@ def test_the_threshold_is_inclusive() -> None:
     chose — a runbook at exactly the configured confidence should behave like the
     configured confidence, rather than racing its own boundary in a float.
     """
-    catalog = _catalog(_runbook("a.one", opener="hi"))
+    catalog = _catalog(_runbook("a.one", confirmation="hi"))
     assert _choose(
         scored_active_ids=["a.one"], scores={"a.one": THRESHOLD}, catalog=catalog
     ).text == "hi"
@@ -82,11 +82,11 @@ def test_the_threshold_is_inclusive() -> None:
 def test_a_near_miss_is_neither_shown_nor_written_off() -> None:
     """The rule that makes the floor a statement about CERTAINTY.
 
-    A runbook loaded below the floor keeps its opener for a later turn that
+    A runbook loaded below the floor keeps its confirmation for a later turn that
     actually commits to the topic. Writing it off here would let one vague
     mention burn the announcement.
     """
-    catalog = _catalog(_runbook("a.one", opener="hi"))
+    catalog = _catalog(_runbook("a.one", confirmation="hi"))
     decision = _choose(
         scored_active_ids=["a.one"], scores={"a.one": 0.80}, catalog=catalog
     )
@@ -95,7 +95,7 @@ def test_a_near_miss_is_neither_shown_nor_written_off() -> None:
 
 
 def test_an_already_announced_runbook_stays_quiet() -> None:
-    catalog = _catalog(_runbook("a.one", opener="hi"))
+    catalog = _catalog(_runbook("a.one", confirmation="hi"))
     decision = _choose(
         scored_active_ids=["a.one"],
         scores={"a.one": 1.0},
@@ -114,9 +114,9 @@ def test_only_the_top_speaks_and_the_rest_are_written_off() -> None:
     was live when the user was first told what the turn was about.
     """
     catalog = _catalog(
-        _runbook("a.one", opener="first"),
-        _runbook("a.two", opener="second"),
-        _runbook("a.three", opener="third"),
+        _runbook("a.one", confirmation="first"),
+        _runbook("a.two", confirmation="second"),
+        _runbook("a.three", confirmation="third"),
     )
     decision = _choose(
         scored_active_ids=["a.two", "a.one", "a.three"],
@@ -129,7 +129,7 @@ def test_only_the_top_speaks_and_the_rest_are_written_off() -> None:
 
 
 def test_a_tie_is_broken_deterministically() -> None:
-    catalog = _catalog(_runbook("a.zzz", opener="z"), _runbook("a.aaa", opener="a"))
+    catalog = _catalog(_runbook("a.zzz", confirmation="z"), _runbook("a.aaa", confirmation="a"))
     for order in (["a.zzz", "a.aaa"], ["a.aaa", "a.zzz"]):
         decision = _choose(
             scored_active_ids=order,
@@ -150,8 +150,8 @@ def test_an_unscored_runbook_never_speaks() -> None:
     that without this module knowing how either of them got into the set.
     """
     catalog = _catalog(
-        _runbook("a.one", opener="specific"),
-        _runbook("a.base", opener="foundation", foundation=True),
+        _runbook("a.one", confirmation="specific"),
+        _runbook("a.base", confirmation="foundation", foundation=True),
     )
     decision = _choose(
         scored_active_ids=["a.one", "a.base"],
@@ -169,7 +169,7 @@ def test_a_reused_active_set_announces_nothing() -> None:
     all at once — none of them ran the selector, so ``scores`` is empty and the
     gate falls out with no special case for any of them.
     """
-    catalog = _catalog(_runbook("a.one", opener="hi"))
+    catalog = _catalog(_runbook("a.one", confirmation="hi"))
     assert _choose(scored_active_ids=[], scores={}, catalog=catalog).text is None
 
 
@@ -184,7 +184,7 @@ def test_a_runbook_with_no_opener_is_silent_and_not_written_off() -> None:
 
 
 def test_a_score_for_an_unknown_id_cannot_speak() -> None:
-    catalog = _catalog(_runbook("a.one", opener="hi"))
+    catalog = _catalog(_runbook("a.one", confirmation="hi"))
     decision = _choose(
         scored_active_ids=["a.gone"], scores={"a.gone": 1.0}, catalog=catalog
     )
@@ -258,11 +258,11 @@ def test_the_cap_drops_the_oldest() -> None:
 
 
 def test_every_packaged_opener_is_reachable_by_the_gate() -> None:
-    """An opener on a runbook the gate can never score is dead text.
+    """A confirmation on a runbook the gate can never score is dead text.
 
     A FOUNDATION is paired in by admission rather than ranked, and a
     SERVER-PINNED runbook is hidden from the selector entirely, so neither can
-    ever carry a score — an opener on one would ship, cost bytes in every
+    ever carry a score — a confirmation on one would ship, cost bytes in every
     content hash, and never once be shown.
     """
     from daintree_assistant_server.config import DOCS_RUNBOOK_ID
@@ -270,15 +270,15 @@ def test_every_packaged_opener_is_reachable_by_the_gate() -> None:
 
     catalog = load_catalog()
     for runbook in catalog.runbooks:
-        if runbook.opener is None:
+        if runbook.confirmation is None:
             continue
         assert not runbook.meta.foundation, (
-            f"{runbook.id} is a domain foundation and carries an opener, which can "
+            f"{runbook.id} is a domain foundation and carries a confirmation, which can "
             "never be shown: admission pairs a foundation in without a score"
         )
         assert runbook.id != DOCS_RUNBOOK_ID, (
             f"{runbook.id} is server-pinned and hidden from the selector, so it is "
-            "never scored and its opener can never be shown"
+            "never scored and its confirmation can never be shown"
         )
 
 
@@ -296,7 +296,7 @@ def test_the_gate_is_total_over_the_packaged_catalog(threshold: float) -> None:
         catalog=catalog,
         threshold=threshold,
     )
-    assert decision.text is None or decision.text in {r.opener for r in catalog.runbooks}
+    assert decision.text is None or decision.text in {r.confirmation for r in catalog.runbooks}
 
 
 def test_a_near_miss_recovers_even_while_it_stays_active() -> None:
@@ -305,11 +305,11 @@ def test_a_near_miss_recovers_even_while_it_stays_active() -> None:
     Eligibility used to be the turn's NEWLY LOADED ids. A runbook admitted at
     0.80 stays in the active set, so a later instruction re-scoring it at 0.97
     found it absent from that list and its caption was suppressed permanently —
-    the exact opposite of what a floor that "keeps its opener for a later turn"
+    the exact opposite of what a floor that "keeps its confirmation for a later turn"
     is supposed to mean. Reading the SCORED ACTIVE set instead is what makes the
     documented rule true.
     """
-    catalog = _catalog(_runbook("a.one", opener="hi"))
+    catalog = _catalog(_runbook("a.one", confirmation="hi"))
     # Turn one: admitted, below the floor, nothing shown or spent.
     first = _choose(
         scored_active_ids=["a.one"], scores={"a.one": 0.80}, catalog=catalog
@@ -334,7 +334,7 @@ def test_a_nan_score_cannot_clear_the_floor() -> None:
     makes the floor mean what it says.
     """
     catalog = _catalog(
-        _runbook("a.nan", opener="from nowhere"), _runbook("a.real", opener="earned")
+        _runbook("a.nan", confirmation="from nowhere"), _runbook("a.real", confirmation="earned")
     )
     decision = _choose(
         scored_active_ids=["a.nan", "a.real"],
@@ -351,7 +351,7 @@ async def test_the_real_selector_reports_a_score_per_admitted_runbook() -> None:
 
     `ScriptedSelector` fills `scores` with one scalar for every selected id, so a
     production regression that returned `{}` — or copied the top confidence to
-    every runbook — would leave every opener integration test green while the
+    every runbook — would leave every confirmation integration test green while the
     gate lost its per-runbook input. Only a test against `LocalSelector` itself
     catches that, so this asserts the two properties the gate actually depends
     on: every admitted id HAS a score, and the scores are read from the ballot
@@ -364,8 +364,8 @@ async def test_the_real_selector_reports_a_score_per_admitted_runbook() -> None:
     from daintree_assistant_server.runbooks.local.setwise import Selection
 
     catalog = _catalog(
-        _runbook("a.one", opener="Mode one — a boundary worth stating here"),
-        _runbook("a.two", opener="Mode two — a different boundary stated here"),
+        _runbook("a.one", confirmation="Mode one — a boundary worth stating here"),
+        _runbook("a.two", confirmation="Mode two — a different boundary stated here"),
     )
     selection = Selection(
         runbook_ids=["a.one", "a.two"],

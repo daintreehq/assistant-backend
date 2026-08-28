@@ -266,7 +266,7 @@ class LocalSelector:
                 if sid in catalog.selectable_ids
             ],
             # Read from the FULL ballot, not from `result.scores` — that one is
-            # the top five, kept for a log line, and the opener gate needs a
+            # the top five, kept for a log line, and the confirmation gate needs a
             # score for every admitted id. At the shipped cap of three they
             # almost always coincide; "almost always" is not a property to
             # build a user-visible behaviour on, and a runbook admitted at rank

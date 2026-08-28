@@ -61,7 +61,7 @@ async def capabilities(
             # never expected it.
             "fast_response": {
                 # Always on, and it describes the EVENT rather than either
-                # producer. Two things can send a `preamble`: the runbook opener
+                # producer. Two things can send a `preamble`: the runbook confirmation
                 # (authored frontmatter, live) and the second-model fast stage
                 # (`config.FAST_RESPONSE_ENABLED`, currently False). Reporting
                 # the stage's flag here would tell a client `false` while the

@@ -865,7 +865,7 @@ characters; treat the field as arbitrary-length prose and wrap it.
 There are two producers behind this one event, and a client cannot tell them apart
 — deliberately, since the display contract below is identical for both:
 
-* **The runbook opener** (what a current backend sends). Authored text carried in
+* **The runbook confirmation** (what a current backend sends). Authored text carried in
   the frontmatter of the runbook the turn selected, emitted the moment `meta` is
   out, before the executor has even opened. Chosen by a confidence threshold and
   shown at most **once per runbook per conversation**, so a turn that continues an
@@ -890,7 +890,7 @@ what the request is taken to BE, never what is about to be done.
 `provisional` and `commit_on` are still on the payload for clients that already
 read them. A client following the rule above never reaches a commit.
 
-**At most one per turn, and never after the first `delta`.** A runbook opener is a
+**At most one per turn, and never after the first `delta`.** A runbook confirmation is a
 lookup, so it is always ready before the executor opens. A fast-response preamble
 is raced against the executor and DROPPED if the answer starts first. Either way a
 client never has to decide what to do with one that arrives late — it simply will
@@ -902,7 +902,7 @@ whether either producer ran, was withheld, or is switched off entirely.
 `/v1/daintree/capabilities` reports `respond.fast_response.enabled`, and it is
 `true` on a current backend. **It describes the EVENT, not either producer**:
 the second-model stage is switched off today, and the flag stays `true` because
-runbook openers still send this event. So it cannot be used to detect which
+runbook confirmations still send this event. So it cannot be used to detect which
 producer you are talking to, and there is deliberately no field that can — the
 display contract is identical either way. Read the flag rather than assuming
 it, but implement the event whenever it is `true`.

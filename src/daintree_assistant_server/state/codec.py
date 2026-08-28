@@ -141,7 +141,7 @@ class StateCodec:
         # Same omit-when-empty rule, and here it is worth more than bytes: the
         # overwhelming majority of turns never announce anything, so this key is
         # absent from most tokens in a conversation and every token in a
-        # conversation that loads no runbook with an opener.
+        # conversation that loads no runbook with a confirmation.
         announced = list(announced_runbooks)
         if announced:
             payload["announced_runbooks"] = announced

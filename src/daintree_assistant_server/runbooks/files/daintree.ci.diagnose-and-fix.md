@@ -3,7 +3,7 @@ id: daintree.ci.diagnose-and-fix
 title: Diagnose and fix a failing check
 summary: Take a red test, build or PR check from symptom to verified green — evidence first, fix second, independent verification last.
 whenToUse: Use when something is FAILING and the user wants it working — "the tests are failing", "why is CI red", "the build broke", "this check won't pass", "fix the failing test", "is this flaky?" — including the fix-and-verify loop that follows. Do not use to judge the quality of a change that already passes (use daintree.review.review-change), to confirm an agent did what it claimed (use daintree.orchestration.verify-agent-work), to read a PR's review state or comment on its issue without a failure to fix (use daintree.workflow.follow-up-on-issue), to ready a branch for review (use daintree.workflow.prep-branch-for-review), or when the "failure" is Daintree itself misbehaving rather than the project (use daintree.diagnostics).
-opener: "Failure diagnosis — the exact error matters more than the visible symptom"
+confirmation: "Diagnosing a failing check. The aim is to get from the symptom to the actual error output before proposing anything, since a check name says what failed and not why."
 risk: project
 requiredTools:
   - context.snapshot

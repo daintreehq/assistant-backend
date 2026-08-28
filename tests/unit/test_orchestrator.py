@@ -728,8 +728,8 @@ async def test_stream_meta_is_yielded_before_upstream_open(
 
     second = await anext(outcome.stream)
     if second.startswith("event: preamble\n"):
-        # The runbook opener, when the selected runbook carries one at this
-        # confidence (`runbooks/openers.py`). It is authored text and a dict
+        # The runbook confirmation, when the selected runbook carries one at this
+        # confidence (`runbooks/confirmations.py`). It is authored text and a dict
         # lookup, so it costs no call — asserted here rather than skipped
         # because "arrives before the provider is even opened" is the property
         # that makes it worth having at all, and it is the same property this

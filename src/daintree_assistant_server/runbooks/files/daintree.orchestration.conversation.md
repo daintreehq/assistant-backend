@@ -3,7 +3,7 @@ id: daintree.orchestration.conversation
 title: Facilitate a live agent conversation
 summary: Relay a live back-and-forth conversation among two or more agents, giving each the floor in turn and catching it up on what the others said since it last spoke while you drive the rounds.
 whenToUse: Use when the user asks you to facilitate, host, relay, moderate, or keep going a live back-and-forth conversation between TWO OR MORE agents — “get them talking,” “let them talk to each other,” “facilitate a conversation,” “have a group chat/roundtable/panel discussion,” “have the three of them hash it out,” or “see where it goes.” Participant count is just a parameter of this runbook. Do not use for a one-shot question to one agent (use daintree.agents.ask-and-relay), an independent poll with no cross-talk (use daintree.agents.poll-pinned-agents), a judged interview that names a winner (use daintree.orchestration.interview), a scored competition or vote (use daintree.orchestration.competition), a post-tie runoff (use daintree.orchestration.runoff-tiebreaker), a debate that ends by voting a position off (use daintree.orchestration.debate-elimination), or several agents collaborating toward ONE synthesized answer or convergence rather than an open-ended visible dialogue (use daintree.orchestration.multi-agent).
-opener: "Relayed dialogue — agents hear each other only when given the floor"
+confirmation: "Hosting a live conversation between agents. The aim is to keep an open-ended discussion moving round by round, since the agents cannot hear each other except through what gets relayed."
 risk: project
 requiredTools:
   - context.snapshot

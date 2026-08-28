@@ -213,42 +213,40 @@ __all__ = [
 # behaviour rather than breaking the turn.
 DOCS_RUNBOOK_ID = "daintree.docs.answer-usage-question"
 
-#: The score a NEWLY-LOADED runbook must reach before its ``opener`` is shown.
+#: The score a runbook must reach before its ``confirmation`` is shown.
 #:
 #: Hardcoded beside the model ids, and for the same reason: whether the product
-#: announces itself is a product decision with one right answer, not an
-#: operational dial. See ``runbooks/openers.py`` for what the gate does with it.
+#: confirms what it understood is a product decision with one right answer, not
+#: an operational dial. See ``runbooks/confirmations.py`` for the gate.
 #:
-#: **0.90 is chosen from a measurement, and the measurement's main finding is
-#: that this knob is weak.** Run over the 177-case routing corpus (173 turns
-#: reach the classifier), scoring what the gate would actually announce — the
-#: top-ranked newly-loaded non-foundation runbook:
+#: **The measurement's main finding is that this knob is weak.** Over the
+#: 177-case routing corpus (173 turns reach the classifier), scoring what the
+#: gate would actually show — the top-ranked scored, non-foundation runbook:
 #:
-#: ===========  =========  =======  =====  ================
-#: threshold    announces  correct  wrong  correct silenced
-#: ===========  =========  =======  =====  ================
-#: 0.00         135        118      16     0
-#: 0.90         134        118      15     0
-#: 0.99         127        116      10     3
-#: ===========  =========  =======  =====  ================
+#: ===========  =====  =======  =====  ================
+#: threshold    shows  correct  wrong  correct silenced
+#: ===========  =====  =======  =====  ================
+#: 0.00         135    118      16     0
+#: 0.90         134    118      15     0
+#: 0.95         133    118      14     0
+#: 0.99         127    116      10     3
+#: ===========  =====  =======  =====  ================
 #:
 #: The head is saturated: the median score is 1.000 for runbooks the case
 #: REQUIRED and 0.964 for ones it did not, so no floor separates them cleanly.
-#: Everything above 0.90 buys a wrong announcement by spending a right one, which
-#: is a bad trade for a cosmetic line. 0.90 is therefore the last value that costs
-#: nothing — well clear of the 0.65 admission floor, so a runbook the selector
-#: merely tolerated stays quiet, while the confident majority still speaks.
+#: 0.95 is the last value that costs NOTHING — it keeps every correct
+#: confirmation and trims one wrong one against 0.90. Above it the trade
+#: inverts: 0.99 buys five fewer wrong by spending three right ones, and goes
+#: quiet on six more turns.
 #:
-#: What actually contains the residual ~11% is the OPENER TEXT, not this number.
-#: An opener is required to be generic enough to remain true of any turn its
-#: runbook plausibly answers (``RunbookMeta.opener``), so a misroute produces a
-#: vague-but-honest line rather than a confident wrong one. Raising this constant
-#: is the wrong response to a bad opener; rewriting the opener is the right one.
-#:
-#: Re-measure with ``scratch``-style access to ``benchmarks.runbook_selection``
-#: after a selector retrain — a recalibrated head moves this table, and the
-#: corpus is the only place the shape is visible.
-RUNBOOK_OPENER_THRESHOLD = 0.90
+#: What contains the residual is the confirmation TEXT, not this number. It
+#: states scope and intent rather than a promised outcome, and it is short enough
+#: to check at a glance — so a misroute is legibly wrong early enough to
+#: interrupt, which is the failure this gate is tuned around (Lee & See 2004 on
+#: calibrated trust; Oliver's expectation-disconfirmation theory on the cost of
+#: over-promising). Raising this constant is the wrong response to a bad
+#: confirmation; rewriting the confirmation is the right one.
+RUNBOOK_CONFIRMATION_THRESHOLD = 0.95
 
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
 # There is one optimum and the server ships it.

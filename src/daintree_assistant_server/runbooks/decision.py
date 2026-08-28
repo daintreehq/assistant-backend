@@ -76,7 +76,7 @@ class SelectionDecision:
     #:
     #: ``confidence`` is this dict's top entry and is deliberately not a
     #: substitute: it answers "how sure was the selector about this TURN", while
-    #: the opener gate (``runbooks/openers.py``) has to ask the question one
+    #: the confirmation gate (``runbooks/confirmations.py``) has to ask the question one
     #: runbook at a time — a turn that loads a workflow at 0.97 and drags a
     #: second in at 0.41 should announce one of them, and a single number cannot
     #: express that.

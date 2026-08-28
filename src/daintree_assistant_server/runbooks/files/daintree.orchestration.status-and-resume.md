@@ -3,7 +3,7 @@ id: daintree.orchestration.status-and-resume
 title: Status sweep, ledger hygiene and session resume
 summary: Reconstruct what is in flight across turns and sessions from the workflow ledger, live supervisors and session history — then close the stale ledger rows nothing else will.
 whenToUse: Use when the user asks where were we, what was I working on, catch me up, what is still open or in flight, what happened while I was away, or to pick up / resume something from an earlier session. Also for the workflow list or ledger itself — why it still shows finished work as active, tidying stale rows, recording a PR onto a row — and for after-the-fact forensics over the audit log. Do not use for a plain what-exists-now read of terminals, worktrees or queues (daintree.foundation), to triage the agents running this minute (daintree.orchestration.supervise-fleet), to set up a watcher or timer that wakes you later (daintree.orchestration.watch-outcome), to verify one agent's output (daintree.orchestration.verify-agent-work), to close terminals or delete worktrees (daintree.orchestration.workspace-cleanup), or to start an issue (daintree.workflow.start-work-on-issue).
-opener: "Session reorientation — what is still live, not what looks open"
+confirmation: "Picking up where the work was left. The aim is an honest picture of what is still live across sessions, since a record left open is not evidence that anything is still running."
 risk: project
 requiredTools:
   - context.snapshot

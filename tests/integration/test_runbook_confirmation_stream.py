@@ -1,6 +1,6 @@
-"""The runbook opener on a real stream: what a client actually receives.
+"""The runbook confirmation on a real stream: what a client actually receives.
 
-The gate's rules are unit-tested in ``tests/unit/test_runbook_openers.py``. What
+The gate's rules are unit-tested in ``tests/unit/test_runbook_confirmations.py``. What
 is tested HERE is the half that only exists on the wire: that the line reaches
 the client as a ``preamble`` event ahead of any model output, that the announce-
 once rule survives a round trip through the SIGNED STATE TOKEN (the only place
@@ -15,13 +15,13 @@ from typing import Any
 from conftest import parse_sse, respond_body
 from fakes import selection_result
 
-#: A real packaged runbook with a real opener, so this suite grades the shipped
-#: catalog rather than a fixture. If its opener is edited, this still passes —
+#: A real packaged runbook with a real confirmation, so this suite grades the shipped
+#: catalog rather than a fixture. If its confirmation is edited, this still passes —
 #: the assertion reads the catalog.
 RUNBOOK = "daintree.explore.repository"
-#: A real packaged runbook with NO opener: it is the domain foundation, which
+#: A real packaged runbook with NO confirmation: it is the domain foundation, which
 #: admission pairs in without a score. It is the natural negative case and it
-#: cannot rot into a positive one without `test_runbook_openers.py` failing.
+#: cannot rot into a positive one without `test_runbook_confirmations.py` failing.
 SILENT_RUNBOOK = "daintree.foundation"
 #: A second scored runbook, used to displace the first. A topic shift replaces
 #: the active set, so selecting this one evicts RUNBOOK — which is what makes a
@@ -31,8 +31,8 @@ OTHER_RUNBOOK = "daintree.terminals.rename"
 
 def _opener_text(client: Any, runbook_id: str = RUNBOOK) -> str:
     runbook = client.app.state.container.catalog_manager.catalog.get(runbook_id)
-    assert runbook is not None and runbook.opener
-    return runbook.opener
+    assert runbook is not None and runbook.confirmation
+    return runbook.confirmation
 
 
 def _turn(
@@ -60,7 +60,7 @@ def test_a_confident_first_load_streams_its_opener_before_any_output(
 ) -> None:
     """The whole feature, on the wire.
 
-    Order is the point: the opener must precede every ``delta``, because its only
+    Order is the point: the confirmation must precede every ``delta``, because its only
     value is filling the gap before the answer starts. It rides ``preamble`` so it
     inherits that event's display-only contract in the CLI — see the long comment
     at the emission site for why a second event type would be worse.
@@ -176,7 +176,7 @@ def test_a_token_that_is_not_handed_back_re_announces(
 ) -> None:
     """The converse, so the test above cannot pass for the wrong reason.
 
-    Without this, a bug that suppressed EVERY opener after the first turn — a
+    Without this, a bug that suppressed EVERY confirmation after the first turn — a
     stuck flag, a mis-scoped guard — would look identical to the announce-once
     rule working.
     """
@@ -223,7 +223,7 @@ def test_the_non_streaming_path_announces_nothing(
     """There is no gap to fill.
 
     A non-streaming turn delivers one body when the answer is finished, so an
-    opener would arrive at the same instant as the thing it was covering for.
+    confirmation would arrive at the same instant as the thing it was covering for.
     The body must carry no trace of one — the field does not exist on the wire
     contract, and this pins that it stays that way.
     """
@@ -284,7 +284,7 @@ def test_resolve_reissues_the_token_without_forgetting_what_was_announced(
     ``announced_runbooks`` would forget every caption the conversation had shown.
     The announce-once rule would then hold everywhere except behind an endpoint
     that never announces anything — and the symptom, a runbook re-announcing
-    minutes later, points at the opener gate rather than at the endpoint that
+    minutes later, points at the confirmation gate rather than at the endpoint that
     actually erased its memory.
 
     The action is ``clear``, and it has to be. A ``load`` leaves the runbook in

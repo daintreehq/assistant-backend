@@ -3,7 +3,7 @@ id: daintree.orchestration.competition
 title: Orchestrate a competition or peer-judging among agents
 summary: 'Run a scored contest among several named agents: ask each for one independent submission, relay all submissions for blind peer votes, tally the points, and declare the winner or tie — you run the ballot, the agents (or a neutral judge agent) supply the verdict.'
 whenToUse: 'Use when the user names several agents (or the fleet) and asks each to produce one independent submission — an interesting fact, a design idea, a quick answer — and then wants them scored: award points, send each agent the others'' submissions, ask each to pick the best, tally, declare a winner. The signal is two-stage: the agents'' OWN submissions become the ballot they peer-judge. A vote over options YOU supplied, even one scored and tallied, is a fleet poll, not a competition. Do not use when each agent instead gets its own unit of real work (daintree.orchestration.fan-out-work), for a judge-led interview (interview runbook), a fleet poll with no scoring (poll-pinned-agents), collaborative debate toward one synthesized answer (multi-agent), a debate that ends by voting a position off (debate-elimination), or a runoff after a tie (runoff-tiebreaker).'
-opener: "Scored contest — entries judged blind by their own authors"
+confirmation: "Running a scored contest between agents. The aim is to rank entries the agents wrote themselves and report who came out ahead, judged on merit rather than on authorship."
 risk: project
 requiredTools:
   - context.snapshot

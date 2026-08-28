@@ -3,7 +3,7 @@ id: daintree.runtime.debug-web-app
 title: Debug an existing Daintree dev preview
 summary: Diagnose runtime failures in an already-open dev-preview panel from console evidence, delegate the fix, reload or restart deliberately, and verify only new navigation output.
 whenToUse: Use when the user asks to debug a web app that is already open in Daintree Dev Preview, inspect browser console errors, fix a runtime rendering failure, reload after a frontend fix, or investigate why an existing preview is broken. Also use when the user asks to start or visually inspect a preview so the assistant can state the current MCP limitation accurately. Do not use for ordinary test/build CI failures without a browser runtime symptom (use daintree.ci.diagnose-and-fix), a deployed-site research question, or general code exploration (use daintree.explore.repository).
-opener: "Preview debugging — console evidence, never the rendered page"
+confirmation: "Debugging the dev preview. The aim is a diagnosis grounded in what the console actually recorded, with any fix judged only on output produced after the page reloads."
 risk: system
 requiredTools:
   - context.snapshot

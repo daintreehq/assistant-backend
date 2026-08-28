@@ -1,18 +1,18 @@
 """Which runbook, if any, gets to say one line before the answer starts.
 
-This is the RUNBOOK OPENER, and it replaces the Cerebras fast-preamble stage on
+This is the RUNBOOK CONFIRMATION, and it replaces the Cerebras fast-preamble stage on
 the same slot on screen and under the same display-only contract. The difference
 is where the sentence comes from: the preamble was written per turn by a second
-model on a second host, racing the executor's first byte; an opener is authored
+model on a second host, racing the executor's first byte; a confirmation is authored
 once in a runbook's frontmatter and chosen by a dict lookup. No call, no
 credential, no race, no failure mode — so it lands with `meta`, before the
 executor has opened, which is earlier than the stage it replaces could ever
 reach.
 
 That trade is only sound because of what the sentence is allowed to say. A
-model-written preamble could describe THIS request; an opener is picked off a
+model-written preamble could describe THIS request; a confirmation is picked off a
 classifier score before anything has been read, so it can only describe the SHAPE
-of the work. `RunbookMeta.opener` carries the rule authors have to write to.
+of the work. `RunbookMeta.confirmation` carries the rule authors have to write to.
 
 **The gate is per-runbook, and it is announce-once.** Three rules, and each one
 exists because the obvious simpler version is wrong:
@@ -112,7 +112,7 @@ def choose_opener(
     catalog: Catalog,
     threshold: float,
 ) -> OpenerDecision:
-    """Pick at most one opener for this turn.
+    """Pick at most one confirmation for this turn.
 
     ``scored_active_ids`` is the turn's active set narrowed to what the selector
     actually RANKED. Deliberately not "newly loaded": the two are the same list
@@ -150,13 +150,13 @@ def choose_opener(
         runbook = catalog.get(sid)
         if runbook is None:
             continue
-        opener = runbook.opener
-        if not opener:
+        confirmation = runbook.confirmation
+        if not confirmation:
             # Above the floor and deliberately silent. NOT written off: there is
             # nothing to spend, and recording it would grow the token for a
             # runbook that can never produce a line.
             continue
-        qualified.append((score, sid, opener))
+        qualified.append((score, sid, confirmation))
 
     if not qualified:
         return OpenerDecision()

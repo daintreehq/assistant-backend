@@ -3,7 +3,7 @@ id: daintree.agents.ask-and-relay
 title: Ask an agent and relay its answer
 summary: Spawn a configured agent in read-only mode, ask it a question, wait for completion, and report its answer cleanly.
 whenToUse: 'Use when the user wants ONE agent asked ONE question and its answer brought back — "ask claude what it makes of the retry logic", "get an agent to look at the auth module and tell me what it finds", "spawn something to check X and report back". The signal is that the DELIVERABLE IS THE ANSWER, relayed this turn — read-only, one spawn, one in-turn wait, no watcher. Do not use when the deliverable is WORK rather than an answer — implementing, refactoring, fixing, or an investigation the user wants to watch and steer (use daintree.edits.spawn-visible-agent); to poll the pinned or configured fleet (daintree.agents.poll-pinned-agents); for multi-round debate, a scored competition or a judged interview (the relevant daintree.orchestration runbook); or when the agent already exists — answer it with daintree.agents.answer-waiting-agent, or use daintree.agents.recover-agent if it has gone wrong.'
-opener: "Question relay — the deliverable is an answer, not changed work"
+confirmation: "Putting a question to a fresh agent. The aim is to bring its answer back intact and clearly attributed, since what is wanted here is the answer rather than changed work."
 risk: project
 requiredTools:
   - context.snapshot

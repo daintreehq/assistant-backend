@@ -398,11 +398,11 @@ def test_response_contract_under_ceiling() -> None:
     )
 
 
-# ---- runbook openers ------------------------------------------------------
+# ---- runbook confirmations ------------------------------------------------------
 #
-# The opener is the only runbook text that reaches a user's screen VERBATIM,
+# The confirmation is the only runbook text that reaches a user's screen VERBATIM,
 # chosen by a classifier score before the model has read anything
-# (`runbooks/openers.py`, and `docs/RUNBOOK_OPENERS.md` for the authoring rules).
+# (`runbooks/confirmations.py`, and `docs/RUNBOOK_CONFIRMATIONS.md` for the authoring rules).
 # Everything else in a runbook is advice a model mediates; this is published. So
 # its house style is a test rather than a convention — the failure mode is a
 # wrong sentence in front of a real person, and there is no model in the loop to
@@ -410,7 +410,7 @@ def test_response_contract_under_ceiling() -> None:
 #
 # THE REGISTER IS COMPREHENSION, NOT ANNOUNCEMENT, and the reason is structural:
 # the executor opens its own reply with "I'll start by reading the current
-# state…", so an opener that also announces is a visible duplicate of the line
+# state…", so a confirmation that also announces is a visible duplicate of the line
 # rendering directly beneath it.
 
 #: Words that describe the machinery rather than the work. The product's own
@@ -430,14 +430,14 @@ _OPENER_BANNED_WORDS = (
 _OPENER_BANNED_CHARS = ("`", "*", "#", "|", "!", "?", "\n", "\r")
 
 
-def _openers() -> list[tuple[str, str]]:
-    return [(r.id, r.opener) for r in load_catalog().runbooks if r.opener]
+def _confirmations() -> list[tuple[str, str]]:
+    return [(r.id, r.confirmation) for r in load_catalog().runbooks if r.confirmation]
 
 
-def test_every_user_facing_runbook_has_an_opener() -> None:
+def test_every_user_facing_runbook_has_a_confirmation() -> None:
     """A new runbook lands with its opening paragraph, or it does not land.
 
-    This is the gate that keeps the feature whole. A runbook with no opener is
+    This is the gate that keeps the feature whole. A runbook with no confirmation is
     silently exempt from the whole mechanism — it loads, the turn works, and the
     only symptom is that the product goes quiet for that one kind of request.
     Nothing else would ever notice.
@@ -445,27 +445,27 @@ def test_every_user_facing_runbook_has_an_opener() -> None:
     Two exemptions, both structural rather than editorial: a FOUNDATION is paired
     in by admission without a score, and the SERVER-PINNED documentation runbook
     is hidden from the selector, so neither can be scored and neither can ever
-    speak. `test_runbook_openers.py` asserts the converse — that neither carries
-    an opener it could not use.
+    speak. `test_runbook_confirmations.py` asserts the converse — that neither carries
+    a confirmation it could not use.
     """
     from daintree_assistant_server.config import DOCS_RUNBOOK_ID
 
     missing = [
         r.id
         for r in load_catalog().runbooks
-        if r.opener is None and not r.meta.foundation and r.id != DOCS_RUNBOOK_ID
+        if r.confirmation is None and not r.meta.foundation and r.id != DOCS_RUNBOOK_ID
     ]
     assert not missing, (
-        "these runbooks have no `opener` and will load silently: "
-        f"{missing} — see docs/RUNBOOK_OPENERS.md"
+        "these runbooks have no `confirmation` and will load silently: "
+        f"{missing} — see docs/RUNBOOK_CONFIRMATIONS.md"
     )
 
 
-def test_every_opener_passes_the_preamble_validator() -> None:
+def test_every_confirmation_passes_the_preamble_validator() -> None:
     """The authored text must clear the bar the LIVE model's text had to clear.
 
     `validate_preamble` is the retired fast-response stage's own validator, and
-    reusing it is the whole point rather than a convenience: these openers occupy
+    reusing it is the whole point rather than a convenience: these confirmations occupy
     exactly that slot, under exactly that display contract, and were written to
     the register that prompt spent most of its length establishing. A separate
     reimplementation here could drift from it, and the drift would show up as a
@@ -476,11 +476,11 @@ def test_every_opener_passes_the_preamble_validator() -> None:
     """
     from daintree_assistant_server.services.fast_response import validate_preamble
 
-    for rid, opener in _openers():
-        verdict = validate_preamble(opener, finish_reason="stop", had_tool_calls=False)
+    for rid, confirmation in _confirmations():
+        verdict = validate_preamble(confirmation, finish_reason="stop", had_tool_calls=False)
         assert verdict.valid, (
-            f"{rid} opener is refused by the preamble validator "
-            f"({verdict.reject_reason}): {opener!r} — see docs/RUNBOOK_OPENERS.md"
+            f"{rid} confirmation is refused by the preamble validator "
+            f"({verdict.reject_reason}): {confirmation!r} — see docs/RUNBOOK_CONFIRMATIONS.md"
         )
         # `valid` alone is not enough. The validator NORMALIZES before it judges —
         # it folds exotic spaces (U+202F and friends) to plain ones — so a caption
@@ -488,101 +488,122 @@ def test_every_opener_passes_the_preamble_validator() -> None:
         # original, which is the string that reaches a terminal. Requiring the
         # verdict's content to be the authored text is what closes the gap between
         # "the validator would accept this" and "this is what we send".
-        assert verdict.content == opener, (
-            f"{rid} opener only passes after normalization; the server emits the "
-            f"original: {opener!r} -> {verdict.content!r}"
+        assert verdict.content == confirmation, (
+            f"{rid} confirmation only passes after normalization; the server emits the "
+            f"original: {confirmation!r} -> {verdict.content!r}"
         )
 
 
-def test_openers_are_a_caption_not_a_paragraph() -> None:
-    """The bound that carries the whole design.
+def test_confirmations_are_two_sentences() -> None:
+    """The shape, and the bound that carries the whole design.
 
-    An earlier revision of this catalog allowed 400 characters and authored 37
-    openers to it: 62.6 words and 350 characters on average, which is about
-    fifteen seconds of reading dropped into the one second before the answer
-    starts. The reader gets interrupted mid-paragraph by the thing they were
-    waiting for, and a fast turn feels slower than it would have with no opener
-    at all.
+    Three revisions bracketed this. A 140-char ANNOUNCEMENT said nothing and
+    duplicated the executor's opening. A 400-char PARAGRAPH measured 62.6 words
+    on average — about fifteen seconds of reading in a window that is often one
+    second, so the answer arrived mid-paragraph. An 80-char CAPTION was scannable
+    but too compressed to state a goal.
 
-    The WORD ceiling is the one that bites — eighty characters of short words is
-    still too much to take in at a glance. There is deliberately no floor: a
-    genuinely short caption is the goal, not a risk.
+    Two sentences is the settled form: a lead that lands in a glance, then one
+    sentence of scope. The WORD ceiling is what bites; the character ceiling
+    stops one very long sentence sneaking past it.
     """
-    from daintree_assistant_server.runbooks.models import OPENER_MAX_CHARS
+    import re
 
-    for rid, opener in _openers():
-        # The em dash is the mandatory separator, not a word. Counting it made a
-        # legitimate twelve-word caption fail a twelve-word ceiling, which is a
-        # gate that lies to the author about which rule they broke.
-        words = len([w for w in opener.split() if w != "—"])
-        assert len(opener) <= OPENER_MAX_CHARS, (
-            f"{rid} opener is {len(opener)} chars, over {OPENER_MAX_CHARS}: {opener!r}"
+    from daintree_assistant_server.runbooks.models import CONFIRMATION_MAX_CHARS
+
+    for rid, confirmation in _confirmations():
+        words = len(confirmation.split())
+        assert len(confirmation) <= CONFIRMATION_MAX_CHARS, (
+            f"{rid} confirmation is {len(confirmation)} chars, over "
+            f"{CONFIRMATION_MAX_CHARS}: {confirmation!r}"
         )
-        assert words <= 12, (
-            f"{rid} opener is {words} words, over the 12-word ceiling — it is a "
-            f"caption, not a sentence: {opener!r}"
+        assert words <= 38, (
+            f"{rid} confirmation is {words} words, over the 38-word ceiling — it "
+            f"is two sentences, not a paragraph: {confirmation!r}"
         )
-        # The documented floor. Not a style preference: under six words there is
-        # no room for both a task mode and a boundary, so what survives is a bare
-        # label that says nothing the spinner did not.
-        assert words >= 6, (
-            f"{rid} opener is only {words} words — too thin to carry a task mode "
-            f"AND a boundary: {opener!r}"
+        assert words >= 15, (
+            f"{rid} confirmation is only {words} words — too compressed to state "
+            f"a goal, which is the failure the caption revision had: {confirmation!r}"
         )
-        assert opener == opener.strip()
-        assert not opener.endswith("."), (
-            f"{rid} opener ends with a period; it is a label rather than a "
-            f"sentence: {opener!r}"
+        assert confirmation == confirmation.strip()
+        sentences = re.findall(r"[.!?](?:\s|$)", confirmation)
+        assert len(sentences) == 2, (
+            f"{rid} confirmation reads as {len(sentences)} sentences; the shape is "
+            f"a lead then a scope: {confirmation!r}"
         )
 
 
-def test_openers_are_noun_led_captions() -> None:
-    """The shape is ``<task mode> — <boundary>``, task mode first.
+def test_confirmation_leads_are_a_short_gerund_sentence() -> None:
+    """The lead is the primary scan target and must survive a 500ms glance.
 
-    Leading with the mode is what makes a partial glance succeed: the user is
-    checking whether their request was routed to the right kind of work, and that
-    answer has to be in the first two or three words. The separator is checked
-    because the consistency IS the feature — thirty-seven identically shaped
-    captions read as product UI, where thirty-seven differently shaped ones read
-    as canned text pretending to be bespoke.
+    Three to eight words, and no first-person subject — the gerund is what lets
+    it say WHAT IS HAPPENING without competing with the executor's own "I'll
+    start by…" opening. `test_confirmations_never_announce` enforces the person
+    rule over the whole string; this one holds the lead's shape and length.
     """
-    for rid, opener in _openers():
-        assert " — " in opener, (
-            f"{rid} opener does not follow `<task mode> — <boundary>`: {opener!r}"
+    for rid, confirmation in _confirmations():
+        lead = confirmation.split(".", 1)[0]
+        words = len(lead.split())
+        assert 3 <= words <= 8, (
+            f"{rid} confirmation's lead sentence is {words} words; it must be "
+            f"three to eight so a glance lands on it: {lead!r}"
         )
-        mode = opener.split(" — ", 1)[0]
-        assert 1 <= len(mode.split()) <= 3, (
-            f"{rid} opener's task mode is {len(mode.split())} words; it must be "
-            f"one to three so a glance lands on it: {opener!r}"
+        assert lead[0].isupper(), (
+            f"{rid} confirmation does not open in sentence case: {confirmation!r}"
         )
-        assert mode[0].isupper(), f"{rid} opener does not open in sentence case: {opener!r}"
 
 
-def test_opener_task_modes_are_distinct() -> None:
-    """Two captions opening `Agent work —` defeat the purpose.
+def test_confirmation_leads_are_distinct() -> None:
+    """Two runbooks opening with the same sentence defeat the purpose.
 
     The distinctness of the whole string is checked below; this checks the part a
-    reader actually uses. A caption whose first three words match another's
-    answers "which mode am I in?" with the wrong mode's name.
+    reader actually uses. A lead that matches another's answers "which kind of
+    work did I get?" with the wrong answer.
     """
     seen: dict[str, str] = {}
-    for rid, opener in _openers():
-        mode = opener.split(" — ", 1)[0].casefold()
-        assert mode not in seen, (
-            f"{rid} and {seen[mode]} share the task mode {mode!r}, so neither "
-            "caption tells the user which one they got"
+    for rid, confirmation in _confirmations():
+        lead = confirmation.split(".", 1)[0].casefold()
+        assert lead not in seen, (
+            f"{rid} and {seen[lead]} share the lead sentence {lead!r}, so neither "
+            "tells the user which kind of work they got"
         )
-        seen[mode] = rid
+        seen[lead] = rid
 
 
-def test_openers_never_announce() -> None:
+def test_confirmations_state_a_goal_not_an_outcome() -> None:
+    """The second sentence carries the goal, and must not assert a result.
+
+    Under expectation-disconfirmation theory the penalty for a stated goal the
+    result then misses is WORSE than having stated no goal — so the house
+    phrasing is "the aim is to" / "the goal is", and a completed-work verb in the
+    future or perfect is refused. `validate_preamble`'s own overclaim patterns
+    cover the past tense; this covers the FORWARD promise it was never written
+    for.
+    """
+    import re
+
+    promises = re.compile(
+        r"\b(?:will|shall)\s+(?:then\s+)?(?:be\s+)?"
+        r"(?:fix|fixes|fixed|resolve|resolved|repair|repaired|correct|corrected|"
+        r"complete|completed|guarantee|guaranteed|ensure|ensured)\b",
+        re.I,
+    )
+    for rid, confirmation in _confirmations():
+        found = promises.search(confirmation)
+        assert found is None, (
+            f"{rid} confirmation promises an outcome ({found.group(0)!r}), which "
+            f"the answer then has to live up to: {confirmation!r}"
+        )
+
+
+def test_confirmations_never_announce() -> None:
     """No first person, anywhere — not just at the opening.
 
     `validate_preamble` rejects an announcing OPENING. This goes further, because
     an authored line has no excuse for a buried one: "the branch gets checked
     first, then I'll summarise" passes an opening test and is still the duplicate
     register. Banning the first person outright is the cheap, total version of
-    the rule, and every worked example in docs/RUNBOOK_OPENERS.md already obeys
+    the rule, and every worked example in docs/RUNBOOK_CONFIRMATIONS.md already obeys
     it.
     """
     import re
@@ -592,15 +613,15 @@ def test_openers_never_announce() -> None:
     # is exactly the prose this register wants, and rejecting it would push
     # authors into worse sentences to satisfy a check not aimed at them.
     first_person = re.compile(r"\b(?:I|I'll|I'm|I've|we'll|we're|let's)\b")
-    for rid, opener in _openers():
-        found = first_person.search(opener)
+    for rid, confirmation in _confirmations():
+        found = first_person.search(confirmation)
         assert found is None, (
-            f"{rid} opener uses the first person ({found.group(0)!r}), which is the "
-            f"executor's register and duplicates its opening line: {opener!r}"
+            f"{rid} confirmation uses the first person ({found.group(0)!r}), which is the "
+            f"executor's register and duplicates its opening line: {confirmation!r}"
         )
 
 
-def test_openers_name_no_internal_machinery() -> None:
+def test_confirmations_name_no_internal_machinery() -> None:
     """Beyond what `_DISCLOSURE` in the validator already refuses.
 
     Matched on WORD BOUNDARIES, not as substrings. A plain `in` test rejected
@@ -609,43 +630,43 @@ def test_openers_name_no_internal_machinery() -> None:
     """
     import re
 
-    for rid, opener in _openers():
+    for rid, confirmation in _confirmations():
         for word in _OPENER_BANNED_WORDS:
-            assert not re.search(rf"\b{word}\b", opener, re.I), (
-                f"{rid} opener names internal machinery ({word!r}): {opener!r} — "
+            assert not re.search(rf"\b{word}\b", confirmation, re.I), (
+                f"{rid} confirmation names internal machinery ({word!r}): {confirmation!r} — "
                 "say what the user would say"
             )
 
 
-def test_openers_carry_no_markup_or_shouting() -> None:
-    for rid, opener in _openers():
+def test_confirmations_carry_no_markup_or_shouting() -> None:
+    for rid, confirmation in _confirmations():
         for char in _OPENER_BANNED_CHARS:
-            assert char not in opener, (
-                f"{rid} opener contains {char!r}, which the terminal renders raw "
-                f"or reads as the wrong register: {opener!r}"
+            assert char not in confirmation, (
+                f"{rid} confirmation contains {char!r}, which the terminal renders raw "
+                f"or reads as the wrong register: {confirmation!r}"
             )
-        assert not any(ord(c) > 0x2100 for c in opener), (
-            f"{rid} opener contains an emoji or symbol: {opener!r}"
+        assert not any(ord(c) > 0x2100 for c in confirmation), (
+            f"{rid} confirmation contains an emoji or symbol: {confirmation!r}"
         )
 
 
-def test_openers_invent_nothing() -> None:
+def test_confirmations_invent_nothing() -> None:
     """Chosen before anything has been read, so it cannot know a number.
 
-    Digits are the cheapest reliable tell that an opener has drifted from "what
+    Digits are the cheapest reliable tell that a confirmation has drifted from "what
     this kind of request turns on" into "what the answer is".
     """
-    for rid, opener in _openers():
-        assert not any(c.isdigit() for c in opener), (
-            f"{rid} opener states a number before anything has been read: {opener!r}"
+    for rid, confirmation in _confirmations():
+        assert not any(c.isdigit() for c in confirmation), (
+            f"{rid} confirmation states a number before anything has been read: {confirmation!r}"
         )
 
 
-def test_openers_do_not_restate_the_question() -> None:
+def test_confirmations_do_not_restate_the_question() -> None:
     """The one register failure the shared validator does not catch.
 
     Repeating the request back proves nothing about whether it was understood and
-    burns the second or two the opener exists to fill.
+    burns the second or two the confirmation exists to fill.
     """
     openings = (
         "the question asks",
@@ -656,15 +677,15 @@ def test_openers_do_not_restate_the_question() -> None:
         "you are asking",
         "you want to",
     )
-    for rid, opener in _openers():
-        lowered = opener.lower()
+    for rid, confirmation in _confirmations():
+        lowered = confirmation.lower()
         for phrase in openings:
             assert not lowered.startswith(phrase), (
-                f"{rid} opener restates the question ({phrase!r}): {opener!r}"
+                f"{rid} confirmation restates the question ({phrase!r}): {confirmation!r}"
             )
 
 
-def test_openers_are_distinct() -> None:
+def test_confirmations_are_distinct() -> None:
     """Two runbooks sharing text make the announcement uninformative.
 
     Neighbours are deliberately written to be interchangeable-ish, so near
@@ -672,15 +693,15 @@ def test_openers_are_distinct() -> None:
     as a canned response — the opposite of showing this ask was understood.
     """
     seen: dict[str, str] = {}
-    for rid, opener in _openers():
-        assert opener not in seen, (
-            f"{rid} and {seen[opener]} share an opener verbatim: {opener!r}"
+    for rid, confirmation in _confirmations():
+        assert confirmation not in seen, (
+            f"{rid} and {seen[confirmation]} share a confirmation verbatim: {confirmation!r}"
         )
-        seen[opener] = rid
+        seen[confirmation] = rid
 
 
 def test_the_opener_threshold_is_not_duplicated_in_prose() -> None:
-    """`docs/RUNBOOK_OPENERS.md` quotes the threshold; `config.py` owns it.
+    """`docs/RUNBOOK_CONFIRMATIONS.md` quotes the threshold; `config.py` owns it.
 
     A number written in two places drifts, and this one drifts SILENTLY: the doc
     would keep telling authors to write for a confidence the server no longer
@@ -688,19 +709,19 @@ def test_the_opener_threshold_is_not_duplicated_in_prose() -> None:
     """
     from pathlib import Path
 
-    from daintree_assistant_server.config import RUNBOOK_OPENER_THRESHOLD
+    from daintree_assistant_server.config import RUNBOOK_CONFIRMATION_THRESHOLD
 
-    doc = Path("docs/RUNBOOK_OPENERS.md").read_text(encoding="utf-8")
-    assert f"{RUNBOOK_OPENER_THRESHOLD:.2f}" in doc, (
-        f"docs/RUNBOOK_OPENERS.md does not mention the shipped threshold "
-        f"{RUNBOOK_OPENER_THRESHOLD:.2f} — update the doc with the constant"
+    doc = Path("docs/RUNBOOK_CONFIRMATIONS.md").read_text(encoding="utf-8")
+    assert f"{RUNBOOK_CONFIRMATION_THRESHOLD:.2f}" in doc, (
+        f"docs/RUNBOOK_CONFIRMATIONS.md does not mention the shipped threshold "
+        f"{RUNBOOK_CONFIRMATION_THRESHOLD:.2f} — update the doc with the constant"
     )
 
 
 def test_editing_an_opener_busts_the_catalog_revision() -> None:
     """The claim `runbooks/models.py` makes about frontmatter, actually tested.
 
-    An opener rides `content_hash_of`, so editing one must change
+    A confirmation rides `content_hash_of`, so editing one must change
     `catalog_revision` and force a client holding older state to re-select. If it
     did not, a caption could change under a live conversation while every client
     kept replaying a token minted against the previous text.
@@ -710,10 +731,10 @@ def test_editing_an_opener_busts_the_catalog_revision() -> None:
     from daintree_assistant_server.runbooks.catalog import Catalog, load_catalog
 
     original = load_catalog()
-    target = next(r for r in original.runbooks if r.opener)
+    target = next(r for r in original.runbooks if r.confirmation)
     edited = Catalog(
         tuple(
-            replace(r, meta=r.meta.model_copy(update={"opener": "Changed mode — a different boundary entirely"}))
+            replace(r, meta=r.meta.model_copy(update={"confirmation": "Changed mode — a different boundary entirely"}))
             if r.id == target.id
             else r
             for r in original.runbooks

@@ -27,7 +27,7 @@ from ..config import (
     FAST_RESPONSE_MODEL,
     FAST_RESPONSE_PROVIDER,
     PUBLIC_MODEL_ID,
-    RUNBOOK_OPENER_THRESHOLD,
+    RUNBOOK_CONFIRMATION_THRESHOLD,
     Settings,
 )
 from ..contracts.daintree_api import (
@@ -70,12 +70,12 @@ from ..runbooks.active_set import (
     resolve_active_runbooks,
 )
 from ..runbooks.catalog import Catalog, CatalogManager
+from ..runbooks.confirmations import OpenerDecision, choose_opener, fold_announced
 from ..runbooks.decision import SelectionDecision
 from ..runbooks.fast_path import can_skip_selection
 from ..runbooks.load_events import RunbookLoadExecution
 from ..runbooks.local.selector import RunbookSelector
 from ..runbooks.models import Runbook
-from ..runbooks.openers import OpenerDecision, choose_opener, fold_announced
 from ..runbooks.tool_projection import (
     REASON_DISABLED,
     REASON_FILTER_ERROR,
@@ -232,13 +232,13 @@ class _RespondMeta:
     # reported" — and a cache ratio computed off that floor would claim a
     # stone-cold prefix on a call that simply never counted its hits.
     selector_usage: ProviderUsage | None = None
-    # The runbook opener for this turn, or None — which is most turns. Internal,
+    # The runbook confirmation for this turn, or None — which is most turns. Internal,
     # not a wire field on `meta`: it is delivered as its own `preamble` event so
     # it inherits that event's display-only contract in the CLI, which already
     # knows never to commit one to conversation history. Putting the text on
     # `meta` instead would give the client a second, undocumented place to find
     # assistant-looking prose and no rule attached to it.
-    opener: str | None = None
+    confirmation: str | None = None
     #: Which runbook wrote it. Logging only; never leaves the server.
     opener_runbook_id: str | None = None
 
@@ -1208,8 +1208,8 @@ class ChatOrchestrator:
         # fail-closed posture as the active set — an untrusted token carries
         # nothing forward.
         prior_docs_query: str | None = None
-        # Runbooks whose opener this conversation has already spent
-        # (`runbooks/openers.py`). Unlike the two above it is NOT filtered against
+        # Runbooks whose confirmation this conversation has already spent
+        # (`runbooks/confirmations.py`). Unlike the two above it is NOT filtered against
         # the catalog and NOT scoped to the turn: it is a record of what the user
         # has already been told, and a runbook that was edited, renamed out of the
         # catalog, or evicted from the active set has still been announced. Its
@@ -1454,7 +1454,7 @@ class ChatOrchestrator:
         active_ids = resolution.active
         newly_loaded_ids = resolution.newly_loaded
 
-        # THE RUNBOOK OPENER — the cheap replacement for the Cerebras preamble
+        # THE RUNBOOK CONFIRMATION — the cheap replacement for the Cerebras preamble
         # stage. A dict lookup and a comparison, so it is computed inline on the
         # first-byte path and travels out on `meta`, which is emitted before the
         # executor is even opened. The stage it replaces could not reach that
@@ -1474,7 +1474,7 @@ class ChatOrchestrator:
         # the next streaming turn would then stay silent about a runbook the user
         # had never been told about. Computing it only where it can be shown is
         # what keeps "shown once" from meaning "shown at most once".
-        opener = (
+        confirmation = (
             OpenerDecision()
             if subagent or not request.generation.stream
             else choose_opener(
@@ -1490,20 +1490,20 @@ class ChatOrchestrator:
                 scores=decision.scores,
                 already_announced=prior_announced,
                 catalog=runbooks_catalog,
-                threshold=RUNBOOK_OPENER_THRESHOLD,
+                threshold=RUNBOOK_CONFIRMATION_THRESHOLD,
             )
         )
-        announced_ids = fold_announced(prior_announced, opener.announced)
-        if opener.announced:
+        announced_ids = fold_announced(prior_announced, confirmation.announced)
+        if confirmation.announced:
             logger.info(
                 "runbook_opener",
                 request_id=request_id,
-                shown=opener.runbook_id,
+                shown=confirmation.runbook_id,
                 # Non-empty means two runbooks cleared the floor on one turn and
                 # one of them was written off unheard. Watch the RATE: a rising
                 # one says the catalog's confident answers overlap, which is a
                 # statement about runbook separation rather than about this gate.
-                suppressed=list(opener.suppressed),
+                suppressed=list(confirmation.suppressed),
                 announced_total=len(announced_ids),
             )
 
@@ -1577,15 +1577,15 @@ class ChatOrchestrator:
         # out on `_PreparedTurn` and is settled by the stream path, which races it
         # against the executor's first visible byte.
         fast_policy = (
-            # An opener already occupies the slot. Both ride the `preamble`
+            # A confirmation already occupies the slot. Both ride the `preamble`
             # event and the CLI REPLACES rather than appends, so running both
             # would spend a Cerebras call to overwrite a line that was already on
-            # screen — the worse of the two outcomes, since the opener landed
+            # screen — the worse of the two outcomes, since the confirmation landed
             # before the executor opened and the preamble by definition cannot.
             # Unreachable while `FAST_RESPONSE_ENABLED` is False; it exists so
             # flipping that flag back on is not also a display bug.
             FastResponsePolicyDecision(run=False, reason="runbook_opener_shown")
-            if opener.text
+            if confirmation.text
             else self._fast_response_policy(
                 request,
                 selector_ran=decision.ran,
@@ -1646,7 +1646,7 @@ class ChatOrchestrator:
             # Carried on EVERY token, including a sub-agent's, and including turns
             # that announced nothing. The set is a property of the conversation
             # rather than of the turn, so a round that drops it re-arms every
-            # opener the conversation has already spent — which is how a
+            # confirmation the conversation has already spent — which is how a
             # continuation round would announce the workflow it is in the middle
             # of.
             announced_runbooks=announced_ids,
@@ -1674,7 +1674,7 @@ class ChatOrchestrator:
             run_selector=run_selector,
             warnings=warnings,
             catalog=resolved_catalog,
-            opener=opener,
+            confirmation=confirmation,
         )
 
         # PROJECTION. Nothing below may fail the turn: every failure path leaves
@@ -2392,7 +2392,7 @@ class ChatOrchestrator:
 
         prior_active_ids: list[str] = []
         # PRESERVED, never added to. This path serves `/runbooks/resolve`, which is
-        # not a streaming turn and shows no opener — but it REISSUES the token, and
+        # not a streaming turn and shows no confirmation — but it REISSUES the token, and
         # a reissue that dropped this would forget every caption the conversation
         # has already shown. The next `/respond` would then re-announce a runbook
         # the user was told about minutes ago, and the announce-once rule would
@@ -2487,7 +2487,7 @@ class ChatOrchestrator:
         run_selector: bool,
         warnings: list[str],
         catalog: Catalog | None = None,
-        opener: OpenerDecision | None = None,
+        confirmation: OpenerDecision | None = None,
     ) -> _RespondMeta:
         selected_catalog = catalog or self.catalog
 
@@ -2537,8 +2537,8 @@ class ChatOrchestrator:
             ),
             selector_endpoint=decision.endpoint,
             selector_usage=decision.usage,
-            opener=opener.text if opener is not None else None,
-            opener_runbook_id=opener.runbook_id if opener is not None else None,
+            confirmation=confirmation.text if confirmation is not None else None,
+            opener_runbook_id=confirmation.runbook_id if confirmation is not None else None,
         )
 
     # ---- response bodies ------------------------------------------------
@@ -2923,11 +2923,11 @@ class ChatOrchestrator:
                 ).model_dump(exclude_none=True),
             )
 
-            # THE RUNBOOK OPENER, emitted the instant `meta` is out.
+            # THE RUNBOOK CONFIRMATION, emitted the instant `meta` is out.
             #
             # It rides the `preamble` event rather than getting one of its own,
             # and that is a contract decision rather than a shortcut: everything
-            # this event already promises is exactly what an opener needs. It is
+            # this event already promises is exactly what a confirmation needs. It is
             # display-only and must never be committed to conversation history
             # (the executor did not write it and has never seen it, so a client
             # that committed one would replay an assistant turn the model has no
@@ -2943,15 +2943,15 @@ class ChatOrchestrator:
             # was RUNNING, which was worth saying while a second host was being
             # waited on; there is nothing to wait for here, so a phase marker
             # would describe a gap that does not exist.
-            if meta.opener:
+            if meta.confirmation:
                 yield self._sse(
                     "preamble",
                     StreamPreamble(
                         id=f"pre_{meta.request_id.split('_', 1)[-1]}",
-                        content=meta.opener,
+                        content=meta.confirmation,
                     ).model_dump(),
                 )
-                # The opener occupies the same slot the preamble did, so it feeds
+                # The confirmation occupies the same slot the preamble did, so it feeds
                 # the same timing field — this is when the user first saw
                 # anything. `budget` is None only in tests.
                 timings.preamble_at_ms = (
@@ -2960,7 +2960,7 @@ class ChatOrchestrator:
                 await trace.record_event(
                     "runbook_opener.emitted",
                     attributes={"runbook_id": meta.opener_runbook_id},
-                    content={"content": meta.opener},
+                    content={"content": meta.confirmation},
                 )
 
             # The preamble, if it has somehow already landed. Almost never: the

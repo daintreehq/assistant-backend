@@ -3,7 +3,7 @@ id: daintree.explore.repository
 title: Understand a repository
 summary: Answer "what does this repo do" / "where is X" with a read-only explore agent and cited evidence.
 whenToUse: Use when the user wants to UNDERSTAND the project rather than change it — "what does this repo do", "where is X implemented", "how does the auth flow work", "explain this subsystem", "what would I have to touch to add Y", "find the code that does Z", or orientation before work starts. The deliverable is an explanation with file evidence and nothing on disk changes. Do not use when the user wants files CHANGED (use daintree.edits.spawn-visible-agent, or daintree.workflow.start-work-on-issue for a forge issue), to judge the quality of a specific change or PR (use daintree.review.review-change), to work out why a check is failing (use daintree.ci.diagnose-and-fix), to ask about DAINTREE itself rather than the project (documentation arrives retrieved — no runbook needed — or daintree.diagnostics when Daintree is broken), or to pick out files to bundle as context (use daintree.context.curate-copytree-bundle), or when the user names a specific agent to ask and just wants its answer relayed back (use daintree.agents.ask-and-relay).
-opener: "Repository orientation — explanations tied to code, not guesses"
+confirmation: "Working out how something here behaves. The aim is an explanation grounded in the code itself, rather than a plausible account of how it probably works."
 risk: project
 requiredTools:
   - context.snapshot
