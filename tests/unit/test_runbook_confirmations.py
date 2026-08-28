@@ -13,7 +13,7 @@ import pytest
 from daintree_assistant_server.runbooks.catalog import Catalog
 from daintree_assistant_server.runbooks.confirmations import (
     CAP_ANNOUNCED_RUNBOOKS,
-    choose_opener,
+    choose_confirmation,
     fold_announced,
 )
 from daintree_assistant_server.runbooks.models import Runbook, RunbookMeta
@@ -47,7 +47,7 @@ def _choose(**kwargs: object):  # type: ignore[no-untyped-def]
         "threshold": THRESHOLD,
     }
     base.update(kwargs)
-    return choose_opener(**base)  # type: ignore[arg-type]
+    return choose_confirmation(**base)  # type: ignore[arg-type]
 
 
 # ---- the happy path -------------------------------------------------------
@@ -173,7 +173,7 @@ def test_a_reused_active_set_announces_nothing() -> None:
     assert _choose(scored_active_ids=[], scores={}, catalog=catalog).text is None
 
 
-def test_a_runbook_with_no_opener_is_silent_and_not_written_off() -> None:
+def test_a_runbook_with_no_confirmation_is_silent_and_not_written_off() -> None:
     """Silence costs nothing, so it must not cost a token entry either."""
     catalog = _catalog(_runbook("a.one"))
     decision = _choose(
@@ -257,7 +257,7 @@ def test_the_cap_drops_the_oldest() -> None:
 # ---- the packaged catalog -------------------------------------------------
 
 
-def test_every_packaged_opener_is_reachable_by_the_gate() -> None:
+def test_every_packaged_confirmation_is_reachable_by_the_gate() -> None:
     """A confirmation on a runbook the gate can never score is dead text.
 
     A FOUNDATION is paired in by admission rather than ranked, and a
@@ -289,7 +289,7 @@ def test_the_gate_is_total_over_the_packaged_catalog(threshold: float) -> None:
 
     catalog = load_catalog()
     ids = [r.id for r in catalog.runbooks]
-    decision = choose_opener(
+    decision = choose_confirmation(
         scored_active_ids=[*ids, "not.a.runbook"],
         scores=dict.fromkeys(ids, 0.95),
         already_announced=[],

@@ -126,7 +126,7 @@ class RunbookMeta(BaseModel):
 
     @field_validator("confirmation")
     @classmethod
-    def _check_opener(cls, v: str | None) -> str | None:
+    def _check_confirmation(cls, v: str | None) -> str | None:
         """One line of plain text, or nothing at all.
 
         A newline is rejected rather than collapsed: the confirmation is emitted as a

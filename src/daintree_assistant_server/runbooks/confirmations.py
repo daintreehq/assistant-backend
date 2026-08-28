@@ -17,7 +17,7 @@ of the work. `RunbookMeta.confirmation` carries the rule authors have to write t
 **The gate is per-runbook, and it is announce-once.** Three rules, and each one
 exists because the obvious simpler version is wrong:
 
-* **A score floor** (`settings.runbook_opener_threshold`). The active set is
+* **A score floor** (`settings.runbook_confirmation_threshold`). The active set is
   deliberately recall-biased — a runbook joins on p>=0.65, because a missing
   runbook costs more than a spare one — and announcing every load would put a
   confident sentence in front of the user on the strength of a coin-flip. The
@@ -82,7 +82,7 @@ CAP_ANNOUNCED_BYTES = 2048
 
 
 @dataclass(frozen=True)
-class OpenerDecision:
+class ConfirmationDecision:
     """What to show, and what the next state token has to remember.
 
     ``announced`` is the ids to WRITE OFF — the ones shown plus the ones
@@ -104,14 +104,14 @@ class OpenerDecision:
     suppressed: tuple[str, ...] = ()
 
 
-def choose_opener(
+def choose_confirmation(
     *,
     scored_active_ids: Sequence[str],
     scores: Mapping[str, float],
     already_announced: Collection[str],
     catalog: Catalog,
     threshold: float,
-) -> OpenerDecision:
+) -> ConfirmationDecision:
     """Pick at most one confirmation for this turn.
 
     ``scored_active_ids`` is the turn's active set narrowed to what the selector
@@ -159,7 +159,7 @@ def choose_opener(
         qualified.append((score, sid, confirmation))
 
     if not qualified:
-        return OpenerDecision()
+        return ConfirmationDecision()
 
     # Highest score wins; the id breaks a tie so the choice is deterministic
     # rather than dependent on admission order — two runbooks at an identical
@@ -167,7 +167,7 @@ def choose_opener(
     # not something to leave in a user-visible path.
     qualified.sort(key=lambda row: (-row[0], row[1]))
     _score, winner, text = qualified[0]
-    return OpenerDecision(
+    return ConfirmationDecision(
         text=text,
         runbook_id=winner,
         announced=tuple(sid for _s, sid, _t in qualified),

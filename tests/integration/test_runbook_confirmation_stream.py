@@ -29,7 +29,7 @@ SILENT_RUNBOOK = "daintree.foundation"
 OTHER_RUNBOOK = "daintree.terminals.rename"
 
 
-def _opener_text(client: Any, runbook_id: str = RUNBOOK) -> str:
+def _confirmation_text(client: Any, runbook_id: str = RUNBOOK) -> str:
     runbook = client.app.state.container.catalog_manager.catalog.get(runbook_id)
     assert runbook is not None and runbook.confirmation
     return runbook.confirmation
@@ -55,7 +55,7 @@ def _turn(
     return events, [name or "" for name, _ in events]
 
 
-def test_a_confident_first_load_streams_its_opener_before_any_output(
+def test_a_confident_first_load_types_its_confirmation_before_any_output(
     client: Any, auth: dict[str, str], fake_provider: Any
 ) -> None:
     """The whole feature, on the wire.
@@ -69,12 +69,24 @@ def test_a_confident_first_load_streams_its_opener_before_any_output(
     events, names = _turn(client, auth)
 
     assert names[0] == "meta", "meta carries the state the client needs first"
-    assert names.count("preamble") == 1, "exactly one caption, never a second"
-    assert names.index("preamble") < names.index("delta")
     assert names[-1] == "done"
 
-    payload = next(data for name, data in events if name == "preamble")
-    assert payload["content"] == _opener_text(client)
+    # PACED: the confirmation arrives as a run of `preamble` events typed out
+    # word by word, and every one of them precedes the executor's first delta.
+    # That ordering is the feature — the words fill the gap rather than
+    # interleaving with the answer.
+    frames = [data["content"] for name, data in events if name == "preamble"]
+    assert len(frames) > 1, "the confirmation should be typed, not dumped"
+    first_delta = names.index("delta")
+    assert all(i < first_delta for i, n in enumerate(names) if n == "preamble")
+
+    # CUMULATIVE, because the CLI REPLACES rather than appends. Word-deltas into
+    # a replacing consumer would leave the reader looking at the final word alone.
+    full = _confirmation_text(client)
+    assert frames[-1] == full
+    assert frames == sorted(frames, key=len), "frames must grow monotonically"
+    for frame in frames:
+        assert full.startswith(frame), f"{frame!r} is not a prefix of the text"
 
 
 def test_a_load_below_the_floor_stays_quiet(
@@ -235,7 +247,7 @@ def test_the_non_streaming_path_announces_nothing(
     )
     assert response.status_code == 200
     assert "preamble" not in response.text
-    assert _opener_text(client) not in response.text
+    assert _confirmation_text(client) not in response.text
 
 
 def test_a_non_streaming_turn_does_not_SPEND_the_caption(
@@ -368,7 +380,7 @@ def test_a_suppressed_runner_up_is_spent_and_does_not_announce_later(
 ) -> None:
     """When two runbooks clear the floor, one speaks and the OTHER is spent.
 
-    The unit test proves `choose_opener` reports both ids in `announced`; this
+    The unit test proves `choose_confirmation` reports both ids in `announced`; this
     proves those ids actually reach the signed token. A regression that stored
     only the WINNER would look identical on the turn itself — one caption, right
     text — and surface much later, when the runner-up is selected alone and
@@ -378,15 +390,16 @@ def test_a_suppressed_runner_up_is_spent_and_does_not_announce_later(
         [RUNBOOK, OTHER_RUNBOOK], confidence=0.99
     )
     first_events, first_names = _turn(client, auth, turn_id="t1")
-    assert first_names.count("preamble") == 1
-    shown = next(d for n, d in first_events if n == "preamble")["content"]
+    assert "preamble" in first_names
+    # The LAST frame is the whole text; the earlier ones are prefixes of it.
+    shown = [d["content"] for n, d in first_events if n == "preamble"][-1]
     first_meta = next(d for n, d in first_events if n == "meta")
     active = [r["id"] for r in first_meta["runbooks"]["active"]]
     assert RUNBOOK in active and OTHER_RUNBOOK in active
     state = first_meta["state"]
 
     # Whichever of the two did NOT speak is the runner-up, and it was spent.
-    quiet = OTHER_RUNBOOK if shown == _opener_text(client, RUNBOOK) else RUNBOOK
+    quiet = OTHER_RUNBOOK if shown == _confirmation_text(client, RUNBOOK) else RUNBOOK
 
     # Clear, so the runner-up loads FRESH on the next turn rather than being
     # carried over — the only way its silence can be attributed to the token.
@@ -410,3 +423,36 @@ def test_a_suppressed_runner_up_is_spent_and_does_not_announce_later(
     ]
     assert quiet in newly, "the runner-up must reload for this to test anything"
     assert "preamble" not in second_names
+
+
+def test_typing_the_confirmation_does_not_delay_the_executor(
+    client: Any, auth: dict[str, str], fake_provider: Any
+) -> None:
+    """The trap this design exists around, guarded by the clock.
+
+    Pacing costs wall-clock. If the confirmation were emitted BEFORE the
+    executor's open was started — which is where it originally sat, immediately
+    after `meta` — every turn that showed one would be delayed by the whole
+    pacing budget. The two must overlap: the open goes first, the words fill the
+    gap it opens.
+
+    Against a fake provider the open completes at once, so the flush path fires
+    and the turn finishes far inside the budget. Move the emission back above
+    `open_task` and there is no task to check, so the full budget is spent
+    serially and this fails — which is exactly the regression it is here for.
+    """
+    import time
+
+    from daintree_assistant_server.config import CONFIRMATION_PACING_SECONDS
+
+    fake_provider.selection_result = selection_result([RUNBOOK], confidence=0.99)
+
+    started = time.perf_counter()
+    _events, names = _turn(client, auth)
+    elapsed = time.perf_counter() - started
+
+    assert "preamble" in names, "the confirmation must actually have been shown"
+    assert elapsed < CONFIRMATION_PACING_SECONDS, (
+        f"the turn took {elapsed:.2f}s against a fake provider — pacing is running "
+        "ahead of the executor open instead of alongside it"
+    )

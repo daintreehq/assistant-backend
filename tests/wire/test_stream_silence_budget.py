@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from pathlib import Path
 
 import pytest
@@ -145,7 +146,16 @@ async def test_a_stalled_open_still_heartbeats(
         {
             "protocol_version": 3,
             "session": {"id": "s", "turn_id": "t"},
-            "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
+            # A greeting, deliberately: it routes to NO runbook, so the turn
+            # shows no confirmation and the comment heartbeat is the only thing
+            # that can keep the wire alive — which is the case this test is for.
+            # Note the container runs the REAL local classifier, so the fake
+            # provider's scripted selection is not consulted and the message is
+            # the only lever. A routed message ("rename my terminals") fills the
+            # same silence with paced `preamble` frames instead, which satisfies
+            # the client's watchdog but not this assertion;
+            # `test_a_stalled_open_never_leaves_a_silent_gap` covers that shape.
+            "input": {"messages": [{"role": "user", "content": "Hello!"}]},
             "startup": {},
             "generation": {"stream": True},
         }
@@ -176,3 +186,91 @@ def _budget_factory(policy):  # type: ignore[no-untyped-def]
         return RequestBudget(*args, policy=policy, **kwargs)
 
     return _make
+
+
+@pytest.mark.asyncio
+async def test_a_stalled_open_never_leaves_a_silent_gap(
+    settings, fake_provider: FakeProvider, monkeypatch
+) -> None:
+    """The invariant the heartbeat is only one mechanism for.
+
+    What the CLI's watchdog actually requires is that BYTES keep arriving — it
+    does not care whether they are a `: hb` comment or a real event. A turn that
+    shows a confirmation fills the stall with `preamble` frames instead of
+    heartbeats, and the test above would fail on it while the client is perfectly
+    happy. So the general property is asserted here directly: no gap between
+    chunks exceeds the heartbeat interval by more than scheduler slack, whatever
+    is filling it.
+
+    Strictly stronger than counting heartbeats, and it is what would catch a
+    regression that made pacing *slower* than the heartbeat cadence without
+    yielding to it.
+    """
+    from pydantic import SecretStr
+
+    from daintree_assistant_server.contracts.daintree_api import RespondRequest
+    from daintree_assistant_server.main import build_container
+    from daintree_assistant_server.services import chat_orchestrator as orch
+
+    interval = 0.05
+    monkeypatch.setattr(orch, "HEARTBEAT_INTERVAL_SECONDS", interval)
+    policy = BudgetPolicy(
+        preparation=5.0, open_stall=1.5, first_output=8.0, stream_idle=5.0, total=10.0
+    )
+    monkeypatch.setattr(orch, "RequestBudget", _budget_factory(policy))
+
+    class _Silent:
+        usage = None
+        endpoint = None
+
+        async def prefetch_first_event(self):  # type: ignore[no-untyped-def]
+            await asyncio.sleep(30)
+            return None
+
+        def __aiter__(self):  # type: ignore[no-untyped-def]
+            return self
+
+        async def __anext__(self):  # type: ignore[no-untyped-def]
+            raise StopAsyncIteration
+
+        async def aclose(self) -> None:
+            return None
+
+    async def _open(request):  # type: ignore[no-untyped-def]
+        return _Silent()
+
+    fake_provider.open_stream = _open  # type: ignore[method-assign]
+    container = build_container(settings, fake_provider)
+
+    body = RespondRequest.model_validate(
+        {
+            "protocol_version": 3,
+            "session": {"id": "s", "turn_id": "t"},
+            "input": {"messages": [{"role": "user", "content": "rename my terminals"}]},
+            "startup": {},
+            "generation": {"stream": True},
+        }
+    )
+    outcome = await container.orchestrator.complete(
+        body, api_key=SecretStr("k"), request_id="req_gap"
+    )
+    assert outcome.stream is not None
+
+    saw_preamble = False
+    gaps: list[float] = []
+    last = time.perf_counter()
+    async with asyncio.timeout(10.0):
+        async for chunk in outcome.stream:
+            now = time.perf_counter()
+            gaps.append(now - last)
+            last = now
+            saw_preamble = saw_preamble or chunk.startswith("event: preamble")
+    await container.aclose()
+
+    assert saw_preamble, "this shape is meant to fill the stall with a confirmation"
+    # Generous against scheduler jitter and a loaded CI box; the regression this
+    # guards is a gap of SECONDS, not of milliseconds.
+    assert max(gaps) <= interval * 8, (
+        f"the wire went quiet for {max(gaps):.3f}s while the upstream stalled — "
+        f"the CLI's idle watchdog would abort and replay the turn"
+    )

@@ -50,6 +50,21 @@ per runbook per conversation** — the set rides the signed state token.
 It replaces a stage that paid a second model on a second host to write this text
 per turn (`services/fast_response.py`, now off).
 
+**It is typed out, word by word.** The text is paced over
+`config.CONFIRMATION_PACING_SECONDS` (0.9s) so it occupies the slot reasoning and
+an opening sentence used to, rather than landing as a block and then leaving the
+screen still. The budget is measured, not chosen: over 24 clean trials the
+executor's first output arrived at p50 1.26s / p90 1.52s, with the fastest turn at
+0.98s — so 0.9s finishes inside even that one. `python -m
+benchmarks.executor_window.bench` re-derives it and reports whether the value
+still has headroom.
+
+Two consequences for an author. Word count is now a DURATION as well as a reading
+cost — the budget is fixed, so a 24-word confirmation types faster per word than a
+35-word one, and both finish at the same moment. And the executor is the real
+bound: if it produces output mid-word the rest is flushed at once, so a
+confirmation is never the reason an answer is late.
+
 ## What the reader needs in that second
 
 They have just handed over control. Their questions, in order: *did that

@@ -700,7 +700,7 @@ def test_confirmations_are_distinct() -> None:
         seen[confirmation] = rid
 
 
-def test_the_opener_threshold_is_not_duplicated_in_prose() -> None:
+def test_the_confirmation_threshold_is_not_duplicated_in_prose() -> None:
     """`docs/RUNBOOK_CONFIRMATIONS.md` quotes the threshold; `config.py` owns it.
 
     A number written in two places drifts, and this one drifts SILENTLY: the doc
@@ -718,7 +718,7 @@ def test_the_opener_threshold_is_not_duplicated_in_prose() -> None:
     )
 
 
-def test_editing_an_opener_busts_the_catalog_revision() -> None:
+def test_editing_a_confirmation_busts_the_catalog_revision() -> None:
     """The claim `runbooks/models.py` makes about frontmatter, actually tested.
 
     A confirmation rides `content_hash_of`, so editing one must change

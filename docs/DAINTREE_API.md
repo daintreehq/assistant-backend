@@ -890,11 +890,23 @@ what the request is taken to BE, never what is about to be done.
 `provisional` and `commit_on` are still on the payload for clients that already
 read them. A client following the rule above never reaches a commit.
 
-**At most one per turn, and never after the first `delta`.** A runbook confirmation is a
-lookup, so it is always ready before the executor opens. A fast-response preamble
-is raced against the executor and DROPPED if the answer starts first. Either way a
-client never has to decide what to do with one that arrives late — it simply will
-not.
+**A run of these events is normal, and every one REPLACES the last.** A runbook
+confirmation is typed out word by word to fill the gap before the answer starts,
+so a turn that shows one sends several `preamble` events in sequence. **Each
+carries the whole text so far**, not the new fragment — render `content`
+verbatim, replacing whatever is on screen. A client that appended would show the
+text growing quadratically.
+
+The `id` is stable across the run, so the frames of one confirmation can be told
+apart from a retried attempt's fresh one. The fast-response producer sends a
+single event; both are the same contract, and a client that always replaces
+handles both without knowing which it received.
+
+**Never after the first `delta`.** Typing is bounded by the executor: the moment
+it has output, the remaining text is flushed in one event and the run ends. A
+fast-response preamble is raced the same way and DROPPED if the answer starts
+first. Either way a client never has to decide what to do with one that arrives
+late — it simply will not.
 
 Nothing about the preamble reaches the main model: its request is byte-identical
 whether either producer ran, was withheld, or is switched off entirely.

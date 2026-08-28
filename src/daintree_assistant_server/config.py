@@ -248,6 +248,44 @@ DOCS_RUNBOOK_ID = "daintree.docs.answer-usage-question"
 #: confirmation; rewriting the confirmation is the right one.
 RUNBOOK_CONFIRMATION_THRESHOLD = 0.95
 
+#: How long the confirmation takes to type itself out, in seconds.
+#:
+#: The confirmation is streamed WORD BY WORD to fill the gap between `meta` and
+#: the executor's first output, so it occupies the slot reasoning and an opening
+#: sentence used to. The budget is measured rather than chosen —
+#: ``python -m benchmarks.executor_window.bench`` re-derives it, and reports
+#: whether the value still has headroom.
+#:
+#: Measured over 24 clean trials on a runbook-loading turn (two runs, trials
+#: spaced 3s to avoid the throttling that made an earlier back-to-back sample
+#: fail 6 of 9), request-in to the executor's first delta of ANY kind — content,
+#: reasoning or tool calls, whichever comes first:
+#:
+#:     p50 1.26s    p90 1.52s    min 0.98s    max 1.58s
+#:
+#: 0.8 x p90 is 1.22s, so the SUB-SECOND CAP is what binds, and it has to: the
+#: fastest turn observed left only 0.98s, and a budget at 1.0s would have
+#: overrun it. 0.9 leaves ~80ms against that fastest observation and ~360ms
+#: against the median.
+#:
+#: **Overrunning is survivable, which is what lets this be tuned tight rather
+#: than timid.** The executor's open is started BEFORE the pacing begins, so the
+#: two overlap; if its first output arrives mid-word the remaining text is
+#: flushed in one event and the answer proceeds. The cost of being slightly too
+#: slow is a confirmation that finishes instantly, never a delayed answer — so
+#: the number is chosen to make that rare, not impossible.
+#:
+#: Hardcoded like the model ids: how long the product pauses before answering is
+#: a benchmarked product decision, not an operational dial. Re-measure after a
+#: host or model change — every number above describes GLM-5.3-Flash on Baseten
+#: with a warm prefix cache, and nothing else.
+CONFIRMATION_PACING_SECONDS = 0.9
+
+#: Below this many words, pacing is pointless — the whole string lands in one
+#: event. A two-word fragment typed over 0.9s reads as a stall rather than as
+#: typing, and every shipped confirmation is far above it.
+CONFIRMATION_MIN_PACED_WORDS = 4
+
 # Thinking posture — hardcoded like the model ids, deliberately NOT env-config.
 # There is one optimum and the server ships it.
 #

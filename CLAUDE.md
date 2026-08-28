@@ -304,11 +304,33 @@ meaning. That is also the failure mode: a demonstration of the WRONG understandi
 worse than an acknowledgement that claimed nothing.
 
 **It replaces the Cerebras preamble stage with authored text and a dict lookup.** No call,
-no credential, no second host, no race — so it is emitted with `meta`, *before* the
-executor has opened, which is earlier than the stage it replaces could ever reach.
-`runbooks/confirmations.py` holds the gate; it is pure, total, and runs inline on the
-first-byte path. It rides the existing `preamble` SSE event, inheriting that event's
-display-only contract in the CLI rather than needing a second one.
+no credential, no second host. `runbooks/confirmations.py` holds the gate; it is pure,
+total, and runs inline on the first-byte path. It rides the existing `preamble` SSE
+event, inheriting that event's display-only contract in the CLI rather than needing a
+second one.
+
+**It is TYPED OUT, word by word, and the ordering that makes that safe is the whole
+trick.** The text is paced over `config.CONFIRMATION_PACING_SECONDS` (0.9s) so it
+occupies the slot reasoning and an opening sentence used to. Pacing costs wall-clock, so
+the executor's open is started FIRST and the words fill the gap it opens — emitted
+before it, as the first revision did, every turn showing one would be delayed by the
+whole budget. `test_typing_the_confirmation_does_not_delay_the_executor` is a clock
+assertion guarding exactly that, and it fails if the emission moves back.
+
+Frames are **cumulative**, because the CLI's rule for this event is REPLACE, never
+append (`preamble = pre.Content`) — word-deltas into a replacing consumer would leave
+the reader looking at the last word alone. And the executor is the real bound: the
+moment it has output the remaining text is flushed in one event, so a confirmation is
+never why an answer is late. That backstop is what lets the budget be tuned tight.
+
+**0.9s is measured, not chosen** (`benchmarks/executor_window`, which re-derives it).
+Over 24 clean trials — spaced 3s, because back-to-back calls failed 6 of 9 and a
+throttled sample reads as a slow model — the executor's first delta of ANY kind
+(content, reasoning or tool calls) arrived at p50 1.26s, p90 1.52s, min 0.98s. `0.8 ×
+p90` is 1.22s, so the sub-second cap binds — and it must: a 1.0s budget would have
+overrun the fastest turn observed. Note this is NOT the `latency` suite's `ttft_s`,
+which is first VISIBLE content and does not exist on the tool-calling turns where
+confirmations actually fire.
 
 **The form is a lead sentence then a scope sentence**, and the three constraints on it are
 each a revision that failed:

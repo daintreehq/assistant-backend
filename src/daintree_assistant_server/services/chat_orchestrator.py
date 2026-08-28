@@ -21,6 +21,8 @@ from pydantic import SecretStr
 
 from .. import PROTOCOL_VERSION, __version__
 from ..config import (
+    CONFIRMATION_MIN_PACED_WORDS,
+    CONFIRMATION_PACING_SECONDS,
     DOCS_RUNBOOK_ID,
     EXECUTOR_MODEL,
     EXECUTOR_PROVIDER,
@@ -70,7 +72,7 @@ from ..runbooks.active_set import (
     resolve_active_runbooks,
 )
 from ..runbooks.catalog import Catalog, CatalogManager
-from ..runbooks.confirmations import OpenerDecision, choose_opener, fold_announced
+from ..runbooks.confirmations import ConfirmationDecision, choose_confirmation, fold_announced
 from ..runbooks.decision import SelectionDecision
 from ..runbooks.fast_path import can_skip_selection
 from ..runbooks.load_events import RunbookLoadExecution
@@ -240,7 +242,7 @@ class _RespondMeta:
     # assistant-looking prose and no rule attached to it.
     confirmation: str | None = None
     #: Which runbook wrote it. Logging only; never leaves the server.
-    opener_runbook_id: str | None = None
+    confirmation_runbook_id: str | None = None
 
 
 @dataclass
@@ -1465,7 +1467,7 @@ class ChatOrchestrator:
         # to reassure — and its narrowed menu means the runbooks it does load are
         # research procedures nobody asked for by name.
         #
-        # `choose_opener` is pure and total; nothing here can fail the turn.
+        # `choose_confirmation` is pure and total; nothing here can fail the turn.
         #
         # Gated on STREAMING as well as the profile, and that is a correctness
         # fix rather than an optimisation: the decision is folded into the state
@@ -1475,9 +1477,9 @@ class ChatOrchestrator:
         # had never been told about. Computing it only where it can be shown is
         # what keeps "shown once" from meaning "shown at most once".
         confirmation = (
-            OpenerDecision()
+            ConfirmationDecision()
             if subagent or not request.generation.stream
-            else choose_opener(
+            else choose_confirmation(
                 # The SCORED members of the active set, not merely the newly
                 # loaded ones. Both are the same list on an ordinary first load,
                 # and they come apart in exactly the case the near-miss rule
@@ -1496,7 +1498,7 @@ class ChatOrchestrator:
         announced_ids = fold_announced(prior_announced, confirmation.announced)
         if confirmation.announced:
             logger.info(
-                "runbook_opener",
+                "runbook_confirmation",
                 request_id=request_id,
                 shown=confirmation.runbook_id,
                 # Non-empty means two runbooks cleared the floor on one turn and
@@ -1584,7 +1586,7 @@ class ChatOrchestrator:
             # before the executor opened and the preamble by definition cannot.
             # Unreachable while `FAST_RESPONSE_ENABLED` is False; it exists so
             # flipping that flag back on is not also a display bug.
-            FastResponsePolicyDecision(run=False, reason="runbook_opener_shown")
+            FastResponsePolicyDecision(run=False, reason="runbook_confirmation_shown")
             if confirmation.text
             else self._fast_response_policy(
                 request,
@@ -2015,6 +2017,97 @@ class ChatOrchestrator:
             content={"content": result.content},
         )
         yield self._sse("status", StreamStatus(phase="executor").model_dump())
+
+    async def _emit_confirmation(
+        self,
+        *,
+        meta: _RespondMeta,
+        timings: _Timings,
+        budget: RequestBudget | None,
+        trace: TraceScope | NullTraceScope,
+        open_task: asyncio.Task[Any] | None,
+    ) -> AsyncGenerator[str, None]:
+        """Type the runbook confirmation out, word by word, into the executor's gap.
+
+        **CUMULATIVE, not incremental.** Every event carries the whole text so
+        far, because the CLI's rule for this event is REPLACE, never append
+        (`internal/backend/sse.go`: `preamble = pre.Content`) — a rule that
+        exists so a retried attempt's line supersedes the abandoned one rather
+        than stacking beneath it. Sending word-deltas into a replacing consumer
+        would leave the reader looking at the last word alone. So the typewriter
+        effect is produced by resending, which costs a few KiB on a connection
+        that is about to carry a model's whole answer.
+
+        It rides `preamble` rather than a new event because everything that
+        event already promises is what a confirmation needs: display-only and
+        never committed to history (the executor never saw this text, so a
+        committed line would replay as an assistant turn the model has no memory
+        of writing); not a visible executor delta, so the retry layer still
+        treats the turn as replay-safe; invisible to bare-intent detection,
+        which would read a description of intended work as a false positive; and
+        outside the output lint, which measures the ANSWER. A second event type
+        would need all four restated, and the CLI already implements them here.
+
+        **The pacing is bounded by the executor, not by the clock.** The budget
+        (`config.CONFIRMATION_PACING_SECONDS`) is measured to finish inside the
+        gap on all but the fastest turns, and `open_task` is the backstop for the
+        rest: the moment the executor has something, the remaining words are
+        flushed in one event and this returns. That is what makes the budget
+        tunable tight — being slightly too slow costs a confirmation that
+        finishes instantly, never a delayed answer.
+
+        Yields nothing at all when the turn has no confirmation, which is most
+        turns.
+        """
+        text = meta.confirmation
+        if not text:
+            return
+
+        event_id = f"pre_{meta.request_id.split('_', 1)[-1]}"
+
+        def frame(content: str) -> str:
+            return self._sse(
+                "preamble",
+                StreamPreamble(id=event_id, content=content).model_dump(),
+            )
+
+        words = text.split()
+        # Below the floor, or with pacing switched off, the whole string lands in
+        # one event — a three-word fragment typed over a second reads as a stall
+        # rather than as typing.
+        if len(words) < CONFIRMATION_MIN_PACED_WORDS or CONFIRMATION_PACING_SECONDS <= 0:
+            yield frame(text)
+        else:
+            # Spread over the gaps BETWEEN words, not over the words: the first
+            # lands immediately, so n words have n-1 waits and the last one lands
+            # at the budget rather than one interval past it.
+            delay = CONFIRMATION_PACING_SECONDS / (len(words) - 1)
+            shown = words[0]
+            yield frame(shown)
+            for word in words[1:]:
+                if open_task is not None and open_task.done():
+                    # The executor got there first. Finish the sentence in one
+                    # event rather than racing it word by word — from here on,
+                    # every wait is a wait the reader is paying for the answer.
+                    break
+                await asyncio.sleep(delay)
+                shown = f"{shown} {word}"
+                yield frame(shown)
+            if shown != text:
+                yield frame(text)
+
+        # Stamped at the END, which is when the confirmation is actually complete
+        # on screen. `budget` is None only in tests.
+        timings.preamble_at_ms = round(budget.elapsed() * 1000) if budget is not None else 0
+        await trace.record_event(
+            "runbook_confirmation.emitted",
+            attributes={
+                "runbook_id": meta.confirmation_runbook_id,
+                "words": len(words),
+                "paced": len(words) >= CONFIRMATION_MIN_PACED_WORDS,
+            },
+            content={"content": text},
+        )
 
     def _abandon_open(self, task: asyncio.Task[Any], *, request_id: str) -> None:
         """Dispose of an executor open that nobody is going to consume.
@@ -2487,7 +2580,7 @@ class ChatOrchestrator:
         run_selector: bool,
         warnings: list[str],
         catalog: Catalog | None = None,
-        confirmation: OpenerDecision | None = None,
+        confirmation: ConfirmationDecision | None = None,
     ) -> _RespondMeta:
         selected_catalog = catalog or self.catalog
 
@@ -2538,7 +2631,7 @@ class ChatOrchestrator:
             selector_endpoint=decision.endpoint,
             selector_usage=decision.usage,
             confirmation=confirmation.text if confirmation is not None else None,
-            opener_runbook_id=confirmation.runbook_id if confirmation is not None else None,
+            confirmation_runbook_id=confirmation.runbook_id if confirmation is not None else None,
         )
 
     # ---- response bodies ------------------------------------------------
@@ -2905,6 +2998,8 @@ class ChatOrchestrator:
         # Up to that point nothing of the retry is public, so the first attempt is
         # still replay-safe and remains the honest fail-open answer.
         fallback: tuple[list[StreamDelta], str | None, str] | None = None
+        # The confirmation is typed once per TURN, not once per open attempt.
+        confirmation_sent = False
         try:
             # The metadata event is always first, before any token: the client gets
             # the runbook prelude, active set, refreshed state, and selector outcome
@@ -2922,46 +3017,6 @@ class ChatOrchestrator:
                     warnings=meta.warnings,
                 ).model_dump(exclude_none=True),
             )
-
-            # THE RUNBOOK CONFIRMATION, emitted the instant `meta` is out.
-            #
-            # It rides the `preamble` event rather than getting one of its own,
-            # and that is a contract decision rather than a shortcut: everything
-            # this event already promises is exactly what a confirmation needs. It is
-            # display-only and must never be committed to conversation history
-            # (the executor did not write it and has never seen it, so a client
-            # that committed one would replay an assistant turn the model has no
-            # memory of); it must not count as a visible executor delta, so the
-            # retry layer still treats the turn as replay-safe; bare-intent
-            # detection must not read it, since a line announcing intended work
-            # is a guaranteed false positive; and the output lint measures the
-            # ANSWER, which this is not part of. A second event would need every
-            # one of those rules restated, and the CLI already implements them
-            # here — including replace-not-append across a retried attempt.
-            #
-            # No `status` event around it. `fast_response` announced that a stage
-            # was RUNNING, which was worth saying while a second host was being
-            # waited on; there is nothing to wait for here, so a phase marker
-            # would describe a gap that does not exist.
-            if meta.confirmation:
-                yield self._sse(
-                    "preamble",
-                    StreamPreamble(
-                        id=f"pre_{meta.request_id.split('_', 1)[-1]}",
-                        content=meta.confirmation,
-                    ).model_dump(),
-                )
-                # The confirmation occupies the same slot the preamble did, so it feeds
-                # the same timing field — this is when the user first saw
-                # anything. `budget` is None only in tests.
-                timings.preamble_at_ms = (
-                    round(budget.elapsed() * 1000) if budget is not None else 0
-                )
-                await trace.record_event(
-                    "runbook_opener.emitted",
-                    attributes={"runbook_id": meta.opener_runbook_id},
-                    content={"content": meta.confirmation},
-                )
 
             # The preamble, if it has somehow already landed. Almost never: the
             # two calls left together moments ago and this runs immediately after
@@ -3006,6 +3061,29 @@ class ChatOrchestrator:
                     )
                     opened: tuple[ProviderStream, dict[str, Any] | None, int] | None = None
                     try:
+                        # THE RUNBOOK CONFIRMATION, typed out into the gap the open
+                        # just opened.
+                        #
+                        # It is emitted HERE, after `open_task` exists, and the
+                        # ordering is the whole point: pacing costs wall-clock, so
+                        # emitting before the open would have delayed the executor
+                        # by exactly the pacing budget. Started first, the two
+                        # overlap and the confirmation is free.
+                        #
+                        # Once per turn, never on the bare-intent re-roll — the
+                        # loop re-enters with `stream = None`, and re-typing a
+                        # sentence the reader already has would delay the retry to
+                        # repeat itself.
+                        if not confirmation_sent:
+                            confirmation_sent = True
+                            async for event in self._emit_confirmation(
+                                meta=meta,
+                                timings=timings,
+                                budget=budget,
+                                trace=trace,
+                                open_task=open_task,
+                            ):
+                                yield event
                         while gate.pending and gate.task is not None and not open_task.done():
                             await asyncio.wait(
                                 (open_task, gate.task),
