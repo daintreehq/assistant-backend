@@ -86,10 +86,11 @@ def test_a_confident_first_load_shows_its_confirmation_before_any_output(
     # of fragments that does not reassemble into the text.
     assert frames, "the confirmation must reach the wire"
     assert "".join(frames) == full
-    # Typed, not dumped. Reassembly alone is satisfied by a single whole frame —
-    # which is exactly what turning pacing off produces — so the count is what
-    # keeps this test honest about the shipped behaviour.
-    assert len(frames) > 1, "the shipped config types the confirmation out"
+    # ONE frame under the shipped config: typing is off until the panel's
+    # vendored CLI accumulates fragments, and one whole frame is what every CLI
+    # version renders correctly. `test_confirmation_pacing.py` drives the typed
+    # path directly.
+    assert len(frames) == 1, "the shipped config delivers the sentence whole"
 
 
 def test_a_load_below_the_floor_stays_quiet(

@@ -264,9 +264,15 @@ RUNBOOK_CONFIRMATION_THRESHOLD = 0.95
 #: `internal/backend/client.go` now accumulates fragments and forwards only the
 #: new suffix, falling back to first-wins when a replay's text is not a
 #: prefix-extension of what is already shown. Both renderers append, so the
-#: separator before the answer moved to the first executor token. Turning this
-#: back off is safe at any time; turning it on against an older CLI is not.
-CONFIRMATION_PACING_ENABLED = True
+#: separator before the answer moved to the first executor token.
+#:
+#: **False until that reaches the panel.** The desktop panel VENDORS the CLI
+#: rather than tracking this repo's submodule, so the fix has to be pinned there
+#: too; against an older build a typed run still renders as its first word.
+#: Delivering the sentence in one frame is correct on every version, which is
+#: why this is the safe default rather than the finished one. Flip it once the
+#: panel carries a CLI with fragment accumulation.
+CONFIRMATION_PACING_ENABLED = False
 
 #: How long the confirmation takes to type itself out, in seconds.
 #:

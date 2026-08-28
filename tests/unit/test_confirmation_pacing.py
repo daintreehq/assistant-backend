@@ -41,6 +41,20 @@ def _meta(text: str | None) -> _RespondMeta:
     )
 
 
+@pytest.fixture
+def paced(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force the typed path on.
+
+    It is off in the shipped config while the panel's vendored CLI catches up
+    (`test_pacing_is_off_in_the_shipped_config` says why). The mechanism is live
+    and measured, and letting it rot untested until then is how it stops working
+    before anyone can turn it back on.
+    """
+    from daintree_assistant_server.services import chat_orchestrator as orch
+
+    monkeypatch.setattr(orch, "CONFIRMATION_PACING_ENABLED", True)
+
+
 async def _collect(orchestrator: Any, text: str | None, open_task: Any = None) -> list[str]:
     frames: list[str] = []
     async for chunk in orchestrator._emit_confirmation(
@@ -70,7 +84,7 @@ async def test_a_turn_with_no_confirmation_emits_nothing(orchestrator: Any) -> N
 
 @pytest.mark.asyncio
 async def test_frames_are_incremental_because_every_renderer_appends(
-    orchestrator: Any,
+    orchestrator: Any, paced: None,
 ) -> None:
     """Fragments, not accumulations — and they must rebuild the text EXACTLY.
 
@@ -92,7 +106,7 @@ async def test_frames_are_incremental_because_every_renderer_appends(
 
 
 @pytest.mark.asyncio
-async def test_typing_finishes_inside_the_budget(orchestrator: Any) -> None:
+async def test_typing_finishes_inside_the_budget(orchestrator: Any, paced: None) -> None:
     """The whole point of the number: it fits in the gap it was measured against.
 
     `CONFIRMATION_PACING_SECONDS` is set from a live measurement of the
@@ -132,7 +146,7 @@ async def test_a_short_confirmation_is_not_paced(orchestrator: Any) -> None:
 
 @pytest.mark.asyncio
 async def test_an_executor_that_gets_there_first_flushes_the_rest(
-    orchestrator: Any,
+    orchestrator: Any, paced: None,
 ) -> None:
     """The backstop that makes a tight budget safe.
 
@@ -152,50 +166,39 @@ async def test_an_executor_that_gets_there_first_flushes_the_rest(
     assert elapsed < 0.2, "an executor that is ready must not be waited on"
 
 
-def test_pacing_is_on_in_the_shipped_config() -> None:
+def test_pacing_is_off_in_the_shipped_config() -> None:
     """The default itself, asserted — not a monkeypatched stand-in for it.
 
-    Every other test here would pass with pacing reverted to False: the
-    reassembly assertions accept one whole frame, which is exactly what the
-    unpaced path emits. So the thing that would actually regress — the product
-    silently going back to delivering the sentence in one block — needs the
-    constant pinned directly.
+    OFF, and deliberately: the desktop panel vendors the CLI rather than tracking
+    this repo's submodule, so fragment accumulation has to be pinned there before
+    typing renders. Against an older build a typed run shows its first word and
+    nothing else, which is the bug this constant exists to avoid shipping.
+
+    Pinned directly because every reassembly assertion in this file is satisfied
+    by one whole frame — so nothing else here would notice the constant moving in
+    either direction.
     """
     from daintree_assistant_server.config import CONFIRMATION_PACING_ENABLED
 
-    assert CONFIRMATION_PACING_ENABLED is True
+    assert CONFIRMATION_PACING_ENABLED is False
 
 
 @pytest.mark.asyncio
-async def test_the_default_path_actually_types(orchestrator: Any) -> None:
-    """No monkeypatching: this is what a real turn produces.
+async def test_the_default_path_delivers_one_whole_frame(orchestrator: Any) -> None:
+    """No monkeypatching: this is what a real turn produces today.
 
-    The paced tests above assert reassembly, which one whole frame also
-    satisfies. This one requires MANY fragments through the shipped config, so
-    turning pacing off fails here rather than passing everything quietly.
+    One frame carrying the whole sentence, which every CLI version renders
+    correctly — the compatibility shape, and the reason the constant is off.
     """
-    frames = await _collect(orchestrator, TEXT)
-
-    assert len(frames) > 1, "the shipped config must type, not dump"
-    assert "".join(frames) == TEXT
-
-
-@pytest.mark.asyncio
-async def test_pacing_off_delivers_the_whole_text(
-    orchestrator: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The compatibility path, for an older client that keeps only one frame."""
-    from daintree_assistant_server.services import chat_orchestrator as orch
-
-    monkeypatch.setattr(orch, "CONFIRMATION_PACING_ENABLED", False)
     frames = await _collect(orchestrator, TEXT)
 
     assert frames == [TEXT], "one frame, whole text — never a prefix"
 
 
 @pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_readiness_cancels_the_timer_rather_than_waiting_it_out(
-    orchestrator: Any,
+    orchestrator: Any, paced: None,
 ) -> None:
     """The flush must RACE the sleep, not be checked before it.
 

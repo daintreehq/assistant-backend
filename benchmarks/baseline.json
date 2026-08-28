@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:d0f84c3a46c6c1e74225c2337881703e9f28d1f2b7e1ecc739c5c40ce345ea23",
+    "revision": "sha256:c29b8c63515b8514d5c2f7602a78d09092ff1d262221e31915ec4c9be70186ba",
     "runbooks": 39
   },
   "identity": {
@@ -25,6 +25,6 @@
   "tools": {
     "count": 96,
     "names_sha256": "7dcd09107bfe7782eae59072ca84fb50043adee54542b4545ef7e3efce7ba577",
-    "tool_inventory_bytes": 119303
+    "tool_inventory_bytes": 118522
   }
 }
