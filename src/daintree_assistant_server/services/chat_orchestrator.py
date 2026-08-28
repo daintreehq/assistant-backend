@@ -2031,14 +2031,16 @@ class ChatOrchestrator:
     ) -> AsyncGenerator[str, None]:
         """Type the runbook confirmation out, word by word, into the executor's gap.
 
-        **CUMULATIVE, not incremental.** Every event carries the whole text so
-        far, because the CLI's rule for this event is REPLACE, never append
-        (`internal/backend/sse.go`: `preamble = pre.Content`) — a rule that
-        exists so a retried attempt's line supersedes the abandoned one rather
-        than stacking beneath it. Sending word-deltas into a replacing consumer
-        would leave the reader looking at the last word alone. So the typewriter
-        effect is produced by resending, which costs a few KiB on a connection
-        that is about to carry a model's whole answer.
+        **INCREMENTAL, not cumulative.** Every event carries only the NEW bytes,
+        because every renderer in the CLI appends: `host.Bridge` turns a preamble
+        into an ordinary turn token, and the console sink writes it. A cumulative
+        frame would stack quadratically in both. The client accumulates the
+        fragments and commits the whole sentence
+        (`internal/backend/client.go`).
+
+        Fragments are exact byte deltas — `"Running"`, `" a"`, `" scored"` — and
+        that matters: splitting on whitespace and rejoining with a single space
+        would rewrite authored text that happened to contain any other spacing.
 
         It rides `preamble` rather than a new event because everything that
         event already promises is what a confirmation needs: display-only and
@@ -2101,9 +2103,9 @@ class ChatOrchestrator:
             ready = await wait(CONFIRMATION_LEAD_IN_SECONDS)
 
         words = text.split()
-        # Whole-string delivery: pacing switched off (the shipped CLI keeps only
-        # the first frame — see `config.CONFIRMATION_PACING_ENABLED`), or a
-        # confirmation too short for typing to read as anything but a stall.
+        # Whole-string delivery: pacing switched off, or a confirmation too short
+        # for typing to read as anything but a stall. One fragment carrying the
+        # whole sentence is the same contract the client already appends.
         if (
             not CONFIRMATION_PACING_ENABLED
             or len(words) < CONFIRMATION_MIN_PACED_WORDS
@@ -2115,19 +2117,26 @@ class ChatOrchestrator:
             # lands immediately, so n words have n-1 waits and the last one lands
             # at the budget rather than one interval past it.
             delay = CONFIRMATION_PACING_SECONDS / (len(words) - 1)
-            shown = words[0]
-            yield frame(shown)
-            for word in words[1:]:
+            # Byte offsets, so the fragments reassemble into the authored string
+            # exactly. `split()` discards the ORIGINAL separators; walking the
+            # text keeps them.
+            cuts: list[int] = []
+            at = 0
+            for word in words[:-1]:
+                at = text.index(word, at) + len(word)
+                cuts.append(at)
+            sent = 0
+            for cut in cuts:
+                yield frame(text[sent:cut])
+                sent = cut
                 if ready:
                     # The executor got there first. Finish the sentence in one
                     # event rather than racing it word by word — from here on,
                     # every wait is a wait the reader is paying for the answer.
                     break
                 ready = await wait(delay)
-                shown = f"{shown} {word}"
-                yield frame(shown)
-            if shown != text:
-                yield frame(text)
+            if sent < len(text):
+                yield frame(text[sent:])
 
         # Stamped at the END, which is when the confirmation is actually complete
         # on screen. `budget` is None only in tests.

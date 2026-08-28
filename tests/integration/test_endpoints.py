@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from unit.test_task_runner import EXPECTED_TASK_IDS
 
 from daintree_assistant_server import PROTOCOL_MAX, PROTOCOL_MIN
+from daintree_assistant_server.config import CONFIRMATION_PACING_ENABLED
 from daintree_assistant_server.main import create_app
 
 RUNBOOK_PREP = "daintree.workflow.prep-branch-for-review"
@@ -202,7 +203,11 @@ def test_capabilities(client, auth, app) -> None:
     assert fast["event"] == "preamble"
     assert fast["commit"] == "never"
     assert fast["retry_safe_before_executor_delta"] is True
-    assert fast["at_most_one_per_turn"] is True
+    # Tracks the pacing constant rather than being asserted flat: typing the
+    # confirmation out sends a RUN of events, so this is False whenever pacing
+    # is on. A client reading it as a permanent guarantee would break the turn
+    # that landed; reading it per-connection is exactly what it is for.
+    assert fast["at_most_one_per_turn"] is not CONFIRMATION_PACING_ENABLED
     assert fast["never_after_first_delta"] is True
     # The old sequential contract must be GONE, not merely falsified: a client
     # still reading these keys was built against a design where the preamble was

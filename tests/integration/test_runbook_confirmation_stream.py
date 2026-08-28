@@ -79,17 +79,17 @@ def test_a_confident_first_load_shows_its_confirmation_before_any_output(
     assert all(i < first_delta for i, n in enumerate(names) if n == "preamble")
 
     full = _confirmation_text(client)
-    # Under the SHIPPED config this is one frame carrying the whole sentence.
-    # Paced, it is a run of cumulative prefixes ending in the same string. Both
-    # are asserted the same way, because what a client must never receive is a
-    # final frame that is only part of the text — which is exactly the bug the
-    # shipped CLI produces when pacing is on (see
-    # `config.CONFIRMATION_PACING_ENABLED`).
+    # INCREMENTAL fragments that rebuild the authored text byte for byte. Every
+    # renderer in the CLI appends, so a cumulative frame would stack. Unpaced,
+    # this is a single fragment carrying the whole sentence — the same assertion
+    # covers both, which is the point: what a client must never receive is a set
+    # of fragments that does not reassemble into the text.
     assert frames, "the confirmation must reach the wire"
-    assert frames[-1] == full
-    assert frames == sorted(frames, key=len), "frames must grow monotonically"
-    for frame in frames:
-        assert full.startswith(frame), f"{frame!r} is not a prefix of the text"
+    assert "".join(frames) == full
+    # Typed, not dumped. Reassembly alone is satisfied by a single whole frame —
+    # which is exactly what turning pacing off produces — so the count is what
+    # keeps this test honest about the shipped behaviour.
+    assert len(frames) > 1, "the shipped config types the confirmation out"
 
 
 def test_a_load_below_the_floor_stays_quiet(
@@ -395,7 +395,7 @@ def test_a_suppressed_runner_up_is_spent_and_does_not_announce_later(
     first_events, first_names = _turn(client, auth, turn_id="t1")
     assert "preamble" in first_names
     # The LAST frame is the whole text; the earlier ones are prefixes of it.
-    shown = [d["content"] for n, d in first_events if n == "preamble"][-1]
+    shown = "".join(d["content"] for n, d in first_events if n == "preamble")
     first_meta = next(d for n, d in first_events if n == "meta")
     active = [r["id"] for r in first_meta["runbooks"]["active"]]
     assert RUNBOOK in active and OTHER_RUNBOOK in active

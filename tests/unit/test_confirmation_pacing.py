@@ -22,20 +22,6 @@ from daintree_assistant_server.config import (
 from daintree_assistant_server.contracts.daintree_api import RunbooksBlock
 from daintree_assistant_server.services.chat_orchestrator import _RespondMeta, _Timings
 
-#: Pacing is OFF in the shipped config until the CLI stops discarding every
-#: frame after the first (`config.CONFIRMATION_PACING_ENABLED`). These tests
-#: force it on: the mechanism is live and measured, and letting it rot untested
-#: while it waits on another repo is how it would stop working before anyone
-#: could switch it back on. `test_the_shipped_config_delivers_the_whole_text`
-#: pins the DEFAULT.
-
-
-@pytest.fixture(autouse=True)
-def _paced(monkeypatch: pytest.MonkeyPatch) -> None:
-    from daintree_assistant_server.services import chat_orchestrator as orch
-
-    monkeypatch.setattr(orch, "CONFIRMATION_PACING_ENABLED", True)
-
 TEXT = (
     "Diagnosing a failing check. The aim is to get from the symptom to the actual "
     "error output before proposing anything, since a check name says what failed "
@@ -83,23 +69,26 @@ async def test_a_turn_with_no_confirmation_emits_nothing(orchestrator: Any) -> N
 
 
 @pytest.mark.asyncio
-async def test_frames_are_cumulative_because_the_client_replaces(
+async def test_frames_are_incremental_because_every_renderer_appends(
     orchestrator: Any,
 ) -> None:
-    """The CLI sets `preamble = pre.Content` — REPLACE, never append.
+    """Fragments, not accumulations — and they must rebuild the text EXACTLY.
 
-    Word-DELTAS into a replacing consumer would leave the reader looking at the
-    last word on its own, which is the one shape that looks like a bug rather
-    than like typing. Every frame therefore carries the whole text so far.
+    Every renderer in the CLI appends: `host.Bridge` turns a preamble into an
+    ordinary turn token and the console sink writes it, so a cumulative frame
+    would stack quadratically in both. The client accumulates and commits the
+    whole sentence.
+
+    Byte-exact reassembly is the part that is easy to get wrong: splitting on
+    whitespace and rejoining with a single space rewrites any authored text whose
+    spacing differs, and the corruption would be invisible in a test that only
+    compared word lists.
     """
     frames = await _collect(orchestrator, TEXT)
 
-    assert len(frames) == len(TEXT.split()), "one frame per word"
-    assert frames[-1] == TEXT
-    assert frames[0] == TEXT.split()[0]
-    for earlier, later in zip(frames, frames[1:], strict=False):
-        assert later.startswith(earlier), "frames must only grow"
-        assert TEXT.startswith(later)
+    assert len(frames) == len(TEXT.split()), "one fragment per word"
+    assert "".join(frames) == TEXT, "fragments must rebuild the text byte for byte"
+    assert frames[0] == TEXT.split()[0], "the first fragment carries no leading space"
 
 
 @pytest.mark.asyncio
@@ -158,22 +147,44 @@ async def test_an_executor_that_gets_there_first_flushes_the_rest(
     frames = await _collect(orchestrator, TEXT, open_task=done)
     elapsed = time.perf_counter() - start
 
-    assert frames[-1] == TEXT, "the whole text still reaches the reader"
+    assert "".join(frames) == TEXT, "the whole text still reaches the reader"
     assert len(frames) < len(TEXT.split()), "it must not keep typing word by word"
     assert elapsed < 0.2, "an executor that is ready must not be waited on"
 
 
+def test_pacing_is_on_in_the_shipped_config() -> None:
+    """The default itself, asserted — not a monkeypatched stand-in for it.
+
+    Every other test here would pass with pacing reverted to False: the
+    reassembly assertions accept one whole frame, which is exactly what the
+    unpaced path emits. So the thing that would actually regress — the product
+    silently going back to delivering the sentence in one block — needs the
+    constant pinned directly.
+    """
+    from daintree_assistant_server.config import CONFIRMATION_PACING_ENABLED
+
+    assert CONFIRMATION_PACING_ENABLED is True
+
+
 @pytest.mark.asyncio
-async def test_the_shipped_config_delivers_the_whole_text(
+async def test_the_default_path_actually_types(orchestrator: Any) -> None:
+    """No monkeypatching: this is what a real turn produces.
+
+    The paced tests above assert reassembly, which one whole frame also
+    satisfies. This one requires MANY fragments through the shipped config, so
+    turning pacing off fails here rather than passing everything quietly.
+    """
+    frames = await _collect(orchestrator, TEXT)
+
+    assert len(frames) > 1, "the shipped config must type, not dump"
+    assert "".join(frames) == TEXT
+
+
+@pytest.mark.asyncio
+async def test_pacing_off_delivers_the_whole_text(
     orchestrator: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """What a real client gets today: one frame, the whole sentence.
-
-    The paced tests above force the flag on. This one pins the shipped default,
-    because it is the only behaviour a user currently sees — and because the bug
-    it exists to prevent is not a crash but a confirmation rendered as its first
-    word, which every other test here would pass straight through.
-    """
+    """The compatibility path, for an older client that keeps only one frame."""
     from daintree_assistant_server.services import chat_orchestrator as orch
 
     monkeypatch.setattr(orch, "CONFIRMATION_PACING_ENABLED", False)
@@ -206,7 +217,7 @@ async def test_readiness_cancels_the_timer_rather_than_waiting_it_out(
     frames = await _collect(orchestrator, TEXT, open_task=open_task)
     elapsed = time.perf_counter() - start
 
-    assert frames[-1] == TEXT, "the whole text still reaches the reader"
+    assert "".join(frames) == TEXT, "the whole text still reaches the reader"
     # Well INSIDE the lead-in: racing finishes just after 0.05s, while a
     # pre-check plus an unconditional sleep finishes at the full 0.2s.
     assert elapsed < CONFIRMATION_LEAD_IN_SECONDS * 0.6, (

@@ -248,28 +248,25 @@ DOCS_RUNBOOK_ID = "daintree.docs.answer-usage-question"
 #: confirmation; rewriting the confirmation is the right one.
 RUNBOOK_CONFIRMATION_THRESHOLD = 0.95
 
-#: Whether the confirmation is TYPED OUT or delivered whole. **It is not.**
+#: Whether the confirmation is TYPED OUT or delivered whole. **It is typed.**
 #:
-#: Typing works by resending the text with one more word each time, because the
-#: `preamble` event's contract is replace-not-append. Today's CLI implements a
-#: strictly narrower rule — FIRST-WINS (`internal/backend/client.go`):
+#: The text is sent as a run of INCREMENTAL byte fragments on the `preamble`
+#: event, one per word, which the client appends. False collapses it to a single
+#: fragment carrying the whole sentence — the same wire contract, one frame.
 #:
-#:     cb.OnPreamble = func(p StreamPreamble) {
-#:         if shownPreamble != "" { return }   // every later frame discarded
+#: It shipped False for one revision, and the reason is worth keeping: the CLI
+#: took the FIRST preamble event and discarded the rest, a guard against a
+#: retried attempt stacking a second line under one already on screen. A typed
+#: run hit it as attempts 2..n, so the reader saw a single word. Measured against
+#: the live server at the time: 17 frames sent, `'Running'` through to the full
+#: sentence, and `Running` on screen.
 #:
-#: which exists so a RETRIED attempt cannot stack a second preamble under the
-#: one already on screen. A paced run hits that guard as attempts 2..n, so the
-#: reader sees frame one — a single word — and nothing else. Verified against the
-#: live server: 17 frames sent, `'Running'` through to the full sentence, and the
-#: CLI renders `Running`.
-#:
-#: So this stays False until the CLI distinguishes "another frame of the same
-#: confirmation" from "a replayed attempt's fresh one" — last-wins WITHIN an
-#: attempt, first-wins ACROSS them. `replaySafe` and the commit join both read
-#: only the final value, so neither has to change.
-#:
-#: Everything below is live and measured; flipping this one word restores it.
-CONFIRMATION_PACING_ENABLED = False
+#: `internal/backend/client.go` now accumulates fragments and forwards only the
+#: new suffix, falling back to first-wins when a replay's text is not a
+#: prefix-extension of what is already shown. Both renderers append, so the
+#: separator before the answer moved to the first executor token. Turning this
+#: back off is safe at any time; turning it on against an older CLI is not.
+CONFIRMATION_PACING_ENABLED = True
 
 #: How long the confirmation takes to type itself out, in seconds.
 #:

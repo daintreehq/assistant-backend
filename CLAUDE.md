@@ -318,11 +318,14 @@ before it, as the first revision did, every turn showing one would be delayed by
 whole budget. `test_typing_the_confirmation_does_not_delay_the_executor` is a clock
 assertion guarding exactly that, and it fails if the emission moves back.
 
-Frames are **cumulative**, because the CLI's rule for this event is REPLACE, never
-append (`preamble = pre.Content`) — word-deltas into a replacing consumer would leave
-the reader looking at the last word alone. And the executor is the real bound: the
-moment it has output the remaining text is flushed in one event, so a confirmation is
-never why an answer is late. That backstop is what lets the budget be tuned tight.
+Frames are **incremental** — each carries only the new bytes — because every renderer
+in the CLI appends: `host.Bridge` turns a preamble into an ordinary turn token and the
+console sink writes it, so a cumulative frame would stack quadratically in both. The
+client accumulates them and commits the whole sentence. Fragments are exact byte
+deltas rather than whitespace-split words, or authored spacing would be rewritten on
+reassembly. And the executor is the real bound: the moment it has output the remaining
+text is flushed in one event, so a confirmation is never why an answer is late — that
+backstop is what lets the budget be tuned tight.
 
 **The 1.2s total is measured against, not chosen** (`benchmarks/executor_window`).
 Over 24 clean trials — spaced 3s, because back-to-back calls failed 6 of 9 and a

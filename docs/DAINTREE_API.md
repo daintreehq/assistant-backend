@@ -890,17 +890,25 @@ what the request is taken to BE, never what is about to be done.
 `provisional` and `commit_on` are still on the payload for clients that already
 read them. A client following the rule above never reaches a commit.
 
-**A run of these events is normal, and every one REPLACES the last.** A runbook
-confirmation is typed out word by word to fill the gap before the answer starts,
-so a turn that shows one sends several `preamble` events in sequence. **Each
-carries the whole text so far**, not the new fragment — render `content`
-verbatim, replacing whatever is on screen. A client that appended would show the
-text growing quadratically.
+**A run of these events is normal, and every one carries only the NEW bytes.** A
+runbook confirmation is typed out word by word to fill the gap before the answer
+starts, so a turn that shows one sends several `preamble` events in sequence.
+**APPEND them**: `content` is a fragment, not the text so far. Concatenated in
+order they reproduce the authored sentence byte for byte, including its original
+spacing. Separators travel WITH the fragment that follows them, so a fragment
+typically begins with the space before its word — but do not rely on that shape:
+whatever whitespace the text contained is preserved wherever it fell, and
+concatenation is the only guarantee.
 
-The `id` is stable across the run, so the frames of one confirmation can be told
-apart from a retried attempt's fresh one. The fast-response producer sends a
-single event; both are the same contract, and a client that always replaces
+Do not split or normalise them; a client that rejoined the fragments with its own
+separator would rewrite the text. The fast-response producer sends a single
+fragment that happens to be the whole line, so a client that always appends
 handles both without knowing which it received.
+
+The `id` is stable across the run. A retried attempt re-sends the sentence from
+its first word, so a client that has already shown part of it should append only
+what extends past what is on screen, and drop a replay whose text diverges
+outright (`internal/backend/client.go` does exactly this).
 
 **Never after the first `delta`.** Typing is bounded by the executor: the moment
 it has output, the remaining text is flushed in one event and the run ends. A
