@@ -55,7 +55,7 @@ def _turn(
     return events, [name or "" for name, _ in events]
 
 
-def test_a_confident_first_load_types_its_confirmation_before_any_output(
+def test_a_confident_first_load_shows_its_confirmation_before_any_output(
     client: Any, auth: dict[str, str], fake_provider: Any
 ) -> None:
     """The whole feature, on the wire.
@@ -71,18 +71,21 @@ def test_a_confident_first_load_types_its_confirmation_before_any_output(
     assert names[0] == "meta", "meta carries the state the client needs first"
     assert names[-1] == "done"
 
-    # PACED: the confirmation arrives as a run of `preamble` events typed out
-    # word by word, and every one of them precedes the executor's first delta.
-    # That ordering is the feature — the words fill the gap rather than
-    # interleaving with the answer.
+    # Every frame precedes the executor's first delta. That ordering is the
+    # feature — the confirmation fills the gap rather than interleaving with the
+    # answer — and it holds whether or not pacing is on.
     frames = [data["content"] for name, data in events if name == "preamble"]
-    assert len(frames) > 1, "the confirmation should be typed, not dumped"
     first_delta = names.index("delta")
     assert all(i < first_delta for i, n in enumerate(names) if n == "preamble")
 
-    # CUMULATIVE, because the CLI REPLACES rather than appends. Word-deltas into
-    # a replacing consumer would leave the reader looking at the final word alone.
     full = _confirmation_text(client)
+    # Under the SHIPPED config this is one frame carrying the whole sentence.
+    # Paced, it is a run of cumulative prefixes ending in the same string. Both
+    # are asserted the same way, because what a client must never receive is a
+    # final frame that is only part of the text — which is exactly the bug the
+    # shipped CLI produces when pacing is on (see
+    # `config.CONFIRMATION_PACING_ENABLED`).
+    assert frames, "the confirmation must reach the wire"
     assert frames[-1] == full
     assert frames == sorted(frames, key=len), "frames must grow monotonically"
     for frame in frames:

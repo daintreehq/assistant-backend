@@ -23,6 +23,7 @@ from .. import PROTOCOL_VERSION, __version__
 from ..config import (
     CONFIRMATION_LEAD_IN_SECONDS,
     CONFIRMATION_MIN_PACED_WORDS,
+    CONFIRMATION_PACING_ENABLED,
     CONFIRMATION_PACING_SECONDS,
     DOCS_RUNBOOK_ID,
     EXECUTOR_MODEL,
@@ -2081,10 +2082,14 @@ class ChatOrchestrator:
             await asyncio.sleep(CONFIRMATION_LEAD_IN_SECONDS)
 
         words = text.split()
-        # Below the floor, or with pacing switched off, the whole string lands in
-        # one event — a three-word fragment typed over a second reads as a stall
-        # rather than as typing.
-        if len(words) < CONFIRMATION_MIN_PACED_WORDS or CONFIRMATION_PACING_SECONDS <= 0:
+        # Whole-string delivery: pacing switched off (the shipped CLI keeps only
+        # the first frame — see `config.CONFIRMATION_PACING_ENABLED`), or a
+        # confirmation too short for typing to read as anything but a stall.
+        if (
+            not CONFIRMATION_PACING_ENABLED
+            or len(words) < CONFIRMATION_MIN_PACED_WORDS
+            or CONFIRMATION_PACING_SECONDS <= 0
+        ):
             yield frame(text)
         else:
             # Spread over the gaps BETWEEN words, not over the words: the first
@@ -2113,7 +2118,10 @@ class ChatOrchestrator:
             attributes={
                 "runbook_id": meta.confirmation_runbook_id,
                 "words": len(words),
-                "paced": len(words) >= CONFIRMATION_MIN_PACED_WORDS,
+                "paced": (
+                    CONFIRMATION_PACING_ENABLED
+                    and len(words) >= CONFIRMATION_MIN_PACED_WORDS
+                ),
             },
             content={"content": text},
         )

@@ -22,6 +22,20 @@ from daintree_assistant_server.config import (
 from daintree_assistant_server.contracts.daintree_api import RunbooksBlock
 from daintree_assistant_server.services.chat_orchestrator import _RespondMeta, _Timings
 
+#: Pacing is OFF in the shipped config until the CLI stops discarding every
+#: frame after the first (`config.CONFIRMATION_PACING_ENABLED`). These tests
+#: force it on: the mechanism is live and measured, and letting it rot untested
+#: while it waits on another repo is how it would stop working before anyone
+#: could switch it back on. `test_the_shipped_config_delivers_the_whole_text`
+#: pins the DEFAULT.
+
+
+@pytest.fixture(autouse=True)
+def _paced(monkeypatch: pytest.MonkeyPatch) -> None:
+    from daintree_assistant_server.services import chat_orchestrator as orch
+
+    monkeypatch.setattr(orch, "CONFIRMATION_PACING_ENABLED", True)
+
 TEXT = (
     "Diagnosing a failing check. The aim is to get from the symptom to the actual "
     "error output before proposing anything, since a check name says what failed "
@@ -147,3 +161,22 @@ async def test_an_executor_that_gets_there_first_flushes_the_rest(
     assert frames[-1] == TEXT, "the whole text still reaches the reader"
     assert len(frames) < len(TEXT.split()), "it must not keep typing word by word"
     assert elapsed < 0.2, "an executor that is ready must not be waited on"
+
+
+@pytest.mark.asyncio
+async def test_the_shipped_config_delivers_the_whole_text(
+    orchestrator: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """What a real client gets today: one frame, the whole sentence.
+
+    The paced tests above force the flag on. This one pins the shipped default,
+    because it is the only behaviour a user currently sees — and because the bug
+    it exists to prevent is not a crash but a confirmation rendered as its first
+    word, which every other test here would pass straight through.
+    """
+    from daintree_assistant_server.services import chat_orchestrator as orch
+
+    monkeypatch.setattr(orch, "CONFIRMATION_PACING_ENABLED", False)
+    frames = await _collect(orchestrator, TEXT)
+
+    assert frames == [TEXT], "one frame, whole text — never a prefix"
