@@ -53,6 +53,18 @@ class StatePayload(BaseModel):
     # Scoped to `last_turn_id` by the reader: a NEW instruction gets its own
     # classification, so a stale query must never search on its behalf.
     docs_query: str | None = None
+    # Runbooks whose OPENER has already been shown, or spent, in this
+    # conversation (``runbooks/openers.py``). Not a subset of
+    # ``active_runbooks``: it outlives eviction, which is the entire point — a
+    # runbook that announces, drops out of the active set, and is selected again
+    # three turns later must not announce twice.
+    #
+    # It rides the token rather than living in process memory for the same reason
+    # everything else here does: Cloud Run holds no session state, so an
+    # instance-local set would re-announce every time a round landed on a
+    # different instance. An invalid or expired token resets it, which is
+    # correct — that turn is already re-selecting from nothing.
+    announced_runbooks: list[str] = Field(default_factory=list)
 
     def active_ids(self) -> list[str]:
         return [s.id for s in self.active_runbooks]

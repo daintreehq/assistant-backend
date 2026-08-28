@@ -3,6 +3,7 @@ id: daintree.orchestration.debate-elimination
 title: Run agent debate with elimination vote
 summary: Facilitate a multi-agent debate, collect final positions, run a peer vote to eliminate the weakest position, and report the tally.
 whenToUse: Use when the user asks several agents to debate a topic and then eliminate, vote off, remove, or identify the weakest agent/position after the debate, including when the elimination request arrives mid-debate. Do not use for a collaborative debate that ends in one synthesized answer with no vote-off (use daintree.orchestration.multi-agent), an open-ended visible conversation among agents with no elimination vote (use daintree.orchestration.conversation), a one-shot independent scored contest or best-entry vote (use daintree.orchestration.competition), a simple fleet poll with no debate (use daintree.agents.poll-pinned-agents), or a runoff after a tied vote (use daintree.orchestration.runoff-tiebreaker).
+opener: "Elimination vote — attributed rather than blind, kept fair by equal framing"
 risk: project
 requiredTools:
   - context.snapshot

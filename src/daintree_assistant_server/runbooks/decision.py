@@ -72,12 +72,28 @@ class SelectionDecision:
     #:
     #: Empty on a degraded or reused decision, which have no ranking of their own.
     ranked_runbook_ids: list[str] = None  # type: ignore[assignment]
+    #: Per-runbook probability, for every id in ``runbook_ids``.
+    #:
+    #: ``confidence`` is this dict's top entry and is deliberately not a
+    #: substitute: it answers "how sure was the selector about this TURN", while
+    #: the opener gate (``runbooks/openers.py``) has to ask the question one
+    #: runbook at a time — a turn that loads a workflow at 0.97 and drags a
+    #: second in at 0.41 should announce one of them, and a single number cannot
+    #: express that.
+    #:
+    #: Keyed by the ids that SURVIVED validation, so a score here always names a
+    #: runbook the turn actually loaded. Empty on a reused, degraded or cleared
+    #: decision — none of them ranked anything, and an empty dict is what stops
+    #: a continuation round announcing the workflow it inherited.
+    scores: dict[str, float] = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         if self.warnings is None:
             self.warnings = []
         if self.ranked_runbook_ids is None:
             self.ranked_runbook_ids = []
+        if self.scores is None:
+            self.scores = {}
 
     @classmethod
     def reuse(cls, active_ids: list[str]) -> SelectionDecision:

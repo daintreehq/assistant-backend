@@ -114,6 +114,7 @@ class StateCodec:
         instruction_revision: int,
         docs_query: str | None = None,
         profile: str = "assistant",
+        announced_runbooks: Iterable[str] = (),
     ) -> str:
         now = int(self._clock())
         payload = {
@@ -137,6 +138,13 @@ class StateCodec:
         # every token would grow every token for the rare case.
         if docs_query:
             payload["docs_query"] = docs_query
+        # Same omit-when-empty rule, and here it is worth more than bytes: the
+        # overwhelming majority of turns never announce anything, so this key is
+        # absent from most tokens in a conversation and every token in a
+        # conversation that loads no runbook with an opener.
+        announced = list(announced_runbooks)
+        if announced:
+            payload["announced_runbooks"] = announced
         body = _b64url_encode(
             json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
         )

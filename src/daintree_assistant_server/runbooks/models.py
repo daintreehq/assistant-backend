@@ -21,6 +21,20 @@ RISK_VALUES: frozenset[str] = frozenset(
 
 TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_.\-]+$")
 
+#: Hard ceiling on an opener, in characters.
+#:
+#: 80 is one line on a narrow terminal, and the bound is the POINT rather than a
+#: guard rail. An earlier revision allowed 400 — two or three sentences — and the
+#: 37 openers written to it averaged 350 characters and 62.6 words. That is about
+#: fifteen seconds of reading dropped into the one second before the answer
+#: starts: the real reply interrupts the reader mid-paragraph, which makes a fast
+#: turn feel slower than no opener at all.
+#:
+#: `tests/unit/test_prompt_budgets.py` also holds a 12-WORD ceiling, which is the
+#: bound that actually bites — 80 characters of short words is still too much to
+#: glance at.
+OPENER_MAX_CHARS = 80
+
 
 class RunbookMeta(BaseModel):
     """Validated runbook frontmatter."""
@@ -47,6 +61,84 @@ class RunbookMeta(BaseModel):
     # That reviewer signal is the whole value — do not delete it as dead.
     risk: str = "read"
     required_tools: list[str] = Field(default_factory=list, alias="requiredTools")
+    # The OPENER: a one-line caption shown the instant a user hits Enter, the
+    # first time this runbook is loaded with real confidence. It replaces the
+    # Cerebras fast-preamble stage — same slot on screen, same display-only
+    # contract — with authored text instead of a second model call.
+    #
+    # **IT IS A RECEIPT, NOT A SENTENCE.** The shape is
+    # ``<task mode> — <one stable boundary, distinction or invariant>``, six to
+    # twelve words, noun-led, no trailing period:
+    #
+    #     Failure diagnosis — the exact error matters more than the visible symptom
+    #
+    # Two independent constraints force that shape, and both were arrived at the
+    # expensive way.
+    #
+    # **It may not announce, because the executor already does.** The executor
+    # opens its own reply with "I'll start by reading the current state…" —
+    # measured, and unchanged by three separate attempts to prompt it out of
+    # doing so. An opener that also announces is not a slightly worse opener; it
+    # is a visible duplicate of the line rendering directly beneath it (the CLI
+    # joins the two into one bubble), and a reply meant to feel fast reads as
+    # padded. Naming the activity as a NOUN PHRASE is what says what is happening
+    # without competing for that register.
+    #
+    # **It may not be prose, because there is no time to read prose.** A previous
+    # revision authored these as two-or-three-sentence comprehension paragraphs,
+    # in the register the retired stage's own prompt taught. Measured over the
+    # catalog: 62.6 words and 350 characters on average, roughly fifteen seconds
+    # of reading placed in a one-second window. The answer arrives mid-paragraph
+    # and the reader is interrupted by the thing they were waiting for.
+    #
+    # **Consistency across the catalog is a FEATURE, not repetition to be
+    # avoided.** Thirty-seven differently-shaped pseudo-insights read as canned
+    # text pretending to be bespoke; thirty-seven identically-shaped captions read
+    # as product UI, and a heavy user starting ten conversations a day recognises
+    # the caption instead of re-reading it.
+    #
+    # What it buys, and it is the only thing available at that instant: the user
+    # learns their request was ROUTED, and into which mode. That is actionable —
+    # a wrong caption is legibly wrong and they can interrupt at once, where a
+    # vague paragraph would have hidden the misroute. This matters because the
+    # 0.90 threshold is not certainty; see `config.RUNBOOK_OPENER_THRESHOLD`.
+    #
+    # Optional. A domain foundation is paired in without a score and the
+    # server-pinned documentation runbook is hidden from the selector, so neither
+    # can ever be shown — an opener on either is dead text, and the tests say so
+    # in both directions.
+    #
+    # NOT a selector signal. `selector_view()` does not expose it and
+    # `runbooks/local/documents.py` builds its embedding document from
+    # title/summary/whenToUse only, so adding or editing an opener changes no
+    # vector and needs no retrain. It DOES enter `content_hash_of` (it is
+    # frontmatter), so an edit busts `catalog_revision` — which is correct: a
+    # client holding state from before the edit should re-select.
+    opener: str | None = Field(default=None, max_length=OPENER_MAX_CHARS)
+
+    @field_validator("opener")
+    @classmethod
+    def _check_opener(cls, v: str | None) -> str | None:
+        """One line of plain text, or nothing at all.
+
+        A newline is rejected rather than collapsed: the opener is emitted as a
+        single ``preamble`` event and a multi-line one would render as a block of
+        server-authored text sitting above an answer that has not started. One
+        caption on one line is the shape.
+
+        An empty-after-strip value is rejected rather than silently becoming
+        ``None`` — ``opener: ""`` in frontmatter is a mistake, and the failure a
+        mistake deserves is a load error, not a runbook that quietly never
+        announces.
+        """
+        if v is None:
+            return None
+        text = v.strip()
+        if not text:
+            raise ValueError("opener must not be blank; omit the key instead")
+        if "\n" in text or "\r" in text:
+            raise ValueError("opener must be a single line")
+        return text
 
     @field_validator("id")
     @classmethod
@@ -142,6 +234,10 @@ class Runbook:
     @property
     def risk(self) -> str:
         return self.meta.risk
+
+    @property
+    def opener(self) -> str | None:
+        return self.meta.opener
 
     def selector_view(self) -> dict[str, object]:
         """The bounded metadata the selector is allowed to see.

@@ -727,6 +727,15 @@ async def test_stream_meta_is_yielded_before_upstream_open(
     assert fake_provider.stream_requests == []
 
     second = await anext(outcome.stream)
+    if second.startswith("event: preamble\n"):
+        # The runbook opener, when the selected runbook carries one at this
+        # confidence (`runbooks/openers.py`). It is authored text and a dict
+        # lookup, so it costs no call — asserted here rather than skipped
+        # because "arrives before the provider is even opened" is the property
+        # that makes it worth having at all, and it is the same property this
+        # test exists to pin for `meta`.
+        assert fake_provider.stream_requests == []
+        second = await anext(outcome.stream)
     assert second.startswith("event: delta\n")
     assert len(fake_provider.stream_requests) == 1
     await outcome.stream.aclose()

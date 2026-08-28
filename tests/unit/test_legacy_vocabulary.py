@@ -48,6 +48,11 @@ _ALLOWED_LINES: dict[str, tuple[str, ...]] = {
     # to detect its return. Renaming these is what makes them stop working.
     "tests/unit/test_docs_drift.py": ("skill", "SKILL_LEARNING"),
     "tests/unit/test_policy_contradictions.py": ("skill",),
+    # The opener house-style gate BANS the retired word from user-facing text, so
+    # it has to name it. Same shape as the two gates above: quoting the vocabulary
+    # is how the check detects it, and renaming the literal is what would silently
+    # switch the check off.
+    "tests/unit/test_prompt_budgets.py": ("skill",),
     # Deferred-work entries that quote the retired vocabulary to describe the
     # rename itself, plus the Go path the CLI still uses.
     "TODO.md": ("skill.go", "skill/skill.go", "skill__", "skill.", "skill\" ->", "skill ->", ".claude/skills", "not `skills`"),

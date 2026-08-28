@@ -527,6 +527,16 @@ class ScriptedSelector:
             endpoint="local",
             calls=0,
             warnings=[],
+            # Every selected id at the scripted `confidence`. The real head
+            # scores each candidate independently, so this is a simplification —
+            # but it is the RIGHT one for a seam: it makes `confidence` the
+            # single dial a test turns to drive the opener gate
+            # (`runbooks/openers.py`), instead of asking every existing fixture
+            # to grow a per-id score map it does not care about. A test that
+            # needs runbooks at DIFFERENT scores is testing the gate rather than
+            # the orchestration around it, and should build a
+            # `SelectionDecision` directly.
+            scores=dict.fromkeys(ids, confidence),
             docs_query=docs_query,
         )
 

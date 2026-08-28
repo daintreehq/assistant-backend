@@ -1,7 +1,7 @@
 {
   "catalog": {
     "foundations": 1,
-    "revision": "sha256:243b8ea54d395ada9ac35bca4be7a34083cb75c4fec2c787e04266a2b731f5e9",
+    "revision": "sha256:f18ccbd5dbf1114c7d93703099bce285ced1885b854720f4ab6bb64aa3c7188c",
     "runbooks": 39
   },
   "identity": {
@@ -10,7 +10,7 @@
     "public_model": "daintree-assistant"
   },
   "prompt": {
-    "base_prompt_bytes": 25267,
+    "base_prompt_bytes": 25271,
     "runbook_body_bytes_total": 294309,
     "subagent_prompt_bytes": 5552
   },

@@ -273,6 +273,7 @@ Runbooks are Markdown procedures that become task-specific operating instruction
 | `summary` | yes | selector signal |
 | `whenToUse` | yes | the *primary* selector signal (camelCase key → `when_to_use`) |
 | `foundation` | no | `true` marks a domain **foundation** runbook; admission pairs it with the specific workflow runbook(s) the selector picks (default `false`) |
+| `opener` | no* | the one-line CAPTION shown the instant the user hits Enter, the first time this runbook loads with real confidence — `<task mode> — <one boundary>`, 6–12 words. **Required in practice** for every selectable runbook (see "Runbook openers" below and `docs/RUNBOOK_OPENERS.md`) |
 | `risk` | no | enum: `read local ui terminal project external git system` — **descriptive, not policy** (see below) |
 | `requiredTools` | no | camelCase key → `required_tools` |
 
@@ -280,8 +281,82 @@ Runbooks are Markdown procedures that become task-specific operating instruction
 
 **Pipeline:** `loader.py` parses/validates (strict — a malformed runbook fails `/readyz`, not a request) → `catalog.py` builds the **immutable** catalog and a deterministic `revision` hash → the selector sees only `Runbook.selector_view()`, the public `/runbooks` endpoint sees only `public_view()`, and **neither ever exposes the body** except via injection into the main prompt for active runbooks. Selection is automatic and server-side: the guarantee that `runbook.find`/`runbook.load` are never *offered* is enforced at the request boundary by the reserved-tool-names check in `services/validation.py` (`RESERVED_TOOL_NAMES`, which also covers the `runbook__find`/`runbook__load` wire spellings and the `daintree_internal__` prefix), and the base prompt separately tells the model it does not find, load, or manage runbooks itself (`main/base/30-runbooks.md` — it never names the tools).
 
+### Runbook openers — the cheap replacement for the fast-response stage
+
+Every selectable runbook carries an `opener`: **a one-line caption shown the instant the
+user hits Enter**, the first time that runbook loads in a conversation with real
+confidence. `docs/RUNBOOK_OPENERS.md` is the authoring reference and the thing to read
+before writing one.
+
+```
+Failure diagnosis — the exact error matters more than the visible symptom
+```
+
+**It replaces the Cerebras preamble stage with authored text and a dict lookup.** No call,
+no credential, no second host, no race — so it is emitted with `meta`, *before* the
+executor has opened, which is earlier than the stage it replaces could ever reach.
+`runbooks/openers.py` holds the gate; it is pure, total, and runs inline on the
+first-byte path. It rides the existing `preamble` SSE event, inheriting that event's
+display-only contract in the CLI rather than needing a second one.
+
+**It is a RECEIPT, not a sentence,** and the shape — `<task mode> — <one stable boundary>`,
+six to twelve words, noun-led — is forced by two constraints found the expensive way:
+
+* **It may not announce, because the executor announces anyway.** `main/base/40-communication.md`
+  already forbids an opening orienting clause and names `I'll start by` among the banned
+  openings — and the executor opens with one regardless, measured. The rule is in the
+  prompt and is not obeyed; three FURTHER attempts to prompt it out were built, measured
+  and reverted for changing nothing. The CLI joins the opener and the answer into ONE
+  bubble, so an announcing opener sits directly above the same announcement. That partial
+  also DESCRIBES the opener to the model ("a short caption naming this kind of work is
+  usually already on the user's screen"), so changing the opener's shape means editing it —
+  it said "two or three sentences" while the fast stage produced them.
+* **It may not be prose, because there is no time to read prose.** A revision of this
+  catalog authored these as two-or-three-sentence comprehension paragraphs, in the register
+  the retired stage's own prompt taught. Measured: 62.6 words and 350 characters on
+  average — about fifteen seconds of reading dropped into a one-second window, so the
+  answer arrives mid-paragraph and interrupts the reader. `OPENER_MAX_CHARS` is 80 and the
+  12-word ceiling in `test_prompt_budgets.py` is the one that bites.
+
+**Consistency across the catalog is a feature, not repetition to be avoided.** Thirty-seven
+differently-shaped pseudo-insights read as canned text pretending to be bespoke; thirty-seven
+identically-shaped captions read as product UI, and a heavy user starting ten conversations a
+day recognises a caption instead of re-reading it. `test_openers_are_noun_led_captions` and
+`test_opener_task_modes_are_distinct` hold the template.
+
+What it buys is the only information available at that instant: the request was **routed,
+and into which mode**. That is actionable — a wrong caption is legibly wrong and the user
+can interrupt at once, where a vague paragraph hides the misroute.
+
+**Three gate rules, each because the simpler version is wrong** (all in `openers.py`):
+
+* **A score floor** (`config.RUNBOOK_OPENER_THRESHOLD`, 0.90 — far above the 0.65
+  admission floor). Admission is recall-biased on purpose; announcing at that bar would
+  caption a turn on the strength of a coin flip. The value is measured, and the
+  measurement's own finding is that **the knob is weak**: the head saturates near 1.0 for
+  right and wrong picks alike (median 1.000 for required runbooks, 0.964 for non-required),
+  so everything above 0.90 buys a wrong caption by spending a right one — ~11% of captions
+  name a runbook the case did not require. What contains that is the caption being SHORT
+  enough to check at a glance, not the threshold. Raising the constant is the wrong response
+  to a bad opener.
+* **Once per runbook per conversation.** The announced set rides the signed state token
+  (`StatePayload.announced_runbooks`), because Cloud Run holds no session state and an
+  instance-local set would re-announce whenever a round landed elsewhere.
+* **A near-miss is NOT written off.** A runbook loaded *below* the floor keeps its opener
+  for a later turn that actually commits to the topic. When several clear the floor, one
+  speaks and **the rest are spent** — the runner-up describes the same turn, so the
+  alternative to suppressing it is repeating it.
+
+A runbook with no score can never speak, which is what silently exempts a paired domain
+foundation and the server-pinned docs runbook without this module knowing how either got
+into the set. Sub-agents never announce (nobody is reading), and neither does the
+non-streaming path (there is no gap to fill).
+
 **To add a runbook:**
 1. Create `runbooks/files/<id>.md` (it is auto-discovered, sorted by id — no registration).
+   **Write its `opener`** — `docs/RUNBOOK_OPENERS.md` first; `test_every_user_facing_runbook_has_an_opener`
+   fails a runbook that ships without one, because the only symptom otherwise is the
+   product going quiet for that one kind of request.
 2. Run `pytest tests/unit` (~5s, no API calls). A new runbook trips more than the loader/catalog tests: `test_prompt_budgets.py` (body size ceilings, no pipe tables, a Report-back line), `test_runbook_catalog_hygiene.py` (every `requiredTools` name exists in the CLI tool-registry snapshot at `tests/fixtures/cli_tool_names.txt` — its header has the regeneration recipe against the pinned `cli/` submodule), and `test_prompt_budgets.py`'s house-style sweep over the packaged catalog. Do **not** try to narrow this with `pytest -k`: the obvious concern-named filter (`-k "catalog or budget or house"`) matches no loader test name or module and silently deselects all 14 of them. Run the directory, or list the files without a filter.
 3. **Run the golden tests** (`pytest tests/golden/`). The prompt snapshots render against a **pinned fixture catalog** (`tests/golden/fixtures/runbooks/`), not the live one, so adding or changing a real runbook no longer churns `loaded_runbooks_*` — only editing a prompt template or the assembler does. (An older revision of this file named a `test_selector_prompt_renders_real_catalog` smoke test here; it does not exist and has not for some time — the prompt-based selector it covered was deleted. The real-catalog checks that DO run live in `tests/unit/test_runbook_catalog_hygiene.py` and `tests/unit/test_prompt_budgets.py`.)
 4. **Check routing coverage** (`python -m benchmarks.runbook_selection.bench coverage`) — a per-runbook case-coverage matrix, offline and free (no API calls). It exits non-zero when a runbook has no benchmark case that requires it, so a new runbook does not land unrouted and untested. **Write carve-outs by fully-qualified ID** — "do not use for X, use `daintree.other.runbook`" — never as a bare leaf (`use competition`) or as prose (`use the competition runbook`). Coverage parses declared neighbours out of the `whenToUse` text, so an unqualified carve-out reads to it as a runbook claiming no confusion at all; `tests/unit/test_runbook_catalog_hygiene.py` holds the count at zero and also fails a dotted reference that resolves to no runbook, namespace or tool. `bench lint` ranks every runbook pair by how alike the retriever finds them and flags the ones with no id-level edge — which is how the 27 unqualified carve-outs were found: they were the catalog's most confusable pairs, invisible to its own tooling. Rewriting them left every one of the 177 benchmark cases returning a byte-identical answer. Note coverage gates per RUNBOOK, not per edge: naming a second neighbour makes the claim readable, not tested.

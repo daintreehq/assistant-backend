@@ -265,6 +265,21 @@ class LocalSelector:
                 for sid, _ in result.ranked[:FAST_CONTEXT_RUNBOOKS]
                 if sid in catalog.selectable_ids
             ],
+            # Read from the FULL ballot, not from `result.scores` — that one is
+            # the top five, kept for a log line, and the opener gate needs a
+            # score for every admitted id. At the shipped cap of three they
+            # almost always coincide; "almost always" is not a property to
+            # build a user-visible behaviour on, and a runbook admitted at rank
+            # six with no score would silently never announce.
+            #
+            # Restricted to `runbook_ids` (already validated against the
+            # snapshot above) so nothing downstream can read a score for a
+            # runbook the turn did not load.
+            scores={
+                sid: float(p)
+                for sid, p in result.ranked
+                if sid in set(runbook_ids)
+            },
             docs_query=_docs_search_query(docs_text) if result.docs_wanted else None,
         )
 

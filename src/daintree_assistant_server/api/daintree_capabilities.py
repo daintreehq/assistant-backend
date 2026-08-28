@@ -60,9 +60,16 @@ async def capabilities(
             # provisional bubble it never receives is worse off than one that
             # never expected it.
             "fast_response": {
-                # Always on. The field stays because the CLI gates on it during
-                # rollout and a disappearing key is a harder change for a client
-                # than a constant one.
+                # Always on, and it describes the EVENT rather than either
+                # producer. Two things can send a `preamble`: the runbook opener
+                # (authored frontmatter, live) and the second-model fast stage
+                # (`config.FAST_RESPONSE_ENABLED`, currently False). Reporting
+                # the stage's flag here would tell a client `false` while the
+                # event still arrives on most turns — worse than a constant,
+                # because it would read as permission to skip implementing it.
+                # The field stays because the CLI gates on it during rollout and
+                # a disappearing key is a harder change for a client than a
+                # constant one.
                 "enabled": True,
                 "streaming_only": True,
                 "event": "preamble",

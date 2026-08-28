@@ -3,6 +3,7 @@ id: daintree.orchestration.execute-durable-workflow
 title: Execute a durable workflow graph
 summary: Plan and advance dependency-aware work across turns using the optional workflow graph tools, with exact resource links, evidence and reconcile checkpoints.
 whenToUse: Use for a substantial multi-step goal with dependent phases that must survive turns, restarts or asynchronous waits — migrations, delegate-then-verify work, several ordered changes, or "track this plan and resume it later". Use when the user explicitly asks for a durable plan, dependencies, progress tracking, reconciliation or a workflow graph. Do not use for a one-step action, independent parallel fan-out (use daintree.orchestration.fan-out-work), a status-only "where were we" sweep of the flat workflow ledger (use daintree.orchestration.status-and-resume), simple agent supervision (use daintree.orchestration.supervise-fleet), or a single future notification (use daintree.orchestration.watch-outcome).
+opener: "Durable plan — the graph recommends the next step, never runs it"
 risk: project
 requiredTools:
   - context.snapshot

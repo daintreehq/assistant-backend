@@ -61,11 +61,26 @@ DOC_API = REPO_ROOT / "docs" / "DAINTREE_API.md"
 DOC_PROVIDER = REPO_ROOT / "docs" / "PROVIDER_POLICY.md"
 DOC_BETA = REPO_ROOT / "docs" / "INTERNAL_BETA.md"
 DOC_KEYS = REPO_ROOT / "docs" / "KEY_HANDLING.md"
+#: The runbook-opener authoring reference. In PROSE_FILES so the vocabulary and
+#: drift sweeps read it, and asserted to EXIST below: it is the only place the
+#: caption register is written down, and `runbooks/models.py`, `CLAUDE.md` and
+#: every runbook-authoring path point at it. Losing it would leave those
+#: pointers dangling with the suite green.
+DOC_OPENERS = REPO_ROOT / "docs" / "RUNBOOK_OPENERS.md"
 
 # Every prose surface a tester or a maintainer reads. The vendored Go CLI is
 # excluded: it is a separate repository on its own release cycle, pinned here as a
 # submodule, so this suite can only report drift in it, never fix it.
-PROSE_FILES = (README, CLAUDE_MD, ENV_EXAMPLE, DOC_API, DOC_PROVIDER, DOC_BETA, DOC_KEYS)
+PROSE_FILES = (
+    README,
+    CLAUDE_MD,
+    ENV_EXAMPLE,
+    DOC_API,
+    DOC_PROVIDER,
+    DOC_BETA,
+    DOC_KEYS,
+    DOC_OPENERS,
+)
 
 
 def _read(path: Path) -> str:
@@ -1923,3 +1938,17 @@ def test_every_setting_is_named_in_env_example() -> None:
         "Pydantic ignores unknown keys, so a reader who copies one gets no error "
         "and no effect."
     )
+
+
+def test_the_opener_authoring_reference_exists() -> None:
+    """The one place the caption register is written down.
+
+    `runbooks/models.py`, `CLAUDE.md` and the runbook-authoring steps all point
+    at this file by path. Without an existence assertion it could be deleted or
+    renamed and every one of those pointers would dangle with CI green — and the
+    next author would write openers to no rules at all.
+    """
+    assert DOC_OPENERS.is_file(), f"{DOC_OPENERS} is missing"
+    text = DOC_OPENERS.read_text(encoding="utf-8")
+    for anchor in ("task mode", "OPENER_MAX_CHARS", "validate_preamble"):
+        assert anchor in text, f"{DOC_OPENERS} no longer explains {anchor!r}"

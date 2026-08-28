@@ -3,6 +3,7 @@ id: daintree.orchestration.workspace-cleanup
 title: Tear down a workspace safely
 summary: The confirmation gate for teardown — inventory, classify safe/unsafe/unknown, get an explicit go-ahead, then cancel supervision, close terminals, delete worktrees and settle the ledger in dependency order.
 whenToUse: Use ONLY when the user explicitly asks to tear down workspace state after a fan-out, competition or long session — "close these", "clean up", "tidy up the terminals", "shut it all down", "disarm everything", "delete that worktree", "mark those workflows done". A cleanup request in the user's own words is required; never select this for a status question, and never treat it as permission to close anything on your own initiative. Do not use for closing ONE named terminal or cancelling ONE watcher (daintree.foundation covers that), to cancel or revoke supervision with nothing else torn down (daintree.orchestration.watch-outcome), to triage or check on a running fleet (daintree.orchestration.supervise-fleet), to answer "what is running" or "where were we" (daintree.orchestration.status-and-resume), or to judge whether an agent's work is good (daintree.orchestration.verify-agent-work).
+opener: "Workspace teardown — quiet is not the same as safe to remove"
 risk: system
 requiredTools:
   - context.snapshot

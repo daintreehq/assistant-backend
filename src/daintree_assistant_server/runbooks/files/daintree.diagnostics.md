@@ -3,6 +3,7 @@ id: daintree.diagnostics
 title: Diagnose a broken or misbehaving Daintree
 summary: Diagnose Daintree itself from its MCP status, offered tools, workspace snapshot, recent error log and notification history, then give the concrete recovery step.
 whenToUse: Use when the question is about DAINTREE'S OWN HEALTH — something is misbehaving ("nothing is responding", "the MCP is disconnected", "I did X and nothing happened", "why can't I…", "why is this tool missing"), the user asks to show recent Daintree errors or notifications, wants diagnostics for a bug report, or wants sign-in confirmed before relying on it. Nothing has to be broken for the sign-in case because `daintree.status` reports only the Daintree MCP link, not provider-key validity. A plain "is Daintree connected?" with nothing wrong is daintree.foundation. Do not use for a plain how-to, setting or keybinding question; for ordinary project failures; for a specific broken agent/spawn (use daintree.agents.recover-agent); for paused-workflow reconstruction (use daintree.orchestration.status-and-resume); or for red project CI (use daintree.ci.diagnose-and-fix).
+opener: "Daintree health — the app itself, read live rather than remembered"
 risk: system
 requiredTools:
   - daintree.status

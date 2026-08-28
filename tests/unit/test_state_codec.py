@@ -313,3 +313,66 @@ def test_the_current_version_is_what_issue_actually_stamps() -> None:
     codec = _codec(clock)
     assert _payload_at(codec)["v"] == TOKEN_VERSION
     assert TOKEN_VERSION == 2, "token schema bumped; update this literal deliberately"
+
+
+# ---- announced runbooks ---------------------------------------------------
+
+
+def test_announced_runbooks_roundtrip() -> None:
+    """The opener gate's memory. Without it every round re-announces."""
+    codec = _codec([1000.0])
+    token = codec.issue(
+        session_id="ses1",
+        active_runbooks=["a"],
+        catalog_revision="sha256:rev",
+        turn_id="t1",
+        instruction_revision=1,
+        announced_runbooks=["a", "b"],
+    )
+    result = codec.verify(token, session_id="ses1")
+    assert result.payload is not None
+    assert result.payload.announced_runbooks == ["a", "b"]
+
+
+def test_a_token_that_announced_nothing_omits_the_key() -> None:
+    """Most turns announce nothing; they should not pay a key to say so.
+
+    Also pins that a token issued before this field existed still verifies — the
+    default is the empty list, so an older token simply re-arms every opener,
+    which is the correct reading of "we have no record".
+    """
+    codec = _codec([1000.0])
+    token = codec.issue(
+        session_id="ses1",
+        active_runbooks=["a"],
+        catalog_revision="sha256:rev",
+        turn_id="t1",
+        instruction_revision=1,
+    )
+    raw = token.split(".")[1]
+    body = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+    assert "announced_runbooks" not in body
+    result = codec.verify(token, session_id="ses1")
+    assert result.payload is not None
+    assert result.payload.announced_runbooks == []
+
+
+def test_announced_runbooks_are_not_filtered_against_the_active_set() -> None:
+    """It records what the USER was told, not what is loaded.
+
+    A runbook that announced and then dropped out of the active set must stay
+    recorded, or re-selecting it three turns later announces it a second time.
+    """
+    codec = _codec([1000.0])
+    token = codec.issue(
+        session_id="ses1",
+        active_runbooks=["still-loaded"],
+        catalog_revision="sha256:rev",
+        turn_id="t1",
+        instruction_revision=1,
+        announced_runbooks=["still-loaded", "long-gone"],
+    )
+    result = codec.verify(token, session_id="ses1")
+    assert result.payload is not None
+    assert "long-gone" in result.payload.announced_runbooks
+    assert result.payload.active_ids() == ["still-loaded"]

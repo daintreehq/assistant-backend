@@ -856,10 +856,26 @@ data: { "error": { "type":"…","code":"…","message":"…","param":"…" },
 
 #### The `preamble` event, and what a client owes it
 
-One short line about the work that is starting, written by a second model running
-**concurrently** with the main one and shown while the main one is still opening.
-It exists to put honest text on the screen sooner; it is **not** a result, and the
-model that wrote it has inspected nothing.
+Short provisional text shown while the main model is still opening. It exists to
+put honest text on the screen sooner; the event is **not** a result, and nothing
+had been inspected when its text was chosen. Size depends on which producer
+sent it (below) — a current backend sends a one-line caption, at most 80
+characters; treat the field as arbitrary-length prose and wrap it.
+
+There are two producers behind this one event, and a client cannot tell them apart
+— deliberately, since the display contract below is identical for both:
+
+* **The runbook opener** (what a current backend sends). Authored text carried in
+  the frontmatter of the runbook the turn selected, emitted the moment `meta` is
+  out, before the executor has even opened. Chosen by a confidence threshold and
+  shown at most **once per runbook per conversation**, so a turn that continues an
+  established piece of work opens straight into its answer.
+* **The fast-response preamble** (built, currently off). A second model running
+  concurrently with the main one.
+
+Neither ANNOUNCES. The main model owns the "I'll start by…" opening, and two of
+those in two seconds is what makes a fast reply feel padded — so this event says
+what the request is taken to BE, never what is about to be done.
 
 `meta` is still first, and `done` is still terminal. The rest is a contract:
 
@@ -874,17 +890,22 @@ model that wrote it has inspected nothing.
 `provisional` and `commit_on` are still on the payload for clients that already
 read them. A client following the rule above never reaches a commit.
 
-**At most one per turn, and never after the first `delta`.** The server races the
-two calls and DROPS the line if the answer starts first — so a client never has to
-decide what to do with one that arrives late. It simply will not.
+**At most one per turn, and never after the first `delta`.** A runbook opener is a
+lookup, so it is always ready before the executor opens. A fast-response preamble
+is raced against the executor and DROPPED if the answer starts first. Either way a
+client never has to decide what to do with one that arrives late — it simply will
+not.
 
 Nothing about the preamble reaches the main model: its request is byte-identical
-whether the stage ran, was withheld, or is switched off entirely.
+whether either producer ran, was withheld, or is switched off entirely.
 
-`/v1/daintree/capabilities` reports `respond.fast_response.enabled` for the
-instance you are talking to. It is always `true` on a current backend — the stage
-has no off switch — but read the field rather than assuming it, since that is what
-lets an older or differently-configured backend tell you otherwise.
+`/v1/daintree/capabilities` reports `respond.fast_response.enabled`, and it is
+`true` on a current backend. **It describes the EVENT, not either producer**:
+the second-model stage is switched off today, and the flag stays `true` because
+runbook openers still send this event. So it cannot be used to detect which
+producer you are talking to, and there is deliberately no field that can — the
+display contract is identical either way. Read the flag rather than assuming
+it, but implement the event whenever it is `true`.
 
 `request_id` is on the **error** event as well as `meta` because a stream can fail
 *before* `meta` is ever sent — a preparation failure does exactly that — and `meta` is

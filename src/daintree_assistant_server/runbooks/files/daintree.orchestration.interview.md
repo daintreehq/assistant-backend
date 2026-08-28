@@ -3,6 +3,7 @@ id: daintree.orchestration.interview
 title: Run a judge-led interview competition among agents
 summary: One agent interviews several others on a topic while you relay questions and answers — optionally with the judge verifying claims against the codebase and narrowing to a top 2 — until it names a winner.
 whenToUse: Use when the user asks to have one agent interview, question, or grill several other agents on a topic and expects a winner — "have one agent interview the others and pick the best", "which of these should be my pair programmer?". Covers both depths, a light Q&A interview and a deep one where the judge verifies candidates' claims against the codebase, issues challenging follow-ups, and narrows to a top 2 before the verdict. Do not use for a plain one-round poll with no interviewer (use daintree.agents.poll-pinned-agents), a scoring-only competition where entries are judged rather than questioned (use daintree.orchestration.competition), or an open-ended dialogue with no judge and no winner (use the daintree.orchestration.conversation runbook).
+opener: "Candidate interview — follow-up questions decide it, not the opening pitch"
 risk: project
 requiredTools:
   - agentTask.spawnForEdits

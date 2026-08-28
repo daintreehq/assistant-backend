@@ -27,6 +27,7 @@ from ..config import (
     FAST_RESPONSE_MODEL,
     FAST_RESPONSE_PROVIDER,
     PUBLIC_MODEL_ID,
+    RUNBOOK_OPENER_THRESHOLD,
     Settings,
 )
 from ..contracts.daintree_api import (
@@ -74,6 +75,7 @@ from ..runbooks.fast_path import can_skip_selection
 from ..runbooks.load_events import RunbookLoadExecution
 from ..runbooks.local.selector import RunbookSelector
 from ..runbooks.models import Runbook
+from ..runbooks.openers import OpenerDecision, choose_opener, fold_announced
 from ..runbooks.tool_projection import (
     REASON_DISABLED,
     REASON_FILTER_ERROR,
@@ -230,6 +232,15 @@ class _RespondMeta:
     # reported" — and a cache ratio computed off that floor would claim a
     # stone-cold prefix on a call that simply never counted its hits.
     selector_usage: ProviderUsage | None = None
+    # The runbook opener for this turn, or None — which is most turns. Internal,
+    # not a wire field on `meta`: it is delivered as its own `preamble` event so
+    # it inherits that event's display-only contract in the CLI, which already
+    # knows never to commit one to conversation history. Putting the text on
+    # `meta` instead would give the client a second, undocumented place to find
+    # assistant-looking prose and no rule attached to it.
+    opener: str | None = None
+    #: Which runbook wrote it. Logging only; never leaves the server.
+    opener_runbook_id: str | None = None
 
 
 @dataclass
@@ -1197,9 +1208,19 @@ class ChatOrchestrator:
         # fail-closed posture as the active set — an untrusted token carries
         # nothing forward.
         prior_docs_query: str | None = None
+        # Runbooks whose opener this conversation has already spent
+        # (`runbooks/openers.py`). Unlike the two above it is NOT filtered against
+        # the catalog and NOT scoped to the turn: it is a record of what the user
+        # has already been told, and a runbook that was edited, renamed out of the
+        # catalog, or evicted from the active set has still been announced. Its
+        # only job is to stop a second announcement, so an id no longer resolving
+        # to anything costs one list entry and changes no behaviour — whereas
+        # dropping it would let a renamed runbook announce twice.
+        prior_announced: list[str] = []
         if verification.valid and verification.payload is not None:
             prior_active_ids = catalog_at_start.filter_known(verification.payload.active_ids())
             payload = verification.payload
+            prior_announced = list(payload.announced_runbooks)
             if (
                 payload.last_turn_id == request.session.turn_id
                 and payload.last_instruction_revision == request.session.instruction_revision
@@ -1433,6 +1454,59 @@ class ChatOrchestrator:
         active_ids = resolution.active
         newly_loaded_ids = resolution.newly_loaded
 
+        # THE RUNBOOK OPENER — the cheap replacement for the Cerebras preamble
+        # stage. A dict lookup and a comparison, so it is computed inline on the
+        # first-byte path and travels out on `meta`, which is emitted before the
+        # executor is even opened. The stage it replaces could not reach that
+        # point: it had to make a call to a second host first.
+        #
+        # Suppressed entirely for a sub-agent. A sub-agent's output is consumed by
+        # the orchestrator, not read by a person, so there is nobody for the line
+        # to reassure — and its narrowed menu means the runbooks it does load are
+        # research procedures nobody asked for by name.
+        #
+        # `choose_opener` is pure and total; nothing here can fail the turn.
+        #
+        # Gated on STREAMING as well as the profile, and that is a correctness
+        # fix rather than an optimisation: the decision is folded into the state
+        # token below, so a non-streaming turn — which has no gap to fill and
+        # emits nothing — would SPEND the caption where nobody could see it, and
+        # the next streaming turn would then stay silent about a runbook the user
+        # had never been told about. Computing it only where it can be shown is
+        # what keeps "shown once" from meaning "shown at most once".
+        opener = (
+            OpenerDecision()
+            if subagent or not request.generation.stream
+            else choose_opener(
+                # The SCORED members of the active set, not merely the newly
+                # loaded ones. Both are the same list on an ordinary first load,
+                # and they come apart in exactly the case the near-miss rule
+                # exists for: a runbook admitted at 0.80 stays active, so a later
+                # instruction that re-scores it at 0.97 finds it absent from
+                # `newly_loaded_ids` and its caption would be suppressed forever.
+                # `scores` is empty on every reused, degraded and cleared
+                # decision, so a continuation round still reaches nothing here.
+                scored_active_ids=[sid for sid in active_ids if sid in decision.scores],
+                scores=decision.scores,
+                already_announced=prior_announced,
+                catalog=runbooks_catalog,
+                threshold=RUNBOOK_OPENER_THRESHOLD,
+            )
+        )
+        announced_ids = fold_announced(prior_announced, opener.announced)
+        if opener.announced:
+            logger.info(
+                "runbook_opener",
+                request_id=request_id,
+                shown=opener.runbook_id,
+                # Non-empty means two runbooks cleared the floor on one turn and
+                # one of them was written off unheard. Watch the RATE: a rising
+                # one says the catalog's confident answers overlap, which is a
+                # statement about runbook separation rather than about this gate.
+                suppressed=list(opener.suppressed),
+                announced_total=len(announced_ids),
+            )
+
         # Selection, recorded with the REJECTED candidates and the prior state, not
         # just the winners. A future routing or context-selection model has to
         # learn what was passed over as much as what was picked, and the ranked
@@ -1502,11 +1576,22 @@ class ChatOrchestrator:
         # so the two calls now genuinely run at the same time. This task travels
         # out on `_PreparedTurn` and is settled by the stream path, which races it
         # against the executor's first visible byte.
-        fast_policy = self._fast_response_policy(
-            request,
-            selector_ran=decision.ran,
-            no_task_fast_path=no_task,
-            active_runbooks=runbooks,
+        fast_policy = (
+            # An opener already occupies the slot. Both ride the `preamble`
+            # event and the CLI REPLACES rather than appends, so running both
+            # would spend a Cerebras call to overwrite a line that was already on
+            # screen — the worse of the two outcomes, since the opener landed
+            # before the executor opened and the preamble by definition cannot.
+            # Unreachable while `FAST_RESPONSE_ENABLED` is False; it exists so
+            # flipping that flag back on is not also a display bug.
+            FastResponsePolicyDecision(run=False, reason="runbook_opener_shown")
+            if opener.text
+            else self._fast_response_policy(
+                request,
+                selector_ran=decision.ran,
+                no_task_fast_path=no_task,
+                active_runbooks=runbooks,
+            )
         )
         fast_task: asyncio.Task[FastResponseResult] | None = None
         if fast_policy.run and self.fast_response is not None:
@@ -1558,6 +1643,13 @@ class ChatOrchestrator:
             # down into a per-round latency tax — and the turn has already
             # decided to answer without documentation.
             docs_query=docs_query if docs is not None else None,
+            # Carried on EVERY token, including a sub-agent's, and including turns
+            # that announced nothing. The set is a property of the conversation
+            # rather than of the turn, so a round that drops it re-arms every
+            # opener the conversation has already spent — which is how a
+            # continuation round would announce the workflow it is in the middle
+            # of.
+            announced_runbooks=announced_ids,
         )
 
         assembled, segments = self.assembler.build_main_request_with_segments(
@@ -1582,6 +1674,7 @@ class ChatOrchestrator:
             run_selector=run_selector,
             warnings=warnings,
             catalog=resolved_catalog,
+            opener=opener,
         )
 
         # PROJECTION. Nothing below may fail the turn: every failure path leaves
@@ -2298,8 +2391,16 @@ class ChatOrchestrator:
             warnings.append(verification.reason)
 
         prior_active_ids: list[str] = []
+        # PRESERVED, never added to. This path serves `/runbooks/resolve`, which is
+        # not a streaming turn and shows no opener — but it REISSUES the token, and
+        # a reissue that dropped this would forget every caption the conversation
+        # has already shown. The next `/respond` would then re-announce a runbook
+        # the user was told about minutes ago, and the announce-once rule would
+        # hold everywhere except behind an endpoint that never announces anything.
+        prior_announced: list[str] = []
         if verification.valid and verification.payload is not None:
             prior_active_ids = self.catalog.filter_known(verification.payload.active_ids())
+            prior_announced = list(verification.payload.announced_runbooks)
 
         run_selector = False
         if action == "clear":
@@ -2345,6 +2446,7 @@ class ChatOrchestrator:
             catalog_revision=self.catalog.revision,
             turn_id=turn_id,
             instruction_revision=instruction_revision,
+            announced_runbooks=prior_announced,
         )
         meta = self._build_meta(
             request_id=request_id,
@@ -2385,6 +2487,7 @@ class ChatOrchestrator:
         run_selector: bool,
         warnings: list[str],
         catalog: Catalog | None = None,
+        opener: OpenerDecision | None = None,
     ) -> _RespondMeta:
         selected_catalog = catalog or self.catalog
 
@@ -2434,6 +2537,8 @@ class ChatOrchestrator:
             ),
             selector_endpoint=decision.endpoint,
             selector_usage=decision.usage,
+            opener=opener.text if opener is not None else None,
+            opener_runbook_id=opener.runbook_id if opener is not None else None,
         )
 
     # ---- response bodies ------------------------------------------------
@@ -2817,6 +2922,46 @@ class ChatOrchestrator:
                     warnings=meta.warnings,
                 ).model_dump(exclude_none=True),
             )
+
+            # THE RUNBOOK OPENER, emitted the instant `meta` is out.
+            #
+            # It rides the `preamble` event rather than getting one of its own,
+            # and that is a contract decision rather than a shortcut: everything
+            # this event already promises is exactly what an opener needs. It is
+            # display-only and must never be committed to conversation history
+            # (the executor did not write it and has never seen it, so a client
+            # that committed one would replay an assistant turn the model has no
+            # memory of); it must not count as a visible executor delta, so the
+            # retry layer still treats the turn as replay-safe; bare-intent
+            # detection must not read it, since a line announcing intended work
+            # is a guaranteed false positive; and the output lint measures the
+            # ANSWER, which this is not part of. A second event would need every
+            # one of those rules restated, and the CLI already implements them
+            # here — including replace-not-append across a retried attempt.
+            #
+            # No `status` event around it. `fast_response` announced that a stage
+            # was RUNNING, which was worth saying while a second host was being
+            # waited on; there is nothing to wait for here, so a phase marker
+            # would describe a gap that does not exist.
+            if meta.opener:
+                yield self._sse(
+                    "preamble",
+                    StreamPreamble(
+                        id=f"pre_{meta.request_id.split('_', 1)[-1]}",
+                        content=meta.opener,
+                    ).model_dump(),
+                )
+                # The opener occupies the same slot the preamble did, so it feeds
+                # the same timing field — this is when the user first saw
+                # anything. `budget` is None only in tests.
+                timings.preamble_at_ms = (
+                    round(budget.elapsed() * 1000) if budget is not None else 0
+                )
+                await trace.record_event(
+                    "runbook_opener.emitted",
+                    attributes={"runbook_id": meta.opener_runbook_id},
+                    content={"content": meta.opener},
+                )
 
             # The preamble, if it has somehow already landed. Almost never: the
             # two calls left together moments ago and this runs immediately after
