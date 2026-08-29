@@ -116,7 +116,7 @@ Three things this does NOT do. Do not promise them:
 
 - **It does not WAKE you.** A timer's own event never triggers an autonomous turn, so the result waits in the inbox until someone looks — UNLESS the payload leaves a watcher behind (spawn with flat `watch:true` + `watchGoal`), whose completion IS a real wake. Watcher attachment is best-effort: a spawn can succeed with a `watcherWarning` and no `watcherId`, and nothing will tell you, so promise the wake only against an id you can see.
 - **It runs ONE tool.** A multi-step sequence is not a timer payload. Make the one tool a spawn whose `taskPrompt` carries the whole job.
-- **It cannot reach the ungrantable tools in step 3.** Those still wait for the user, and saying so plainly is the honest answer.
+- **It cannot exceed the tier, or reach the ungrantable names in step 3.** The tier gate is checked before any grant is looked up, so a grant never widens what the tier allows. Those still wait for the user, and saying so plainly is the honest answer.
 
 Still prefer starting NOW when the delay was really about not blocking the user: spawn with flat `watch:true` + `watchGoal` and an `acceptanceCriteria` contract, per step 1 — the user is free the moment you hand back. Reach for the timer when the delay is genuinely about the CLOCK, which is what "in ten minutes" and "at 6pm" mean.
 
