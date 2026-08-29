@@ -8,6 +8,7 @@ risk: system
 requiredTools:
   - context.snapshot
   - agentTask.spawnForEdits
+  - terminal.sendCommand
   - watcher.terminal.create
   - watcher.watchPR
   - watcher.list
@@ -25,9 +26,9 @@ requiredTools:
   - queue.digest
   - queue.resolve
 ---
-Use when: the user wants supervision that OUTLIVES this turn — wake me when it finishes, alert me if it breaks, remind me later — rather than a wait you sit through now.
+Use when: the user wants something to OUTLIVE this turn — wake me when it finishes, alert me if it breaks, remind me later, or DO it at a stated later time — rather than a wait you sit through now.
 
-You are setting up the supervisor, not doing the work: on the wake you spawn, verify and relay — never fix the build, edit the branch, or land a merge yourself. Reads need no authority; only a MUTATION performed unattended needs the grant in step 3.
+You are setting up the mechanism, not doing the work in this turn: on a wake you spawn, verify and relay — never fix the build, edit the branch, or land a merge yourself. A scheduled action is the same discipline moved in time: you arrange the ONE call that will run later, you do not run it now. Reads need no authority; only a MUTATION performed unattended needs the grant in step 3.
 
 Procedure:
 
@@ -41,21 +42,21 @@ Procedure:
 
 2. Create the watcher. `watcher.terminal.create` requires `terminalIds` (array of full ids), `title`, and `goal` — plain language for what you are observing, which drives the per-check classification. Optional: `stopWhen` (ends the watcher, status `condition_met`), `alertWhen` (alerts and KEEPS running), `cadenceMs` (default 120000), `modelTier` (`small` | `medium`), `startAfterMs`, `stopAfterMs` (defaults to 24 h — a watcher never runs forever, so set the horizon you mean). Write the conditions with the DSL below: prefer the free deterministic leaves, and set `cadenceMs` to the resolution you genuinely need.
 
-3. Grant BEFORE you leave, if the wake must mutate. An unattended turn has nobody to confirm: a confirm-required tool called by a watcher/timer/wake actor with no matching grant is blocked and lands as a pending-approval item — the overnight run stalls until morning, the exact failure the user asked you to prevent. Only the interactive main actor can mint a grant, so it happens now or never.
+3. Grant BEFORE you leave, if the wake must mutate. An unattended turn has nobody to confirm: a confirm-required tool called by a watcher/timer/wake actor with no matching grant is blocked and lands as a pending-approval item. For a watcher or a wake that means the overnight run stalls until morning; for a ONE-SHOT TIMER it is worse, because the timer has already been marked fired and the authorization offered by that inbox item can no longer be spent. Either way it is the exact failure the user asked you to prevent. Only the interactive main actor can mint a grant, so it happens now or never.
    `grant.create {"actorType":"wake","actorId":"wake","allowedToolNames":["terminal.sendCommand"],"ttlMs":28800000,"maxUses":3}`
    - `actorType` is `watcher` | `timer` | `wake`. For `watcher`/`timer`, `actorId` is that supervisor's own `wch_…`/`tmr_…` id — create it first (a watcher in step 2, a timer in step 4), then grant against the id it returned. That ORDER is forced, not a preference: the id does not exist until the create call returns, so create first, read the id off the result, and mint the grant in the SAME turn. A one-shot timer is included — step 4 says why it can spend a grant. For `wake` (the supervisor daemon's autonomous turns while the user is away) `actorId` must be the literal `"wake"`.
    - `ttlMs` and `maxUses` are required, and so is at least one of `allowedToolNames` / `allowedRiskClasses` — a grant with no scope authorizes nothing and is rejected.
    - Scope NARROW: an explicit `allowedToolNames` list, a `maxUses` equal to the actions you actually expect, a `ttlMs` covering only the window (8 h for overnight, not the 30-day ceiling). Never hand out a blanket `allowedRiskClasses` entry, and never mint a grant for read-only watching — reads need none.
-   - `grant.create`, `grant.revoke`, `daintree.call` and `daintree.invoke` can NEVER be granted, so a wrapper-less capability cannot run unattended: do it yourself now, or say plainly that it waits for the user.
+   - `grant.create`, `grant.revoke` and `daintree.call` can NEVER be granted, and neither can the raw dynamic-invoke entry point under its own bare name. A wrapper-less MCP action is still not automatically out of reach: dispatch resolves a per-call identity of the form daintree.invoke:ACTION before it looks for a grant, and a grant naming that exact composite IS honoured (a read-risk target needs no grant at all). So either name the resolved action explicitly, do it yourself now, or say plainly that it waits for the user.
 
 4. For a time-based nudge: `timer.schedule {"title":"…","payload":{"type":"enqueue","message":"…"},"delayMs":3600000}`. Use `delayMs` (relative), never `fireAt` — you have no reliable clock, so an invented wall-clock time fires at the wrong hour or never. `payload.type` is `enqueue` (a reminder in the attention queue) or `call_safe_tool` with `payload.toolCall {"toolName":"…","args":{…}}`. A `repeat` requires `everyMs` and must be bounded by `maxRuns` or `until`, or it pings forever. Optional `target` ties it to a `terminalId` / `worktreeId` / `projectId` / `workflowRunId`.
    - `enqueue` posts that queue item and does NOTHING else — it runs no tool, and once the assistant is closed nothing reads it until the user next looks. It is a note to a human, never unattended work, so never schedule one to "handle" something.
    - To ACT at fire time the payload must be `call_safe_tool`, and it fires with nobody there to confirm. `toolName` may name any registered tool — the timer adds no allowlist of its own — but the usual tier and confirmation policy still decides what runs, so a tool that needs no confirmation simply runs and a read-only payload is unaffected.
-   - A confirm-required tool needs a live grant, and a timer CAN hold one. The fire dispatches as the timer's own actor with `actorId` set to its `tmr_…` id, so a grant minted against that id is what authorizes the call. The revoke on a TERMINAL fire (every one-shot, and the last fire of a bounded repeat) is DEFERRED until after the payload has dispatched, precisely so the single fire the grant was minted for can still spend it. So a one-shot timer DOES carry out a confirm-required mutation unattended: schedule it, then grant against the id it returned. Only the ungrantable tools in step 3 stay out of reach.
+   - A confirm-required tool needs a live grant, and a timer CAN hold one. The fire dispatches as the timer's own actor with `actorId` set to its `tmr_…` id, so a grant minted against that id is what authorizes the call. The revoke on a TERMINAL fire (every one-shot, and the last fire of a bounded repeat) is DEFERRED until after the payload has dispatched, precisely so the single fire the grant was minted for can still spend it. So a one-shot timer DOES reach a confirm-required tool unattended: schedule it, then grant against the id it returned. Two limits on that, both real. The dispatch is AT-MOST-ONCE — the timer is marked fired BEFORE the payload runs and is never rescheduled on failure, so if the tool fails at fire time (Daintree MCP down, say) the grant is already spent, an error lands in the queue, and nothing retries. And the TIER gate runs BEFORE the grant is even looked up, so a grant can never authorize what the tier forbids: `operator` excludes git and system, `supervisor` allows only read/local/ui. Beyond that, the ungrantable names in step 3.
 
 5. Report the ids and END the turn — the setup IS the deliverable, so do not then wait on the same terminal in-turn. Every mechanism here outlives the turn, but they do not deliver the same thing once the assistant is CLOSED, so promise only what yours does:
    - WAKES YOU: a terminal watcher reaching its `stopWhen`/`alertWhen`, and a finished `terminal.await.async`. Only here is "I'll wake you when it finishes" a promise you can actually keep — and a `watch:true` spawn earns it only if it came back with a watcher id.
-   - ACTS, QUIETLY: a timer's `call_safe_tool` runs its ONE tool — no-confirmation outright, or confirm-required under the grant from step 3 — and leaves the result in the queue. It never wakes you itself, but what it STARTS can: a payload that spawns with `watch:true` leaves a terminal watcher behind, and that watcher's completion IS a wake.
+   - ACTS, QUIETLY: a timer's `call_safe_tool` runs its ONE tool — no-confirmation outright, or confirm-required under the grant from step 3 — and leaves the result in the queue. It never wakes you itself, but what it STARTS can: a payload that spawns with `watch:true` leaves a terminal watcher behind IF attachment succeeded and returned a `watcherId` — it is best-effort and can come back successful with a `watcherWarning` and no watcher, and since the timer's own event wakes nobody, that miss is silent. Promise the wake only when you can point at the id.
    - NEITHER: `watcher.watchPR` and a timer `enqueue` only leave an item that sits until the user looks. Promise a note waiting, never a wake.
 
 6. Clean up when the window closes. `watcher.list`, `timer.list`, `async.list` and `grant.list` (optional `actorId`) answer "what is still watching". Retire with `watcher.cancel` / `timer.cancel` / `grant.revoke` (each `{"id":"…"}`) or `async.cancel {"asyncId":"asy_…"}` — cancelling an async only stops tracking, nothing is killed or closed. Revoke a wake grant the moment the window is over; never leave standing authority behind.
@@ -103,13 +104,17 @@ THE KEY TRAP: to stop when an AGENT finishes its turn, do NOT use a bare `stopWh
 1. `timer.schedule` with a `call_safe_tool` payload naming the ONE tool that does the work — `agentTask.spawnForEdits` to start an agent, `terminal.sendCommand` to drive a terminal that already exists. Use `delayMs`. Read the `timerId` off the result.
 2. `grant.create {"actorType":"timer","actorId":"<that tmr_… id>","allowedToolNames":["agentTask.spawnForEdits"],"ttlMs":<the wait plus a margin>,"maxUses":1}` — scoped to exactly the tool the payload names, with `maxUses` matching the fires you actually expect (1 for a one-shot).
 
+   The TTL runs from NOW, not from the fire, so it has to cover the delay plus any lateness (the scheduler ticks every few seconds, and a project with no scheduler running catches up only when one next starts). And do not use this shape for a delay of a few seconds: the timer can fire before the grant lands, and `grant.create` does not check that its actor still exists, so you would be left holding a live grant for a timer that has already gone.
+
 At fire time the scheduler dispatches that tool as the timer actor, consumes the grant, and publishes the result to the attention queue. Nobody has to be present, and no model turn runs.
+
+It is ONE AT-MOST-ONCE ATTEMPT, not a guarantee. The timer is marked fired before the payload runs and is never rescheduled on failure, and the grant is consumed before the handler discovers it cannot work — so a fire that lands while Daintree is unreachable spends the grant, files an error, and does not retry when it comes back. Say "I have scheduled it", never "it will have run".
 
 Miss step 2 and the fire is wasted: the dispatch comes back `CONFIRMATION_REQUIRED` and lands as a pending-approval inbox item, which is the same nothing-happened the user asked you to prevent. A `call_safe_tool` payload whose tool needs no confirmation (a read) needs no grant at all.
 
 Three things this does NOT do. Do not promise them:
 
-- **It does not WAKE you.** A timer's own event never triggers an autonomous turn, so the result waits in the inbox until someone looks — UNLESS the payload leaves a watcher behind (spawn with flat `watch:true` + `watchGoal`), whose completion IS a real wake. Chain it that way when the user wants to be told, and say which one you set up.
+- **It does not WAKE you.** A timer's own event never triggers an autonomous turn, so the result waits in the inbox until someone looks — UNLESS the payload leaves a watcher behind (spawn with flat `watch:true` + `watchGoal`), whose completion IS a real wake. Watcher attachment is best-effort: a spawn can succeed with a `watcherWarning` and no `watcherId`, and nothing will tell you, so promise the wake only against an id you can see.
 - **It runs ONE tool.** A multi-step sequence is not a timer payload. Make the one tool a spawn whose `taskPrompt` carries the whole job.
 - **It cannot reach the ungrantable tools in step 3.** Those still wait for the user, and saying so plainly is the honest answer.
 
