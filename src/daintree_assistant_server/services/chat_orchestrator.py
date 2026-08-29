@@ -35,6 +35,13 @@ from ..config import (
     Settings,
 )
 from ..contracts.daintree_api import (
+    SSE_EVENT_COMPACTION,
+    SSE_EVENT_DELTA,
+    SSE_EVENT_DONE,
+    SSE_EVENT_ERROR,
+    SSE_EVENT_META,
+    SSE_EVENT_PREAMBLE,
+    SSE_EVENT_STATUS,
     CompactionBlock,
     CompactionSpan,
     RespondMessage,
@@ -1551,11 +1558,11 @@ class ChatOrchestrator:
 
         runbooks = runbooks_catalog.get_many(active_ids)
         executions: list[RunbookLoadExecution | DocsSearchExecution] = [
-            RunbookLoadExecution.from_runbook(
-                new_call_id(),
-                runbooks_catalog.get(sid),  # type: ignore[arg-type]
-            )
-            for sid in newly_loaded_ids
+            RunbookLoadExecution.from_runbook(new_call_id(), runbook)
+            # `get_many`, not `get` per id: every id here came out of this very
+            # catalog, so the two are equivalent — but one of them is typed as
+            # returning runbooks and the other as returning Optionals.
+            for runbook in runbooks_catalog.get_many(newly_loaded_ids)
         ]
 
         # The selector's second answer: this turn asked how Daintree works, so
@@ -1995,9 +2002,9 @@ class ChatOrchestrator:
         result = gate.poll()
         if result is None:
             return
-        yield self._sse("status", StreamStatus(phase="fast_response").model_dump())
+        yield self._sse(SSE_EVENT_STATUS, StreamStatus(phase="fast_response").model_dump())
         yield self._sse(
-            "preamble",
+            SSE_EVENT_PREAMBLE,
             StreamPreamble(
                 id=f"pre_{meta.request_id.split('_', 1)[-1]}",
                 content=result.content or "",
@@ -2018,7 +2025,7 @@ class ChatOrchestrator:
             },
             content={"content": result.content},
         )
-        yield self._sse("status", StreamStatus(phase="executor").model_dump())
+        yield self._sse(SSE_EVENT_STATUS, StreamStatus(phase="executor").model_dump())
 
     async def _emit_confirmation(
         self,
@@ -2071,7 +2078,7 @@ class ChatOrchestrator:
 
         def frame(content: str) -> str:
             return self._sse(
-                "preamble",
+                SSE_EVENT_PREAMBLE,
                 StreamPreamble(id=event_id, content=content).model_dump(),
             )
 
@@ -2576,8 +2583,8 @@ class ChatOrchestrator:
 
         runbooks = self.catalog.get_many(active_ids)
         executions = [
-            RunbookLoadExecution.from_runbook(new_call_id(), self.catalog.get(sid))  # type: ignore[arg-type]
-            for sid in newly_loaded_ids
+            RunbookLoadExecution.from_runbook(new_call_id(), runbook)
+            for runbook in self.catalog.get_many(newly_loaded_ids)
         ]
         new_state = self.state_codec.issue(
             session_id=session_id,
@@ -2721,7 +2728,7 @@ class ChatOrchestrator:
         self, raw: Any, *, param_index: ParameterIndex, request_id: str
     ) -> list[dict[str, Any]] | None:
         """Project upstream tool-call dicts onto the strict response shape,
-        dropping provider-specific fields (e.g. DeepSeek's ``index``) and
+        dropping provider-specific fields (e.g. the upstream's ``index``) and
         repairing near-miss arguments against the client-declared schemas."""
         if not raw:
             return None
@@ -2832,7 +2839,7 @@ class ChatOrchestrator:
                 status=exc.status_code,
             )
             yield self._sse(
-                "error",
+                SSE_EVENT_ERROR,
                 StreamError(
                     error=exc.envelope().error,
                     request_id=request_id,
@@ -2843,7 +2850,7 @@ class ChatOrchestrator:
         except Exception:
             logger.exception("respond_prepare_unexpected", request_id=request_id)
             yield self._sse(
-                "error",
+                SSE_EVENT_ERROR,
                 StreamError(error=internal_error().envelope().error, request_id=request_id),
             )
             return
@@ -2878,7 +2885,7 @@ class ChatOrchestrator:
                 elapsed_ms=round(exc.elapsed * 1000),
             )
             yield self._sse(
-                "error",
+                SSE_EVENT_ERROR,
                 StreamError(
                     error=turn_deadline_exceeded(exc.phase.value).envelope().error,
                     request_id=request_id,
@@ -2890,7 +2897,7 @@ class ChatOrchestrator:
             # chunk crashing delta handling) so the client still gets a typed end.
             logger.exception("respond_stream_unexpected", request_id=request_id)
             yield self._sse(
-                "error",
+                SSE_EVENT_ERROR,
                 StreamError(error=internal_error().envelope().error, request_id=request_id),
             )
         finally:
@@ -3052,7 +3059,7 @@ class ChatOrchestrator:
             # as soon as selection finishes — local selection is ~10ms, so this
             # arrives effectively immediately, well before the upstream opens.
             yield self._sse(
-                "meta",
+                SSE_EVENT_META,
                 StreamMeta(
                     request_id=meta.request_id,
                     model=PUBLIC_MODEL_ID,
@@ -3300,7 +3307,7 @@ class ChatOrchestrator:
                     ):
                         for pending in held:
                             _mark_first_output(pending)
-                            yield self._sse("delta", pending)
+                            yield self._sse(SSE_EVENT_DELTA, pending)
                         held = None
                     # Announce the thinking phase once, the instant the model's
                     # chain-of-thought starts streaming, so the CLI can show it.
@@ -3310,7 +3317,9 @@ class ChatOrchestrator:
                         )
                     if delta.reasoning_content and not thinking_signaled:
                         thinking_signaled = True
-                        yield self._sse("status", StreamStatus(phase="thinking").model_dump())
+                        yield self._sse(
+                            SSE_EVENT_STATUS, StreamStatus(phase="thinking").model_dump()
+                        )
                     if delta.tool_calls:
                         saw_tool_calls = True
                         ready = tool_call_buffer.add(delta.tool_calls)
@@ -3331,7 +3340,7 @@ class ChatOrchestrator:
                                 )
                             )
                             yield self._sse(
-                                "delta",
+                                SSE_EVENT_DELTA,
                                 StreamDelta(
                                     content=delta.content,
                                     reasoning_content=delta.reasoning_content,
@@ -3339,13 +3348,13 @@ class ChatOrchestrator:
                             )
                         if ready:
                             _mark_first_output(StreamDelta(tool_calls=ready))
-                            yield self._sse("delta", StreamDelta(tool_calls=ready))
+                            yield self._sse(SSE_EVENT_DELTA, StreamDelta(tool_calls=ready))
                         continue
                     if held is not None:
                         held.append(delta)
                         continue
                     _mark_first_output(delta)
-                    yield self._sse("delta", delta)
+                    yield self._sse(SSE_EVENT_DELTA, delta)
 
                 # THE LAST POLL, and it is not redundant with the one at the top
                 # of the loop above.
@@ -3375,7 +3384,7 @@ class ChatOrchestrator:
                         held.append(tail_delta)
                     else:
                         _mark_first_output(tail_delta)
-                        yield self._sse("delta", tail_delta)
+                        yield self._sse(SSE_EVENT_DELTA, tail_delta)
 
                 # The reply has ended with its content still private. This is the one
                 # moment the dead round can be caught, and discarding it is free.
@@ -3471,12 +3480,12 @@ class ChatOrchestrator:
             # Anything still held belongs to the accepted attempt and goes out now.
             for pending in held or []:
                 _mark_first_output(pending)
-                yield self._sse("delta", pending)
+                yield self._sse(SSE_EVENT_DELTA, pending)
             held = None
             remaining = tool_call_buffer.flush()
             if remaining:
                 _mark_first_output(StreamDelta(tool_calls=remaining))
-                yield self._sse("delta", StreamDelta(tool_calls=remaining))
+                yield self._sse(SSE_EVENT_DELTA, StreamDelta(tool_calls=remaining))
             self._log_tool_call_repairs(tool_call_buffer.repairs, request_id=meta.request_id)
             # Compaction rides AHEAD of the terminal event, never behind it. SSE
             # itself has no notion of a terminal event, but a reader modelled on
@@ -3524,9 +3533,9 @@ class ChatOrchestrator:
                     budget=budget,
                 )
                 if compaction is not None:
-                    yield self._sse("compaction", compaction.model_dump())
+                    yield self._sse(SSE_EVENT_COMPACTION, compaction.model_dump())
             yield self._sse(
-                "done",
+                SSE_EVENT_DONE,
                 StreamDone(
                     finish_reason=finish_reason,
                     usage=response_usage(total_usage),
@@ -3571,7 +3580,7 @@ class ChatOrchestrator:
                 status=exc.status_code,
             )
             yield self._sse(
-                "error",
+                SSE_EVENT_ERROR,
                 StreamError(
                     error=exc.envelope().error,
                     request_id=meta.request_id,

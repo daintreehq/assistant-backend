@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from structlog.testing import capture_logs
 
 from daintree_assistant_server.runbooks.local.documents import (
     query_document,
@@ -413,51 +414,51 @@ def test_local_selector_hides_pinned_actives_from_the_classifier() -> None:
     asyncio.run(go())
 
 
-def test_local_selector_logs_a_reservation_without_conversation_text(caplog) -> None:  # type: ignore[no-untyped-def]
+def test_local_selector_logs_a_reservation_without_conversation_text() -> None:
     """The one number worth watching as the catalog grows, and nothing else.
 
     Reservation firing is how often the pre-reservation ballot would have been
     evicting a live workflow, so it is logged — but runbook ids only. This
     codebase never logs user text, and a selector log line is one of the easier
     places to leak it by accident.
+
+    Captured through `structlog.testing` rather than `caplog`, for the reason
+    `test_provider_failover.py` gives: once `configure_logging` has run — which it
+    has, in any session that touched the app — the logger factory prints to stdout
+    and never reaches stdlib logging, so a `caplog` assertion would pass or fail on
+    TEST ORDER rather than on behaviour.
     """
-    import logging
+    captured: list[dict[str, object]] = []
 
     async def go() -> None:
         clf = _StubClassifier(["daintree.terminals.rename"])
         clf.reserved = ("daintree.terminals.rename",)
         sel, pool = _local_selector(clf)
-        with caplog.at_level(logging.INFO):
+        with capture_logs() as logs:
             await sel.select([_Msg("user", "PRIVATE-USER-TEXT")], ["daintree.terminals.rename"])
+        captured.extend(logs)
         pool.close()
 
     asyncio.run(go())
-    records = [r for r in caplog.records if r.message == "local_selector_reserved_active"]
+    records = [e for e in captured if e["event"] == "local_selector_reserved_active"]
     assert len(records) == 1
-    assert records[0].reserved == ["daintree.terminals.rename"]
-    assert records[0].retained == ["daintree.terminals.rename"]
-    assert "PRIVATE-USER-TEXT" not in caplog.text
+    assert records[0]["reserved"] == ["daintree.terminals.rename"]
+    assert records[0]["retained"] == ["daintree.terminals.rename"]
+    assert "PRIVATE-USER-TEXT" not in repr(captured)
 
 
 def test_local_selector_does_not_log_when_nothing_was_reserved() -> None:
     """The common path stays silent — this is a rate to watch, not a heartbeat."""
 
     async def go() -> tuple[object, ...]:
-        import logging
-
         clf = _StubClassifier()
         sel, pool = _local_selector(clf)
-        logger = logging.getLogger("daintree_assistant_server.runbooks.local.selector")
-        seen: list[str] = []
-        handler = logging.Handler()
-        handler.emit = lambda record: seen.append(record.getMessage())  # type: ignore[method-assign]
-        logger.addHandler(handler)
         try:
-            await sel.select([_Msg("user", "rename my terminals")], [])
+            with capture_logs() as logs:
+                await sel.select([_Msg("user", "rename my terminals")], [])
         finally:
-            logger.removeHandler(handler)
             pool.close()
-        return tuple(seen)
+        return tuple(entry["event"] for entry in logs)
 
     assert "local_selector_reserved_active" not in asyncio.run(go())
 

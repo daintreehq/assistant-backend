@@ -343,8 +343,14 @@ class PromptLoader:
         # Templates too. Without them, two builds whose selector or loaded-runbooks
         # INSTRUCTIONS differ report identical hashes — and those templates carry
         # as much behaviour as the raw bodies do.
+        # `Environment.loader` is Optional on the Jinja type; this environment is
+        # always built with one a few lines up in `__init__`, so an absence is a
+        # construction bug rather than a state to render around.
+        loader = self.env.loader
+        if loader is None:  # pragma: no cover - defensive
+            raise PromptError("prompt environment has no template loader")
         for name in _ALL_TEMPLATES:
-            source, _, _ = self.env.loader.get_source(self.env, name)  # type: ignore[union-attr]
+            source, _, _ = loader.get_source(self.env, name)
             hashes[f"template:{name}"] = digest(source)
         return hashes
 

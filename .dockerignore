@@ -11,6 +11,10 @@ tests/
 infra/
 *.egg-info/
 .env
+# Every .env sibling too — `.env.bak.<epoch>` backups carry the same live
+# secrets as `.env` itself, and a pattern that only names the canonical
+# file ships them into the build context on the first `cp .env .env.bak`.
+.env.*
 .DS_Store
 
 # The Dockerfile only copies pyproject.toml, README.md, requirements.lock and

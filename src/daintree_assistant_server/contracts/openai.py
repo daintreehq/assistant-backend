@@ -1,7 +1,7 @@
 """Internal canonical message / tool / content models.
 
-These mirror the OpenAI wire shape because that is what the DeepSeek provider
-speaks *upstream*. They are reused as the internal conversation representation
+These mirror the OpenAI wire shape because that is what the provider adapters
+speak *upstream*. They are reused as the internal conversation representation
 by the selector, the prompt assembler, and the native respond contract — so the
 public protocol can be Daintree-native while the provider stays unchanged.
 Role validation is intentionally permissive at the schema level (``role: str``)
@@ -54,7 +54,7 @@ ContentPart = Annotated[
 class FunctionCall(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # OpenAI/DeepSeek function names are limited to 64 characters; this applies
+    # OpenAI-wire function names are limited to 64 characters; this applies
     # to tool calls echoed back in assistant message history too.
     name: str = Field(min_length=1, max_length=64)
     arguments: str = Field(default="", max_length=1_048_576)
@@ -71,7 +71,7 @@ class ToolCall(BaseModel):
 class FunctionDef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # OpenAI/DeepSeek function names are limited to 64 characters.
+    # OpenAI-wire function names are limited to 64 characters.
     name: str = Field(min_length=1, max_length=64)
     description: str | None = Field(default=None, max_length=8192)
     parameters: dict[str, Any] | None = None
@@ -97,9 +97,13 @@ class ChatMessage(BaseModel):
     name: str | None = Field(default=None, max_length=256)
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = Field(default=None, max_length=256)
-    # DeepSeek thinking-mode chain-of-thought. The model returns it alongside
+    # The serving model's chain-of-thought. The model returns it alongside
     # content; on an assistant turn that performed tool calls it MUST be replayed
-    # verbatim in later requests or DeepSeek returns 400 (it is ignored on turns
-    # without tool calls). Prompt assembly forwards it verbatim on tool-call turns
-    # only and drops it on final-answer turns, where it would be pure prompt cost.
+    # verbatim in later requests or the upstream returns 400 (it is ignored on
+    # turns without tool calls). This is Daintree's canonical name for the field:
+    # it happens to be Baseten's own spelling too, in both the message and the
+    # streaming delta, which is why `providers/baseten.py` undoes the parent
+    # adapter's outbound rename to `reasoning`. Prompt assembly forwards it
+    # verbatim on tool-call turns only and drops it on final-answer turns, where
+    # it would be pure prompt cost.
     reasoning_content: str | None = Field(default=None, max_length=1_048_576)

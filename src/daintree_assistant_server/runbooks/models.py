@@ -260,7 +260,7 @@ class Runbook:
 
         Request-varying state is NOT here: which runbooks are currently active is
         rendered once after the catalog block, so the per-runbook lines stay
-        byte-identical across turns for DeepSeek's content-prefix cache.
+        byte-identical across turns for the upstream's content-prefix cache.
         """
         return {
             "id": self.meta.id,

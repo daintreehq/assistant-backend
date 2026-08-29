@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..config import EXECUTOR_CONTEXT_TOKENS
-from ..contracts.errors import TYPE_INVALID_REQUEST
+from ..contracts.errors import CODE_CONTEXT_WINDOW_EXCEEDED, TYPE_INVALID_REQUEST
 from ..errors import DaintreeError
 from ..providers.base import ProviderChatRequest
 from ..text_utils import estimate_tokens
@@ -49,8 +49,9 @@ from ..text_utils import estimate_tokens
 # Stable code for "this prompt is too big", in both directions: raised here when
 # we can see it ourselves, and mapped from the upstream's own rejection when we
 # could not (see `providers/openrouter._map_status`). One code, so the CLI needs
-# one branch and the operator needs one query.
-CODE_CONTEXT_WINDOW_EXCEEDED = "context_window_exceeded"
+# one branch and the operator needs one query — and one DEFINITION, in
+# `contracts/errors.py`, because `providers/failover.py` classifies on the same
+# literal and a second spelling of it would be invisible until it diverged.
 
 # Chat templates add role markers, separators and a tool-schema preamble that no
 # amount of measuring the payload can see, and tokenizers disagree with a

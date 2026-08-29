@@ -14,8 +14,8 @@ select between them. The kill switch below is operational, not a menu.
   Each adapter resolves it to its own single name; sending both is the failure
   mode this rule exists to prevent.
 * **No ``reasoning`` object, ever — Cerebras spells it ``reasoning_effort``.**
-  The parent MUST send `{"enabled": false}` because DeepSeek V4 Flash reasons by
-  default and omission means "think". Cerebras does not speak that object at all,
+  The parent MUST state the posture, because a reasoning model reads omission as
+  "think". Cerebras does not speak that object at all,
   so it is dropped unconditionally and `reasoning_effort` is sent only for an
   EXPLICIT effort a caller asked for — never synthesised from `thinking_disabled`,
   which would put a parameter on the wire to buy a disable that does not exist.
@@ -80,9 +80,11 @@ class CerebrasProvider(OpenRouterProvider):
             body["max_completion_tokens"] = body.pop("max_tokens")
 
         # The parent always writes a `reasoning` object. Cerebras does not speak
-        # it, and for a non-reasoning model there is nothing to disable — see the
-        # module docstring. Dropped unconditionally, then re-added only for an
-        # EXPLICIT effort a caller asked for.
+        # it at all, and there is no field on this wire that could express a
+        # disable — see the module docstring. Dropped unconditionally, then
+        # re-added, as `reasoning_effort`, only for an EXPLICIT effort a caller
+        # asked for: the model this reaches DOES reason, so a synthesised value
+        # would be buying a posture rather than stating one.
         body.pop("reasoning", None)
         if not request.thinking_disabled and request.reasoning_effort:
             body["reasoning_effort"] = request.reasoning_effort

@@ -15,6 +15,10 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .contracts.errors import (
+    CODE_CONTEXT_WINDOW_EXCEEDED,
+    CODE_PROVIDER_KEY_FORBIDDEN,
+    CODE_UPSTREAM_REQUEST_REJECTED,
+    CODE_UPSTREAM_RUNAWAY_OUTPUT,
     TYPE_API,
     TYPE_AUTHENTICATION,
     TYPE_BILLING,
@@ -645,7 +649,7 @@ def provider_key_forbidden(
         status_code=403,
         message=message,
         type=TYPE_AUTHENTICATION,
-        code="provider_key_forbidden",
+        code=CODE_PROVIDER_KEY_FORBIDDEN,
     )
 
 
@@ -719,7 +723,7 @@ def upstream_request_rejected(
         status_code=502,
         message=message,
         type=TYPE_API,
-        code="upstream_request_rejected",
+        code=CODE_UPSTREAM_REQUEST_REJECTED,
     )
 
 
@@ -756,7 +760,7 @@ def upstream_context_window_exceeded(
         status_code=413,
         message=message,
         type=TYPE_INVALID_REQUEST,
-        code="context_window_exceeded",
+        code=CODE_CONTEXT_WINDOW_EXCEEDED,
     )
 
 
@@ -818,7 +822,7 @@ def upstream_runaway_output(
         status_code=502,
         message=message,
         type=TYPE_API,
-        code="upstream_runaway_output",
+        code=CODE_UPSTREAM_RUNAWAY_OUTPUT,
     )
 
 

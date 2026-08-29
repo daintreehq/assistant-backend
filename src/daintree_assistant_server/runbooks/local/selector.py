@@ -29,20 +29,20 @@ next deploy — reachable, not yet competitive against its trained neighbours; s
 
 from __future__ import annotations
 
-import logging
 from typing import Protocol
 
 from pydantic import SecretStr
 
 from ...config import Settings
 from ...contracts.openai import ChatMessage
+from ...observability import get_logger
 from ..catalog import Catalog, CatalogManager
 from ..decision import SelectionDecision
 from .documents import ACTIVE_PREFIX, fit_query, last_user_text
 from .runtime import InferencePool
 from .setwise import SetwiseClassifier
 
-_log = logging.getLogger(__name__)
+_log = get_logger("daintree.runbooks.selector")
 
 #: How much of the head's ranking the fast-response stage is shown. Five rather
 #: than the active cap of three on purpose: the extra two are the near-misses, and
@@ -215,8 +215,7 @@ class LocalSelector:
             # out of this very catalog snapshot — so it means table and catalog
             # disagree, and the upstream selector's parser treats the same shape
             # as malformed for the same reason.
-            _log.warning("local_selector_unresolvable_answer",
-                         extra={"named": result.runbook_ids[:3]})
+            _log.warning("local_selector_unresolvable_answer", named=result.runbook_ids[:3])
             return SelectionDecision.degraded_open(["local_runbook_selector_unknown_ids"])
 
         if result.reserved_ids:
@@ -227,12 +226,8 @@ class LocalSelector:
             # workflow on a vague follow-up. Watch the rate, not the event.
             _log.info(
                 "local_selector_reserved_active",
-                extra={
-                    "reserved": list(result.reserved_ids),
-                    "retained": [
-                        sid for sid in result.reserved_ids if sid in result.runbook_ids
-                    ],
-                },
+                reserved=list(result.reserved_ids),
+                retained=[sid for sid in result.reserved_ids if sid in result.runbook_ids],
             )
 
         top_scores = ", ".join(

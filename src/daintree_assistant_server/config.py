@@ -1690,24 +1690,24 @@ class Settings(BaseSettings):
     def missing_secrets(self) -> list[str]:
         """Return env var names of required secrets that are empty.
 
-        All three entries are SERVER-owned, which is the whole shape of the
-        credential model: Daintree holds every upstream key and callers hold none
-        (see auth.py). ``BASETEN_API_KEY`` is required for the server to answer
+        BOTH entries are SERVER-owned, which is the whole shape of the credential
+        model: Daintree holds every upstream key and callers hold none (see
+        auth.py). ``BASETEN_API_KEY`` is required for the server to answer
         anything at all, and its absence must fail READINESS rather than surface a
         turn later as an upstream 401 that reads like the caller's fault. There is
         still no INBOUND key to configure: account authentication is OAuth, and
         its settings are public configuration gated through ``auth_problems()``
         rather than secrets. The door's posture is ``AUTH_MODE``, not an absence.
 
-        ``CEREBRAS_API_KEY`` joined them when the fast-response stage lost its off
-        switch. It is a weaker requirement than the other two — the turn still
-        answers without it — but not a soft one: the stage runs on every eligible
-        turn, so a missing key is the feature failing open silently on all of them,
-        which is indistinguishable from a model that chose not to answer. That is
-        exactly the failure that never gets noticed in production.
+        ``CEREBRAS_API_KEY`` was a third entry for as long as the fast-response
+        stage had no off switch, and it LEFT with that switch — see the comment in
+        the body, which is the authority on why.
 
-        (Contrast OPENROUTER_API_KEY, deliberately absent: nothing on the serving
-        path routes there, so a deployment without it is complete.)
+        (Contrast OPENROUTER_API_KEY, also absent and for a different reason: it
+        funds the executor FALLBACK, so without it every turn is still answered
+        and only the robustness is lost. ``STAGING_ALLOWED_SUBJECT_DIGESTS`` is a
+        third kind again — required, but only under one posture, so it gates
+        through ``subject_gate_problems()``.)
         """
         missing: list[str] = []
         if not self.state_signing_key_current.get_secret_value():

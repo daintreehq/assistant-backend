@@ -10,8 +10,9 @@ before this file was written.
 misremembered.** Every other adapter in this package exists in a world where
 non-thinking is reachable: the OpenRouter/Together parent sends
 ``reasoning: {"enabled": false}`` to hold a reasoning model down, and the
-Cerebras adapter omits the field entirely because its model does not reason at
-all. GLM-5.3-Flash admits neither. It reasons unconditionally — Baseten lists it
+Cerebras adapter omits the field entirely because its host does not speak that
+object, steering its model with a bare ``reasoning_effort`` instead.
+GLM-5.3-Flash admits neither. It reasons unconditionally — Baseten lists it
 "always enabled", ``none`` is not an accepted effort, and the only control is
 ``reasoning_effort`` over ``low`` | ``high`` | ``max``, defaulting to ``high``
 when the field is absent. So OMISSION IS EXPENSIVE here, in the same way it is
@@ -113,7 +114,8 @@ class BasetenProvider(OpenRouterProvider):
         body = super()._build_body(request, stream=stream)
 
         # The parent always writes a unified `reasoning` object — the field that
-        # holds DeepSeek down. Baseten does not document it, accepts it silently
+        # holds a switchable reasoning model down. Baseten does not document it,
+        # accepts it silently
         # like any unknown field, and serves a model that cannot be held down at
         # all. Dropped unconditionally, then replaced with the ONE control this
         # host exposes. See the module docstring on why its apparent effect is

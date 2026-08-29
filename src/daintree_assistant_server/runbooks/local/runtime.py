@@ -30,14 +30,15 @@ worse component than the network call it replaces.
 from __future__ import annotations
 
 import asyncio
-import logging
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import TypeVar
 
-_log = logging.getLogger(__name__)
+from ...observability import get_logger
+
+_log = get_logger("daintree.runbooks.inference")
 
 T = TypeVar("T")
 
@@ -155,7 +156,7 @@ class InferencePool:
             # should, because the alternative to a short wait is a ~2.0s upstream
             # call (see RANK_TIMEOUT_SECONDS).
             self._rejected_full += 1
-            _log.warning("runbook_rank_pool_full", extra={"depth": self._queue_depth})
+            _log.warning("runbook_rank_pool_full", depth=self._queue_depth)
             return None
 
         await self._slots.acquire()
@@ -211,7 +212,7 @@ class InferencePool:
             return result
         except TimeoutError:
             self._timed_out += 1
-            _log.warning("runbook_rank_timeout", extra={"timeout_s": self._timeout})
+            _log.warning("runbook_rank_timeout", timeout_s=self._timeout)
             return None
         except Exception:  # noqa: BLE001 - fail open on anything the model does
             self._failed += 1

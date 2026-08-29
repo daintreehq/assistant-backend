@@ -36,6 +36,36 @@ TYPE_API = "api_error"
 TYPE_BILLING = "billing_error"
 
 
+# --------------------------------------------------------------------------
+# Error ``code`` values with a CROSS-MODULE consumer.
+#
+# Most codes are written once, by the factory that raises them, and read only by
+# the caller receiving the envelope — a literal at the raise site is the clearest
+# thing there and these constants are deliberately not a registry of all of them.
+#
+# These four are different. ``providers/failover.py`` classifies a failure by
+# comparing ``DaintreeError.code`` against :data:`~..providers.failover.
+# REQUEST_FAULT_CODES`, so the spelling in the factory and the spelling in that
+# set must agree EXACTLY or the classification silently inverts: a request fault
+# read as a host fault is replayed, whole, onto a second host — which for
+# ``provider_key_forbidden`` means laundering a moderation refusal. A shared name
+# is what makes that agreement a fact rather than a coincidence of typing.
+# --------------------------------------------------------------------------
+
+#: A 4xx that is not about length — malformed body, unknown field, bad schema.
+CODE_UPSTREAM_REQUEST_REJECTED = "upstream_request_rejected"
+
+#: The assembled prompt does not fit the window. Also the code the upstream's own
+#: length rejection is mapped to, so both arrive as one thing to the caller.
+CODE_CONTEXT_WINDOW_EXCEEDED = "context_window_exceeded"
+
+#: We stopped the generation ourselves.
+CODE_UPSTREAM_RUNAWAY_OUTPUT = "upstream_runaway_output"
+
+#: A 403 — ambiguous between model permissions and a host's moderation refusal.
+CODE_PROVIDER_KEY_FORBIDDEN = "provider_key_forbidden"
+
+
 class ErrorDetail(BaseModel):
     """The inner error object."""
 

@@ -22,10 +22,14 @@ opposite convention is what a reader who saw that adapter will remember:
 
 * **``max_tokens``, the OpenAI-standard spelling.** One spelling per adapter,
   resolved at the boundary.
-* **The ``reasoning`` object is sent EXPLICITLY, and disabled.** DeepSeek V4
-  Flash is a reasoning model and reasons by DEFAULT when the field is absent, so
-  ``{"enabled": false}`` is what actually keeps a call non-thinking. Sending
-  nothing would silently buy reasoning tokens and latency on every call.
+* **The ``reasoning`` object is sent EXPLICITLY, never omitted.** An absent
+  field does not mean "non-thinking" on a reasoning model — it means "think, at
+  the endpoint's default depth", silently buying tokens and latency. So the
+  posture is always stated: ``{"enabled": false}`` for a call that asked for no
+  thinking, ``{"effort": ...}`` for one that named a floor. The Baseten subclass
+  drops this object and sends ``reasoning_effort`` instead, because the model it
+  reaches (``zai-org/GLM-5.3-Flash``) has no off switch to express — see
+  ``baseten.py``.
 * **Error bodies are NESTED.** OpenRouter returns OpenAI's ``{"error": {...}}``
   envelope, so ``_upstream_error_detail`` reads nested FIRST. It reads the flat
   shape too; only the priority differs.
@@ -891,14 +895,16 @@ class OpenRouterProvider:
             body["response_format"] = request.response_format
         if request.stop:
             body["stop"] = request.stop
-        # Reasoning is a unified OBJECT here, and the disable is MANDATORY rather
-        # than implied. The model this adapter exists to reach (DeepSeek V4 Flash)
-        # reasons by DEFAULT when the field is absent, so an omitted `reasoning`
-        # does not mean "non-thinking" — it means "think, at the endpoint's
-        # default depth", silently buying tokens and latency on a call whose whole
-        # purpose is to be cheap. This is the exact inverse of the retired Cerebras
-        # adapter, where the wire has no field that could express the disable and
-        # omission IS the posture.
+        # Reasoning is a unified OBJECT here, and STATING it is mandatory rather
+        # than implied. A reasoning model reasons by DEFAULT when the field is
+        # absent, so an omitted `reasoning` does not mean "non-thinking" — it
+        # means "think, at the endpoint's default depth", silently buying tokens
+        # and latency on a call whose whole purpose is to be cheap. This is the
+        # exact inverse of the retired Cerebras adapter, where the wire has no
+        # field that could express the disable and omission IS the posture. The
+        # Baseten subclass pops this object again: the model it serves cannot be
+        # run non-thinking at all, so the only control is a `reasoning_effort`
+        # floor.
         if request.thinking_disabled:
             body["reasoning"] = {"enabled": False}
         elif request.reasoning_effort:

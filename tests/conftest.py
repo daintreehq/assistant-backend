@@ -69,9 +69,11 @@ def settings(tmp_path: Any) -> Settings:
         # `assert key not in body` is unsatisfiable rather than merely weak.
         # A sentinel here makes both environments run the same test.
         BASETEN_API_KEY="tgp_v1_test-key",
-        # Required for readiness since the fast-response stage lost its off
-        # switch — the same reasoning as the executor key above, and a sentinel
-        # rather than a real key for the same redaction reason.
+        # NOT required for readiness — it left `missing_secrets()` with the
+        # fast-response stage's off switch (`FAST_RESPONSE_ENABLED` is False, so
+        # no call is ever opened). Kept here so a test that re-enables the stage
+        # has a credential to build a provider from, and a sentinel rather than a
+        # real key for the same redaction reason as the executor key above.
         CEREBRAS_API_KEY="csk-test-key",
         STATE_SIGNING_KEY_CURRENT="test-signing-key",
         STATE_SIGNING_KID="k1",

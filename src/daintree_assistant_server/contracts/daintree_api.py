@@ -6,8 +6,8 @@ envelope is first-class (not a bolted-on extension), the request is strict
 block in the response because dynamic runbook loading is the system's core value.
 
 Conversation messages and tool definitions reuse the internal canonical models
-(:mod:`.openai`) so the selector, assembler, and DeepSeek provider — which speak
-the OpenAI wire shape *upstream* — need no translation. Only the public envelope
+(:mod:`.openai`) so the assembler and the provider adapters — which speak the
+OpenAI wire shape *upstream* — need no translation. Only the public envelope
 and the response/stream serialization are Daintree-native.
 """
 
@@ -270,7 +270,7 @@ class TurnCost(BaseModel):
 class RespondMessage(BaseModel):
     role: str = "assistant"
     content: str | None = None
-    # DeepSeek thinking-mode chain-of-thought (present only when thinking is on).
+    # The model's chain-of-thought, under Daintree's canonical name for it.
     # The client must store it on the assistant turn and replay it next request
     # when the turn performed tool calls — see ChatMessage.reasoning_content.
     reasoning_content: str | None = None
@@ -302,7 +302,26 @@ class RespondResponse(BaseModel):
 # --------------------------------------------------------------------------
 # Streaming event payloads (named SSE events: meta / status / delta /
 # compaction / done / error). `done` is terminal — nothing follows it.
+#
+# The ``event:`` names themselves are named here, beside the payload each one
+# carries, rather than spelled at the twenty-odd emission sites in
+# `services/chat_orchestrator.py`. They are WIRE CONTRACT (`docs/DAINTREE_API.md`
+# section 8): a client dispatches on the exact byte sequence, so a typo at one
+# emission site is not a crash here — it is an event the CLI silently drops, and
+# for `done` it is a stream the reader never breaks out of.
 # --------------------------------------------------------------------------
+
+SSE_EVENT_META = "meta"
+SSE_EVENT_STATUS = "status"
+SSE_EVENT_PREAMBLE = "preamble"
+SSE_EVENT_DELTA = "delta"
+SSE_EVENT_COMPACTION = "compaction"
+#: Terminal. Emitted last, and readers modelled on the `data: [DONE]` convention
+#: break their loop on it — which is why `compaction` goes immediately BEFORE it.
+SSE_EVENT_DONE = "done"
+#: The other terminal event. A stream ends with exactly one of these two, never
+#: with a fabricated `done` standing in for a failure.
+SSE_EVENT_ERROR = "error"
 
 
 class StreamMeta(BaseModel):

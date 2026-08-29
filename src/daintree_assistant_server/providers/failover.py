@@ -92,6 +92,12 @@ from ..config import (
     EXECUTOR_FALLBACK_PROBE_INTERVAL_SECONDS,
     EXECUTOR_FALLBACK_STALL_HOLDOFF_SECONDS,
 )
+from ..contracts.errors import (
+    CODE_CONTEXT_WINDOW_EXCEEDED,
+    CODE_PROVIDER_KEY_FORBIDDEN,
+    CODE_UPSTREAM_REQUEST_REJECTED,
+    CODE_UPSTREAM_RUNAWAY_OUTPUT,
+)
 from ..errors import DaintreeError
 from ..observability import get_logger
 from .base import (
@@ -121,15 +127,15 @@ REQUEST_FAULT_CODES = frozenset(
     {
         # A 4xx that is not about length: a malformed body, an unknown field, a
         # bad tool schema. Almost always a server-side bug in what we sent.
-        "upstream_request_rejected",
+        CODE_UPSTREAM_REQUEST_REJECTED,
         # The prompt does not fit. It will not fit on the other host either —
         # both serve the same weights at the same window.
-        "context_window_exceeded",
+        CODE_CONTEXT_WINDOW_EXCEEDED,
         # We stopped the generation ourselves. Not the host's doing, and
         # unreachable from the failover sites anyway (it is a mid-stream
         # verdict); listed so the classification is complete rather than
         # incidentally correct.
-        "upstream_runaway_output",
+        CODE_UPSTREAM_RUNAWAY_OUTPUT,
         # A 403, and the ONE entry here that is not obviously about the request.
         # It is here because the code is AMBIGUOUS in a direction that only
         # resolves one way: it covers model permissions and spend limits, and it
@@ -141,7 +147,7 @@ REQUEST_FAULT_CODES = frozenset(
         # operator-fixable condition that a second host would very likely refuse
         # too. The cost of the unsafe reading is laundering a refusal. Split the
         # code before revisiting this.
-        "provider_key_forbidden",
+        CODE_PROVIDER_KEY_FORBIDDEN,
     }
 )
 

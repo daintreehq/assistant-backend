@@ -10,7 +10,7 @@ ready (``/readyz`` returns 503) without crashing liveness.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from http.cookiejar import DefaultCookiePolicy
@@ -19,6 +19,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, Request
+from fastapi.responses import Response
 
 from . import __version__
 from .api import (
@@ -820,7 +821,7 @@ async def _build_entitlement_service(settings: Settings) -> EntitlementService |
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
     injected: ChatProvider | None = getattr(app.state, "injected_provider", None)
     injected_selector: RunbookSelector | None = getattr(app.state, "injected_selector", None)
@@ -941,7 +942,9 @@ def create_app(
     register_exception_handlers(app)
 
     @app.middleware("http")
-    async def request_context(request: Request, call_next):  # type: ignore[no-untyped-def]
+    async def request_context(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         supplied_ids = request.headers.getlist("x-request-id")
         request_id = _safe_request_id(
             # Exactly one, or mint. See BodySizeLimitMiddleware._reject: two

@@ -203,7 +203,7 @@ class Catalog:
         themselves and the reason budget they select — renders in the short tail
         after this block; when it was an inline per-runbook marker, activating an
         early-sorting runbook
-        invalidated most of the prompt on DeepSeek's content-prefix cache (no call
+        invalidated most of the prompt on the upstream's content-prefix cache (no call
         sends ``prompt_cache_key`` — with ``require_parameters`` on, an unadvertised
         parameter can empty the eligible-endpoint pool — so a shared content prefix
         is the only thing the upstream can match on).

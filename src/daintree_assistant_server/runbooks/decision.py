@@ -16,7 +16,7 @@ fact worth being able to state in the same words as "selection cost this much".
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..providers.base import ProviderUsage
 
@@ -39,7 +39,7 @@ class SelectionDecision:
     # doubles selector latency and is otherwise invisible in the timing.
     endpoint: str | None = None
     calls: int = 0
-    warnings: list[str] = None  # type: ignore[assignment]
+    warnings: list[str] = field(default_factory=list)
     # Whether ``runbook_ids`` REPLACES the prior active set rather than being
     # reused alongside it. A successful selector run is authoritative by
     # definition; the no-task fast path is authoritative WITHOUT having run, so
@@ -71,7 +71,7 @@ class SelectionDecision:
     #: is ``resolve_active_runbooks``'s job and stays there.
     #:
     #: Empty on a degraded or reused decision, which have no ranking of their own.
-    ranked_runbook_ids: list[str] = None  # type: ignore[assignment]
+    ranked_runbook_ids: list[str] = field(default_factory=list)
     #: Per-runbook probability, for every id in ``runbook_ids``.
     #:
     #: ``confidence`` is this dict's top entry and is deliberately not a
@@ -85,15 +85,7 @@ class SelectionDecision:
     #: runbook the turn actually loaded. Empty on a reused, degraded or cleared
     #: decision — none of them ranked anything, and an empty dict is what stops
     #: a continuation round announcing the workflow it inherited.
-    scores: dict[str, float] = None  # type: ignore[assignment]
-
-    def __post_init__(self) -> None:
-        if self.warnings is None:
-            self.warnings = []
-        if self.ranked_runbook_ids is None:
-            self.ranked_runbook_ids = []
-        if self.scores is None:
-            self.scores = {}
+    scores: dict[str, float] = field(default_factory=dict)
 
     @classmethod
     def reuse(cls, active_ids: list[str]) -> SelectionDecision:

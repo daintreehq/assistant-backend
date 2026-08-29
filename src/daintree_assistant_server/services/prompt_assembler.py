@@ -1,8 +1,9 @@
 """Assemble the cache-aware upstream main-model request.
 
-The DeepSeek chat template serializes every system message before tools and non-system
-messages (unchanged by routing through OpenRouter — it is the model's template, not the
-API's), so the system role is reserved for content that is static for EVERY caller. The
+The serving model's chat template serializes every system message before tools and
+non-system messages (a property of the weights, not of whichever API fronts them — it
+has survived every host move unchanged), so the system role is reserved for content
+that is static for EVERY caller. The
 rows below it are ordered by how widely each can be shared, widest first, so a change to
 one never re-encodes anything above it. The effective order is:
 
@@ -917,9 +918,9 @@ class PromptAssembler:
     @staticmethod
     def _is_forced_tool_choice(tool_choice: Any) -> bool:
         """A forced tool_choice ("required" or a named tool) is incompatible with
-        DeepSeek thinking mode — the same constraint that keeps the selector
-        non-thinking. It is the model's constraint, not the router's, so it holds
-        however OpenRouter routes the call. "auto"/"none"/absent are fine."""
+        thinking mode on the model this was measured against. It is the model's
+        constraint rather than any one host's, so it is kept AND-ed into the
+        posture wherever the call is routed. "auto"/"none"/absent are fine."""
         if isinstance(tool_choice, RespondToolChoice):
             return True
         return bool(tool_choice == "required")
@@ -1059,8 +1060,12 @@ class PromptAssembler:
         task/session/conversation prefix as each caller actually shares.
 
         CACHE-CRITICAL LAYOUT (measured 2026-07-08, latency benchmark, against
-        DeepSeek directly; the template is the model's, so it survives the move to
-        OpenRouter): the prompt serializes as [ALL system messages, in array order] →
+        DeepSeek V4 Flash — the model serving then. The serialization order is a
+        property of a model's chat template, so the layout is carried forward as a
+        design invariant rather than a live measurement: the executor has since
+        become GLM-5.3-Flash on Baseten and the 36%→99% figure below has NOT been
+        re-measured there): the prompt serializes as
+        [ALL system messages, in array order] →
         [tools] → [non-system conversation]. A system message ANYWHERE in the array
         therefore lands in the leading system region, BEFORE the ~21.5k-token tool
         schemas and the conversation. The old layout put the volatile runtime/turn
@@ -1217,15 +1222,18 @@ class PromptAssembler:
         if gen.response_format == "json_object":
             response_format = {"type": "json_object"}
 
-        # Thinking is hardcoded OFF for the main call (posture lives with the model
-        # id in config.py — this workload routes requests onto runbooks and
-        # emits tool calls, which reasoning did not measurably improve while costing
-        # seconds of first-byte latency).
+        # Thinking is pinned to the LEAST this host will do for the main call, and
+        # the flag's name outlived its literal meaning (posture lives with the model
+        # id in config.py — this workload routes requests onto runbooks and emits
+        # tool calls, which reasoning did not measurably improve while costing
+        # seconds of first-byte latency). `False` reached a genuine zero on the
+        # model that rule was written for; GLM-5.3-Flash has no off switch, so the
+        # Baseten adapter translates the same posture into the `low` effort floor.
         #
         # The forced-tool_choice guard stays AND-ed in rather than replaced: it is an
-        # independent upstream constraint (DeepSeek 400s on thinking + forced
-        # tool_choice), so keeping it here means flipping the posture back on cannot
-        # silently reintroduce that failure.
+        # independent upstream constraint (the model measured here 400s on thinking
+        # + forced tool_choice), so keeping it means flipping the posture back on
+        # cannot silently reintroduce that failure.
         thinking_enabled = INTERACTIVE_THINKING_ENABLED and not self._is_forced_tool_choice(
             request.input.tool_choice
         )
