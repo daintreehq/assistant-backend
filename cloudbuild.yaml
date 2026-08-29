@@ -1012,6 +1012,52 @@ steps:
         # existing for the same reason.
         SECRET_FLAGS="$$SECRET_FLAGS,CEREBRAS_API_KEY=cerebras-api-key:latest"
 
+        # openrouter-api-key funds the EXECUTOR FALLBACK — the same weights on a
+        # different host, reached only when Baseten cannot answer
+        # (docs/PROVIDER_POLICY.md 1a). Mounted CONDITIONALLY, which is the
+        # opposite treatment to the two above and follows from it not gating
+        # readiness: without it every turn is still answered and only the ability
+        # to survive a Baseten outage is lost. An unconditional mount would fail
+        # the deploy of a service that is, by the readiness contract's own
+        # standard, complete.
+        #
+        # `describe` on the VERSION rather than the secret, because bootstrap.sh
+        # creates the shell whether or not an operator has pasted a key into it —
+        # so an existing secret is not evidence there is anything to mount, and
+        # `--set-secrets` fails on a secret with no enabled version exactly as it
+        # does on one that is absent.
+        #
+        # ONLY "absent" is optional. Every other failure — PERMISSION_DENIED, an
+        # expired build identity, a Secret Manager outage — FAILS THE BUILD, and
+        # that distinction is the whole reason this is eight lines rather than
+        # one. The obvious `if gcloud ... 2>/dev/null; then` form treats a missing
+        # IAM grant as "no fallback configured": the deploy goes green, the
+        # revision serves, and the second host is silently absent until the
+        # outage it exists for. That is precisely the silent-rotation failure the
+        # previous-signing-key block two hundred lines up already warns about,
+        # arriving through the same shortcut.
+        FALLBACK_STATE=""
+        FALLBACK_STATUS=0
+        FALLBACK_STATE=$$(gcloud secrets versions describe latest \
+          --secret=openrouter-api-key --project="$PROJECT_ID" \
+          --format='value(state)' 2>/workspace/fallback_err) || FALLBACK_STATUS=$$?
+        if [ "$$FALLBACK_STATUS" -eq 0 ] && [ "$$FALLBACK_STATE" = "ENABLED" ]; then
+          SECRET_FLAGS="$$SECRET_FLAGS,OPENROUTER_API_KEY=openrouter-api-key:latest"
+          echo "Executor fallback: mounting openrouter-api-key."
+        elif [ "$$FALLBACK_STATUS" -ne 0 ] \
+             && ! grep -qi 'not found\|NOT_FOUND\|no versions' /workspace/fallback_err; then
+          echo "ERROR: could not determine whether openrouter-api-key has a usable" >&2
+          echo "       version. This is NOT the same as 'no fallback configured' —" >&2
+          echo "       a permission or control-plane failure must not deploy a" >&2
+          echo "       revision that silently has no second host." >&2
+          cat /workspace/fallback_err >&2
+          exit 1
+        else
+          echo "Executor fallback: NO openrouter-api-key version — deploying without"
+          echo "  a second host. Every turn is still answered; a Baseten outage is"
+          echo "  an outage. /v1/daintree/doctor reports provider.fallback.armed=false."
+        fi
+
         # ---------------------------------------------------------------------
         # Is this service reachable by a stranger? Asked of the IAM policy rather
         # than assumed, because every posture rule below is really a rule about

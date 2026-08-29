@@ -179,5 +179,19 @@ variable "secret_ids" {
     # Required since the fast-response stage lost its off switch: it runs on
     # every eligible turn, so readiness refuses a deployment without it.
     CEREBRAS_API_KEY          = "cerebras-api-key"
+    # OPENROUTER_API_KEY — the executor fallback (docs/PROVIDER_POLICY.md 1a) —
+    # is DELIBERATELY ABSENT from this default, and the asymmetry with
+    # cloudbuild.yaml is the point rather than an oversight.
+    #
+    # main.tf mounts every entry in this map at its `latest` version
+    # unconditionally, and bootstrap.sh creates the secret SHELL whether or not
+    # an operator has pasted a key into it. So listing it here would break the
+    # apply for every deployment that has not adopted the fallback — turning an
+    # optional credential into a required one, which is exactly what
+    # `missing_secrets()` refuses to do on the readiness side. Cloud Build can
+    # mount it conditionally because it is a script; a map cannot.
+    #
+    # A deployment that wants the fallback adds the entry to `secret_env` itself,
+    # after putting a version in the secret.
   }
 }

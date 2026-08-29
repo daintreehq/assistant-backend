@@ -112,6 +112,23 @@ FLOORS: dict[str, int] = {
     # credential and because its whole job is a body that differs from the parent
     # in three specific ways — a regression in any of them is silent on the wire.
     "src/daintree_assistant_server/providers/cerebras.py": 97,
+    # Added 2026-08-29 (measured 99% / 96%). The executor fallback, and it earns a
+    # floor for a reason none of the adapters above share: **this code only runs
+    # during an outage.** A break in the serving adapter is reported by the first
+    # turn after a bad deploy; a break here is invisible until the exact moment it
+    # is load-bearing, which is also the moment nobody has attention to spare for
+    # diagnosing it.
+    #
+    # The breaker is the sharper half. Every branch in it is a judgement about
+    # time, and both directions of losing one are silent: an untested probe path
+    # stops testing recovery (traffic stays on the second host indefinitely), and
+    # an untested reservation path leaks the probe slot, which stops probing FOR
+    # GOOD — the one failure mode of this design that never recovers on its own.
+    # The wire half is the same story a level down: `require_parameters` going
+    # missing shows up as a JSON task answering prose, and `sort` going missing
+    # shows up only as a slower failover.
+    "src/daintree_assistant_server/providers/failover.py": 99,
+    "src/daintree_assistant_server/providers/openrouter_fallback.py": 96,
     # Added 2026-08-20 (measured 94.70%). The orchestrator earned a floor when the
     # streaming fold became a COST-CONTAINMENT surface as well as a correctness
     # one: the runaway guard is the only thing standing between a degenerating

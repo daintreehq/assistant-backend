@@ -693,6 +693,20 @@ sub-processors) for the content it actually receives, and say plainly which part
 Daintree can promise and which are each host's to change. This is now a two-host
 privacy statement, not a one-host swap.
 
+**And it is now a THREE-host statement, with the newest one the hardest.** The
+executor fallback (`docs/PROVIDER_POLICY.md` §1a) sends the FULL request — prompt,
+runbook bodies, tool schemas, conversation — to OpenRouter on every turn Baseten
+could not answer. Unlike Cerebras's, that path is not waiting on a flag: it runs
+the moment the primary has an incident. OpenRouter is a ROUTER, so its own terms
+are not the end of the question — the endpoint that actually serves the turn has
+terms too, and `sort: "latency"` means which one that is varies per request
+(Modal, Makora, Together and Parasail all answered during one afternoon of
+testing). This server used to bound exactly that with `data_collection: "deny"`
+and sends nothing of the sort today. Whether the fallback should carry it back is
+a decision that belongs WITH this reading rather than ahead of it: adding the
+filter narrows the pool, and narrowing the pool on the path that exists because
+the preferred host is already down is not obviously the right trade.
+
 ## Shed context instead of only refusing it
 
 **Trigger: the first `context_window_exceeded` on real traffic, or the compaction
@@ -1131,9 +1145,41 @@ Nothing replaced it, so these are now remembered rather than checked:
 - the error-body shape the adapter parses;
 - streaming, tool calls, forced tool choice and JSON mode against the real API.
 
+**There are now TWO adapters in this gap, and the second one is worse off.** The
+executor fallback (`providers/openrouter_fallback.py`) has been exercised by hand
+against the live API — non-streaming, streaming, tool calls, `response_format`,
+and a full `/v1/daintree/respond` turn with the primary pointed at a host that
+does not resolve — but none of that is pinned anywhere a regression would fail.
+Two of its four `provider` fields are the kind that fail SILENTLY:
+`require_parameters` stopping being sent shows up as a JSON task answering prose,
+and `sort: "latency"` stopping being sent shows up only as a slower failover.
+Worse, this adapter runs *only during an outage*, so a break in it is invisible
+until the exact moment it is load-bearing — the inverse of the serving adapter,
+where the first turn after a bad deploy tells you.
+
 A mocked test proves the adapter builds what we THINK the API wants. Only a live
 one proves the API agrees, and the gap is widest right after a host change —
 which is exactly when this one was removed.
+
+## Assert the fallback posture in release smoke
+
+**Trigger: the first production deployment with `openrouter-api-key` armed.**
+
+`infra/gcp/smoke.sh` never calls `/v1/daintree/doctor` at all, so nothing in the
+release gate can see whether the revision it just promoted actually has a second
+host. The deploy step now fails loudly on a Secret Manager permission error
+rather than treating it as "no fallback configured", which closes the worst of
+that — but a revision that mounted the secret and then could not BUILD the
+provider (an empty value, a malformed key) still passes every check we run.
+
+What is owed is small: read `provider.fallback.armed` from `/doctor` and compare
+it against the deployment's intent, the way the subject-gate and posture fields
+are already compared against `/version`. It needs a decision first, though —
+`/doctor` is a POST route and its answer is PER-INSTANCE, so a smoke check hits
+one arbitrary revision instance and proves nothing about the others. Publishing
+`armed` on `/version` beside the existing `posture` block is probably the right
+shape, and is a change to a public unauthenticated endpoint, so it wants thinking
+about rather than adding in passing.
 
 
 ---

@@ -41,6 +41,8 @@ from fastapi import APIRouter, Depends, Request
 from .. import PROTOCOL_MAX, PROTOCOL_MIN, __version__
 from ..auth import Principal, require_auth
 from ..config import (
+    EXECUTOR_FALLBACK_MODEL,
+    EXECUTOR_FALLBACK_PROVIDER,
     EXECUTOR_MODEL,
     EXECUTOR_PROVIDER,
     INTERACTIVE_THINKING_ENABLED,
@@ -141,6 +143,8 @@ async def _provider_section(
         warnings.append("provider_unavailable")
         return section
 
+    section["fallback"] = _fallback_posture(provider)
+
     started = time.perf_counter()
     try:
         record = await provider.verify_key()
@@ -181,6 +185,48 @@ async def _provider_section(
     if reason != REASON_OK:
         warnings.append("provider_key_unusable")
     return section
+
+
+def _fallback_posture(provider: Any) -> dict[str, Any]:
+    """Whether a Baseten outage would currently cost this deployment its turns.
+
+    Reported and **deliberately not warned about**, in either direction.
+
+    `armed: false` is not a fault: `OPENROUTER_API_KEY` is ungated on purpose, so
+    a deployment without it answers every turn and is complete — it simply has no
+    spare tyre. Raising a warning would contradict the readiness posture and
+    would make an intentionally minimal deployment read as broken. But silence
+    would be worse than either, because "no second host configured" and "second
+    host configured and healthy" are indistinguishable from outside right up
+    until the incident where the difference is the whole story. So it is stated
+    as a fact and left to the reader.
+
+    An OPEN breaker is not a fault either, and that one is the sharper case: it
+    means the mechanism is working and turns are being answered by the second host
+    right now. A doctor that cried "unhealthy" during a successful failover would
+    be reporting the fix as the fault. `seconds_until_probe` says when the primary
+    is next tested, which is the one thing an operator watching an incident
+    actually wants.
+
+    Reads defensively (`getattr`) for the same reason the section around it does:
+    a doctor must survive a half-built container, and on any deployment without the
+    second credential the provider is a plain adapter rather than a wrapper.
+    """
+    health = getattr(provider, "health", None)
+    if health is None:
+        return {"armed": False, "provider": None}
+    return {
+        "armed": True,
+        "provider": EXECUTOR_FALLBACK_PROVIDER,
+        "upstream_model": EXECUTOR_FALLBACK_MODEL,
+        "breaker_open": bool(health.is_open),
+        "consecutive_failures": int(health.consecutive_failures),
+        # How many times the primary has been given up on in this PROCESS. A
+        # per-instance count, like the state it summarises — see
+        # providers/failover.py on why that is sound rather than merely tolerable.
+        "breaker_opened_count": int(health.opened_count),
+        "seconds_until_probe": health.seconds_until_probe(),
+    }
 
 
 def _catalog_section(container: Any, warnings: list[str]) -> dict[str, Any]:

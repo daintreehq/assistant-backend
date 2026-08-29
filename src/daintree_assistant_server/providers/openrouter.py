@@ -446,16 +446,30 @@ def _map_status(status: int, *, retry_after: str | None, detail: str | None) -> 
     deterministic, and replaying it burns the CLI's retry budget to arrive at the
     same answer more slowly.
 
-    Note what is NOT here: the 404-means-routing-dead-end branch the old adapter
-    carried. OpenRouter genuinely IS a router, so that branch was once meaningful
-    — but it only ever fired because this server sent a routing policy whose
-    filters could empty the eligible pool. Nothing sends one now (no ``provider``
-    block, no caller-facing preference), so a 404 can no longer mean "the filters
-    emptied the pool". What remains — a wrong model id, a misconfigured base URL,
-    an intermediary that does not have the route — is in every case a server-side
-    bug in what we sent rather than anything a caller can act on, which is
-    exactly ``upstream_request_rejected``, carrying the upstream's own reason.
-    Reviving the branch would mean reviving the policy that made it necessary.
+    **The 404 branch is BACK, and it is back because its own retirement note said
+    what would bring it back.** That note read: "reviving the branch would mean
+    reviving the policy that made it necessary." The executor fallback
+    (``providers/openrouter_fallback.py``) revives exactly that policy — it sends
+    a ``provider`` block with ``ignore`` and ``require_parameters``, whose filters
+    CAN empty the eligible pool — so "no endpoint matches" is once again a real
+    404 this server can produce.
+
+    It maps to ``upstream_unavailable`` rather than to a routing-specific code,
+    because the two things a 404 means here want the same treatment and neither
+    is about our body. A chat-completions 404 is never a malformed request: the
+    body was not parsed to produce it. It means the ROUTE is not there — an
+    emptied pool, a model deployment that is down, a base URL pointing at an
+    intermediary that lacks the path — and every one of those is a fact about a
+    host, so it should be retryable and it should be worth a second host's
+    opinion. Under the previous mapping a Baseten model outage arrived as
+    ``upstream_request_rejected``: permanent, un-retried, and — the part that
+    matters now — classified by ``providers/failover.py`` as a REQUEST fault that
+    must not fail over, so the one error most likely to mean "this host is down"
+    was the one that guaranteed the fallback was never tried.
+
+    The cost of the wider reading is a genuinely wrong model id being retried
+    once and failed over once before surfacing, as a 503 rather than a 502. That
+    is a deploy-time bug either way, and the trade buys the outage case.
     """
     if status == 429:
         return upstream_rate_limited(retry_after=retry_after)
@@ -477,6 +491,14 @@ def _map_status(status: int, *, retry_after: str | None, detail: str | None) -> 
         # Genuine upstream fault or capacity shortfall. Transient, so retry while
         # no model output is exposed.
         return upstream_unavailable()
+
+    # A ROUTE that is not there — see the docstring. Checked before the
+    # context-length sniff below purely for order-of-specificity: a 404 body does
+    # not carry a length complaint, so the two cannot collide.
+    if status == 404:
+        return upstream_unavailable(
+            "The upstream provider has no endpoint for this request (HTTP 404)."
+        )
 
     # A 4xx whose reason is LENGTH is a different diagnosis from a 4xx whose
     # reason is shape, and only the upstream's own prose separates them: both

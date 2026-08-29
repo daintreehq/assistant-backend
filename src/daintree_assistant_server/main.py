@@ -33,6 +33,9 @@ from .api import (
     root,
 )
 from .config import (
+    EXECUTOR_FALLBACK_MODEL,
+    EXECUTOR_FALLBACK_PROVIDER,
+    EXECUTOR_PROVIDER,
     EXECUTOR_REASONING_EFFORT,
     FAST_RESPONSE_ENABLED,
     Settings,
@@ -50,7 +53,9 @@ from .prompts.loader import PromptLoader
 from .providers.base import ChatProvider
 from .providers.baseten import BasetenProvider
 from .providers.cerebras import CerebrasProvider
+from .providers.failover import FailoverProvider
 from .providers.openrouter import OpenRouterProvider
+from .providers.openrouter_fallback import OpenRouterFallbackProvider
 from .runbooks.catalog import Catalog, CatalogManager, default_runbooks_dir, load_catalog
 from .runbooks.local.paths_local import selector_artifact_dir
 from .runbooks.local.runtime import InferencePool
@@ -437,6 +442,51 @@ def _build_trace_recorder(
     )
 
 
+def _build_executor_fallback_provider(settings: Settings) -> ChatProvider | None:
+    """The executor's SECOND host, or ``None`` when no credential is configured.
+
+    The same GLM-5.3-Flash weights via OpenRouter, sorted by latency — see
+    providers/openrouter_fallback.py for the wire, and providers/failover.py for
+    when it is reached.
+
+    **Returning ``None`` is a normal outcome, not a degraded one that readiness
+    should catch.** `OPENROUTER_API_KEY` is deliberately absent from
+    `missing_secrets()`: without it every turn is still answered, and what is lost
+    is the ability to survive a Baseten outage. Failing readiness over a spare
+    tyre would take the server down for a fault it does not have. `_build_provider`
+    below returns the bare Baseten adapter in that case, which is exactly the
+    behaviour this deployment had before failover existed.
+
+    Its own client, sized like the SERVING one rather than like the compaction
+    one beside it — and the difference is the whole point. That client is small
+    because compaction is an occasional background task. This one may carry
+    ONE HUNDRED PERCENT of the serving traffic, for as long as the primary is
+    down, so a pool tuned for a background task would turn a survivable outage
+    into a queue.
+    """
+    if not settings.openrouter_api_key.get_secret_value():
+        return None
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(
+            connect=settings.upstream_connect_timeout_seconds,
+            read=settings.main_timeout_seconds,
+            write=_UPSTREAM_WRITE_TIMEOUT_SECONDS,
+            pool=_UPSTREAM_POOL_TIMEOUT_SECONDS,
+        ),
+        limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+    )
+    return OpenRouterFallbackProvider(
+        client,
+        api_key=settings.openrouter_api_key,
+        # The SAME floor the primary is pinned to. A fallback that reasoned
+        # differently would answer differently, and the point of this host is to
+        # be a substitute rather than a second product.
+        reasoning_effort=EXECUTOR_REASONING_EFFORT,
+        default_timeout=settings.main_timeout_seconds,
+        dump_dir=settings.dump_upstream_dir,
+    )
+
+
 def _build_provider(settings: Settings) -> ChatProvider:
     """The serving adapter: Baseten, holding the server's own credential.
 
@@ -446,6 +496,11 @@ def _build_provider(settings: Settings) -> ChatProvider:
     the one place this host is not interchangeable: GLM-5.3-Flash cannot be run
     non-thinking, so the adapter sends `reasoning_effort` where the parent sends
     a `reasoning` object. See providers/baseten.py.
+
+    Wrapped in a `FailoverProvider` when a second credential exists, so a Baseten
+    outage stops being a Daintree outage. The wrapper is transparent: everything
+    above the provider boundary still sees one provider and one model, and the
+    Baseten adapter below it is constructed and called exactly as it was before.
     """
     client = httpx.AsyncClient(
         timeout=httpx.Timeout(
@@ -456,7 +511,7 @@ def _build_provider(settings: Settings) -> ChatProvider:
         ),
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
     )
-    return BasetenProvider(
+    primary: ChatProvider = BasetenProvider(
         client,
         # THE server credential. Daintree funds every turn from this key: callers
         # supply none of their own (see auth.py), so a provider built without one
@@ -470,6 +525,16 @@ def _build_provider(settings: Settings) -> ChatProvider:
         reasoning_effort=EXECUTOR_REASONING_EFFORT,
         default_timeout=settings.main_timeout_seconds,
         dump_dir=settings.dump_upstream_dir,
+    )
+    fallback = _build_executor_fallback_provider(settings)
+    if fallback is None:
+        return primary
+    return FailoverProvider(
+        primary,
+        fallback,
+        fallback_model=EXECUTOR_FALLBACK_MODEL,
+        primary_name=EXECUTOR_PROVIDER,
+        fallback_name=EXECUTOR_FALLBACK_PROVIDER,
     )
 
 

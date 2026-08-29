@@ -913,13 +913,20 @@ def test_a_unicode_escaped_credential_is_caught_by_scrubbing_after_extraction() 
 
 
 @pytest.mark.asyncio
-async def test_a_404_is_a_rejected_request_not_a_routing_dead_end() -> None:
-    """Guards against reviving the deleted routing taxonomy.
+async def test_a_404_is_a_missing_route_rather_than_a_bad_request() -> None:
+    """A 404 says the ROUTE is not there, never that our body was wrong.
 
-    The old adapter mapped 404 to `upstream_no_compliant_provider` — "the policy
-    filters emptied the pool". Nothing sends a routing policy now, so a 404 on a
-    fixed, correct path can only mean the model id is wrong: our bug, reported
-    with the upstream's own reason attached.
+    This test used to assert the opposite, and the reason it flipped is the
+    executor fallback. `upstream_request_rejected` was defensible while nothing
+    sent a routing policy: on a fixed correct path a 404 could only be a wrong
+    model id. It stopped being defensible in two directions at once —
+    `providers/openrouter_fallback.py` sends filters that can empty OpenRouter's
+    eligible pool, and `providers/failover.py` classifies request-faults as the
+    one thing that must NOT be tried on a second host. So the error most likely
+    to mean "this host is down" became the error guaranteed to keep us there.
+
+    A chat-completions 404 is never a malformed body, because the body was not
+    parsed to produce it. Retryable, and a host fault.
     """
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -928,8 +935,8 @@ async def test_a_404_is_a_rejected_request_not_a_routing_dead_end() -> None:
     provider = _provider(handler)
     with pytest.raises(DaintreeError) as exc:
         await provider.complete(_req())
-    assert exc.value.code == "upstream_request_rejected"
-    assert "Model does not exist" in exc.value.message
+    assert exc.value.code == "upstream_unavailable"
+    assert exc.value.retryable is True
     await provider.aclose()
 
 

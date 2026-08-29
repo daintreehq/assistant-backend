@@ -22,7 +22,12 @@ There are **two internal provider ROLES**, and exactly one public product.
 | Role | Host | Model | When it is called |
 |---|---|---|---|
 | **executor** | Baseten Model APIs (`https://inference.baseten.co/v1`) | `zai-org/GLM-5.3-Flash` | every turn, and every utility task |
+| **executor fallback** | OpenRouter (`https://openrouter.ai/api/v1`) | `z-ai/glm-5.3-flash` | only when Baseten cannot answer (§1a) |
 | **fast response** | Cerebras (`https://api.cerebras.ai/v1`) | `gpt-oss-120b` | **NEVER — the stage is OFF** (`config.FAST_RESPONSE_ENABLED`) |
+
+The fallback is a second HOST for the same weights, not a second role in the
+sense the other two are: it answers the identical request, at the identical
+reasoning floor, and its existence changes nothing about an ordinary turn.
 
 A caller cannot choose between them and is never told which answered. The public
 model id stays `daintree-assistant`; the backend composes the two calls behind it.
@@ -54,6 +59,14 @@ a ranking axis, a latency floor, a fallback policy, an output-quality denylist, 
 sticky-affinity key and a caller-facing `routing` preference to expose all of it.
 None of that has a subject any more, so all of it is **deleted rather than
 neutered** (git history has the previous revision).
+
+None of it comes back with the fallback in §1a either, and the distinction is
+worth being precise about, because "we send a `provider` block again" is the
+easiest thing to misread here. The deleted apparatus was a POLICY evaluated on
+every ordinary turn against a host with one endpoint. What §1a sends is an
+ORDERING over a pool that genuinely exists, on a path that runs only when the
+preferred host has already failed. A caller still cannot express a preference,
+still targets `daintree-assistant`, and is still never told which host answered.
 
 | Call | Model | Source of truth |
 |---|---|---|
@@ -94,8 +107,9 @@ this repository is calibrated against this exact model. Changing it is §9.
 > "selector latency" and "selector cost" below describe a path that no longer
 > exists on any route.
 
-**Every credential is the server's.** `BASETEN_API_KEY` funds every turn and
-`CEREBRAS_API_KEY` funds the preamble stage; callers supply none of their own —
+**Every credential is the server's.** `BASETEN_API_KEY` funds every turn,
+`OPENROUTER_API_KEY` funds the ones Baseten could not, and `CEREBRAS_API_KEY`
+funds the preamble stage; callers supply none of their own —
 see [`KEY_HANDLING.md`](KEY_HANDLING.md). This inverted with the move off
 caller-supplied keys and it is the fact most likely to be misremembered from
 older copy. Variable names follow the ROLE (`EXECUTOR_*`, `FAST_RESPONSE_*`);
@@ -106,6 +120,135 @@ the ownership does not change with them.
 `/v1/daintree/tasks` currently does **not**: its response carries the pinned
 upstream id verbatim. That is an inconsistency, not a design — do not write "the
 client never sees a real model id" without qualifying it.
+
+### 1a. The executor fallback — a second host, not a second product
+
+**Before this existed, a Baseten outage was a Daintree outage.** One host held
+the only copy of the executor, so a 5xx, a refused connection or a socket that
+went quiet became a failed turn as soon as `MAX_UPSTREAM_RETRIES` was spent —
+and retrying a dead host harder is not robustness, it is the same failure taken
+more slowly. Nothing about these weights requires Baseten specifically: twenty
+other endpoints serve `z-ai/glm-5.3-flash` behind OpenRouter, so the single point
+of failure was an accident of how the host was picked.
+
+`providers/failover.py` fronts the two. It is transparent above the provider
+boundary — the orchestrator, the task runner, the retry layer and both response
+paths see one provider and one model.
+
+**Failover is only ever attempted before any model output has been forwarded**,
+and that is structural rather than a rule anyone has to remember. There are four
+sites, all pre-output: `complete`, `structured_tool_call`, `open_stream`, and the
+first-event prefetch on the stream it returns. The first event closes the window,
+so a mid-generation failure stays terminal exactly as it always was — replaying
+content a user has already seen is the one thing this must not do.
+
+**A first event is not a health verdict, though, and that distinction is
+separate.** "The host responded" is not "the host completed a generation": one
+that emits a role-only frame and then goes quiet, or a token and then drops,
+would otherwise settle successfully on every turn and the breaker could never
+open against it. So a stream's permit is held for its whole life — clean
+termination counts as success, a late break counts as a failure, and an abandoned
+stream counts as neither.
+
+**What counts as "the host could not answer" is defined by EXCLUSION.** The
+eligible set is everything except the three errors that are about our REQUEST:
+
+| Error | Failover? | Why |
+|---|---|---|
+| `upstream_request_rejected` | no | A malformed body is malformed on both hosts. |
+| `context_window_exceeded` | no | Same weights, same window. |
+| `upstream_runaway_output` | no | We stopped the generation; the host is fine. |
+| `provider_key_forbidden` | no | The one entry that is not about the request, and it is here because the code is AMBIGUOUS: it covers model permissions and spend limits, and it also covers a host's own moderation refusal, with nothing separating them. Failing over would sometimes take a prompt one host declined and send it whole to another. Split the code before revisiting. |
+| everything else | yes | 5xx, timeout, rate limit, a missing route (404), an unparseable response, a dead credential, an exhausted balance — each says something about THIS host and nothing about the request. |
+
+`upstream_unavailable` now covers **404** as well as 5xx. A chat-completions 404
+is never a malformed body — the body was not parsed to produce it — and both
+readings (a model deployment that is down, or an eligible pool the fallback's own
+`ignore`/`require_parameters` filters emptied) are facts about a host. Under the
+previous mapping the error most likely to mean "this host is down" was classified
+as a request fault, which is to say it was the one error guaranteed NOT to reach
+the second host.
+
+A request-fault also does **not** count against the primary's health: the host
+answered, which is exactly what health measures. Defining the small set rather
+than the large one is what stops a new error code defaulting to "give up".
+
+#### The breaker
+
+An outage is not one failed request, and engaging purely per-call gets the worst
+of both readings. Left alone, every turn during a ten-minute incident pays the
+primary's failure — usually a full TIMEOUT — before reaching the host that was
+always going to answer. Tripping on the first failure does the opposite: moves
+all traffic to a second host over a blip that has already passed.
+
+| State | Behaviour | Leaves when |
+|---|---|---|
+| closed | every call tries the primary; a failure falls back for that call and increments a counter, any success resets it to zero | `EXECUTOR_FALLBACK_FAILURE_THRESHOLD` (3) CONSECUTIVE failures |
+| open | the primary is skipped outright; calls go straight to the fallback and wait for nothing | `EXECUTOR_FALLBACK_PROBE_INTERVAL_SECONDS` (180s) elapses |
+| half-open | ONE call becomes a probe against the primary; every other concurrent caller stays on the fallback | the probe succeeds (→ closed) or fails (→ open, a full interval re-armed) |
+
+There is a **fourth timer**, for the outage shape that produces no status code at
+all. A host can accept the connection, answer with headers, and then never
+complete an SSE event — which the orchestrator bounds with a wall clock, so it
+arrives as a CANCELLATION rather than as an error the breaker can classify. The
+failure count alone does not help there: the retry re-enters immediately, the
+breaker is still two failures from opening, and the turn burns its whole budget
+stalling twice against the same host while the fallback is never called. So a
+stall also holds the primary off for `EXECUTOR_FALLBACK_STALL_HOLDOFF_SECONDS`
+(30s), which is what actually puts the retry on the fallback. A client
+disconnecting mid-open is cancelled identically and is misread as a stall —
+deliberately, because the asymmetry is stark: that misreading costs half a minute
+of traffic on a healthy second host, while missing a stall costs every turn of
+the outage.
+
+So a 10-to-15-minute incident costs: two or three failed-then-recovered turns to
+open the breaker, three to five probe turns spread across the outage, and nothing
+else. Recovery is noticed within one probe interval of it happening. (Two or
+three rather than exactly three because the threshold counts primary ATTEMPTS,
+and `MAX_UPSTREAM_RETRIES` means one turn can contribute more than one.)
+
+State is **per-instance and per-process**. Cloud Run holds no shared state, so a
+second instance opens its breaker on its own evidence — which is sound rather
+than merely tolerable, since each instance's evidence is about the connections IT
+is making, and a shared store would buy fewer probes without shortening the
+window it takes to notice recovery.
+
+Three log lines carry the incident, and their SEVERITIES are deliberate.
+`failover_engaged` (WARNING) is a surprise — the primary could not answer.
+`failover_primary_skipped` (INFO) is the mechanism working, and it fires on every
+call for as long as the breaker is open, so at warning it would bury the line
+that says why under minutes of lines saying nothing new. `failover_recovered`
+(WARNING) is the transition with no natural line of its own: without it, recovery
+reads as the logging simply going quiet, which is indistinguishable from traffic
+stopping.
+
+`/v1/daintree/doctor` reports the live posture under `provider.fallback`:
+`armed`, `breaker_open`, `consecutive_failures`, `breaker_opened_count` and
+`seconds_until_probe`. Neither `armed: false` nor an open breaker raises a
+warning — the first is a correct deployment without a spare tyre, and the second
+is the mechanism working.
+
+#### Endpoint selection
+
+The fallback adapter (`providers/openrouter_fallback.py`) sends a `provider`
+block, and it is the **only** place in this server that does:
+
+| Field | Value | Why |
+|---|---|---|
+| `sort` | `"latency"` | The visible cost of a failover is time-to-first-byte, and the turn has already spent its primary attempt. OpenRouter's default balance is price-and-throughput weighted, which is the wrong optimum here. |
+| `ignore` | `["baseten"]` | OpenRouter serves this model from Baseten among others, and that is the one endpoint guaranteed not to help — this path runs *because* Baseten just failed. |
+| `allow_fallbacks` | `true` | A fallback that could not fall back would be a new single point of failure. |
+| `require_parameters` | `true` | OpenRouter's default is to DROP an unsupported parameter, not to avoid the endpoint. A JSON task whose `response_format` went missing answers prose, burns its repair retry and 502s, and nothing in that chain names the cause. |
+
+The thinking posture is §2's, restated in OpenRouter's canonical spelling
+(`reasoning: {"effort": "low"}`, normalized by OpenRouter to each endpoint's own
+`reasoning_effort`). A fallback that reasoned differently would answer
+differently, and the point of this host is to be a substitute.
+
+One capability difference is worth knowing before reading a dashboard:
+**OpenRouter reports `usage.cost` and Baseten does not**, so a failed-over turn
+is priced while an ordinary one is not (§5c).
+
 
 ## 2. Thinking posture
 
@@ -267,10 +410,15 @@ handles both so that the answer is a log query rather than an outage.
 > **Do not repeat any of it, anywhere, as a statement about the current
 > deployment.** That includes the summary in `README.md`.
 >
-> **There are TWO hosts to verify, though only one is receiving traffic.**
-> Baseten receives every turn; Cerebras receives nothing while
-> `FAST_RESPONSE_ENABLED` is False, and would again the moment it is not —
-> so its terms still have to be read before that flag moves, not after.
+> **There are THREE hosts to verify, and two of them can receive traffic
+> today.** Baseten receives every turn. **OpenRouter receives every turn Baseten
+> could not** (§1a) — the FULL request, not a summary: the assembled prompt, the
+> runbook bodies, the tool schemas and the conversation. That is not a
+> hypothetical path waiting on a flag the way Cerebras's is; it runs the moment
+> the primary has an incident, which is precisely when nobody is thinking about
+> data handling. Cerebras receives nothing while `FAST_RESPONSE_ENABLED` is
+> False, and would again the moment it is not — so its terms still have to be
+> read before that flag moves, not after.
 > Historically:
 > Cerebras receives an eligible turn's prompt content when the fast-response
 > stage is enabled (§1). An earlier revision of this warning said Cerebras "is
@@ -278,9 +426,21 @@ handles both so that the answer is a log query rather than an outage.
 > withdrawn, and §4a is live rather than historical.
 >
 > Closing this means reading <https://www.baseten.co/privacy-policy/>,
-> <https://www.baseten.co/terms-and-conditions/>, <https://trust.cerebras.ai> and
-> <https://cerebras.ai/privacy-policy>, and writing what each actually commits to
-> for the tier we run on. Tracked in `TODO.md`.
+> <https://www.baseten.co/terms-and-conditions/>,
+> <https://openrouter.ai/privacy>, <https://openrouter.ai/terms>,
+> <https://trust.cerebras.ai> and <https://cerebras.ai/privacy-policy>, and
+> writing what each actually commits to for the tier we run on. Tracked in
+> `TODO.md`.
+>
+> **OpenRouter is the hardest of the three to close**, and the reason is
+> structural rather than a matter of reading one more page: it is a router, so
+> its own terms are not the end of the question — the endpoint that actually
+> serves a failed-over turn has terms too, and `sort: "latency"` means which one
+> that is varies per request (measured: Modal, Makora, Together and Parasail all
+> answered during one afternoon's testing). Under the retired routing policy this
+> server sent `data_collection: "deny"` to bound exactly that. Nothing sends it
+> today. Whether the fallback should carry it back is a decision that belongs
+> with the reading, not ahead of it.
 >
 > **The executor host CHANGED, so this is not merely still-unverified — it is
 > unverified about a different company.** Any reading previously done against
@@ -726,7 +886,17 @@ upstream bodies are never echoed".
 and provider-object construction. `BASETEN_API_KEY` being **present** is part of
 that (`missing_secrets`) — without it nothing can be answered at all, and
 discovering that on the first turn surfaces as an upstream 401 that reads like the
-caller's fault. But presence is not validity: `/readyz` **cannot** prove Baseten
+caller's fault.
+
+**`OPENROUTER_API_KEY` is deliberately NOT part of it**, and the asymmetry is the
+whole difference between the two credentials. Without it every turn is still
+answered; what is lost is the ability to survive a Baseten outage. A deployment
+without it is degraded in its ROBUSTNESS, not in its function, and failing
+readiness over a spare tyre would take the server down for a fault it does not
+have. `main._build_provider` returns the bare Baseten adapter in that case —
+exactly the behaviour this service had before §1a existed — and
+`/v1/daintree/doctor` reports `provider.fallback.armed: false` so the absence is
+visible rather than silent. But presence is not validity: `/readyz` **cannot** prove Baseten
 is reachable or that the key works, and it deliberately does not try. A readiness
 probe that made a network call to a third party would fail this service for their
 outage.

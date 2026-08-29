@@ -114,6 +114,128 @@ EXECUTOR_REASONING_EFFORT = "low"
 EXECUTOR_REASONING_ALLOWANCE_TOKENS = 64
 
 # ---------------------------------------------------------------------------
+# The EXECUTOR FALLBACK. A second host for the SAME model, reached only when the
+# first one cannot answer.
+# ---------------------------------------------------------------------------
+#
+# **This is not a return to routing, and the distinction is the whole reason the
+# constants below are narrow.** The apparatus this repo deleted — a `provider`
+# block on every request, a privacy filter, an output-quality denylist, a
+# sticky-affinity cohort, a caller-facing `routing` preference — existed to
+# choose between endpoints on the ORDINARY path, per turn, as policy. None of
+# that comes back. Baseten is still the host: it answers every turn it can, the
+# body it receives is byte-identical to what it received before this landed, and
+# nothing a caller sends can steer any of it.
+#
+# What changed is only what happens when Baseten CANNOT answer. Before, a Baseten
+# outage was a Daintree outage — one host, one credential, and a 5xx or a silent
+# socket became a failed turn after the configured retry. There is nothing about
+# `zai-org/GLM-5.3-Flash` that requires Baseten specifically: the same weights
+# are served by twenty other endpoints behind OpenRouter, so the single point of
+# failure was an accident of how the host was picked rather than a property of
+# the product.
+#
+# The public promise is unchanged either way — a caller still targets
+# `daintree-assistant` (`PUBLIC_MODEL_ID`), is never told which host answered,
+# and has no field with which to ask.
+EXECUTOR_FALLBACK_MODEL = "z-ai/glm-5.3-flash"
+
+#: The host name, for logs and traces. Never reaches a client.
+EXECUTOR_FALLBACK_PROVIDER = "openrouter"
+EXECUTOR_FALLBACK_KEY_ENV = "OPENROUTER_API_KEY"
+
+#: How OpenRouter picks among the endpoints serving those weights: **lowest
+#: measured latency**, sent as `provider: {"sort": "latency"}`.
+#:
+#: This is the one place a `provider` block is deliberately reintroduced, and the
+#: argument for it is the inverse of the argument that deleted the old one. That
+#: block encoded a POLICY — which endpoints are acceptable — evaluated on every
+#: ordinary turn, and it was wrong because a single host has no pool to choose
+#: from. This one encodes an ORDERING over a pool that genuinely exists, on the
+#: path that only runs when the preferred host is already failing. Sorting is
+#: also the only lever available: the fallback is an interactive turn whose user
+#: is already waiting out one failed attempt, and OpenRouter's default balance is
+#: price-and-throughput weighted, which is the wrong optimum for a request that
+#: has just lost a second or more to an outage.
+#:
+#: Latency rather than throughput because the visible cost of a failover is
+#: time-to-first-byte, not tokens per second: the turn has already spent its
+#: primary attempt, and what the reader experiences is the delay before anything
+#: appears.
+EXECUTOR_FALLBACK_SORT = "latency"
+
+#: Endpoints excluded from the fallback pool, by OpenRouter provider slug.
+#:
+#: Baseten is one of the twenty endpoints OpenRouter routes this model to, and it
+#: is the one endpoint guaranteed to be useless here: this path only runs because
+#: Baseten just failed, so routing back to the same infrastructure through a
+#: second hop buys a slower copy of the failure that already happened. Excluding
+#: it makes the fallback a genuinely independent second attempt rather than a
+#: retry wearing a different hostname.
+EXECUTOR_FALLBACK_IGNORED_PROVIDERS = ("baseten",)
+
+#: Consecutive primary failures before the breaker opens and turns stop being
+#: spent on a host that is not answering.
+#:
+#: Three rather than one, and that is the "do not overreact" half of the design.
+#: A single 500 or a one-off socket reset is noise: the turn that hit it is
+#: already served by the fallback, so tripping on it would buy nothing and would
+#: move every subsequent turn onto a second host over an event that has already
+#: passed. Three CONSECUTIVE failures — any success resets the count to zero — is
+#: the cheapest signal that distinguishes a blip from an outage.
+#:
+#: What tripping buys is real, though, and it is why the threshold is not higher:
+#: while the breaker is closed every turn pays the primary's failure before
+#: reaching the fallback, and during an outage that failure is usually a TIMEOUT.
+#: An open breaker is what stops a 10-minute Baseten outage from adding the
+#: connect-or-stall budget to the front of every single turn in it.
+EXECUTOR_FALLBACK_FAILURE_THRESHOLD = 3
+
+#: How long the breaker stays open before one turn is allowed to test the primary
+#: again — the "retry every few minutes" half.
+#:
+#: Three minutes is chosen against the shape of the outage this exists for: a
+#: 10-to-15-minute incident is re-probed three to five times, so recovery is
+#: noticed within a few minutes of it happening, while the cost of being wrong
+#: about recovery is exactly ONE turn paying a failed primary attempt (the probe
+#: is a single request; every other turn in flight goes straight to the fallback
+#: and waits for nothing).
+#:
+#: Shorter would spend a probe on turns that cannot benefit — nothing recovers
+#: from a real incident in thirty seconds, and each probe costs a live user the
+#: primary's timeout. Longer would leave traffic on the fallback for minutes
+#: after the primary came back, which is a worse steady state: the fallback adds
+#: a routing hop and is not where the prefix cache lives.
+EXECUTOR_FALLBACK_PROBE_INTERVAL_SECONDS = 180.0
+
+#: How long a STALLED primary is held off, independently of the breaker above.
+#:
+#: This exists because one outage shape produces no status code at all. A host
+#: can accept the connection, answer with headers, and then never complete an SSE
+#: event — and the orchestrator bounds that with a wall clock, so it arrives as a
+#: CANCELLATION rather than as an error the breaker can classify. The failure
+#: count alone is not enough there: the orchestrator's retry re-enters
+#: immediately, the breaker is still two failures from opening, and the turn
+#: spends its whole budget stalling against the same host twice before failing —
+#: with a healthy second host never called. That is the exact outage this feature
+#: exists for, arriving in the one form it could not see.
+#:
+#: So a stall does two things: it counts toward the breaker like any failure, AND
+#: it holds the primary off for this window, which is what actually gets the
+#: retry onto the fallback.
+#:
+#: 30 seconds, which is chosen against the two things it has to sit between. It
+#: must comfortably outlast one turn's remaining retries (the point), and it must
+#: be short enough that the cost of the misreading below is negligible. A CLIENT
+#: DISCONNECT mid-open is cancelled the same way and cannot be told apart from
+#: here, so it is misread as a stall — deliberately, because the asymmetry is
+#: stark: mistaking a disconnect for a stall costs half a minute of traffic on a
+#: healthy second host, while mistaking a stall for nothing costs every turn of
+#: the outage.
+EXECUTOR_FALLBACK_STALL_HOLDOFF_SECONDS = 30.0
+
+
+# ---------------------------------------------------------------------------
 # The FAST-RESPONSE role. A second internal provider, NOT a second product.
 # ---------------------------------------------------------------------------
 #
@@ -185,6 +307,7 @@ EXECUTOR_PROVIDER = "baseten"
 
 __all__ = [
     "EXECUTOR_CONTEXT_TOKENS",
+    "EXECUTOR_FALLBACK_MODEL",
     "EXECUTOR_MODEL",
     "EXECUTOR_REASONING_ALLOWANCE_TOKENS",
     "EXECUTOR_REASONING_EFFORT",
@@ -1059,24 +1182,34 @@ class Settings(BaseSettings):
     baseten_api_key: SecretStr = Field(default=SecretStr(""), alias="BASETEN_API_KEY")
 
     # ---- Second provider (OpenRouter) — OPTIONAL, and deliberately not gating.
-    # Funds the ONE utility task that does not run on the serving model: context
-    # compaction, which routes to a model an order of magnitude cheaper per input
-    # token than the serving model precisely because it re-reads conversation
-    # history (see OPENROUTER_COMPACTION_MODEL in services/task_runner.py).
+    # It now funds TWO different things, and they are worth keeping apart because
+    # only one of them is on the serving path:
     #
-    # It is absent from ``missing_secrets`` ON PURPOSE, and that is the whole
-    # difference between the two credentials. Without BASETEN_API_KEY nothing
-    # can be answered at all, so its absence must fail readiness. Without this
-    # one everything still works except a single task that nothing on the serving
-    # path calls yet — so a deployment that never sets it is a correct
-    # deployment, not a broken one. Gating readiness on it would take the whole
-    # server down over a feature it is not using.
+    #   1. The one utility task that does not run on the serving model — context
+    #      compaction, which routes to a model an order of magnitude cheaper per
+    #      input token precisely because it re-reads conversation history (see
+    #      OPENROUTER_COMPACTION_MODEL in services/task_runner.py).
+    #   2. The EXECUTOR FALLBACK: the same GLM-5.3-Flash weights on a different
+    #      host, reached only when Baseten cannot answer (see
+    #      EXECUTOR_FALLBACK_MODEL at the top of this module and
+    #      providers/failover.py).
+    #
+    # It is absent from ``missing_secrets`` ON PURPOSE, and that is still the
+    # whole difference between the two credentials — the second use above does
+    # not change it. Without BASETEN_API_KEY nothing can be answered at all, so
+    # its absence must fail readiness. Without this one every turn is still
+    # answered; what is lost is a utility task nothing on the serving path calls
+    # yet, and the ability to survive a Baseten outage. A deployment without it
+    # is degraded in its ROBUSTNESS, not in its function, and taking the whole
+    # server down at readiness over a spare tyre is the wrong trade. ``/doctor``
+    # reports whether the fallback is armed so the absence is visible rather than
+    # silent.
     #
     # There is no OPENROUTER_BASE_URL to match ``baseten_base_url``: that one
     # exists so tests and local proxies can redirect the credential-bearing
     # serving path, and ``weak_secrets`` pins it back to the real origin in
-    # production. This provider is constructed against its module default and
-    # nothing has asked to move it.
+    # production. Both OpenRouter adapters are constructed against the module
+    # default and nothing has asked to move them.
     openrouter_api_key: SecretStr = Field(default=SecretStr(""), alias="OPENROUTER_API_KEY")
 
 

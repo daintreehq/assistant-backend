@@ -311,6 +311,16 @@ class ProviderStream(abc.ABC):
     usage: ProviderUsage | None = None
     # Set once the first chunk naming it arrives; see ProviderChatResult.endpoint.
     endpoint: str | None = None
+    # How many upstream opens THIS stream object abandoned before it yielded
+    # anything — always 0 for a plain single-host stream, and non-zero only when a
+    # wrapper changed hosts mid-open (see providers/failover.py).
+    #
+    # Not diagnostics. An abandoned open may already have been billed a prefill it
+    # never got to report, so the turn's cost is no longer known to be complete;
+    # the orchestrator folds this into the same count its own retry loop keeps and
+    # marks the cost accordingly. A confident total that silently omits a billed
+    # attempt is the one report the accounting chain must never produce.
+    abandoned_attempts: int = 0
 
     @abc.abstractmethod
     async def prefetch_first_event(self) -> dict[str, Any] | None:

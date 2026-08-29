@@ -113,6 +113,10 @@ async def test_a_stalled_stream_ends_with_a_terminal_error_not_a_fabricated_done
 
         usage = None
         endpoint = None
+        # These stand in for a `ProviderStream`, so they carry its whole surface
+        # — including `abandoned_attempts`, which the orchestrator reads off every
+        # opened stream to decide whether a turn's cost is known to be complete.
+        abandoned_attempts = 0
         closed = False
 
         async def prefetch_first_event(self):  # type: ignore[no-untyped-def]
@@ -345,6 +349,7 @@ async def test_a_stall_before_anything_visible_is_still_attributed_to_first_outp
     class _ReasonsThenStalls:
         usage = None
         endpoint = None
+        abandoned_attempts = 0
 
         def __init__(self) -> None:
             self.closed = False
@@ -404,6 +409,7 @@ async def test_a_stalled_open_whose_teardown_also_hangs_still_retries(
     class _StallsThenRefusesToClose:
         usage = None
         endpoint = None
+        abandoned_attempts = 0
 
         async def prefetch_first_event(self):  # type: ignore[no-untyped-def]
             await asyncio.sleep(30)
@@ -469,6 +475,7 @@ async def test_invisible_chunks_cannot_hold_a_user_answerless_forever(
     class _ThinksForever:
         usage = None
         endpoint = None
+        abandoned_attempts = 0
 
         async def prefetch_first_event(self):  # type: ignore[no-untyped-def]
             return {"choices": [{"delta": {"reasoning_content": "hmm"}}]}
@@ -602,6 +609,7 @@ class _NeverFirstEvent:
 
     usage = None
     endpoint = None
+    abandoned_attempts = 0
 
     def __init__(self) -> None:
         self.closed = False

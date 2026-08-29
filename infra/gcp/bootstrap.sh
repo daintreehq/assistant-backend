@@ -174,6 +174,20 @@ ensure_supplied_secret baseten-api-key '<Baseten API key>' gates
 # entirely would make re-enabling it a two-step rollout. A version is optional.
 ensure_supplied_secret cerebras-api-key 'csk-...' optional
 
+# The EXECUTOR FALLBACK credential, and it does not gate either — but for the
+# opposite reason to the one above. Cerebras funds a stage that is switched off;
+# this one funds a host that is very much live, just only when Baseten cannot
+# answer (docs/PROVIDER_POLICY.md 1a). Without a version, `_build_provider`
+# returns the bare Baseten adapter and the service is complete but has no spare
+# tyre: a Baseten outage is a Daintree outage again. `/v1/daintree/doctor`
+# reports `provider.fallback.armed` so which of the two you have is checkable
+# rather than guessable.
+#
+# Optional rather than gating because readiness must not refuse a deployment
+# whose only shortcoming is robustness — that would take the server down for a
+# fault it does not have.
+ensure_supplied_secret openrouter-api-key 'sk-or-v1-...' optional
+
 # The private-staging subject gate's membership list — A SHELL ONLY, and this
 # script must never put a version in it.
 #
@@ -227,7 +241,7 @@ fi
 # a membership list later needs no IAM change — and a missing grant would present
 # as a private staging revision that fails at startup on a mount it cannot read,
 # which reads as a broken image rather than a missing permission.
-RUNTIME_SECRETS="state-signing-key-current state-salt baseten-api-key cerebras-api-key staging-allowed-subject-digests"
+RUNTIME_SECRETS="state-signing-key-current state-salt baseten-api-key cerebras-api-key openrouter-api-key staging-allowed-subject-digests"
 for s in $RUNTIME_SECRETS; do
   retry 12 gcloud secrets add-iam-policy-binding "$s" \
     --member="serviceAccount:${RUNTIME_SA_EMAIL}" \

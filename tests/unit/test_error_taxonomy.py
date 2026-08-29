@@ -68,10 +68,18 @@ async def _fail_with(status: int, message: str = "boom") -> DaintreeError:
         (401, 503, "provider_invalid_api_key", False),
         (402, 402, "provider_insufficient_credits", False),
         (403, 403, "provider_key_forbidden", False),
-        # 404 is NOT a routing dead-end any more. Cerebras hosts one endpoint
-        # per model on a fixed path, so a 404 can only mean the model id is
-        # wrong — our bug, reported like any other malformed request.
-        (404, 502, "upstream_request_rejected", False),
+        # 404 is a HOST fault again, and the reason is the executor fallback.
+        # It was `upstream_request_rejected` while nothing sent a routing policy
+        # — a 404 could then only mean a wrong model id, our bug. The fallback
+        # adapter sends `provider: {ignore, require_parameters}`, whose filters
+        # CAN empty the eligible pool, so "no endpoint matches" is a real 404
+        # again. Both readings of a 404 here (emptied pool, model deployment
+        # down) are facts about a host rather than about our body — the body was
+        # never parsed to produce one — so it is retryable, and, crucially,
+        # `providers/failover.py` will now try the second host on it. Under the
+        # old mapping the error most likely to mean "this host is down" was the
+        # one guaranteed NOT to fail over.
+        (404, 503, "upstream_unavailable", True),
         (408, 504, "upstream_timeout", True),
         (429, 429, "upstream_rate_limited", True),
         (500, 503, "upstream_unavailable", True),
@@ -94,11 +102,10 @@ async def test_every_mapped_code_is_distinct() -> None:
     """The whole point of the split. If two upstream conditions produce the same
     code, the CLI cannot give different advice for them.
 
-    404 is deliberately absent from this list now: it shares
-    ``upstream_request_rejected`` with 400, and correctly so — both mean the
-    upstream refused what this server sent. Distinctness is only valuable where
-    the two conditions need DIFFERENT advice, and "fix the request we sent" is
-    one answer, not two.
+    404 is deliberately absent from this list: it shares ``upstream_unavailable``
+    with 500, and correctly so — both mean the host could not serve this, and the
+    advice for both is the same (retry, and let the fallback try the other host).
+    Distinctness is only valuable where two conditions need DIFFERENT advice.
     """
     codes = set()
     for status in (401, 402, 403, 429, 500, 400):
@@ -112,12 +119,15 @@ async def test_every_mapped_code_is_distinct() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status", [401, 402, 403, 404, 400])
+@pytest.mark.parametrize("status", [401, 402, 403, 400])
 async def test_deterministic_failures_are_not_retryable(status: int) -> None:
     """Replaying a revoked key, an empty balance, a guardrail denial or a request
     the upstream rejected reaches the same answer, slower — and on the streaming
     path it burns the CLI's retry budget after `meta` has already committed a
-    200."""
+    200.
+
+    404 LEFT this list when the executor fallback landed: a missing route is a
+    fact about a host, not a deterministic verdict on our body."""
     assert (await _fail_with(status)).retryable is False
 
 
@@ -278,7 +288,7 @@ def test_our_door_and_the_provider_are_different_codes_and_now_different_statuse
         ({"code": 401, "message": "no"}, "provider_invalid_api_key", False),
         ({"code": 402, "message": "no"}, "provider_insufficient_credits", False),
         ({"code": 403, "message": "no"}, "provider_key_forbidden", False),
-        ({"code": 404, "message": "no"}, "upstream_request_rejected", False),
+        ({"code": 404, "message": "no"}, "upstream_unavailable", True),
         ({"code": 429, "message": "slow down"}, "upstream_rate_limited", True),
         ({"code": 500, "message": "boom"}, "upstream_unavailable", True),
         ({"code": 400, "message": "bad body"}, "upstream_request_rejected", False),

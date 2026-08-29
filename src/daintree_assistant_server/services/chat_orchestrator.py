@@ -3175,7 +3175,12 @@ class ChatOrchestrator:
                         if opened is None:
                             self._abandon_open(open_task, request_id=meta.request_id)
                     opened_stream, first_event, abandoned = opened
-                    abandoned_opens += abandoned
+                    # Both counts: the ones this loop's own retry gave up on, and
+                    # the ones the stream itself abandoned when it changed hosts
+                    # mid-open. Either kind may have been billed a prefill that was
+                    # never reported, and both make the turn's cost incomplete for
+                    # the same reason.
+                    abandoned_opens += abandoned + opened_stream.abandoned_attempts
                     stream = opened_stream
                 # Phase timing for the round's remaining "dead air": upstream
                 # open-to-first-event. It dominates on cache misses (prefill) and on
@@ -4143,6 +4148,7 @@ class ChatOrchestrator:
         abandoned = 0
 
         async def _open() -> tuple[ProviderStream, dict[str, Any] | None]:
+            nonlocal abandoned
             stream = await self.provider.open_stream(request)
             ok = False
             try:
@@ -4151,6 +4157,13 @@ class ChatOrchestrator:
                 return stream, first
             finally:
                 if not ok:
+                    # This stream may itself have abandoned an open before
+                    # failing — a provider that changed hosts mid-open and then
+                    # lost the second one too. It is about to be discarded, so
+                    # its count has to be harvested HERE or it is simply lost,
+                    # and the turn goes on to report a confident total that omits
+                    # an attempt the upstream may already have billed.
+                    abandoned += stream.abandoned_attempts
                     # BOUNDED, and that is load-bearing here in a way it is not in
                     # an ordinary teardown. This `finally` runs while the deadline
                     # below is cancelling the prefetch, and `asyncio.timeout` waits
